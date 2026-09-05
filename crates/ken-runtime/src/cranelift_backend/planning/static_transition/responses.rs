@@ -19,7 +19,10 @@ use super::continuations::{
 };
 use super::occurrences::StaticOriginId;
 use super::semantic_ir::ConstructorIdentity;
-use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
+use super::{
+    occurrence_subtree_contains, planner_capacity_error, planner_error, CraneliftBackendError,
+    StaticTransitionPlan,
+};
 use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -1323,6 +1326,223 @@ fn static_response_effect_environment(
     Ok(Ok(bindings))
 }
 
+/// Transient proof inputs for recut-A's static single-owner gate.
+///
+/// `response_uses` is the maximum along one executable branch, not a sum over
+/// mutually exclusive case bodies. A handler may mention its response once in
+/// every alternative and still consume it exactly once dynamically.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct DeferredResponseContinuationShape {
+    pub(super) k_body_origin: StaticOriginId,
+    pub(super) response_uses: usize,
+    pub(super) ret_exits: usize,
+    pub(super) static_tail_calls: usize,
+    pub(super) other_exits: usize,
+}
+
+/// Count uses of lexical parameter zero along the most demanding execution
+/// path. Sequential children add; mutually exclusive branches take their max;
+/// nested closure bodies have their own coordinate space, so only capture
+/// expressions can retain this parameter.
+fn count_deferred_response_parameter_uses(
+    expr: &RuntimeExpr,
+    depth: u32,
+) -> Result<usize, CraneliftBackendError> {
+    let visit = |expr, depth| count_deferred_response_parameter_uses(expr, depth);
+    let sum = |values: Vec<usize>| {
+        values.into_iter().try_fold(0usize, |total, value| {
+            total
+                .checked_add(value)
+                .ok_or_else(|| planner_capacity_error("response-use count exhausted"))
+        })
+    };
+    match expr {
+        RuntimeExpr::CheckedJoinSite { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => visit(body, depth),
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Trap(_) => Ok(0),
+        RuntimeExpr::Var(index) => Ok(usize::from(*index == depth)),
+        RuntimeExpr::Let { value, body } => sum(vec![
+            visit(value, depth)?,
+            visit(
+                body,
+                depth
+                    .checked_add(1)
+                    .ok_or_else(|| planner_capacity_error("response-use depth exhausted"))?,
+            )?,
+        ]),
+        RuntimeExpr::If {
+            scrutinee,
+            then_expr,
+            else_expr,
+        } => sum(vec![
+            visit(scrutinee, depth)?,
+            visit(then_expr, depth)?.max(visit(else_expr, depth)?),
+        ]),
+        RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => sum(args
+            .iter()
+            .map(|arg| visit(arg, depth))
+            .collect::<Result<Vec<_>, _>>()?),
+        RuntimeExpr::Match {
+            scrutinee, cases, ..
+        } => {
+            let mut branch_max = 0;
+            for case in cases {
+                let binders = u32::try_from(case.binders)
+                    .map_err(|_| planner_capacity_error("response match depth exhausted"))?;
+                branch_max = branch_max.max(visit(
+                    &case.body,
+                    depth
+                        .checked_add(binders)
+                        .ok_or_else(|| planner_capacity_error("response match depth exhausted"))?,
+                )?);
+            }
+            sum(vec![visit(scrutinee, depth)?, branch_max])
+        }
+        RuntimeExpr::ComputationalMatch {
+            scrutinee, cases, ..
+        } => {
+            let mut branch_max = 0;
+            for case in cases {
+                let binders = case
+                    .argument_binders
+                    .checked_add(case.recursive_positions.len())
+                    .and_then(|count| u32::try_from(count).ok())
+                    .ok_or_else(|| {
+                        planner_capacity_error("response computational depth exhausted")
+                    })?;
+                branch_max = branch_max.max(visit(
+                    &case.body,
+                    depth.checked_add(binders).ok_or_else(|| {
+                        planner_capacity_error("response computational depth exhausted")
+                    })?,
+                )?);
+            }
+            sum(vec![visit(scrutinee, depth)?, branch_max])
+        }
+        RuntimeExpr::Record { fields } => sum(fields
+            .iter()
+            .map(|(_, value)| visit(value, depth))
+            .collect::<Result<Vec<_>, _>>()?),
+        RuntimeExpr::Project { record, .. } => visit(record, depth),
+        // A nested closure body has its own parameter/capture coordinate space.
+        // Only its capture expressions can retain this K's response parameter.
+        RuntimeExpr::Closure { .. } => Ok(0),
+        RuntimeExpr::LexicalClosure { captures, .. } => sum(captures
+            .iter()
+            .map(|capture| visit(capture, depth))
+            .collect::<Result<Vec<_>, _>>()?),
+        RuntimeExpr::Call { callee, args } => {
+            let mut uses = vec![visit(callee, depth)?];
+            uses.extend(
+                args.iter()
+                    .map(|arg| visit(arg, depth))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
+            sum(uses)
+        }
+        RuntimeExpr::Effect {
+            capability, args, ..
+        } => {
+            let mut uses = Vec::new();
+            if let Some(capability) = capability {
+                uses.push(visit(&capability.value, depth)?);
+            }
+            uses.extend(
+                args.iter()
+                    .map(|arg| visit(arg, depth))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
+            sum(uses)
+        }
+    }
+}
+
+/// Classify every tail exit without following calls. A direct, uniquely
+/// resolved declaration call remains a static synchronous tail; a returned
+/// closure, effect, indirect call, or other value is outside the bounded class.
+fn classify_deferred_response_tail(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    shape: &mut DeferredResponseContinuationShape,
+) -> Result<(), CraneliftBackendError> {
+    let visit = |origin, shape: &mut DeferredResponseContinuationShape| {
+        classify_deferred_response_tail(plan, origin, shape)
+    };
+    match plan.planned_occurrence_expr(origin)? {
+        RuntimeExpr::CheckedJoinSite { .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
+            visit(plan.semantic.child_origin(origin, 0)?, shape)?;
+        }
+        RuntimeExpr::Let { .. } => {
+            visit(plan.semantic.child_origin(origin, 1)?, shape)?;
+        }
+        RuntimeExpr::If { .. } => {
+            for position in [1, 2] {
+                visit(plan.semantic.child_origin(origin, position)?, shape)?;
+            }
+        }
+        RuntimeExpr::Match { cases, .. } => {
+            for alternative in 0..cases.len() {
+                visit(plan.semantic.child_origin(origin, 1 + alternative)?, shape)?;
+            }
+        }
+        RuntimeExpr::ComputationalMatch { cases, .. } => {
+            for alternative in 0..cases.len() {
+                visit(plan.semantic.child_origin(origin, 1 + alternative)?, shape)?;
+            }
+        }
+        RuntimeExpr::Construct { constructor, args }
+            if constructor.as_str().ends_with("::ITree::Ret") && args.len() == 1 =>
+        {
+            shape.ret_exits += 1;
+        }
+        RuntimeExpr::Trap(_) => {}
+        RuntimeExpr::Call { .. } => {
+            let callee = plan.semantic.child_origin(origin, 0)?;
+            let declared = matches!(
+                plan.planned_occurrence_expr(callee)?,
+                RuntimeExpr::DeclarationRef { .. }
+            ) && plan.declaration_call_target_class(callee).is_some();
+            let edges = plan
+                .emittable_call_edges()?
+                .into_iter()
+                .filter(|edge| {
+                    edge.kind() == super::units::EmittableCallKind::Declaration
+                        && edge.call_site_origin() == callee
+                })
+                .count();
+            if declared && edges == 1 {
+                shape.static_tail_calls += 1;
+            } else {
+                shape.other_exits += 1;
+            }
+        }
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::Var(_)
+        | RuntimeExpr::PrimitiveCall { .. }
+        | RuntimeExpr::Construct { .. }
+        | RuntimeExpr::Record { .. }
+        | RuntimeExpr::Project { .. }
+        | RuntimeExpr::Closure { .. }
+        | RuntimeExpr::LexicalClosure { .. }
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Effect { .. } => {
+            shape.other_exits += 1;
+        }
+    }
+    Ok(())
+}
+
 impl StaticTransitionPlan<'_> {
     /// Derive and fully validate every statically attributable response demand.
     ///
@@ -2391,6 +2611,188 @@ impl StaticTransitionPlan<'_> {
             Some(ResponseDisposition::Deferred)
         } else {
             None
+        }
+    }
+
+    /// Derive the lexical K's single-shot and tail-exit facts from its source
+    /// occurrence. Nothing here consults `RecursiveBackedge` or runtime tags.
+    pub(super) fn deferred_response_continuation_shape(
+        &self,
+        row: &DeferredResponseRow,
+    ) -> Result<Option<DeferredResponseContinuationShape>, CraneliftBackendError> {
+        let RuntimeExpr::Construct { args, .. } = self.planned_occurrence_expr(row.vis_origin)?
+        else {
+            return Ok(None);
+        };
+        let [_, RuntimeExpr::LexicalClosure { params, body, .. }] = args.as_slice() else {
+            return Ok(None);
+        };
+        if params.len() != 1 {
+            return Ok(None);
+        }
+        let k_body_origin = self
+            .deferred_response_k_body(row)?
+            .ok_or_else(|| planner_error("a Deferred response lost its lexical K body"))?;
+        if self.semantic.function_owner(row.vis_origin)?.is_none() {
+            return Err(planner_error("a Deferred response Vis has no source owner"));
+        }
+        let mut shape = DeferredResponseContinuationShape {
+            k_body_origin,
+            response_uses: count_deferred_response_parameter_uses(body, 0)?,
+            ret_exits: 0,
+            static_tail_calls: 0,
+            other_exits: 0,
+        };
+        classify_deferred_response_tail(self, k_body_origin, &mut shape)?;
+        Ok(Some(shape))
+    }
+
+    /// The nearest specialized handler whose K body contains one Deferred
+    /// response.
+    ///
+    /// This is the single-owner decomposition for a Deferred response whose K
+    /// uses the current HostResult exactly once on its most demanding path and
+    /// whose exits are
+    /// only `ITree::Ret`, traps, or uniquely resolved static tail calls. Several
+    /// enclosing response bodies may contain the same lexical subtree; the
+    /// nearest one is the unique candidate whose K body is contained by every
+    /// other candidate K body. Selection is therefore by structural nesting,
+    /// never by specialization ordinal, origin proximity, or runtime state.
+    pub(in crate::cranelift_backend) fn deferred_response_handler_owner(
+        &self,
+        row: &DeferredResponseRow,
+    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        let Some(shape) = self.deferred_response_continuation_shape(row)? else {
+            return Ok(None);
+        };
+        if shape.response_uses != 1 || shape.ret_exits == 0 || shape.other_exits != 0 {
+            return Ok(None);
+        }
+        let mut candidates = Vec::new();
+        for response in &self.static_response_continuations {
+            if occurrence_subtree_contains(self, response.k_body_origin(), row.vis_origin)? {
+                candidates.push(response);
+            }
+        }
+        let mut nearest = Vec::new();
+        for candidate in &candidates {
+            let mut inside_every_other = true;
+            for other in &candidates {
+                if other.k_body_origin() != candidate.k_body_origin()
+                    && !occurrence_subtree_contains(
+                        self,
+                        other.k_body_origin(),
+                        candidate.k_body_origin(),
+                    )?
+                {
+                    inside_every_other = false;
+                    break;
+                }
+            }
+            if inside_every_other {
+                nearest.push(*candidate);
+            }
+        }
+        match nearest.as_slice() {
+            [] => Ok(None),
+            [handler] => Ok(Some(handler.base_owner())),
+            _ => Err(planner_error(
+                "one Deferred response has more than one nearest static handler owner",
+            )),
+        }
+    }
+
+    /// The prefix ending at the nearest enclosing continuation frame.
+    ///
+    /// `frame_origins` is ordered inner-to-outer by the existing eliminator
+    /// stack. Every later frame that also contains the response must contain the
+    /// first such frame, so a crossing or reordered stack refuses rather than
+    /// turning a position into ownership authority.
+    pub(in crate::cranelift_backend) fn deferred_response_handler_prefix_len(
+        &self,
+        row: &DeferredResponseRow,
+        frame_origins: &[StaticOriginId],
+    ) -> Result<Option<usize>, CraneliftBackendError> {
+        if self.deferred_response_handler_owner(row)?.is_none() {
+            return Ok(None);
+        }
+        let mut containing = Vec::new();
+        for (position, frame) in frame_origins.iter().copied().enumerate() {
+            if occurrence_subtree_contains(self, frame, row.vis_origin)? {
+                containing.push((position, frame));
+            }
+        }
+        let Some((position, nearest)) = containing.first().copied() else {
+            return Ok(None);
+        };
+        for (_, outer) in containing.iter().copied().skip(1) {
+            if !occurrence_subtree_contains(self, outer, nearest)? {
+                return Err(planner_error(
+                    "Deferred response continuation frames are not nested inner-to-outer",
+                ));
+            }
+        }
+        Ok(Some(position + 1))
+    }
+
+    /// The exact lexical continuation body of one Deferred response Vis.
+    pub(in crate::cranelift_backend) fn deferred_response_k_body(
+        &self,
+        row: &DeferredResponseRow,
+    ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+        let RuntimeExpr::Construct { args, .. } = self.planned_occurrence_expr(row.vis_origin)?
+        else {
+            return Ok(None);
+        };
+        let [_, RuntimeExpr::LexicalClosure { params, .. }] = args.as_slice() else {
+            return Ok(None);
+        };
+        if params.len() != 1 {
+            return Ok(None);
+        }
+        let k_origin = self.semantic.child_origin(row.vis_origin, 1)?;
+        Ok(Some(self.semantic.child_origin(k_origin, 0)?))
+    }
+
+    /// The one Deferred response row at an exact source `ITree::Vis`.
+    pub(in crate::cranelift_backend) fn deferred_response_at_vis(
+        &self,
+        vis_origin: StaticOriginId,
+    ) -> Result<Option<DeferredResponseRow>, CraneliftBackendError> {
+        let mut matching = self
+            .static_response_deferred
+            .iter()
+            .filter(|row| row.vis_origin == vis_origin);
+        let first = matching.next().cloned();
+        if matching.next().is_some() {
+            return Err(planner_error(
+                "one source Vis has more than one Deferred response row",
+            ));
+        }
+        Ok(first)
+    }
+
+    /// The one unit-less Deferred response Vis owned by a retained call body.
+    /// Absence is ordinary; multiplicity refuses because one call result cannot
+    /// select two distinct in-frame response executions.
+    pub(in crate::cranelift_backend) fn deferred_no_unit_response_in_body(
+        &self,
+        body_origin: StaticOriginId,
+    ) -> Result<Option<DeferredResponseRow>, CraneliftBackendError> {
+        let mut matching = Vec::new();
+        for row in &self.static_response_deferred {
+            if row.sub_case == DeferredResponseSubCase::NoContinuationUnit
+                && occurrence_subtree_contains(self, body_origin, row.vis_origin)?
+            {
+                matching.push(row.clone());
+            }
+        }
+        match matching.as_slice() {
+            [] => Ok(None),
+            [row] => Ok(Some(row.clone())),
+            _ => Err(planner_error(
+                "one retained call body owns more than one unit-less Deferred response Vis",
+            )),
         }
     }
 

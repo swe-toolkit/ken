@@ -76,6 +76,74 @@ thread_local! {
         const { std::cell::Cell::new(0) };
 }
 
+/// Compile-preserving controls for the two consumption seats of the
+/// handler-owned Deferred-response decomposition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HandlerOwnedDeferredResponseMutation {
+    SuppressUnitlessDrive,
+    SuppressLocalContinuationDrive,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION:
+        std::cell::Cell<Option<HandlerOwnedDeferredResponseMutation>> =
+        const { std::cell::Cell::new(None) };
+    static HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS:
+        std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_handler_owned_deferred_response_mutation<T>(
+    mutation: HandlerOwnedDeferredResponseMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION.with(|slot| slot.set(None));
+        }
+    }
+    HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION.with(|slot| {
+        assert_eq!(
+            slot.replace(Some(mutation)),
+            None,
+            "handler-owned Deferred-response mutations cannot nest",
+        );
+    });
+    HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let _restore = Restore;
+    let result = operation();
+    let applications =
+        HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn handler_owned_deferred_response_mutation_is_exact() -> bool {
+    HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION.with(|slot| slot.get().is_none())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn handler_owned_deferred_response_mutation_applies(
+    mutation: HandlerOwnedDeferredResponseMutation,
+) -> bool {
+    let applies =
+        HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION.with(|slot| slot.get() == Some(mutation));
+    if applies {
+        HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_APPLICATIONS
+            .with(|count| count.set(count.get() + 1));
+    }
+    applies
+}
+
+#[cfg(not(feature = "px8-ds-test-support"))]
+fn handler_owned_deferred_response_mutation_applies(
+    _: HandlerOwnedDeferredResponseMutation,
+) -> bool {
+    false
+}
+
 #[cfg(test)]
 fn reset_invocation_return_transport_decisions() {
     INVOCATION_RETURN_TRANSPORT_DECISIONS.with(|decisions| decisions.borrow_mut().clear());
@@ -5180,6 +5248,566 @@ impl<'a> Lowering<'a> {
         .map(ProducerTrampolineStep::ordinary)
     }
 
+    /// Execute a carried P1 `Vis` only in its planner-selected nearest handler.
+    ///
+    /// The ordinary writeAll unit still computes the recursive ITree value. The
+    /// handler owns the effect and invokes the value's existing lexical K once;
+    /// the checked route then re-enters the already-active carried eliminator.
+    /// No closure, continuation identity, or route is stored across a return.
+    fn drive_deferred_no_unit_response_call(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        returned: LoweringOperand,
+        row: &crate::cranelift_backend::planning::DeferredResponseRow,
+    ) -> Result<(CarriedBoundaryWord, cranelift_codegen::ir::Value), CraneliftBackendError> {
+        let LoweringOperand::Carried(tree) = returned else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response call did not return its existing carrier word",
+            ));
+        };
+        let vis_origin = row.vis_origin();
+        let handler_owner = self
+            .static_transition_plan
+            .deferred_response_handler_owner(row)?
+            .ok_or_else(|| {
+                unsupported(
+                    "StaticResponseDeferred",
+                    "a unit-less response has no unique nearest static handler owner",
+                )
+            })?;
+        if self.defining_emission_owner != Some(handler_owner) {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response was driven outside its unique nearest static handler owner",
+            ));
+        }
+        let RuntimeExpr::Construct { args: vis_args, .. } =
+            self.static_transition_plan.source_occurrence(vis_origin)?
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response row does not name its source Vis",
+            ));
+        };
+        let [operation_source, k_source] = vis_args.as_slice() else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response Vis does not have one operation and one K",
+            ));
+        };
+        let operation_origin = self
+            .static_transition_plan
+            .child_static_origin(vis_origin, 0)?;
+        let RuntimeExpr::Construct {
+            args: operation_fields,
+            ..
+        } = operation_source
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response Vis operation is not its planned coproduct",
+            ));
+        };
+        let [selected_source] = operation_fields.as_slice() else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response operation coproduct has no unique selected field",
+            ));
+        };
+        let selected_origin = self
+            .static_transition_plan
+            .child_static_origin(operation_origin, 0)?;
+        let RuntimeExpr::Construct {
+            args: selected_fields,
+            ..
+        } = selected_source
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response row has no selected operation constructor",
+            ));
+        };
+        let k_origin = self
+            .static_transition_plan
+            .child_static_origin(vis_origin, 1)?;
+        let RuntimeExpr::LexicalClosure {
+            captures,
+            params,
+            body: _,
+        } = k_source
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response row has no exact lexical K",
+            ));
+        };
+        if params.len() != 1 {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response K does not accept exactly one HostResult",
+            ));
+        }
+        let k_body = self
+            .static_transition_plan
+            .child_static_origin(k_origin, 0)?;
+
+        let tag = self.emit_carrier_tag(builder, tree)?;
+        let vis_identity = self
+            .static_transition_plan
+            .constructor_symbol_identity(vis_origin)?
+            .tag_abi_word()?;
+        let vis_identity = Self::carrier_identity_immediate(builder, vis_identity);
+        let is_selected_vis = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            tag,
+            vis_identity,
+        );
+        let drive = builder.create_block();
+        let passthrough = builder.create_block();
+        let merge = builder.create_block();
+        builder.append_block_param(merge, types::I64);
+        builder.append_block_param(merge, types::I64);
+        builder
+            .ins()
+            .brif(is_selected_vis, drive, &[], passthrough, &[]);
+
+        builder.switch_to_block(passthrough);
+        let direct = builder.ins().iconst(
+            types::I64,
+            SourceComputationalAnswerRoute::DIRECT_CONTROL_WORD,
+        );
+        builder
+            .ins()
+            .jump(merge, &[tree.word.into(), direct.into()]);
+
+        builder.switch_to_block(drive);
+        let tree_fields = self.emit_carrier_field_count(builder, tree)?;
+        Self::require_i64(builder, tree_fields, 2);
+        let operation = self.emit_carrier_field(builder, tree, 0)?;
+        let k = self.emit_carrier_field(builder, tree, 1)?;
+
+        let operation_tag = self.emit_carrier_tag(builder, operation)?;
+        let expected_operation = self
+            .static_transition_plan
+            .constructor_symbol_identity(operation_origin)?
+            .tag_abi_word()?;
+        let expected_operation = Self::carrier_identity_immediate(builder, expected_operation);
+        let operation_matches = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            operation_tag,
+            expected_operation,
+        );
+        Self::require_i64(builder, operation_matches, 1);
+        let operation_arity = self.emit_carrier_field_count(builder, operation)?;
+        Self::require_i64(builder, operation_arity, 1);
+        let selected = self.emit_carrier_field(builder, operation, 0)?;
+
+        let selected_tag = self.emit_carrier_tag(builder, selected)?;
+        let expected_selected = self
+            .static_transition_plan
+            .constructor_symbol_identity(selected_origin)?
+            .tag_abi_word()?;
+        let expected_selected = Self::carrier_identity_immediate(builder, expected_selected);
+        let selected_matches = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            selected_tag,
+            expected_selected,
+        );
+        Self::require_i64(builder, selected_matches, 1);
+        let selected_arity = self.emit_carrier_field_count(builder, selected)?;
+        Self::require_i64(
+            builder,
+            selected_arity,
+            i64::try_from(selected_fields.len()).map_err(|_| {
+                unsupported(
+                    "StaticResponseDeferred",
+                    "a unit-less response operation arity exceeds the carrier word",
+                )
+            })?,
+        );
+        let mut effect_env = Vec::with_capacity(selected_fields.len());
+        for position in 0..selected_fields.len() {
+            effect_env.push(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                self.emit_carrier_field(builder, selected, position)?,
+            )));
+        }
+        let effect = self.retained_body_occurrence(row.effect_origin())?;
+        let RuntimeExpr::Effect {
+            family,
+            operation: effect_operation,
+            capability,
+            args: effect_args,
+        } = effect.expr
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response row names no host effect",
+            ));
+        };
+        if *effect_operation != row.operation() {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response row disagrees with its host effect",
+            ));
+        }
+        let response = self.lower_process_host_effect(
+            builder,
+            family,
+            *effect_operation,
+            capability.as_ref(),
+            effect_args,
+            effect.static_origin,
+            &effect_env,
+        )?;
+        if !matches!(
+            response,
+            LoweringOperand::Specialized(Lowered::HostResult { .. })
+        ) {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response effect did not produce a HostResult",
+            ));
+        }
+
+        let k_fields = self.emit_carrier_field_count(builder, k)?;
+        Self::require_i64(
+            builder,
+            k_fields,
+            i64::try_from(captures.len()).map_err(|_| {
+                unsupported(
+                    "StaticResponseDeferred",
+                    "a unit-less response K capture count exceeds the carrier word",
+                )
+            })?,
+        );
+        let mut k_inputs = Vec::with_capacity(captures.len() + 1);
+        k_inputs.push(response);
+        for position in 0..captures.len() {
+            k_inputs.push(LoweringOperand::Carried(
+                self.emit_carrier_field(builder, k, position)?,
+            ));
+        }
+        let resumed = self.call_declared_unit(
+            builder,
+            k_body,
+            &k_inputs,
+            #[cfg(test)]
+            None,
+        )?;
+        let LoweringOperand::Carried(resumed) = resumed else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a unit-less response K did not return its existing carrier result",
+            ));
+        };
+        let checked = builder.ins().iconst(
+            types::I64,
+            SourceComputationalAnswerRoute::CHECKED_CONTROL_WORD,
+        );
+        builder
+            .ins()
+            .jump(merge, &[resumed.word.into(), checked.into()]);
+
+        builder.switch_to_block(merge);
+        Ok((
+            CarriedBoundaryWord {
+                word: builder.block_params(merge)[0],
+            },
+            builder.block_params(merge)[1],
+        ))
+    }
+
+    /// Consume a Deferred `Vis` constructed inside its nearest static handler.
+    ///
+    /// This is recut-A's local half. The planner has already proved a one-use,
+    /// tail-resumptive lexical K and selected one nearest handler. Operation
+    /// fields may already be carried or may still be specialized; both routes
+    /// validate the same source identities before the existing synchronous host
+    /// dispatch. The K body is then lowered in this function, so its closure does
+    /// not cross a boundary and the current HostResult cannot be replaced by a
+    /// prior body result.
+    fn drive_handler_owned_deferred_response(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        vis_origin: StaticOriginId,
+        lowered_args: &[LoweringOperand],
+        row: &crate::cranelift_backend::planning::DeferredResponseRow,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let handler_owner = self
+            .static_transition_plan
+            .deferred_response_handler_owner(row)?
+            .ok_or_else(|| {
+                unsupported(
+                    "StaticResponseDeferred",
+                    "a Deferred response has no unique nearest static handler owner",
+                )
+            })?;
+        if self.defining_emission_owner != Some(handler_owner) {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a Deferred response was driven outside its unique nearest static handler owner",
+            ));
+        }
+        if row.vis_origin() != vis_origin {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response row names a different source Vis",
+            ));
+        }
+        let [operation, k] = lowered_args else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response Vis does not have one operation and one K",
+            ));
+        };
+        let RuntimeExpr::Construct { args: vis_args, .. } =
+            self.static_transition_plan.source_occurrence(vis_origin)?
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response row does not name a source Vis",
+            ));
+        };
+        let [operation_source, k_source] = vis_args.as_slice() else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response source does not have one operation and one K",
+            ));
+        };
+        let operation_origin = self
+            .static_transition_plan
+            .child_static_origin(vis_origin, 0)?;
+        if operation_origin != row.operation_root_origin() {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response row disagrees with its operation root",
+            ));
+        }
+        let RuntimeExpr::Construct {
+            args: operation_fields,
+            ..
+        } = operation_source
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response operation is not its planned coproduct",
+            ));
+        };
+        let [selected_source] = operation_fields.as_slice() else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response coproduct has no unique selected field",
+            ));
+        };
+        let selected_origin = self
+            .static_transition_plan
+            .child_static_origin(operation_origin, 0)?;
+        let RuntimeExpr::Construct {
+            args: selected_sources,
+            ..
+        } = selected_source
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response has no selected operation constructor",
+            ));
+        };
+
+        let selected_fields = match operation {
+            LoweringOperand::Carried(operation) => {
+                let tag = self.emit_carrier_tag(builder, *operation)?;
+                let expected = self
+                    .static_transition_plan
+                    .constructor_symbol_identity(operation_origin)?
+                    .tag_abi_word()?;
+                let expected = Self::carrier_identity_immediate(builder, expected);
+                let matches = builder.ins().icmp(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    tag,
+                    expected,
+                );
+                Self::require_i64(builder, matches, 1);
+                let fields = self.emit_carrier_field_count(builder, *operation)?;
+                Self::require_i64(builder, fields, 1);
+                let selected = self.emit_carrier_field(builder, *operation, 0)?;
+                let selected_tag = self.emit_carrier_tag(builder, selected)?;
+                let expected_selected = self
+                    .static_transition_plan
+                    .constructor_symbol_identity(selected_origin)?
+                    .tag_abi_word()?;
+                let expected_selected =
+                    Self::carrier_identity_immediate(builder, expected_selected);
+                let selected_matches = builder.ins().icmp(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    selected_tag,
+                    expected_selected,
+                );
+                Self::require_i64(builder, selected_matches, 1);
+                let selected_arity = self.emit_carrier_field_count(builder, selected)?;
+                Self::require_i64(
+                    builder,
+                    selected_arity,
+                    i64::try_from(selected_sources.len()).map_err(|_| {
+                        unsupported(
+                            "StaticResponseDeferred",
+                            "a handler-owned response operation arity exceeds the carrier word",
+                        )
+                    })?,
+                );
+                (0..selected_sources.len())
+                    .map(|position| {
+                        self.emit_carrier_field(builder, selected, position)
+                            .map(LoweringOperand::Carried)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+            LoweringOperand::Specialized(Lowered::Constructor {
+                synthesized_identity,
+                args,
+                ..
+            }) => {
+                let expected = self
+                    .static_transition_plan
+                    .constructor_symbol_identity(operation_origin)?;
+                if *synthesized_identity != Some(expected) || args.len() != 1 {
+                    return Err(unsupported(
+                        "StaticResponseDeferred",
+                        "a specialized handler-owned response disagrees with its operation coproduct",
+                    ));
+                }
+                let selected = args[0]
+                    .specialized_at("a handler-owned response's selected operation constructor")?;
+                let Lowered::Constructor {
+                    synthesized_identity,
+                    args,
+                    ..
+                } = selected
+                else {
+                    return Err(unsupported(
+                        "StaticResponseDeferred",
+                        "a specialized handler-owned response has no selected operation constructor",
+                    ));
+                };
+                let expected = self
+                    .static_transition_plan
+                    .constructor_symbol_identity(selected_origin)?;
+                if *synthesized_identity != Some(expected) || args.len() != selected_sources.len() {
+                    return Err(unsupported(
+                        "StaticResponseDeferred",
+                        "a specialized handler-owned response disagrees with its selected operation",
+                    ));
+                }
+                args.iter()
+                    .map(|field| {
+                        field
+                            .specialized_at("a handler-owned response operation field")
+                            .cloned()
+                            .map(LoweringOperand::Specialized)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+            LoweringOperand::Specialized(_) => {
+                return Err(unsupported(
+                    "StaticResponseDeferred",
+                    "a handler-owned response operation is neither carried nor a specialized constructor",
+                ));
+            }
+        };
+
+        let k_origin = self
+            .static_transition_plan
+            .child_static_origin(vis_origin, 1)?;
+        let RuntimeExpr::LexicalClosure {
+            captures: source_captures,
+            params: source_params,
+            ..
+        } = k_source
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response has no exact lexical K",
+            ));
+        };
+        let expected_k_body = self
+            .static_transition_plan
+            .child_static_origin(k_origin, 0)?;
+        let LoweringOperand::Specialized(Lowered::Closure {
+            captures,
+            params,
+            body,
+            ..
+        }) = k
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response K is not its static closure",
+            ));
+        };
+        if params != source_params
+            || params.len() != 1
+            || captures.len() != source_captures.len()
+            || *body != expected_k_body
+        {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response K disagrees with its exact source closure",
+            ));
+        }
+
+        let effect = self.retained_body_occurrence(row.effect_origin())?;
+        let RuntimeExpr::Effect {
+            family,
+            operation,
+            capability,
+            args,
+        } = effect.expr
+        else {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response row names no host effect",
+            ));
+        };
+        if *operation != row.operation() {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response row disagrees with its host effect",
+            ));
+        }
+        let effect_env = selected_fields
+            .into_iter()
+            .map(LoweringEnvironmentBinding::Value)
+            .collect::<Vec<_>>();
+        let response = self.lower_process_host_effect(
+            builder,
+            family,
+            *operation,
+            capability.as_ref(),
+            args,
+            effect.static_origin,
+            &effect_env,
+        )?;
+        if !matches!(
+            response,
+            LoweringOperand::Specialized(Lowered::HostResult { .. })
+        ) {
+            return Err(unsupported(
+                "StaticResponseDeferred",
+                "a handler-owned response effect did not produce a HostResult",
+            ));
+        }
+        let mut k_env = Vec::with_capacity(captures.len() + 1);
+        k_env.push(LoweringEnvironmentBinding::Value(response));
+        k_env.extend(
+            captures
+                .iter()
+                .cloned()
+                .map(LoweringEnvironmentBinding::Value),
+        );
+        let k_body = self.retained_body_occurrence(*body)?;
+        self.lower_expr(builder, k_body, &k_env)
+    }
+
     fn lower_computational_producer_call(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -5260,6 +5888,72 @@ impl<'a> Lowering<'a> {
                     #[cfg(test)]
                     None,
                 )?;
+                if let Some(row) = self
+                    .static_transition_plan
+                    .deferred_no_unit_response_in_body(body)?
+                {
+                    let current_owns_response = self
+                        .static_transition_plan
+                        .deferred_response_handler_owner(&row)?
+                        .is_some_and(|owner| self.defining_emission_owner == Some(owner));
+                    if !current_owns_response
+                        || handler_owned_deferred_response_mutation_applies(
+                            HandlerOwnedDeferredResponseMutation::SuppressUnitlessDrive,
+                        )
+                    {
+                        return self.lower_computational_match_value_composed(
+                            builder,
+                            RoutedAnswer::direct(returned),
+                            eliminators,
+                        );
+                    }
+                    let (returned, route_control) =
+                        self.drive_deferred_no_unit_response_call(builder, returned, &row)?;
+                    let Some((first, remaining)) = eliminators.split_first() else {
+                        return Err(unsupported(
+                            "StaticResponseDeferred",
+                            "a unit-less response call has no receiving eliminator",
+                        ));
+                    };
+                    let EliminatorFrame::Computational(first) = first else {
+                        return Err(unsupported(
+                            "StaticResponseDeferred",
+                            "a unit-less response call is not received by its computational frame",
+                        ));
+                    };
+                    let remaining_origins = remaining
+                        .iter()
+                        .map(|frame| match frame {
+                            EliminatorFrame::Computational(frame) => Ok(frame.static_origin),
+                            _ => Err(unsupported(
+                                "StaticResponseDeferred",
+                                "a handler-owned Deferred response has a non-computational frame before its owner boundary",
+                            )),
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let prefix_len = self
+                        .static_transition_plan
+                        .deferred_response_handler_prefix_len(&row, &remaining_origins)?
+                        .ok_or_else(|| {
+                            unsupported(
+                                "StaticResponseDeferred",
+                                "a unit-less response subtree has no nearest enclosing handler frame",
+                            )
+                        })?;
+                    let local_remaining = remaining.get(..prefix_len).ok_or_else(|| {
+                        unsupported(
+                            "StaticResponseDeferred",
+                            "a handler-owned response prefix exceeds its eliminator stack",
+                        )
+                    })?;
+                    return self.lower_carried_computational_match_with_control(
+                        builder,
+                        returned,
+                        route_control,
+                        *first,
+                        local_remaining,
+                    );
+                }
                 self.lower_computational_match_value_composed(
                     builder,
                     RoutedAnswer::direct(returned),
@@ -13385,6 +14079,62 @@ impl<'a> Lowering<'a> {
         lowered
     }
 
+    fn lower_carried_computational_match_with_control(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        scrutinee: CarriedBoundaryWord,
+        route_control: cranelift_codegen::ir::Value,
+        eliminator: ComputationalEliminatorFrame<'_>,
+        remaining_eliminators: &[EliminatorFrame<'_>],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        if let Some(header) = self
+            .active_carried_computational_eliminations
+            .iter()
+            .rev()
+            .find(|active| active.active_frame_origin == eliminator.static_origin)
+            .map(|active| active.header)
+        {
+            builder
+                .ins()
+                .jump(header, &[scrutinee.word.into(), route_control.into()]);
+            let unreachable = builder.create_block();
+            builder.switch_to_block(unreachable);
+            return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+        }
+        let header = builder.create_block();
+        builder.append_block_param(header, types::I64);
+        builder.append_block_param(header, types::I64);
+        builder
+            .ins()
+            .jump(header, &[scrutinee.word.into(), route_control.into()]);
+        builder.switch_to_block(header);
+        let scrutinee = CarriedBoundaryWord {
+            word: builder.block_params(header)[0],
+        };
+        let route_control = builder.block_params(header)[1];
+        self.active_carried_computational_eliminations.push(
+            ActiveCarriedComputationalElimination {
+                active_frame_origin: eliminator.static_origin,
+                header,
+                ret_sink: None,
+            },
+        );
+        let lowered = self.lower_carried_computational_match_inner(
+            builder,
+            scrutinee,
+            route_control,
+            eliminator,
+            remaining_eliminators,
+        );
+        let popped = self.active_carried_computational_eliminations.pop();
+        debug_assert_eq!(
+            popped.map(|active| (active.active_frame_origin, active.header)),
+            Some((eliminator.static_origin, header)),
+            "the carried elimination stack must unwind in the order it was pushed"
+        );
+        lowered
+    }
+
     fn lower_carried_computational_match_inner(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -14237,6 +14987,27 @@ impl<'a> Lowering<'a> {
                     .any(|arg| matches!(arg, LoweringOperand::Specialized(Lowered::RecursiveBackedge)))
                 {
                     return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+                }
+                if let Some(row) = self
+                    .static_transition_plan
+                    .deferred_response_at_vis(static_origin)?
+                {
+                    if self
+                        .static_transition_plan
+                        .deferred_response_handler_owner(&row)?
+                        .is_some_and(|owner| self.defining_emission_owner == Some(owner))
+                    {
+                        if !handler_owned_deferred_response_mutation_applies(
+                            HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
+                        ) {
+                            return self.drive_handler_owned_deferred_response(
+                                builder,
+                                static_origin,
+                                &lowered_args,
+                                &row,
+                            );
+                        }
+                    }
                 }
                 if lowered_args.is_empty()
                     && (constructor == &self.process_symbols.bool_true

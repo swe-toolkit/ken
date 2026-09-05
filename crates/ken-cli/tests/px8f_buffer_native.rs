@@ -193,6 +193,10 @@ const RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD: &str =
     "KEN_RT_RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD";
 
 #[cfg(target_os = "linux")]
+const HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD: &str =
+    "KEN_RT_HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD";
+
+#[cfg(target_os = "linux")]
 fn assert_retained_unit_call_target_mutation_child() {
     use ken_runtime::RetainedUnitCallTargetMutation as Mutation;
 
@@ -337,12 +341,101 @@ fn assert_retained_result_closure_proof_mutation_child() {
 }
 
 #[cfg(target_os = "linux")]
+fn assert_handler_owned_deferred_response_mutation_child() {
+    use ken_runtime::HandlerOwnedDeferredResponseMutation as Mutation;
+
+    let mode = std::env::var(HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD)
+        .expect("handler-owned Deferred-response mutation child mode");
+    let mutation = match mode.as_str() {
+        "suppress-unitless-drive" => Mutation::SuppressUnitlessDrive,
+        "suppress-local-continuation" => Mutation::SuppressLocalContinuationDrive,
+        other => panic!("unknown handler-owned Deferred-response mutation: {other}"),
+    };
+    let dir = tempfile::Builder::new()
+        .prefix("ken-px8f-handler-owned-response-control-")
+        .tempdir()
+        .unwrap();
+    std::fs::write(dir.path().join("input.bin"), b"abcdef").unwrap();
+    let preload = build_short_pwrite_preload(dir.path());
+    let (compiled, applications) =
+        ken_runtime::with_handler_owned_deferred_response_mutation(mutation, || {
+            ken_cli::build_native_program(
+                WRITE_ALL,
+                ken_cli::SourceFormat::Ken,
+                "px8f_write_all_handler_owned_response_control",
+                dir.path(),
+            )
+        });
+    assert_eq!(
+        applications, 1,
+        "{mode}: mutation must reach exactly one natural production consumer"
+    );
+    match mode.as_str() {
+        "suppress-unitless-drive" => {
+            let output = compiled.expect("suppressing P1 execution still emits the old artifact");
+            let run = ken_runtime::run_bound_process_effect_observation(
+                &output.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: Vec::new(),
+                    environment: vec![("LD_PRELOAD".into(), preload.into_os_string())],
+                    cwd: dir.path().to_owned(),
+                    plan_hash: output.plan_transport_hash,
+                },
+            );
+            let observation = run.expect("the inert P1 artifact reports its source trap");
+            assert_ne!(
+                observation.exit_status, 0,
+                "suppressing P1 execution preserved the successful program"
+            );
+            let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+                observation.terminal_error
+            else {
+                panic!("suppressing P1 execution did not restore the source Result trap");
+            };
+            assert_eq!(
+                provenance.trap.code,
+                ken_runtime::RuntimeTrapCode::PatternMatchFailure
+            );
+            assert!(
+                provenance.trap.message.ends_with("::Result"),
+                "the P1 suppression reached the wrong source trap: {:?}",
+                provenance.trap
+            );
+            assert!(
+                observation
+                    .effect_trace
+                    .iter()
+                    .all(|event| event.operation != ken_runtime::HostOpV1::FsWriteAt),
+                "the inert P1 path unexpectedly dispatched a write"
+            );
+            assert_eq!(
+                std::fs::read(dir.path().join("output.bin")).unwrap_or_default(),
+                b"",
+                "suppressing P1 execution still wrote the output"
+            );
+        }
+        "suppress-local-continuation" => {
+            let error = compiled
+                .expect_err("suppressing the handler-local continuation drive crossed its closure");
+            assert!(
+                format!("{error:?}").contains("a closure cannot cross the boundary"),
+                "the local-continuation mutation reached the wrong refusal: {error:?}"
+            );
+        }
+        _ => unreachable!("the mode was validated above"),
+    }
+    assert!(
+        ken_runtime::handler_owned_deferred_response_mutation_is_exact(),
+        "{mode}: scoped handler-owned response mutation did not restore"
+    );
+}
+
+#[cfg(target_os = "linux")]
 /// Promise class: durable invariant. The native run and interpreter must agree
 /// on the ordered short-write observations required by runtime evaluation
 /// (`spec/40-runtime/42-evaluation.md` section 6.2 and
 /// `spec/40-runtime/45-native-backend.md` section 4).
 #[test]
-#[ignore = "RT-RESULT-CONTINUATION-BINDING-PROVENANCE: retained result-closure representation succeeds; the existing D3 frontier next returns a CheckedIhCapturedEnvironment where fresh R2 belongs"]
 fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
     std::thread::Builder::new()
         .name("px8f-write-all".to_string())
@@ -388,7 +481,6 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
             .args([
                 "--exact",
                 "linked_checked_write_all_observes_short_progress_and_matches_interpreter",
-                "--ignored",
                 "--nocapture",
             ])
             .env(RETAINED_UNIT_CALL_TARGET_MUTATION_CHILD, mode)
@@ -480,7 +572,6 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
             .args([
                 "--exact",
                 "linked_checked_write_all_observes_short_progress_and_matches_interpreter",
-                "--ignored",
                 "--nocapture",
             ])
             .env(RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD, mode)
@@ -518,6 +609,40 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
 }
 
 #[cfg(target_os = "linux")]
+/// Promise class: durable mutation proof. Both halves of the single-owner recut
+/// are load-bearing on the real WRITE_ALL compile: dropping P1 execution restores
+/// the inert no-write path, while dropping handler-local K consumption restores
+/// the existing closure-boundary refusal.
+///
+/// MEASURED: each isolated child mutates one natural production consumer, reports
+/// a nonzero application count, and observes its distinct pre-recut failure.
+/// CLAIMED: executable P1 dispatch and handler-local continuation consumption are
+/// both necessary to return the carried success value without a durable closure.
+/// THE GAP: the unchanged positive row above proves the same fixture reaches exit
+/// zero with the exact three writes; these negative children prove causality.
+#[test]
+fn handler_owned_deferred_response_controls_are_load_bearing() {
+    for mode in ["suppress-unitless-drive", "suppress-local-continuation"] {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "linked_checked_write_all_observes_short_progress_and_matches_interpreter",
+                "--nocapture",
+            ])
+            .env(HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated handler-owned Deferred-response mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn run_linked_checked_write_all() {
     use std::os::unix::ffi::OsStrExt as _;
 
@@ -527,6 +652,10 @@ fn run_linked_checked_write_all() {
     }
     if std::env::var_os(RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD).is_some() {
         assert_retained_result_closure_proof_mutation_child();
+        return;
+    }
+    if std::env::var_os(HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD).is_some() {
+        assert_handler_owned_deferred_response_mutation_child();
         return;
     }
 
@@ -581,6 +710,24 @@ fn run_linked_checked_write_all() {
         std::fs::read(dir.path().join("output.bin")).unwrap(),
         b"abcdef"
     );
+    let reads: Vec<_> = observation
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+        .collect();
+    assert_eq!(reads.len(), 1, "the source must be read exactly once");
+    assert!(matches!(
+        &reads[0].outcome,
+        ken_runtime::CanonicalOutcomeV1::Success(
+            ken_runtime::CanonicalReplyV1::ReadProgress(
+                ken_runtime::ReadProgressV1::ReadSome { span, transferred }
+            )
+        ) if span.start() == 0
+            && span.length() == 6
+            && transferred.get() == 6
+            && transferred.effective_request() == 6
+    ));
+
     let writes: Vec<_> = observation
         .effect_trace
         .iter()
@@ -602,6 +749,18 @@ fn run_linked_checked_write_all() {
             ) if (*file_offset, *buffer_start, *length) == expected
         ));
     }
+    let releases: Vec<_> = observation
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
+        .collect();
+    assert_eq!(releases.len(), 3, "every acquired resource must be released");
+    assert!(releases.iter().all(|event| matches!(
+        &event.outcome,
+        ken_runtime::CanonicalOutcomeV1::Success(
+            ken_runtime::CanonicalReplyV1::ResourceSettlement(settlement)
+        ) if format!("{:?}", settlement.outcome) == "Released"
+    )));
 
     let mut unsupported_virtual = ken_interp::CaptureHost::new(Vec::new());
     unsupported_virtual.insert_file(b"input.bin".to_vec(), b"abcdef".to_vec());
@@ -740,6 +899,61 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                     (287, 1024, "ResourceRelease", "UnconsumedTransportCaller"),
                 ]),
                 "P1 stays main-lowered and the mixed-owner group stays P2"
+            );
+
+            // Gate 0, on continuation structure rather than the RecursiveBackedge
+            // marker. The maximum path use is one, every tail returns or makes one
+            // static declared call, and no other exit can publish the continuation.
+            // The P1 owner must be the exact promoted BufferAllocate handler.
+            let buffer_handler = diagnostic
+                .all_static_response_rows
+                .iter()
+                .find(|row| row.vis_origin == 1549)
+                .expect("the promoted BufferAllocate response remains present")
+                .base_owner
+                .clone();
+            let p1 = diagnostic
+                .static_response_deferred
+                .iter()
+                .find(|row| row.vis_origin == 1229)
+                .expect("the P1 response remains in the Deferred population");
+            assert_eq!(p1.handler_owner.as_deref(), Some(buffer_handler.as_str()));
+            for row in &diagnostic.static_response_deferred {
+                assert!(
+                    row.handler_owner.is_some() && row.k_body_origin.is_some(),
+                    "Deferred response {} has no single static handler or lexical K body",
+                    row.vis_origin
+                );
+                assert_eq!(
+                    row.response_uses,
+                    Some(1),
+                    "Deferred response {} can use one host response more than once on one path",
+                    row.vis_origin
+                );
+                assert!(
+                    row.tail_ret_exits.is_some_and(|exits| exits > 0),
+                    "Deferred response {} has no tail Ret exit",
+                    row.vis_origin
+                );
+                assert_eq!(
+                    row.tail_other_exits,
+                    Some(0),
+                    "Deferred response {} has a non-local or non-tail exit",
+                    row.vis_origin
+                );
+            }
+            assert_eq!(
+                p1.tail_static_calls,
+                Some(1),
+                "P1 short progress must recurse through one static tail call"
+            );
+            assert!(
+                diagnostic
+                    .static_response_deferred
+                    .iter()
+                    .filter(|row| row.vis_origin != 1229)
+                    .all(|row| row.tail_static_calls == Some(0)),
+                "resource-release continuations must return directly rather than recurse"
             );
 
             let (suppressed_result, suppressed_diagnostics) =
