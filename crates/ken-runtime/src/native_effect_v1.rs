@@ -10,7 +10,7 @@ use ken_host::{
     assert_host_effect_abi_identity, assert_target_abi_identity, dispatch_host_op_v1,
     CanonicalRequestV1, CapabilityTableV1, CapabilityTokenV1, EffectObservation, FsDeltaV1,
     HostDispatchReplyV1, HostEffectBackendV1, HostOpV1, ResourceInputsV1, ResourceTableV1,
-    TerminalErrorV1,
+    RevocationDomain, TerminalErrorV1,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,6 +53,7 @@ pub struct KenNativeInvocationV1<B> {
     pub bindings: NativeEntrypointBindingsV1,
     pub backend: B,
     pub capabilities: CapabilityTableV1,
+    pub revocation: RevocationDomain,
     pub resources: ResourceTableV1,
     pub response_arena: ResponseArenaV1,
     pub observation: EffectObservation,
@@ -63,6 +64,7 @@ impl<B: HostEffectBackendV1> KenNativeInvocationV1<B> {
         bindings: NativeEntrypointBindingsV1,
         backend: B,
         capabilities: CapabilityTableV1,
+        revocation: RevocationDomain,
     ) -> Result<Self, TerminalErrorV1> {
         assert_target_abi_identity(bindings.target_abi_hash)
             .map_err(|_| TerminalErrorV1::TargetAbiMismatch)?;
@@ -77,6 +79,7 @@ impl<B: HostEffectBackendV1> KenNativeInvocationV1<B> {
             bindings,
             backend,
             capabilities,
+            revocation,
             resources: ResourceTableV1::default(),
             response_arena: ResponseArenaV1::default(),
             observation: EffectObservation {
@@ -99,6 +102,7 @@ impl<B: HostEffectBackendV1> KenNativeInvocationV1<B> {
         let reply = dispatch_host_op_v1(
             &mut self.backend,
             &self.capabilities,
+            &self.revocation,
             &mut self.resources,
             call.operation,
             token,
@@ -187,10 +191,11 @@ mod tests {
             target_abi_hash: TARGET_ABI_MANIFEST_HASH,
             host_effect_abi_hash: HOST_EFFECT_ABI_V1_HASH,
         };
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let token = capabilities.insert(CapabilityGrantV1 {
-            identity: CapabilityTraceIdentity("fsCap".to_string()),
-            capability: ken_host::Cap::mint_scoped(
+        let token = capabilities.insert(CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("fsCap".to_string()),
+            ken_host::Cap::mint_scoped(
                 ken_host::AUTH_FULL,
                 "FS",
                 ken_host::FsScope::root(
@@ -200,9 +205,16 @@ mod tests {
                     ken_host::SymlinkPolicy::NoFollow,
                 ),
             ),
-        });
+            &mut revocation,
+        ));
         (
-            KenNativeInvocationV1::initialize(bindings, MockHost::default(), capabilities).unwrap(),
+            KenNativeInvocationV1::initialize(
+                bindings,
+                MockHost::default(),
+                capabilities,
+                revocation,
+            )
+            .unwrap(),
             token,
         )
     }
@@ -220,6 +232,7 @@ mod tests {
             bindings,
             MockHost::default(),
             CapabilityTableV1::default(),
+            RevocationDomain::default(),
         );
         assert!(matches!(
             result,

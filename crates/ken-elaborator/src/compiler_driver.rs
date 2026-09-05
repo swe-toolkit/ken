@@ -3512,6 +3512,7 @@ fn checked_host_spine_v1(
             roles.io_error_not_directory,
             roles.io_error_not_empty,
             roles.io_error_unsupported,
+            roles.io_error_revoked,
             roles.io_error_other,
         ]
         .into_iter()
@@ -6777,7 +6778,8 @@ mod d1b_role_c1_roster_identity {
             ("io_error_not_directory", record.spine.io_errors[8].clone()),
             ("io_error_not_empty", record.spine.io_errors[9].clone()),
             ("io_error_unsupported", record.spine.io_errors[10].clone()),
-            ("io_error_other", record.spine.io_errors[11].clone()),
+            ("io_error_revoked", record.spine.io_errors[11].clone()),
+            ("io_error_other", record.spine.io_errors[12].clone()),
             ("process_input", record.process_input.clone()),
             ("list_nil", record.list_nil.clone()),
             ("list_cons", record.list_cons.clone()),

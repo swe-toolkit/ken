@@ -463,6 +463,7 @@ fn catalog_ambient_passthrough_migration_census() {
                 "NotFound",
                 "Other",
                 "PermissionDenied",
+                "Revoked",
                 "Unsupported",
             ]
             .into_iter()

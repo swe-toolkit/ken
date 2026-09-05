@@ -402,6 +402,7 @@ fn put_cause(out: &mut Vec<u8>, cause: &FileErrorCauseV1) {
             put_u8(out, 1);
             put_denial(out, error);
         }
+        FileErrorCauseV1::Revoked => put_u8(out, 2),
     }
 }
 
@@ -895,6 +896,7 @@ fn get_cause(cursor: &mut Cursor<'_>) -> Result<FileErrorCauseV1, EffectTraceWir
     match cursor.u8()? {
         0 => Ok(FileErrorCauseV1::Io(get_io_error(cursor)?)),
         1 => Ok(FileErrorCauseV1::Capability(get_denial(cursor)?)),
+        2 => Ok(FileErrorCauseV1::Revoked),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -1322,6 +1324,33 @@ mod tests {
     #[test]
     fn linked_trace_codec_roundtrips_identity_bytes_and_outcomes() {
         let expected = representative_trace();
+        let encoded = encode_linked_effect_trace(&expected).unwrap();
+        assert_eq!(decode_linked_effect_trace(&encoded), Ok(expected));
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the sole
+    /// effect-trace codec round-trips the exact Revoked file-error cause.
+    /// CLAIMED: observation transport cannot collapse revocation into a
+    /// capability or host-I/O neighbour. THE GAP: this is codec evidence; the
+    /// dispatcher and both reifiers have independent D1 controls.
+    #[test]
+    fn linked_trace_codec_preserves_revoked_file_error_identity() {
+        let mut expected = representative_trace();
+        expected.effect_trace.push(EffectEvent {
+            sequence: 9,
+            operation: HostOpV1::FsReadFile,
+            capability: Some(CapabilityTraceIdentity("revoked".to_string())),
+            resource_bindings: Vec::new(),
+            request: CanonicalRequestV1::FsReadFile {
+                path: b"shared".to_vec(),
+            },
+            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation: HostOpV1::FsReadFile,
+                relative_path: b"shared".to_vec(),
+                cause: FileErrorCauseV1::Revoked,
+            })),
+        });
+
         let encoded = encode_linked_effect_trace(&expected).unwrap();
         assert_eq!(decode_linked_effect_trace(&encoded), Ok(expected));
     }

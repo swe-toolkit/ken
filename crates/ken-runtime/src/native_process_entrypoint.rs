@@ -91,6 +91,7 @@ impl NativeProcessSymbols {
                 "NotDirectory",
                 "NotEmpty",
                 "Unsupported",
+                "Revoked",
                 "Other",
             ]
             .into_iter()

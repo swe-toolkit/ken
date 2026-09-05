@@ -136,6 +136,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
                 NotDirectory |-> host_program_then APartial (print_line "NotDirectory") (Failure 1) ;
                 NotEmpty |-> host_program_then APartial (print_line "NotEmpty") (Failure 1) ;
                 Unsupported |-> host_program_then APartial (print_line "Unsupported") (Failure 1) ;
+                Revoked |-> host_program_then APartial (print_line "Revoked") (Failure 1) ;
                 Other errno |-> host_program_then APartial (print_line "Other") (Failure 1)
               }} ;
             Ok _ |-> host_exit APartial Success

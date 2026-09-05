@@ -167,7 +167,7 @@ macro_rules! runtime_host_spine_v1 {
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct RuntimeCheckedHostSpineV1 {
             $( pub $field: RuntimeSymbol, )*
-            /// The twelve IO errors, in the order the record carries them.
+            /// The thirteen IO errors, in the order the record carries them.
             pub io_errors: Vec<RuntimeSymbol>,
             /// Public host operations as `(symbol, HostOpV1 tag)`.
             pub operations: Vec<(RuntimeSymbol, u16)>,
