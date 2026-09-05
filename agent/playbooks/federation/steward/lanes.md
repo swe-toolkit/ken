@@ -60,6 +60,52 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
+> ### OPERATOR RULING 2026-09-05 — schedule LANG-ROOTS-LOADER on L2 to unblock L3
+>
+> (Operator, 2026-09-05, this session: "schedule LANG-ROOTS-LOADER-LOCAL-INSTANCE-
+> DICT-SCOPE with L2 at the next seam to unblock L3.")
+>
+> LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE (status ready, language, M/T1,
+> depends_on [], blocks CAT-MIGRATE-EC-FUNCTOR-IMPORT and generally every instance-
+> declaring/consuming Tier C/D/E module) is now a scheduled lane-2 LANGUAGE-ring
+> deliverable, RELEASED at the next L2 seam — when the current L2 increment (the
+> verify ring's CI-NATIVE-PARITY-DURATION, parked at the Architect awaiting the
+> partition ruling) reaches a stop. It runs AHEAD of the remaining 2026-09-04
+> language sequence (symbolic-operators / match-patterns / kernel-hardening / SEC1)
+> because its purpose is to unblock L3 foundation. On its landing, foundation's held
+> nodes (CAT-MIGRATE-EC-FUNCTOR-IMPORT, then EC-APPLICATIVE-PROVIDERS, TIER-C-
+> NONEMPTY-VALIDATION) become releasable — the four LF dicts import with no further
+> foundation edit (auto-synthesized/exported off the now-public classes). This does
+> NOT change the three-lane structure (still runtime/language/foundation) and does
+> NOT add a fourth lane; it is a lane-2 sequence priority + the authorized L3
+> unblock. The node's own stale "released as interim while FO is held" sequencing
+> prose is superseded (FO is complete per 2026-09-04). Steward EXECUTES the release
+> at the seam (Architect is the required soundness/design reviewer on the candidate).
+
+> ### OPERATOR RULING 2026-09-04 — lane-2 objective sequence; runtime reseat to openai-pi
+>
+> (Operator, 2026-09-04, this session.) The FO/Kripke arc is COMPLETE (V3-FO-*
+> all merged). CI regressed to ~23 min (back OVER the 20-min ceiling), so lane
+> 2's **verify** ring resumes `CI-NATIVE-PARITY-DURATION` FIRST — another pass at
+> reducing CI time (re-measure the current critical path, the node's bb33dfb71
+> inputs are stale; then D5 the ~574s test split + partition/shard rebalance to
+> drive back under the ceiling and toward 10 min). THEN lane 2 works this
+> SEQUENCE, one WP at a time (Steward releases each in turn):
+> (1) operator-syntax surface = `LANG-SYMBOLIC-OPERATOR-NAMES` (ready; head of
+> the symbolic → infix → fixity chain);
+> (2) spec conformance = `LANG-MATCH-PATTERN-FORMS-ABSENT` (draft, dep merged,
+> promote) + the ready quick wins (`LANG-BYTES-HEX-LIST-LITERAL`,
+> `LANG-MEMBERSHIP-OPERATOR-SURFACE`, `LANG-FOREIGN-NAME-FORMAT-CHARS`);
+> (3) kernel hardening = `KERNEL-CONV-CONGRUENCE-CLOSURE` (draft, dep merged);
+> (4) verdict::disproved = `SEC1-IFC-R3` (verify, draft).
+> The lane-2 ring swaps language ↔ verify per increment (CI + SEC1 = verify; the
+> surface/kernel items = language). Runtime + foundation lanes UNCHANGED.
+>
+> OPERATIONAL: reseat the RUNTIME team (leader/implementer/qa) to the **openai-pi**
+> stack at the next convenient seam — the ring is idle post-inc2, which is that
+> seam. Steward EXECUTES (moot from `/workspaces/ken`, not a worktree); do it
+> before dispatching inc3 so the fresh seats take it.
+
 > ### OPERATOR RULING 2026-09-02 — L3 module-system RESOLVED; retire scaffolding
 >
 > (terminal directive; lane re-scopes from semantics-fix to scaffolding retirement)

@@ -108,14 +108,40 @@ operator gate. Evidence predicts (a) / Route B.
   static_response_deferred.
 - AC-PLANE-CLOSES. The plane CLOSES - requires_execute_then_resume=true across
   groups 267/279, observable on the feasibility-diagnostics surface.
-- AC-COMPOSE-SOUND (the load-bearing one; the boundary-move obligation). A
-  control proves P1's path composes with the specialized siblings at the
-  composed exit selecting the RIGHT path (Route B discharges responses.rs:2116-
-  2120; Route A rides the identity-preserving widening) - NOT a vacuous plane-
-  flip. "The plane closed" alone does NOT satisfy this AC.
-- AC-NECESSITY. A discriminating necessity control - a mutation that removes P1's
-  supplied unit / re-imposes the veto RE-OPENS the plane and reds the newly-green
-  state (mirror with_suppressed_execute_then_resume_response, responses.rs:594).
+- AC-COMPOSE-SOUND (the load-bearing obligation; Architect-refined + Route B
+  APPROVED, evt_3p3bk579nq5r8). D1 already exercised this AC and it CAUGHT the
+  over-promotion: naive veto-removal over-promotes the specialization-owned
+  606/815 Release demands and a StaticResponseDeferred escapes its owner - the
+  exact "partially replacing siblings selects the wrong path" concern
+  (responses.rs:2116-2120) made concrete. The approved narrowing discharges it
+  STRUCTURALLY: admit execute-then-resume only on PREDECLARED-OWNED transport
+  demands once >= 2 exclusively-predeclared producer groups exist; RETAIN the
+  specialization-owned mixed (287 P2) and the main-lowered P1 (1229) on main.
+  Three arms, ALL required; arm 3 is what keeps it non-vacuous:
+    1. PLAN/LOWERING COEXISTENCE + NO-ESCAPE: pin the exact {267, 279} predeclared
+       specialization plus the {P1 1229 main-lowered, 287 P2 mixed} residual, and
+       that it COMPILES with NO StaticResponseDeferred escaping its exact owner.
+    2. SUPPRESSION-RESTORES (the necessity arm):
+       with_suppressed_execute_then_resume_response restores 267/279 to P2 - the
+       plane RE-OPENS.
+    3. OVER-PROMOTION-REDS (the load-bearing discriminator - ADD THIS): a control
+       that the NAIVE promotion (WITHOUT the predeclared-owned restriction) REDS -
+       compile-fails / the StaticResponseDeferred escapes its owner (the exact
+       over-promotion D1 measured). Without arm 3, arms 1-2 pass under any
+       narrowing; with it, the plan witness is discriminating - it proves the veto
+       guarded a real owner-escape and the predeclared-owned restriction is
+       exactly what averts it.
+  "The plane closed" alone does NOT satisfy this AC. NO synthetic runtime fixture
+  is required here (the plan/lowering-coexistence witness IS the predecessor
+  witness).
+- RUNTIME-RIGHT-PATH-DEFERRED (named deferral, NOT a dropped AC; Architect
+  evt_3p3bk579nq5r8). The runtime right-path SELECTION witness is not this
+  predecessor's to produce: the real fixture returns raw -1 before FsWriteAt
+  because the parent body-carry has not landed. That witness is the parent's
+  px8f_buffer_native:346 going green, which by construction requires the carried
+  ReadSome. It is EXPLICITLY DEFERRED to RT-NATIVE-WRITEALL-SUCCESS-FOLD (the
+  parent carry WP), where the carry makes the runtime right-path real - not a
+  silent gap.
 - AC-ZERO-TCB. No new erased-IR variant / frame field / side table / continuation-
   identity object; kernel tree hash unchanged; ABI / spec / wire = NO; reuses the
   landed execute-then-resume mechanism + the existing classifier only.
