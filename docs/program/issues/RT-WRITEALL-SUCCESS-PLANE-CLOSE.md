@@ -1,7 +1,7 @@
 ---
 id: RT-WRITEALL-SUCCESS-PLANE-CLOSE
 title: "Close the recursive WRITE_ALL success plane so execute-then-resume admits it: supply P1's missing continuation unit (FsWriteAt vis 1229 / producer 254) whose lone NoContinuationUnit row forces has_unitless_response and holds the whole plane OPEN, WHILE discharging the boundary-move soundness obligation (P1's path composes with the specialized 267/279 siblings at the composed-return exit, right-path selection) rather than merely flipping the plane closed. The zero-TCB / outcome-(a) plane-closing predecessor to RT-NATIVE-WRITEALL-SUCCESS-FOLD's D1. A D0 measurement selects Route B (narrow the classifier veto) vs Route A (widen P1's OPEN source env); both are backend-internal planning-only."
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
