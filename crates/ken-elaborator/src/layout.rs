@@ -759,10 +759,14 @@ impl<'a> LayoutPrinter<'a> {
                 indices[indices.len() - 1],
                 Doc::Nil,
             );
+            let inner = &indices[1..indices.len() - 1];
+            let contents = self
+                .comma_separated_token_slice(inner)
+                .unwrap_or_else(|| self.consistent_token_slice(inner));
             return Doc::concat([
                 Doc::text(self.token_text(indices[0])),
                 before,
-                self.consistent_token_slice(&indices[1..indices.len() - 1]),
+                contents,
                 after,
                 Doc::text(self.token_text(indices[indices.len() - 1])),
             ])
@@ -817,6 +821,56 @@ impl<'a> LayoutPrinter<'a> {
             previous_end = end;
         }
         Doc::concat([head, Doc::concat(continuation).nest(INDENT_WIDTH)]).fit_group()
+    }
+
+    /// Build a locally fitted comma list whose broken form places each item on
+    /// its own continuation line. Commas nested inside child delimiters remain
+    /// owned by the child and do not split this list.
+    fn comma_separated_token_slice(&self, indices: &[usize]) -> Option<Doc> {
+        let mut ends = Vec::new();
+        let mut paren_depth = 0usize;
+        let mut bracket_depth = 0usize;
+        let mut brace_depth = 0usize;
+        for (position, index) in indices.iter().copied().enumerate() {
+            let token = &self.source.tokens()[index].kind;
+            if matches!(token, Token::Comma)
+                && paren_depth == 0
+                && bracket_depth == 0
+                && brace_depth == 0
+            {
+                ends.push(position + 1);
+            }
+            match token {
+                Token::LParen => paren_depth += 1,
+                Token::RParen => paren_depth = paren_depth.saturating_sub(1),
+                Token::LBracket => bracket_depth += 1,
+                Token::RBracket => bracket_depth = bracket_depth.saturating_sub(1),
+                Token::LBrace => brace_depth += 1,
+                Token::RBrace => brace_depth = brace_depth.saturating_sub(1),
+                _ => {}
+            }
+        }
+        if ends.is_empty() {
+            return None;
+        }
+        if ends.last().copied() != Some(indices.len()) {
+            ends.push(indices.len());
+        }
+
+        let mut items = Vec::new();
+        let mut start = 0usize;
+        for end in ends {
+            if start == end {
+                continue;
+            }
+            if start > 0 {
+                items.push(self.token_boundary(indices[start - 1], indices[start], Doc::line()));
+            }
+            items.push(self.raw_grouped_token_slice(&indices[start..end]));
+            start = end;
+        }
+        let head = items.remove(0);
+        Some(Doc::concat([head, Doc::concat(items).nest(INDENT_WIDTH)]).fit_group())
     }
 
     /// Build a recursive application/arrow group inside a delimited child.
