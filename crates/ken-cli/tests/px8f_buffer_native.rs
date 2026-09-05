@@ -293,10 +293,6 @@ fn assert_retained_result_closure_proof_mutation_child() {
             Mutation::DropExactStaticBodyCallEdge,
             Some("proof has no unique exact static-body call edge"),
         ),
-        "suppressed-result-authorization" => (
-            Mutation::SuppressResultAuthorizationArm,
-            Some("a closure cannot cross the boundary"),
-        ),
         other => panic!("unknown retained result-closure proof mutation: {other}"),
     };
     let dir = tempfile::Builder::new()
@@ -516,12 +512,13 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
 /// MEASURED: the same real px8f compile accepts the exact population, while
 /// dropping, duplicating, substituting real neighboring owner/body/field/target
 /// rows, permuting the real capture run, widening to every other captured
-/// lexical occurrence, dropping the exact downstream call edge, or suppressing
-/// the caller's exact result arm reaches a distinct production refusal.
+/// lexical occurrence, or dropping the exact downstream call edge reaches a
+/// distinct production refusal.
 /// CLAIMED: only the exact result/constructor/field/closure/body/capture/target
 /// tuple and its joined static call edge may acquire the existing M4 environment
-/// representation, and the result arm is causally necessary: its result-derived
-/// record cannot borrow either weaker M4 authorization.
+/// representation. Handler-owned Deferred continuations no longer cross this
+/// boundary; their replacement control is
+/// `handler_owned_deferred_response_controls_are_load_bearing`.
 /// THE GAP: numeric coordinates below establish that each population mutation
 /// reached D0's exact fixture row; they select no authority and are never inputs
 /// to production derivation.
@@ -561,10 +558,6 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
         (
             "missing-static-body-call-edge",
             Some("proof has no unique exact static-body call edge"),
-        ),
-        (
-            "suppressed-result-authorization",
-            Some("a closure cannot cross the boundary"),
         ),
     ];
     for (mode, expected) in cases {

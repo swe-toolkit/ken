@@ -2656,8 +2656,10 @@ impl StaticTransitionPlan<'_> {
     /// only `ITree::Ret`, traps, or uniquely resolved static tail calls. Several
     /// enclosing response bodies may contain the same lexical subtree; the
     /// nearest one is the unique candidate whose K body is contained by every
-    /// other candidate K body. Selection is therefore by structural nesting,
-    /// never by specialization ordinal, origin proximity, or runtime state.
+    /// other candidate K body. That handler must also contain a unit-less P1;
+    /// P1-free response planes therefore retain their established behavior.
+    /// Selection is by structural nesting, never by specialization ordinal,
+    /// origin proximity, or runtime state.
     pub(in crate::cranelift_backend) fn deferred_response_handler_owner(
         &self,
         row: &DeferredResponseRow,
@@ -2695,7 +2697,22 @@ impl StaticTransitionPlan<'_> {
         }
         match nearest.as_slice() {
             [] => Ok(None),
-            [handler] => Ok(Some(handler.base_owner())),
+            [handler] => {
+                let mut contains_unitless = false;
+                for candidate in &self.static_response_deferred {
+                    if candidate.sub_case == DeferredResponseSubCase::NoContinuationUnit
+                        && occurrence_subtree_contains(
+                            self,
+                            handler.k_body_origin(),
+                            candidate.vis_origin,
+                        )?
+                    {
+                        contains_unitless = true;
+                        break;
+                    }
+                }
+                Ok(contains_unitless.then(|| handler.base_owner()))
+            }
             _ => Err(planner_error(
                 "one Deferred response has more than one nearest static handler owner",
             )),
