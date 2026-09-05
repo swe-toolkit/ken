@@ -1,7 +1,7 @@
 ---
 id: PX8-NOPROGRESS-ABS
 title: "NoProgress absolute oracle on the INTERPRETER — a component-boundary test asserting a reified ResourceError::NoProgress against LOCKED §1.7.2, the PX8-WROTE-ABS shape. Closes PX8 clause-(b) both-engines for NoProgress (native + host-shared already cover it; the interpreter side has no absolute assertion)."
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
@@ -12,9 +12,11 @@ github: null
 origin: "Steward, 2026-09-05, filing B1 of the Architect's PX8 closure-property residual decomposition (evt_4dr93v8qdv3tv, verdict evt_56ssrfbr4tt37). Gap G3: the interp reifier maps NoProgress (eval.rs:5077) but no interpreter test asserts a reified NoProgress absolutely; native + host-shared cover it, so clause-(b) both-engines fails on interp. INDEPENDENT of the native carried-value residual (Lane A) — production unchanged, no seam. Steward-filed per COORDINATION §2."
 ---
 
-> # READY (deps met, unassigned). Independent of Lane A — does NOT gate on
-> # RT-WRITEALL-ERROR-ROUTE-NATIVE. Cheap parallel-ish path for the runtime ring;
-> # release when the ring has bandwidth off the A1 critical path.
+> # RELEASED 2026-09-05 to the runtime ring (A1 landed 2168f3ae3; the ring has
+> # bandwidth off the A1 critical path). Independent of Lane A — does NOT gate on
+> # RT-WRITEALL-ERROR-ROUTE-NATIVE, and touches a DIFFERENT file (interp
+> # eval.rs:5077 reify path), so it runs parallel to the critical-path follow-up
+> # RT-WRITEALL-IO-IDENTITY-COMPLETE without contention. Base = current main.
 
 ## Objective
 
