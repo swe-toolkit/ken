@@ -543,7 +543,10 @@ string contains Unicode scalars and constructs the existing UTF-8 `String`; an
 escape never introduces a surrogate. Within a byte string, every unescaped
 body character is ASCII and contributes its ASCII byte, while `\xHH`
 contributes one arbitrary byte. A non-ASCII body character is not implicitly
-UTF-8-encoded into a byte string. The `0x[…]` byte-literal form is unchanged.
+UTF-8-encoded into a byte string. The `0x[…]` byte-literal form is unchanged:
+its body is a contiguous, even-length run of ASCII hexadecimal digits with no
+internal whitespace or separator (`38 §1.1`), so `0x[de ad]` is a lexical error
+rather than a spelling of `0x[dead]`.
 
 Triple-quoted raw strings perform no escape processing. Within `"""…"""`, a
 backslash is an ordinary body scalar; the lexer applies only the existing raw-
