@@ -1,7 +1,7 @@
 ---
 id: LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE
 title: "Roots-loader / module-surface completeness for synthesized instance dictionaries: a synthesized dictionary C_instance_T (the WIRE-mechanism real global an InstanceDecl/DeriveDecl produces) is a first-class NAMED declaration for ALL of roots/strict name resolution — (i) bind_local'd in its own module's per-unit scope, (ii) on its owning module's export surface by its canonical name, and (iii) selectively importable by that name. ONE predicate, three faces (§1b closure); NOT three point-fixes and NOT new pub-instance syntax. Completeness, not soundness; zero trusted-base delta (surface name resolution, not kernel; no instance bodies, no proof re-authoring). NOTE: the id says LOCAL but the ruled scope is the full three-face closure — see the widened-scope banner."
-status: ready
+status: active
 owner: language
 size: M
 gate: none
@@ -12,6 +12,14 @@ github: null
 origin: "Steward, 2026-09-03. Minted on the Architect's classification evt_5hnv374ev2a80 (EC's renewed hard-stop = a reachable elaborator predecessor) and WIDENED by the Architect's D0 ruling evt_y9cn3eqdxakn to the FULL closure. The Architect named ONE predicate — the roots loader / module system does not model a synthesized instance dictionary (the WIRE-mechanism real global) as a first-class NAMED declaration under roots/strict — with THREE faces (§1b: at the 3rd entry, stop ruling entries, name the closure). GENERAL: unblocks EC and every instance-declaring / instance-consuming Tier C/D/E module, not EC alone. Language lane (crates/ken-elaborator/src/modules.rs = the module/import roots loader). Architect required soundness/design reviewer. Cross-lane note for the operator: a language-lane fix is now a partial gate on the foundation critical path (Tier C instance modules); surfaced, not acted on against the roster — default sequencing queues it behind the lane-2 FO priority (released as interim work while FO is held)."
 ---
 
+> # ACTIVE — RELEASED to the language ring (Steward, 2026-09-05). Operator
+> # direction "do not starve the other lanes; keep the fleet moving" — brought up
+> # NOW ahead of the verify seam (the lane-2 verify node CI-NATIVE-PARITY-DURATION
+> # is Architect-blocked and CI is "acceptable atm"), since this is the idle
+> # language ring's ready deliverable and the L3 unblock. On landing, foundation's
+> # CAT-MIGRATE-EC-FUNCTOR-IMPORT (and every instance-declaring/consuming Tier
+> # C/D/E module) becomes releasable. base = current main.
+>
 > # SCOPE WIDENED (Architect D0 ruling evt_y9cn3eqdxakn). ONE predicate, THREE
 > # faces — a synthesized instance dictionary C_instance_T is a first-class NAMED
 > # declaration for roots/strict name resolution:
