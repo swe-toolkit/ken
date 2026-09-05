@@ -107,6 +107,14 @@ pub fn load_derived_importing_fixture(env: &mut ElabEnv, imported: &str) {
     load_derived_importing_fixture_many(env, &[imported]);
 }
 
+/// Load LawfulFunctors as a real module so ordered fixtures record its export
+/// table before flat-loading EffectfulClasses. EC's selective import then binds
+/// the same provider `GlobalId`s as the production roots path.
+pub fn load_lawful_functors_importing_fixture(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulFunctors")
+        .expect("Core.Classes.LawfulFunctors must load through its real provider closure");
+}
+
 /// Withhold LC's flat conjunction aliases before elaborating LawfulFunctors.
 /// This proves that the package's qualified import, rather than an earlier
 /// dependency's synthetic flat exposure, supplies every canonical binding.
