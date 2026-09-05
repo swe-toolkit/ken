@@ -1,7 +1,7 @@
 ---
 id: ABI-REVOKE-D1
 title: "authority-side lineage + admission lease + the path-side revoked error identity — wires RevocationDomain into the shared host dispatcher and turns the revoked-path oracle case green"
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
@@ -11,12 +11,20 @@ github: null
 origin: "Architect decomposition of ABI-REVOKE, evt_30z9y81yxvdyv (2026-09-05). Second of three increments (D0 S + D1 M + D2 M). Queued behind ABI-REVOKE-D0; the Steward RE-RELEASES it explicitly once D0 lands — a satisfied dependency is not itself a release. Cut per COORDINATION §2."
 ---
 
-> # QUEUED — NOT YET RELEASED
->
-> This node is `draft` and behind `ABI-REVOKE-D0`. The landing of D0 discharges
-> the dependency; it does not authorize a start. The Steward flips this
-> `ready`/`active` and kicks the ring after D0 lands. Re-measure every anchor
-> against the landed tree at release.
+> # RELEASED 2026-09-05 to the runtime ring (lane-1) — ABI-REVOKE-D0 landed
+> # (f08b8029b, PR #3339, node merged), discharging this node's dependency. This
+> # is the Steward's explicit second release the queued banner required (a
+> # satisfied dependency is not itself a release). Base = current main
+> # c9c675997. Re-measure every cited anchor against the landed tree at cut
+> # (dispatch_host_op_v1 at effect_v1.rs:1536, CapabilityGrantV1 slots,
+> # FileErrorCauseV1) and confirm D0's landed RevocationDomain substrate is the
+> # one you wire — escalate a false fixed input, do not build around it. Seat:
+> # the deliberate T1 runtime seat is acceptable for D1 (Steward ruling
+> # evt_4s0mkg9qztbtf holds for D1/D2, no re-litigation). Reviewer of record:
+> # the Architect (D1 against its ADR-0022 clauses + the revoked-path oracle
+> # case). GATE-0/option-(a) carries: inability to represent the admission lease
+> # without a value crossing a fn-return or a new IR variant is a HARD STOP to
+> # the Architect (the option-(a) premise would be false), never a workaround.
 
 ## Objective
 

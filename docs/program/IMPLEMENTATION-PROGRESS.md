@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 22:31:04Z — from 552 issue file(s) in `docs/program/issues/`.
+2026-09-05 22:35:46Z — from 553 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -47,7 +47,7 @@ the committed file matches the generator's output.
 | `ABI-R1` | correct stale filesystem capability prose — scoped roots, rights, symlink policy and no-follow resolution have landed | closed | foundation | S | none | — |
 | `ABI-R3` | generated operation inventory derived from catalog structure — a new operation must be a build break | merged | runtime | M | none | — |
 | `ABI-REVOKE-D0` | RevocationDomain substrate + lineage tree — the host-internal authority-lineage foundation for the revocation membrane; no dispatch wiring, lands green with zero observable Ken change | merged | runtime | S | none | — |
-| `ABI-REVOKE-D1` | authority-side lineage + admission lease + the path-side revoked error identity — wires RevocationDomain into the shared host dispatcher and turns the revoked-path oracle case green | draft | runtime | M | none | — |
+| `ABI-REVOKE-D1` | authority-side lineage + admission lease + the path-side revoked error identity — wires RevocationDomain into the shared host dispatcher and turns the revoked-path oracle case green | active | runtime | M | none | — |
 | `ABI-REVOKE-D2` | resource provenance + close-after-drain settlement — a resource-token-only op cannot bypass revocation, and owned fds close only after admitted leases drain; turns the two resource oracle cases green | draft | runtime | M | none | — |
 | `ABI-REVOKE` | runtime revocation membrane — the deferred runtime face of 62 §4 | active | runtime | M-L | none | — |
 | `ABI-S1` | descriptor completion — seek, truncate, sync/data-sync, flags, duplication under explicit inheritance policy | draft | runtime | M | none | — |
@@ -201,6 +201,7 @@ the committed file matches the generator's output.
 | `LANG-LEX-PROJECTION-ADJACENCY` | The positional-projection lexer guard tests raw character adjacency, so exactly one of four spacing variants fails -- `p.1.2`, `p.1 .2` and `p. 1 .2` all lex as two projections while `p. 1.2` lexes as `Dot, FloatLit(1.2)` -- and the refusal comes from the number scanner rather than from any grammar rule | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/1864 |
 | `LANG-LIFT-DISPATCH-SELF-GUARD` | `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard | ready | language | S | none | — |
 | `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` | `assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it | merged | language | XS | none | — |
+| `LANG-MATCH-AS-PATTERN` | as-patterns `p as x` -- the first contained slice of 34 §3's six absent pattern forms: the alias binds the value matched by p at its position, the inner p obeys the current position rules so the top-level non-constructor refusal stays fail-closed (keeping NoInhabitants honest), and the P1 association/precedence pin is honored forward-compatibly against the not-yet-existing or-pattern | ready | language | S | none | — |
 | `LANG-MATCH-DIAGNOSTIC-PROSE` | The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed | merged | language | S | none | — |
 | `LANG-MATCH-PATTERN-FORMS-ABSENT` | spec 34 §3 normatively lists nine pattern forms and the elaborator's PatKind has three -- literals, tuple/record patterns, as-patterns, or-patterns and guards are all absent from the AST, with no deferral statement anywhere in a chapter marked impl-ready and high-priority, and no tracker row for any of them | draft | language | unsized | none | — |
 | `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | ready | language | M | none | — |
@@ -599,6 +600,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `CAT-MIGRATE-EC-FUNCTOR-IMPORT` — Scaffold-retirement, orthogonal Core.Classes node (off the DecEq critical path): make EffectfulClasses (EC) standalone-green by publishing the four LawfulFunctors (LF) provider surfaces it consumes ambiently — LF marks class Functor + fn comp + fn idf + fn list_map pub; EC replaces ambient resolution with a real selective import from LF. Publication + one import block + loader-inventory extension; NO relocation, NO proof authoring. Not a regression fix — EC already elaborates in the full-catalog build via ambient class-install; this node removes its dependence on that scaffolding so it elaborates standalone.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
+- `LANG-MATCH-AS-PATTERN` — as-patterns `p as x` -- the first contained slice of 34 §3's six absent pattern forms: the alias binds the value matched by p at its position, the inner p obeys the current position rules so the top-level non-constructor refusal stays fail-closed (keeping NoInhabitants honest), and the P1 association/precedence pin is honored forward-compatibly against the not-yet-existing or-pattern
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
@@ -627,7 +629,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-A1` blocked by `ABI-REVOKE` (status: active)
 - `ABI-A2` blocked by `ABI-REVOKE` (status: active)
 - `ABI-A3` blocked by `ABI-REVOKE` (status: active)
-- `ABI-REVOKE-D2` blocked by `ABI-REVOKE-D1` (status: draft)
+- `ABI-REVOKE-D2` blocked by `ABI-REVOKE-D1` (status: active)
 - `ABI-S1` blocked by `PX9` (status: draft)
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
