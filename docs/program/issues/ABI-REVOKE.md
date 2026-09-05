@@ -1,9 +1,9 @@
 ---
 id: ABI-REVOKE
 title: "runtime revocation membrane — the deferred runtime face of 62 §4"
-status: draft
+status: active
 owner: runtime
-size: TBD
+size: M-L
 gate: none
 depends_on: [ABI-R3]
 blocks: [ABI-A1, ABI-A2, ABI-A3, PX9]
@@ -16,47 +16,38 @@ origin: docs/program/09-posix-linux-abi-campaign.md §5 (charter gap); split out
 grows."* **It is not the same machinery** (§2), and PX7 has landed, so the
 fold-in option is gone regardless.
 
-> ### ⛔ STILL NOT SHOVEL-READY — DO NOT RELEASE TO A BUILD TEAM
+> # DECOMPOSED AND UNDERWAY — now sizable, three increments (2026-09-05)
 >
-> **The Architect has ruled** (`dec_p1dv4gw6bsc2`, §4), so the *design* question
-> is settled and `owner: runtime` is now correct. **`size: TBD` is not a
-> placeholder I forgot to fill:** the ruling requires **an ADR, and a
-> Spec-owned behavioral slice, both BEFORE sizing.** Until those exist there is
-> no mechanism to brief. **Do not let a leader pull this.**
+> Both before-sizing prerequisites of the Architect ruling `dec_p1dv4gw6bsc2`
+> are discharged, so this program is sizable and now `active`:
 >
-> **Two prerequisites, in order:** (1) route the narrow observable contract to
-> the **Spec enclave** — revoke/attenuate operation shape, distinct `revoked`
-> identity, settlement observation; (2) the **ADR**, whose isolation argument
-> must be structural and closed-world (§4). Then size it.
+> - Behavioral contract MERGED — spec `@9ebebb8e` (PR #865); the two public
+>   projections and admission/settlement are pinned, `attenuate`/`revoke` stay
+>   non-Ken-visible (I-4).
+> - Runtime ADR-0022 LANDED (2026-09-05) — the mechanism decision plus the
+>   five-clause structural closed-world isolation argument the ruling required.
+> - ABI-R3 MERGED — the implementation gate; its generated inventory is the
+>   closed admission boundary (ADR-0022 trust-clause 4). `PX8 -> ABI-R3 ->
+>   ABI-REVOKE` is satisfied.
 >
-> **▶ Prerequisite (1) is IN FLIGHT as of 2026-07-22 ~12:54Z** — routed to the
-> Spec enclave by the Steward in `evt_2btjbdwarvwme`. **`status: draft` is
-> still correct for this item**: what is active is the enclave's behavioral
-> slice, not the runtime membrane. This issue does not become `ready` until
-> that contract **and** the ADR land and it is sized. **Do not let a build
-> leader read the enclave's activity as a release signal.**
+> The Architect decomposition (`evt_30z9y81yxvdyv`) cuts this into three
+> increments, each landing green; acceptance is the three `seed-capabilities.md`
+> oracle cases, RED until their increment:
 >
-> ### ⛔ ABI-R3 GATES THIS, and the dependency is bound HERE, not in `depends_on:`
+> - `ABI-REVOKE-D0` (S) — RevocationDomain substrate + lineage tree,
+>   host-internal, no dispatch wiring, zero observable change. RELEASED to the
+>   runtime ring 2026-09-05.
+> - `ABI-REVOKE-D1` (M) — authority lineage + admission lease + the path-side
+>   `Revoked` error identity. QUEUED behind D0.
+> - `ABI-REVOKE-D2` (M) — resource provenance + close-after-drain settlement.
+>   QUEUED behind D1; it closes the batch.
 >
-> **`PX8 -> ABI-R3 -> ABI-REVOKE`** (Architect, `dec_p1dv4gw6bsc2`).
-> **ABI-R3 must land first**, and the reason is load-bearing rather than
-> sequencing hygiene: the membrane **adds and guards operation identities**,
-> and ABI-R3's generated inventory is what makes a new operation a **build
-> break**. Landing the membrane first would put un-inventoried operations in
-> the dispatcher — the precise failure ABI-R3 exists to prevent.
->
-> **ABI-REVOKE then gates `ABI-A1`-`ABI-A3` and `PX9`**, so PX9 absorbs revoked
-> identity *before* the synchronous/Track-T expansion rather than retrofitting
-> it. `ABI-M1`/`ABI-M2` stay on their existing inventory/probe path unless the
-> revised manifest explicitly carries revocation evidence.
->
-> **Why `depends_on:` is empty.** `ABI-R3` is an unframed item in
-> `10-linux-abi-completion.md`, **not a tracked issue**, so there is no id to
-> reference — the schema gate rejects one. **Minting a stub purely to satisfy a
-> schema field would be inventing scope.** The gate has now caught me doing
-> exactly that three times, and it has been right each time. When `ABI-R3` is
-> framed it takes `blocks: [ABI-REVOKE]`, this issue takes
-> `depends_on: [ABI-R3]`, and this note comes out.
+> No option-(b)/TCB fork: the whole membrane is host-runtime through the single
+> shared `dispatch_host_op_v1`, so GATE-0 resolves to option-(a) by construction
+> — zero kernel/TCB delta. The Architect is the required reviewer of record on
+> all three candidates. This umbrella flips to `merged` when D2 lands, and PX9
+> unblocks then. `ABI-R3` is now a tracked node, so `depends_on: [ABI-R3]` is
+> bound in the frontmatter above.
 
 ## 1. What exists today, measured
 
