@@ -1,7 +1,7 @@
 ---
 id: LANG-BYTES-HEX-LIST-LITERAL
 title: "the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
