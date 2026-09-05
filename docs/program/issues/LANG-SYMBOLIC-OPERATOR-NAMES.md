@@ -1,7 +1,7 @@
 ---
 id: LANG-SYMBOLIC-OPERATOR-NAMES
 title: "`31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -11,6 +11,13 @@ github: null
 origin: "Architect scope ruling evt_1s7mqjg4tyxx1 (2026-08-15) on LANG-FIXITY-DECL-SURFACE. The Steward's census searched for `fixity|Fixity|infixl|InfixL` and found zero hits; the Architect reproduced it and established the gap is wider than the search term -- what is absent is user-defined operators, of which fixity is one of three parts. This is part (i) of his decomposition, and it is the bounded lexer half the Steward had concluded did not exist. Steward-filed and cut per COORDINATION section 2."
 ---
 
+> # RELEASED 2026-09-05 to the language ring (lane-2, next after the formatter
+> # predecessor LANDED 196392b6f). Per the operator CI-defer sequence in lanes.md:
+> # symbolic-operators (THIS) -> match-patterns/quick-wins -> kernel-hardening ->
+> # SEC1. Base = current main. Frame is complete (Deliverables + AC-1..5 with
+> # controls, banned scope); anchors measured at e6d2716cf — re-check them against
+> # landed code and escalate if any fixed input is false, do not build around it.
+>
 > # THE EXISTENCE OF THIS SURFACE IS NOT AN OPEN QUESTION. THE SPEC SAYS SO.
 >
 > `spec/30-surface/32-grammar.md:392-393`, verbatim:

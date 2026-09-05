@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-EC-FUNCTOR-IMPORT
 title: "Scaffold-retirement, orthogonal Core.Classes node (off the DecEq critical path): make EffectfulClasses (EC) standalone-green by publishing the four LawfulFunctors (LF) provider surfaces it consumes ambiently — LF marks class Functor + fn comp + fn idf + fn list_map pub; EC replaces ambient resolution with a real selective import from LF. Publication + one import block + loader-inventory extension; NO relocation, NO proof authoring. Not a regression fix — EC already elaborates in the full-catalog build via ambient class-install; this node removes its dependence on that scaffolding so it elaborates standalone."
-status: draft
+status: ready
 owner: foundation
 size: S
 gate: none
@@ -12,6 +12,17 @@ github: null
 origin: "Steward, 2026-09-03. Spun out of the Tier-B recut as a census-error correction: the Tier-B D0 (foundation-implementer) found EC fails standalone with UnresolvedCon Functor — EC was wrongly folded in as clean. Architect ruling evt_21c0cdvnmv3f3 CONFIRM 2: (b) LF-Functor + EC clean-ification is ORTHOGONAL to the DecEq chain (Functor is not DecEq; the recut relocation touches LC/BytesKeys/StringKeys/EmptyDec/StringBijection, never EC), so it is its OWN independent Core.Classes node, runnable in parallel whenever, and must NOT sit on the relocation's critical path. Architect CONFIRM 1 blessed the surface: publishing LF class Functor + comp/idf/list_map is the sound and intended consequence of the class-owner model + scaffold-retirement mandate — pub changes VISIBILITY only, class-uniformity preserved by construction (still exactly one class Functor in LF). Coordinates re-measured by Steward at origin/main 21f87f5b5 (below); re-measure at your build SHA (D0)."
 ---
 
+> # RELEASED-FOR-RESPIN 2026-09-05 — the formatter predecessor LANDED. The
+> # capability [[LANG-KENFMT-SELECTIVE-IMPORT-WRAP]] landed 196392b6f
+> # (Steward-blob-verified; AC-EC-AC7-GREEN confirmed the whole-catalog width gate
+> # passes with EC's 14-item import), and EC's other two deps are done
+> # (LANG-ROOTS-LOADER closed, CAT-MIGRATE-EC-CLOSURE-PROVIDERS merged). All deps
+> # satisfied -> status draft->ready. Foundation-leader owns the respin kickoff:
+> # rebuild the candidate on current main (the old 1f439178 is VOID), the import
+> # RELATION is unchanged so the Architect design/soundness approval carries in
+> # substance, but the respin SHA takes a FRESH QA + Architect vote-of-record (no
+> # auto-carry) -> a fresh Decision -> Steward M1-M4. History below.
+> #
 > # HELD 2026-09-05 on a formatter predecessor. The reviewed candidate 1f439178
 > # (Architect evt_5g66nsdc9s024 + foundation-qa evt_73jx5x7vmt501, Decision
 > # dec_4mg2thjg5yhfn) was VOID at M5 CI: EC's 14-item LawfulFunctors selective
