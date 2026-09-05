@@ -1,7 +1,7 @@
 ---
 id: RT-COMPOSED-RETURN-FORWARD-RET-EDGE
 title: "Close the composed-return Tail wall by shape (a): a governed Tail result takes ONE certified forward SSA edge from the existing producer to the existing shared Ret block, bypassing the source-machine answer collapse, constructor transfer, active carried backedge, and checked fallback. The single relaxed constraint is the lossy middle; everything else (spec, kernel, ABI, runtime state) is unchanged. Flips the base-red Tail `ResourceBodyResult` `PatternMatchFailure` rows to exact `InvalidOffset` on the two `SourceFormat::Ken` witnesses."
-status: active
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -11,6 +11,8 @@ blocks: [PX8]
 github: null
 origin: "Operator ruling 2026-08-30 (this session, verbatim: \"use shape (a)\") FUNDED the shape-(a) relaxation after the constraint-differential report (docs/program/rt-composed-return-constraint-differential-report.md, merged 5b20fe84f) found BOTH native walls INCIDENTAL, not spec-mandated. The build design is the fresh operator+Architect decision the report fed; Architect ruling evt_70n2y6s9wanf9 (base origin/main 7d807a78e, tree 37da2a975) mints this fresh T1 node and closes the held authority-only build RT-COMPOSED-RETURN-PRODUCER-ORDER-BUILD (refuted/superseded without implementation). Steward-filed and released per COORDINATION section 2."
 ---
+
+> # CLOSED — no remaining product obligation (Steward, per Architect evt_592eh20103vn9, 2026-09-05). Its D3-RECUT InvalidOffset closeout fully landed (inc2 ea0c04eec + inc3(i) 553d99a42 + inc3(ii) write-narrowing 3911d2861); the 8 AC-EDGE-CONTROL-REKEY deferred controls were DISCHARGED by 3911d2861 (re-keyed to live OwnerMutation variants asserting RT_EXECUTE_THEN_RESUME_REKEY_APPLIED, rt_parity_native.rs:3436-3493, completion marker :3418; no #[ignore] cites AC-EDGE-CONTROL-REKEY) and AC-INVALIDOFFSET-FLIP rows are live-green. status:active was tracker lag (ken-ci auto-close broken). It never carried the success Wrote/ReadSome rows.
 
 > # ACTIVE — lane 1, funded shape-(a). D1+D2 LANDED; the old D3 release is
 > STALE, RETIRED, superseded by D3-RECUT (fresh atomic closeout; see the
