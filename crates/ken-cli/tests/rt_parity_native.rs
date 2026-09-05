@@ -1546,6 +1546,13 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
             read.static_response_deferred
         );
         assert!(
+            read.static_response_deferred
+                .iter()
+                .all(|row| row.handler_owner.is_none()),
+            "a P1-free plane acquired handler-owned Deferred execution: {:?}",
+            read.static_response_deferred
+        );
+        assert!(
             write.static_response_deferred.is_empty(),
             "the eligible write plane must materialize every transport source: {:?}",
             write.static_response_deferred

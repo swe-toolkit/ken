@@ -152,9 +152,11 @@ pub use planning::{
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{
+    handler_owned_deferred_response_mutation_is_exact,
     with_branched_scrutinee_unit_body_match_branch_entry_suppressed,
-    with_branched_scrutinee_unit_body_route1, with_match_recursor_census,
-    BranchedScrutineeUnitBodyRoute1, MatchRecursorCensusRow,
+    with_branched_scrutinee_unit_body_route1, with_handler_owned_deferred_response_mutation,
+    with_match_recursor_census, BranchedScrutineeUnitBodyRoute1,
+    HandlerOwnedDeferredResponseMutation, MatchRecursorCensusRow,
 };
 
 // `RT-4B-OBSERVATION-FEATURE-GATE`: the existing D2f observer, reachable by

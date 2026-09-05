@@ -2985,32 +2985,82 @@ fn d1_nat_match_expr() -> RuntimeExpr {
     ])
 }
 
-/// Durable invariant: both immediate Nat representations explicitly refuse at
-/// the non-Bool class gate for both Zero-shaped and Suc-shaped payloads.
+/// Durable invariant: the carried entry adapter decodes the exact validated
+/// BoundedNat representation and selects the existing Zero/Suc eliminator.
 ///
-/// MEASURED: four real words span both Nat tags and payloads 0/1; all return -1.
-/// CLAIMED: neither immediate Nat representation falls through the Bool repair.
-/// THE GAP: the final status alone cannot locate the gate; the spill mutation
-/// below makes class admission observably reach the later default.
+/// MEASURED: immediate payloads 0 and 1 select distinct source arms, while the
+/// sibling StructuralNat representation still refuses.
+/// CLAIMED: carried ReadSome span lengths are consumed as bounded Nat values,
+/// without admitting Int-class words to the constructor-node dispatcher.
+/// THE GAP: persistent Int-class spills remain outside this immediate adapter;
+/// the spill control below keeps that refusal explicit.
 #[test]
-fn carried_non_bool_match_refuses_both_immediate_nat_representations() {
+fn carried_bounded_nat_match_selects_zero_and_suc_immediates() {
     let source = d1_nat_match_expr();
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
-    let (_module, consumer, _) =
+    let (_module, consumer, selected) =
         d1_compile_carried_match_consumer(&source, &symbols).expect("Nat family lowers");
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = ac_c7_bind_arena(&mut store);
-    for tag in [
-        BoundaryTag::ImmediateBoundedNat,
-        BoundaryTag::ImmediateStructuralNat,
-    ] {
-        for payload in [0, 1] {
-            assert_eq!(
-                d1_run_carried_word(consumer, base, d1_raw_immediate(tag, payload)),
-                -1,
-                "{tag:?} payload {payload} must refuse before the node chain"
-            );
-        }
+    assert_eq!(
+        d1_run_carried_word(
+            consumer,
+            base,
+            d1_raw_immediate(BoundaryTag::ImmediateBoundedNat, 0),
+        ),
+        selected[0],
+    );
+    assert_eq!(
+        d1_run_carried_word(
+            consumer,
+            base,
+            d1_raw_immediate(BoundaryTag::ImmediateBoundedNat, 1),
+        ),
+        selected[1],
+    );
+    assert_eq!(
+        d1_run_carried_word(
+            consumer,
+            base,
+            d1_raw_immediate(BoundaryTag::ImmediateStructuralNat, 1),
+        ),
+        -1,
+        "the sibling immediate Nat representation is not widened into this adapter",
+    );
+}
+
+/// Durable invariant and mutation proof: removing only the carried BoundedNat
+/// adapter restores the old class-gate refusal for both Nat arms.
+///
+/// MEASURED: the production adapter selects both arms; the compile-preserving
+/// mutation applies once and both identical words return -1.
+/// CLAIMED: the new adapter, rather than an incidental neighboring change, is
+/// necessary for carried BoundedNat consumption.
+/// THE GAP: this focused rig proves the immediate Nat consumer; the WRITE_ALL
+/// witness proves that ReadSome produces the reaching word.
+#[test]
+fn carried_bounded_nat_adapter_is_load_bearing() {
+    let source = d1_nat_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_exact_module, exact, selected) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("Nat family lowers");
+    let (mutated, hits) = with_carried_match_dispatch_mutation(
+        CarriedMatchDispatchMutation::DropBoundedNatAdapter,
+        || d1_compile_carried_match_consumer(&source, &symbols),
+    );
+    let (_mutated_module, without_adapter, _) =
+        mutated.expect("the adapter-removal mutation compiles");
+    assert_eq!(hits, 1, "the mutation must reach the exact Nat adapter once");
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    for (payload, expected) in [(0, selected[0]), (1, selected[1])] {
+        let word = d1_raw_immediate(BoundaryTag::ImmediateBoundedNat, payload);
+        assert_eq!(d1_run_carried_word(exact, base, word), expected);
+        assert_eq!(
+            d1_run_carried_word(without_adapter, base, word),
+            -1,
+            "dropping the adapter must restore the old refusal for payload {payload}",
+        );
     }
 }
 
@@ -3109,10 +3159,13 @@ fn d1_compile_nat_spill_producer(
 /// rather than the whole-process trap projection.
 #[test]
 fn carried_non_bool_match_refuses_structural_and_bounded_nat_spills() {
-    let source = d1_nat_match_expr();
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let source = d1_match_expr(vec![
+        d1_match_case("ctor:fixture::CarriedNode::Left".to_string(), 0, 101),
+        d1_match_case("ctor:fixture::CarriedNode::Right".to_string(), 1, 103),
+    ]);
     let (_exact_module, exact_consumer, _) =
-        d1_compile_carried_match_consumer(&source, &symbols).expect("Nat family lowers");
+        d1_compile_carried_match_consumer(&source, &symbols).expect("node family lowers");
     let (mutated, hits) =
         with_carried_match_dispatch_mutation(CarriedMatchDispatchMutation::AdmitIntClass, || {
             d1_compile_carried_match_consumer(&source, &symbols)

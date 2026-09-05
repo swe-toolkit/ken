@@ -757,6 +757,26 @@ fn inline_synthesized_seat_emission_owners(
                 .filter(|response| response.effect_origin() == seat)
                 .map(|response| response.base_owner()),
         );
+        for row in plan.static_response_deferred() {
+            let k_body = plan.deferred_response_k_body(row)?;
+            let owns_seat = if row.effect_origin() == seat {
+                true
+            } else if row.sub_case() == DeferredResponseSubCase::UnconsumedTransportCaller {
+                match k_body {
+                    Some(body) => occurrence_subtree_contains(plan, body, seat)?,
+                    None => false,
+                }
+            } else {
+                false
+            };
+            if !owns_seat {
+                continue;
+            }
+            let Some(owner) = plan.deferred_response_handler_owner(row)? else {
+                continue;
+            };
+            owners.push(owner);
+        }
     }
     owners.sort();
     owners.dedup();
@@ -987,6 +1007,14 @@ pub struct DeferredResponseObservation {
     /// zero). Eligible-plane has-K census comes from Specialized rows.
     pub capture_count: usize,
     pub continuation_input_count: usize,
+    /// The structurally nearest specialized handler, only when the lexical K
+    /// is single-shot and tail-resumptive.
+    pub handler_owner: Option<String>,
+    pub k_body_origin: Option<u32>,
+    pub response_uses: Option<usize>,
+    pub tail_ret_exits: Option<usize>,
+    pub tail_static_calls: Option<usize>,
+    pub tail_other_exits: Option<usize>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1114,17 +1142,28 @@ fn record_static_response_feasibility_diagnostic(
     let static_response_deferred = plan
         .static_response_deferred()
         .iter()
-        .map(|row| DeferredResponseObservation {
-            vis_origin: row.vis_origin().0,
-            producer_call_origin: row.producer_call_origin().0,
-            operation_root_origin: row.operation_root_origin().0,
-            effect_origin: row.effect_origin().0,
-            operation: format!("{:?}", row.operation()),
-            sub_case: format!("{:?}", row.sub_case()),
-            capture_count: row.capture_count(),
-            continuation_input_count: row.continuation_input_count(),
+        .map(|row| {
+            let shape = plan.deferred_response_continuation_shape(row)?;
+            Ok(DeferredResponseObservation {
+                vis_origin: row.vis_origin().0,
+                producer_call_origin: row.producer_call_origin().0,
+                operation_root_origin: row.operation_root_origin().0,
+                effect_origin: row.effect_origin().0,
+                operation: format!("{:?}", row.operation()),
+                sub_case: format!("{:?}", row.sub_case()),
+                capture_count: row.capture_count(),
+                continuation_input_count: row.continuation_input_count(),
+                handler_owner: plan
+                    .deferred_response_handler_owner(row)?
+                    .map(|owner| format!("{owner:?}")),
+                k_body_origin: shape.map(|shape| shape.k_body_origin.0),
+                response_uses: shape.map(|shape| shape.response_uses),
+                tail_ret_exits: shape.map(|shape| shape.ret_exits),
+                tail_static_calls: shape.map(|shape| shape.static_tail_calls),
+                tail_other_exits: shape.map(|shape| shape.other_exits),
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
     STATIC_RESPONSE_FEASIBILITY_DIAGNOSTICS.with(|slot| {
         if let Some(rows) = slot.borrow_mut().as_mut() {
             rows.push(StaticResponseFeasibilityDiagnostic {
