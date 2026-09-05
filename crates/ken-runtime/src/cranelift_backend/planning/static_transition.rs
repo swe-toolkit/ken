@@ -91,9 +91,12 @@ pub(in crate::cranelift_backend) use responses::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
+    mixed_owner_execute_then_resume_overpromotion_is_exact,
     static_response_context_demand_mutation_is_exact,
-    suppressed_execute_then_resume_response_is_exact, with_static_response_context_demand_mutation,
-    with_suppressed_execute_then_resume_response, StaticResponseContextDemandMutation,
+    suppressed_execute_then_resume_response_is_exact,
+    with_mixed_owner_execute_then_resume_overpromotion,
+    with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
+    StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,

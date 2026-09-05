@@ -347,10 +347,10 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// name and no owner; main already lowers the `Vis` construct.
     NoContinuationUnit,
     /// P2 — a transport-source caller outside the execute-then-resume subset.
-    /// An eligible plane is closed and contains at least two producer groups
-    /// whose transport sources are exclusively predeclared; open and single-stage
-    /// planes retain every transport
-    /// source here. The suppression control also restores this disposition.
+    /// An eligible plane contains at least two producer groups whose transport
+    /// sources are exclusively predeclared. In a P1-bearing plane only those
+    /// groups are promoted; mixed-owner and single-stage groups remain here. The
+    /// suppression control also restores this disposition.
     UnconsumedTransportCaller,
 }
 
@@ -606,6 +606,42 @@ pub fn with_suppressed_execute_then_resume_response<T>(operation: impl FnOnce() 
 #[cfg(feature = "px8-ds-test-support")]
 pub fn suppressed_execute_then_resume_response_is_exact() -> bool {
     SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
+}
+
+// Route-B precision control for `RT-WRITEALL-SUCCESS-PLANE-CLOSE`. Production
+// promotes only exclusively-predeclared transport groups. This mutation removes
+// that ownership restriction and counts every mixed-owner response it actually
+// over-promotes; the real WRITE_ALL compile must then refuse the escaping
+// response placeholder.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_mixed_owner_execute_then_resume_overpromotion<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| {
+        assert!(
+            !slot.replace(true),
+            "mixed-owner execute-then-resume overpromotion mutations cannot nest"
+        );
+    });
+    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS.with(|count| count.set(0));
+    let result = operation();
+    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| slot.set(false));
+    let applications =
+        OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn mixed_owner_execute_then_resume_overpromotion_is_exact() -> bool {
+    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
 }
 
 impl SsaInfeasible {
@@ -1357,17 +1393,20 @@ impl StaticTransitionPlan<'_> {
         // pass runs at install (construction.rs:1213), BEFORE aggregate_ownership
         // and the transport records exist. Phase A builds a context demand for
         // EVERY has-K-unit member and captures ONLY P1 (no continuation unit) as
-        // a Deferred residual. Phase B assigns every demand an owner only when
-        // the response plane is closed and at least two producer groups have
-        // exclusively predeclared transport sources; otherwise transport
-        // sources remain P2. The record-derived set identifies those callers
-        // and gives the suppression control a production-side discriminator.
+        // a Deferred residual. Phase B assigns owners to exclusively-predeclared
+        // transport groups only when at least two such groups compose; otherwise
+        // transport sources remain P2. In a P1-bearing plane, P1 stays
+        // main-lowered outside the demand population and a mixed-owner group
+        // stays P2 rather than borrowing the ordinary groups' authority. The
+        // record-derived set identifies those
+        // callers and gives the suppression control a production-side
+        // discriminator.
         // Congruence
         // over the full
         // response-Vis population (AC-1) and total-match reconciliation (R2/§7)
         // hold across the two phases: phase A's demand domain is has-K-unit, phase
         // B's disposition domain is the whole population (P1 sealed via its own
-        // Deferred arm).
+        // main-lowered Deferred arm).
         let mut deferred: Vec<DeferredResponseRow> = Vec::new();
         for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque) in
             response_vis
@@ -2025,13 +2064,13 @@ impl StaticTransitionPlan<'_> {
 
     /// PHASE B of the two-phase response context install. Runs after the first
     /// aggregate/transport derivation identifies transport-source callers.
-    /// Execute-then-resume assigns owners to transport-source demands only for
-    /// a closed plane with no P1 response and at least two producer groups whose
-    /// transport sources are exclusively predeclared. Open planes retain P2
-    /// rather than partially
-    /// specializing; single-stage planes retain the inc1 forward-Ret path. The
-    /// test suppression restores P2 in an eligible plane. Phase A entries are
-    /// never retracted.
+    /// Execute-then-resume assigns owners only to exclusively-predeclared
+    /// transport groups when at least two such groups compose. A P1 response
+    /// remains on main lowering and is not replaced; in that P1-bearing plane a
+    /// mixed-owner group remains P2 rather than borrowing an ordinary group's
+    /// call authority. P1-free composed planes keep their existing promotion.
+    /// Single-stage groups retain the inc1 forward-Ret path. The test suppression
+    /// restores P2 in an eligible plane. Phase A entries are never retracted.
     pub(super) fn install_static_response_context_plan_phase_b(
         &mut self,
     ) -> Result<(), CraneliftBackendError> {
@@ -2084,9 +2123,11 @@ impl StaticTransitionPlan<'_> {
         // Execute-then-resume serves a composed response plane: at least two
         // producer groups have exclusively predeclared transport sources.
         // A producer that also has a specialization/fusion-owned source is a
-        // mixed-owner fan-out, not an exclusively ordinary stage, so it does not
-        // increase the composition count. This keeps the single-stage read on
-        // the proven forward-Ret path while admitting both read-then-write shapes.
+        // mixed-owner fan-out and does not increase the composition count. When
+        // P1 is present it also cannot borrow the ordinary groups' promotion
+        // authority; P1-free composed planes preserve their existing promotion.
+        // This keeps single-stage and P1-bearing mixed-owner residuals on their
+        // proven paths while admitting the ordinary read-then-write stages.
         let mut transport_producer_owners = BTreeMap::new();
         for demand in &demands {
             if !transport_sources.contains(&demand.k_identity) {
@@ -2105,7 +2146,7 @@ impl StaticTransitionPlan<'_> {
             .values()
             .filter(|(predeclared, specialization)| *predeclared && !*specialization)
             .count();
-        let requires_execute_then_resume = !has_unitless_response && ordinary_stage_count >= 2;
+        let requires_execute_then_resume = ordinary_stage_count >= 2;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {
@@ -2113,12 +2154,39 @@ impl StaticTransitionPlan<'_> {
             let suppress_execute = SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
             #[cfg(not(feature = "px8-ds-test-support"))]
             let suppress_execute = false;
+            #[cfg(feature = "px8-ds-test-support")]
+            let overpromote_mixed =
+                OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let overpromote_mixed = false;
             let transport_source = transport_sources.contains(&demand.k_identity);
-            // Execute-then-resume is admitted only for the closed composed plane
-            // identified above. A P1 member has no owner-call target; a
-            // single-stage plane already has the inc1 forward-Ret route. In
-            // either case, partially replacing siblings selects the wrong path.
-            if transport_source && (suppress_execute || !requires_execute_then_resume) {
+            let exclusively_predeclared_stage = transport_producer_owners
+                .get(&demand.producer_call_origin)
+                .is_some_and(|owners| *owners == (true, false));
+            #[cfg(feature = "px8-ds-test-support")]
+            if overpromote_mixed
+                && has_unitless_response
+                && requires_execute_then_resume
+                && transport_source
+                && !exclusively_predeclared_stage
+            {
+                OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS
+                    .with(|count| count.set(count.get() + 1));
+            }
+            // Execute-then-resume is admitted only for the composed ordinary
+            // has-K groups identified above. Unit-less P1 members are absent
+            // from `demands` and remain on main lowering, so this loop cannot
+            // replace their path. In a P1-bearing plane, mixed-owner groups may
+            // not borrow another group's authority; P1-free composed planes keep
+            // their prior promotion. Single-stage groups retain their existing
+            // route.
+            if transport_source
+                && (suppress_execute
+                    || !requires_execute_then_resume
+                    || (has_unitless_response
+                        && !exclusively_predeclared_stage
+                        && !overpromote_mixed))
+            {
                 // Population-side mutation restores P2 for an otherwise eligible
                 // plane; open and single-stage planes remain lawful residuals.
                 deferred.push(DeferredResponseRow {
@@ -2198,8 +2266,11 @@ impl StaticTransitionPlan<'_> {
         // Phase A re-derivation: the owner-less context-entry plane over has-K-unit.
         let (mut expected_contexts, preexisting_count) =
             self.response_context_union(causal_contexts, &demands)?;
-        // Phase B re-derivation: an eligible plane gives every has-K demand an
-        // owner; an open/single-stage plane or suppression retains P2.
+        // Phase B re-derivation: a P1-bearing eligible plane gives each
+        // exclusively-predeclared group an owner while mixed-owner groups retain
+        // P2; P1-free composed planes preserve their existing promotion. A
+        // single-stage plane or the suppression control retains P2. P1 stays on
+        // main lowering outside the demand population.
         let (specialized, mut expected_deferred) =
             self.static_response_phase_b_split(demands, !p1_deferred.is_empty())?;
         expected_deferred.extend(p1_deferred);

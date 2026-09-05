@@ -1259,12 +1259,12 @@ impl<'src> Planner<'src> {
         // evt_7eh84c8n6w08e). aggregate_ownership and the transport records are
         // now final, so the exact record-derived transport-source set exists.
         // Phase A minted the owner-less context entries the context ABI already
-        // covers. Execute-then-resume assigns transport-source owners when the
-        // plane is closed and at least two producer groups have exclusively
-        // predeclared transport sources. P1 keeps callers P2 rather than partially
-        // specializing; a single-stage plane keeps the forward-Ret path. The
-        // suppression control restores P2 in an eligible plane. Phase A entries
-        // remain untouched.
+        // covers. Execute-then-resume assigns owners to exclusively-predeclared
+        // transport groups when at least two such groups compose. In a P1-
+        // bearing plane, P1 remains on main lowering and mixed-owner groups keep
+        // their existing paths; P1-free composed planes preserve their prior
+        // promotion. Single-stage groups keep the forward-Ret path. The
+        // suppression control restores P2. Phase A entries remain untouched.
         let transport_sources_before_response_owners = self
             .plan
             .checked_ih_environment_transport_source_identities();
