@@ -946,6 +946,9 @@ impl<'s> Lexer<'s> {
         // Numeric literals: starts with a digit
         if c.is_ascii_digit() {
             if self.src[self.pos..].starts_with("0x") || self.src[self.pos..].starts_with("0X") {
+                if self.src[self.pos + 2..].starts_with('[') {
+                    return self.lex_hex_byte_list(start);
+                }
                 let mut token_tail = String::new();
                 let mut exponent = false;
                 let mut exp_sign = false;
@@ -1223,6 +1226,54 @@ impl<'s> Lexer<'s> {
             Ok((Token::Nat(nat), Span::new(start, self.pos)))
         } else {
             Ok((Token::IntLit(n), Span::new(start, self.pos)))
+        }
+    }
+
+    /// Lex the bracketed `0x[…]` Bytes spelling (`31 §3`, `38 §1.1`). The
+    /// numeric dispatch has already distinguished it from unbracketed hex
+    /// integers/floats by the `[` immediately after the case-insensitive `0x`
+    /// prefix. Until the whitespace question is normatively settled, the body
+    /// is the strict contiguous form: zero or more complete hex-nibble pairs.
+    fn lex_hex_byte_list(&mut self, start: usize) -> Result<(Token, Span), ElabError> {
+        self.advance(); // `0`
+        self.advance(); // `x` or `X`
+        debug_assert_eq!(self.cur(), Some('['));
+        self.advance(); // `[` discriminator
+
+        let mut bytes = Vec::new();
+        let mut high_nibble = None;
+        loop {
+            let Some(c) = self.cur() else {
+                return Err(ElabError::ParseError {
+                    msg: "unterminated hex byte-list literal".into(),
+                    span: Span::new(start, self.pos),
+                });
+            };
+            if c == ']' {
+                self.advance();
+                if high_nibble.is_some() {
+                    return Err(ElabError::ParseError {
+                        msg: "hex byte-list literal requires an even number of digits".into(),
+                        span: Span::new(start, self.pos),
+                    });
+                }
+                return Ok((Token::ByteStr(bytes), Span::new(start, self.pos)));
+            }
+            let Some(nibble) = c.to_digit(16).filter(|_| c.is_ascii_hexdigit()) else {
+                self.advance();
+                return Err(ElabError::ParseError {
+                    msg: format!(
+                        "invalid character {c:?} in hex byte-list literal; expected contiguous hexadecimal digits"
+                    ),
+                    span: Span::new(start, self.pos),
+                });
+            };
+            self.advance();
+            if let Some(high) = high_nibble.take() {
+                bytes.push(((high << 4) | nibble) as u8);
+            } else {
+                high_nibble = Some(nibble);
+            }
         }
     }
 
