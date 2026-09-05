@@ -6405,11 +6405,16 @@ mod px5b_effect_observation_tests {
     use super::*;
 
     #[derive(Default)]
-    struct ShortWriteBackend {
+    struct PositionedWriteCountBackend<const WRITTEN: usize> {
         write_calls: usize,
     }
 
-    impl ken_host::HostEffectBackendV1 for ShortWriteBackend {
+    type ShortWriteBackend = PositionedWriteCountBackend<2>;
+    type ZeroWriteBackend = PositionedWriteCountBackend<0>;
+
+    impl<const WRITTEN: usize> ken_host::HostEffectBackendV1
+        for PositionedWriteCountBackend<WRITTEN>
+    {
         fn console_write(
             &mut self,
             _stream: ken_host::ConsoleStreamV1,
@@ -6459,7 +6464,7 @@ mod px5b_effect_observation_tests {
         ) -> Result<usize, ken_host::IoErrorIdentityV1> {
             self.write_calls += 1;
             assert_eq!(bytes.len(), 4, "dispatcher must apply buffer capacity");
-            Ok(2)
+            Ok(WRITTEN)
         }
     }
 
@@ -6982,6 +6987,51 @@ mod px5b_effect_observation_tests {
                 )
                 .expect("interpreter reifies positioned InvalidBounds");
                 expect_resource_error(&result, fs.invalid_bounds_id, ids);
+            },
+        );
+    }
+
+    /// Promise class: durable component-boundary invariant for locked section
+    /// 1.7.2's rule that a backend write of zero bytes is `NoProgress`, never
+    /// progress with a zero count.
+    ///
+    /// MEASURED: a test-local backend returns zero after one visit; the real
+    /// dispatcher mints `ResourceErrorV1::NoProgress`, and the production
+    /// interpreter reifier returns the exact checked `no_progress_id`
+    /// constructor. CLAIMED: the interpreter observes the absolute semantic
+    /// error required by section 1.7.2. THE GAP: this component fixture proves
+    /// the dispatcher-to-reifier boundary, not a full checked `writeAll` run.
+    #[test]
+    fn positioned_backend_zero_write_reifies_absolute_no_progress() {
+        with_positioned_write_fixture(
+            "px8-no-progress-absolute",
+            |ids, fs, store, resources, file, buffer| {
+                let mut backend = ZeroWriteBackend::default();
+                let (request, reply) =
+                    dispatch_positioned_write(&mut backend, resources, file, buffer, 0);
+                assert_eq!(
+                    backend.write_calls, 1,
+                    "a real backend zero reply must produce NoProgress"
+                );
+                assert_eq!(
+                    reply.outcome,
+                    ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Resource(
+                        ken_host::ResourceErrorV1::NoProgress,
+                    ),),
+                    "the real dispatcher must mint absolute NoProgress"
+                );
+                let result = reify_host_reply_v1(
+                    reply.outcome,
+                    reply.resource_token,
+                    None,
+                    &request,
+                    fs.private_fs_write_at_id,
+                    fs,
+                    ids,
+                    store,
+                )
+                .expect("interpreter reifies positioned NoProgress");
+                expect_resource_error(&result, fs.no_progress_id, ids);
             },
         );
     }
