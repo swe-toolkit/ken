@@ -1,25 +1,47 @@
 ---
 id: PX8
 title: "partial/positioned IO — the completion program's root; closure condition"
-status: draft
+status: closed
 owner: runtime
 size: L
 gate: none
-depends_on: [PX8-F-CAP-41, PX8-WROTE-ABS, PX8-ERRID-SCOPE, RT-NATIVE-CARRIED-VALUE, RT-WRITEALL-ERROR-ROUTE-NATIVE, RT-WRITEALL-IO-IDENTITY-COMPLETE, RT-COMPMATCH-TREE-SCRUTINEE, PX8-NOPROGRESS-ABS]
+depends_on: [PX8-F-CAP-41, PX8-WROTE-ABS, PX8-ERRID-SCOPE, RT-NATIVE-CARRIED-VALUE, RT-WRITEALL-ERROR-ROUTE-NATIVE, RT-WRITEALL-IO-IDENTITY-COMPLETE, PX8-NOPROGRESS-ABS]
 blocks: [PX9]
 github: null
 origin: docs/program/09-posix-linux-abi-campaign.md (charter, PX-C phase); closure condition added 2026-07-22 (operator-approved)
 ---
 
-> # CLOSURE-PROPERTY RE-VERIFIED = NO — 2026-09-05 (Architect evt_56ssrfbr4tt37,
-> # grounded structurally at main febce9a10; population re-derived from the closed
-> # effect_v1.rs sums, NOT the WP list). PX8 STAYS OPEN; ABI-R3 + PX9 STAY HELD.
->
-> This is the standing operator plan (PX8-F-CAP-41 close-out, 2026-08-22: "PX8
-> stays OPEN until the native carried-value program lands") re-verified against
-> current main — NOT a reversal. RT-NATIVE-CARRIED-VALUE closing was ONE node of
-> that program, not its completion. The file working exactly as designed:
-> deps-green does not equal property-holds.
+ # CLOSED — CLOSURE-PROPERTY RE-VERIFIED = YES, 2026-09-05 (Architect verdict
+> # evt_6afgrapqf4f1r, grounded on current main; Architect state checkpointed
+> # 62b78b67b). The positioned/partial-IO closure property HOLDS on both engines.
+> # PX8 CLOSES -> ABI-R3 (already merged) + PX9 unblock (PX9 still gated on its
+> # other dep ABI-REVOKE, draft). This executes the standing operator plan
+> # (PX8-F-CAP-41 close-out, 2026-08-22: "PX8 stays OPEN until the native
+> # carried-value program lands") — the program has now landed and re-verified.
+> #
+> # Population re-derived STRUCTURALLY from the closed effect_v1.rs sums (not the
+> # WP list), byte-stable vs the z3270 derivation, no reified arm added. Every
+> # z3270 gap now closed on both engines, absolute + co-indexed:
+> # px8f_write_partition.rs has zero #[ignore] rows and drives the real derived
+> # writeAll on native (build_native_program) and interp (PosixHost) through one
+> # LD_PRELOAD interposer with exact-constructor oracles — obs1 full, obs2 short
+> # co-indexed, obs3 write-zero->NoProgress (not Wrote(0)), obs4 mid-stream
+> # Interrupted, BrokenPipe/Unsupported as genuine mid-stream after an exact
+> # Wrote(2) prefix; interp NoProgress absolute via B1. The G1/G2/G3 gaps in the
+> # historical "WHY NO" section below are ALL now discharged (A1 2168f3ae3,
+> # RT-WRITEALL-IO-IDENTITY-COMPLETE 4b1a0a590, B1 d03957492).
+> #
+> # RT-COMPMATCH-TREE-SCRUTINEE DROPPED from depends_on (Architect A3 flag): its
+> # #[ignore] is a native-codegen capability gap (tree-producing match scrutinee
+> # refuses at object emission — pre-existing base debt, orthogonal to IO), while
+> # the clause-(b) foreign-span value it would witness is already discharged
+> # absolutely on both engines (dispatch_host_op_v1 effect_v1.rs:1919/4479, interp
+> # e2e :479). A capability gap masquerading as a PX8 dependency, not a residual.
+> #
+> # HISTORICAL — the prior RE-VERIFIED = NO banner (Architect evt_56ssrfbr4tt37,
+> # 2026-09-05 @febce9a10) is superseded by the YES verdict above; the "WHY NO"
+> # gap analysis below is retained as the record of what the residual program had
+> # to land, all now closed.
 >
 > WHAT HOLDS (the SUCCESS/progress half, both engines, ABSOLUTE — real value the
 > FOLD delivered): ReadSome{span,count}, ReadEof (§1.7.1 effective 0), Wrote incl.

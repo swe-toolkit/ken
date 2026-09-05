@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 19:51:08Z — from 549 issue file(s) in `docs/program/issues/`.
+2026-09-05 20:08:43Z — from 549 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -271,7 +271,7 @@ the committed file matches the generator's output.
 | `PX8-NOPROGRESS-ABS` | NoProgress absolute oracle on the INTERPRETER — a component-boundary test asserting a reified ResourceError::NoProgress against LOCKED §1.7.2, the PX8-WROTE-ABS shape. Closes PX8 clause-(b) both-engines for NoProgress (native + host-shared already cover it; the interpreter side has no absolute assertion). | closed | runtime | S | none | — |
 | `PX8-SPAN-PROV` | PX8 clause-(b) gap — BufferSpan carries no originating-buffer identity; freeze accepts a same-shape span from a different buffer | merged | spec-enclave | M | none | 914 |
 | `PX8-WROTE-ABS` | PX8 clause-(a) evidence gap — interpreter capped-short Wrote lacks an absolute oracle; PR-C error identities unreached | merged | verify | S | none | — |
-| `PX8` | partial/positioned IO — the completion program's root; closure condition | draft | runtime | L | none | — |
+| `PX8` | partial/positioned IO — the completion program's root; closure condition | closed | runtime | L | none | — |
 | `PX9` | cross-domain System.Error — semantic identity, raw errno, operation, resource, safe context, and honest retry classification | draft | foundation | L | none | — |
 | `Q-CLAIM-CLOSURE` | Q-RESIDUE adversary findings — claim-loss in multi-claim test blocks, plus R1/R2/R3 | merged | runtime | S | none | — |
 | `Q-CLAIM-COMPARE-ORD` | claim-loss in list_instance_routes... (compare_ord) — both routing claims dropped, replacement only instantiates Bool | merged | runtime | XS | none | — |
@@ -642,8 +642,6 @@ is itself not yet `merged`/`closed`:
 - `PX11` blocked by `PX9` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
-- `PX8` blocked by `RT-COMPMATCH-TREE-SCRUTINEE` (status: draft)
-- `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
