@@ -34,6 +34,7 @@ mod effect_v1;
 mod effect_wire;
 #[cfg(target_os = "linux")]
 mod resource_close_v1;
+mod revocation_v1;
 
 pub use abi_v1::{
     admit_root_execution, observe_effective_uid_v1, EffectiveUidSnapshotV1, RootExecutionDeniedV1,
