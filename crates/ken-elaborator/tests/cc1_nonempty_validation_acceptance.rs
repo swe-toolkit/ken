@@ -12,8 +12,6 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
-const LAWFUL_FUNCTORS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
 const EFFECTFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
 const NONEMPTY_KEN_MD: &str =
@@ -28,10 +26,7 @@ fn dependency_env() -> ElabEnv {
     // LawfulFunctors imports `Data.Collections.Derived (list_append)` after the
     // attached-proof migration; clear both imports and keep Derived importable.
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "list_append"]);
-    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
-        .expect("Core/Classes/LawfulFunctors.ken.md must elaborate fourth");
-    catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
+    catalog_or::load_lawful_functors_importing_fixture(&mut env);
     env.elaborate_ken_md_file(EFFECTFUL_CLASSES_KEN_MD)
         .expect("Core/Classes/EffectfulClasses.ken.md must elaborate fifth");
     env

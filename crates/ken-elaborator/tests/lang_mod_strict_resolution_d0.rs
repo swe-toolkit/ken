@@ -537,6 +537,31 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // EffectfulClasses now declares its complete LF, Derived, and
+            // Transport closure. Its ordinary package boundary loads; strict
+            // mode records only the remaining compiler-convenience floor.
+            "Core.Classes.EffectfulClasses".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Core.Classes.LawfulClasses".to_string(),
             [
                 "And",
@@ -808,7 +833,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Capability.Parsing.Parsing",
         "Capability.Process.Arguments",
         "Capability.System.IO",
-        "Core.Classes.EffectfulClasses",
         "Data.Collections.Map",
         "Data.Collections.NonEmpty",
         "Data.Serialization.Json",
