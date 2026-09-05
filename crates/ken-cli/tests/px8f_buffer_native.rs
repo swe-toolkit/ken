@@ -647,6 +647,19 @@ fn run_linked_checked_write_all() {
 }
 
 #[cfg(target_os = "linux")]
+// Baseline provisioning, not a depth claim. With ambient RUST_MIN_STACK absent,
+// the exact three-arm compile aborted at 2 MiB twice and completed at 4 MiB
+// twice. Treat 4 MiB as the conservative measured peak. Retaining this test's
+// pre-existing 256 MiB provision adds exactly 252 MiB of headroom; the named
+// local Builder stack, rather than an ambient harness default, is operative.
+const WRITE_ALL_CLASSIFIER_STACK_MEASURED_PEAK_BYTES: usize = 4 * 1024 * 1024;
+#[cfg(target_os = "linux")]
+const WRITE_ALL_CLASSIFIER_STACK_HEADROOM_BYTES: usize = 252 * 1024 * 1024;
+#[cfg(target_os = "linux")]
+const WRITE_ALL_CLASSIFIER_STACK_BYTES: usize =
+    WRITE_ALL_CLASSIFIER_STACK_MEASURED_PEAK_BYTES + WRITE_ALL_CLASSIFIER_STACK_HEADROOM_BYTES;
+
+#[cfg(target_os = "linux")]
 /// Promise class: durable invariant. The checked `writeAll` response plane
 /// promotes exactly its two exclusively-predeclared producer groups while the
 /// unit-less P1 and mixed-owner group retain their existing lowering paths.
@@ -662,7 +675,7 @@ fn run_linked_checked_write_all() {
 fn write_all_classifies_mixed_specialized_and_deferred_responses() {
     std::thread::Builder::new()
         .name("px8f-classify-mixed".to_string())
-        .stack_size(256 * 1024 * 1024)
+        .stack_size(WRITE_ALL_CLASSIFIER_STACK_BYTES)
         .spawn(|| {
             let dir = tempfile::Builder::new()
                 .prefix("ken-px8f-classify-mixed-")
