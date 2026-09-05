@@ -5,12 +5,63 @@ status: draft
 owner: runtime
 size: L
 gate: none
-depends_on: [PX8-F-CAP-41, PX8-WROTE-ABS, PX8-ERRID-SCOPE, RT-NATIVE-CARRIED-VALUE]
+depends_on: [PX8-F-CAP-41, PX8-WROTE-ABS, PX8-ERRID-SCOPE, RT-NATIVE-CARRIED-VALUE, RT-WRITEALL-ERROR-ROUTE-NATIVE, RT-COMPMATCH-TREE-SCRUTINEE, PX8-NOPROGRESS-ABS]
 blocks: [PX9]
 github: null
 origin: docs/program/09-posix-linux-abi-campaign.md (charter, PX-C phase); closure condition added 2026-07-22 (operator-approved)
 ---
 
+> # CLOSURE-PROPERTY RE-VERIFIED = NO — 2026-09-05 (Architect evt_56ssrfbr4tt37,
+> # grounded structurally at main febce9a10; population re-derived from the closed
+> # effect_v1.rs sums, NOT the WP list). PX8 STAYS OPEN; ABI-R3 + PX9 STAY HELD.
+>
+> This is the standing operator plan (PX8-F-CAP-41 close-out, 2026-08-22: "PX8
+> stays OPEN until the native carried-value program lands") re-verified against
+> current main — NOT a reversal. RT-NATIVE-CARRIED-VALUE closing was ONE node of
+> that program, not its completion. The file working exactly as designed:
+> deps-green does not equal property-holds.
+>
+> WHAT HOLDS (the SUCCESS/progress half, both engines, ABSOLUTE — real value the
+> FOLD delivered): ReadSome{span,count}, ReadEof (§1.7.1 effective 0), Wrote incl.
+> capped-short, InvalidBounds/InvalidOffset/BufferLimit/AllocationFailed; co-index
+> clause (b) structural (TransferCountV1 carries effective_request; span.length ==
+> count; closed sums map 1:1 to LOCKED §1.7.2).
+>
+> WHY NO (the ERROR/termination half + writeAll route, "both engines absolute"
+> fails). The residual native carried-value program is only PARTIALLY landed.
+> Grounded gaps and their now-filed owners:
+> - G1 writeAll §1.7.3 obs 1/3/4 (all-full / write-zero->NoProgress / mid-stream
+>   Io error after exact prefix) unwitnessed on native (px8f_write_partition.rs:355
+>   IGNORED, ken-verify). OWNER = [[RT-WRITEALL-ERROR-ROUTE-NATIVE]] (A1, filed
+>   2026-09-05, active, GATE-0-first, option-(b) fork-ready). The critical
+>   sub-item; the error/termination continuation is DISTINCT from the success
+>   carry the FOLD closed (the old label named merged RT-CLOSURE-BOUNDARY-RESIDUAL).
+> - G2 host-Io error identities (Unsupported/BrokenPipe/Interrupted) on native
+>   have no projection arm. Home decided by a separability measurement (A2):
+>   mid-stream Interrupted rides the writeAll route (folds into A1); synchronous
+>   Unsupported / write-side BrokenPipe MAY be reachable via a direct host-failure
+>   fixture -> if separable, a small independent native-projection node (B2), else
+>   folds into A1. Not minted until the measurement lands.
+> - G3 NoProgress absolute oracle missing on the INTERPRETER. OWNER =
+>   [[PX8-NOPROGRESS-ABS]] (B1, filed 2026-09-05, ready, independent, S).
+> - G4 clause-(b) foreign-span-freeze rejection unwitnessed on native. OWNER =
+>   [[RT-COMPMATCH-TREE-SCRUTINEE]] (A3, existing draft). Weakest gap (shared
+>   dispatcher; interp + malformed-span controls cover the mechanism).
+> - G5 (secondary tail, GATE-0 per node, priority after A1/A3, NOT yet wired as
+>   PX8 deps pending per-node confirmation each is a distinct property VALUE vs
+>   coverage): [[RT-PROCESS-EXIT-STATUS]] (cross-buffer freeze->InvalidBounds),
+>   [[RT-CARRIED-RESOURCE-SCALAR]] + [[RT-SITEOP-CARRIED-WITNESS]] D2 residual
+>   (px7f escape/right-denial/second-release; buffer_allocate->InvalidBounds is
+>   COVERAGE-ONLY, InvalidBounds already native-witnessed = not a PX8 gate),
+>   [[RT-BORROWED-INPUT-CARRIER-DURABILITY]] (px8l recursive-decl execution trap).
+>
+> EXIT GATE (Architect-owned, binds above every node): PX8 closes when the
+> closure PROPERTY re-verifies — every positioned/partial-IO reified value (a)
+> absolute vs LOCKED §38, (b) co-indexed, on BOTH engines — NOT when these nodes
+> go green. The Architect re-derives the population structurally from the closed
+> effect_v1.rs sums AGAIN at the end, so a reified arm added meanwhile is caught.
+> Do not let node-green substitute for that re-verification.
+>
 > ## ⚠ STATUS CORRECTED `active` → `draft` — 2026-07-25 (Steward, tracker honesty)
 >
 > **Nothing is building this, and its `depends_on` is unmet** (`PX8-F-CAP-41`
