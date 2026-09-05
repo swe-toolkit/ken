@@ -372,9 +372,20 @@ impl<'s> Lexer<'s> {
         )
     }
 
+    /// The one retired match-arm spelling that is also a maximal run over the
+    /// admitted ASCII operator alphabet. Its Unicode twin `⇒` is outside that
+    /// alphabet and continues through the existing unexpected-character error.
+    fn retired_ascii_symbolic_spelling(lexeme: &str) -> Option<&'static str> {
+        match lexeme {
+            "=>" => Some("`=>` is retired; use `|->` or `↦` for a match arm"),
+            _ => None,
+        }
+    }
+
     /// Maximal symbolic run, classified through the complete pre-existing
-    /// ASCII token inventory before falling back to a user-defined name.
-    fn lex_symbolic_operator(&mut self, start: usize) -> (Token, Span) {
+    /// fixed and reserved ASCII inventory before falling back to a user-defined
+    /// name.
+    fn lex_symbolic_operator(&mut self, start: usize) -> Result<(Token, Span), ElabError> {
         while self
             .cur()
             .map(Self::is_symbolic_operator_char)
@@ -386,6 +397,12 @@ impl<'s> Lexer<'s> {
             self.advance();
         }
         let lexeme = &self.src[start..self.pos];
+        if let Some(msg) = Self::retired_ascii_symbolic_spelling(lexeme) {
+            return Err(ElabError::ParseError {
+                msg: msg.to_string(),
+                span: Span::new(start, self.pos),
+            });
+        }
         let token = match lexeme {
             ":" => Token::Colon,
             "::" => Token::DoubleColon,
@@ -410,7 +427,7 @@ impl<'s> Lexer<'s> {
             "/\\" => Token::And,
             _ => Token::Operator(lexeme.to_string()),
         };
-        (token, Span::new(start, self.pos))
+        Ok((token, Span::new(start, self.pos)))
     }
 
     // ── Literal-escape scanning (`31 §3`, LANG-SURFACE-LITERAL-ESCAPES) ────
@@ -762,7 +779,7 @@ impl<'s> Lexer<'s> {
         // or an ordinary user-defined operator name. Comment openers have
         // already been consumed by `skip_ws_comments`.
         if Self::is_symbolic_operator_char(c) {
-            return Ok(self.lex_symbolic_operator(start));
+            return self.lex_symbolic_operator(start);
         }
 
         // Single-char and multi-char punctuation

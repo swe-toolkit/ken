@@ -47,6 +47,33 @@ fn symbolic_character_run_lexes_to_one_carried_name() {
     );
 }
 
+/// MEASURED: the complete retired match-arm pair `=>`/`⇒` remains a lexical
+/// error, while longer symbolic names containing the same ASCII bytes remain
+/// admitted. CLAIMED: exact reserved spellings are not reintroduced as user
+/// names. THE GAP: a future retired symbolic spelling must be added to this
+/// inventory when it is retired; today the match-arm migration is the only
+/// landed retirement over the admitted ASCII alphabet.
+#[test]
+fn retired_match_arm_spellings_remain_lexically_reserved() {
+    for (source, expected_msg) in [
+        ("=>", "`=>` is retired; use `|->` or `↦` for a match arm"),
+        ("⇒", "unexpected character '⇒'"),
+    ] {
+        match Lexer::lex(source) {
+            Err(ElabError::ParseError { msg, span }) => {
+                assert_eq!(msg, expected_msg);
+                assert_eq!((span.start, span.end), (0, source.len()));
+            }
+            other => panic!(
+                "retired match-arm spelling {source:?} must remain the exact lexical error, got {other:?}"
+            ),
+        }
+    }
+
+    assert_eq!(lex_one("<=>"), Token::Operator("<=>".to_string()));
+    assert_eq!(lex_one("=>+"), Token::Operator("=>+".to_string()));
+}
+
 /// MEASURED: each pre-existing ASCII token spelling on the widened character
 /// surface retains its exact token discriminant. CLAIMED: symbolic-name lexing
 /// preserves all fixed punctuation/operator behavior. THE GAP: token identity
