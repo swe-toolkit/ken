@@ -1,7 +1,7 @@
 ---
 id: LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE
 title: "Roots-loader / module-surface completeness for synthesized instance dictionaries: a synthesized dictionary C_instance_T (the WIRE-mechanism real global an InstanceDecl/DeriveDecl produces) is a first-class NAMED declaration for ALL of roots/strict name resolution — (i) bind_local'd in its own module's per-unit scope, (ii) on its owning module's export surface by its canonical name, and (iii) selectively importable by that name. ONE predicate, three faces (§1b closure); NOT three point-fixes and NOT new pub-instance syntax. Completeness, not soundness; zero trusted-base delta (surface name resolution, not kernel; no instance bodies, no proof re-authoring). NOTE: the id says LOCAL but the ruled scope is the full three-face closure — see the widened-scope banner."
-status: active
+status: merged
 owner: language
 size: M
 gate: none

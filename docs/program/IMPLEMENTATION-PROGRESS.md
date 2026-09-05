@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 15:50:49Z — from 547 issue file(s) in `docs/program/issues/`.
+2026-09-05 16:35:45Z — from 547 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -227,7 +227,7 @@ the committed file matches the generator's output.
 | `LANG-RECORD-STACK-OVERFLOW` | The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token | merged | language | M | none | — |
 | `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` | The doc comment justifying LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT's -3120 saving says the pow10 cascade's arms are all bare literals, which the generator refutes -- only the True arms are, every False arm is the next nested match, and the innermost is an application; the conclusion survives, the recorded reason does not, and it misleads in both directions | merged | language | S | none | 2195 |
 | `LANG-RESULT-TRANSPORT-SIGMA-SWEEP` | Sibling-consumer sweep of the record-index Sigma closure: transport_recursive_group_call_result (elab.rs ~:1934, UNCHANGED by LANG-RECORD-INDEX-SIGMA-CLOSURE) consumes the SAME generated record-index premise as the three consumers that WP made Sigma-aware, but still via the whole-Eq path (try_reindex_cast -> build_index_type_cong -> J over the raw sentinel), NOT the new project_generated_index_equality_leaves walker. A recursive-group fn whose result type is indexed by a COMPONENT of the record (not the whole record) reaches subst_term_generalize, finds no whole-record term, and silently installs no per-component refinement — the exact completeness gap the parent WP closed in the other consumers, left in the result-transport sibling. CONFIRM-OR-REFUTE reachability, then fix-with-the-walker or record EXCLUDED with a cited reason. | draft | language | S | none | — |
-| `LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE` | Roots-loader / module-surface completeness for synthesized instance dictionaries: a synthesized dictionary C_instance_T (the WIRE-mechanism real global an InstanceDecl/DeriveDecl produces) is a first-class NAMED declaration for ALL of roots/strict name resolution — (i) bind_local'd in its own module's per-unit scope, (ii) on its owning module's export surface by its canonical name, and (iii) selectively importable by that name. ONE predicate, three faces (§1b closure); NOT three point-fixes and NOT new pub-instance syntax. Completeness, not soundness; zero trusted-base delta (surface name resolution, not kernel; no instance bodies, no proof re-authoring). NOTE: the id says LOCAL but the ruled scope is the full three-face closure — see the widened-scope banner. | active | language | M | none | — |
+| `LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE` | Roots-loader / module-surface completeness for synthesized instance dictionaries: a synthesized dictionary C_instance_T (the WIRE-mechanism real global an InstanceDecl/DeriveDecl produces) is a first-class NAMED declaration for ALL of roots/strict name resolution — (i) bind_local'd in its own module's per-unit scope, (ii) on its owning module's export surface by its canonical name, and (iii) selectively importable by that name. ONE predicate, three faces (§1b closure); NOT three point-fixes and NOT new pub-instance syntax. Completeness, not soundness; zero trusted-base delta (surface name resolution, not kernel; no instance bodies, no proof re-authoring). NOTE: the id says LOCAL but the ruled scope is the full three-face closure — see the widened-scope banner. | merged | language | M | none | — |
 | `LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN` | Ken's SCT termination checker traces a structural decrease only through a direct pattern match feeding the recursive call, so factoring a shared guard into a non-recursive helper reds NotTerminating -- forcing duplication at exactly the sites a checker wants one guard | draft | language | S | none | — |
 | `LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC` | The selector's non-universe classifier arm reports the elaborator's own refusal as KernelRejected and fabricates a Type(?0) expectation that Omega would equally satisfy | merged | language | S | none | — |
 | `LANG-SELECTOR-SORT-SPLIT-ELAB` | Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates | merged | language | L | none | — |
@@ -628,10 +628,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` blocked by `LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE` (status: active)
-- `CAT-MIGRATE-EC-FUNCTOR-IMPORT` blocked by `LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE` (status: active)
 - `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` blocked by `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` (status: draft)
-- `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` blocked by `LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE` (status: active)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
