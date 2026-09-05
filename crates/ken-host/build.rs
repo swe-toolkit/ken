@@ -23,6 +23,9 @@ fn main() {
     let target = env::var("TARGET").expect("Cargo provides TARGET");
     let host = env::var("HOST").expect("Cargo provides HOST");
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("Cargo provides target OS");
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").expect("Cargo provides target arch");
+    let target_endianness =
+        env::var("CARGO_CFG_TARGET_ENDIAN").expect("Cargo provides target endianness");
     if target_os != "linux" || target != host {
         panic!(
             "HostEffectAbiV1 layout generation is unavailable for target {target}; \
@@ -80,12 +83,30 @@ fn main() {
     let effect_catalog = parse_effect_catalog();
     write_host_effect_generated(&target, &effect_catalog, &effect_layout);
 
-    let families = group_facts_by_family(&facts);
-    let canonical = canonical_manifest(&target, &target_os, backend, &dependencies, &families);
+    let families = if backend == "linux_raw" {
+        group_facts_by_family(&facts)
+    } else {
+        assert!(
+            facts.is_empty(),
+            "an unavailable target ABI backend must not emit facts"
+        );
+        Vec::new()
+    };
+    let canonical = canonical_manifest(
+        &target,
+        &target_os,
+        &target_arch,
+        &target_endianness,
+        backend,
+        &dependencies,
+        &families,
+    );
     let hash: [u8; 32] = Sha256::digest(canonical.as_bytes()).into();
     write_generated(
         &target,
         &target_os,
+        &target_arch,
+        &target_endianness,
         backend,
         &dependencies,
         &facts,
@@ -344,6 +365,45 @@ fn package_identity(
     panic!("Cargo.lock lacks exact {name} {version}");
 }
 
+/// How one family-schema row claims facts.
+///
+/// Target identity is an exact compatibility vector: a broad `C_` prefix would
+/// silently absorb a future record-layout fact. Open-ended constant families
+/// use their closed namespace prefixes instead.
+#[derive(Clone, Copy)]
+enum FactSelector {
+    Exact(&'static [&'static str]),
+    Prefix(&'static [&'static str]),
+}
+
+impl FactSelector {
+    fn claims(self, name: &str) -> bool {
+        match self {
+            Self::Exact(names) => names.contains(&name),
+            Self::Prefix(prefixes) => prefixes.iter().any(|prefix| name.starts_with(prefix)),
+        }
+    }
+}
+
+const TARGET_IDENTITY_FACTS: &[&str] = &[
+    "POINTER_WIDTH",
+    "POINTER_ALIGNMENT",
+    "C_CHAR_WIDTH",
+    "C_CHAR_ALIGNMENT",
+    "C_SHORT_WIDTH",
+    "C_SHORT_ALIGNMENT",
+    "C_INT_WIDTH",
+    "C_INT_ALIGNMENT",
+    "C_LONG_WIDTH",
+    "C_LONG_ALIGNMENT",
+    "C_LONG_LONG_WIDTH",
+    "C_LONG_LONG_ALIGNMENT",
+    "C_FLOAT_WIDTH",
+    "C_FLOAT_ALIGNMENT",
+    "C_DOUBLE_WIDTH",
+    "C_DOUBLE_ALIGNMENT",
+];
+
 /// **`ABI-M1` `D1` -- the family schema, one row per `AbiFamily` variant.**
 ///
 /// `build.rs` cannot import `ken_host::AbiFamily`, so it names each family by
@@ -353,54 +413,94 @@ fn package_identity(
 /// `error[E0004]` in `lib.rs`. Neither side keeps a private list the other can
 /// drift from.
 ///
-/// The prefix is how a fact is assigned to its family. Assignment is TOTAL and
-/// checked at generation: a fact matching no prefix aborts the build rather
-/// than landing in a default family, because a silent default is exactly the
-/// omission this WP exists to remove.
-const FAMILY_SCHEMA: &[(&str, &str, u32, &[&str])] = &[
-    // (canonical name, emitted variant path, facility ABI version, fact prefixes)
-    ("target_identity", "AbiFamily::TargetIdentity", 1, &["POINTER_WIDTH", "C_INT_WIDTH"]),
-    ("open_flags", "AbiFamily::OpenFlags", 1, &["O_"]),
-    ("at_flags", "AbiFamily::AtFlags", 1, &["AT_"]),
-    ("mode", "AbiFamily::Mode", 1, &["MODE_"]),
-    ("syscall_number", "AbiFamily::SyscallNumber", 1, &["SYS_"]),
-    ("errno", "AbiFamily::Errno", 1, &["ERRNO_"]),
+/// The selector assigns facts to families. Assignment is TOTAL and UNIQUE at
+/// generation: a fact matching zero or multiple selectors aborts the build
+/// rather than landing in a default or first-match family.
+const FAMILY_SCHEMA: &[(&str, &str, u32, FactSelector)] = &[
+    // (canonical name, emitted variant path, facility ABI version, fact selector)
+    (
+        "target_identity",
+        "AbiFamily::TargetIdentity",
+        1,
+        FactSelector::Exact(TARGET_IDENTITY_FACTS),
+    ),
+    (
+        "open_flags",
+        "AbiFamily::OpenFlags",
+        1,
+        FactSelector::Prefix(&["O_"]),
+    ),
+    (
+        "at_flags",
+        "AbiFamily::AtFlags",
+        1,
+        FactSelector::Prefix(&["AT_"]),
+    ),
+    (
+        "mode",
+        "AbiFamily::Mode",
+        1,
+        FactSelector::Prefix(&["MODE_"]),
+    ),
+    (
+        "syscall_number",
+        "AbiFamily::SyscallNumber",
+        1,
+        FactSelector::Prefix(&["SYS_"]),
+    ),
+    (
+        "errno",
+        "AbiFamily::Errno",
+        1,
+        FactSelector::Prefix(&["ERRNO_"]),
+    ),
 ];
 
 /// Assign every fact to exactly one family, in schema order.
 ///
-/// Fails closed on an unassigned fact: a new fact whose prefix no family claims
-/// aborts generation, so it cannot be absorbed silently.
+/// Fails closed in both directions: a fact claimed by no family would be
+/// dropped, while a fact claimed by multiple families would be assigned by
+/// schema order rather than identity. Both are malformed schema states.
 fn group_facts_by_family<'a>(
     facts: &[(&'a str, u64)],
 ) -> Vec<(&'static str, &'static str, u32, Vec<(&'a str, u64)>)> {
-    let mut grouped = Vec::new();
-    let mut claimed = vec![false; facts.len()];
-    for (canonical, variant, version, prefixes) in FAMILY_SCHEMA {
-        let mut members = Vec::new();
-        for (index, (name, value)) in facts.iter().enumerate() {
-            if claimed[index] {
-                continue;
-            }
-            if prefixes.iter().any(|prefix| name.starts_with(prefix)) {
-                claimed[index] = true;
-                members.push((*name, *value));
-            }
-        }
-        grouped.push((*canonical, *variant, *version, members));
-    }
-    let unassigned: Vec<&str> = facts
+    let mut grouped = FAMILY_SCHEMA
         .iter()
-        .enumerate()
-        .filter(|(index, _)| !claimed[*index])
-        .map(|(_, (name, _))| *name)
-        .collect();
-    assert!(
-        unassigned.is_empty(),
-        "ABI-M1: these manifest facts belong to no family and would be dropped \
-         from every projection: {unassigned:?}. Add the fact to a family's \
-         prefixes in FAMILY_SCHEMA, or add its family."
-    );
+        .map(|(canonical, variant, version, _)| (*canonical, *variant, *version, Vec::new()))
+        .collect::<Vec<_>>();
+    for (name, value) in facts {
+        let matches = FAMILY_SCHEMA
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, _, _, selector))| selector.claims(name))
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            matches.len(),
+            1,
+            "ABI-M1: manifest fact {name} must belong to exactly one family; \
+             matched family schema rows {matches:?}"
+        );
+        grouped[matches[0]].3.push((*name, *value));
+    }
+    for (canonical, _, _, selector) in FAMILY_SCHEMA {
+        match selector {
+            FactSelector::Exact(declared) => {
+                for name in *declared {
+                    let emitted = facts
+                        .iter()
+                        .filter(|(candidate, _)| candidate == name)
+                        .count();
+                    assert_eq!(
+                        emitted, 1,
+                        "ABI-M1: exact family {canonical} declares fact {name}, but the \
+                         producer emitted it {emitted} times"
+                    );
+                }
+            }
+            FactSelector::Prefix(_) => {}
+        }
+    }
     grouped
 }
 
@@ -408,9 +508,16 @@ fn group_facts_by_family<'a>(
 fn canonical_family_projection(
     canonical: &str,
     facility_version: u32,
+    target_identity: Option<(&str, &str)>,
     facts: &[(&str, u64)],
 ) -> String {
-    let mut out = format!("family={canonical}\nfacility_version={facility_version}\nfact_count={}\n", facts.len());
+    let mut out = format!("family={canonical}\nfacility_version={facility_version}\n");
+    if let Some((target_arch, target_endianness)) = target_identity {
+        out.push_str(&format!(
+            "target_arch={target_arch}\ntarget_endianness={target_endianness}\n"
+        ));
+    }
+    out.push_str(&format!("fact_count={}\n", facts.len()));
     for (name, value) in facts {
         out.push_str(&format!("fact={name}|{value}\n"));
     }
@@ -421,8 +528,31 @@ fn canonical_family_projection(
 fn linux_raw_facts() -> Vec<(&'static str, u64)> {
     use linux_raw_sys::{errno, general};
     vec![
-        width_fact("POINTER_WIDTH", bit_width::<usize>()),
-        width_fact("C_INT_WIDTH", bit_width::<core::ffi::c_int>()),
+        layout_fact("POINTER_WIDTH", bit_width::<*const core::ffi::c_void>()),
+        layout_fact(
+            "POINTER_ALIGNMENT",
+            byte_alignment::<*const core::ffi::c_void>(),
+        ),
+        layout_fact("C_CHAR_WIDTH", bit_width::<core::ffi::c_char>()),
+        layout_fact("C_CHAR_ALIGNMENT", byte_alignment::<core::ffi::c_char>()),
+        layout_fact("C_SHORT_WIDTH", bit_width::<core::ffi::c_short>()),
+        layout_fact("C_SHORT_ALIGNMENT", byte_alignment::<core::ffi::c_short>()),
+        layout_fact("C_INT_WIDTH", bit_width::<core::ffi::c_int>()),
+        layout_fact("C_INT_ALIGNMENT", byte_alignment::<core::ffi::c_int>()),
+        layout_fact("C_LONG_WIDTH", bit_width::<core::ffi::c_long>()),
+        layout_fact("C_LONG_ALIGNMENT", byte_alignment::<core::ffi::c_long>()),
+        layout_fact("C_LONG_LONG_WIDTH", bit_width::<core::ffi::c_longlong>()),
+        layout_fact(
+            "C_LONG_LONG_ALIGNMENT",
+            byte_alignment::<core::ffi::c_longlong>(),
+        ),
+        layout_fact("C_FLOAT_WIDTH", bit_width::<core::ffi::c_float>()),
+        layout_fact("C_FLOAT_ALIGNMENT", byte_alignment::<core::ffi::c_float>()),
+        layout_fact("C_DOUBLE_WIDTH", bit_width::<core::ffi::c_double>()),
+        layout_fact(
+            "C_DOUBLE_ALIGNMENT",
+            byte_alignment::<core::ffi::c_double>(),
+        ),
         ("O_RDONLY", general::O_RDONLY.into()),
         ("O_WRONLY", general::O_WRONLY.into()),
         ("O_RDWR", general::O_RDWR.into()),
@@ -465,7 +595,12 @@ fn bit_width<T>() -> u64 {
 }
 
 #[cfg(target_os = "linux")]
-fn width_fact(name: &'static str, value: u64) -> (&'static str, u64) {
+fn byte_alignment<T>() -> u64 {
+    core::mem::align_of::<T>() as u64
+}
+
+#[cfg(target_os = "linux")]
+fn layout_fact(name: &'static str, value: u64) -> (&'static str, u64) {
     (name, value)
 }
 
@@ -520,6 +655,8 @@ fn run_probe(target: &str, host: &str, expected: &[(&str, u64)]) {
 fn canonical_manifest(
     target: &str,
     target_os: &str,
+    target_arch: &str,
+    target_endianness: &str,
     backend: &str,
     dependencies: &[(String, String, String, String)],
     families: &[(&str, &str, u32, Vec<(&str, u64)>)],
@@ -534,7 +671,10 @@ fn canonical_manifest(
     }
     out.push_str(&format!("family_count={}\n", families.len()));
     for (canonical, _variant, facility_version, facts) in families {
-        let projection = canonical_family_projection(canonical, *facility_version, facts);
+        let target_identity =
+            (*canonical == "target_identity").then_some((target_arch, target_endianness));
+        let projection =
+            canonical_family_projection(canonical, *facility_version, target_identity, facts);
         let digest: [u8; 32] = Sha256::digest(projection.as_bytes()).into();
         out.push_str(&format!(
             "family={canonical}|{facility_version}|{}|{}\n",
@@ -556,6 +696,8 @@ fn hex_lower(bytes: &[u8; 32]) -> String {
 fn write_generated(
     target: &str,
     target_os: &str,
+    target_arch: &str,
+    target_endianness: &str,
     backend: &str,
     dependencies: &[(String, String, String, String)],
     facts: &[(&str, u64)],
@@ -577,8 +719,14 @@ fn write_generated(
     let families = families
         .iter()
         .map(|(canonical_name, variant, facility_version, members)| {
-            let projection =
-                canonical_family_projection(canonical_name, *facility_version, members);
+            let target_identity = (*canonical_name == "target_identity")
+                .then_some((target_arch, target_endianness));
+            let projection = canonical_family_projection(
+                canonical_name,
+                *facility_version,
+                target_identity,
+                members,
+            );
             let digest: [u8; 32] = Sha256::digest(projection.as_bytes()).into();
             let member_facts = members
                 .iter()
@@ -592,7 +740,7 @@ fn write_generated(
     let generated = format!(
         "pub const TARGET_ABI_CANONICAL: &str = {canonical:?};\n\
          pub const TARGET_ABI_MANIFEST_HASH: [u8; 32] = {hash:?};\n\
-         pub const TARGET_ABI: TargetAbi = TargetAbi {{ schema_version: {SCHEMA_VERSION}, target: {target:?}, target_os: {target_os:?}, backend: {backend:?}, dependencies: &[{dependencies}], fact_count: {fact_count}, facts: &[{facts}], families: &[{families}], manifest_hash: TARGET_ABI_MANIFEST_HASH }};\n",
+         pub const TARGET_ABI: TargetAbi = TargetAbi {{ schema_version: {SCHEMA_VERSION}, target: {target:?}, target_os: {target_os:?}, target_arch: {target_arch:?}, target_endianness: {target_endianness:?}, backend: {backend:?}, dependencies: &[{dependencies}], fact_count: {fact_count}, facts: &[{facts}], families: &[{families}], manifest_hash: TARGET_ABI_MANIFEST_HASH }};\n",
         fact_count = facts.matches("AbiFact").count(),
     );
     fs::write(

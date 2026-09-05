@@ -8,7 +8,8 @@ Source: `docs/program/10-linux-abi-completion.md` Track M (`:135-142`), the §5
 dependency graph (`ABI_R3 -> ABI_M1 -> {ABI_M2, ABI_S4, PX10, PX11}`), and the
 campaign's AC discipline (`:316-317`).
 
-Fixed inputs measured at `origin/main a12f74158`.
+Fixed inputs measured at `origin/main a12f74158` and re-measured before the
+final increment at `origin/main bb52018ce`.
 
 ## Objective
 
@@ -33,8 +34,10 @@ canonical projection hash per family that composes into the whole-manifest hash.
    `linux_raw_facts` (`:346-385`), the C-header cross-check `run_probe` over
    `abi_probe.c`, fail-closed (`:402-432`), `TARGET_ABI` /
    `TARGET_ABI_MANIFEST_HASH` emit (`:474-475`), `SCHEMA_VERSION = 1` (`:9`),
-   canonical serialization + SHA-256 (`:84`, `:258`), non-Linux/cross target
-   records unavailable backend + no facts (`:70-77`).
+   and canonical serialization + SHA-256 (`:84`, `:258`). Re-measurement found
+   the apparent unavailable-manifest branches are behind the earlier native-only
+   HostEffect ABI guard: non-Linux/cross targets fail the build before generation
+   and produce no native manifest.
 3. The ABI-R3 derive precedent to mirror: `crates/ken-host/src/effect_v1.rs` —
    `HostOpV1::next_in_inventory` exhaustive match, no wildcard, omission is
    `error[E0004]` (`:100-130`); `COUNT` / `ALL` derived by walking the chain
@@ -121,6 +124,25 @@ Routed, NOT decided here:
 - D3 — honest reach (only if D1/D2 leave a bounded residual; state it, do not
   pad).
 
+## D3 honest reach
+
+The native target-identity compatibility vector covers pointer layout and the
+non-extended C arithmetic ranks for which `core::ffi` supplies the independent
+Rust-side authority: `char`, `short`, `int`, `long`, `long long`, `float`, and
+`double`. Corresponding signed and unsigned integer ranks have the same width
+and alignment, so the manifest does not duplicate them. It does not claim a
+layout for C `_Bool`, extended floating types, target-specific vectors, or
+records; a C-probe-only observation would not satisfy the sourced-from-source
+cross-check.
+
+The named cross-target residual is an **observable cross-target unavailable
+manifest**. Program 10 §3 and §8 defer that under cross-target/cross-compilation
+scope. ABI-M1 retains the stronger native-only refusal: unsupported targets do
+not build and receive no native manifest. The residual becomes an operator
+option-(B) scope decision only if a real cross-compilation consumer later needs
+graceful success. It does not mint a near-term node and does not authorize
+crossing or restructuring the native-only guard.
+
 ## Acceptance criteria (property + closure axis + loud failure)
 
 - AC-1. Adding a family or a fact to the schema without threading it through the
@@ -139,9 +161,9 @@ Routed, NOT decided here:
 - AC-5. The ken-verify catalog partition
   (`imported_catalog_partition_is_exact_and_closed`) stays exact and closed over
   the v2 manifest. Control: the existing partition test passes / is extended.
-- AC-6. Non-Linux / cross targets still record an unavailable backend and emit
-  no facts — no cross-target generation is added. Control: the existing
-  cross-target guard.
+- AC-6. Non-Linux/cross targets fail closed at the native-only ABI guard; no
+  native manifest is produced. Control: the existing cross-target guard remains
+  before generation and no cross-target generation is added.
 - AC-7 (designed return). If the family-schema representation is not cleanly
   expressible extending `TargetAbi`, D0 returns to the Architect with the
   symptom inventory rather than inventing a representation. This is a valid

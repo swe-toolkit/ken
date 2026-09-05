@@ -23,6 +23,11 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn native_identity_accepts_match_and_rejects_mismatch() {
+        assert_eq!(ken_host::TARGET_ABI.schema_version, 2);
+        assert_eq!(
+            NATIVE_TARGET_ABI_MANIFEST_HASH,
+            ken_host::TARGET_ABI.manifest_hash
+        );
         assert_native_target_abi().expect("matching native ABI identity");
         let mut mismatch = NATIVE_TARGET_ABI_MANIFEST_HASH;
         mismatch[0] ^= 1;
