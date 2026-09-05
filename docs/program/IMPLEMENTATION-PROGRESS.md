@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 00:39:05Z — from 542 issue file(s) in `docs/program/issues/`.
+2026-09-05 01:17:54Z — from 542 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -42,7 +42,7 @@ the committed file matches the generator's output.
 | `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | draft | runtime | M | none | — |
 | `ABI-A2` | promote FsAppendFile, FsMetadata, FsRename to NativeTested | draft | runtime | M | none | — |
 | `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | draft | runtime | M | none | — |
-| `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | active | runtime | L | none | — |
+| `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | merged | runtime | L | none | — |
 | `ABI-M2` | runtime facility/operation probes, distinct from build-time facts | draft | runtime | M | none | — |
 | `ABI-R1` | correct stale filesystem capability prose — scoped roots, rights, symlink policy and no-follow resolution have landed | closed | foundation | S | none | — |
 | `ABI-R3` | generated operation inventory derived from catalog structure — a new operation must be a build break | merged | runtime | M | none | — |
@@ -619,10 +619,8 @@ is itself not yet `merged`/`closed`:
 - `ABI-A1` blocked by `ABI-REVOKE` (status: draft)
 - `ABI-A2` blocked by `ABI-REVOKE` (status: draft)
 - `ABI-A3` blocked by `ABI-REVOKE` (status: draft)
-- `ABI-M2` blocked by `ABI-M1` (status: active)
 - `ABI-S1` blocked by `PX9` (status: draft)
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
-- `ABI-S4` blocked by `ABI-M1` (status: active)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` blocked by `LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE` (status: ready)
@@ -637,10 +635,8 @@ is itself not yet `merged`/`closed`:
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `PX10` blocked by `PX9` (status: draft)
-- `PX10` blocked by `ABI-M1` (status: active)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX11` blocked by `PX9` (status: draft)
-- `PX11` blocked by `ABI-M1` (status: active)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `PX8` blocked by `RT-NATIVE-CARRIED-VALUE` (status: active)
