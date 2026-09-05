@@ -50,7 +50,12 @@ these interfaces, so a `Monad List` instance can reuse the laws of
 canonical field per law:
 
 ```ken
-import Data.Collections.Derived (concat_map)
+import Core.Classes.LawfulFunctors
+  (Foldable, Foldable_instance_List, Foldable_instance_Option, Functor, Functor_instance_List, Functor_instance_Option, comp, idf, list_map)
+
+import Core.Logic.Transport (cong, sym, trans)
+
+import Data.Collections.Derived (concat_map, list_append)
 
 fn apply_to (a : Type) (b : Type) (y : a) (g : a → b) : b = g y
 
