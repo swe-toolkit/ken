@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-AS-PATTERN
 title: "as-patterns `p as x` -- the first contained slice of 34 §3's six absent pattern forms: the alias binds the value matched by p at its position, the inner p obeys the current position rules so the top-level non-constructor refusal stays fail-closed (keeping NoInhabitants honest), and the P1 association/precedence pin is honored forward-compatibly against the not-yet-existing or-pattern"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -10,6 +10,19 @@ blocks: []
 github: null
 origin: "Steward cut 2026-09-05 from the umbrella LANG-MATCH-PATTERN-FORMS-ABSENT on the spec-enclave disposition evt_12qrtnp7237dn ('release a first contained as-pattern slice rather than a six-form frame'). SPEC-MATCH-PATTERN-PINS merged at 34fd01c1 discharged the whole prerequisite pin column, so P1 (`p as x` association/precedence) is landed and this slice is cuttable. First of six slices; the umbrella stays draft and flips its as-pattern row when this lands. Anchors re-measured by the Steward at main 64e77119c before framing."
 ---
+
+> # RELEASED 2026-09-05 to the language ring (lane-2) — the next lane-2 WP.
+> # LANG-BYTES-HEX-LIST-LITERAL merged, and LANG-MEMBERSHIP-OPERATOR-SURFACE
+> # hard-stopped and is HELD pending an Architect decomposition, so this
+> # contained slice is the live lane-2 deliverable. Base = current main
+> # 76c87a74f. SPEC-MATCH-PATTERN-PINS is merged (P1 as-association/precedence
+> # landed), so the slice is cuttable. The elaborator pattern anchors are
+> # unchanged since the frame's measurement (PatKind ast.rs:167, top-level
+> # non-constructor refusal elab.rs:12325, RPatKind resolve.rs:54) — re-measure
+> # at cut and escalate a false fixed input rather than building around it. The
+> # load-bearing design line: the inner p keeps the current position rules so
+> # the top-level non-constructor refusal STAYS fail-closed (keeps NoInhabitants
+> # honest, does not reopen LANG-REACHABILITY-SUBSUMING-ARMS).
 
 ## What this is
 
