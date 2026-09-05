@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: L
 gate: none
-depends_on: [PX8-F-CAP-41, PX8-WROTE-ABS, PX8-ERRID-SCOPE, RT-NATIVE-CARRIED-VALUE, RT-WRITEALL-ERROR-ROUTE-NATIVE, RT-COMPMATCH-TREE-SCRUTINEE, PX8-NOPROGRESS-ABS]
+depends_on: [PX8-F-CAP-41, PX8-WROTE-ABS, PX8-ERRID-SCOPE, RT-NATIVE-CARRIED-VALUE, RT-WRITEALL-ERROR-ROUTE-NATIVE, RT-WRITEALL-IO-IDENTITY-COMPLETE, RT-COMPMATCH-TREE-SCRUTINEE, PX8-NOPROGRESS-ABS]
 blocks: [PX9]
 github: null
 origin: docs/program/09-posix-linux-abi-campaign.md (charter, PX-C phase); closure condition added 2026-07-22 (operator-approved)
@@ -36,12 +36,17 @@ origin: docs/program/09-posix-linux-abi-campaign.md (charter, PX-C phase); closu
 >   2026-09-05, active, GATE-0-first, option-(b) fork-ready). The critical
 >   sub-item; the error/termination continuation is DISTINCT from the success
 >   carry the FOLD closed (the old label named merged RT-CLOSURE-BOUNDARY-RESIDUAL).
-> - G2 host-Io error identities (Unsupported/BrokenPipe/Interrupted) on native
->   have no projection arm. Home decided by a separability measurement (A2):
->   mid-stream Interrupted rides the writeAll route (folds into A1); synchronous
->   Unsupported / write-side BrokenPipe MAY be reachable via a direct host-failure
->   fixture -> if separable, a small independent native-projection node (B2), else
->   folds into A1. Not minted until the measurement lands.
+> - G2 host-Io error identities (Unsupported/BrokenPipe/Interrupted) on native.
+>   RESOLVED into the writeAll route; NO B2. The separability measurement
+>   returned NO (runtime-implementer evt_1aqmj64zhk9b1, evidence 85d35017): a
+>   single positioned writeAt with an injected BrokenPipe/Unsupported refuses at
+>   StaticResponseDeferred BEFORE host dispatch, so there is no synchronous
+>   single-op Io identity off the writeAll boundary and no independent B2 node.
+>   Mid-stream Interrupted is witnessed by A1. The two remaining in-path
+>   identities (Unsupported/ENOSYS + BrokenPipe/EPIPE), forced as GENUINE
+>   mid-stream replies after an exact prior Wrote prefix, are owned by
+>   [[RT-WRITEALL-IO-IDENTITY-COMPLETE]] (filed 2026-09-05, active, S; a small
+>   serialized follow-up, same file, behind A1; Architect-reviewed candidate).
 > - G3 NoProgress absolute oracle missing on the INTERPRETER. OWNER =
 >   [[PX8-NOPROGRESS-ABS]] (B1, filed 2026-09-05, ready, independent, S).
 > - G4 clause-(b) foreign-span-freeze rejection unwitnessed on native. OWNER =
@@ -61,6 +66,20 @@ origin: docs/program/09-posix-linux-abi-campaign.md (charter, PX-C phase); closu
 > go green. The Architect re-derives the population structurally from the closed
 > effect_v1.rs sums AGAIN at the end, so a reified arm added meanwhile is caught.
 > Do not let node-green substitute for that re-verification.
+>
+> EXIT-GATE POPULATION IS BOUNDED (Architect evt_41vprsanc96e8, grounded
+> @f0e96061d): the property ranges over the positioned/partial-IO §1.7 reified
+> values ONLY — progress (ReadSome/ReadEof/Wrote/NoProgress), window
+> (InvalidBounds/InvalidOffset), buffer (BufferLimit/AllocationFailed), and the
+> IN-PATH host-Io identities (Interrupted + Unsupported + BrokenPipe) — NOT the
+> whole ResourceErrorV1 enum. The resource-lifecycle/authority identities
+> (Closed/RightNotHeld/ReleaseFailed/MalformedResource/ResourceKindMismatch) are
+> ADR-0021/ADR-0022's closure, on the authority track (RT-CARRIED-RESOURCE-SCALAR
+> et al.), OUTSIDE PX8. Per-row: rt_escape:755 + rt_parity:850 InvalidBounds are
+> COVERAGE-ONLY (already positioned-witnessed at rt_parity:4763/:884); px7f
+> Closed/RightNotHeld and px8l closure-representation traps are off the
+> reified-value axis. So the PX8 residual is A1 + RT-WRITEALL-IO-IDENTITY-COMPLETE
+> + A3 (RT-COMPMATCH-TREE-SCRUTINEE) + B1 (PX8-NOPROGRESS-ABS); no B2, no G5.
 >
 > ## ⚠ STATUS CORRECTED `active` → `draft` — 2026-07-25 (Steward, tracker honesty)
 >
