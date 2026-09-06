@@ -3,7 +3,7 @@ id: ABI-A1
 title: "promote ConsoleRead and ClockWallNow to NativeTested with differential evidence"
 status: active
 owner: runtime
-size: M
+size: L
 gate: none
 depends_on: [ABI-REVOKE]
 blocks: []
@@ -23,6 +23,11 @@ origin: docs/program/10-linux-abi-completion.md §4 (the ABI-completion program)
 > 2026-09-06 concurrence to run Track A now; `depends_on: [ABI-REVOKE]` merged
 > (`3e1b21cf1`). A2 (`FsAppendFile`/`FsMetadata`/`FsRename`, path policy) and A3
 > (directory mutation, `depends_on ABI-R3`) follow this slice.
+> **D0 REFRAME 2026-09-06 (size M→L):** runtime's D0 found native execution for
+> both operations is absent (deferred), so the native leg (`ProcessHost`
+> methods + `ken_host_dispatch_v1` decode arms) is folded into this node as
+> `D-NATIVE` — subsume, don't proliferate. See the frame's D0 REFRAME block. Node
+> stays active; same ring, same `wp/ABI-A1` branch (nothing was started).
 
 ## Objective
 
