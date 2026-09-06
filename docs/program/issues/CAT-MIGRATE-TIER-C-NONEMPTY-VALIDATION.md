@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION
 title: "Scaffold-retirement Tier C, held component: migrate the {NonEmpty, Validation} WCC off fixture scaffolding onto real imports, once their split-out predecessors are published. Same per-module publish+import+standalone shape as the Tier C ready lane; NonEmpty before Validation (the intra-tier edge). NO class-instance relocation, NO invented pub instance."
-status: draft
+status: active
 owner: foundation
 size: M
 gate: none
@@ -12,6 +12,19 @@ github: null
 origin: "Steward, 2026-09-03, split out of [[CAT-MIGRATE-TIER-C-DATA-VALUE]] on the confirmed D0 census (foundation evt_19kq7r92attpy, Architect confirmation evt_4hp6qxkdaqgbz). The census measured {NonEmpty, Validation} as a WCC (edge NonEmpty -> Validation) that sits behind UNPUBLISHED split-out providers, so the DAG-axis discipline holds it out of the ready lane: NonEmpty needs private LF Semigroup ([[CAT-MIGRATE-LF-SEMIGROUP-PUBLISH]]); Validation needs private EC apply_to/compose/functor_map_of/Applicative AND EC itself roots-loads red at Functor / Functor_instance_Identity, i.e. blocked on the Language roots-loader faces-3 cross-module export+import predecessor ([[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] follow-up) PLUS the EC provider-widen ([[CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS]]). Validation also names Semigroup_instance_NonEmpty (a synthesized dict) in a checked example — that resolves ONLY via the predecessor's imported-head carry, NEVER an invented pub instance. Held until all three predecessors land; then released one behind the ready lane."
 ---
 
+> # RE-RELEASED 2026-09-06 to the foundation ring (lane-3). BOTH predecessors of
+> # the D1 rescope have LANDED: LANG-ABSTRACT-EXPORT-PARAM-ELAB (the elaborator
+> # two-faced/arity fix, ba81c9777 / node close 68642cbc6) and the §4.2 spec text
+> # LANG-ABSTRACT-EXPORT-PARAM-spec (560dd455b). All four depends_on are merged.
+> # Base = current main 68642cbc6 (re-measure at cut per D0). Foundation seat is
+> # gpt-5.6-terra/medium (T2) -- correct for this M/T2 node; the D1 rescope
+> # (abstract type + smart constructors, executing the Architect's specified
+> # design) stays T2. D0 FIRST (re-census both modules at the new cut -- providers
+> # and anchors moved since the original D0), then the RESCOPED D1 NonEmpty (see
+> # Deliverables), then D2 Validation. A measured drift needing intrinsic-T1 work
+> # is a HARD STOP to Steward + Architect, not a push-through. The RE-HELD history
+> # below is retained for context.
+> #
 > # RE-HELD 2026-09-06 after a D1 hard stop. It WAS released 2026-09-06 (its
 > # three original predecessors merged); the foundation ring ran D0 clean, then D1
 > # hard-stopped: `pub data NonEmpty` at the module level flips the checked
@@ -82,15 +95,29 @@ condition each increment closes (see the parent frame's "Not a regression fix").
   0. The `Semigroup_instance_NonEmpty` example still resolves via imported-head
   carry only.
 
-## Acceptance criteria — the proven Tier-A / EC / ready-lane shape
+## Acceptance criteria — proven shape, adjusted for the D1 abstract-export rescope
 
-Identical to [[CAT-MIGRATE-TIER-C-DATA-VALUE]]: AC-EXPORTED (per published symbol,
+From [[CAT-MIGRATE-TIER-C-DATA-VALUE]]: AC-EXPORTED (per published symbol,
 loader-resolved with a still-private-sibling control), AC-EXACT-INVENTORY (per
 module, per-symbol reddening mutation), AC-STANDALONE-GREEN (removing the import
-line restores the exact prior standalone failure), AC-VISIBILITY-ONLY (any `pub`
-is a byte-unchanged body, mints no second class/instance), AC-NO-REGRESSION
-(complete affected-target closure, scoped by changed paths, targeted via
-`scripts/ken-cargo`, never `--workspace` — green in CI is the workspace verdict).
+line restores the exact prior standalone failure), AC-NO-REGRESSION (complete
+affected-target closure, scoped by changed paths, targeted via `scripts/ken-cargo`,
+never `--workspace` — green in CI is the workspace verdict).
+
+**AC-VISIBILITY-ONLY — adjusted for the abstract-export rescope.** Pub-widening of
+EXISTING symbols (accessors head/tail/to_list/map/append, the Semigroup instance
+and its law) is a byte-unchanged body. The ONLY permitted new definitions are the
+two Architect-specified smart constructors (`nonempty_singleton`, `nonempty_cons`)
+whose bodies are exactly the trivial `NonEmptyCons` wrappers named in D1 — no other
+new pub symbol, NO second class/instance, NO invented `pub instance`. Raw
+`NonEmptyCons` is REMOVED from the client Public API (the type is abstract to
+clients); the raw constructor stays internal to the defining module.
+
+**AC-ABSTRACT (new, per Architect evt_4s9y6bpyzgaet).** A CLIENT module cannot
+match or construct `NonEmpty` via its raw constructor (opaque view); it constructs
+only through the smart constructors and eliminates only through the accessors.
+Control: the raw-constructor reference that compiles INSIDE the defining module is
+rejected from a client.
 
 ## Gate, reviewer, sequencing
 
