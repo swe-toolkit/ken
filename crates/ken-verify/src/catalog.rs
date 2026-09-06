@@ -43,6 +43,26 @@ impl NativeTestedEvidence {
         }
     }
 
+    /// ClockWallNow is nondeterministic, so its promotion evidence uses the
+    /// operation-specific symmetric projection rather than pretending two real
+    /// instants should be byte-equal. The projection still compares the full
+    /// external observation after erasing only the Instant field.
+    pub fn from_clock_wall_now_run(run: &CanonicalDifferentialRun) -> Self {
+        let operation = HostOpV1::ClockWallNow;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run.compare_clock_wall_now().is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
     /// CaptureHost and hand-fed observations can exercise comparator units but
     /// can never manufacture exact-artifact evidence.
     pub fn unit_or_negative_control(

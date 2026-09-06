@@ -238,6 +238,7 @@ fn runtime_producible_constructors(
         read_some,
         read_eof,
         wrote,
+        mk_instant,
         unit,
         bool_false,
         bool_true,
@@ -281,6 +282,7 @@ fn runtime_producible_constructors(
         read_some,
         read_eof,
         wrote,
+        mk_instant,
         unit,
         bool_false,
         bool_true,
@@ -764,9 +766,15 @@ impl EffectSeatLedger {
                 open.effect_origin
             )));
         }
-        if planned.is_empty() {
+        if planned.is_empty() && operation != ken_host::HostOpV1::ClockWallNow {
             return Err(backend_module(format!(
                 "host effect seat ledger: {effect_origin:?} is visited but plans no seat at all"
+            )));
+        }
+        if operation == ken_host::HostOpV1::ClockWallNow && !planned.is_empty() {
+            return Err(backend_module(format!(
+                "host effect seat ledger: zero-arity ClockWallNow \
+                 {effect_origin:?} planned unexpected seats {planned:?}"
             )));
         }
         let id = effect_seat_group::mint(&mut self.next_group);
@@ -1717,6 +1725,105 @@ impl<'a> Lowering<'a> {
         self.function_local.native_int_tags.insert(value, tag);
         Lowered::Int { value, known: None }
     }
+
+    /// Decode ProcessHost's exact signed-i128 big-endian Instant field through
+    /// the existing arbitrary-precision Int interner. The response span is
+    /// validated before either limb is loaded; no host pointer escapes.
+    fn lower_wall_clock_instant_int(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        pointer: cranelift_codegen::ir::Value,
+        len: cranelift_codegen::ir::Value,
+    ) -> Result<Lowered, CraneliftBackendError> {
+        Self::require_i64(builder, len, std::mem::size_of::<i128>() as i64);
+        let pointer_type = builder.func.dfg.value_type(pointer);
+        let null = builder.ins().iconst(pointer_type, 0);
+        let present = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+            pointer,
+            null,
+        );
+        Self::require_true(builder, present);
+
+        // HostReplyV1 carries the signed field in network byte order so the
+        // canonical trace has one target-independent spelling. Native lowering
+        // runs only on the little-endian x86_64 target and byte-swaps each limb
+        // before converting two's complement into sign plus magnitude.
+        let high = builder
+            .ins()
+            .load(types::I64, MemFlags::trusted(), pointer, 0);
+        let low = builder
+            .ins()
+            .load(types::I64, MemFlags::trusted(), pointer, 8);
+        let high = builder.ins().bswap(high);
+        let low = builder.ins().bswap(low);
+        let sign = builder.ins().ushr_imm(high, 63);
+        let negative = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+            sign,
+            0,
+        );
+
+        let negative_low = builder.ins().ineg(low);
+        let carry = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            negative_low,
+            0,
+        );
+        let carry = builder.ins().uextend(types::I64, carry);
+        let inverted_high = builder.ins().bnot(high);
+        let negative_high = builder.ins().iadd(inverted_high, carry);
+        let magnitude_low = builder.ins().select(negative, negative_low, low);
+        let magnitude_high = builder.ins().select(negative, negative_high, high);
+
+        let limbs = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            16,
+            3,
+        ));
+        builder.ins().stack_store(magnitude_low, limbs, 0);
+        builder.ins().stack_store(magnitude_high, limbs, 8);
+        let high_nonzero = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+            magnitude_high,
+            0,
+        );
+        let one = builder.ins().iconst(types::I64, 1);
+        let two = builder.ins().iconst(types::I64, 2);
+        let limb_count = builder.ins().select(high_nonzero, two, one);
+
+        let arena = self.function_local.native_int_arena.ok_or_else(|| {
+            unsupported("ClockWallNow", "Instant Int has no invocation arena")
+        })?;
+        let helper = self.function_local.native_int_intern.ok_or_else(|| {
+            unsupported("ClockWallNow", "Instant Int has no local intern helper")
+        })?;
+        let output = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            16,
+            3,
+        ));
+        let limbs = builder.ins().stack_addr(pointer_type, limbs, 0);
+        let output_pointer = builder.ins().stack_addr(pointer_type, output, 0);
+        let call = builder
+            .ins()
+            .call(helper, &[arena, sign, limbs, limb_count, output_pointer]);
+        Self::require_i64(builder, builder.inst_results(call)[0], 0);
+        let pair = NativeScalarPairV1 {
+            tag: builder.ins().stack_load(types::I64, output, 0),
+            payload: builder.ins().stack_load(types::I64, output, 8),
+        };
+        Self::require_one_of_i64(
+            builder,
+            pair.tag,
+            &[
+                crate::NATIVE_INT_SMALL_TAG_V1 as i64,
+                crate::NATIVE_INT_BIG_TAG_V1 as i64,
+            ],
+        );
+        Ok(self.lowered_from_scalar_pair(ScalarMergeKind::Int, pair))
+    }
+
     fn require_u8(builder: &mut FunctionBuilder<'_>, value: cranelift_codegen::ir::Value) {
         let valid = builder.create_block();
         let invalid = builder.create_block();
@@ -2255,6 +2362,18 @@ impl<'a> Lowering<'a> {
                 ),
             ));
         }
+        // `RT-DEAD-ARM-EFFECT-LOWERING` completion: admission changes whether
+        // the host operation has a native emitter, never whether the enclosing
+        // request arm is constructible. An admitted effect in a proven-dead arm
+        // must therefore take the same fail-closed trap as an unavailable one,
+        // before its unreachable operands or continuation reach a later
+        // specialized-only refusal surface.
+        if self.effect_arm_is_provably_dead(static_origin)? {
+            self.disposition_dead_arm_joins(static_origin)?;
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                dead_arm_effect_trap(family, operation),
+            )));
+        }
         let argument_base = usize::from(capability.is_some());
         let lowered = args
             .iter()
@@ -2477,6 +2596,14 @@ impl<'a> Lowering<'a> {
                 });
             };
         match operation {
+            ken_host::HostOpV1::ClockWallNow => {
+                if capability.is_some() || !args.is_empty() {
+                    return Err(unsupported(
+                        "Effect",
+                        "ambient ClockWallNow carried an operand",
+                    ));
+                }
+            }
             ken_host::HostOpV1::ConsoleWrite
             | ken_host::HostOpV1::ConsoleFlush
             | ken_host::HostOpV1::ConsoleIsTerminal => {
@@ -2946,6 +3073,38 @@ impl<'a> Lowering<'a> {
                 value: detail,
                 known: None,
             }))
+        } else if operation == ken_host::HostOpV1::ClockWallNow {
+            Self::require_i64(builder, tag, wire.reply_bytes_tag as i64);
+            let response_pointer = builder.ins().stack_load(
+                pointer_type,
+                reply,
+                i32::try_from(wire.reply_bytes_data_offset)
+                    .expect("reply bytes data offset is u32"),
+            );
+            let response_len = builder.ins().stack_load(
+                types::I64,
+                reply,
+                i32::try_from(wire.reply_bytes_len_offset)
+                    .expect("reply bytes len offset is u32"),
+            );
+            let instant_int = self.lower_wall_clock_instant_int(
+                builder,
+                response_pointer,
+                response_len,
+            )?;
+            let ok_root = SynthesizedAggregatePath::root(
+                SynthesizedAggregateRoot::HostResultOk,
+            );
+            let instant = self.synthesized_constructor(
+                static_origin,
+                &ok_root,
+                SynthesizedFixedConstructorRole::MkInstant,
+                self.process_symbols.mk_instant.clone(),
+                vec![SynthesizedArgument::Scalar(instant_int)],
+                &seats,
+            )?;
+            self.reconcile_host_result_root(static_origin, &ok_root, &instant)?;
+            Ok(LoweringOperand::Specialized(instant))
         } else {
             let success_tag = match operation {
                 ken_host::HostOpV1::FsReadFile => wire.reply_bytes_tag,

@@ -117,11 +117,12 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ReadSome,
     ReadEof,
     Wrote,
+    MkInstant,
     Unit,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 26] = [
+    pub(super) const ALL: [Self; 27] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -147,6 +148,7 @@ impl SynthesizedFixedConstructorRole {
         Self::ReadSome,
         Self::ReadEof,
         Self::Wrote,
+        Self::MkInstant,
         Self::Unit,
     ];
 
@@ -177,6 +179,7 @@ impl SynthesizedFixedConstructorRole {
             Self::ReadSome => &symbols.read_some,
             Self::ReadEof => &symbols.read_eof,
             Self::Wrote => &symbols.wrote,
+            Self::MkInstant => &symbols.mk_instant,
             Self::Unit => &symbols.unit,
         }
     }
@@ -724,6 +727,13 @@ pub(super) fn build_synthesized_constructor_inventory(
 > {
     let mut identities = BTreeMap::new();
     for role in SynthesizedFixedConstructorRole::ALL {
+        // ABI-A1 appends its new role after the pre-existing fixed + IOError
+        // population below. Inserting it before the IOError run would move
+        // every established semantic identity merely because Clock gained one
+        // constructor; the map does not require declaration-order allocation.
+        if role == SynthesizedFixedConstructorRole::MkInstant {
+            continue;
+        }
         let span = arena.intern(role.spelling(symbols).as_bytes())?;
         identities.insert(SynthesizedConstructorRole::Fixed(role), span);
     }
@@ -744,6 +754,9 @@ pub(super) fn build_synthesized_constructor_inventory(
         }
         io_roles.push(role);
     }
+    let role = SynthesizedFixedConstructorRole::MkInstant;
+    let span = arena.intern(role.spelling(symbols).as_bytes())?;
+    identities.insert(SynthesizedConstructorRole::Fixed(role), span);
     Ok((identities, io_roles))
 }
 

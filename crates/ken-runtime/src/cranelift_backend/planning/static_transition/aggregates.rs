@@ -3333,6 +3333,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         role: R::Wrote,
         children: &[TRANSFER_COUNT],
     };
+    /// The direct Clock response: `MkInstant <host signed nanoseconds>`.
+    const INSTANT: SynthesizedAggregateNode = N::Fixed {
+        role: R::MkInstant,
+        children: &[N::native_int()],
+    };
     const UNIT: SynthesizedAggregateNode = N::nullary(R::Unit);
 
     let (error, ok) = match operation {
@@ -3340,6 +3345,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         // exists. Not a gap: the early return is above the synthesis entirely.
         Op::ConsoleIsTerminal => (N::Absent, N::Absent),
         Op::ConsoleWrite | Op::ConsoleFlush => (IO_ERRORS, UNIT),
+        Op::ClockWallNow => (N::Absent, INSTANT),
         Op::FsReadFile => (READ_FILE_ERROR, N::Absent),
         Op::FsOpen => (READ_FILE_ERROR, N::Absent),
         // ⚠ The `ok` arm here is the emitter's `else` branch, which is `Unit`.
@@ -10211,6 +10217,10 @@ mod tests {
                 Op::ConsoleFlush,
                 console_error().into_iter().chain(unit()).collect(),
             ),
+            (
+                Op::ClockWallNow,
+                vec![(path(OK, &[]), Fixed(R::MkInstant))],
+            ),
             (Op::FsReadFile, file_error(R::FileOperationRead)),
             (Op::FsOpen, file_error(R::FileOperationRead)),
             // ⚠ DERIVED, not observed — no fixture exercises these two. The
@@ -11070,6 +11080,7 @@ mod tests {
             Op::ConsoleIsTerminal,
             Op::ConsoleWrite,
             Op::ConsoleFlush,
+            Op::ClockWallNow,
             Op::FsReadFile,
             Op::FsOpen,
             Op::FsWriteFile,

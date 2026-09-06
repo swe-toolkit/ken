@@ -23,6 +23,10 @@ pub struct AmbientScript {
     pub stdout_is_terminal: bool,
     pub stderr_is_terminal: bool,
     pub wall_clock_nanoseconds: Vec<BigInt>,
+    /// Use the same real wall clock as the production native lane. Kept
+    /// explicit so an accidentally unscripted deterministic fixture still
+    /// fails loudly rather than acquiring nondeterminism.
+    pub use_real_wall_clock: bool,
     pub monotonic_clock_nanoseconds: Vec<BigInt>,
     pub entropy_bytes: Vec<Vec<u8>>,
 }
@@ -77,6 +81,8 @@ pub struct ScriptedPosixHost {
     stderr: Vec<u8>,
     terminals: [bool; 3],
     wall_clock_nanoseconds: VecDeque<BigInt>,
+    wall_clock_is_scripted: bool,
+    use_real_wall_clock: bool,
     monotonic_clock_nanoseconds: VecDeque<BigInt>,
     entropy_bytes: VecDeque<Vec<u8>>,
     sleep_deadlines: Vec<BigInt>,
@@ -89,6 +95,7 @@ pub struct ScriptedPosixHost {
 
 impl ScriptedPosixHost {
     pub fn new_at(root: impl AsRef<Path>, script: AmbientScript) -> Self {
+        let wall_clock_is_scripted = !script.wall_clock_nanoseconds.is_empty();
         Self {
             inner: PosixHost::new_at(root),
             scoped_cap: None,
@@ -101,6 +108,8 @@ impl ScriptedPosixHost {
                 script.stderr_is_terminal,
             ],
             wall_clock_nanoseconds: script.wall_clock_nanoseconds.into(),
+            wall_clock_is_scripted,
+            use_real_wall_clock: script.use_real_wall_clock,
             monotonic_clock_nanoseconds: script.monotonic_clock_nanoseconds.into(),
             entropy_bytes: script.entropy_bytes.into(),
             sleep_deadlines: Vec::new(),
@@ -248,9 +257,18 @@ impl HostHandler for ScriptedPosixHost {
     }
 
     fn clock_wall_now(&mut self) -> BigInt {
-        self.wall_clock_nanoseconds
-            .pop_front()
-            .expect("PX6 Clock.WallNow requires an explicit scripted response")
+        if self.wall_clock_is_scripted {
+            self.wall_clock_nanoseconds
+                .pop_front()
+                .expect("PX6 scripted Clock.WallNow responses were exhausted")
+        } else if self.use_real_wall_clock {
+            self.inner.clock_wall_now()
+        } else {
+            panic!(
+                "PX6 Clock.WallNow requires an explicit scripted response or \
+                 explicit real-clock response"
+            )
+        }
     }
 
     fn clock_monotonic_now(&mut self) -> BigInt {

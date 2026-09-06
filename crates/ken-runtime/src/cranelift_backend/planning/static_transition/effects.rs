@@ -343,10 +343,11 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 13] = [
+    [ken_host::HostOpV1; 14] = [
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
     ken_host::HostOpV1::ConsoleIsTerminal,
+    ken_host::HostOpV1::ClockWallNow,
     ken_host::HostOpV1::FsReadFile,
     ken_host::HostOpV1::FsWriteFile,
     ken_host::HostOpV1::FsChangeMode,
@@ -361,7 +362,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
 
 /// The seat contract of one admitted operation at one semantic ordinal.
 ///
-/// ⛔ **Total over the 13 admitted operations, with no `_` arm**, so a new
+/// **Total over the 14 admitted operations, with no `_` arm**, so a new
 /// admitted operation is a compile error here rather than an operation whose
 /// seats silently have no contract. `None` means the operation has no seat at
 /// that ordinal, which is an arity disagreement and is refused by the caller —
@@ -525,6 +526,7 @@ fn host_effect_seat_contract(
             Op::ConsoleWrite
             | Op::ConsoleFlush
             | Op::ConsoleIsTerminal
+            | Op::ClockWallNow
             | Op::FsReadFile
             | Op::FsWriteFile
             | Op::FsChangeMode
@@ -544,7 +546,6 @@ fn host_effect_seat_contract(
         // seats silently answer `None`.
         (
             Op::ConsoleRead
-            | Op::ClockWallNow
             | Op::ClockMonotonicNow
             | Op::ClockSleepUntil
             | Op::FsAppendFile

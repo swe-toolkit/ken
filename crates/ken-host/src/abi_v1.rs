@@ -161,7 +161,8 @@ struct ConsoleStreamRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
+// C has no zero-sized records; zero-arity requests never read this byte.
+#[allow(dead_code)]
 struct UnitRequestV1 {
     reserved: u8,
 }
@@ -417,6 +418,22 @@ impl ProcessHost {
 }
 
 impl HostEffectBackendV1 for ProcessHost {
+    fn clock_wall_now(&mut self) -> Vec<u8> {
+        let nanoseconds = match std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+        {
+            Ok(duration) => i128::try_from(duration.as_nanos())
+                .expect("a SystemTime duration always fits signed nanoseconds"),
+            Err(error) => -i128::try_from(error.duration().as_nanos())
+                .expect("a SystemTime duration always fits signed nanoseconds"),
+        };
+        // The semantic Instant carrier is an arbitrary-precision signed Int.
+        // A fixed signed-i128 big-endian field is a valid signed integer byte
+        // sequence, and lets generated code validate one exact
+        // response layout before interning the magnitude.
+        nanoseconds.to_be_bytes().to_vec()
+    }
+
     fn console_write(
         &mut self,
         stream: ConsoleStreamV1,
@@ -955,7 +972,9 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
             reply.tag = REPLY_BOOL;
             reply.detail = u64::from(value);
         }
-        CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(bytes)) => {
+        CanonicalOutcomeV1::Success(
+            CanonicalReplyV1::Bytes(bytes) | CanonicalReplyV1::Instant(bytes),
+        ) => {
             context.response_arena.push(bytes.into_boxed_slice());
             let bytes = context
                 .response_arena
@@ -1221,6 +1240,17 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                     stream,
                     bytes: bytes.to_vec(),
                 },
+            )
+        }
+        HostOpV1::ClockWallNow
+            if request_size == std::mem::size_of::<UnitRequestV1>() => {
+            if !request.cast::<UnitRequestV1>().is_aligned() {
+                return -1;
+            }
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ClockWallNow,
             )
         }
         HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal
@@ -2126,6 +2156,78 @@ mod tests {
         assert_eq!(reply.tag, REPLY_ERROR);
         assert_eq!(reply.detail, 11, "Revoked keeps its distinct IOError tag");
         assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector for the executable
+    /// boundary. The real raw dispatcher
+    /// must decode the zero-arity ClockWallNow request instead of falling to
+    /// `-3`, return the manifested HostReplyV1 bytes field, and record the same
+    /// canonical Instant response that the semantic dispatcher produced.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn clock_wall_now_raw_dispatch_returns_a_plausible_instant_response() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-clock-wall-native-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let initialized = context(&directory);
+        let request = UnitRequestV1 { reserved: 0 };
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: 0,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let before = ProcessHost.clock_wall_now();
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::ClockWallNow as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<UnitRequestV1>(),
+                std::ptr::from_mut(&mut reply).cast(),
+            )
+        };
+        let after = ProcessHost.clock_wall_now();
+
+        assert_eq!(status, 0, "ClockWallNow must not take the -3 fallback");
+        assert_eq!(reply.tag, REPLY_BYTES);
+        assert_eq!(reply.detail, 0);
+        assert_eq!(reply.bytes.len, std::mem::size_of::<i128>());
+        let bytes = unsafe {
+            std::slice::from_raw_parts(reply.bytes.data, reply.bytes.len)
+        };
+        let bytes: [u8; 16] = bytes
+            .try_into()
+            .expect("the response is one signed i128");
+        let reading = i128::from_be_bytes(bytes);
+        let before = i128::from_be_bytes(before.try_into().unwrap());
+        let after = i128::from_be_bytes(after.try_into().unwrap());
+        assert!(
+            before <= reading && reading <= after,
+            "raw wall reading {reading} lies outside its controlled \
+             [{before}, {after}] window"
+        );
+
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        let [event] = context.effect_trace.as_slice() else {
+            panic!("one raw dispatch must record exactly one event")
+        };
+        assert_eq!(event.operation, HostOpV1::ClockWallNow);
+        assert_eq!(event.request, CanonicalRequestV1::ClockWallNow);
+        assert_eq!(
+            event.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Instant(bytes.to_vec()))
+        );
 
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         std::fs::remove_dir_all(directory).unwrap();

@@ -254,6 +254,7 @@ runtime_host_spine_v1! {
     read_some,
     read_eof,
     wrote,
+    mk_instant,
     unit,
     bool_false,
     bool_true,
