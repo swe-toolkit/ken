@@ -663,6 +663,9 @@ fn collect_binder_spans(binder: &Binder, out: &mut Vec<Span>) {
 fn collect_match_arm_spans(arm: &MatchArm, out: &mut Vec<Span>) {
     out.push(arm.span.clone());
     collect_pattern_spans(&arm.pat, out);
+    if let Some(guard) = &arm.guard {
+        collect_expr_spans(guard, out);
+    }
     collect_expr_spans(&arm.body, out);
 }
 

@@ -74,6 +74,7 @@ pub enum RPatKind {
 #[derive(Clone, Debug)]
 pub struct RMatchArm {
     pub pat: RPattern,
+    pub guard: Option<RExpr>,
     pub body: RExpr,
     pub span: Span,
 }
@@ -1938,6 +1939,11 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
                 if let Some(equation) = equation {
                     scope.push(equation);
                 }
+                let rguard = arm
+                    .guard
+                    .as_ref()
+                    .map(|guard| resolve_expr_ctx(scope, guard, ctx))
+                    .transpose()?;
                 let rbody = resolve_expr_ctx(scope, &arm.body, ctx)?;
                 if equation.is_some() {
                     scope.pop();
@@ -1948,6 +1954,7 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
                 assert_eq!(scope.depth(), depth_before);
                 rarms.push(RMatchArm {
                     pat: rpat,
+                    guard: rguard,
                     body: rbody,
                     span: arm.span.clone(),
                 });
