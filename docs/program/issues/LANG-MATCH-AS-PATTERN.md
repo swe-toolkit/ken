@@ -5,24 +5,44 @@ status: active
 owner: language
 size: S
 gate: none
-depends_on: [SPEC-MATCH-PATTERN-PINS]
+depends_on: [SPEC-MATCH-PATTERN-PINS, LANG-MATCH-MATRIX-OCCURRENCE-THREADING]
 blocks: []
 github: null
 origin: "Steward cut 2026-09-05 from the umbrella LANG-MATCH-PATTERN-FORMS-ABSENT on the spec-enclave disposition evt_12qrtnp7237dn ('release a first contained as-pattern slice rather than a six-form frame'). SPEC-MATCH-PATTERN-PINS merged at 34fd01c1 discharged the whole prerequisite pin column, so P1 (`p as x` association/precedence) is landed and this slice is cuttable. First of six slices; the umbrella stays draft and flips its as-pattern row when this lands. Anchors re-measured by the Steward at main 64e77119c before framing."
 ---
 
-> # RELEASED 2026-09-05 to the language ring (lane-2) — the next lane-2 WP.
-> # LANG-BYTES-HEX-LIST-LITERAL merged, and LANG-MEMBERSHIP-OPERATOR-SURFACE
-> # hard-stopped and is HELD pending an Architect decomposition, so this
-> # contained slice is the live lane-2 deliverable. Base = current main
-> # 76c87a74f. SPEC-MATCH-PATTERN-PINS is merged (P1 as-association/precedence
-> # landed), so the slice is cuttable. The elaborator pattern anchors are
-> # unchanged since the frame's measurement (PatKind ast.rs:167, top-level
-> # non-constructor refusal elab.rs:12325, RPatKind resolve.rs:54) — re-measure
-> # at cut and escalate a false fixed input rather than building around it. The
-> # load-bearing design line: the inner p keeps the current position rules so
-> # the top-level non-constructor refusal STAYS fail-closed (keeps NoInhabitants
-> # honest, does not reopen LANG-REACHABILITY-SUBSUMING-ARMS).
+> # RESUMED 2026-09-06 to the language ring (lane-2). This slice hard-stopped on
+> # its original 2026-09-05 release (language-implementer evt_kybs4q6dm6z4): the
+> # general match matrix drops each column's matched value before the arm-body
+> # leaf, so an alias RVar had no value term to bind. The Architect ruled the fix
+> # (evt_4e73y2bawf4gz, option (a)): thread a per-position occurrence through the
+> # matrix. That PREDECESSOR CAPABILITY, LANG-MATCH-MATRIX-OCCURRENCE-THREADING,
+> # has now LANDED and CLOSED (9ef5c3c19) -- it subsumes every value-binding
+> # 34 §3 form. This node is its thin CONSUMER; the gap that stopped it is
+> # cleared, so it RESUMES. Base = current main 36d7d5ee8. Both depends_on
+> # satisfied: SPEC-MATCH-PATTERN-PINS merged (34fd01c1), matrix closed.
+> #
+> # CONSUMER CONTRACT (amends the deliverables/ACs below):
+> #  - The alias RVar is supplied from its column's OCCURRENCE, which the landed
+> #    capability threads to the leaf. The design judgment below stands
+> #    unchanged; only the source of "the value at p's position" is now that
+> #    occurrence, NOT new matrix plumbing invented here.
+> #  - AC-NESTED-AS-PATTERN (MANDATORY, Architect): acceptance MUST include a
+> #    NESTED as-pattern -- an alias at a nested constructor position, not only a
+> #    top-level `(C p̄) as x`. This proves the capability's per-depth rebasing
+> #    and forecloses the silent-partial the hard stop named. It amends AC-1.
+> #  - Load-bearing design line still holds: the inner p keeps the current
+> #    position rules; top-level non-constructor stays fail-closed (NoInhabitants
+> #    honest; does not reopen LANG-REACHABILITY-SUBSUMING-ARMS).
+> #  - Reviewer of record GAINS the Architect (required on the consumer per its
+> #    ruling), alongside language-qa + CI.
+> #  - ANCHORS re-measured at origin/main 36d7d5ee8 (main advanced since the
+> #    76c87a74f/64e77119c frame measurement): PatKind ast.rs:167 and RPatKind
+> #    resolve.rs:54 unchanged; the top-level non-constructor guard/refusal is
+> #    now elab.rs:12488-12491 (was :12325); the NoInhabitants classifier sites
+> #    are elab.rs:3798/:5749/:12551 (the first two unchanged from the frame,
+> #    the general-matrix site moved from :12375). RE-MEASURE all fixed inputs
+> #    at cut; escalate a false fixed input rather than building around it.
 
 ## What this is
 
