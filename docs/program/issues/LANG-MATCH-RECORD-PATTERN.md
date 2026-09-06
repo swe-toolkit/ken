@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-RECORD-PATTERN
 title: "record patterns `{ label = p, … }` -- slice 3 of 34 §3's six absent pattern forms: the second projecting form, but keyed by LABEL against the scrutinee's record declaration and OPEN (an omitted field is an implicit wildcard), checked in declaration order so dependent later fields see earlier projections; no elim_D (records are negative, 14 §4); and -- the composition discriminator this slice owes -- a redundant record arm must get the subsumption cause, never a false NoInhabitants"
-status: ready
+status: active
 owner: language
 size: M
 gate: none
