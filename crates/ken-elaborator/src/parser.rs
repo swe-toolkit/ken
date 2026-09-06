@@ -2131,16 +2131,36 @@ impl Parser {
     /// latent bug where `+`/`*` shared one flat precedence level).
     fn parse_multiplicative_expr(&mut self) -> Result<Expr, ElabError> {
         use crate::ast::BinOp;
-        let mut lhs = self.parse_app_expr()?;
+        let mut lhs = self.parse_default_infix_expr()?;
         loop {
             let op = match self.peek() {
                 Token::Star => BinOp::Mul,
                 _ => break,
             };
             self.advance();
-            let rhs = self.parse_app_expr()?;
+            let rhs = self.parse_default_infix_expr()?;
             let span = Span::merge(lhs.span(), rhs.span());
             lhs = Expr::EBinOp(op, Box::new(lhs), Box::new(rhs), span);
+        }
+        Ok(lhs)
+    }
+
+    /// User-defined operators without a fixity declaration use the normative
+    /// default `infixl 9`: tighter than level-7 multiplication and looser than
+    /// ordinary application. Infix notation lowers directly to the existing
+    /// prefix application shape `operator lhs rhs`.
+    fn parse_default_infix_expr(&mut self) -> Result<Expr, ElabError> {
+        let mut lhs = self.parse_app_expr()?;
+        while let Token::Operator(operator_name) = self.peek().clone() {
+            let operator_span = self.peek_span().clone();
+            self.advance();
+            let rhs = self.parse_app_expr()?;
+
+            let first_span = Span::merge(lhs.span(), &operator_span);
+            let operator = Expr::EVar(operator_name, operator_span);
+            let operator_and_lhs = Expr::EApp(Box::new(operator), Box::new(lhs), first_span);
+            let span = Span::merge(operator_and_lhs.span(), rhs.span());
+            lhs = Expr::EApp(Box::new(operator_and_lhs), Box::new(rhs), span);
         }
         Ok(lhs)
     }
