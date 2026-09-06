@@ -11,6 +11,24 @@ github: null
 origin: Architect finding at evt_3aeg25e7b35mc while approving LANG-FOREIGN-NAME-CONTROL-CHARS (dec_79sd3nnqvkrvx), explicitly non-blocking and explicitly needing an owner. Filed by the Steward 2026-08-13 rather than left in prose, because the finding this whole arc came from was about an obligation landing in nobody's node.
 ---
 
+> # STEWARD RECONCILIATION 2026-09-06 — operator concurred CLOSING the vector; the
+> # shape is not the foreign-name fix, and that is being confirmed before release.
+> #
+> # The operator concurred releasing this node (closing the visual-spoofing
+> # vector). That answers the routed threat-model question ("whose reading is the
+> # threat model?", below): the reader includes humans in terminals and web views,
+> # so the Trojan-Source spoofing vector has a real victim. BUT this node's own
+> # 2026-08-13 measurement RULES OUT the two-`foreign`-name-site fix — it would
+> # protect two strings out of the whole language surface (a bidi override is
+> # expressible in any Ken comment and any string literal today), with no placement
+> # argument. The honest shape of "close this vector" is therefore the
+> # **whole-source lexical policy** disposition (Rust's post-CVE-2021-42574
+> # `text_direction_codepoint_in_literal` lint shape) — a spec/Architect lexer-level
+> # item, NOT a language-ring parser patch at the `foreign`-name sites, and NOT this
+> # node's XS shape. The Steward is confirming this disposition with the operator
+> # before flipping the gate/status, rather than kicking the language ring at the
+> # ruled-out fix. `gate: operator` and `status: draft` stand until that confirm.
+
 ## What this is
 
 `LANG-FOREIGN-NAME-CONTROL-CHARS` (#2128) rejects `char::is_control()` in

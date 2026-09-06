@@ -11,6 +11,22 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
+> # SCHEDULED 2026-09-06 (operator) — resume at the END of the language queue.
+> #
+> # Operator directive, 2026-09-06: schedule this node for the language ring at
+> # the end of its current queue. It runs AFTER the currently-queued lane-2 work
+> # (the match-pattern slices — record slice 3 released, then slices 4-6 as cut —
+> # plus the rest of the 2026-09-04 language sequence). It is the tail item, not a
+> # near-term release, and it is NOT abandoned or deferred-indefinitely: it is a
+> # genuine over-strict completeness bug (it REJECTS a valid program; it is not
+> # unsound), with landed partials (D4 + AC-6 discharged) and the core D2 semantic
+> # repair + D3 still owed. When the queue drains to it, the Steward RE-RELEASES
+> # it explicitly; per the body, D1 must run FIRST and ALONE as the regression
+> # check against [[LANG-CONVOY-MATCH-FIELD-PROVENANCE]] (its `depends_on`) before
+> # the semantic repair, because the Architect refused the "orthogonal" reading
+> # and there is an influence path through RVar resolution. Do not start it ahead
+> # of its queue position, and do not treat this scheduling note as the release.
+
 # CARVE-OUT 2026-08-17 — `AC-6` IS DISCHARGED AND ON `main`
 
 **Landed at squash `000d69663`.** All four operand assertion remedies are on

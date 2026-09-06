@@ -254,13 +254,19 @@ Steward cuts it rather than the ring.
 > - **Slice 1 as-patterns -- LANDED.** [[LANG-MATCH-AS-PATTERN]] merged
 >   `e6645d7c2` / closed `4cbb0c088` (consumed the landed occurrence-threading
 >   capability `LANG-MATCH-MATRIX-OCCURRENCE-THREADING`, `9ef5c3c19`).
-> - **Slice 2 tuple/pair patterns -- RELEASED 2026-09-06.**
->   [[LANG-MATCH-TUPLE-PATTERN]] (`ready`), the first SPLITTING form; it owes the
->   NoInhabitants composition discriminator for a redundant tuple arm.
-> - **Slices 3-6 (record, or-patterns, guards, literals)** remain future slices,
->   each fail-closed until cut. Literals stay blocked (the enclave's DecEq/expected
->   -type finding). The Steward cuts the next slice one-release-ahead as the ring
->   drains.
+> - **Slice 2 tuple/pair patterns -- LANDED 2026-09-06.**
+>   [[LANG-MATCH-TUPLE-PATTERN]] merged `af2b36dc8` / closed `a8ee55b2f`, the first
+>   SPLITTING form; it discharged the NoInhabitants composition discriminator for a
+>   redundant tuple arm.
+> - **Slice 3 record patterns -- RELEASED 2026-09-06.**
+>   [[LANG-MATCH-RECORD-PATTERN]] (`ready`), the second projecting form but
+>   label-keyed against the record declaration and OPEN (an omitted field is an
+>   implicit wildcard), checked in declaration order for dependent later fields; it
+>   owes the same NoInhabitants composition discriminator, including the
+>   open-record field-subset-subsumes-superset case.
+> - **Slices 4-6 (or-patterns, guards, literals)** remain future slices, each
+>   fail-closed until cut. Literals stay blocked (the enclave's DecEq/expected-type
+>   finding). The Steward cuts the next slice one-release-ahead as the ring drains.
 
 **One thing already decided and needing no further ruling:** this node does
 **not** amend `34`. The enclave ruled the chapter's obligations real, so the
