@@ -1151,6 +1151,7 @@ fn rewrite_rtype_inner(
             RType::RCon(n, span)
         }
         RType::RVarTy(i, n, s) => RType::RVarTy(i, n, s),
+        RType::RPatternAliasTy(slot, name, span) => RType::RPatternAliasTy(slot, name, span),
         RType::RUniv(l, s) => RType::RUniv(l, s),
         RType::RPi(x, a, b, s) => RType::RPi(
             x,
@@ -1372,7 +1373,7 @@ fn rewrite_rpattern(
 ) -> Result<RPattern, ElabError> {
     let kind = match p.kind {
         RPatKind::Wild => RPatKind::Wild,
-        RPatKind::Var(n) => RPatKind::Var(n),
+        RPatKind::Var(n, slot) => RPatKind::Var(n, slot),
         RPatKind::Ctor(name, subs) => {
             let n = resolve_ref(scope, exports, &name, &p.span)?;
             let subs = subs
@@ -1385,6 +1386,15 @@ fn rewrite_rpattern(
             components
                 .into_iter()
                 .map(|component| rewrite_rpattern(scope, exports, component))
+                .collect::<Result<Vec<_>, ElabError>>()?,
+        ),
+        RPatKind::Record(fields) => RPatKind::Record(
+            fields
+                .into_iter()
+                .map(|mut field| {
+                    field.pattern = rewrite_rpattern(scope, exports, field.pattern)?;
+                    Ok(field)
+                })
                 .collect::<Result<Vec<_>, ElabError>>()?,
         ),
         RPatKind::As(inner, alias, slot) => RPatKind::As(

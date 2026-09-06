@@ -28,7 +28,8 @@ use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResu
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
-    RPropIntro, RRecordField, RSpaceDecl, RType, SUGAR_ABSURD, SUGAR_AXIOM, SUGAR_ELIM_TRUNC,
+    RPropIntro, RRecordField, RRecordPatField, RSpaceDecl, RType, SUGAR_ABSURD, SUGAR_AXIOM,
+    SUGAR_ELIM_TRUNC,
     SUGAR_EQ, SUGAR_J, SUGAR_REFL, SUGAR_TRUNC_INTRO,
 };
 
@@ -725,6 +726,9 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         }
 
         RType::RVarTy(i, _, _) => Ok(Term::var(*i)),
+        RType::RPatternAliasTy(slot, name, _) => {
+            infer_active_pattern_alias(cx, *slot, name).map(|(term, _)| term)
+        }
 
         RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _) => {
             let a_core = elab_type(cx, a)?;
@@ -1385,7 +1389,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             let flat = arms.iter().all(|a| match &a.pat.kind {
                 RPatKind::Ctor(_, subs) => subs
                     .iter()
-                    .all(|s| matches!(s.kind, RPatKind::Var(_) | RPatKind::Wild)),
+                    .all(|s| matches!(s.kind, RPatKind::Var(_, _) | RPatKind::Wild)),
                 _ => false,
             });
             // Flat checked matches use the dependent-match producer path. For
@@ -3683,7 +3687,7 @@ fn check_match_with_lift(
         if sub_pats.len() != host_ctor.args.len()
             || sub_pats
                 .iter()
-                .any(|pat| !matches!(pat.kind, RPatKind::Var(_) | RPatKind::Wild))
+                .any(|pat| !matches!(pat.kind, RPatKind::Var(_, _) | RPatKind::Wild))
         {
             return Err(ElabError::Internal(
                 "lifted dependent match requires flat source constructor fields".into(),
@@ -5600,7 +5604,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 ));
             }
             for sp in &sub_pats {
-                if !matches!(sp.kind, RPatKind::Var(_) | RPatKind::Wild) {
+                if !matches!(sp.kind, RPatKind::Var(_, _) | RPatKind::Wild) {
                     return Err(ElabError::Internal(
                         "dependent match (AC4): nested constructor sub-patterns are not \
                          yet supported here"
@@ -8541,7 +8545,10 @@ fn type_contains_effect_row(ty: &RType) -> bool {
         }
         RType::RApp(f, a, _) => type_contains_effect_row(f) || type_contains_effect_row(a),
         RType::RRefine(_, carrier, _, _) => type_contains_effect_row(carrier),
-        RType::RUniv(_, _) | RType::RCon(_, _) | RType::RVarTy(_, _, _) => false,
+        RType::RUniv(_, _)
+        | RType::RCon(_, _)
+        | RType::RVarTy(_, _, _)
+        | RType::RPatternAliasTy(_, _, _) => false,
     }
 }
 
@@ -9468,7 +9475,7 @@ fn elab_record_decl(
 /// Extract the outermost type constructor name from a resolved type.
 fn head_type_name(ty: &RType) -> String {
     match ty {
-        RType::RCon(s, _) | RType::RVarTy(_, s, _) => s.clone(),
+        RType::RCon(s, _) | RType::RVarTy(_, s, _) | RType::RPatternAliasTy(_, s, _) => s.clone(),
         RType::RApp(f, _, _) => head_type_name(f),
         RType::RUniv(_, _) => "Type".to_string(),
         RType::RArr(_, _, _) | RType::REffectArr(_, _, _, _) | RType::RPi(_, _, _, _) => {
@@ -11110,7 +11117,7 @@ pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
         RType::RRefine(_, carrier, predicate, _) => {
             rtype_mentions_name(carrier, name) || rexpr_mentions_name(predicate, name)
         }
-        RType::RUniv(_, _) | RType::RVarTy(_, _, _) => false,
+        RType::RUniv(_, _) | RType::RVarTy(_, _, _) | RType::RPatternAliasTy(_, _, _) => false,
     }
 }
 
@@ -12151,6 +12158,9 @@ struct MatrixOccurrence {
     term: Term,
     live: bool,
     source_binding: bool,
+    /// Whether an emitted core binder occupies a surface de Bruijn position.
+    /// Record projection columns are continuation binders, not lexical ones.
+    surface_binder: bool,
 }
 
 impl MatrixOccurrence {
@@ -12159,14 +12169,16 @@ impl MatrixOccurrence {
             term,
             live: true,
             source_binding: true,
+            surface_binder: true,
         }
     }
 
-    fn pending_field(source_binding: bool) -> Self {
+    fn pending_field(source_binding: bool, surface_binder: bool) -> Self {
         Self {
             term: Term::var(0),
             live: false,
             source_binding,
+            surface_binder,
         }
     }
 }
@@ -12175,7 +12187,7 @@ impl MatrixOccurrence {
 #[derive(Default)]
 struct MatchOccurrenceTrace {
     seeds: Vec<Term>,
-    leaves: Vec<Vec<Term>>,
+    leaves: Vec<Vec<Option<Term>>>,
 }
 
 #[cfg(test)]
@@ -12204,7 +12216,7 @@ fn take_match_occurrence_trace() -> MatchOccurrenceTrace {
 struct RowState {
     real_pats: Vec<RPattern>,
     real_occurrences: Vec<MatrixOccurrence>,
-    binding_occurrences: Vec<Term>,
+    binding_occurrences: Vec<Option<Term>>,
     arm_idx: usize,
 }
 
@@ -12223,7 +12235,7 @@ impl RowState {
                 occurrence.term = weaken(&occurrence.term, 1);
             }
         }
-        for occurrence in &mut self.binding_occurrences {
+        for occurrence in self.binding_occurrences.iter_mut().flatten() {
             *occurrence = weaken(occurrence, 1);
         }
         self
@@ -12252,8 +12264,22 @@ impl RowState {
             .expect("a bound matrix column has an aligned occurrence");
         debug_assert!(current.live);
         if current.source_binding {
-            self.binding_occurrences.push(current.term.clone());
+            self.binding_occurrences.push(Some(current.term.clone()));
         }
+        self
+    }
+
+    fn bind_current_occurrence_at(mut self, slot: usize) -> Self {
+        let current = self
+            .real_occurrences
+            .first()
+            .expect("a bound matrix column has an aligned occurrence");
+        debug_assert!(current.live);
+        if self.binding_occurrences.len() <= slot {
+            self.binding_occurrences.resize(slot + 1, None);
+        }
+        debug_assert!(self.binding_occurrences[slot].is_none());
+        self.binding_occurrences[slot] = Some(current.term.clone());
         self
     }
 
@@ -12265,21 +12291,43 @@ impl RowState {
     }
 
     fn specialize_current_column(
-        mut self,
+        self,
         replacement_pats: Vec<RPattern>,
         replacement_source_bindings: bool,
     ) -> Self {
+        let surface_binder = self.real_occurrences[0].surface_binder;
+        let source_bindings = vec![replacement_source_bindings; replacement_pats.len()];
+        self.specialize_current_columns(replacement_pats, source_bindings, surface_binder)
+    }
+
+    fn specialize_projected_record_column(
+        self,
+        replacement_pats: Vec<RPattern>,
+        replacement_source_bindings: Vec<bool>,
+    ) -> Self {
+        self.specialize_current_columns(replacement_pats, replacement_source_bindings, false)
+    }
+
+    fn specialize_current_columns(
+        mut self,
+        replacement_pats: Vec<RPattern>,
+        replacement_source_bindings: Vec<bool>,
+        replacement_surface_binder: bool,
+    ) -> Self {
         self.assert_occurrence_alignment();
+        debug_assert_eq!(replacement_pats.len(), replacement_source_bindings.len());
         self.real_pats.remove(0);
         self.real_occurrences.remove(0);
 
-        let replacement_count = replacement_pats.len();
         let mut real_pats = replacement_pats;
         real_pats.append(&mut self.real_pats);
         self.real_pats = real_pats;
 
-        let mut real_occurrences = (0..replacement_count)
-            .map(|_| MatrixOccurrence::pending_field(replacement_source_bindings))
+        let mut real_occurrences = replacement_source_bindings
+            .into_iter()
+            .map(|source_binding| {
+                MatrixOccurrence::pending_field(source_binding, replacement_surface_binder)
+            })
             .collect::<Vec<_>>();
         real_occurrences.append(&mut self.real_occurrences);
         self.real_occurrences = real_occurrences;
@@ -12291,7 +12339,7 @@ impl RowState {
     /// The as-pattern consumer will extend this vector with alias positions;
     /// keeping the accessor on the production leaf boundary prevents a second
     /// pattern walk from becoming a competing occurrence derivation.
-    fn leaf_binding_occurrences(&self) -> &[Term] {
+    fn leaf_binding_occurrences(&self) -> &[Option<Term>] {
         self.assert_occurrence_alignment();
         debug_assert!(self.real_pats.is_empty());
         #[cfg(test)]
@@ -12304,9 +12352,10 @@ impl RowState {
     }
 }
 
-/// Strip only the consumer wrapper at the current position. Its value comes
-/// from the already-landed aligned occurrence; the inner pattern remains the
-/// sole matcher and therefore owns coverage and reachability exactly as before.
+/// Expose lexical bindings whose value comes from the aligned occurrence.
+/// Surface `as` keeps its inner matcher; record-contained variables become a
+/// wildcard after recording their projected value because record columns are
+/// declaration-ordered rather than lexical kernel binders.
 #[inline(never)]
 fn expose_current_pattern_aliases(
     cx: &mut ElabCtx,
@@ -12314,14 +12363,24 @@ fn expose_current_pattern_aliases(
     current_ty: &Term,
 ) -> RowState {
     loop {
-        let (inner, name, slot) = match row.real_pats[0].kind.clone() {
-            RPatKind::As(inner, name, slot) => (inner, name, slot),
+        let (inner, name, slot, occurrence_var) = match row.real_pats[0].kind.clone() {
+            RPatKind::As(inner, name, slot) => (*inner, name, slot, false),
+            RPatKind::Var(name, Some(slot)) => (
+                RPattern {
+                    kind: RPatKind::Wild,
+                    span: row.real_pats[0].span.clone(),
+                },
+                name,
+                slot,
+                true,
+            ),
             _ => break,
         };
-        debug_assert_eq!(
-            row.binding_occurrences.len(),
-            slot,
-            "resolver binding order must match matrix occurrence supply order"
+        debug_assert!(
+            row.binding_occurrences
+                .get(slot)
+                .is_none_or(Option::is_none),
+            "each resolver slot must receive exactly one matrix occurrence"
         );
         cx.pattern_alias_type_frames
             .last_mut()
@@ -12334,8 +12393,11 @@ fn expose_current_pattern_aliases(
                     install_depth: cx.ctx.len(),
                 },
             );
-        row = row.bind_current_occurrence();
-        row.real_pats[0] = *inner;
+        row = row.bind_current_occurrence_at(slot);
+        if occurrence_var {
+            row.real_occurrences[0].source_binding = false;
+        }
+        row.real_pats[0] = inner;
     }
     row
 }
@@ -12375,7 +12437,7 @@ fn infer_pattern_alias_leaf(
     cx: &mut ElabCtx,
     arm: &RMatchArm,
     arm_idx: usize,
-    binding_occurrences: &[Term],
+    binding_occurrences: &[Option<Term>],
     real_depth: usize,
 ) -> Result<(Term, Term), ElabError> {
     let alias_types = cx
@@ -12390,10 +12452,10 @@ fn infer_pattern_alias_leaf(
     for (slot, alias) in alias_types {
         let occurrence = binding_occurrences
             .get(slot)
+            .and_then(Clone::clone)
             .unwrap_or_else(|| {
-                panic!("as-pattern slot {slot} is absent from its matrix-leaf occurrence vector")
-            })
-            .clone();
+                panic!("pattern slot {slot} is absent from its matrix-leaf occurrence vector")
+            });
         let sentinel = cx.next_pattern_alias_sentinel;
         cx.next_pattern_alias_sentinel += 1;
         cx.pattern_alias_replacement_frames
@@ -12528,7 +12590,7 @@ fn compile_tuple_column(
                     "resolved tuple pattern must contain at least two components".into(),
                 ));
             }
-            RPatKind::Wild | RPatKind::Var(_) => {
+            RPatKind::Wild | RPatKind::Var(_, _) => {
                 let span = row.real_pats[0].span.clone();
                 let wild = || RPattern {
                     kind: RPatKind::Wild,
@@ -12539,10 +12601,10 @@ fn compile_tuple_column(
                         .specialize_current_column(vec![wild(), wild()], false),
                 );
             }
-            RPatKind::Ctor(_, _) => {
+            RPatKind::Ctor(_, _) | RPatKind::Record(_) => {
                 return Err(ElabError::TypeMismatch {
                     span: row.real_pats[0].span.clone(),
-                    reason: "constructor pattern cannot match a pair component".into(),
+                    reason: "non-tuple pattern cannot match a pair component".into(),
                 });
             }
             RPatKind::As(_, _, _) => {
@@ -12589,6 +12651,226 @@ fn compile_tuple_column(
         Term::app(continuation, Term::proj1(pair_occurrence.clone())),
         Term::proj2(pair_occurrence),
     );
+    if current_is_live {
+        Ok(projected)
+    } else {
+        Ok(Term::lam(col_types[0].clone(), projected))
+    }
+}
+
+struct RecordPatternProjection {
+    owner_name: String,
+    field_names: Vec<String>,
+    field_types: Vec<Term>,
+}
+
+fn record_pattern_projection(
+    cx: &ElabCtx<'_>,
+    record_ty: &Term,
+    span: &Span,
+) -> Result<RecordPatternProjection, ElabError> {
+    let (owner_id, head_arg) = match record_ty {
+        Term::App(function, argument) => match function.as_ref() {
+            Term::Const { id, .. } => (*id, Some((**argument).clone())),
+            _ => {
+                return Err(ElabError::TypeMismatch {
+                    span: span.clone(),
+                    reason: "record pattern requires a named record type".into(),
+                })
+            }
+        },
+        Term::Const { id, .. } => (*id, None),
+        _ => {
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "record pattern requires a named record type".into(),
+            })
+        }
+    };
+    let class_env = cx.class_env.ok_or_else(|| ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "record patterns are unavailable in this elaboration context".into(),
+    })?;
+    let projection =
+        class_env
+            .projection_by_type_id(owner_id)
+            .ok_or_else(|| ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "record pattern scrutinee is not a known named record type".into(),
+            })?;
+    let field_types = match (projection.head_param, head_arg) {
+        (None, None) => projection.field_types.to_vec(),
+        (Some(_), Some(head)) => projection
+            .field_types
+            .iter()
+            .enumerate()
+            .map(|(index, ty)| subst_outer(ty, 1, std::slice::from_ref(&head), index))
+            .collect(),
+        _ => {
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "record pattern scrutinee has an incomplete owner application".into(),
+            })
+        }
+    };
+    Ok(RecordPatternProjection {
+        owner_name: projection.owner_name.to_string(),
+        field_names: projection.field_names.to_vec(),
+        field_types,
+    })
+}
+
+fn normalize_record_row(
+    fields: &[RRecordPatField],
+    projection: &RecordPatternProjection,
+    row_span: &Span,
+) -> Result<(Vec<RPattern>, Vec<bool>), ElabError> {
+    for field in fields {
+        if !projection
+            .field_names
+            .iter()
+            .any(|declared| declared == &field.label)
+        {
+            return Err(ElabError::UnresolvedCon {
+                name: format!("{}.{}", projection.owner_name, field.label),
+                span: field.label_span.clone(),
+            });
+        }
+    }
+
+    let mut patterns = Vec::with_capacity(projection.field_names.len());
+    let mut source_bindings = Vec::with_capacity(projection.field_names.len());
+    for name in &projection.field_names {
+        if let Some(field) = fields.iter().find(|field| &field.label == name) {
+            patterns.push(field.pattern.clone());
+            source_bindings.push(true);
+        } else {
+            patterns.push(RPattern {
+                kind: RPatKind::Wild,
+                span: row_span.clone(),
+            });
+            source_bindings.push(false);
+        }
+    }
+    Ok((patterns, source_bindings))
+}
+
+fn project_named_record_field(mut base: Term, index: usize) -> Term {
+    for _ in 0..index {
+        base = Term::proj2(base);
+    }
+    Term::proj1(base)
+}
+
+/// Project one named record column into declaration-order field columns and
+/// compile those columns through the existing matrix continuation. Omitted
+/// fields are generated wildcards; their continuation binders are hidden from
+/// surface de Bruijn lookup and bind no source occurrence.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn compile_record_column(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    col_types: &[Term],
+    col_kinds: &[ColKind],
+    mut rows: Vec<RowState>,
+    real_depth_so_far: usize,
+    top_span: &Span,
+    ret_ty_slot: &mut Option<Term>,
+    arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
+) -> Result<Term, ElabError> {
+    let projection = record_pattern_projection(cx, &col_types[0], top_span)?;
+    let current_is_live = rows[0].real_occurrences[0].live;
+    debug_assert!(rows
+        .iter()
+        .all(|row| row.real_occurrences[0].live == current_is_live));
+    if !current_is_live {
+        rows = rows
+            .into_iter()
+            .map(RowState::enter_current_real_binder)
+            .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
+            .collect();
+    }
+    let record_occurrence = rows[0].real_occurrences[0].term.clone();
+
+    let mut field_rows = Vec::with_capacity(rows.len());
+    for row in rows {
+        let row = expose_current_pattern_aliases(cx, row, &col_types[0]);
+        match row.real_pats[0].kind.clone() {
+            RPatKind::Record(fields) => {
+                let (patterns, source_bindings) =
+                    normalize_record_row(&fields, &projection, &row.real_pats[0].span)?;
+                field_rows.push(row.specialize_projected_record_column(patterns, source_bindings));
+            }
+            RPatKind::Wild | RPatKind::Var(_, _) => {
+                let span = row.real_pats[0].span.clone();
+                let patterns = projection
+                    .field_names
+                    .iter()
+                    .map(|_| RPattern {
+                        kind: RPatKind::Wild,
+                        span: span.clone(),
+                    })
+                    .collect::<Vec<_>>();
+                let source_bindings = vec![false; patterns.len()];
+                field_rows.push(
+                    row.bind_current_occurrence()
+                        .specialize_projected_record_column(patterns, source_bindings),
+                );
+            }
+            RPatKind::Ctor(_, _) | RPatKind::Tuple(_) => {
+                return Err(ElabError::TypeMismatch {
+                    span: row.real_pats[0].span.clone(),
+                    reason: "non-record pattern cannot match a named record component".into(),
+                });
+            }
+            RPatKind::As(_, _, _) => {
+                unreachable!("current-column aliases are exposed before record projection")
+            }
+        }
+    }
+
+    let mut field_types = projection.field_types.clone();
+    field_types.extend_from_slice(&col_types[1..]);
+    let mut field_kinds = vec![ColKind::Real; projection.field_names.len()];
+    field_kinds.extend_from_slice(&col_kinds[1..]);
+    let continuation = compile_match_matrix(
+        cx,
+        arms,
+        &field_types,
+        &field_kinds,
+        field_rows,
+        real_depth_so_far,
+        top_span,
+        ret_ty_slot,
+        arm_used,
+        subsumed_by,
+    )?;
+    let ret_ty = ret_ty_slot
+        .as_ref()
+        .expect("record field compilation reaches a body leaf")
+        .clone();
+    let continuation_ty = tail_codomain(&field_types, &field_kinds, &ret_ty, real_depth_so_far);
+    let continuation = if current_is_live {
+        Term::Ascript(Box::new(continuation), Box::new(continuation_ty))
+    } else {
+        Term::Ascript(
+            Box::new(weaken(&continuation, 1)),
+            Box::new(weaken(&continuation_ty, 1)),
+        )
+    };
+    let projected =
+        projection
+            .field_names
+            .iter()
+            .enumerate()
+            .fold(continuation, |term, (index, _)| {
+                Term::app(
+                    term,
+                    project_named_record_field(record_occurrence.clone(), index),
+                )
+            });
     if current_is_live {
         Ok(projected)
     } else {
@@ -12704,6 +12986,27 @@ fn compile_match_matrix(
             Ok(Term::lam(ih_ty, weaken(&inner, 1)))
         }
         ColKind::Real => {
+            let has_record = rows.iter().any(|row| {
+                matches!(
+                    pattern_without_aliases(&row.real_pats[0]).kind,
+                    RPatKind::Record(_)
+                )
+            });
+            if has_record {
+                return compile_record_column(
+                    cx,
+                    arms,
+                    col_types,
+                    col_kinds,
+                    rows,
+                    real_depth_so_far,
+                    top_span,
+                    ret_ty_slot,
+                    arm_used,
+                    subsumed_by,
+                );
+            }
+
             let has_tuple = rows.iter().any(|row| {
                 matches!(
                     pattern_without_aliases(&row.real_pats[0]).kind,
@@ -12728,14 +13031,21 @@ fn compile_match_matrix(
             let all_flat = rows.iter().all(|row| {
                 matches!(
                     pattern_without_aliases(&row.real_pats[0]).kind,
-                    RPatKind::Wild | RPatKind::Var(_)
+                    RPatKind::Wild | RPatKind::Var(_, _)
                 )
             });
             if all_flat {
                 // No constructor pattern in this column across any row: bind
                 // it flatly (a real `cx.ctx` push), matching the resolver's
                 // count exactly, and move on.
+                let surface_binder = rows[0].real_occurrences[0].surface_binder;
+                debug_assert!(rows
+                    .iter()
+                    .all(|row| row.real_occurrences[0].surface_binder == surface_binder));
                 cx.ctx.push(col_types[0].clone());
+                if !surface_binder {
+                    cx.hidden_positions.push(cx.ctx.len() - 1);
+                }
                 let current_ty = weaken(&col_types[0], 1);
                 let new_rows: Vec<RowState> = rows
                     .into_iter()
@@ -12755,6 +13065,10 @@ fn compile_match_matrix(
                     arm_used,
                     subsumed_by,
                 );
+                if !surface_binder {
+                    let hidden = cx.hidden_positions.pop();
+                    debug_assert_eq!(hidden, Some(cx.ctx.len() - 1));
+                }
                 cx.ctx.pop();
                 return Ok(Term::lam(col_types[0].clone(), inner?));
             }
@@ -12885,7 +13199,7 @@ fn build_ctor_buckets(
                         bucket.push(r.clone().specialize_current_column(subs.clone(), true));
                     }
                 }
-                RPatKind::Wild | RPatKind::Var(_) => {
+                RPatKind::Wild | RPatKind::Var(_, _) => {
                     let span = r.real_pats[0].span.clone();
                     let new_pats: Vec<RPattern> = (0..c0.args.len())
                         .map(|_| RPattern {
@@ -12899,8 +13213,8 @@ fn build_ctor_buckets(
                             .specialize_current_column(new_pats, false),
                     );
                 }
-                RPatKind::Tuple(_) => {
-                    unreachable!("tuple columns are projected before constructor bucketing")
+                RPatKind::Tuple(_) | RPatKind::Record(_) => {
+                    unreachable!("negative columns are projected before constructor bucketing")
                 }
                 RPatKind::As(_, _, _) => {
                     unreachable!("current-column aliases are exposed before constructor bucketing")
@@ -12964,7 +13278,7 @@ fn infer_tuple_match(
     for arm in arms {
         if matches!(
             pattern_without_aliases(&arm.pat).kind,
-            RPatKind::Wild | RPatKind::Var(_)
+            RPatKind::Wild | RPatKind::Var(_, _)
         ) {
             return Err(ElabError::Internal(
                 "non-constructor pattern in match (wildcard/var not yet supported \
@@ -13041,6 +13355,87 @@ fn infer_tuple_match(
     ))
 }
 
+#[inline(never)]
+fn infer_record_match(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    arms: &[RMatchArm],
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    for arm in arms {
+        if matches!(
+            pattern_without_aliases(&arm.pat).kind,
+            RPatKind::Wild | RPatKind::Var(_, _)
+        ) {
+            return Err(ElabError::Internal(
+                "non-constructor pattern in match (wildcard/var not yet supported \
+                 at top level; use constructor patterns)"
+                    .into(),
+            ));
+        }
+        if !matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Record(_)) {
+            return Err(ElabError::TypeMismatch {
+                span: arm.pat.span.clone(),
+                reason: "record-pattern match arms must use record patterns at the top level"
+                    .into(),
+            });
+        }
+    }
+
+    let (scrut_core, scrut_ty) = infer(cx, scrut)?;
+    record_pattern_projection(cx, &scrut_ty, span)?;
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
+    #[cfg(test)]
+    MATCH_OCCURRENCE_TRACE.with(|trace| {
+        if let Some(trace) = trace.borrow_mut().as_mut() {
+            trace
+                .seeds
+                .extend(rows.iter().map(|row| row.real_occurrences[0].term.clone()));
+        }
+    });
+
+    let mut ret_ty_slot = None;
+    let mut arm_used = vec![false; arms.len()];
+    let mut subsumed_by = vec![Vec::new(); arms.len()];
+    let body_result = compile_match_matrix(
+        cx,
+        arms,
+        std::slice::from_ref(&scrut_ty),
+        &[ColKind::Real],
+        rows,
+        0,
+        span,
+        &mut ret_ty_slot,
+        &mut arm_used,
+        &mut subsumed_by,
+    );
+    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+
+    for (i, used) in arm_used.iter().enumerate() {
+        if !used {
+            let cause = match subsumed_by[i].split_first() {
+                Some((&first, rest)) => ArmDeadCause::Subsumed {
+                    first: arms[first].span.clone(),
+                    rest: rest
+                        .iter()
+                        .map(|&winner| arms[winner].span.clone())
+                        .collect(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
+            return Err(ElabError::ReachabilityError {
+                span: arms[i].span.clone(),
+                cause,
+            });
+        }
+    }
+
+    Ok((
+        body_core,
+        ret_ty_slot.unwrap_or_else(|| Term::ty(Level::Zero)),
+    ))
+}
+
 fn infer_match(
     cx: &mut ElabCtx,
     scrut: &RExpr,
@@ -13049,6 +13444,12 @@ fn infer_match(
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
+    }
+    if arms
+        .iter()
+        .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Record(_)))
+    {
+        return infer_record_match(cx, scrut, arms, span);
     }
     if arms
         .iter()
@@ -13089,7 +13490,7 @@ fn infer_match(
     for arm in arms {
         if matches!(
             pattern_without_aliases(&arm.pat).kind,
-            RPatKind::Wild | RPatKind::Var(_)
+            RPatKind::Wild | RPatKind::Var(_, _)
         ) {
             return Err(ElabError::Internal(
                 "non-constructor pattern in match (wildcard/var not yet supported \
@@ -13208,8 +13609,13 @@ fn ensure_pattern_constructors_resolve(
                 ensure_pattern_constructors_resolve(cx, component)?;
             }
         }
+        RPatKind::Record(fields) => {
+            for field in fields {
+                ensure_pattern_constructors_resolve(cx, &field.pattern)?;
+            }
+        }
         RPatKind::As(inner, _, _) => ensure_pattern_constructors_resolve(cx, inner)?,
-        RPatKind::Wild | RPatKind::Var(_) => {}
+        RPatKind::Wild | RPatKind::Var(_, _) => {}
     }
     Ok(())
 }
@@ -14431,9 +14837,9 @@ mod match_matrix_occurrence_tests {
             vec![
                 pat(RPatKind::Ctor(
                     "Inner".into(),
-                    vec![pat(RPatKind::Var("child".into()))],
+                    vec![pat(RPatKind::Var("child".into(), None))],
                 )),
-                pat(RPatKind::Var("tail".into())),
+                pat(RPatKind::Var("tail".into(), None)),
             ],
         ));
 
@@ -14479,7 +14885,12 @@ mod match_matrix_occurrence_tests {
         assert!(state.real_pats.is_empty());
         assert_eq!(
             state.leaf_binding_occurrences(),
-            &[Term::var(4), Term::var(3), Term::var(2), Term::var(0)],
+            &[
+                Some(Term::var(4)),
+                Some(Term::var(3)),
+                Some(Term::var(2)),
+                Some(Term::var(0)),
+            ],
             "top scrutinee, nested constructor, nested child, and tail must each \
              name their own binder after two splits plus the intervening IH"
         );
@@ -14535,7 +14946,7 @@ mod match_matrix_occurrence_tests {
             trace
                 .leaves
                 .iter()
-                .any(|occurrences| occurrences == &[Term::var(2)]),
+                .any(|occurrences| occurrences == &[Some(Term::var(2))]),
             "the nested `m` binder must cross its own and its enclosing LSucc IH; \
              production leaf trace was {:?}",
             trace.leaves
@@ -14552,20 +14963,20 @@ mod match_matrix_occurrence_tests {
         // proves the same distinction composes through a real split shape.
         let state = RowState {
             real_pats: vec![
-                pat(RPatKind::Var("live".into())),
-                pat(RPatKind::Var("future".into())),
+                pat(RPatKind::Var("live".into(), None)),
+                pat(RPatKind::Var("future".into(), None)),
             ],
             real_occurrences: vec![
                 MatrixOccurrence::live(Term::var(2)),
-                MatrixOccurrence::pending_field(true),
+                MatrixOccurrence::pending_field(true, true),
             ],
-            binding_occurrences: vec![Term::var(1)],
+            binding_occurrences: vec![Some(Term::var(1))],
             arm_idx: 0,
         }
         .under_core_binder();
 
         assert_eq!(state.real_occurrences[0].term, Term::var(3));
-        assert_eq!(state.binding_occurrences, vec![Term::var(2)]);
+        assert_eq!(state.binding_occurrences, vec![Some(Term::var(2))]);
         assert_eq!(state.real_occurrences[1].term, Term::var(0));
         assert!(!state.real_occurrences[1].live);
     }

@@ -11,7 +11,7 @@
 use crate::ast::{
     Binder, BoundaryKind, CapabilityDecl, ClassField, ConstructorSignature,
     ConstructorSignatureArg, CtorDecl, Decl, DefKeyword, EffectRowSyntax, ExplicitDataCtor, Expr,
-    LetBinding, MatchArm, PatKind, Pattern, PropIntro, SpaceCell, SpaceOperation, Type,
+    FieldPat, LetBinding, MatchArm, PatKind, Pattern, PropIntro, SpaceCell, SpaceOperation, Type,
 };
 use crate::error::{ElabError, Span};
 use crate::lexer::Token;
@@ -2190,14 +2190,19 @@ impl Parser {
         }
         let mut offset = 1;
         let mut paren_depth = 0usize;
+        let mut brace_depth = 0usize;
         loop {
             match self.lookahead(offset) {
                 Token::LParen => paren_depth += 1,
                 Token::RParen if paren_depth > 0 => paren_depth -= 1,
-                Token::MapsTo if paren_depth == 0 => return true,
+                Token::LBrace => brace_depth += 1,
+                Token::RBrace if brace_depth > 0 => brace_depth -= 1,
+                Token::MapsTo if paren_depth == 0 && brace_depth == 0 => return true,
                 Token::RBrace if offset == 1 => return true,
                 Token::Eof => return false,
-                Token::Eq | Token::Comma | Token::Pipe | Token::RBrace if paren_depth == 0 => {
+                Token::Eq | Token::Comma | Token::Pipe | Token::RBrace
+                    if paren_depth == 0 && brace_depth == 0 =>
+                {
                     return false;
                 }
                 _ => {}
@@ -2421,7 +2426,7 @@ impl Parser {
                 };
                 Ok(Pattern { kind, span })
             }
-            Token::LParen => self.parse_atom_pattern(),
+            Token::LParen | Token::LBrace => self.parse_atom_pattern(),
             other => Err(ElabError::ParseError {
                 msg: format!("expected a pattern, found {:?}", other),
                 span: self.peek_span().clone(),
@@ -2432,7 +2437,7 @@ impl Parser {
     fn can_start_atom_pat(&self) -> bool {
         matches!(
             self.peek(),
-            Token::Ident(_) | Token::ConId(_) | Token::LParen
+            Token::Ident(_) | Token::ConId(_) | Token::LParen | Token::LBrace
         ) && !self.is_contextual_ident("as")
     }
 
@@ -2497,11 +2502,63 @@ impl Parser {
                     span: Span::new(start, end),
                 })
             }
+            Token::LBrace => self.parse_record_pattern(),
             other => Err(ElabError::ParseError {
                 msg: format!("expected an atom pattern, found {:?}", other),
                 span: self.peek_span().clone(),
             }),
         }
+    }
+
+    fn parse_record_pattern(&mut self) -> Result<Pattern, ElabError> {
+        let start = self.peek_span().start;
+        self.advance();
+        if matches!(self.peek(), Token::RBrace) {
+            return Err(ElabError::ParseError {
+                msg: "record patterns require at least one field".to_string(),
+                span: Span::new(start, self.peek_span().end),
+            });
+        }
+
+        let mut fields = Vec::<FieldPat>::new();
+        loop {
+            let (label, label_span) = self.expect_ident()?;
+            if fields.iter().any(|field| field.label == label) {
+                return Err(ElabError::ParseError {
+                    msg: format!("duplicate record-pattern field '{label}'"),
+                    span: label_span,
+                });
+            }
+            let pattern = if matches!(self.peek(), Token::Eq) {
+                self.advance();
+                Some(self.parse_pattern()?)
+            } else {
+                None
+            };
+            fields.push(FieldPat {
+                label,
+                pattern,
+                label_span,
+            });
+
+            if matches!(self.peek(), Token::RBrace) {
+                break;
+            }
+            let comma_span = self.peek_span().clone();
+            self.expect(&Token::Comma)?;
+            if matches!(self.peek(), Token::RBrace | Token::Eof) {
+                return Err(ElabError::ParseError {
+                    msg: "record patterns require a field after ','".to_string(),
+                    span: comma_span,
+                });
+            }
+        }
+        let end = self.peek_span().end;
+        self.expect(&Token::RBrace)?;
+        Ok(Pattern {
+            kind: PatKind::Record(fields),
+            span: Span::new(start, end),
+        })
     }
 
     /// Parse an atom, then zero or more postfix `.field` projections
@@ -2945,6 +3002,25 @@ mod as_pattern_precedence_tests {
                 "as-patterns are non-associative; parenthesize the inner as-pattern"
             ),
             other => panic!("expected the non-associativity diagnostic, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn record_pattern_retains_source_order_and_pun_distinction() {
+        let record = only_pattern("match value { { later, earlier = Suc child } |-> child }");
+        match record.kind {
+            PatKind::Record(fields) => {
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].label, "later");
+                assert!(fields[0].pattern.is_none());
+                assert_eq!(fields[1].label, "earlier");
+                assert!(matches!(
+                    fields[1].pattern.as_ref().map(|pattern| &pattern.kind),
+                    Some(PatKind::Ctor(name, children))
+                        if name == "Suc" && children.len() == 1
+                ));
+            }
+            other => panic!("expected a source-ordered record pattern, got {other:?}"),
         }
     }
 

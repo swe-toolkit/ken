@@ -51,11 +51,21 @@ pub struct RPattern {
 }
 
 #[derive(Clone, Debug)]
+pub struct RRecordPatField {
+    pub label: String,
+    pub pattern: RPattern,
+    pub label_span: Span,
+}
+
+#[derive(Clone, Debug)]
 pub enum RPatKind {
     Wild,
-    Var(String),
+    /// The optional slot makes a record-contained variable occurrence-backed:
+    /// declaration-order projection columns need not become lexical binders.
+    Var(String, Option<usize>),
     Ctor(String, Vec<RPattern>),
     Tuple(Vec<RPattern>),
+    Record(Vec<RRecordPatField>),
     As(Box<RPattern>, String, usize),
 }
 
@@ -348,6 +358,8 @@ pub enum RType {
     RUniv(Option<u32>, Span),
     RCon(String, Span),
     RVarTy(usize, String, Span),
+    /// A record-pattern binding used in a type annotation in its arm body.
+    RPatternAliasTy(usize, String, Span),
     /// `{ x : A | φ }` — carrier `A` + tracked predicate `φ` (`21 §6.1`).
     RRefine(String, Box<RType>, Box<RExpr>, Span),
     /// `T a b` — type-level application (`34 §1`).
@@ -364,6 +376,7 @@ impl RType {
             | RType::RUniv(_, s)
             | RType::RCon(_, s)
             | RType::RVarTy(_, _, s)
+            | RType::RPatternAliasTy(_, _, s)
             | RType::RRefine(_, _, _, s)
             | RType::RApp(_, _, s) => s,
         }
@@ -1952,7 +1965,10 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
 struct PatternBinding {
     name: String,
     span: Span,
+    /// An occurrence-backed binding is lexical but not a kernel binder.
     alias_slot: Option<usize>,
+    /// Only a surface `as` alias owns the alias-collision diagnostic.
+    is_as_alias: bool,
 }
 
 /// Resolve a pattern and enumerate its source bindings in the exact order the
@@ -1963,18 +1979,14 @@ fn resolve_pattern(
     pat: &crate::ast::Pattern,
 ) -> Result<(RPattern, Vec<PatternBinding>), ElabError> {
     let mut next_slot = 0;
-    let (resolved, bindings) = resolve_pattern_inner(pat, &mut next_slot)?;
+    let (resolved, bindings) = resolve_pattern_inner(pat, &mut next_slot, false)?;
     for (index, binding) in bindings.iter().enumerate() {
         for other in bindings.iter().skip(index + 1) {
             if binding.name != "_"
                 && binding.name == other.name
-                && (binding.alias_slot.is_some() || other.alias_slot.is_some())
+                && (binding.is_as_alias || other.is_as_alias)
             {
-                let alias = if binding.alias_slot.is_some() {
-                    binding
-                } else {
-                    other
-                };
+                let alias = if binding.is_as_alias { binding } else { other };
                 return Err(ElabError::ParseError {
                     msg: format!(
                         "as-pattern alias '{}' collides with an existing pattern binder",
@@ -1991,9 +2003,11 @@ fn resolve_pattern(
 fn resolve_pattern_inner(
     pat: &crate::ast::Pattern,
     next_slot: &mut usize,
+    occurrence_backed: bool,
 ) -> Result<(RPattern, Vec<PatternBinding>), ElabError> {
     match &pat.kind {
         PatKind::Wild => {
+            let slot = occurrence_backed.then_some(*next_slot);
             *next_slot += 1;
             Ok((
                 RPattern {
@@ -2003,21 +2017,24 @@ fn resolve_pattern_inner(
                 vec![PatternBinding {
                     name: "_".to_string(),
                     span: pat.span.clone(),
-                    alias_slot: None,
+                    alias_slot: slot,
+                    is_as_alias: false,
                 }],
             ))
         }
         PatKind::Var(name) => {
+            let slot = occurrence_backed.then_some(*next_slot);
             *next_slot += 1;
             Ok((
                 RPattern {
-                    kind: RPatKind::Var(name.clone()),
+                    kind: RPatKind::Var(name.clone(), slot),
                     span: pat.span.clone(),
                 },
                 vec![PatternBinding {
                     name: name.clone(),
                     span: pat.span.clone(),
-                    alias_slot: None,
+                    alias_slot: slot,
+                    is_as_alias: false,
                 }],
             ))
         }
@@ -2025,7 +2042,7 @@ fn resolve_pattern_inner(
             let mut rsubs = Vec::new();
             let mut all_names = Vec::new();
             for sub in subs {
-                let (rpat, names) = resolve_pattern_inner(sub, next_slot)?;
+                let (rpat, names) = resolve_pattern_inner(sub, next_slot, occurrence_backed)?;
                 rsubs.push(rpat);
                 all_names.extend(names);
             }
@@ -2041,7 +2058,8 @@ fn resolve_pattern_inner(
             let mut resolved_components = Vec::with_capacity(components.len());
             let mut all_bindings = Vec::new();
             for component in components {
-                let (resolved, mut bindings) = resolve_pattern_inner(component, next_slot)?;
+                let (resolved, mut bindings) =
+                    resolve_pattern_inner(component, next_slot, occurrence_backed)?;
                 resolved_components.push(resolved);
                 all_bindings.append(&mut bindings);
             }
@@ -2053,14 +2071,45 @@ fn resolve_pattern_inner(
                 all_bindings,
             ))
         }
+        PatKind::Record(fields) => {
+            let mut resolved_fields = Vec::with_capacity(fields.len());
+            let mut all_bindings = Vec::new();
+            for field in fields {
+                let surface_pattern =
+                    field
+                        .pattern
+                        .clone()
+                        .unwrap_or_else(|| crate::ast::Pattern {
+                            kind: PatKind::Var(field.label.clone()),
+                            span: field.label_span.clone(),
+                        });
+                let (pattern, mut bindings) =
+                    resolve_pattern_inner(&surface_pattern, next_slot, true)?;
+                resolved_fields.push(RRecordPatField {
+                    label: field.label.clone(),
+                    pattern,
+                    label_span: field.label_span.clone(),
+                });
+                all_bindings.append(&mut bindings);
+            }
+            Ok((
+                RPattern {
+                    kind: RPatKind::Record(resolved_fields),
+                    span: pat.span.clone(),
+                },
+                all_bindings,
+            ))
+        }
         PatKind::As(inner, alias) => {
             let slot = *next_slot;
             *next_slot += 1;
-            let (resolved_inner, mut bindings) = resolve_pattern_inner(inner, next_slot)?;
+            let (resolved_inner, mut bindings) =
+                resolve_pattern_inner(inner, next_slot, occurrence_backed)?;
             let mut all_bindings = vec![PatternBinding {
                 name: alias.clone(),
                 span: pat.span.clone(),
                 alias_slot: Some(slot),
+                is_as_alias: true,
             }];
             all_bindings.append(&mut bindings);
             Ok((
@@ -2081,7 +2130,9 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
         Type::TCon(name, span) => Ok(RType::RCon(name.clone(), span.clone())),
 
         Type::TVar(name, span) => {
-            if let Some(i) = scope.index_of(name) {
+            if let Some(slot) = scope.pattern_alias(name) {
+                Ok(RType::RPatternAliasTy(slot, name.clone(), span.clone()))
+            } else if let Some(i) = scope.index_of(name) {
                 Ok(RType::RVarTy(i, name.clone(), span.clone()))
             } else {
                 Ok(RType::RCon(name.clone(), span.clone()))
