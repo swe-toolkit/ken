@@ -24,10 +24,16 @@ not act on it against the roster.
 > wearing a permanent hat. Operator, 2026-08-22: playbook = stable discipline,
 > this file = mutable roster.
 
-## Current roster — three-lane trial (operator 2026-08-22; REAFFIRMED 2026-08-25)
+## Current roster — three lanes (operator 2026-08-22; REAFFIRMED 2026-08-25; trial CONCLUDED 2026-09-05)
 
-Three concurrent lanes. The trial's own purpose is to measure whether three
-lanes overburden the Architect (see lane 3).
+Three concurrent lanes, runtime / language / foundation. This is the SETTLED
+structure, not a trial. Operator, 2026-09-05: "the trial is over. 3 lanes works
+with some contention. retire the idea that there is still a trial running." So
+the earlier open question — "measure whether three lanes overburden the
+Architect" — is CLOSED: three lanes is the accepted arrangement, and contention
+across the shared Architect is an accepted operating condition, not a signal to
+re-scope. Do NOT re-open the trial framing, and do NOT treat Architect
+contention as grounds to collapse lanes.
 
 > **Operator, 2026-08-25 (reaffirmation, correcting a Steward single-lane
 > relapse):** "there are three lanes authorized right now. language (lane 2) was
@@ -60,6 +66,19 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
+> ### OPERATOR RULING 2026-09-05 (LATEST) — THREE-LANE TRIAL CONCLUDED
+>
+> (Operator, 2026-09-05, this session.) Verbatim: "btw the trial is over. 3
+> lanes works with some contention. retire the idea that there is still a trial
+> running." This SETTLES the lane count at three (runtime / language /
+> foundation) as the standing structure. The three-lane arrangement is no longer
+> a trial and carries no open measurement question: contention across the shared
+> Architect is an ACCEPTED condition, not a signal to escalate or collapse
+> lanes. Do not report Architect contention as a trial data point, and do not
+> re-scope the lane count on the strength of it — a lane change remains a
+> distinct, explicit operator ruling. The roster header and purpose block above
+> were updated to match.
+>
 > ### OPERATOR RULING 2026-09-05 (LATEST) — RUNTIME lane-1 objective = ABI-REVOKE
 >
 > (Operator, 2026-09-05, this session, via AskUserQuestion.) The runtime lane
@@ -497,6 +516,14 @@ not `crates/`) — it is the standing exception, not a lane (`CLAUDE.md`).
 
 ## Roster history
 
+- 2026-09-05: **no roster change — the three-lane TRIAL is CONCLUDED (operator).**
+  "the trial is over. 3 lanes works with some contention. retire the idea that
+  there is still a trial running." Structure unchanged (three lanes, runtime /
+  language / foundation); what changed is that three lanes is now the settled
+  arrangement rather than a trial with an open Architect-overburden question, and
+  Architect contention is an accepted operating condition. The roster header, the
+  purpose block, and a new topmost OPERATOR RULING block were updated to retire
+  the trial framing.
 - 2026-08-28 (at `5da4dd772`): **no roster change — all three lanes released in
   one stretch, and the lane-2 ring change the operator ordered is now in
   effect.** Lane 1 released D0-only after its HS13 recut landed; lane 2's D4
