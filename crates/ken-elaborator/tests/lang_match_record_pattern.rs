@@ -275,25 +275,32 @@ fn record_fields_compose_with_tuple_constructor_and_as_patterns() {
          { payload = (Suc child as whole, other), enabled = True } |-> whole ; \
          { enabled = False } |-> Zero }",
     );
-    elaborate(&mut env, "data RecordBox = MkRecordBox Envelope");
+    elaborate(&mut env, "data RecordBox = MkRecordBox Nat Envelope");
     elaborate(
         &mut env,
-        "const boxed_envelope : RecordBox = MkRecordBox envelope",
+        "const boxed_envelope : RecordBox = MkRecordBox (Suc (Suc Zero)) envelope",
     );
     let nested = elaborate(
         &mut env,
         "const boxed_record_selected : Nat = match boxed_envelope { \
-         MkRecordBox { payload = (Zero, other), enabled = True } |-> other ; \
-         MkRecordBox { payload = (Suc child as whole, other), enabled = True } |-> whole ; \
-         MkRecordBox { enabled = False } |-> Zero }",
+         MkRecordBox prefix { payload = (Zero, other), enabled = True } |-> other ; \
+         MkRecordBox prefix { payload = (Suc child as whole, other), enabled = True } |-> whole ; \
+         MkRecordBox prefix { enabled = False } |-> Zero }",
+    );
+    let carried = elaborate(
+        &mut env,
+        "const record_carried_alias : Nat = match boxed_envelope { \
+         MkRecordBox (prefix as saved) { payload = payload } |-> saved }",
     );
     let zero = constructor(env.globals["Zero"], []);
-    let one = constructor(env.globals["Suc"], [zero]);
+    let one = constructor(env.globals["Suc"], [zero.clone()]);
+    let two = constructor(env.globals["Suc"], [one.clone()]);
     assert_eq!(whnf(&env.env, &Context::new(), &body(&env, selected)), one);
     assert_eq!(
         whnf(&env.env, &Context::new(), &body(&env, nested)),
         whnf(&env.env, &Context::new(), &body(&env, selected))
     );
+    assert_eq!(whnf(&env.env, &Context::new(), &body(&env, carried)), two);
 }
 
 #[test]
