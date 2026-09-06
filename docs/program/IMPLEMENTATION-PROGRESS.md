@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 02:39:13Z — from 553 issue file(s) in `docs/program/issues/`.
+2026-09-06 02:41:08Z — from 554 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -203,6 +203,7 @@ the committed file matches the generator's output.
 | `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` | `assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it | merged | language | XS | none | — |
 | `LANG-MATCH-AS-PATTERN` | as-patterns `p as x` -- the first contained slice of 34 §3's six absent pattern forms: the alias binds the value matched by p at its position, the inner p obeys the current position rules so the top-level non-constructor refusal stays fail-closed (keeping NoInhabitants honest), and the P1 association/precedence pin is honored forward-compatibly against the not-yet-existing or-pattern | active | language | S | none | — |
 | `LANG-MATCH-DIAGNOSTIC-PROSE` | The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed | merged | language | S | none | — |
+| `LANG-MATCH-MATRIX-OCCURRENCE-THREADING` | the match compiler drops each column's matched value before the arm-body leaf, so no value-binding pattern form (as-pattern, and later literal/nested-binder positions) can bind the value it matched -- thread a per-position OCCURRENCE (the core term for that column's value, re-indexed at each descent depth) through RowState and the matrix descent, reusing the existing elim_D field binders and the proven under()/scrut_occurs weakening; no new core construct | active | language | M | none | — |
 | `LANG-MATCH-PATTERN-FORMS-ABSENT` | spec 34 §3 normatively lists nine pattern forms and the elaborator's PatKind has three -- literals, tuple/record patterns, as-patterns, or-patterns and guards are all absent from the AST, with no deferral statement anywhere in a chapter marked impl-ready and high-priority, and no tracker row for any of them | draft | language | unsized | none | — |
 | `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | ready | language | M | none | — |
 | `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` | Attached-proof namespace closure: normative clarification that a proof's attached namespace is closed under its subject's defining module (a nonlocal attached-declaration head rejects at declaration time), with paired conformance. The coupled durable artifact of the Component B convert-to-local ruling. | draft | spec | S | none | — |
