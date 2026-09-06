@@ -1012,9 +1012,9 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             found[0].clone()
         };
         let read_target = select(&read, 1, 2, 301);
-        assert_eq!(read_target.active_frame_lineage, vec![470, 301]);
-        assert_eq!(read_target.destination_construct_origin, 476);
-        assert_eq!(read_target.recursive_child_origin, 474);
+        assert_eq!(read_target.active_frame_lineage, vec![479, 301]);
+        assert_eq!(read_target.destination_construct_origin, 485);
+        assert_eq!(read_target.recursive_child_origin, 483);
         assert_eq!(read_target.selected_case_body_origin, 308);
         assert_eq!(read_target.invocation_origin, 305);
         assert_eq!(read_target.call_origin, 304);
@@ -1029,20 +1029,20 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
         assert_eq!(read_target.immediate_k_environment_index, 0);
         assert_eq!(read_target.immediate_k_preceding_environment_provenance, None);
         assert_eq!(read_target.immediate_k_lineage_environment_indices, vec![0, 0]);
-        assert_eq!(read_target.ret_case_body_origin, 465);
-        assert_eq!(read_target.closure_origin, 460);
+        assert_eq!(read_target.ret_case_body_origin, 474);
+        assert_eq!(read_target.closure_origin, 469);
         assert_eq!(read_target.capture_ordinal, 0);
-        assert_eq!(read_target.capture_occurrence, 459);
-        assert_eq!(read_target.closure_body_origin, 452);
-        assert_eq!(read_target.body_capture_reads, vec![450]);
+        assert_eq!(read_target.capture_occurrence, 468);
+        assert_eq!(read_target.closure_body_origin, 461);
+        assert_eq!(read_target.body_capture_reads, vec![459]);
         assert_eq!(read_target.closure_parameter_count, 1);
         assert!(!read_target.fresh_destination_mentions_source_result);
         assert!(read_target.ordinary_non_governed_exclusion_count > 0);
 
         let write_target = select(&write, 3, 5, 314);
-        assert_eq!(write_target.active_frame_lineage, vec![483, 314]);
-        assert_eq!(write_target.destination_construct_origin, 489);
-        assert_eq!(write_target.recursive_child_origin, 487);
+        assert_eq!(write_target.active_frame_lineage, vec![492, 314]);
+        assert_eq!(write_target.destination_construct_origin, 498);
+        assert_eq!(write_target.recursive_child_origin, 496);
         assert_eq!(write_target.selected_case_body_origin, 321);
         assert_eq!(write_target.invocation_origin, 318);
         assert_eq!(write_target.call_origin, 317);
@@ -1057,12 +1057,12 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
         assert_eq!(write_target.immediate_k_environment_index, 0);
         assert_eq!(write_target.immediate_k_preceding_environment_provenance, None);
         assert_eq!(write_target.immediate_k_lineage_environment_indices, vec![0, 0]);
-        assert_eq!(write_target.ret_case_body_origin, 478);
-        assert_eq!(write_target.closure_origin, 473);
+        assert_eq!(write_target.ret_case_body_origin, 487);
+        assert_eq!(write_target.closure_origin, 482);
         assert_eq!(write_target.capture_ordinal, 0);
-        assert_eq!(write_target.capture_occurrence, 472);
-        assert_eq!(write_target.closure_body_origin, 465);
-        assert_eq!(write_target.body_capture_reads, vec![463]);
+        assert_eq!(write_target.capture_occurrence, 481);
+        assert_eq!(write_target.closure_body_origin, 474);
+        assert_eq!(write_target.body_capture_reads, vec![472]);
         assert_eq!(write_target.closure_parameter_count, 1);
         assert!(!write_target.fresh_destination_mentions_source_result);
         assert!(write_target.ordinary_non_governed_exclusion_count > 0);
@@ -1223,12 +1223,12 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 
         let collision = write
             .iter()
-            .find(|row| row.binding_frame_origin == 737 && row.invocation_origin == 741)
+            .find(|row| row.binding_frame_origin == 755 && row.invocation_origin == 759)
             .expect("the real W0/W1 coordinate");
         assert_eq!(collision.members.len(), 2);
         assert_ne!(collision.members[0], collision.members[1]);
-        assert_eq!(collision.call_origin, 740);
-        assert_eq!(collision.callee_origin, 739);
+        assert_eq!(collision.call_origin, 758);
+        assert_eq!(collision.callee_origin, 757);
         assert_eq!(collision.locator_index, 0);
         assert_eq!(collision.locator_domain, "ImmediateInvocationEnvironment");
         assert!(
@@ -1238,10 +1238,10 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             "the exact body-refined invocation-return edge is the direct route: {collision:?}"
         );
         for coordinate in [
-            "invocation_origin: StaticOriginId(741)",
-            "call_origin: StaticOriginId(740)",
-            "callee_origin: StaticOriginId(739)",
-            "binding: CheckedIhBinding { frame_origin: StaticOriginId(737), recursive_position: 1 }",
+            "invocation_origin: StaticOriginId(759)",
+            "call_origin: StaticOriginId(758)",
+            "callee_origin: StaticOriginId(757)",
+            "binding: CheckedIhBinding { frame_origin: StaticOriginId(755), recursive_position: 1 }",
         ] {
             assert!(
                 collision.fresh_result_route.contains(coordinate),
@@ -1255,7 +1255,7 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
 
         let write_singleton = write
             .iter()
-            .find(|row| row.context == collision.context && row.invocation_origin == 529)
+            .find(|row| row.context == collision.context && row.invocation_origin == 538)
             .expect("W2 stays separate despite sharing the context");
         assert_eq!(write_singleton.members.len(), 1);
         assert_ne!(write_singleton.callee_origin, collision.callee_origin);
@@ -1266,13 +1266,13 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             "the Tail case must name the governed producer-to-Ret route: {write_singleton:?}"
         );
         for coordinate in [
-            "invocation_origin: StaticOriginId(700)",
-            "call_origin: StaticOriginId(699)",
-            "callee_origin: StaticOriginId(698)",
-            "active_frame_origin: StaticOriginId(696)",
+            "invocation_origin: StaticOriginId(718)",
+            "call_origin: StaticOriginId(717)",
+            "callee_origin: StaticOriginId(716)",
+            "active_frame_origin: StaticOriginId(714)",
             "direction: Forward",
-            "ret_case_body_origin: StaticOriginId(731)",
-            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(696), field_position: 0 }",
+            "ret_case_body_origin: StaticOriginId(749)",
+            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(714), field_position: 0 }",
             "ret_input_delivery: ProducerResultDirect",
         ] {
             assert!(
@@ -2358,9 +2358,9 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
         );
         assert_eq!(write_applications, write.len());
         for row in &write {
-            assert_eq!(row.invocation_origin, "StaticOriginId(741)");
-            assert_eq!(row.application_origin, "StaticOriginId(740)");
-            assert_eq!(row.callee_origin, "StaticOriginId(739)");
+            assert_eq!(row.invocation_origin, "StaticOriginId(759)");
+            assert_eq!(row.application_origin, "StaticOriginId(758)");
+            assert_eq!(row.callee_origin, "StaticOriginId(757)");
             assert!(
                 row.capture_count > 1,
                 "the capture-order control requires a non-degenerate Direct population: {row:#?}"
@@ -2456,9 +2456,9 @@ fn direct_application_control_arm(
     );
     assert_eq!(applications, 1, "{label}: mutation missed Direct");
     assert_eq!(rows.len(), 1, "{label}: missing application provenance");
-    assert_eq!(rows[0].invocation_origin, "StaticOriginId(741)");
-    assert_eq!(rows[0].application_origin, "StaticOriginId(740)");
-    assert_eq!(rows[0].callee_origin, "StaticOriginId(739)");
+    assert_eq!(rows[0].invocation_origin, "StaticOriginId(759)");
+    assert_eq!(rows[0].application_origin, "StaticOriginId(758)");
+    assert_eq!(rows[0].callee_origin, "StaticOriginId(757)");
     assert_eq!(rows[0].emitted_call_count, expected_calls);
     assert_eq!(rows[0].emitted_call.is_some(), expected_calls == 1);
     assert!(!rows[0].application_result_from_call);
@@ -2697,22 +2697,22 @@ fn checked_ih_generated_entry_admission_population_is_total() {
                 .collect::<std::collections::BTreeSet<_>>()
         };
         let expected_read = std::collections::BTreeSet::from([
-            (2, 941, 301, 1, 305, 304, 303, true),
-            (2, 941, 470, 1, 474, 473, 472, false),
-            (2, 941, 511, 1, 515, 514, 513, true),
-            (2, 941, 681, 1, 685, 684, 683, false),
+            (2, 963, 301, 1, 305, 304, 303, true),
+            (2, 963, 479, 1, 483, 482, 481, false),
+            (2, 963, 520, 1, 524, 523, 522, true),
+            (2, 963, 699, 1, 703, 702, 701, false),
         ]);
         let expected_write = std::collections::BTreeSet::from([
-            (3, 1238, 525, 1, 529, 528, 527, true),
-            (3, 1238, 696, 1, 700, 699, 698, false),
-            (3, 1238, 737, 1, 741, 740, 739, true),
-            (3, 1238, 909, 1, 913, 912, 911, false),
-            (5, 1259, 314, 1, 318, 317, 316, true),
-            (5, 1259, 483, 1, 487, 486, 485, false),
-            (5, 1259, 525, 1, 529, 528, 527, false),
-            (5, 1259, 696, 1, 700, 699, 698, false),
-            (5, 1259, 737, 1, 741, 740, 739, false),
-            (5, 1259, 909, 1, 913, 912, 911, false),
+            (3, 1269, 534, 1, 538, 537, 536, true),
+            (3, 1269, 714, 1, 718, 717, 716, false),
+            (3, 1269, 755, 1, 759, 758, 757, true),
+            (3, 1269, 936, 1, 940, 939, 938, false),
+            (5, 1290, 314, 1, 318, 317, 316, true),
+            (5, 1290, 492, 1, 496, 495, 494, false),
+            (5, 1290, 534, 1, 538, 537, 536, false),
+            (5, 1290, 714, 1, 718, 717, 716, false),
+            (5, 1290, 755, 1, 759, 758, 757, false),
+            (5, 1290, 936, 1, 940, 939, 938, false),
         ]);
         assert_eq!(keys(&read), expected_read, "the read admission population P is closed");
         assert_eq!(keys(&write), expected_write, "the write admission population P is closed");
@@ -3620,8 +3620,10 @@ fn composed_return_ret_sink_population_is_unique() {
         // composed-return collapse. Strict-Ret seams DOWNSTREAM of that collapse --
         // the ones base reached by continuing past it -- are no longer reached, so
         // their sinks are not installed => the reached-seam population DROPS
-        // (read 35->17, write 26->17; the count is 1:1 with reached seams, invariant
-        // below unchanged). This is pure SUBSUMPTION, not a structural rewrite: the
+        // (read 35->17, write 26->17 at D3-RECUT; D2's appended ResourceRevoked
+        // alternative adds one reached read-side sink, so read is now 18 while write
+        // remains 17; the count is 1:1 with reached seams, invariant below unchanged).
+        // This is pure SUBSUMPTION plus one additive error arm, not a structural rewrite: the
         // new coordinate set is a strict SUBSET of the base set (no new seam appears),
         // and the removed coordinates are exactly the backedge-subsumed downstream
         // seams -- read loses (301,465),(511,676); write loses (525,691).
@@ -3629,11 +3631,11 @@ fn composed_return_ret_sink_population_is_unique() {
             (
                 "read",
                 read,
-                17,
+                18,
                 std::collections::BTreeSet::from([
                     ("StaticOriginId(12)", "StaticOriginId(294)", 0),
-                    ("StaticOriginId(470)", "StaticOriginId(505)", 0),
-                    ("StaticOriginId(681)", "StaticOriginId(744)", 0),
+                    ("StaticOriginId(479)", "StaticOriginId(514)", 0),
+                    ("StaticOriginId(699)", "StaticOriginId(766)", 0),
                 ]),
             ),
             (
@@ -3642,11 +3644,11 @@ fn composed_return_ret_sink_population_is_unique() {
                 17,
                 std::collections::BTreeSet::from([
                     ("StaticOriginId(25)", "StaticOriginId(307)", 0),
-                    ("StaticOriginId(314)", "StaticOriginId(478)", 0),
-                    ("StaticOriginId(483)", "StaticOriginId(518)", 0),
-                    ("StaticOriginId(696)", "StaticOriginId(731)", 0),
-                    ("StaticOriginId(737)", "StaticOriginId(904)", 0),
-                    ("StaticOriginId(909)", "StaticOriginId(1053)", 0),
+                    ("StaticOriginId(314)", "StaticOriginId(487)", 0),
+                    ("StaticOriginId(492)", "StaticOriginId(527)", 0),
+                    ("StaticOriginId(714)", "StaticOriginId(749)", 0),
+                    ("StaticOriginId(755)", "StaticOriginId(931)", 0),
+                    ("StaticOriginId(936)", "StaticOriginId(1084)", 0),
                 ]),
             ),
         ] {

@@ -205,11 +205,11 @@ fn assert_retained_unit_call_target_mutation_child() {
     let (mutation, expected) = match mode.as_str() {
         "unrelated-owner-root" => (
             Mutation::SubstituteUnrelatedOwnerRoot,
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "retained body StaticOriginId(1263) has no graph-derived call target in this unit",
         ),
         "suppress-graph-claims" => (
             Mutation::SuppressGraphClaims,
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "retained body StaticOriginId(1263) has no graph-derived call target in this unit",
         ),
         "wrong-target" => (
             Mutation::SubstituteWrongTarget,
@@ -460,11 +460,11 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
     let cases = [
         (
             "unrelated-owner-root",
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "retained body StaticOriginId(1263) has no graph-derived call target in this unit",
         ),
         (
             "suppress-graph-claims",
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "retained body StaticOriginId(1263) has no graph-derived call target in this unit",
         ),
         ("wrong-target", "a retained-body graph claim for"),
         (
@@ -584,12 +584,12 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
                 "{mode}: child did not publish intended refusal; stderr:\n{stderr}"
             );
             for coordinate in [
-                "construct=StaticOriginId(815)",
+                "construct=StaticOriginId(833)",
                 "field=1",
-                "seat=StaticOriginId(810)",
-                "body=StaticOriginId(800)",
-                "StaticOriginId(809)",
-                "StaticOriginId(801)",
+                "seat=StaticOriginId(828)",
+                "body=StaticOriginId(818)",
+                "StaticOriginId(827)",
+                "StaticOriginId(819)",
                 "target=ContinuationSpecializationId(3)",
             ] {
                 assert!(
@@ -865,9 +865,9 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             assert_eq!(
                 specialized,
                 std::collections::BTreeSet::from([
-                    (267, 1406, "FsReadAt"),
-                    (279, 1549, "BufferAllocate"),
-                    (303, 1572, "FsOpen"),
+                    (267, 1433, "FsReadAt"),
+                    (279, 1576, "BufferAllocate"),
+                    (303, 1599, "FsOpen"),
                 ]),
                 "only the two exclusively-predeclared groups join the preexisting open row"
             );
@@ -886,10 +886,10 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             assert_eq!(
                 deferred,
                 std::collections::BTreeSet::from([
-                    (254, 1229, "FsWriteAt", "NoContinuationUnit"),
-                    (287, 606, "ResourceRelease", "UnconsumedTransportCaller"),
-                    (287, 815, "ResourceRelease", "UnconsumedTransportCaller"),
-                    (287, 1024, "ResourceRelease", "UnconsumedTransportCaller"),
+                    (254, 1256, "FsWriteAt", "NoContinuationUnit"),
+                    (287, 615, "ResourceRelease", "UnconsumedTransportCaller"),
+                    (287, 833, "ResourceRelease", "UnconsumedTransportCaller"),
+                    (287, 1051, "ResourceRelease", "UnconsumedTransportCaller"),
                 ]),
                 "P1 stays main-lowered and the mixed-owner group stays P2"
             );
@@ -901,14 +901,14 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             let buffer_handler = diagnostic
                 .all_static_response_rows
                 .iter()
-                .find(|row| row.vis_origin == 1549)
+                .find(|row| row.vis_origin == 1576)
                 .expect("the promoted BufferAllocate response remains present")
                 .base_owner
                 .clone();
             let p1 = diagnostic
                 .static_response_deferred
                 .iter()
-                .find(|row| row.vis_origin == 1229)
+                .find(|row| row.vis_origin == 1256)
                 .expect("the P1 response remains in the Deferred population");
             assert_eq!(p1.handler_owner.as_deref(), Some(buffer_handler.as_str()));
             for row in &diagnostic.static_response_deferred {
@@ -944,7 +944,7 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 diagnostic
                     .static_response_deferred
                     .iter()
-                    .filter(|row| row.vis_origin != 1229)
+                    .filter(|row| row.vis_origin != 1256)
                     .all(|row| row.tail_static_calls == Some(0)),
                 "resource-release continuations must return directly rather than recurse"
             );
@@ -967,7 +967,7 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .collect::<std::collections::BTreeSet<_>>();
             assert_eq!(
                 suppressed_specialized,
-                std::collections::BTreeSet::from([(303, 1572)]),
+                std::collections::BTreeSet::from([(303, 1599)]),
                 "suppression must remove both execute-then-resume owners"
             );
             let suppressed_p2 = suppressed
@@ -979,11 +979,11 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             assert_eq!(
                 suppressed_p2,
                 std::collections::BTreeSet::from([
-                    (267, 1406),
-                    (279, 1549),
-                    (287, 606),
-                    (287, 815),
-                    (287, 1024),
+                    (267, 1433),
+                    (279, 1576),
+                    (287, 615),
+                    (287, 833),
+                    (287, 1051),
                 ]),
                 "restoring the veto must reopen the ordinary groups as P2"
             );
