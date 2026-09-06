@@ -258,15 +258,25 @@ Steward cuts it rather than the ring.
 >   [[LANG-MATCH-TUPLE-PATTERN]] merged `af2b36dc8` / closed `a8ee55b2f`, the first
 >   SPLITTING form; it discharged the NoInhabitants composition discriminator for a
 >   redundant tuple arm.
-> - **Slice 3 record patterns -- RELEASED 2026-09-06.**
->   [[LANG-MATCH-RECORD-PATTERN]] (`ready`), the second projecting form but
->   label-keyed against the record declaration and OPEN (an omitted field is an
->   implicit wildcard), checked in declaration order for dependent later fields; it
->   owes the same NoInhabitants composition discriminator, including the
->   open-record field-subset-subsumes-superset case.
-> - **Slices 4-6 (or-patterns, guards, literals)** remain future slices, each
->   fail-closed until cut. Literals stay blocked (the enclave's DecEq/expected-type
->   finding). The Steward cuts the next slice one-release-ahead as the ring drains.
+> - **Slice 3 record patterns -- LANDED 2026-09-06.**
+>   [[LANG-MATCH-RECORD-PATTERN]] merged `a42b90454` (PR #3370, CI-green) / closed
+>   `760e12fd0`, the second projecting form -- label-keyed against the record
+>   declaration and OPEN (an omitted field is an implicit wildcard), checked in
+>   declaration order for dependent later fields; it discharged the NoInhabitants
+>   composition discriminator including the open-record field-subset-subsumes-
+>   superset case.
+> - **Slice 4 or-patterns -- RELEASED 2026-09-06.** [[LANG-MATCH-OR-PATTERN]]
+>   (`active`), an ALTERNATION over the same occurrence (not a projecting form, no
+>   new carrier): every alternative binds the same name set at definitionally-equal
+>   types in the common pre-branch context, coverage is the union and the arm is
+>   reachable if any alternative has a non-empty residual. Its composition
+>   discriminator has two parts -- a fully-subsumed or-arm gets the subsumption
+>   cause never NoInhabitants, and a partially-dead or-pattern stays reachable --
+>   plus the top-level refusal is lifted to see THROUGH an or-pattern (a `Wild`/`Var`
+>   alternative stays refused as the catch-all it is). Base `a42b90454`.
+> - **Slices 5-6 (guards, literals)** remain future slices, each fail-closed until
+>   cut. Literals stay blocked (the enclave's DecEq/expected-type finding). The
+>   Steward cuts the next slice one-release-ahead as the ring drains.
 
 **One thing already decided and needing no further ruling:** this node does
 **not** amend `34`. The enclave ruled the chapter's obligations real, so the
