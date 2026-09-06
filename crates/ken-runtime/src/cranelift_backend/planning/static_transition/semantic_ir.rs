@@ -121,10 +121,12 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ReadChunk,
     ReadResultEof,
     Unit,
+    /// ABI-A2 appends this role so established semantic identities do not move.
+    FileOperationAppend,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 29] = [
+    pub(super) const ALL: [Self; 30] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -154,6 +156,7 @@ impl SynthesizedFixedConstructorRole {
         Self::ReadChunk,
         Self::ReadResultEof,
         Self::Unit,
+        Self::FileOperationAppend,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -187,6 +190,7 @@ impl SynthesizedFixedConstructorRole {
             Self::ReadChunk => &symbols.read_chunk,
             Self::ReadResultEof => &symbols.read_result_eof,
             Self::Unit => &symbols.unit,
+            Self::FileOperationAppend => &symbols.file_operation_append,
         }
     }
 }

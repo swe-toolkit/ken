@@ -2728,7 +2728,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// set, and it is derived from the operation and the slot alone.**
 ///
 /// ⛔ **Nothing here compiles or runs a program.** The point of the seat
-/// authority is that the population is STATIC: it is a fact about the 15
+/// authority is that the population is STATIC: it is a fact about the 16
 /// admitted operations, not about the arms some execution happened to take. A
 /// control that established it by compiling a fixture would prove the property
 /// only for the seats that fixture reaches, which is the row-driven discovery
@@ -2737,7 +2737,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// MEASURED: for each admitted operation the ordinals carrying a contract are
 /// exactly `0..n`; `ClockWallNow` is the sole zero-arity operation, every other
 /// admitted operation has `n >= 1`, the capability slot carries one for exactly
-/// the four FS-path operations, and no unadmitted lane carries one at any slot.
+/// the five FS-path operations, and no unadmitted lane carries one at any slot.
 ///
 /// CLAIMED: the table has no hole and no wildcard, so an operation cannot be
 /// admitted while some seat of it silently has no contract.
@@ -2755,6 +2755,7 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
     let capability_bearing = [
         ken_host::HostOpV1::FsReadFile,
         ken_host::HostOpV1::FsWriteFile,
+        ken_host::HostOpV1::FsAppendFile,
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
     ];
@@ -2782,6 +2783,36 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         )),
         "ConsoleRead.limit is the bounded host-width Int seat"
     );
+    for (slot, expected) in [
+        (
+            EffectSeatSlot::Capability,
+            (
+                EffectSeatOperation::ObserveCapabilityToken,
+                EffectSeatNeed::CapabilityTokenScalar,
+            ),
+        ),
+        (
+            EffectSeatSlot::Argument(0),
+            (
+                EffectSeatOperation::ProjectBytesSpan,
+                EffectSeatNeed::BytesPointerLength,
+            ),
+        ),
+        (
+            EffectSeatSlot::Argument(1),
+            (
+                EffectSeatOperation::ProjectBytesSpan,
+                EffectSeatNeed::BytesPointerLength,
+            ),
+        ),
+    ] {
+        assert_eq!(
+            host_effect_seat_contract_of(ken_host::HostOpV1::FsAppendFile, slot)
+                .map(|(operation, need, _)| (operation, need)),
+            Some(expected),
+            "FsAppendFile has its exact capability/path/contents seat contract"
+        );
+    }
     for operation in CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
         assert_eq!(
             host_effect_seat_contract_of(operation, EffectSeatSlot::Capability).is_some(),
@@ -2816,7 +2847,6 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
     for operation in [
         ken_host::HostOpV1::ClockMonotonicNow,
         ken_host::HostOpV1::ClockSleepUntil,
-        ken_host::HostOpV1::FsAppendFile,
         ken_host::HostOpV1::FsMetadata,
         ken_host::HostOpV1::FsReadDirectory,
         ken_host::HostOpV1::FsCreateDirectory,

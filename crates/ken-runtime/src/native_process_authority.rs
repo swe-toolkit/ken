@@ -621,6 +621,7 @@ fn native_process_symbols_from_record(
         unit: spine.unit.clone(),
         bool_false: spine.bool_false.clone(),
         bool_true: spine.bool_true.clone(),
+        file_operation_append: spine.file_operation_append.clone(),
     }
 }
 

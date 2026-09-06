@@ -41,6 +41,10 @@ pub enum ExpectedFsEffect {
         create_policy: CreatePolicyV1,
         bytes: Vec<u8>,
     },
+    AppendFile {
+        path: Vec<u8>,
+        bytes: Vec<u8>,
+    },
     ChangeMode {
         path: Vec<u8>,
         mode: u16,
@@ -52,6 +56,7 @@ impl ExpectedFsEffect {
         match self {
             Self::ReadFile { .. } => HostOpV1::FsReadFile,
             Self::WriteFile { .. } => HostOpV1::FsWriteFile,
+            Self::AppendFile { .. } => HostOpV1::FsAppendFile,
             Self::ChangeMode { .. } => HostOpV1::FsChangeMode,
         }
     }
@@ -60,6 +65,7 @@ impl ExpectedFsEffect {
         match self {
             Self::ReadFile { path }
             | Self::WriteFile { path, .. }
+            | Self::AppendFile { path, .. }
             | Self::ChangeMode { path, .. } => path,
         }
     }
@@ -68,6 +74,7 @@ impl ExpectedFsEffect {
         match self {
             Self::ReadFile { .. } => FsOpKind::Read,
             Self::WriteFile { .. } => FsOpKind::Write,
+            Self::AppendFile { .. } => FsOpKind::Append,
             Self::ChangeMode { .. } => FsOpKind::ChangeMode,
         }
     }
@@ -369,6 +376,8 @@ impl HostHandler for ScriptedPosixHost {
     }
 
     fn fs_append_at(&mut self, handle: &Self::Handle, bytes: &[u8]) -> io::Result<()> {
+        let expected = self.take_pending(HostOpV1::FsAppendFile);
+        verify_append_assertion(self, expected.as_ref(), bytes);
         self.inner.fs_append_at(handle, bytes)
     }
 
@@ -378,6 +387,8 @@ impl HostHandler for ScriptedPosixHost {
         leaf: &[u8],
         bytes: &[u8],
     ) -> io::Result<()> {
+        let expected = self.take_pending(HostOpV1::FsAppendFile);
+        verify_append_assertion(self, expected.as_ref(), bytes);
         self.inner.fs_create_append_at(parent, leaf, bytes)
     }
 
@@ -452,6 +463,23 @@ fn verify_write_assertion(
     ) {
         host.fail_assertion(format!(
             "interpreter FS write payload diverged: expected={expected:?}, policy={policy:?}, bytes={bytes:?}"
+        ));
+    }
+}
+
+fn verify_append_assertion(
+    host: &mut ScriptedPosixHost,
+    expected: Option<&ExpectedFsEffect>,
+    bytes: &[u8],
+) {
+    if !matches!(
+        expected,
+        Some(ExpectedFsEffect::AppendFile { bytes: expected_bytes, .. })
+            if expected_bytes == bytes
+    ) {
+        host.fail_assertion(format!(
+            "interpreter FS append payload diverged: expected={expected:?}, \
+             bytes={bytes:?}"
         ));
     }
 }

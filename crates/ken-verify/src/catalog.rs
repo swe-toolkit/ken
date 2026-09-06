@@ -87,6 +87,37 @@ impl NativeTestedEvidence {
         }
     }
 
+    /// FsAppendFile evidence first validates the exact request/Unit reply and
+    /// before-plus-appended content/count relation on both real roots.
+    pub fn from_fs_append_file_run(
+        run: &CanonicalDifferentialRun,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+        before: &[u8],
+        appended: &[u8],
+    ) -> Self {
+        let operation = HostOpV1::FsAppendFile;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run
+                .compare_fs_append_file(
+                    request_path,
+                    filesystem_path,
+                    before,
+                    appended,
+                )
+                .is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
     /// CaptureHost and hand-fed observations can exercise comparator units but
     /// can never manufacture exact-artifact evidence.
     pub fn unit_or_negative_control(

@@ -3298,6 +3298,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         SOME_SITE_PATH,
         IO_ERRORS,
     ];
+    const APPEND_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
+        N::nullary(R::FileOperationAppend),
+        SOME_SITE_PATH,
+        IO_ERRORS,
+    ];
     const CHANGE_MODE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
         N::nullary(R::FileOperationChangeMode),
         SOME_SITE_PATH,
@@ -3310,6 +3315,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     const WRITE_FILE_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
         children: WRITE_FILE_ERROR_CHILDREN,
+    };
+    const APPEND_FILE_ERROR: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileError,
+        children: APPEND_FILE_ERROR_CHILDREN,
     };
     const CHANGE_MODE_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
@@ -3369,10 +3378,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         // ⚠ The `ok` arm here is the emitter's `else` branch, which is `Unit`.
         // The flat use table this tree replaces derived these two rows from the
         // operation match and MISSED that branch, so it planned no `Unit`
-        // record for them. No fixture exercises either operation, which is why
-        // the omission was invisible; the tree states both arms from the same
-        // match the emitter uses, so an arm cannot be dropped by inattention.
+        // record for them. The tree states all arms from the same match the
+        // emitter uses, so an arm cannot be dropped by inattention.
         Op::FsWriteFile => (WRITE_FILE_ERROR, UNIT),
+        Op::FsAppendFile => (APPEND_FILE_ERROR, UNIT),
         Op::FsChangeMode => (CHANGE_MODE_ERROR, UNIT),
         Op::BufferAllocate | Op::BufferFreeze => (RESOURCE_SURFACE, N::Absent),
         Op::FsHandleMetadata => (RESOURCE_SURFACE, N::Absent),
@@ -10350,12 +10359,18 @@ mod tests {
             ),
             (Op::FsReadFile, file_error(R::FileOperationRead)),
             (Op::FsOpen, file_error(R::FileOperationRead)),
-            // ⚠ DERIVED, not observed — no fixture exercises these two. The
-            // `Unit` row is the emitter's `else` branch, which the flat use
-            // table this tree replaced had MISSED.
+            // The `Unit` row is the emitter's `else` branch, which the flat
+            // use table this tree replaced had missed.
             (
                 Op::FsWriteFile,
                 file_error(R::FileOperationWrite)
+                    .into_iter()
+                    .chain(unit())
+                    .collect(),
+            ),
+            (
+                Op::FsAppendFile,
+                file_error(R::FileOperationAppend)
                     .into_iter()
                     .chain(unit())
                     .collect(),
@@ -11212,6 +11227,7 @@ mod tests {
             Op::FsReadFile,
             Op::FsOpen,
             Op::FsWriteFile,
+            Op::FsAppendFile,
             Op::FsChangeMode,
             Op::BufferAllocate,
             Op::BufferFreeze,

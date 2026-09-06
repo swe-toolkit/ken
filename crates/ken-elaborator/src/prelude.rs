@@ -125,6 +125,7 @@ canonical_runtime_roles! {
     file_operation_read => "OpReadFile",
     file_operation_write => "OpWriteFile",
     file_operation_change_mode => "OpChangeMode",
+    file_operation_append => "OpAppendFile",
     // The thirteen IO errors, in the exact order the spine's vector carries them.
     // That order is the contract; the record's bytes depend on it.
     io_error_not_found => "NotFound",

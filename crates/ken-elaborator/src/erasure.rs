@@ -533,6 +533,9 @@ pub(crate) struct CheckedHostSpineV1 {
     pub unit: StableSymbol,
     pub bool_false: StableSymbol,
     pub bool_true: StableSymbol,
+    /// Appended to the positional role record by ABI-A2 so every established
+    /// field retains its index.
+    pub file_operation_append: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -7784,6 +7787,10 @@ mod px7l_tests {
                 &family("FileOperation"),
                 "ChangeMode",
             ),
+            file_operation_append: StableSymbol::constructor(
+                &family("FileOperation"),
+                "Append",
+            ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8185,6 +8192,7 @@ mod d1b_role_b_decoder_alignment {
             unit: sentinel("unit"),
             bool_false: sentinel("bool_false"),
             bool_true: sentinel("bool_true"),
+            file_operation_append: sentinel("file_operation_append"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8252,6 +8260,7 @@ mod d1b_role_b_decoder_alignment {
         (spine.unit.as_str(), "unit"),
         (spine.bool_false.as_str(), "bool_false"),
         (spine.bool_true.as_str(), "bool_true"),
+        (spine.file_operation_append.as_str(), "file_operation_append"),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(

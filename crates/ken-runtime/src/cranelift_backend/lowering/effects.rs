@@ -247,6 +247,7 @@ fn runtime_producible_constructors(
         unit,
         bool_false,
         bool_true,
+        file_operation_append,
     } = symbols;
     // Every field is a constructor the native runtime can put in front of a
     // match: host-effect responses, process-entry inputs, and the primitive
@@ -293,6 +294,7 @@ fn runtime_producible_constructors(
         unit,
         bool_false,
         bool_true,
+        file_operation_append,
     ]
     .into_iter()
     .cloned()
@@ -2350,7 +2352,7 @@ impl<'a> Lowering<'a> {
             // BEFORE any seat is claimed. On a provably dead arm that refusal
             // fails the whole object emission for a lane no execution reaches --
             // the identical defect, one check earlier. Measured on the governed
-            // fixtures: seven arms (FsAppendFile, FsMetadata, FsReadDirectory,
+            // fixtures: six arms (FsMetadata, FsReadDirectory,
             // FsCreateDirectory, FsRemoveFile, FsRemoveDirectory, FsRename).
             //
             // Same fail-closed substitute for the same reason: an arm wrongly
@@ -2555,8 +2557,8 @@ impl<'a> Lowering<'a> {
         // high 32 bits, discriminator `12` in the low byte, which the decoder
         // below recovers with `sshr_imm(detail, 32)`.
         //
-        // `ConsoleWrite` and `FsWriteFile` declare `IOError` surfaces, so their
-        // `detail` is read as an `IOError` discriminator. Handing them a RAW
+        // `ConsoleWrite`, `FsWriteFile`, and `FsAppendFile` declare `IOError`
+        // surfaces, so their `detail` is read as an `IOError` discriminator. Handing them a RAW
         // resource code would silently reinterpret `1` and `7` as
         // `PermissionDenied` and `IsDirectory` — two real, wrong errors. `Other`
         // is the one variant that carries an integer whose meaning is the
@@ -2571,9 +2573,9 @@ impl<'a> Lowering<'a> {
         // `(invalid, reply tag, detail)`. The TAG is carried rather than assumed
         // because a synthesized pre-dispatch failure must land on the surface
         // the operation actually declares: the resource operations accept
-        // `reply_resource_error_tag`, and `ConsoleWrite` / `FsWriteFile` accept
-        // only `success` or `reply_error_tag`. Writing the wrong one is not a
-        // mis-labelled error — `require_one_of_i64` refuses the reply outright
+        // `reply_resource_error_tag`, while ConsoleWrite, FsWriteFile, and
+        // FsAppendFile accept only `success` or `reply_error_tag`. Writing the
+        // wrong one is not a mis-labelled error — `require_one_of_i64` refuses the reply outright
         // and the whole compiled function fails generically, which is the defect
         // this triple exists to make unspellable.
         let mut narrow_failure: Option<(
@@ -2679,6 +2681,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::FsReadFile
             | ken_host::HostOpV1::FsWriteFile
+            | ken_host::HostOpV1::FsAppendFile
             | ken_host::HostOpV1::FsChangeMode
             | ken_host::HostOpV1::FsOpen => {
                 // Lowered and claimed above, with every other operand, so the
@@ -2742,6 +2745,23 @@ impl<'a> Lowering<'a> {
                     builder
                         .ins()
                         .stack_store(contents.len, request, request_offset(5));
+                } else if operation == ken_host::HostOpV1::FsAppendFile {
+                    let contents = self.wire_bytes_seat(builder, &seats, SEAT_1)?;
+                    if let Some((invalid, resource_code)) = contents.refusal {
+                        let detail = io_error_other_detail(builder, resource_code);
+                        record_narrow_failure(
+                            builder,
+                            invalid,
+                            error_reply_tag,
+                            detail,
+                        );
+                    }
+                    builder
+                        .ins()
+                        .stack_store(contents.pointer, request, request_offset(3));
+                    builder
+                        .ins()
+                        .stack_store(contents.len, request, request_offset(4));
                 } else if operation == ken_host::HostOpV1::FsChangeMode {
                     let mode = seats.specialized(SEAT_1)?;
                     let (mode, valid_int) = self.narrow_native_int_u64(builder, mode)?;
@@ -3066,9 +3086,9 @@ impl<'a> Lowering<'a> {
             // The tag comes from whoever recorded the failure, because only they
             // know which surface this operation declares. Hardcoding the
             // resource-error tag here is what made a byte-span refusal on
-            // `ConsoleWrite` / `FsWriteFile` fail `require_one_of_i64` below and
-            // collapse into the generic compiled-function failure instead of
-            // reaching Ken as a value.
+            // ConsoleWrite, FsWriteFile, and FsAppendFile fail
+            // `require_one_of_i64` below and collapse into the generic compiled
+            // function failure instead of reaching Ken as a value.
             builder.ins().stack_store(
                 failure_tag,
                 reply,
@@ -3335,6 +3355,7 @@ impl<'a> Lowering<'a> {
                 operation,
                 ken_host::HostOpV1::FsReadFile
                     | ken_host::HostOpV1::FsWriteFile
+                    | ken_host::HostOpV1::FsAppendFile
                     | ken_host::HostOpV1::FsChangeMode
                     | ken_host::HostOpV1::FsOpen
             ) {
@@ -3352,6 +3373,10 @@ impl<'a> Lowering<'a> {
                     ken_host::HostOpV1::FsWriteFile => (
                         SynthesizedFixedConstructorRole::FileOperationWrite,
                         self.process_symbols.file_operation_write.clone(),
+                    ),
+                    ken_host::HostOpV1::FsAppendFile => (
+                        SynthesizedFixedConstructorRole::FileOperationAppend,
+                        self.process_symbols.file_operation_append.clone(),
                     ),
                     ken_host::HostOpV1::FsChangeMode => (
                         SynthesizedFixedConstructorRole::FileOperationChangeMode,
