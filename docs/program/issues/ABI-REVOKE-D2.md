@@ -1,7 +1,7 @@
 ---
 id: ABI-REVOKE-D2
 title: "resource provenance + close-after-drain settlement — a resource-token-only op cannot bypass revocation, and owned fds close only after admitted leases drain; turns the two resource oracle cases green"
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
@@ -11,13 +11,18 @@ github: null
 origin: "Architect decomposition of ABI-REVOKE, evt_30z9y81yxvdyv (2026-09-05). Third of three increments (D0 S + D1 M + D2 M); it closes the batch, so ABI-REVOKE completes when D2 lands. Queued behind ABI-REVOKE-D1; the Steward RE-RELEASES explicitly once D1 lands. Cut per COORDINATION §2."
 ---
 
-> # QUEUED — NOT YET RELEASED
->
-> This node is `draft` and behind `ABI-REVOKE-D1`. The Steward flips it
-> `ready`/`active` and kicks the ring after D1 lands. The Architect noted D1 and
-> D2 may be built as one M increment (they share the dispatch edit) at the ring's
-> discretion — that is a sequencing call at D1's release, not a reason to start
-> D2 early. Re-measure every anchor at release.
+> # RELEASED 2026-09-06 to the runtime ring (lane-1). ABI-REVOKE-D1 has LANDED
+> # and is merged on main (respin 3c017b7f8 / node close 83670602e; kernel tree
+> # byte-identical, zero-TCB confirmed). Base = current main 83670602e; re-measure
+> # every anchor at the cut (the D1 landing moved lines). Kick evt_3qx9h34dj7n1e
+> # (top-level anchor). D1+D2 bundling is OFF — the Architect's "one M increment"
+> # note was contingent on releasing them together, and D1 landed on its own, so
+> # D2 is its own increment. Released on the incumbent runtime seat
+> # (gpt-5.6-sol/high, T1) though framed T2: D2 shares the dispatch edit with D1,
+> # the seat is warm from the D1 repair, this closes the batch, and the lane's
+> # next objective (PX9) is T1 — over-provision on one closing increment is cheaper
+> # than reseat churn (recorded, not escalated). Architect is REQUIRED per-candidate
+> # reviewer + Runtime QA on the exact SHA -> Steward M1-M4 -> lieutenant.
 
 ## Objective
 
