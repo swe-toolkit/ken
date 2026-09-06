@@ -3633,6 +3633,7 @@ fn check_match_with_lift(
     host_params: &[Term],
     binding: LiftBinding,
 ) -> Result<Term, ElabError> {
+    ensure_arm_ctors_belong_to_family(cx, arms, host, host.id)?;
     let support = binding
         .support
         .ok_or_else(|| ElabError::Internal("nested match lost residual All evidence".into()))?;
@@ -14874,9 +14875,9 @@ mod nested_lift_association_tests {
     };
 
     use super::{
-        discharge_reflexive_recursive_ih_evidence, infer, lift_association_error,
-        validate_lift_associations, ElabCtx, ElabError, GlobalId, HashMap, LiftAssociationFailure,
-        LiftBinding, Span,
+        check_match_with_lift, discharge_reflexive_recursive_ih_evidence, infer,
+        lift_association_error, validate_lift_associations, ElabCtx, ElabError, GlobalId, HashMap,
+        LiftAssociationFailure, LiftBinding, Span,
     };
 
     fn binding(
@@ -14888,6 +14889,68 @@ mod nested_lift_association_tests {
             evidence_position,
             recursive_result_position,
             support,
+        }
+    }
+
+    #[test]
+    fn lifted_dispatch_rejects_a_foreign_constructor_before_reading_lift_evidence() {
+        // Promise class: durable invariant. Intended extensions may add callers
+        // or lift-evidence shapes; every direct lifted dispatch must still
+        // reject an arm from a different family before reading its evidence.
+        // MEASURED: a direct call reaches `check_match_with_lift` with a Bool
+        // arm against the Nat host and no support binding, and reports the
+        // family mismatch rather than the later missing-evidence error.
+        // CLAIMED: the lifted dispatch guards its own complete arm population.
+        // THE GAP: ordinary source reaches this dispatch through its currently
+        // guarded sole caller; this direct control exists to cover future callers.
+        let mut env = ElabEnv::new().expect("base environment");
+        let host_id = env.globals["Nat"];
+        let host = env
+            .env
+            .inductive(host_id)
+            .expect("Nat declaration")
+            .clone();
+        let parsed = parse_expr("match Zero { True |-> Zero }").expect("match parses");
+        let RExpr::RMatch { arms, span, .. } =
+            resolve_expr_standalone(&parsed).expect("match resolves")
+        else {
+            panic!("expected a resolved match")
+        };
+        let expected = Term::IndFormer {
+            id: host_id,
+            level_args: vec![],
+        };
+        let scrutinee = Term::Constructor {
+            id: env.globals["Zero"],
+            level_args: vec![],
+        };
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "lift-dispatch-self-guard-control",
+        );
+
+        let error = check_match_with_lift(
+            &mut cx,
+            &arms,
+            &expected,
+            &span,
+            &scrutinee,
+            &host,
+            &[],
+            &[],
+            binding(0, None, None),
+        )
+        .expect_err("a Bool constructor must be foreign to the Nat host");
+
+        match error {
+            ElabError::TypeMismatch { reason, .. } => assert_eq!(
+                reason,
+                "constructor 'True' is not a constructor of type 'Nat'"
+            ),
+            other => panic!("expected the family-mismatch diagnostic, got {other:?}"),
         }
     }
 
