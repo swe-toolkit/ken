@@ -32,14 +32,14 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 12:39:55Z — from 559 issue file(s) in `docs/program/issues/`.
+2026-09-06 13:16:43Z — from 560 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
 | ID | Title | Status | Owner | Size | Gate | GitHub |
 |---|---|---|---|---|---|---|
 | `A3` | catalog-coverage walker | draft | TBD | TBD | none | — |
-| `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | draft | runtime | M | none | — |
+| `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | ready | runtime | M | none | — |
 | `ABI-A2` | promote FsAppendFile, FsMetadata, FsRename to NativeTested | draft | runtime | M | none | — |
 | `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | draft | runtime | M | none | — |
 | `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | merged | runtime | L | none | — |
@@ -209,6 +209,7 @@ the committed file matches the generator's output.
 | `LANG-MATCH-DIAGNOSTIC-PROSE` | The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed | merged | language | S | none | — |
 | `LANG-MATCH-MATRIX-OCCURRENCE-THREADING` | the match compiler drops each column's matched value before the arm-body leaf, so no value-binding pattern form (as-pattern, and later literal/nested-binder positions) can bind the value it matched -- thread a per-position OCCURRENCE (the core term for that column's value, re-indexed at each descent depth) through RowState and the matrix descent, reusing the existing elim_D field binders and the proven under()/scrut_occurs weakening; no new core construct | merged | language | M | none | — |
 | `LANG-MATCH-PATTERN-FORMS-ABSENT` | spec 34 §3 normatively lists nine pattern forms and the elaborator's PatKind has three -- literals, tuple/record patterns, as-patterns, or-patterns and guards are all absent from the AST, with no deferral statement anywhere in a chapter marked impl-ready and high-priority, and no tracker row for any of them | draft | language | unsized | none | — |
+| `LANG-MATCH-RECORD-PATTERN` | record patterns `{ label = p, … }` -- slice 3 of 34 §3's six absent pattern forms: the second projecting form, but keyed by LABEL against the scrutinee's record declaration and OPEN (an omitted field is an implicit wildcard), checked in declaration order so dependent later fields see earlier projections; no elim_D (records are negative, 14 §4); and -- the composition discriminator this slice owes -- a redundant record arm must get the subsumption cause, never a false NoInhabitants | ready | language | M | none | — |
 | `LANG-MATCH-TUPLE-PATTERN` | tuple/pair patterns `(p₁, …, pₙ)` -- slice 2 of 34 §3's six absent pattern forms and the first SPLITTING form: it projects the negative Σ componentwise (no elim_D, matched by Proj1/Proj2), right-nests for arity >2, carries componentwise coverage/reachability, and -- the composition discriminator this slice owes -- a redundant tuple arm must get the subsumption cause, never a false NoInhabitants | merged | language | M | none | — |
 | `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | draft | language | M | none | — |
 | `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` | Attached-proof namespace closure: normative clarification that a proof's attached namespace is closed under its subject's defining module (a nonlocal attached-declaration head rejects at declaration time), with paired conformance. The coupled durable artifact of the Component B convert-to-local ruling. | draft | spec | S | none | — |
@@ -603,8 +604,10 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `ABI-A1` — promote ConsoleRead and ClockWallNow to NativeTested with differential evidence
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
+- `LANG-MATCH-RECORD-PATTERN` — record patterns `{ label = p, … }` -- slice 3 of 34 §3's six absent pattern forms: the second projecting form, but keyed by LABEL against the scrutinee's record declaration and OPEN (an omitted field is an implicit wildcard), checked in declaration order so dependent later fields see earlier projections; no elim_D (records are negative, 14 §4); and -- the composition discriminator this slice owes -- a redundant record arm must get the subsumption cause, never a false NoInhabitants
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed

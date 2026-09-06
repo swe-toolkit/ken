@@ -48,6 +48,44 @@ origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 st
 > lands, rerun the unchanged real loaders and replace `Unavailable` only with
 > newly-successful exact evidence — a monotone frontier, not an upfront graph.
 >
+> ## OPERATOR DIRECTION 2026-09-06 — the deciding PRINCIPLE for the floor question
+>
+> The operator gave the governing principle for decision 2 (the floor question),
+> verbatim: "The principle of the prelude is to bridge the language internals with
+> the language surface where there is no other means to do so. Objects such as FS
+> which are defined in native code and have extensive support in the compiler
+> should be ambiently available to programs." An `import LRUCacheTree` (a surface
+> CONSTRUCTION) is "quite a different thing" from `import FS` (a language
+> INTRINSIC): "I'd prefer that language intrinsics are ambient and do not require
+> import to reference. Does this mean floor? perhaps. I don't have a strong
+> preference for the mechanism."
+>
+> What this settles and what it delegates:
+> - **Settled (decision 2's direction):** language INTRINSICS — native-defined
+>   with extensive compiler support, `FS`, `IO`, and their kind — are to be
+>   **ambient** (referenceable with no import). Surface CONSTRUCTIONS remain
+>   import-required. So the four canonical-package-shaped units the census names
+>   (`Unit`/`Empty`/`IO`/`FS`) are NOT to be forced through the import-edge
+>   discipline that the whole-catalog strict-green criterion assumed for them.
+> - **Delegated (the mechanism):** whether "ambient intrinsic" is realized by
+>   reopening the exact-nine floor, by an ambient-prelude surface, or by another
+>   mechanism is explicitly the enclave's design call ("no strong preference for
+>   the mechanism"). Any mechanism that grows the trusted base returns to the
+>   operator for TCB sign-off.
+> - **Reshapes decision 1 (program shape), does not close it:** if the intrinsics
+>   go ambient rather than importable, the whole-catalog strict-green target
+>   shrinks — those units stop needing synthesized import edges — so the "full
+>   migration program vs foundation-unblock subset" choice is now downstream of the
+>   ambient mechanism the enclave picks. Decision 1 remains the operator's.
+>
+> Steward action (2026-09-06): this fork is being framed as a clean standalone
+> decision with the evidence-frontier census attached, and the MECHANISM question
+> (ambient-intrinsic realization for `FS`/`IO` and the kind) is routed to the
+> Architect + Spec enclave (design authority over the prelude/floor/ambient
+> surface) with foundation as the catalog-realization owner. The census continues
+> as a low-priority truthful monotone report meanwhile; it forecloses neither
+> future and is the input both need.
+>
 > ------------------------------------------------------------------------------
 > RECUT #2 (below) is HISTORICAL — its `StrictGreenAtBase | BlockedOn` two-class
 > total is superseded by the RECUT-#3 evidence-frontier AC-CENSUS. Retained for

@@ -66,6 +66,51 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
+> ### LIVE POSITION 2026-09-06 (NEWEST — read before the 2026-09-05 blocks below)
+>
+> Operator active this session. Roster STRUCTURE unchanged (three lanes,
+> runtime / language / foundation). Live position per lane, with the operator
+> rulings that set it:
+>
+> - **Lane 1 (runtime): ABI-A track, ABI-A1 RELEASED 2026-09-06.** Operator
+>   2026-09-05 set the runtime objective to the ABI availability program; ABI-REVOKE
+>   completed and merged (`3e1b21cf1`); operator 2026-09-06 concurred running
+>   Track A now. `ABI-A1` (promote `ConsoleRead` + `ClockWallNow` to NativeTested
+>   with a normalized differential — the whole T1 content) is framed
+>   (`docs/program/wp/ABI-A1-console-clock-native-promotion.md`), flipped `ready`,
+>   released and kicked to `runtime-leader`. `ABI-A2` (Fs metadata/rename, path
+>   policy) and `ABI-A3` (directory mutation, `depends_on ABI-R3`) follow as the
+>   ring drains. This SUPERSEDES the stale 2026-08-31 LIVE-K objective in the
+>   lane-1 table cell.
+> - **Lane 2 (language): match-pattern slices; record slice 3 RELEASED
+>   2026-09-06.** `LANG-MATCH-RECORD-PATTERN` (slice 3 of the enclave six-slice cut
+>   evt_12qrtnp7237dn; label-keyed open-record projection) is framed in-node,
+>   `ready`, released and kicked to `language-leader`. Queue (one seat, serial):
+>   record slice 3 → slices 4-6 as cut → the rest of the 2026-09-04 language
+>   sequence → **`LANG-INTERVENING-LET-FRAME-WEAKENING` at the END** (operator
+>   2026-09-06: "schedule it for the language ring at the end of its current
+>   queue"; it is the tail item, re-released explicitly by the Steward when the
+>   queue drains to it, D1 regression-check-vs-LANG-CONVOY first). `LANG-FOREIGN-
+>   NAME-FORMAT-CHARS`: operator concurred CLOSING the spoofing vector, but the
+>   node's own measurement rules out the two-`foreign`-site fix — the honest shape
+>   is a whole-source lexical policy (spec/Architect lexer item), being confirmed
+>   with the operator before release (held `draft`/`gate:operator`).
+> - **Lane 3 (foundation): Tier-C P3 building; PX9 scheduled post-P3.**
+>   `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` (P3 flip-only) is active/building.
+>   Operator 2026-09-06 concurred `PX9` (cross-domain `System.Error`,
+>   foundation-owned, gates Track S/T) as the next foundation objective AFTER P3
+>   lands — it needs a frame before release (not shovel-ready).
+> - **Node-3 floor fork (LANG-MOD-CATALOG-COMPLETENESS): operator gave the deciding
+>   PRINCIPLE 2026-09-06.** Language intrinsics (native-defined + compiler-supported:
+>   `FS`, `IO`) are to be **ambient** (no import); surface constructions stay
+>   import-required; mechanism (floor reopen vs ambient prelude vs other) delegated
+>   to the enclave. The fork is being framed as a standalone decision + the
+>   mechanism routed to Architect + Spec enclave (design) + foundation
+>   (realization); decision 1 (full migration program vs foundation-unblock subset)
+>   stays the operator's and is now downstream of the ambient mechanism. This is
+>   enclave/Architect design work — it does NOT consume the language build ring's
+>   serial deliverable (record slice 3).
+
 > ### OPERATOR RULING 2026-09-05 (LATEST) — THREE-LANE TRIAL CONCLUDED
 >
 > (Operator, 2026-09-05, this session.) Verbatim: "btw the trial is over. 3
