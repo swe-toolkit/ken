@@ -69,7 +69,13 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
     env.elaborate_file(
         "const ambient_singleton : NonEmpty Nat = nonempty_singleton Nat Zero \
          const ambient_cons : NonEmpty Nat = nonempty_cons Nat (Suc Zero) (Nil Nat) \
-         const ambient_raw : NonEmpty Nat = NonEmptyCons Nat Zero (Nil Nat)",
+         const ambient_raw : NonEmpty Nat = NonEmptyCons Nat Zero (Nil Nat) \
+         theorem singleton_denotation : Equal (NonEmpty Nat) \
+           (nonempty_singleton Nat Zero) \
+           (NonEmptyCons Nat Zero (Nil Nat)) = Refl \
+         theorem cons_denotation : Equal (NonEmpty Nat) \
+           (nonempty_cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))) \
+           (NonEmptyCons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))) = Refl",
     )
     .expect("smart constructors and raw constructor remain ambiently usable during P1");
 
