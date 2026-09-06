@@ -112,11 +112,17 @@ the prelude bridges to the surface. This is the surface analog of the kernel's
 > 1. **Signature arm.** A built-in primitive's type signature names the type.
 > 2. **Internal-provision arm.** Before source-unit elaboration, the
 >    implementation has installed one canonical identity through ordinary
->    kernel checking. The witness records whether the identity originates at
->    the kernel boundary or in the compiler bootstrap. The surface contract
->    independently requires programs to name that exact identity, and a source
->    declaration with the same structure would allocate a distinct `GlobalId`
->    rather than reproduce it.
+>    kernel checking, and a **native mechanism is keyed to that exact
+>    identity** — the kernel, the effect reifier, erasure/lowering, or the host
+>    runner — so that a source declaration of the same structure allocates a
+>    distinct `GlobalId` that **fails to interoperate** with that mechanism
+>    rather than reproducing the identity. The witness records which mechanism
+>    does the keying and whether the origin is the kernel boundary or the
+>    compiler bootstrap. The surface contract independently requires programs to
+>    name that exact identity — even at a single boundary, such as the Program-I
+>    entrypoint. The two are a conjunction: a bootstrap-installed identity that
+>    no mechanism is keyed to (a source equivalent would serve) is bloat, and so
+>    is a machinery-keyed identity that no surface contract makes source name.
 >
 > The prelude is the **closed union** of the two witnessed inventories, never a
 > fallback to arbitrary compiler globals. Presence in the compiler's global map
@@ -175,6 +181,29 @@ constructor-free. A same-shaped source family or definition has a different
 identity and is not the floor member. Every floor type, constructor, and
 companion is re-checked and **out** of `trusted_base()`.
 
+**The effect surface and the Program-I entrypoint ABI.** The same
+internal-provision arm admits the intrinsics behind Ken's effect surface and
+its Program-I entrypoint ABI, on the machinery-keying witness above — this is
+not a new arm, only that witness read over the effect reifier, erasure, and the
+host runner as well as the kernel and bootstrap. The positive shape: the
+one-element effect result `Unit`, whose exact identity the effect reifier
+produces wherever a native effect response yields it, so a source-defined `Unit`
+fails to interoperate, and the entrypoint-ABI types the host runner is keyed to
+at
+`main`. Two boundaries stay **out**. A bootstrap-installed type that no
+mechanism is keyed to, whose source-defined equivalent would serve — `Empty`,
+installed for `Dec` but forced by nothing — fails the keying clause and stays an
+import-required package. And a construction over a landed ABI is not an identity
+at all: a catalog policy wrapper (`Capability/Process/Exit`'s
+`exit_with`/`exit_from_result` are transparent terms over the one `ExitCode`)
+or any catalog-defined `data` is an ordinary package identity, never floor. The
+exact witnessed set — and which mechanism keys each identity — is recorded by
+the per-name intrinsic ledger; **extending the closed roster and its count to
+that set is an operator-owned floor-membership change**, adding no
+`trusted_base()` entry (every added member is re-checked and out of the trusted
+base, exactly as the ten above) and landing atomically with the roster. Until
+it lands, the floor is the ten stated above.
+
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
 and it has no internal-provision witness. It is therefore a standard-package
@@ -184,7 +213,9 @@ The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
 **Implementation staging.** The specification fixes the ten-type and
-three-companion target. Until the floor-realization build captures and admits
+three-companion target as the current floor; the effect-surface and
+entrypoint-ABI extension above grows it only under the operator-gated
+floor-membership change. Until the floor-realization build captures and admits
 the four existing Pair-family identities, current Strict loading may still
 reject their bare names. That implementation gap is not a package boundary and
 does not authorize a second identity or fallback route.
@@ -197,9 +228,12 @@ path from the built-ins stated in-spec**. `Nat` and `Pair` are therefore not
 package carriers: they are the kernel-origin and compiler-bootstrap members of
 the internal-provision arm. `Option` and `Result` are likewise not packages:
 public primitive signatures name their canonical compiler-installed
-identities. `Unit`, `Empty`, and `Either` remain packages. A same-shaped source
-definition of `Pair` allocates a distinct identity; it neither replaces the
-floor family nor converts structural equality into floor provenance.
+identities. `Empty` and `Either` remain packages; `Unit` is the one the
+effect-surface extension in §4 moves floor-side (the effect reifier is keyed to
+its exact identity), pending that operator-gated floor-membership change. A
+same-shaped source definition of `Pair` allocates a distinct identity; it
+neither replaces the floor family nor converts structural equality into floor
+provenance.
 
 The reframed catalog is
 `../50-stdlib/README.md` — the lawful classes (`Num`/`Ord`/`Eq`/`Monoid`/
