@@ -14905,11 +14905,7 @@ mod nested_lift_association_tests {
         // guarded sole caller; this direct control exists to cover future callers.
         let mut env = ElabEnv::new().expect("base environment");
         let host_id = env.globals["Nat"];
-        let host = env
-            .env
-            .inductive(host_id)
-            .expect("Nat declaration")
-            .clone();
+        let host = env.env.inductive(host_id).expect("Nat declaration").clone();
         let parsed = parse_expr("match Zero { True |-> Zero }").expect("match parses");
         let RExpr::RMatch { arms, span, .. } =
             resolve_expr_standalone(&parsed).expect("match resolves")
