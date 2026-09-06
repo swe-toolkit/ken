@@ -2189,15 +2189,20 @@ impl Parser {
             return false;
         }
         let mut offset = 1;
+        let mut paren_depth = 0usize;
         loop {
             match self.lookahead(offset) {
-                Token::MapsTo => return true,
+                Token::LParen => paren_depth += 1,
+                Token::RParen if paren_depth > 0 => paren_depth -= 1,
+                Token::MapsTo if paren_depth == 0 => return true,
                 Token::RBrace if offset == 1 => return true,
-                Token::Eq | Token::Comma | Token::Pipe | Token::RBrace | Token::Eof => {
+                Token::Eof => return false,
+                Token::Eq | Token::Comma | Token::Pipe | Token::RBrace if paren_depth == 0 => {
                     return false;
                 }
-                _ => offset += 1,
+                _ => {}
             }
+            offset += 1;
         }
     }
 
@@ -2456,11 +2461,39 @@ impl Parser {
             }
             Token::LParen => {
                 self.advance();
-                let inner = self.parse_pattern()?;
+                if matches!(self.peek(), Token::RParen) {
+                    return Err(ElabError::ParseError {
+                        msg: "empty tuple patterns are not allowed".to_string(),
+                        span: Span::new(start, self.peek_span().end),
+                    });
+                }
+
+                let first = self.parse_pattern()?;
+                if !matches!(self.peek(), Token::Comma) {
+                    let end = self.peek_span().end;
+                    self.expect(&Token::RParen)?;
+                    return Ok(Pattern {
+                        kind: first.kind,
+                        span: Span::new(start, end),
+                    });
+                }
+
+                let mut components = vec![first];
+                while matches!(self.peek(), Token::Comma) {
+                    let comma_span = self.peek_span().clone();
+                    self.advance();
+                    if matches!(self.peek(), Token::RParen | Token::Eof) {
+                        return Err(ElabError::ParseError {
+                            msg: "tuple patterns require a pattern after ','".to_string(),
+                            span: comma_span,
+                        });
+                    }
+                    components.push(self.parse_pattern()?);
+                }
                 let end = self.peek_span().end;
                 self.expect(&Token::RParen)?;
                 Ok(Pattern {
-                    kind: inner.kind,
+                    kind: PatKind::Tuple(components),
                     span: Span::new(start, end),
                 })
             }
@@ -2913,5 +2946,22 @@ mod as_pattern_precedence_tests {
             ),
             other => panic!("expected the non-associativity diagnostic, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn tuple_pattern_retains_surface_arity_while_parentheses_group() {
+        let tuple = only_pattern("match value { (first, second, third) |-> second }");
+        match tuple.kind {
+            PatKind::Tuple(components) => {
+                assert_eq!(components.len(), 3);
+                assert!(matches!(components[0].kind, PatKind::Var(ref name) if name == "first"));
+                assert!(matches!(components[1].kind, PatKind::Var(ref name) if name == "second"));
+                assert!(matches!(components[2].kind, PatKind::Var(ref name) if name == "third"));
+            }
+            other => panic!("expected a three-component surface tuple, got {other:?}"),
+        }
+
+        let grouped = only_pattern("match value { (single) |-> single }");
+        assert!(matches!(grouped.kind, PatKind::Var(ref name) if name == "single"));
     }
 }

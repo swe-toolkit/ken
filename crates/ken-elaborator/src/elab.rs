@@ -11995,6 +11995,25 @@ fn finish_pattern_alias_frame(
 }
 
 #[inline(never)]
+fn finish_pattern_alias_term_frame(
+    cx: &mut ElabCtx,
+    body_result: Result<Term, ElabError>,
+) -> Result<Term, ElabError> {
+    let replacements = cx
+        .pattern_alias_replacement_frames
+        .pop()
+        .expect("infer_match replacement frame must balance");
+    cx.pattern_alias_type_frames
+        .pop()
+        .expect("infer_match alias-type frame must balance");
+    let body = body_result?;
+    if replacements.is_empty() {
+        return Ok(body);
+    }
+    Ok(finalize_pattern_aliases(&body, 0, &replacements))
+}
+
+#[inline(never)]
 fn finalize_pattern_aliases(
     term: &Term,
     depth: usize,
@@ -12448,6 +12467,135 @@ fn tail_codomain(
     }
 }
 
+/// Split one negative Sigma column into its two projected components, compile
+/// those components through the existing matrix continuation, then apply the
+/// resulting two binders to the projections. Surface tuples with arity above
+/// two remain right-nested in their second component and revisit this same
+/// binary split on the next matrix step.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn compile_tuple_column(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    col_types: &[Term],
+    col_kinds: &[ColKind],
+    mut rows: Vec<RowState>,
+    real_depth_so_far: usize,
+    top_span: &Span,
+    ret_ty_slot: &mut Option<Term>,
+    arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
+) -> Result<Term, ElabError> {
+    let current_ty = whnf(cx.env, &cx.ctx, &col_types[0]);
+    let Term::Sigma(domain, codomain) = current_ty else {
+        return Err(ElabError::TypeMismatch {
+            span: top_span.clone(),
+            reason: "tuple pattern requires a pair type".into(),
+        });
+    };
+
+    let current_is_live = rows[0].real_occurrences[0].live;
+    debug_assert!(rows
+        .iter()
+        .all(|row| row.real_occurrences[0].live == current_is_live));
+    if !current_is_live {
+        rows = rows
+            .into_iter()
+            .map(RowState::enter_current_real_binder)
+            .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
+            .collect();
+    }
+    let pair_occurrence = rows[0].real_occurrences[0].term.clone();
+
+    let mut component_rows = Vec::with_capacity(rows.len());
+    for row in rows {
+        let row = expose_current_pattern_aliases(cx, row, &col_types[0]);
+        match row.real_pats[0].kind.clone() {
+            RPatKind::Tuple(components) if components.len() >= 2 => {
+                let first = components[0].clone();
+                let second = if components.len() == 2 {
+                    components[1].clone()
+                } else {
+                    RPattern {
+                        kind: RPatKind::Tuple(components[1..].to_vec()),
+                        span: row.real_pats[0].span.clone(),
+                    }
+                };
+                component_rows.push(row.specialize_current_column(vec![first, second], true));
+            }
+            RPatKind::Tuple(_) => {
+                return Err(ElabError::Internal(
+                    "resolved tuple pattern must contain at least two components".into(),
+                ));
+            }
+            RPatKind::Wild | RPatKind::Var(_) => {
+                let span = row.real_pats[0].span.clone();
+                let wild = || RPattern {
+                    kind: RPatKind::Wild,
+                    span: span.clone(),
+                };
+                component_rows.push(
+                    row.bind_current_occurrence()
+                        .specialize_current_column(vec![wild(), wild()], false),
+                );
+            }
+            RPatKind::Ctor(_, _) => {
+                return Err(ElabError::TypeMismatch {
+                    span: row.real_pats[0].span.clone(),
+                    reason: "constructor pattern cannot match a pair component".into(),
+                });
+            }
+            RPatKind::As(_, _, _) => {
+                unreachable!("current-column aliases are exposed before tuple splitting")
+            }
+        }
+    }
+
+    let mut component_types = vec![*domain, *codomain];
+    component_types.extend_from_slice(&col_types[1..]);
+    let mut component_kinds = vec![ColKind::Real, ColKind::Real];
+    component_kinds.extend_from_slice(&col_kinds[1..]);
+    let continuation = compile_match_matrix(
+        cx,
+        arms,
+        &component_types,
+        &component_kinds,
+        component_rows,
+        real_depth_so_far,
+        top_span,
+        ret_ty_slot,
+        arm_used,
+        subsumed_by,
+    )?;
+    let ret_ty = ret_ty_slot
+        .as_ref()
+        .expect("tuple component compilation reaches a body leaf")
+        .clone();
+    let continuation_ty = tail_codomain(
+        &component_types,
+        &component_kinds,
+        &ret_ty,
+        real_depth_so_far,
+    );
+    let continuation = if current_is_live {
+        Term::Ascript(Box::new(continuation), Box::new(continuation_ty))
+    } else {
+        Term::Ascript(
+            Box::new(weaken(&continuation, 1)),
+            Box::new(weaken(&continuation_ty, 1)),
+        )
+    };
+    let projected = Term::app(
+        Term::app(continuation, Term::proj1(pair_occurrence.clone())),
+        Term::proj2(pair_occurrence),
+    );
+    if current_is_live {
+        Ok(projected)
+    } else {
+        Ok(Term::lam(col_types[0].clone(), projected))
+    }
+}
+
 /// Compile the pattern matrix `col_types`/`col_kinds` (aligned; `Real`
 /// columns are matched against `rows[_].real_pats`, `Ih` columns are
 /// synthetic and never touch row patterns) down to a nested-`elim_D` method
@@ -12556,6 +12704,27 @@ fn compile_match_matrix(
             Ok(Term::lam(ih_ty, weaken(&inner, 1)))
         }
         ColKind::Real => {
+            let has_tuple = rows.iter().any(|row| {
+                matches!(
+                    pattern_without_aliases(&row.real_pats[0]).kind,
+                    RPatKind::Tuple(_)
+                )
+            });
+            if has_tuple {
+                return compile_tuple_column(
+                    cx,
+                    arms,
+                    col_types,
+                    col_kinds,
+                    rows,
+                    real_depth_so_far,
+                    top_span,
+                    ret_ty_slot,
+                    arm_used,
+                    subsumed_by,
+                );
+            }
+
             let all_flat = rows.iter().all(|row| {
                 matches!(
                     pattern_without_aliases(&row.real_pats[0]).kind,
@@ -12730,6 +12899,9 @@ fn build_ctor_buckets(
                             .specialize_current_column(new_pats, false),
                     );
                 }
+                RPatKind::Tuple(_) => {
+                    unreachable!("tuple columns are projected before constructor bucketing")
+                }
                 RPatKind::As(_, _, _) => {
                     unreachable!("current-column aliases are exposed before constructor bucketing")
                 }
@@ -12782,6 +12954,93 @@ fn build_ctor_buckets(
     Ok(methods.into_iter().map(|m| m.unwrap()).collect())
 }
 
+#[inline(never)]
+fn infer_tuple_match(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    arms: &[RMatchArm],
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    for arm in arms {
+        if matches!(
+            pattern_without_aliases(&arm.pat).kind,
+            RPatKind::Wild | RPatKind::Var(_)
+        ) {
+            return Err(ElabError::Internal(
+                "non-constructor pattern in match (wildcard/var not yet supported \
+                 at top level; use constructor patterns)"
+                    .into(),
+            ));
+        }
+        if !matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Tuple(_)) {
+            return Err(ElabError::TypeMismatch {
+                span: arm.pat.span.clone(),
+                reason: "tuple-pattern match arms must use tuple patterns at the top level".into(),
+            });
+        }
+    }
+
+    let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
+    let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
+    if !matches!(scrut_ty, Term::Sigma(_, _)) {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "tuple pattern requires a pair type".into(),
+        });
+    }
+
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
+    #[cfg(test)]
+    MATCH_OCCURRENCE_TRACE.with(|trace| {
+        if let Some(trace) = trace.borrow_mut().as_mut() {
+            trace
+                .seeds
+                .extend(rows.iter().map(|row| row.real_occurrences[0].term.clone()));
+        }
+    });
+
+    let mut ret_ty_slot = None;
+    let mut arm_used = vec![false; arms.len()];
+    let mut subsumed_by = vec![Vec::new(); arms.len()];
+    let body_result = compile_match_matrix(
+        cx,
+        arms,
+        std::slice::from_ref(&scrut_ty),
+        &[ColKind::Real],
+        rows,
+        0,
+        span,
+        &mut ret_ty_slot,
+        &mut arm_used,
+        &mut subsumed_by,
+    );
+    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+
+    for (i, used) in arm_used.iter().enumerate() {
+        if !used {
+            let cause = match subsumed_by[i].split_first() {
+                Some((&first, rest)) => ArmDeadCause::Subsumed {
+                    first: arms[first].span.clone(),
+                    rest: rest
+                        .iter()
+                        .map(|&winner| arms[winner].span.clone())
+                        .collect(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
+            return Err(ElabError::ReachabilityError {
+                span: arms[i].span.clone(),
+                cause,
+            });
+        }
+    }
+
+    Ok((
+        body_core,
+        ret_ty_slot.unwrap_or_else(|| Term::ty(Level::Zero)),
+    ))
+}
+
 fn infer_match(
     cx: &mut ElabCtx,
     scrut: &RExpr,
@@ -12791,6 +13050,13 @@ fn infer_match(
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
     }
+    if arms
+        .iter()
+        .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Tuple(_)))
+    {
+        return infer_tuple_match(cx, scrut, arms, span);
+    }
+
     // 1. Infer scrutinee.
     let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
     let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
@@ -12935,6 +13201,11 @@ fn ensure_pattern_constructors_resolve(
             }
             for field in fields {
                 ensure_pattern_constructors_resolve(cx, field)?;
+            }
+        }
+        RPatKind::Tuple(components) => {
+            for component in components {
+                ensure_pattern_constructors_resolve(cx, component)?;
             }
         }
         RPatKind::As(inner, _, _) => ensure_pattern_constructors_resolve(cx, inner)?,
