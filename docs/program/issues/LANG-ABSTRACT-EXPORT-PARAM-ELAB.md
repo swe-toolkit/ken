@@ -1,7 +1,7 @@
 ---
 id: LANG-ABSTRACT-EXPORT-PARAM-ELAB
 title: "abstract export of a parameterized module data type: mint the opaque view at the type's full kind (not nullary Type 0), and keep the defining module's constructors transparent (two-faced elaboration). Elaborator-only, no kernel edit. Unblocks the NonEmpty/Validation Tier-C migration."
-status: active
+status: merged
 owner: language
 size: M
 gate: none

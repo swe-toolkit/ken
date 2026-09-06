@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 03:37:32Z — from 556 issue file(s) in `docs/program/issues/`.
+2026-09-06 04:00:46Z — from 556 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -170,7 +170,7 @@ the committed file matches the generator's output.
 | `KW-ORACLE-CLOSURE` | close the KW-THEOREM source oracle structurally — the occurrence sweep is never applied, and the file population is a five-arm hand enumeration | merged | language | S | none | 986 |
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
 | `KW-THEOREM` | rename the surface keyword `lemma` to `theorem` | merged | language | M | none | — |
-| `LANG-ABSTRACT-EXPORT-PARAM-ELAB` | abstract export of a parameterized module data type: mint the opaque view at the type's full kind (not nullary Type 0), and keep the defining module's constructors transparent (two-faced elaboration). Elaborator-only, no kernel edit. Unblocks the NonEmpty/Validation Tier-C migration. | active | language | M | none | — |
+| `LANG-ABSTRACT-EXPORT-PARAM-ELAB` | abstract export of a parameterized module data type: mint the opaque view at the type's full kind (not nullary Type 0), and keep the defining module's constructors transparent (two-faced elaboration). Elaborator-only, no kernel edit. Unblocks the NonEmpty/Validation Tier-C migration. | merged | language | M | none | — |
 | `LANG-BYTES-HEX-LIST-LITERAL` | the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer | merged | language | S | none | — |
 | `LANG-CHECKED-IH-BODY-VIEW-CAUSE` | An ordinary binary-tree traversal does not compile natively, and the code discards the reason: compiler_driver.rs maps any failure of checked_core_declaration_body_view to MissingClosureMetadata with map_err(|_| ...), so the label is not a diagnosis. Surface the cause before sizing anything | draft | language | S | none | — |
 | `LANG-COMMENT-CLASSIFIER-SHARED` | The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either | merged | language | S | none | — |
@@ -634,7 +634,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` blocked by `LANG-ABSTRACT-EXPORT-PARAM-ELAB` (status: active)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
