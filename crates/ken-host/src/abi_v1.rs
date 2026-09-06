@@ -188,7 +188,6 @@ struct FsAppendFileRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsPathRequestV1 {
     capability: u64,
     path: SliceV1,
@@ -534,6 +533,25 @@ impl HostEffectBackendV1 for ProcessHost {
         let handle = crate::open_at(&parent, &leaf, OpenRequest::AppendOrCreate)
             .map_err(host_error)?;
         crate::append(&handle, bytes).map_err(host_error)
+    }
+
+    fn fs_metadata(
+        &mut self,
+        grant: &CapabilityGrantV1,
+        path: &[u8],
+    ) -> Result<crate::FileMetadataV1, FileErrorCauseV1> {
+        let (parent, leaf) = Self::parent(grant, path)?;
+        let handle = crate::open_at(&parent, &leaf, OpenRequest::Read).map_err(host_error)?;
+        let metadata = crate::metadata(&handle).map_err(host_error)?;
+        Ok(crate::FileMetadataV1 {
+            size: metadata.size,
+            kind: match metadata.kind {
+                crate::FileKind::File => crate::FsNodeKindV1::File,
+                crate::FileKind::Directory => crate::FsNodeKindV1::Directory,
+                crate::FileKind::Symlink => crate::FsNodeKindV1::Symlink,
+                crate::FileKind::Other => crate::FsNodeKindV1::Other,
+            },
+        })
     }
 
     fn fs_change_mode(
@@ -1390,6 +1408,22 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 CanonicalRequestV1::FsAppendFile {
                     path: path.to_vec(),
                     bytes: bytes.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsMetadata if request_size == std::mem::size_of::<FsPathRequestV1>() => {
+            if !request.cast::<FsPathRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return -1;
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsMetadata {
+                    path: path.to_vec(),
                 },
             )
         }
@@ -2320,6 +2354,107 @@ mod tests {
             CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
         );
 
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector for the existing raw
+    /// boundary.
+    ///
+    /// MEASURED: raw id 0x0304 plus the manifested two-field request returns
+    /// exact size/kind metadata for one known file and one known directory,
+    /// while recording both canonical requests and replies.
+    /// CLAIMED: FsMetadata reaches ProcessHost and the typed dispatcher without
+    /// changing its wire identity or request/reply shape.
+    /// THE GAP: this does not prove checked-source lowering or path policy; the
+    /// real-artifact field differential and policy scenarios pin those.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fs_metadata_raw_dispatch_returns_exact_file_and_directory_fields() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-fs-metadata-native-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(directory.join("known-dir")).unwrap();
+        std::fs::write(directory.join("known.bin"), b"five!").unwrap();
+        let initialized = context(&directory);
+
+        for (index, (path, expected_kind)) in [
+            (b"known.bin".as_slice(), crate::FsNodeKindV1::File),
+            (b"known-dir".as_slice(), crate::FsNodeKindV1::Directory),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let expected_size = std::fs::metadata(directory.join(
+                std::str::from_utf8(path).expect("fixture path is UTF-8"),
+            ))
+            .unwrap()
+            .len();
+            let request = FsPathRequestV1 {
+                capability: initialized.capability,
+                path: SliceV1 {
+                    data: path.as_ptr(),
+                    len: path.len(),
+                },
+            };
+            let mut reply = HostReplyV1 {
+                tag: u64::MAX,
+                detail: u64::MAX,
+                bytes: SliceV1 {
+                    data: std::ptr::null(),
+                    len: usize::MAX,
+                },
+                resource_error: ResourceErrorReplyV1::default(),
+                effective_request: u64::MAX,
+            };
+            let status = unsafe {
+                ken_host_dispatch_v1(
+                    initialized.context,
+                    u64::from(HostOpV1::FsMetadata as u16),
+                    std::ptr::from_ref(&request).cast(),
+                    std::mem::size_of::<FsPathRequestV1>(),
+                    std::ptr::from_mut(&mut reply).cast(),
+                )
+            };
+            assert_eq!(status, 0, "FsMetadata must not take the -3 fallback");
+            assert_eq!(reply.tag, REPLY_METADATA);
+            assert_eq!(reply.detail, expected_size);
+            assert_eq!(
+                reply.bytes.len,
+                match expected_kind {
+                    crate::FsNodeKindV1::File => 0,
+                    crate::FsNodeKindV1::Directory => 1,
+                    crate::FsNodeKindV1::Symlink => 2,
+                    crate::FsNodeKindV1::Other => 3,
+                }
+            );
+            assert!(reply.bytes.data.is_null());
+            assert_eq!(reply.effective_request, 0);
+
+            let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+            let event = &context.effect_trace[index];
+            assert_eq!(event.operation, HostOpV1::FsMetadata);
+            assert_eq!(
+                event.request,
+                CanonicalRequestV1::FsMetadata {
+                    path: path.to_vec(),
+                }
+            );
+            assert_eq!(
+                event.outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(
+                    crate::FileMetadataV1 {
+                        size: expected_size,
+                        kind: expected_kind,
+                    }
+                ))
+            );
+        }
+
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        assert_eq!(context.effect_trace.len(), 2);
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         std::fs::remove_dir_all(directory).unwrap();
     }

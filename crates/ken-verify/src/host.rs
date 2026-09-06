@@ -45,6 +45,9 @@ pub enum ExpectedFsEffect {
         path: Vec<u8>,
         bytes: Vec<u8>,
     },
+    Metadata {
+        path: Vec<u8>,
+    },
     ChangeMode {
         path: Vec<u8>,
         mode: u16,
@@ -57,6 +60,7 @@ impl ExpectedFsEffect {
             Self::ReadFile { .. } => HostOpV1::FsReadFile,
             Self::WriteFile { .. } => HostOpV1::FsWriteFile,
             Self::AppendFile { .. } => HostOpV1::FsAppendFile,
+            Self::Metadata { .. } => HostOpV1::FsMetadata,
             Self::ChangeMode { .. } => HostOpV1::FsChangeMode,
         }
     }
@@ -66,6 +70,7 @@ impl ExpectedFsEffect {
             Self::ReadFile { path }
             | Self::WriteFile { path, .. }
             | Self::AppendFile { path, .. }
+            | Self::Metadata { path }
             | Self::ChangeMode { path, .. } => path,
         }
     }
@@ -75,6 +80,7 @@ impl ExpectedFsEffect {
             Self::ReadFile { .. } => FsOpKind::Read,
             Self::WriteFile { .. } => FsOpKind::Write,
             Self::AppendFile { .. } => FsOpKind::Append,
+            Self::Metadata { .. } => FsOpKind::Metadata,
             Self::ChangeMode { .. } => FsOpKind::ChangeMode,
         }
     }
@@ -393,6 +399,7 @@ impl HostHandler for ScriptedPosixHost {
     }
 
     fn fs_metadata_at(&mut self, handle: &Self::Handle) -> io::Result<HostFileMetadata> {
+        self.take_pending(HostOpV1::FsMetadata);
         self.inner.fs_metadata_at(handle)
     }
 

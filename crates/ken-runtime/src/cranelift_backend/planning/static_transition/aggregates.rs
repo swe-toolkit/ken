@@ -3303,6 +3303,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         SOME_SITE_PATH,
         IO_ERRORS,
     ];
+    const METADATA_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
+        N::nullary(R::FileOperationMetadata),
+        SOME_SITE_PATH,
+        IO_ERRORS,
+    ];
     const CHANGE_MODE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
         N::nullary(R::FileOperationChangeMode),
         SOME_SITE_PATH,
@@ -3319,6 +3324,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     const APPEND_FILE_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
         children: APPEND_FILE_ERROR_CHILDREN,
+    };
+    const METADATA_ERROR: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileError,
+        children: METADATA_ERROR_CHILDREN,
     };
     const CHANGE_MODE_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
@@ -3364,6 +3373,17 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             },
             N::nullary(R::ReadResultEof),
         ]));
+    const FILE_KIND: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::nullary(R::FileKindFile),
+            N::nullary(R::FileKindDirectory),
+            N::nullary(R::FileKindSymlink),
+            N::nullary(R::FileKindOther),
+        ]));
+    const FILE_METADATA: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileMetadata,
+        children: &[N::native_int(), FILE_KIND],
+    };
     const UNIT: SynthesizedAggregateNode = N::nullary(R::Unit);
 
     let (error, ok) = match operation {
@@ -3382,6 +3402,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         // emitter uses, so an arm cannot be dropped by inattention.
         Op::FsWriteFile => (WRITE_FILE_ERROR, UNIT),
         Op::FsAppendFile => (APPEND_FILE_ERROR, UNIT),
+        Op::FsMetadata => (METADATA_ERROR, FILE_METADATA),
         Op::FsChangeMode => (CHANGE_MODE_ERROR, UNIT),
         Op::BufferAllocate | Op::BufferFreeze => (RESOURCE_SURFACE, N::Absent),
         Op::FsHandleMetadata => (RESOURCE_SURFACE, N::Absent),
@@ -10376,6 +10397,25 @@ mod tests {
                     .collect(),
             ),
             (
+                Op::FsMetadata,
+                file_error(R::FileOperationMetadata)
+                    .into_iter()
+                    .chain([
+                        (path(OK, &[]), Fixed(R::FileMetadata)),
+                        (path(OK, &[field(1), alt(0)]), Fixed(R::FileKindFile)),
+                        (
+                            path(OK, &[field(1), alt(1)]),
+                            Fixed(R::FileKindDirectory),
+                        ),
+                        (
+                            path(OK, &[field(1), alt(2)]),
+                            Fixed(R::FileKindSymlink),
+                        ),
+                        (path(OK, &[field(1), alt(3)]), Fixed(R::FileKindOther)),
+                    ])
+                    .collect(),
+            ),
+            (
                 Op::FsChangeMode,
                 file_error(R::FileOperationChangeMode)
                     .into_iter()
@@ -11228,6 +11268,7 @@ mod tests {
             Op::FsOpen,
             Op::FsWriteFile,
             Op::FsAppendFile,
+            Op::FsMetadata,
             Op::FsChangeMode,
             Op::BufferAllocate,
             Op::BufferFreeze,
