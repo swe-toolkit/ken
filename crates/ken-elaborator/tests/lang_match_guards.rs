@@ -261,6 +261,13 @@ fn guard_composes_with_nested_tuple_and_record_patterns() {
     );
     let zero = constructor(env.globals["Zero"], []);
     assert_eq!(whnf(&env.env, &Context::new(), &body(&env, selected)), zero);
+    match env.elaborate_decl(
+        "const incomplete_envelope : Nat = match guard_envelope { \
+         { inner = (flag, payload) } if True |-> payload }",
+    ) {
+        Err(ElabError::ExhaustivenessError { .. }) => {}
+        other => panic!("a guarded record leaf must not discharge coverage, got {other:?}"),
+    }
 }
 
 #[test]
