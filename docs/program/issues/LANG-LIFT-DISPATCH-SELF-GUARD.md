@@ -1,7 +1,7 @@
 ---
 id: LANG-LIFT-DISPATCH-SELF-GUARD
 title: "`check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard"
-status: ready
+status: active
 owner: language
 size: S
 gate: none

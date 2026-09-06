@@ -80,6 +80,22 @@ at your cut — a partial substrate in `native_effect_v1.rs` may already exist.
 
 ## 3. The design, front-loaded
 
+> ### CORRECTION 2026-09-06 — FsMetadata contract amended (evt_2d7d3713030ss)
+>
+> The runtime ring's D0 measurement showed the original FsMetadata design here
+> assumed a metadata payload that does not exist at the landed base. Verified at
+> `ec74213d6`: canonical `FileMetadataV1` is `{ size, kind }` only (no
+> mode/times/inode/nlink), `REPLY_METADATA` carries no response bytes, and the
+> no-follow path refuses a leaf symlink with `SymlinkDenied`. **The
+> erase-five-volatile normalizer, the governed-Bytes-leaf reuse, and the
+> link-self-metadata requirement are all withdrawn.** The FsMetadata partial is
+> an EXACT `{size, kind}` differential + `SymlinkDenied` under no-follow; see the
+> amended `FsMetadata` bullet below and the superseded `AC-4`. The
+> contract-EXTENSION alternative (a richer canonical result + new raw transport +
+> rooted lstat/O_PATH substrate) was REJECTED as out of scope for a promotion —
+> whether Ken should later expose richer file metadata is a separate spec
+> question for the operator/enclave, not folded into A2.
+
 A NativeTested promotion means native execution is proven to agree with the
 interpreter under a differential. Author each normalizer/comparator as an
 explicit projection applied to BOTH sides before comparison, never a relaxed
@@ -97,16 +113,20 @@ assertion on one side.
   appended bytes and the returned count is the appended length. The differential
   is exact on content and count; no normalization needed. Requires the write
   right; an append without it or outside the root is refused.
-- **`FsMetadata`** (host-reply bytes → governed leaf; normalized differential).
-  Normalizer erases mtime/atime/ctime, inode, nlink and keeps size, file type,
-  permission mode; native and interpreter agree on the normalized projection.
-  Its host-generated result bytes need an owner — **reuse ConsoleRead's
-  `HostResponseReferent{class}` (`{PersistentStore}`) if the shape matches**; a
-  distinct owner, if genuinely required, is backend planner substrate authorized
-  within this WP (as ConsoleRead's was — NOT TCB, no separate node, no operator
-  call), carrying the same exact-owner mutation + exhaustive-match + byte-identical
-  existing-mappings obligations. No-follow: metadata on a symlink returns the
-  **link's own** metadata, not the target's, and the differential asserts that.
+- **`FsMetadata`** (exact `{size, kind}` differential — AMENDED, see the banner
+  at the top of this section). The landed canonical `FileMetadataV1` is exactly
+  `{ size, kind }` (effect_v1.rs:2856); the prelude is `MkFileMetadata Int
+  FileKind`; `REPLY_METADATA` carries `detail=size` and a `bytes.len` kind-tag
+  with `bytes.data` **unset** (abi_v1.rs:1056+). So the differential is EXACT
+  equality of both fields, native vs interpreter — no normalizer (nothing
+  volatile crosses the boundary) and NO governed leaf (there are no response
+  bytes to own; ConsoleRead's `HostResponseReferent{Bytes}` does not apply). It
+  is non-vacuous by asserting BOTH fields against a real artifact of known size
+  AND known kind (regular file vs directory); a size-mismatch OR a kind-mismatch
+  mutation must redden. No-follow: a leaf symlink is **refused** with
+  `SymlinkDenied` (the landed `reject_symlink`, abi_v1.rs:387) — the frame's
+  earlier "link's own metadata" wording was unstateable on the landed no-follow
+  path and is dropped (it contradicted AC-2's own symlink refusal).
 - **`FsRename`** (state transition). The comparator is over the observable
   before/after directory state and the result classification, applied identically
   to native and interpreter runs against the same fixture tree. A rename whose
@@ -175,10 +195,13 @@ assertion on one side.
 - **`AC-3` — each differential discriminates.** Control: D4's wrong-observation
   mutation reddens the exact named differential and names the op. Show the red,
   then remove it and show green.
-- **`AC-4` — the `FsMetadata` normalizer is necessary, not decorative.** Control:
-  an exact-equality metadata differential fails on a correct implementation
-  (mtime/inode differ run to run), shown in a comment or ignored companion, so the
-  normalization is load-bearing.
+- **`AC-4` — SUPERSEDED by the 2026-09-06 correction (evt_2d7d3713030ss).** There
+  is no normalizer: the landed metadata is `{size, kind}`, both deterministic, so
+  the FsMetadata differential is EXACT equality of both fields. Necessity is
+  instead shown by non-vacuity — a size-mismatch OR a kind-mismatch mutation
+  reddens the differential (both fields asserted against a real artifact of known
+  size and known kind). The original "erase volatile fields" wording assumed
+  fields that do not cross the boundary.
 - **`AC-5` — the wire contract is unchanged; only these three ops' availability
   status moves.** Control: `git diff` on `effect_abi_v1.catalog` shows a status
   change (`unavailable → native`) for `FsAppendFile`/`FsMetadata`/`FsRename` ONLY
