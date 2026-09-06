@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 21:48:21Z — from 562 issue file(s) in `docs/program/issues/`.
+2026-09-06 22:53:10Z — from 562 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -203,7 +203,7 @@ the committed file matches the generator's output.
 | `LANG-LEX-HEX-FLOAT` | Both spec literal tables give `0x1p-3` as a `Float` form, but the lexer has no hex-float path at all -- and unlike every other numeric form in this arc it cannot be reached by handing a string to `parse::<f64>()`, because Rust's float parser rejects hex-float syntax, so the value must be assembled and correctly rounded by hand | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1885 |
 | `LANG-LEX-NUMERIC-FORMS` | The lexer implements none of the numeric literal forms 31-lexical and 35-numbers list besides bare decimal -- no `1_000` separators, no `0xFF`/`0b1010`/`0o17` radix integers, no `0x1p-3` hex float -- and `1e-9`, which both spec tables give as the canonical Float example, does not lex as a float at all because the exponent branch is gated on having seen a dot | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1881 |
 | `LANG-LEX-PROJECTION-ADJACENCY` | The positional-projection lexer guard tests raw character adjacency, so exactly one of four spacing variants fails -- `p.1.2`, `p.1 .2` and `p. 1 .2` all lex as two projections while `p. 1.2` lexes as `Dot, FloatLit(1.2)` -- and the refusal comes from the number scanner rather than from any grammar rule | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/1864 |
-| `LANG-LIFT-DISPATCH-SELF-GUARD` | `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard | active | language | S | none | — |
+| `LANG-LIFT-DISPATCH-SELF-GUARD` | `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard | merged | language | S | none | — |
 | `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` | `assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it | merged | language | XS | none | — |
 | `LANG-MATCH-AS-PATTERN` | as-patterns `p as x` -- the first contained slice of 34 §3's six absent pattern forms: the alias binds the value matched by p at its position, the inner p obeys the current position rules so the top-level non-constructor refusal stays fail-closed (keeping NoInhabitants honest), and the P1 association/precedence pin is honored forward-compatibly against the not-yet-existing or-pattern | merged | language | S | none | — |
 | `LANG-MATCH-DIAGNOSTIC-PROSE` | The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed | merged | language | S | none | — |
