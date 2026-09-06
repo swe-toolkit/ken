@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-OR-PATTERN
 title: "or-patterns `p | q` -- slice 4 of 34 §3's six absent pattern forms: an ALTERNATION over the same occurrence (not a projecting form, no new carrier), where every alternative binds the SAME name set at definitionally-equal types in the common pre-branch context (32 §4:345, 34 §3.1:372-382), coverage is the UNION of the alternatives and the arm is reachable if any alternative has a non-empty residual; and -- the composition discriminator this slice owes -- a fully-subsumed or-arm gets the subsumption cause never a false NoInhabitants, and an or-pattern carrying a top-level wildcard/variable ALTERNATIVE stays refused as the catch-all it is"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
