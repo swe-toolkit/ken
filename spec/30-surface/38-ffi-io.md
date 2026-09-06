@@ -79,12 +79,21 @@ registered operation symbols, listed in the trusted-base ledger (`18 §5`).
 | Form | Example | Meaning |
 |---|---|---|
 | **byte string** | `b"GET / HTTP/1.1\r\n"` | a byte sequence from a string-like body with escapes (each `\xNN`/ASCII char ⇒ one byte) |
-| **hex** | `0x[deadbeef]` | the bytes spelled as hex nibble pairs (`de ad be ef`) |
+| **hex** | `0x[deadbeef]` | the bytes spelled as hex nibble pairs (here `de`, `ad`, `be`, `ef`) |
 
 The **bracketed** `0x[…]` is the `Bytes` form; the **un-bracketed** `0xFF` is an
 **`Int`** literal (`31 §3`, `35`) — the two are different tokens with different
 types and must not be conflated. A `b"…"` literal elaborates **directly** to the
 `Bytes` primitive (AC1), not via `String` (no decode round-trip at the literal).
+
+The `0x[…]` body is a **contiguous** run of an even number of ASCII hexadecimal
+digits, lexed as consecutive nibble pairs; it admits **no internal whitespace or
+separator**. `0x[de ad]` is a lexical error, not a spelling of `0x[dead]`. The
+groupings that appear as reading aids — the nibble-pair gloss above, and any
+spaced `0x[…]` in a doc comment — name the byte boundaries; they are never legal
+source. (Readability grouping in Ken's literals is the underscore
+digit separator, `31 §3`; if grouping in `0x[…]` is ever wanted it follows that
+convention, not whitespace, and is a separate additive decision.)
 
 ### 1.2 Core `Bytes` operations (primitive / prelude)
 
