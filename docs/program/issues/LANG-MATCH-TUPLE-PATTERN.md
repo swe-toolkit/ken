@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-TUPLE-PATTERN
 title: "tuple/pair patterns `(p₁, …, pₙ)` -- slice 2 of 34 §3's six absent pattern forms and the first SPLITTING form: it projects the negative Σ componentwise (no elim_D, matched by Proj1/Proj2), right-nests for arity >2, carries componentwise coverage/reachability, and -- the composition discriminator this slice owes -- a redundant tuple arm must get the subsumption cause, never a false NoInhabitants"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
