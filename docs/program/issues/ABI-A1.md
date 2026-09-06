@@ -28,6 +28,19 @@ origin: docs/program/10-linux-abi-completion.md §4 (the ABI-completion program)
 > methods + `ken_host_dispatch_v1` decode arms) is folded into this node as
 > `D-NATIVE` — subsume, don't proliferate. See the frame's D0 REFRAME block. Node
 > stays active; same ring, same `wp/ABI-A1` branch (nothing was started).
+>
+> **CLOCKWALLNOW ACCEPTED PARTIAL LANDED 2026-09-06** at `266ccd383` (PR #3372,
+> CI-green, blob-verified 18/18; Decision `dec_74fax0fkkyhw9`, QA
+> `evt_4sm3qx1hzz4d5` + Architect `evt_1h9aa51bn40fm`). It adds real native 0x0201
+> Clock execution, the normalized temporal differential, the generalized dead-arm
+> trap (Architect ruling A, z3800), and Clock-only NativeTested promotion (13→14)
+> with the exact 11-op deferred tail frozen. **Node STAYS ACTIVE** — its objective
+> covers ConsoleRead too. The REMAINING increment is **ConsoleRead D-NATIVE**: it
+> needs the z3750 governed-leaf owner planner node (host-reply-bytes owner,
+> `{PersistentStore}`), which is AUTHORIZED within ABI-A1 (backend substrate, NOT
+> TCB — no separate node, no operator call), and it returns to the Architect as
+> its OWN fresh-SHA review when cut. ABI-A1 flips to merged only when ConsoleRead
+> lands. A2/A3 follow as separate slices.
 
 ## Objective
 
