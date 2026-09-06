@@ -2558,8 +2558,8 @@ impl<'a> Lowering<'a> {
         // below recovers with `sshr_imm(detail, 32)`.
         //
         // `ConsoleWrite`, `FsWriteFile`, and `FsAppendFile` declare `IOError`
-        // surfaces, so their `detail` is read as an `IOError` discriminator. Handing them a RAW
-        // resource code would silently reinterpret `1` and `7` as
+        // surfaces, so their `detail` is read as an `IOError` discriminator.
+        // Handing them a RAW resource code would silently reinterpret `1` and `7` as
         // `PermissionDenied` and `IsDirectory` — two real, wrong errors. `Other`
         // is the one variant that carries an integer whose meaning is the
         // payload rather than the discriminator, which is why the observer's
@@ -2575,8 +2575,8 @@ impl<'a> Lowering<'a> {
         // the operation actually declares: the resource operations accept
         // `reply_resource_error_tag`, while ConsoleWrite, FsWriteFile, and
         // FsAppendFile accept only `success` or `reply_error_tag`. Writing the
-        // wrong one is not a mis-labelled error — `require_one_of_i64` refuses the reply outright
-        // and the whole compiled function fails generically, which is the defect
+        // wrong one is not a mis-labelled error — `require_one_of_i64` refuses
+        // the reply outright and the whole compiled function fails generically, which is the defect
         // this triple exists to make unspellable.
         let mut narrow_failure: Option<(
             cranelift_codegen::ir::Value,
