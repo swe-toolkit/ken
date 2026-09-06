@@ -343,7 +343,8 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 14] = [
+    [ken_host::HostOpV1; 15] = [
+    ken_host::HostOpV1::ConsoleRead,
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
     ken_host::HostOpV1::ConsoleIsTerminal,
@@ -362,7 +363,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
 
 /// The seat contract of one admitted operation at one semantic ordinal.
 ///
-/// **Total over the 14 admitted operations, with no `_` arm**, so a new
+/// **Total over the 15 admitted operations, with no `_` arm**, so a new
 /// admitted operation is a compile error here rather than an operation whose
 /// seats silently have no contract. `None` means the operation has no seat at
 /// that ordinal, which is an arity disagreement and is refused by the caller —
@@ -466,7 +467,11 @@ fn host_effect_seat_contract(
         Avail::EITHER_PHASE,
     );
     match (operation, ordinal) {
-        (Op::ConsoleWrite, 0) | (Op::ConsoleFlush, 0) | (Op::ConsoleIsTerminal, 0) => Some(tag),
+        (Op::ConsoleRead, 0)
+        | (Op::ConsoleWrite, 0)
+        | (Op::ConsoleFlush, 0)
+        | (Op::ConsoleIsTerminal, 0) => Some(tag),
+        (Op::ConsoleRead, 1) => Some(exact_int),
         // PROVED carried, per seat: `D5` measured a carried word reaching each
         // of these and the observer consuming it. Neither is site-bound.
         (Op::ConsoleWrite, 1) | (Op::FsWriteFile, 2) => Some(carried_bytes),
@@ -523,7 +528,8 @@ fn host_effect_seat_contract(
         // an arity disagreement, refused by the caller with the seat's own
         // coordinates -- never a seat that is exempt from having a contract.
         (
-            Op::ConsoleWrite
+            Op::ConsoleRead
+            | Op::ConsoleWrite
             | Op::ConsoleFlush
             | Op::ConsoleIsTerminal
             | Op::ClockWallNow
@@ -545,8 +551,7 @@ fn host_effect_seat_contract(
         // admitted set a compile error here rather than an operation whose
         // seats silently answer `None`.
         (
-            Op::ConsoleRead
-            | Op::ClockMonotonicNow
+            Op::ClockMonotonicNow
             | Op::ClockSleepUntil
             | Op::FsAppendFile
             | Op::FsMetadata

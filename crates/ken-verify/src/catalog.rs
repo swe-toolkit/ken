@@ -63,6 +63,30 @@ impl NativeTestedEvidence {
         }
     }
 
+    /// ConsoleRead evidence binds both lanes to the same finite stdin fixture
+    /// and retains exact reply bytes after validating Chunk/EOF discipline.
+    pub fn from_console_read_run(
+        run: &CanonicalDifferentialRun,
+        stdin: &[u8],
+        limits: &[u64],
+    ) -> Self {
+        let operation = HostOpV1::ConsoleRead;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run
+                .compare_console_read(stdin, limits)
+                .is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
     /// CaptureHost and hand-fed observations can exercise comparator units but
     /// can never manufacture exact-artifact evidence.
     pub fn unit_or_negative_control(

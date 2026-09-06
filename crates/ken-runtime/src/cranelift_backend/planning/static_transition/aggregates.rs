@@ -3104,6 +3104,13 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateNode {
     /// The index is into the seat's `args`, before the capability offset that
     /// `RuntimeExpr::Effect` applies to its semantic children.
     SiteOperand(u32),
+    /// A host-reply-generated referent copied into the persistent store.
+    ///
+    /// This is a governed child, unlike `Absent`, and its source is the reply,
+    /// unlike `SiteOperand`. It is also not a scalar: its exact referent-owner
+    /// set is the singleton `{PersistentStore}` because the response span is
+    /// copied before the parent is published.
+    HostResponseReferent { class: BoundaryClass },
     /// **A carried continuation-envelope worker-capture word, by position.**
     ///
     /// The child at position `i` is the `i`-th `WorkerCapture` operand of the
@@ -3338,12 +3345,23 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         role: R::MkInstant,
         children: &[N::native_int()],
     };
+    const CONSOLE_READ_RESULT: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::Fixed {
+                role: R::ReadChunk,
+                children: &[N::HostResponseReferent {
+                    class: BoundaryClass::Bytes,
+                }],
+            },
+            N::nullary(R::ReadResultEof),
+        ]));
     const UNIT: SynthesizedAggregateNode = N::nullary(R::Unit);
 
     let (error, ok) = match operation {
         // Returns a `Bool` before any synthesized producer runs, so neither arm
         // exists. Not a gap: the early return is above the synthesis entirely.
         Op::ConsoleIsTerminal => (N::Absent, N::Absent),
+        Op::ConsoleRead => (IO_ERRORS, CONSOLE_READ_RESULT),
         Op::ConsoleWrite | Op::ConsoleFlush => (IO_ERRORS, UNIT),
         Op::ClockWallNow => (N::Absent, INSTANT),
         Op::FsReadFile => (READ_FILE_ERROR, N::Absent),
@@ -3417,6 +3435,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn collect_site_op
         // population that indexes the seat's arguments. Folding it in here
         // would claim the seat supplies an argument it does not have.
         SynthesizedAggregateNode::WorkerCaptureOperand(_)
+        | SynthesizedAggregateNode::HostResponseReferent { .. }
         | SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
         | SynthesizedAggregateNode::Scalar { .. }
         | SynthesizedAggregateNode::Absent => {}
@@ -3572,6 +3591,7 @@ fn collect_reachable_uses(
         }
         SynthesizedAggregateNode::Scalar { .. }
         | SynthesizedAggregateNode::SiteOperand(_)
+        | SynthesizedAggregateNode::HostResponseReferent { .. }
         // A capture word is a leaf and, more to the point, is never reachable
         // from a host-effect recipe at all: this walk starts at
         // `host_effect_recipe_tree(operation)`, and no recipe names a capture.
@@ -3612,6 +3632,9 @@ pub(in crate::cranelift_backend::planning::static_transition) fn node_referent_o
             BoundaryReferentOwner::NoReferent,
             BoundaryReferentOwner::PersistentStore,
         ]),
+        SynthesizedAggregateNode::HostResponseReferent { .. } => {
+            Ok(vec![BoundaryReferentOwner::PersistentStore])
+        }
         // A nested fixed constructor IS a referent, and its owner is
         // determined -- it is the lane its own children select. It is never
         // `NoReferent`, and listing alternatives it cannot take would describe
@@ -3766,15 +3789,17 @@ fn fixed_node_selected_owner_of(
         SynthesizedAggregateNode::Fixed { children, .. } => {
             fixed_node_selected_owner(plan, seat, children)
         }
-        // A dynamic set nested directly inside a dynamic set is not a shape the
-        // measured tree has; it would be an alternative that is itself a
-        // choice, with no constructor to allocate.
-        other => {
-            let _ = other;
-            Err(planner_error(
-                "a dynamic aggregate alternative is not a constructor, so it allocates nothing",
-            ))
-        }
+        // None of the leaf/source kinds allocates a constructor alternative.
+        // Naming each kind keeps this closed when the node vocabulary grows.
+        SynthesizedAggregateNode::Dynamic(_)
+        | SynthesizedAggregateNode::Scalar { .. }
+        | SynthesizedAggregateNode::SiteOperand(_)
+        | SynthesizedAggregateNode::HostResponseReferent { .. }
+        | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+        | SynthesizedAggregateNode::Absent => Err(planner_error(
+            "a dynamic aggregate alternative is not a constructor, so it \
+             allocates nothing",
+        )),
     }
 }
 /// Source-constructor fields whose empty lexical environment is carried into a
@@ -9381,7 +9406,14 @@ impl<'src> StaticTransitionPlan<'src> {
                     io_error_alternative_children(position as usize, roles.len()),
                 ))
             }
-            SynthesizedTreeResolution::Node(_) => Err(planner_error(
+            SynthesizedTreeResolution::Node(
+                SynthesizedAggregateNode::Dynamic(_)
+                | SynthesizedAggregateNode::Scalar { .. }
+                | SynthesizedAggregateNode::SiteOperand(_)
+                | SynthesizedAggregateNode::HostResponseReferent { .. }
+                | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+                | SynthesizedAggregateNode::Absent,
+            ) => Err(planner_error(
                 "synthesized aggregate path does not name a constructor node",
             )),
         }
@@ -9435,11 +9467,31 @@ impl<'src> StaticTransitionPlan<'src> {
                         "synthesized aggregate path names an alternative the tree does not have",
                     )
                 })?,
-                // ⛔ A field step into a dynamic set, or an alternative step
-                // into a fixed constructor, is not a path this tree has. The
-                // step kinds are what make that a refusal rather than an index
-                // that happens to be in range.
-                _ => {
+                // A field step into a dynamic set, an alternative step into a
+                // fixed constructor, or any step into a leaf is not a path this
+                // tree has. Every node kind is named so a new kind cannot enter
+                // through this refusal wildcard without being classified.
+                (
+                    SynthesizedAggregateNode::Fixed { .. },
+                    SynthesizedAggregateStep::Alternative(_),
+                )
+                | (
+                    SynthesizedAggregateNode::Dynamic(
+                        SynthesizedDynamicSet::Alternatives(_),
+                    ),
+                    SynthesizedAggregateStep::Field(_),
+                )
+                | (
+                    SynthesizedAggregateNode::Dynamic(
+                        SynthesizedDynamicSet::IoErrors,
+                    ),
+                    _,
+                )
+                | (SynthesizedAggregateNode::Scalar { .. }, _)
+                | (SynthesizedAggregateNode::SiteOperand(_), _)
+                | (SynthesizedAggregateNode::HostResponseReferent { .. }, _)
+                | (SynthesizedAggregateNode::WorkerCaptureOperand(_), _)
+                | (SynthesizedAggregateNode::Absent, _) => {
                     return Err(planner_error(
                         "synthesized aggregate path takes a step the node it is at cannot take",
                     ));
@@ -9592,10 +9644,15 @@ impl<'src> StaticTransitionPlan<'src> {
                         SynthesizedAggregateNode::Fixed { role, .. } => {
                             Ok(SynthesizedConstructorRole::Fixed(*role))
                         }
-                        // ⛔ A malformed population is a FAILURE, not an
-                        // absence: an alternative that is not a constructor
-                        // allocates nothing and the set cannot be stated.
-                        _ => Err(planner_error(
+                        // A malformed population is a failure, not an absence.
+                        // Every non-constructor node is named so a new kind
+                        // cannot be absorbed by a wildcard here.
+                        SynthesizedAggregateNode::Dynamic(_)
+                        | SynthesizedAggregateNode::Scalar { .. }
+                        | SynthesizedAggregateNode::SiteOperand(_)
+                        | SynthesizedAggregateNode::HostResponseReferent { .. }
+                        | SynthesizedAggregateNode::WorkerCaptureOperand(_)
+                        | SynthesizedAggregateNode::Absent => Err(planner_error(
                             "a dynamic aggregate alternative is not a constructor, so it \
                              allocates nothing",
                         )),
@@ -9615,6 +9672,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 SynthesizedAggregateNode::Fixed { .. }
                 | SynthesizedAggregateNode::Scalar { .. }
                 | SynthesizedAggregateNode::SiteOperand(_)
+                | SynthesizedAggregateNode::HostResponseReferent { .. }
                 // A capture word is a leaf, never a dynamic alternative set.
                 | SynthesizedAggregateNode::WorkerCaptureOperand(_)
                 | SynthesizedAggregateNode::Absent => Ok(None),
@@ -9844,6 +9902,65 @@ mod tests {
             }
         }
     }
+    /// ABI-A1 ConsoleRead: a reply-generated child has one exact owner.
+    ///
+    /// It agrees with the existing root `ResponseBytes` representation's
+    /// persistent-ground tag while remaining a governed child in the recipe.
+    /// The negative comparison against a spilling scalar proves the singleton
+    /// is not the broader set returned by the pre-existing scalar arm.
+    #[test]
+    fn a_host_response_referent_has_exactly_persistent_store_owner() {
+        let response = SynthesizedAggregateNode::HostResponseReferent {
+            class: BoundaryClass::Bytes,
+        };
+        let (plan, seat, owner) = d7_seat_fixture(
+            ken_host::HostOpV1::ConsoleRead,
+            vec![
+                RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::Stream::Stdin".to_string(),
+                    args: Vec::new(),
+                },
+                RuntimeExpr::Value(RuntimeValue::Int(2.into())),
+            ],
+        );
+        let chunk_path = SynthesizedAggregatePath::root(
+            SynthesizedAggregateRoot::HostResultOk,
+        )
+        .alternative(0);
+        let record = plan
+            .synthesized_aggregate_record(
+                owner,
+                seat,
+                &chunk_path,
+                SynthesizedAggregateRole::Constructor(
+                    SynthesizedConstructorRole::Fixed(
+                        SynthesizedFixedConstructorRole::ReadChunk,
+                    ),
+                ),
+            )
+            .expect("ConsoleRead Chunk has a governed ownership record");
+        assert_eq!(record.declared_children, Some(&[response][..]));
+        assert_eq!(
+            record.children[0].owners,
+            vec![BoundaryReferentOwner::PersistentStore]
+        );
+
+        let owners = node_referent_owners(&plan, seat, response)
+            .expect("a response-generated referent resolves");
+        assert_eq!(owners, vec![BoundaryReferentOwner::PersistentStore]);
+        assert_eq!(
+            BoundaryTag::PersistentGround.referent_owner(),
+            BoundaryReferentOwner::PersistentStore,
+            "the governed child and the existing root ResponseBytes lane must agree"
+        );
+        assert_ne!(
+            owners,
+            node_referent_owners(&plan, seat, SynthesizedAggregateNode::native_int())
+                .expect("the scalar control resolves"),
+            "a response referent must not inherit Scalar's NoReferent alternative"
+        );
+    }
+
     /// **A site-bound child is RESOLVED against the seat, never pruned.**
     ///
     /// MEASURED: at a real `FsReadFile` seat, `OptionSome` — whose only child
@@ -10209,6 +10326,16 @@ mod tests {
         let expected: Vec<(Op, Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)>)> = vec![
             // Returns a `Bool` above the synthesis entirely.
             (Op::ConsoleIsTerminal, vec![]),
+            (
+                Op::ConsoleRead,
+                console_error()
+                    .into_iter()
+                    .chain([
+                        (path(OK, &[alt(0)]), Fixed(R::ReadChunk)),
+                        (path(OK, &[alt(1)]), Fixed(R::ReadResultEof)),
+                    ])
+                    .collect(),
+            ),
             (
                 Op::ConsoleWrite,
                 console_error().into_iter().chain(unit()).collect(),
@@ -11078,6 +11205,7 @@ mod tests {
         use ken_host::HostOpV1 as Op;
         vec![
             Op::ConsoleIsTerminal,
+            Op::ConsoleRead,
             Op::ConsoleWrite,
             Op::ConsoleFlush,
             Op::ClockWallNow,
@@ -11138,6 +11266,7 @@ mod tests {
             SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
             | SynthesizedAggregateNode::Scalar { .. }
             | SynthesizedAggregateNode::SiteOperand(_)
+            | SynthesizedAggregateNode::HostResponseReferent { .. }
             // A leaf, and never in a host-effect recipe tree, which is what
             // this walker is pointed at.
             | SynthesizedAggregateNode::WorkerCaptureOperand(_)

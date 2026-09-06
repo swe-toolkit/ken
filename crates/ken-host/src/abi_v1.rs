@@ -8,7 +8,7 @@
 
 use std::ffi::c_void;
 use std::fs::OpenOptions;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 
 use crate::revocation_v1::RevocationDomain;
 use crate::{
@@ -149,7 +149,6 @@ struct ConsoleWriteRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct ConsoleReadRequestV1 {
     stream: u64,
     limit: u64,
@@ -418,6 +417,32 @@ impl ProcessHost {
 }
 
 impl HostEffectBackendV1 for ProcessHost {
+    fn console_read(
+        &mut self,
+        stream: ConsoleStreamV1,
+        limit: u64,
+    ) -> Result<CanonicalReplyV1, IoErrorIdentityV1> {
+        if stream != ConsoleStreamV1::Stdin {
+            return Err(IoErrorIdentityV1::Unsupported);
+        }
+        let limit = usize::try_from(limit)
+            .map_err(|_| IoErrorIdentityV1::InvalidInput)?;
+        if limit == 0 {
+            return Ok(CanonicalReplyV1::ReadChunk(Vec::new()));
+        }
+        let mut bytes = vec![0; limit];
+        let count = io::stdin()
+            .lock()
+            .read(&mut bytes)
+            .map_err(|error| crate::io_error_identity_v1(&error))?;
+        if count == 0 {
+            Ok(CanonicalReplyV1::ReadEof)
+        } else {
+            bytes.truncate(count);
+            Ok(CanonicalReplyV1::ReadChunk(bytes))
+        }
+    }
+
     fn clock_wall_now(&mut self) -> Vec<u8> {
         let nanoseconds = match std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -973,7 +998,9 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
             reply.detail = u64::from(value);
         }
         CanonicalOutcomeV1::Success(
-            CanonicalReplyV1::Bytes(bytes) | CanonicalReplyV1::Instant(bytes),
+            CanonicalReplyV1::Bytes(bytes)
+            | CanonicalReplyV1::ReadChunk(bytes)
+            | CanonicalReplyV1::Instant(bytes),
         ) => {
             context.response_arena.push(bytes.into_boxed_slice());
             let bytes = context
@@ -985,6 +1012,9 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 data: bytes.as_ptr(),
                 len: bytes.len(),
             };
+        }
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::ReadEof) => {
+            reply.tag = REPLY_UNIT;
         }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired { .. }) => {
             reply.tag = REPLY_RESOURCE;
@@ -1223,6 +1253,24 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
         return -(0x1_0000_i64 + i64::from(op as u16));
     }
     let (capability, resource, request) = match op {
+        HostOpV1::ConsoleRead
+            if request_size == std::mem::size_of::<ConsoleReadRequestV1>() => {
+            if !request.cast::<ConsoleReadRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<ConsoleReadRequestV1>()) };
+            let Some(stream) = stream(wire.stream) else {
+                return -1;
+            };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ConsoleRead {
+                    stream,
+                    limit: wire.limit,
+                },
+            )
+        }
         HostOpV1::ConsoleWrite if request_size == std::mem::size_of::<ConsoleWriteRequestV1>() => {
             if !request.cast::<ConsoleWriteRequestV1>().is_aligned() {
                 return -1;
@@ -2156,6 +2204,51 @@ mod tests {
         assert_eq!(reply.tag, REPLY_ERROR);
         assert_eq!(reply.detail, 11, "Revoked keeps its distinct IOError tag");
         assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector for the executable
+    /// boundary. A zero-limit read exercises the real ConsoleRead decode and
+    /// dispatch without depending on the test harness process's stdin.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn console_read_raw_dispatch_no_longer_falls_to_the_deferred_boundary() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-console-read-native-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let initialized = context(&directory);
+        let request = ConsoleReadRequestV1 {
+            stream: 0,
+            limit: 0,
+        };
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: usize::MAX,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::ConsoleRead as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<ConsoleReadRequestV1>(),
+                std::ptr::from_mut(&mut reply).cast(),
+            )
+        };
+        assert_eq!(status, 0, "ConsoleRead must not take the -3 fallback");
+        assert_eq!(reply.tag, REPLY_BYTES);
+        assert_eq!(reply.detail, 0);
+        assert_eq!(reply.bytes.len, 0);
 
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         std::fs::remove_dir_all(directory).unwrap();

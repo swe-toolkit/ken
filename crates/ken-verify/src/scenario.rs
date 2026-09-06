@@ -188,6 +188,42 @@ impl fmt::Display for ClockWallNowDifferentialError {
 
 impl std::error::Error for ClockWallNowDifferentialError {}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConsoleReadDifferentialError {
+    TraceShape {
+        lane: &'static str,
+        reason: String,
+    },
+    FixtureMismatch {
+        lane: &'static str,
+        event: usize,
+        reason: String,
+    },
+    NormalizedMismatch(ObservationMismatch),
+}
+
+impl fmt::Display for ConsoleReadDifferentialError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TraceShape { lane, reason } => {
+                write!(formatter, "{lane} ConsoleRead trace shape: {reason}")
+            }
+            Self::FixtureMismatch {
+                lane,
+                event,
+                reason,
+            } => write!(
+                formatter,
+                "{lane} ConsoleRead event {event} disagrees with stdin fixture: \
+                 {reason}"
+            ),
+            Self::NormalizedMismatch(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for ConsoleReadDifferentialError {}
+
 impl CanonicalDifferentialRun {
     pub fn compare_exact(&self) -> Result<(), ObservationMismatch> {
         compare_canonical_exact(&self.interpreter, &self.native)
@@ -206,6 +242,21 @@ impl CanonicalDifferentialRun {
             self.interpreter_wall_window,
             &self.native,
             self.native_wall_window,
+        )
+    }
+
+    /// Apply the same finite-stdin projection to both lanes, then compare the
+    /// complete canonical observations without erasing the reply bytes.
+    pub fn compare_console_read(
+        &self,
+        stdin: &[u8],
+        limits: &[u64],
+    ) -> Result<(), ConsoleReadDifferentialError> {
+        compare_console_read_observations(
+            &self.interpreter,
+            &self.native,
+            stdin,
+            limits,
         )
     }
 
@@ -315,8 +366,12 @@ fn execute_scenario(
         plan_hash: build.plan_transport_hash,
     };
     let native_window_start = wall_clock_nanoseconds();
-    let native = ken_runtime::run_bound_process_effect_observation(&build.artifact, &options)
-        .map_err(HarnessError::NativeRun)?;
+    let native = ken_runtime::run_bound_process_effect_observation_with_stdin(
+        &build.artifact,
+        &options,
+        &scenario.ambient.stdin,
+    )
+    .map_err(HarnessError::NativeRun)?;
     let native_window_end = wall_clock_nanoseconds();
     let native_after = roots.snapshot_native()?;
     let native_actions = LaneActionEvidence {
@@ -447,10 +502,116 @@ fn normalize_clock_wall_now_observation(
     Ok(normalized)
 }
 
-fn validate_native_ambient(ambient: &AmbientScript) -> Result<(), HarnessError> {
-    if !ambient.stdin.is_empty() {
-        return Err(HarnessError::UnsupportedAmbient("stdin"));
+fn compare_console_read_observations(
+    interpreter: &EffectObservation,
+    native: &EffectObservation,
+    stdin: &[u8],
+    limits: &[u64],
+) -> Result<(), ConsoleReadDifferentialError> {
+    let interpreter = normalize_console_read_observation(
+        "interpreter",
+        interpreter,
+        stdin,
+        limits,
+    )?;
+    let native =
+        normalize_console_read_observation("native", native, stdin, limits)?;
+    compare_canonical_exact(&interpreter, &native)
+        .map_err(ConsoleReadDifferentialError::NormalizedMismatch)
+}
+
+fn normalize_console_read_observation(
+    lane: &'static str,
+    observation: &EffectObservation,
+    stdin: &[u8],
+    limits: &[u64],
+) -> Result<EffectObservation, ConsoleReadDifferentialError> {
+    if observation.effect_trace.len() != limits.len() {
+        return Err(ConsoleReadDifferentialError::TraceShape {
+            lane,
+            reason: format!(
+                "expected {} events, observed {}",
+                limits.len(),
+                observation.effect_trace.len()
+            ),
+        });
     }
+    let mut cursor = 0usize;
+    for (index, (event, expected_limit)) in observation
+        .effect_trace
+        .iter()
+        .zip(limits)
+        .enumerate()
+    {
+        if event.sequence != index as u64
+            || event.operation != ken_host::HostOpV1::ConsoleRead
+            || event.capability.is_some()
+            || !event.resource_bindings.is_empty()
+            || event.request
+                != (ken_host::CanonicalRequestV1::ConsoleRead {
+                    stream: ken_host::ConsoleStreamV1::Stdin,
+                    limit: *expected_limit,
+                })
+        {
+            return Err(ConsoleReadDifferentialError::TraceShape {
+                lane,
+                reason: format!(
+                    "event {index} is not the exact ConsoleRead request shape"
+                ),
+            });
+        }
+        if cursor == stdin.len() {
+            if event.outcome
+                != ken_host::CanonicalOutcomeV1::Success(
+                    ken_host::CanonicalReplyV1::ReadEof,
+                )
+            {
+                return Err(ConsoleReadDifferentialError::FixtureMismatch {
+                    lane,
+                    event: index,
+                    reason: "expected EOF after the fixture's last byte".to_string(),
+                });
+            }
+            continue;
+        }
+        let requested = usize::try_from(*expected_limit).unwrap_or(usize::MAX);
+        let count = requested.min(stdin.len() - cursor);
+        let expected = &stdin[cursor..cursor + count];
+        let ken_host::CanonicalOutcomeV1::Success(
+            ken_host::CanonicalReplyV1::ReadChunk(actual),
+        ) = &event.outcome
+        else {
+            return Err(ConsoleReadDifferentialError::FixtureMismatch {
+                lane,
+                event: index,
+                reason: format!("expected a {count}-byte Chunk"),
+            });
+        };
+        if actual != expected {
+            return Err(ConsoleReadDifferentialError::FixtureMismatch {
+                lane,
+                event: index,
+                reason: format!(
+                    "expected bytes {:?}, observed {:?}",
+                    expected, actual
+                ),
+            });
+        }
+        cursor += count;
+    }
+    if cursor != stdin.len() {
+        return Err(ConsoleReadDifferentialError::TraceShape {
+            lane,
+            reason: format!(
+                "limits consumed {cursor} of {} injected byte(s)",
+                stdin.len()
+            ),
+        });
+    }
+    Ok(observation.clone())
+}
+
+fn validate_native_ambient(ambient: &AmbientScript) -> Result<(), HarnessError> {
     if ambient.stdin_is_terminal || ambient.stdout_is_terminal || ambient.stderr_is_terminal {
         return Err(HarnessError::UnsupportedAmbient(
             "terminal state other than piped/false",
@@ -598,6 +759,57 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
                 }
               }
           })
+    })
+"#;
+
+    const CONSOLE_READ_SOURCE: &str = r#"program capabilities FS AFull
+proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [Console] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+       (resp_coproduct (FSOp AFull) AmbientOp
+         (fs_resp AFull) ambient_resp)
+       (Result IOError ReadResult) ExitCode
+    (host_console AFull (Result IOError ReadResult) (read Stdin (2 : Int)))
+    (\first. match first {
+      Err _ |-> host_exit AFull (Failure 41) ;
+      Ok first_read |-> match first_read {
+        Eof |-> host_exit AFull (Failure 42) ;
+        Chunk first_bytes |->
+          match eq_int (bytes_length first_bytes) 2 {
+            False |-> host_exit AFull (Failure 47) ;
+            True |->
+              bind (Coproduct (FSOp AFull) AmbientOp)
+                   (resp_coproduct (FSOp AFull) AmbientOp
+                     (fs_resp AFull) ambient_resp)
+                   (Result IOError ReadResult) ExitCode
+                (host_console AFull (Result IOError ReadResult)
+                  (read Stdin (4 : Int)))
+                (\second. match second {
+              Err _ |-> host_exit AFull (Failure 43) ;
+              Ok second_read |-> match second_read {
+                Eof |-> host_exit AFull (Failure 44) ;
+                Chunk second_bytes |->
+                  match eq_int (bytes_length second_bytes) 1 {
+                    False |-> host_exit AFull (Failure 48) ;
+                    True |->
+                      bind (Coproduct (FSOp AFull) AmbientOp)
+                           (resp_coproduct (FSOp AFull) AmbientOp
+                             (fs_resp AFull) ambient_resp)
+                           (Result IOError ReadResult) ExitCode
+                        (host_console AFull (Result IOError ReadResult)
+                          (read Stdin (4 : Int)))
+                        (\third. match third {
+                          Err _ |-> host_exit AFull (Failure 45) ;
+                          Ok third_read |-> match third_read {
+                            Chunk _ |-> host_exit AFull (Failure 46) ;
+                            Eof |-> host_exit AFull Success
+                          }
+                        })
+                  }
+              }
+            })
+          }
+      }
     })
 "#;
 
@@ -750,6 +962,24 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 identity: "abi-a1-clock-wall-real-artifact".to_string(),
                 package_name: "abi-a1-clock-wall-real-artifact".to_string(),
                 source: CLOCK_WALL_SOURCE.to_string(),
+            },
+            initial_filesystem: Vec::new(),
+            expected_fs: Vec::new(),
+        }
+    }
+
+    fn console_read_scenario() -> Scenario {
+        Scenario {
+            process_input: RawProcessInput::default(),
+            ambient: AmbientScript {
+                stdin: vec![0xff, b'a', 0],
+                ..AmbientScript::default()
+            },
+            program_caps: ProgramCapsShape::default(),
+            entry: CheckedProgramEntry {
+                identity: "abi-a1-console-read-real-artifact".to_string(),
+                package_name: "abi-a1-console-read-real-artifact".to_string(),
+                source: CONSOLE_READ_SOURCE.to_string(),
             },
             initial_filesystem: Vec::new(),
             expected_fs: Vec::new(),
@@ -1078,6 +1308,51 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 run.native_wall_window,
             ),
             Err(ClockWallNowDifferentialError::NormalizedMismatch(_))
+        ));
+    }
+
+    /// Promise class: durable invariant. Both lanes read the same finite stdin
+    /// fixture at limits 2, 4, and 4. The projection requires the exact request
+    /// sequence, a two-byte Chunk, a one-byte partial Chunk, then EOF, and keeps
+    /// every reply byte for the final canonical comparison.
+    #[test]
+    fn console_read_normalized_real_artifact_differential_discriminates() {
+        const STDIN: &[u8] = &[0xff, b'a', 0];
+        const LIMITS: &[u64] = &[2, 4, 4];
+        let run = execute_scenario(&console_read_scenario())
+            .expect("ConsoleRead real-artifact differential executes");
+        run.compare_console_read(STDIN, LIMITS)
+            .expect("the finite-stdin projection agrees");
+        assert_eq!(
+            crate::confirm_native_tested_transition(
+                ken_host::HostOpV1::ConsoleRead,
+                crate::NativeTestedEvidence::from_console_read_run(
+                    &run, STDIN, LIMITS,
+                ),
+            ),
+            Ok(ken_host::HostOpAvailabilityV1::NativeTested)
+        );
+
+        let mut wrong_native = run.native.clone();
+        let ken_host::CanonicalOutcomeV1::Success(
+            ken_host::CanonicalReplyV1::ReadChunk(bytes),
+        ) = &mut wrong_native.effect_trace[1].outcome
+        else {
+            panic!("the second native response must be a partial Chunk")
+        };
+        bytes.clear();
+        assert!(matches!(
+            compare_console_read_observations(
+                &run.interpreter,
+                &wrong_native,
+                STDIN,
+                LIMITS,
+            ),
+            Err(ConsoleReadDifferentialError::FixtureMismatch {
+                lane: "native",
+                event: 1,
+                ..
+            })
         ));
     }
 

@@ -2728,7 +2728,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// set, and it is derived from the operation and the slot alone.**
 ///
 /// ⛔ **Nothing here compiles or runs a program.** The point of the seat
-/// authority is that the population is STATIC: it is a fact about the 13
+/// authority is that the population is STATIC: it is a fact about the 15
 /// admitted operations, not about the arms some execution happened to take. A
 /// control that established it by compiling a fixture would prove the property
 /// only for the seats that fixture reaches, which is the row-driven discovery
@@ -2758,6 +2758,30 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
     ];
+    assert_eq!(
+        host_effect_seat_contract_of(
+            ken_host::HostOpV1::ConsoleRead,
+            EffectSeatSlot::Argument(0),
+        )
+        .map(|(operation, need, _)| (operation, need)),
+        Some((
+            EffectSeatOperation::SelectClosedTag,
+            EffectSeatNeed::ConstructorTag,
+        )),
+        "ConsoleRead.stream is the closed Stream tag seat"
+    );
+    assert_eq!(
+        host_effect_seat_contract_of(
+            ken_host::HostOpV1::ConsoleRead,
+            EffectSeatSlot::Argument(1),
+        )
+        .map(|(operation, need, _)| (operation, need)),
+        Some((
+            EffectSeatOperation::NarrowExactInt,
+            EffectSeatNeed::ExactIntU64,
+        )),
+        "ConsoleRead.limit is the bounded host-width Int seat"
+    );
     for operation in CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
         assert_eq!(
             host_effect_seat_contract_of(operation, EffectSeatSlot::Capability).is_some(),
@@ -2790,7 +2814,6 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         );
     }
     for operation in [
-        ken_host::HostOpV1::ConsoleRead,
         ken_host::HostOpV1::ClockMonotonicNow,
         ken_host::HostOpV1::ClockSleepUntil,
         ken_host::HostOpV1::FsAppendFile,
@@ -4794,6 +4817,43 @@ fn a_discarded_visit_refuses_before_its_body_is_defined() {
     set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
     recursive_port_process_compiles(&expr)
         .expect("the bracket compiles again once the mutation clears");
+}
+
+/// ABI-A1 ConsoleRead: the reply child uses its own governed source kind.
+///
+/// The baseline compiles the real response recipe. The mutation passes the
+/// identical `ResponseBytes` value through the scalar argument form, so arity
+/// and runtime value shape stay fixed and only the ownership source is wrong.
+#[test]
+fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
+    let expr = RuntimeExpr::Effect {
+        family: "Console".to_string(),
+        operation: ken_host::HostOpV1::ConsoleRead,
+        capability: None,
+        args: vec![
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::Stream::Stdin".to_string(),
+                args: Vec::new(),
+            },
+            RuntimeExpr::Value(RuntimeValue::Int(2.into())),
+        ],
+    };
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+    recursive_port_process_compiles(&expr)
+        .expect("the correctly classified response child compiles");
+
+    set_effect_seat_dispatch_mutation(
+        EffectSeatDispatchMutation::HostResponseAsScalar,
+    );
+    let error = recursive_port_process_compiles(&expr)
+        .expect_err("a scalar must not inherit the response referent's owner proof")
+        .to_string();
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+    assert!(
+        error.contains("HostResponseReferent")
+            && error.contains("different node"),
+        "the refusal must come from exact child reconciliation: {error}"
+    );
 }
 
 /// **`RT-DEAD-ARM-EFFECT-LOWERING` `AC-4` -- the MANDATORY negative control, as
