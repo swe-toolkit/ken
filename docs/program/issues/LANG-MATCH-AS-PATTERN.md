@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-AS-PATTERN
 title: "as-patterns `p as x` -- the first contained slice of 34 §3's six absent pattern forms: the alias binds the value matched by p at its position, the inner p obeys the current position rules so the top-level non-constructor refusal stays fail-closed (keeping NoInhabitants honest), and the P1 association/precedence pin is honored forward-compatibly against the not-yet-existing or-pattern"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
