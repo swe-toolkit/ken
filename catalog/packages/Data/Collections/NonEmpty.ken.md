@@ -32,6 +32,10 @@ combinators in `Data.Collections` while preserving the same familiar names.
 ```ken
 data NonEmpty a = NonEmptyCons a (List a)
 
+pub fn nonempty_singleton (a : Type) (x : a) : NonEmpty a = NonEmptyCons a x (Nil a)
+
+pub fn nonempty_cons (a : Type) (x : a) (rest : List a) : NonEmpty a = NonEmptyCons a x rest
+
 fn nonempty_head (a : Type) (xs : NonEmpty a) : a =
   match xs {
     NonEmptyCons x rest ↦ x
@@ -132,8 +136,9 @@ list-append associativity.
 
 ## 7. Trust & derivation
 
-**Public API (stable names):** `NonEmpty`/`NonEmptyCons`, `nonempty_head`,
-`nonempty_tail`, `nonempty_to_list`, `nonempty_map`, `nonempty_append`, and
+**Public API (stable names):** `NonEmpty`/`NonEmptyCons`,
+`nonempty_singleton`, `nonempty_cons`, `nonempty_head`, `nonempty_tail`,
+`nonempty_to_list`, `nonempty_map`, `nonempty_append`, and
 `Semigroup_instance_NonEmpty`.
 
 **Source map:**
