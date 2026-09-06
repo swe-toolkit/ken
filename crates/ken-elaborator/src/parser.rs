@@ -2361,24 +2361,46 @@ impl Parser {
         })
     }
 
-    /// Parse a pattern: `C p₁…pₙ` | `_` | `x`.
+    /// Parse a pattern with the `32 §4` pattern precedence: constructor
+    /// application binds tighter than the non-associative `as` wrapper.
     fn parse_pattern(&mut self) -> Result<Pattern, ElabError> {
+        let start = self.peek_span().start;
+        let inner = self.parse_pattern_application()?;
+        if !self.is_contextual_ident("as") {
+            return Ok(inner);
+        }
+
+        self.advance();
+        let (alias, alias_span) = self.expect_ident()?;
+        let pattern = Pattern {
+            kind: PatKind::As(Box::new(inner), alias),
+            span: Span::new(start, alias_span.end),
+        };
+        if self.is_contextual_ident("as") {
+            return Err(ElabError::ParseError {
+                msg: "as-patterns are non-associative; parenthesize the inner as-pattern"
+                    .to_string(),
+                span: self.peek_span().clone(),
+            });
+        }
+        Ok(pattern)
+    }
+
+    fn parse_pattern_application(&mut self) -> Result<Pattern, ElabError> {
         let start = self.peek_span().start;
         match self.peek().clone() {
             Token::ConId(name) => {
                 let con_span = self.peek_span().clone();
                 self.advance();
                 let (name, _) = self.parse_dotted(name, con_span);
-                // Collect atom-level sub-patterns (stop at `=>`, `|`, `}`, `;`, EOF).
                 let mut sub = Vec::new();
                 while self.can_start_atom_pat() {
                     sub.push(self.parse_atom_pattern()?);
                 }
-                let end = if sub.is_empty() {
-                    self.tokens[self.pos - 1].1.end
-                } else {
-                    sub.last().unwrap().span.end
-                };
+                let end = sub
+                    .last()
+                    .map(|pattern| pattern.span.end)
+                    .unwrap_or_else(|| self.tokens[self.pos - 1].1.end);
                 Ok(Pattern {
                     kind: PatKind::Ctor(name, sub),
                     span: Span::new(start, end),
@@ -2394,6 +2416,7 @@ impl Parser {
                 };
                 Ok(Pattern { kind, span })
             }
+            Token::LParen => self.parse_atom_pattern(),
             other => Err(ElabError::ParseError {
                 msg: format!("expected a pattern, found {:?}", other),
                 span: self.peek_span().clone(),
@@ -2405,7 +2428,7 @@ impl Parser {
         matches!(
             self.peek(),
             Token::Ident(_) | Token::ConId(_) | Token::LParen
-        ) && !matches!(self.peek(), Token::MapsTo)
+        ) && !self.is_contextual_ident("as")
     }
 
     fn parse_atom_pattern(&mut self) -> Result<Pattern, ElabError> {
@@ -2835,4 +2858,60 @@ pub fn parse_decls(src: &str) -> Result<Vec<Decl>, ElabError> {
 pub fn parse_expr(src: &str) -> Result<Expr, ElabError> {
     let tokens = crate::lexer::Lexer::lex(src)?;
     Parser::new(tokens, src.to_string()).parse_expr_only()
+}
+
+#[cfg(test)]
+mod as_pattern_precedence_tests {
+    use super::parse_expr;
+    use crate::ast::{Expr, PatKind};
+    use crate::error::ElabError;
+
+    fn only_pattern(source: &str) -> crate::ast::Pattern {
+        match parse_expr(source).expect("pattern fixture parses") {
+            Expr::EMatch { mut arms, .. } if arms.len() == 1 => arms.remove(0).pat,
+            other => panic!("expected one-arm match, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn constructor_application_binds_tighter_than_as() {
+        // Promise class: normative compatibility vector (`32 §4`). MEASURED:
+        // `C a as whole` produces As(Ctor(C, [a]), whole). CLAIMED: `as`
+        // cannot become a constructor argument without grouping. THE GAP: the
+        // paired grouped control below proves that argument-position As remains
+        // representable rather than merely rejected everywhere.
+        let pattern = only_pattern("match C { C a as whole |-> whole }");
+        match pattern.kind {
+            PatKind::As(inner, alias) => {
+                assert_eq!(alias, "whole");
+                assert!(matches!(
+                    inner.kind,
+                    PatKind::Ctor(ref name, ref fields)
+                        if name == "C" && fields.len() == 1
+                ));
+            }
+            other => panic!("expected outer As wrapper, got {other:?}"),
+        }
+
+        let grouped = only_pattern("match C { C (D a as nested) tail |-> tail }");
+        match grouped.kind {
+            PatKind::Ctor(name, fields) => {
+                assert_eq!(name, "C");
+                assert_eq!(fields.len(), 2);
+                assert!(matches!(fields[0].kind, PatKind::As(_, ref alias) if alias == "nested"));
+            }
+            other => panic!("expected grouped argument As under C, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unparenthesized_second_as_is_rejected_as_nonassociative() {
+        match parse_expr("match C { C a as first as second |-> first }") {
+            Err(ElabError::ParseError { msg, .. }) => assert_eq!(
+                msg,
+                "as-patterns are non-associative; parenthesize the inner as-pattern"
+            ),
+            other => panic!("expected the non-associativity diagnostic, got {other:?}"),
+        }
+    }
 }
