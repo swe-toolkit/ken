@@ -498,6 +498,65 @@ ASCII names. The last case must prove identity: `ℓ` and `level` resolve to the
 same binding, not merely that both spellings are accepted. This WP does not
 edit a conformance path.
 
+## 1f. Format characters (Unicode `Cf`): whole-source Trojan-Source policy
+
+Ken source is written by agents and **read by humans** (§1a). A source review is
+sound only if what the reviewer *sees* (the rendered glyphs) faithfully
+represents what the compiler *lexes* (the codepoint stream in logical order).
+Unicode format characters (general category `Cf`) break that correspondence:
+bidirectional overrides and isolates (U+202A–U+202E, U+2066–U+2069) reorder the
+rendering away from the logical order, and zero-width characters (U+200B,
+U+200D, U+FEFF, …) are invisible — so two distinct declarations can be made to
+render identically, or code hidden from or reordered under review. This is the
+Trojan-Source class (CVE-2021-42574), and it attacks review directly: the
+mitigation for a `foreign` name (`38 §2`) is a human reading the declaration, so
+rendering-divergence attacks the mitigation itself.
+
+**Rule (whole-source, fail-closed).** A raw in-scope `Cf` codepoint anywhere in
+the source is a **lexical error** — in a comment, in the token stream, and
+inside a string, character, or byte-literal body alike. In scope is the closed
+Unicode general category `Cf`: the *category* is the predicate, not an
+enumerated list (a list goes stale as Unicode adds format characters; the
+codepoints named above are instances, not the definition). The one exception is
+U+FEFF as a byte-order mark at source offset 0, consumed as a BOM; U+FEFF
+anywhere else is in scope. The error is hard, not a warning — the property is a
+security boundary, and one enforced only advisorily is not enforced.
+
+**Placement — one guard on the decoded codepoint, before context dispatch.** The
+check applies to the decoded source codepoint *before* the scanner decides
+whether it sits in a comment, a token, or a literal. A single guard on the
+codepoint stream therefore covers comment scanning, literal decoding, and the
+token stream uniformly; it cannot be bypassed by a lexer context added later (a
+new context inherits it); and it needs no per-context duplication. Being
+byte-stream-wide it also makes the property renderer-agnostic — the divergence
+is removed at the source, so no terminal or web renderer can reintroduce it.
+
+**Data stays expressible — the escape round-trip.** The rule restricts the raw
+*spelling*, never the *data*. A `Cf` codepoint a literal legitimately carries —
+a zero-width joiner in an emoji sequence, an intentional bidi run — is written
+with the existing escape (`\u{…}` in a string or character literal, `\xHH` bytes
+in a byte-string literal, §3), which is visible and reviewable. The escape is a
+true identity on the value: `\u{202E}` decodes to the U+202E codepoint in the
+runtime value, unchanged from a raw occurrence. The mandated formatter (§1c)
+auto-escapes on save as the exact inverse — a raw in-scope `Cf` codepoint in a
+literal's source spelling is rewritten to its escape, value unchanged — so the
+hard error is in practice a save-time auto-fix, not a barrier. Consequence,
+stated rather than left implicit: a triple-quoted raw string performs no escape
+processing (§3), so it cannot carry an in-scope `Cf` codepoint at all; a literal
+that must contain one uses an ordinary escaped string. What is prevented is
+never the data — it is an invisible or reordering character sitting in the
+source text where it defeats review.
+
+**Whole-source, and forward to blessed identifiers.** The rule is stated over
+the entire codepoint stream, so it already covers every present payload
+(comments, notation, literals) and, when `SPEC-IDENT-BLESSED` (§1e) admits
+blessed Unicode letters into identifiers, covers identifier codepoints on the
+same guard with no re-derivation — the future node inherits this policy rather
+than restating it. It is orthogonal to and composes with TR39
+confusable-resistance (§1e, §1a principle 5): a `Cf` character is a
+rendering/byte divergence, a confusable is a glyph resembling another — distinct
+axes, both closed.
+
 ## 2. Tokens
 
 ```
