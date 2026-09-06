@@ -146,7 +146,7 @@ impl HostOpV1 {
             Self::ClockSleepUntil => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsReadFile => HostOpAvailabilityV1::NativeTested,
             Self::FsWriteFile => HostOpAvailabilityV1::NativeTested,
-            Self::FsAppendFile => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsAppendFile => HostOpAvailabilityV1::NativeTested,
             Self::FsMetadata => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsReadDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsCreateDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
@@ -217,7 +217,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 15] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 16] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -225,6 +225,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 15] = [
     HostOpV1::ClockWallNow,
     HostOpV1::FsReadFile,
     HostOpV1::FsWriteFile,
+    HostOpV1::FsAppendFile,
     HostOpV1::FsChangeMode,
     HostOpV1::FsOpen,
     HostOpV1::FsHandleMetadata,
@@ -398,6 +399,17 @@ pub fn host_effect_wire_layout_v1(
                 bytes[1],
             ]
         }
+        HostOpV1::FsAppendFile => {
+            let path = slice("path")?;
+            let bytes = slice("bytes")?;
+            vec![
+                checked_u32(field("capability")?)?,
+                path[0],
+                path[1],
+                bytes[0],
+                bytes[1],
+            ]
+        }
         HostOpV1::FsChangeMode => {
             let path = slice("path")?;
             vec![
@@ -452,13 +464,12 @@ pub fn host_effect_wire_layout_v1(
         // omit. Naming the operations that legitimately carry no wire layout
         // turns a new operation from a runtime refusal into `error[E0004]`.
         //
-        // These ten are exactly the `RepresentedUnavailable` set, and the
-        // fifteen matched above are exactly the `NativeTested` set. That
+        // These nine are exactly the `RepresentedUnavailable` set, and the
+        // sixteen matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
         HostOpV1::ClockMonotonicNow
         | HostOpV1::ClockSleepUntil
-        | HostOpV1::FsAppendFile
         | HostOpV1::FsMetadata
         | HostOpV1::FsReadDirectory
         | HostOpV1::FsCreateDirectory
@@ -3995,12 +4006,11 @@ mod tests {
         assert_eq!(HostOpV1::try_from(0), Err(UnknownHostOpV1(0)));
     }
 
-    /// Promise class: transition sentinel. ABI-S3 expanded the catalog after
-    /// ABI-A1's original seven-operation D5 estimate, so the measured partial
-    /// tail is ten after the ConsoleRead partial; unrelated promotions must
-    /// fail it.
+    /// Promise class: transition sentinel. This accepted ABI-A2 partial moves
+    /// only FsAppendFile, so the exact deferred tail is nine; metadata, rename,
+    /// the A3 directory operations, Clock siblings, and Entropy remain.
     #[test]
-    fn abi_a1_console_read_partial_leaves_the_exact_deferred_tail() {
+    fn abi_a2_fs_append_partial_leaves_the_exact_deferred_tail() {
         assert_eq!(
             HostOpV1::ALL
                 .into_iter()
@@ -4012,7 +4022,6 @@ mod tests {
             vec![
                 HostOpV1::ClockMonotonicNow,
                 HostOpV1::ClockSleepUntil,
-                HostOpV1::FsAppendFile,
                 HostOpV1::FsMetadata,
                 HostOpV1::FsReadDirectory,
                 HostOpV1::FsCreateDirectory,
@@ -4021,7 +4030,7 @@ mod tests {
                 HostOpV1::FsRename,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "the ConsoleRead partial must not promote another deferred lane"
+            "the FsAppendFile partial must not promote another deferred lane"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,

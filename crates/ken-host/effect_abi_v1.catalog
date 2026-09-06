@@ -59,7 +59,7 @@ operation|ClockSleepUntil|0203|unavailable|ClockDeadlineRequestV1|1|HostReplyV1|
 operation|EntropyRandomBytes|0501|unavailable|EntropyRequestV1|1|HostReplyV1|1
 operation|FsReadFile|0301|native|FsReadFileRequestV1|2|HostReplyV1|1
 operation|FsWriteFile|0302|native|FsWriteFileRequestV1|4|HostReplyV1|1
-operation|FsAppendFile|0303|unavailable|FsAppendFileRequestV1|3|HostReplyV1|1
+operation|FsAppendFile|0303|native|FsAppendFileRequestV1|3|HostReplyV1|1
 operation|FsMetadata|0304|unavailable|FsPathRequestV1|2|HostReplyV1|1
 operation|FsReadDirectory|0305|unavailable|FsPathRequestV1|2|HostReplyV1|1
 operation|FsCreateDirectory|0306|unavailable|FsRecursivePathRequestV1|3|HostReplyV1|1

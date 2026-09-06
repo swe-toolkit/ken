@@ -65,6 +65,7 @@ pub struct NativeProcessSymbols {
     pub unit: RuntimeSymbol,
     pub bool_false: RuntimeSymbol,
     pub bool_true: RuntimeSymbol,
+    pub file_operation_append: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -131,6 +132,8 @@ impl NativeProcessSymbols {
             unit: "ctor:prelude::Unit::MkUnit".to_string(),
             bool_false: "ctor:prelude::Bool::False".to_string(),
             bool_true: "ctor:prelude::Bool::True".to_string(),
+            file_operation_append:
+                "ctor:prelude::FileOperation::OpAppendFile".to_string(),
         }
     }
 }

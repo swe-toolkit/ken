@@ -181,7 +181,6 @@ struct FsWriteFileRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsAppendFileRequestV1 {
     capability: u64,
     path: SliceV1,
@@ -523,6 +522,18 @@ impl HostEffectBackendV1 for ProcessHost {
             }
             Err(error) => Err(host_error(error)),
         }
+    }
+
+    fn fs_append_file(
+        &mut self,
+        grant: &CapabilityGrantV1,
+        path: &[u8],
+        bytes: &[u8],
+    ) -> Result<(), FileErrorCauseV1> {
+        let (parent, leaf) = Self::parent(grant, path)?;
+        let handle = crate::open_at(&parent, &leaf, OpenRequest::AppendOrCreate)
+            .map_err(host_error)?;
+        crate::append(&handle, bytes).map_err(host_error)
     }
 
     fn fs_change_mode(
@@ -1356,6 +1367,28 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 CanonicalRequestV1::FsWriteFile {
                     path: path.to_vec(),
                     create_policy: policy,
+                    bytes: bytes.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsAppendFile
+            if request_size == std::mem::size_of::<FsAppendFileRequestV1>() =>
+        {
+            if !request.cast::<FsAppendFileRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<FsAppendFileRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return -1;
+            };
+            let Some(bytes) = (unsafe { borrowed_slice(&wire.bytes) }) else {
+                return -1;
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsAppendFile {
+                    path: path.to_vec(),
                     bytes: bytes.to_vec(),
                 },
             )
@@ -2204,6 +2237,88 @@ mod tests {
         assert_eq!(reply.tag, REPLY_ERROR);
         assert_eq!(reply.detail, 11, "Revoked keeps its distinct IOError tag");
         assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector for the existing raw
+    /// boundary.
+    ///
+    /// MEASURED: raw id 0x0303 plus the manifested three-field request appends
+    /// exact bytes, returns Unit, and records the canonical request and reply.
+    /// CLAIMED: FsAppendFile reaches the native typed dispatcher instead of the
+    /// `-3` fallback without changing its wire identity or shape.
+    /// THE GAP: this does not prove checked-source lowering or path policy;
+    /// the real-artifact differential and three policy refusals pin those.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fs_append_file_raw_dispatch_appends_exact_bytes() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-fs-append-native-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("data.bin"), b"before").unwrap();
+        let initialized = context(&directory);
+        let path = b"data.bin";
+        let bytes = [0xff, 0, b'x'];
+        let request = FsAppendFileRequestV1 {
+            capability: initialized.capability,
+            path: SliceV1 {
+                data: path.as_ptr(),
+                len: path.len(),
+            },
+            bytes: SliceV1 {
+                data: bytes.as_ptr(),
+                len: bytes.len(),
+            },
+        };
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: usize::MAX,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::FsAppendFile as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<FsAppendFileRequestV1>(),
+                std::ptr::from_mut(&mut reply).cast(),
+            )
+        };
+
+        assert_eq!(status, 0, "FsAppendFile must not take the -3 fallback");
+        assert_eq!(reply.tag, REPLY_UNIT);
+        assert_eq!(reply.detail, 0);
+        assert_eq!(reply.bytes.len, 0);
+        assert_eq!(
+            std::fs::read(directory.join("data.bin")).unwrap(),
+            [b"before".as_slice(), bytes.as_slice()].concat()
+        );
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        let [event] = context.effect_trace.as_slice() else {
+            panic!("one raw append must record exactly one event")
+        };
+        assert_eq!(event.operation, HostOpV1::FsAppendFile);
+        assert_eq!(
+            event.request,
+            CanonicalRequestV1::FsAppendFile {
+                path: path.to_vec(),
+                bytes: bytes.to_vec(),
+            }
+        );
+        assert_eq!(
+            event.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        );
 
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         std::fs::remove_dir_all(directory).unwrap();

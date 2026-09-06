@@ -181,6 +181,17 @@ mod tests {
             self.file = bytes.to_vec();
             Ok(())
         }
+
+        fn fs_append_file(
+            &mut self,
+            _grant: &CapabilityGrantV1,
+            _path: &[u8],
+            bytes: &[u8],
+        ) -> Result<(), FileErrorCauseV1> {
+            self.calls += 1;
+            self.file.extend_from_slice(bytes);
+            Ok(())
+        }
     }
 
     fn invocation(rights: u8) -> (KenNativeInvocationV1<MockHost>, CapabilityTokenV1) {
@@ -241,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn five_lane_dispatch_is_ordered_and_response_arena_is_invocation_lived() {
+    fn fs_append_dispatch_is_ordered_and_response_arena_is_invocation_lived() {
         let (mut invocation, token) = invocation(RIGHT_READ_V1 | RIGHT_WRITE_V1);
         let write = invocation
             .dispatch(NativeEffectCallV1 {
@@ -252,6 +263,17 @@ mod tests {
                     path: b"a".to_vec(),
                     create_policy: CreatePolicyV1::CreateOrTruncate,
                     bytes: b"payload".to_vec(),
+                },
+            })
+            .unwrap();
+        let append = invocation
+            .dispatch(NativeEffectCallV1 {
+                operation: HostOpV1::FsAppendFile,
+                capability: Some(("fsCap".to_string(), token)),
+                resources: ResourceInputsV1::None,
+                request: CanonicalRequestV1::FsAppendFile {
+                    path: b"a".to_vec(),
+                    bytes: b"-tail".to_vec(),
                 },
             })
             .unwrap();
@@ -267,13 +289,34 @@ mod tests {
             .unwrap();
         assert_eq!(invocation.observation.effect_trace[0].sequence, 0);
         assert_eq!(invocation.observation.effect_trace[1].sequence, 1);
+        assert_eq!(invocation.observation.effect_trace[2].sequence, 2);
+        assert_eq!(invocation.backend.calls, 3);
+        assert_eq!(
+            invocation
+                .observation
+                .effect_trace
+                .iter()
+                .map(|event| event.operation)
+                .collect::<Vec<_>>(),
+            [
+                HostOpV1::FsWriteFile,
+                HostOpV1::FsAppendFile,
+                HostOpV1::FsReadFile,
+            ]
+        );
         assert!(matches!(
             invocation.response_arena.get(write).unwrap().outcome,
             CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
         ));
+        assert!(matches!(
+            invocation.response_arena.get(append).unwrap().outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        ));
         assert_eq!(
             invocation.response_arena.get(read).unwrap().outcome,
-            CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(b"payload".to_vec()))
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(
+                b"payload-tail".to_vec()
+            ))
         );
     }
 

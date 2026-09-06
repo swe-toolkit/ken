@@ -2728,7 +2728,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// set, and it is derived from the operation and the slot alone.**
 ///
 /// ⛔ **Nothing here compiles or runs a program.** The point of the seat
-/// authority is that the population is STATIC: it is a fact about the 15
+/// authority is that the population is STATIC: it is a fact about the 16
 /// admitted operations, not about the arms some execution happened to take. A
 /// control that established it by compiling a fixture would prove the property
 /// only for the seats that fixture reaches, which is the row-driven discovery
@@ -2737,7 +2737,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// MEASURED: for each admitted operation the ordinals carrying a contract are
 /// exactly `0..n`; `ClockWallNow` is the sole zero-arity operation, every other
 /// admitted operation has `n >= 1`, the capability slot carries one for exactly
-/// the four FS-path operations, and no unadmitted lane carries one at any slot.
+/// the five FS-path operations, and no unadmitted lane carries one at any slot.
 ///
 /// CLAIMED: the table has no hole and no wildcard, so an operation cannot be
 /// admitted while some seat of it silently has no contract.
@@ -2755,6 +2755,7 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
     let capability_bearing = [
         ken_host::HostOpV1::FsReadFile,
         ken_host::HostOpV1::FsWriteFile,
+        ken_host::HostOpV1::FsAppendFile,
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
     ];
@@ -2782,6 +2783,36 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         )),
         "ConsoleRead.limit is the bounded host-width Int seat"
     );
+    for (slot, expected) in [
+        (
+            EffectSeatSlot::Capability,
+            (
+                EffectSeatOperation::ObserveCapabilityToken,
+                EffectSeatNeed::CapabilityTokenScalar,
+            ),
+        ),
+        (
+            EffectSeatSlot::Argument(0),
+            (
+                EffectSeatOperation::ProjectBytesSpan,
+                EffectSeatNeed::BytesPointerLength,
+            ),
+        ),
+        (
+            EffectSeatSlot::Argument(1),
+            (
+                EffectSeatOperation::ProjectBytesSpan,
+                EffectSeatNeed::BytesPointerLength,
+            ),
+        ),
+    ] {
+        assert_eq!(
+            host_effect_seat_contract_of(ken_host::HostOpV1::FsAppendFile, slot)
+                .map(|(operation, need, _)| (operation, need)),
+            Some(expected),
+            "FsAppendFile has its exact capability/path/contents seat contract"
+        );
+    }
     for operation in CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
         assert_eq!(
             host_effect_seat_contract_of(operation, EffectSeatSlot::Capability).is_some(),
@@ -2816,7 +2847,6 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
     for operation in [
         ken_host::HostOpV1::ClockMonotonicNow,
         ken_host::HostOpV1::ClockSleepUntil,
-        ken_host::HostOpV1::FsAppendFile,
         ken_host::HostOpV1::FsMetadata,
         ken_host::HostOpV1::FsReadDirectory,
         ken_host::HostOpV1::FsCreateDirectory,
@@ -4365,24 +4395,25 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// **MEASURED:** the exact partition of every `BytesPointerLength` seat in the
 /// contract into those whose `Avail` admits a carried word and those it does
 /// not.
-/// **CLAIMED:** `D5` activated exactly the seats it proved, and no others.
+/// **CLAIMED:** the original `D5` pair plus ABI-A2's real carried append
+/// contents seat are activated, and no others.
 /// **THE GAP this closes:** a forbidden list only reddens on a seat someone
 /// thought to name. This scans the authoritative population and asserts the
-/// whole partition, so a seventh byte-span seat, or a later flip of one nobody
+/// whole partition, so a ninth byte-span seat, or a later flip of one nobody
 /// re-derived evidence for, reddens here even though this test never mentions
 /// it.
 ///
-/// The two literals are the disposition itself, which IS the contract — this is
-/// a normative compatibility vector, not a snapshot. Changing either side takes
-/// a per-seat evidence decision, which is exactly the review this forces.
+/// The two inventories are the disposition itself, which IS the contract —
+/// this is a normative compatibility vector, not a snapshot. Changing either
+/// side takes a per-seat evidence decision, which is exactly the review this forces.
 ///
 /// The `SPECIALIZED_ONLY` side is not a gap in the observer. `D5` measured the
-/// byte-span observation succeeding at all four seats. Their synthesized
-/// `FileError` separately declares `SiteOperand(0)`; the exact carried use is
-/// projected through the emitted helper without widening this direct-consumer
-/// availability partition.
+/// original four and ABI-A2's real artifact measures the appended path seat.
+/// Their synthesized `FileError` separately declares `SiteOperand(0)`; the
+/// exact carried use is projected through the emitted helper without widening
+/// this direct-consumer availability partition.
 #[test]
-fn ac_4_byte_span_seats_are_activated_exactly_where_d5_proved_them() {
+fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     let mut either_phase = Vec::new();
     let mut specialized_only = Vec::new();
     for operation in CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
@@ -4411,23 +4442,25 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_d5_proved_them() {
         vec![
             (ken_host::HostOpV1::ConsoleWrite, EffectSeatSlot::Argument(1)),
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(2)),
+            (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(1)),
         ],
-        "the EITHER_PHASE byte-span inventory is not the set `D5` proved"
+        "the EITHER_PHASE byte-span inventory is not the evidence-backed set"
     );
     assert_eq!(
         specialized_only,
         vec![
             (ken_host::HostOpV1::FsReadFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsChangeMode, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsOpen, EffectSeatSlot::Argument(0)),
         ],
-        "a byte-span seat left SPECIALIZED_ONLY is not the set `D5` dispositioned"
+        "a SPECIALIZED_ONLY byte-span seat lacks its evidence disposition"
     );
     assert_eq!(
         either_phase.len() + specialized_only.len(),
-        6,
-        "the byte-span seat population is six; a change to it needs its own disposition"
+        8,
+        "the byte-span seat population is eight; a change needs its own disposition"
     );
 }
 

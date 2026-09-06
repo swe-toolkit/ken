@@ -8,7 +8,9 @@ use num_bigint::BigInt;
 #[cfg(unix)]
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
-use ken_elaborator::capabilities::{Authority, RightSet, SymlinkPolicy, AUTH_FULL};
+use ken_elaborator::capabilities::{
+    Authority, RightSet, SymlinkPolicy, AUTH_FULL, AUTH_PARTIAL,
+};
 use ken_host::EffectObservation;
 use ken_runtime::{
     BoundProcessExecutableArtifact, NativeEffectRunErrorV1, NativeEffectRunOptionsV1,
@@ -224,6 +226,35 @@ impl fmt::Display for ConsoleReadDifferentialError {
 
 impl std::error::Error for ConsoleReadDifferentialError {}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FsAppendFileDifferentialError {
+    Shape {
+        lane: &'static str,
+        reason: String,
+    },
+    ContentCount {
+        lane: &'static str,
+        reason: String,
+    },
+    Observation(ObservationMismatch),
+}
+
+impl fmt::Display for FsAppendFileDifferentialError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape { lane, reason } => {
+                write!(formatter, "{lane} FsAppendFile shape: {reason}")
+            }
+            Self::ContentCount { lane, reason } => {
+                write!(formatter, "{lane} FsAppendFile content/count: {reason}")
+            }
+            Self::Observation(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for FsAppendFileDifferentialError {}
+
 impl CanonicalDifferentialRun {
     pub fn compare_exact(&self) -> Result<(), ObservationMismatch> {
         compare_canonical_exact(&self.interpreter, &self.native)
@@ -257,6 +288,27 @@ impl CanonicalDifferentialRun {
             &self.native,
             stdin,
             limits,
+        )
+    }
+
+    /// Require exact FsAppendFile request/reply and filesystem content/count
+    /// behavior independently on both lanes before comparing all observations.
+    /// The existing result is Unit, so count is the exact after-minus-before
+    /// byte length; no reply field or wire identity is invented.
+    pub fn compare_fs_append_file(
+        &self,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+        before: &[u8],
+        appended: &[u8],
+    ) -> Result<(), FsAppendFileDifferentialError> {
+        compare_fs_append_file_observations(
+            &self.interpreter,
+            &self.native,
+            request_path,
+            filesystem_path,
+            before,
+            appended,
         )
     }
 
@@ -611,6 +663,103 @@ fn normalize_console_read_observation(
     Ok(observation.clone())
 }
 
+fn compare_fs_append_file_observations(
+    interpreter: &EffectObservation,
+    native: &EffectObservation,
+    request_path: &[u8],
+    filesystem_path: &[u8],
+    before: &[u8],
+    appended: &[u8],
+) -> Result<(), FsAppendFileDifferentialError> {
+    for (lane, observation) in [
+        ("interpreter", interpreter),
+        ("native", native),
+    ] {
+        validate_fs_append_file_observation(
+            lane,
+            observation,
+            request_path,
+            filesystem_path,
+            before,
+            appended,
+        )?;
+    }
+    compare_canonical_exact(interpreter, native)
+        .map_err(FsAppendFileDifferentialError::Observation)
+}
+
+fn validate_fs_append_file_observation(
+    lane: &'static str,
+    observation: &EffectObservation,
+    request_path: &[u8],
+    filesystem_path: &[u8],
+    before: &[u8],
+    appended: &[u8],
+) -> Result<(), FsAppendFileDifferentialError> {
+    let [event] = observation.effect_trace.as_slice() else {
+        return Err(FsAppendFileDifferentialError::Shape {
+            lane,
+            reason: format!(
+                "expected one event, observed {}",
+                observation.effect_trace.len()
+            ),
+        });
+    };
+    if event.sequence != 0
+        || event.operation != ken_host::HostOpV1::FsAppendFile
+        || event.capability.is_none()
+        || !event.resource_bindings.is_empty()
+        || event.request
+            != (ken_host::CanonicalRequestV1::FsAppendFile {
+                path: request_path.to_vec(),
+                bytes: appended.to_vec(),
+            })
+        || event.outcome
+            != ken_host::CanonicalOutcomeV1::Success(
+                ken_host::CanonicalReplyV1::Unit,
+            )
+    {
+        return Err(FsAppendFileDifferentialError::Shape {
+            lane,
+            reason: "event is not the exact capability/request/Unit shape"
+                .to_string(),
+        });
+    }
+    let [ken_host::FsDeltaV1::Modified {
+        relative_path,
+        before: before_node,
+        after: after_node,
+    }] = observation.filesystem_delta.as_slice()
+    else {
+        return Err(FsAppendFileDifferentialError::ContentCount {
+            lane,
+            reason: "expected exactly one modified filesystem node".to_string(),
+        });
+    };
+    let expected_after = [before, appended].concat();
+    let before_bytes = before_node.file_bytes.as_deref();
+    let after_bytes = after_node.file_bytes.as_deref();
+    let count = after_bytes
+        .and_then(|after| after.len().checked_sub(before.len()));
+    if relative_path != filesystem_path
+        || before_node.kind != ken_host::FsNodeKindV1::File
+        || after_node.kind != ken_host::FsNodeKindV1::File
+        || before_bytes != Some(before)
+        || after_bytes != Some(expected_after.as_slice())
+        || count != Some(appended.len())
+    {
+        return Err(FsAppendFileDifferentialError::ContentCount {
+            lane,
+            reason: format!(
+                "expected before={before:?}, appended={appended:?}, \
+                 after={expected_after:?}; observed delta={:?}",
+                observation.filesystem_delta
+            ),
+        });
+    }
+    Ok(())
+}
+
 fn validate_native_ambient(ambient: &AmbientScript) -> Result<(), HarnessError> {
     if ambient.stdin_is_terminal || ambient.stdout_is_terminal || ambient.stderr_is_terminal {
         return Err(HarnessError::UnsupportedAmbient(
@@ -813,6 +962,37 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
     })
 "#;
 
+    const FS_APPEND_SOURCE: &str = r#"program capabilities FS AFull "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit AFull (Failure 80) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit AFull (Failure 81) ;
+        Cons path more |-> match more {
+          Nil |-> host_exit AFull (Failure 82) ;
+          Cons contents _ |-> match caps {
+            MkProgramCaps cap |->
+              bind (Coproduct (FSOp AFull) AmbientOp)
+                (resp_coproduct (FSOp AFull) AmbientOp
+                  (fs_resp AFull) ambient_resp)
+                (Result FileError Unit) ExitCode
+                (inject_l (FSOp AFull) AmbientOp
+                  (fs_resp AFull) ambient_resp
+                  (Result FileError Unit)
+                  (append_file AFull cap path contents))
+                (\appended. match appended {
+                  Ok _ |-> host_exit AFull Success ;
+                  Err _ |-> host_exit AFull (Failure 84)
+                })
+          }
+        }
+      }
+    }
+  }
+"#;
+
     const DENIAL_SOURCE: &str = r#"program capabilities FS AFull
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
@@ -984,6 +1164,129 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             initial_filesystem: Vec::new(),
             expected_fs: Vec::new(),
         }
+    }
+
+    fn fs_append_scenario(
+        identity: &str,
+        source: String,
+        authority: Authority,
+        rights: RightSet,
+        path: Vec<u8>,
+        bytes: Vec<u8>,
+        initial_filesystem: Vec<SeedNode>,
+    ) -> Scenario {
+        Scenario {
+            process_input: RawProcessInput {
+                arguments: vec![path.clone(), bytes.clone()],
+                environment: Vec::new(),
+            },
+            ambient: AmbientScript::default(),
+            program_caps: ProgramCapsShape {
+                fs_authority: authority,
+                relative_root: b"data".to_vec(),
+                rights,
+                symlink: SymlinkPolicy::NoFollow,
+            },
+            entry: CheckedProgramEntry {
+                identity: identity.to_string(),
+                package_name: identity.to_string(),
+                source,
+            },
+            initial_filesystem,
+            expected_fs: vec![ExpectedFsEffect::AppendFile { path, bytes }],
+        }
+    }
+
+    fn fs_append_success_scenario() -> Scenario {
+        fs_append_scenario(
+            "abi-a2-fs-append-success",
+            FS_APPEND_SOURCE.to_string(),
+            AUTH_FULL,
+            RightSet::ALL,
+            b"file.bin".to_vec(),
+            vec![0xff, b'x', 0xfe],
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/file.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"before".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_append_escape_scenario() -> Scenario {
+        fs_append_scenario(
+            "abi-a2-fs-append-scope-escape",
+            FS_APPEND_SOURCE.to_string(),
+            AUTH_FULL,
+            RightSet::ALL,
+            b"../outside.bin".to_vec(),
+            b"forbidden".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"outside-before".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_append_symlink_scenario() -> Scenario {
+        fs_append_scenario(
+            "abi-a2-fs-append-symlink-denied",
+            FS_APPEND_SOURCE.to_string(),
+            AUTH_FULL,
+            RightSet::ALL,
+            b"link".to_vec(),
+            b"forbidden".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"outside-before".to_vec()),
+                },
+                SeedNode {
+                    relative_path: b"data/link".to_vec(),
+                    kind: crate::SeedNodeKind::Symlink(b"../outside.bin".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_append_missing_right_scenario() -> Scenario {
+        let source = FS_APPEND_SOURCE.replace("AFull", "APartial");
+        let rights = RightSet::READ
+            .union(RightSet::ENUMERATE)
+            .union(RightSet::METADATA);
+        fs_append_scenario(
+            "abi-a2-fs-append-missing-right",
+            source,
+            AUTH_PARTIAL,
+            rights,
+            b"file.bin".to_vec(),
+            b"forbidden".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/file.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"before".to_vec()),
+                },
+            ],
+        )
     }
 
     fn denial_scenario() -> Scenario {
@@ -1354,6 +1657,136 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 ..
             })
         ));
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: both real lanes append the same non-text bytes to the same
+    /// pre-existing file; the comparator requires the exact request and Unit
+    /// reply, exact before/after content, and appended count equal to request
+    /// length before comparing every canonical observation field.
+    /// CLAIMED: the promoted native append agrees exactly with the interpreter
+    /// on its deterministic content/count contract.
+    /// THE GAP: an exact correct-vs-correct run alone cannot show the comparator
+    /// reads the delta, so the wrong-native after-content mutation must redden.
+    #[test]
+    fn fs_append_file_real_artifact_content_count_differential_discriminates() {
+        let run = run_scenario(&fs_append_success_scenario())
+            .expect("FsAppendFile real-artifact differential executes");
+        run.compare_fs_append_file(
+            b"file.bin",
+            b"data/file.bin",
+            b"before",
+            &[0xff, b'x', 0xfe],
+        )
+        .expect("exact append content/count parity");
+        assert_eq!(run.interpreter_actions.fs_actions_after_resolve, Some(1));
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsAppendFile,
+                NativeTestedEvidence::from_fs_append_file_run(
+                    &run,
+                    b"file.bin",
+                    b"data/file.bin",
+                    b"before",
+                    &[0xff, b'x', 0xfe],
+                ),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested)
+        );
+
+        let mut wrong_native = run.native.clone();
+        let [ken_host::FsDeltaV1::Modified { after, .. }] =
+            wrong_native.filesystem_delta.as_mut_slice()
+        else {
+            panic!("append fixture must modify exactly one file")
+        };
+        after
+            .file_bytes
+            .as_mut()
+            .expect("modified file has bytes")
+            .pop();
+        assert!(matches!(
+            compare_fs_append_file_observations(
+                &run.interpreter,
+                &wrong_native,
+                b"file.bin",
+                b"data/file.bin",
+                b"before",
+                &[0xff, b'x', 0xfe],
+            ),
+            Err(FsAppendFileDifferentialError::ContentCount {
+                lane: "native",
+                ..
+            })
+        ));
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: the same append surface succeeds in-root above, while escape,
+    /// symlink-under-no-follow, and missing-write-right inputs return their
+    /// exact policy identities on both real lanes without filesystem mutation.
+    /// CLAIMED: native FsAppendFile exercises the landed scoped-root, rights,
+    /// and no-follow policy rather than bypassing it.
+    /// THE GAP: symmetric refusals could survive a shared policy bypass; the
+    /// exact identities and before/after roots make such a bypass observable,
+    /// and the production-call mutation demonstrates that they redden.
+    #[test]
+    fn fs_append_file_real_artifact_exercises_all_path_policy_refusals() {
+        let partial_rights = RightSet::READ
+            .union(RightSet::ENUMERATE)
+            .union(RightSet::METADATA);
+        for (scenario, expected) in [
+            (
+                fs_append_escape_scenario(),
+                CapabilityDeniedV1::ScopeEscape,
+            ),
+            (
+                fs_append_symlink_scenario(),
+                CapabilityDeniedV1::SymlinkDenied,
+            ),
+            (
+                fs_append_missing_right_scenario(),
+                CapabilityDeniedV1::RightNotHeld {
+                    operation: ken_host::FsCapabilityOperationV1::Append,
+                    held_rights: partial_rights.bits(),
+                },
+            ),
+        ] {
+            let run = run_scenario(&scenario).unwrap_or_else(|error| {
+                panic!("{}: {error}", scenario.entry.identity)
+            });
+            assert_eq!(run.interpreter.exit_status, 84);
+            assert_eq!(run.native.exit_status, 84);
+            assert!(run.interpreter.filesystem_delta.is_empty());
+            assert!(run.native.filesystem_delta.is_empty());
+            assert_eq!(run.interpreter_actions.fs_actions_after_resolve, Some(0));
+            assert_eq!(
+                run.interpreter_actions.root_before,
+                run.interpreter_actions.root_after
+            );
+            assert_eq!(
+                run.native_actions.root_before,
+                run.native_actions.root_after
+            );
+            for observation in [&run.interpreter, &run.native] {
+                let [event] = observation.effect_trace.as_slice() else {
+                    panic!(
+                        "{} must emit exactly one refusal",
+                        scenario.entry.identity
+                    )
+                };
+                assert_eq!(event.operation, HostOpV1::FsAppendFile);
+                assert!(matches!(
+                    &event.outcome,
+                    CanonicalOutcomeV1::Error(SemanticErrorV1::File(error))
+                        if error.operation == HostOpV1::FsAppendFile
+                            && error.cause
+                                == FileErrorCauseV1::Capability(expected.clone())
+                ));
+            }
+        }
     }
 
     /// Promise class: durable-invariant companion control. ABI-A1 D4 is
