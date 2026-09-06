@@ -249,7 +249,7 @@ fn argparse_error
   Invalid
     (NonEmpty Diagnostic)
     a
-    (NonEmptyCons Diagnostic (argparse_diagnostic index start end code) (Nil Diagnostic))
+    (nonempty_cons Diagnostic (argparse_diagnostic index start end code) (Nil Diagnostic))
 
 fn argparse_valid_argument
       (value : ParsedArgument)

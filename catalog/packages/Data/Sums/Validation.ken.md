@@ -74,7 +74,7 @@ first message.
 
 ```ken example
 const name_failure : NonEmpty String =
-  NonEmptyCons
+  nonempty_cons
     String
     (match bytes_decode (bytes_encode "name is missing") {
       Err _ ↦ "name is missing";
@@ -83,7 +83,7 @@ const name_failure : NonEmpty String =
     (Nil String)
 
 const age_failure : NonEmpty String =
-  NonEmptyCons
+  nonempty_cons
     String
     (match bytes_decode (bytes_encode "age is invalid") {
       Err _ ↦ "age is invalid";
