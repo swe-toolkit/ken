@@ -2200,7 +2200,7 @@ impl Parser {
                 Token::MapsTo if paren_depth == 0 && brace_depth == 0 => return true,
                 Token::RBrace if offset == 1 => return true,
                 Token::Eof => return false,
-                Token::Eq | Token::Comma | Token::Pipe | Token::RBrace
+                Token::Eq | Token::Comma | Token::RBrace
                     if paren_depth == 0 && brace_depth == 0 =>
                 {
                     return false;
@@ -2371,9 +2371,49 @@ impl Parser {
         })
     }
 
-    /// Parse a pattern with the `32 §4` pattern precedence: constructor
-    /// application binds tighter than the non-associative `as` wrapper.
+    /// Parse a pattern with the `32 §4` precedence: constructor application
+    /// binds tighter than non-associative `as`, which binds tighter than `|`.
+    /// A disjunction is retained as one flat alternative list; parentheses do
+    /// not introduce a semantic grouping inside that list.
     fn parse_pattern(&mut self) -> Result<Pattern, ElabError> {
+        let start = self.peek_span().start;
+        let first = self.parse_as_pattern()?;
+        if !matches!(self.peek(), Token::Pipe) {
+            return Ok(first);
+        }
+
+        let mut alternatives = Vec::new();
+        let mut append = |pattern: Pattern| match pattern.kind {
+            PatKind::Or(nested) => alternatives.extend(nested),
+            kind => alternatives.push(Pattern {
+                kind,
+                span: pattern.span,
+            }),
+        };
+        append(first);
+        while matches!(self.peek(), Token::Pipe) {
+            let pipe_span = self.peek_span().clone();
+            self.advance();
+            if !self.can_start_pattern() {
+                return Err(ElabError::ParseError {
+                    msg: "or-patterns require a pattern after '|'".to_string(),
+                    span: pipe_span,
+                });
+            }
+            append(self.parse_as_pattern()?);
+        }
+        let end = alternatives
+            .last()
+            .expect("a parsed or-pattern has at least two alternatives")
+            .span
+            .end;
+        Ok(Pattern {
+            kind: PatKind::Or(alternatives),
+            span: Span::new(start, end),
+        })
+    }
+
+    fn parse_as_pattern(&mut self) -> Result<Pattern, ElabError> {
         let start = self.peek_span().start;
         let inner = self.parse_pattern_application()?;
         if !self.is_contextual_ident("as") {
@@ -2434,11 +2474,15 @@ impl Parser {
         }
     }
 
-    fn can_start_atom_pat(&self) -> bool {
+    fn can_start_pattern(&self) -> bool {
         matches!(
             self.peek(),
             Token::Ident(_) | Token::ConId(_) | Token::LParen | Token::LBrace
-        ) && !self.is_contextual_ident("as")
+        )
+    }
+
+    fn can_start_atom_pat(&self) -> bool {
+        self.can_start_pattern() && !self.is_contextual_ident("as")
     }
 
     fn parse_atom_pattern(&mut self) -> Result<Pattern, ElabError> {
@@ -3039,5 +3083,36 @@ mod as_pattern_precedence_tests {
 
         let grouped = only_pattern("match value { (single) |-> single }");
         assert!(matches!(grouped.kind, PatKind::Var(ref name) if name == "single"));
+    }
+
+    #[test]
+    fn as_binds_tighter_than_flat_or() {
+        // Promise class: normative compatibility vector (`32 §4`). MEASURED:
+        // the first alternative is As(Ctor), while parenthesized nested `|`
+        // contributes directly to the same three-element alternative vector.
+        let pattern =
+            only_pattern("match value { A item as whole | (B whole | C whole) |-> whole }");
+        let PatKind::Or(alternatives) = pattern.kind else {
+            panic!("expected one flat or-pattern");
+        };
+        assert_eq!(alternatives.len(), 3);
+        assert!(matches!(alternatives[0].kind, PatKind::As(_, ref name) if name == "whole"));
+        assert!(matches!(alternatives[1].kind, PatKind::Ctor(ref name, _) if name == "B"));
+        assert!(matches!(alternatives[2].kind, PatKind::Ctor(ref name, _) if name == "C"));
+    }
+
+    #[test]
+    fn constructor_argument_or_requires_parentheses() {
+        let grouped = only_pattern("match value { Wrap (A x | B x) |-> x }");
+        let PatKind::Ctor(name, fields) = grouped.kind else {
+            panic!("expected a constructor pattern");
+        };
+        assert_eq!(name, "Wrap");
+        assert!(
+            matches!(fields.as_slice(), [crate::ast::Pattern { kind: PatKind::Or(alternatives), .. }] if alternatives.len() == 2)
+        );
+
+        let ungrouped = only_pattern("match value { Wrap A x | B x |-> x }");
+        assert!(matches!(ungrouped.kind, PatKind::Or(ref alternatives) if alternatives.len() == 2));
     }
 }

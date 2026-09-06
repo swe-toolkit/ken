@@ -186,6 +186,8 @@ pub enum PatKind {
     Record(Vec<FieldPat>),
     /// `p as x` — match through `p` and bind `x` to that position's value.
     As(Box<Pattern>, String),
+    /// `p₁ | … | pₙ` — a flat same-occurrence alternation, with `n >= 2`.
+    Or(Vec<Pattern>),
 }
 
 /// A top-level V0/V1/L2 declaration (`32 §8`, `21 §6.2`, `34`).
