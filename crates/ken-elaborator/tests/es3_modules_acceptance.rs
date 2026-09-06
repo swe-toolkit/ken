@@ -148,39 +148,61 @@ fn module_elaborates_to_identical_flat_sigma() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// B. Abstract export IS the opaque constant (AC2)
+// B. Abstract export is owner-transparent and client-opaque (AC2)
 // ─────────────────────────────────────────────────────────────────────────
 
-/// `abstract-export-is-the-opaque-constant`: a `pub data T = MkT` (ctors
-/// never separately `pub`-able, so always withheld) must be kernel-
-/// representation byte-identical to a hand-written opaque constant — no
-/// new `Decl` variant, no kernel "abstract" flag.
+/// Durable invariant: abstract export is two-faced. The defining module
+/// elaborates the ordinary checked inductive and may use its constructor,
+/// while the client surface exports only the type name. The client's nullary
+/// type former has the same kind as a hand-written opaque declaration and the
+/// module layer adds no trust.
+///
+/// MEASURED: the owner constructs and matches `MkT`, the client calls the
+/// public operations but gets an exact surface rejection for `M.MkT`, the type
+/// kind matches an independent opaque declaration, and trust stays unchanged.
+/// CLAIMED: nullary abstract export preserves the owner/client split.
+/// THE GAP: the client operation call must share the exported type identity;
+/// mere owner success plus constructor rejection would not establish that.
 #[test]
-fn abstract_export_is_the_opaque_constant() {
+fn nullary_abstract_export_is_transparent_to_owner_and_opaque_to_client() {
     let mut env = mk_env();
-    env.elaborate_file("module M { pub data T = MkT }").expect("module M elaborates");
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file(
+        "module M { \
+           pub data T = MkT \
+           pub const make : T = MkT \
+           pub fn inspect (value : T) : Int = match value { MkT |-> 0 } \
+         }",
+    )
+    .expect("the defining module retains transparent constructor access");
     let t_id = env.globals["M.T"];
 
-    let hand_id = env
-        .declare_postulate_raw("HandT", Term::ty(Level::Zero))
-        .expect("hand-written opaque constant declares");
+    let (_, t_kind) = env.env.const_type(t_id).expect("exported type has a kind");
+    assert_eq!(
+        t_kind,
+        Term::ty(Level::Zero),
+        "the nullary abstract type keeps the hand-written opaque kind"
+    );
+    assert!(
+        matches!(env.env.lookup(t_id), Some(KernelDecl::Inductive(_))),
+        "the defining module must elaborate the real inductive"
+    );
+    assert!(
+        env.globals.contains_key("M.MkT"),
+        "the defining module's constructor must exist in the flat checked environment"
+    );
 
-    match (env.env.lookup(t_id), env.env.lookup(hand_id)) {
-        (Some(KernelDecl::Opaque { level_params: lp1, ty: ty1, .. }),
-         Some(KernelDecl::Opaque { level_params: lp2, ty: ty2, .. })) => {
-            assert_eq!(lp1, lp2, "same (empty) level params");
-            assert_eq!(ty1, ty2, "same Type-0 signature");
-        }
-        other => panic!(
-            "AC2: abstractly-exported `T` must be Decl::Opaque, byte-identical \
-             to a hand-written opaque constant; got {:?}",
-            other
-        ),
+    env.elaborate_decl("const observed : Int = M.inspect M.make")
+        .expect("a client may consume the opaque surface through public operations");
+    match env.elaborate_decl("const forbidden : M.T = M.MkT") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "M.MkT"),
+        other => panic!("the qualified hidden constructor must reject at the surface: {other:?}"),
     }
-    // No constructor is ever registered anywhere — not constructible, not
-    // matchable, by any observer (kernel included).
-    assert!(!env.globals.contains_key("M.MkT"));
-    assert!(!env.globals.contains_key("MkT"));
+    assert_eq!(
+        env.env.trusted_base(),
+        trusted_before,
+        "module abstract export must add no trusted declaration"
+    );
 }
 
 /// Regression (language-qa, `evt_6pp9m18vp5bj6`): abstract export is a
@@ -219,18 +241,204 @@ fn client_match_hidden_ctor_rejected_at_surface() {
     let mut env = mk_env();
     env.elaborate_file("module M { pub data T = MkT }").expect("module M elaborates");
 
-    let result = env.elaborate_decl(
-        "fn bad (t : M.T) : Int = match t { MkT |-> 0 }",
-    );
-    assert!(result.is_err(), "AC2: matching a hidden constructor must be rejected");
-    // Surface, not kernel: never a KernelRejected/TypeMismatch — the ctor
-    // simply never entered scope.
-    match result.unwrap_err() {
-        ElabError::KernelRejected { .. } => {
-            panic!("AC2: rejection must be a SURFACE diagnostic, not a kernel rejection")
-        }
-        _ => {}
+    match env.elaborate_decl("fn bad (t : M.T) : Int = match t { MkT |-> 0 }") {
+        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "MkT"),
+        other => panic!("AC2: hidden constructor match must be a surface rejection: {other:?}"),
     }
+}
+
+/// Durable invariant: a parameterized abstract export retains the full kind,
+/// and its public operations and attached proof elaborate against the same
+/// owner-visible inductive identity. Clients can use those operations with the
+/// exported type but cannot name the raw constructor in construction or match.
+///
+/// MEASURED: the complete NonEmpty append and associativity proof check in the
+/// owner, its exported kind is the literal one-parameter Pi kind, public smart
+/// construction and elimination check at a client, both constructor uses get
+/// exact surface errors, and module trust stays unchanged.
+/// CLAIMED: parameterized abstract export preserves arity and both faces.
+/// THE GAP: the proof and client operations must use the same family identity;
+/// independent owner/client lookalikes would not establish the claim.
+#[test]
+fn parameterized_abstract_export_preserves_kind_and_owner_proof() {
+    let mut env = mk_env();
+    env.elaborate_decl(
+        "axiom cong : \
+           (a : Type) -> (b : Type) -> (x : a) -> (y : a) -> \
+           (f : a -> b) -> Equal a x y -> Equal b (f x) (f y)",
+    )
+    .expect("fixture supplies Transport.cong's public type");
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_file(
+        r#"
+        fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
+          match xs {
+            Nil |-> ys;
+            Cons h rest |-> Cons a h (list_append a rest ys)
+          }
+
+        proof assoc for list_append
+              (a : Type) (xs : List a) (ys : List a) (zs : List a)
+            : Equal
+                (List a)
+                (list_append a (list_append a xs ys) zs)
+                (list_append a xs (list_append a ys zs)) =
+          match xs {
+            Nil |-> Refl;
+            Cons h rest |->
+              cong
+                (List a)
+                (List a)
+                (list_append a (list_append a rest ys) zs)
+                (list_append a rest (list_append a ys zs))
+                (Cons a h)
+                ((proof assoc for list_append) a rest ys zs)
+          }
+
+        module M {
+          pub data NonEmpty a = NonEmptyCons a (List a)
+
+          pub fn nonempty_singleton (a : Type) (x : a) : NonEmpty a =
+            NonEmptyCons a x (Nil a)
+
+          pub fn nonempty_head (a : Type) (xs : NonEmpty a) : a =
+            match xs { NonEmptyCons x rest |-> x }
+
+          pub fn nonempty_tail (a : Type) (xs : NonEmpty a) : List a =
+            match xs { NonEmptyCons x rest |-> rest }
+
+          pub fn nonempty_append
+              (a : Type) (xs : NonEmpty a) (ys : NonEmpty a) : NonEmpty a =
+            match xs {
+              NonEmptyCons x rest |->
+                match ys {
+                  NonEmptyCons y more |->
+                    NonEmptyCons a x (list_append a rest (Cons a y more))
+                }
+            }
+
+          pub proof assoc for nonempty_append
+                (a : Type) (xs : NonEmpty a) (ys : NonEmpty a) (zs : NonEmpty a)
+              : Equal
+                  (NonEmpty a)
+                  (nonempty_append a (nonempty_append a xs ys) zs)
+                  (nonempty_append a xs (nonempty_append a ys zs)) =
+            match xs {
+              NonEmptyCons x rest |->
+                match ys {
+                  NonEmptyCons y more |->
+                    match zs {
+                      NonEmptyCons z last |->
+                        cong
+                          (List a)
+                          (NonEmpty a)
+                          (list_append a (list_append a rest (Cons a y more)) (Cons a z last))
+                          (list_append a rest (Cons a y (list_append a more (Cons a z last))))
+                          (NonEmptyCons a x)
+                          (list_append::assoc a rest (Cons a y more) (Cons a z last))
+                    }
+                }
+            }
+        }
+        "#,
+    )
+    .expect("the exact NonEmpty owner definition and associativity proof elaborate");
+
+    let nonempty_id = env.globals["M.NonEmpty"];
+    let (_, exported_kind) = env
+        .env
+        .const_type(nonempty_id)
+        .expect("parameterized abstract type has a kind");
+    let expected_kind = Term::pi(Term::ty(Level::Zero), Term::ty(Level::Zero));
+    assert_eq!(
+        exported_kind, expected_kind,
+        "the abstract export must retain the hand-written opaque Pi kind"
+    );
+
+    env.elaborate_decl("const one : M.NonEmpty Nat = M.nonempty_singleton Nat Zero")
+        .expect("a client may construct through the public smart constructor");
+    env.elaborate_decl("const first : Nat = M.nonempty_head Nat one")
+        .expect("a client may consume the same exposed type through a public operation");
+
+    match env.elaborate_decl("const forbidden : M.NonEmpty Nat = M.NonEmptyCons Nat Zero (Nil Nat)")
+    {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "M.NonEmptyCons"),
+        other => panic!("client construction with the hidden constructor must reject: {other:?}"),
+    }
+    match env.elaborate_decl(
+        "fn forbidden_match (xs : M.NonEmpty Nat) : Nat = \
+           match xs { NonEmptyCons x rest |-> x }",
+    ) {
+        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "NonEmptyCons"),
+        other => panic!("client match with the hidden constructor must reject: {other:?}"),
+    }
+    assert_eq!(
+        env.env.trusted_base(),
+        trusted_before,
+        "the real inductive and module visibility add no trust"
+    );
+}
+
+/// Durable invariant: the strict roots loader gives a provider its transparent
+/// owner face while importing only its abstract public face into a distinct
+/// client unit. This is the cross-unit path that catalog packages use.
+///
+/// MEASURED: strict roots loading checks an owner constructor and a client
+/// smart-constructor/eliminator pair, retains the Pi kind, rejects the hidden
+/// qualified constructor, and leaves trust unchanged.
+/// CLAIMED: the two-face invariant survives the real cross-unit loader.
+/// THE GAP: the provider and client must be distinct loader units; the same-file
+/// control above cannot establish the import/export boundary by itself.
+#[test]
+fn strict_roots_parameterized_abstract_export_keeps_two_faces() {
+    let fixture = std::env::temp_dir().join(format!(
+        "ken-abstract-export-param-{}/catalog/packages",
+        std::process::id()
+    ));
+    let fixture_parent = fixture.parent().expect("fixture has parent");
+    let _ = fs::remove_dir_all(fixture_parent);
+    fs::create_dir_all(&fixture).expect("create catalog fixture");
+    fs::write(
+        fixture.join("M.ken"),
+        "pub data Boxed a = MkBoxed a\n\
+         pub fn make (a : Type) (value : a) : Boxed a = MkBoxed a value\n\
+         pub fn get (a : Type) (boxed : Boxed a) : a = \
+           match boxed { MkBoxed value |-> value }\n",
+    )
+    .expect("write abstract provider");
+    fs::write(
+        fixture.join("Entry.ken"),
+        "import M (Boxed, make, get)\n\
+         const one : Boxed Nat = make Nat Zero\n\
+         const observed : Nat = get Nat one\n",
+    )
+    .expect("write abstract client");
+
+    let mut env = mk_env();
+    let trusted_before = env.env.trusted_base();
+    env.elaborate_module_from_roots_strict(&[fixture.clone()], "Entry")
+        .expect("strict roots provider and client elaborate through the two faces");
+    let boxed_id = env.globals["M.Boxed"];
+    let (_, boxed_kind) = env.env.const_type(boxed_id).expect("Boxed has a kind");
+    assert_eq!(
+        boxed_kind,
+        Term::pi(Term::ty(Level::Zero), Term::ty(Level::Zero)),
+        "the strict client sees the complete parameterized type former"
+    );
+    assert!(
+        env.globals.contains_key("M.MkBoxed"),
+        "the provider's checked constructor remains in its owner environment"
+    );
+    assert_eq!(
+        env.env.trusted_base(),
+        trusted_before,
+        "strict cross-unit abstract export must add no trust"
+    );
+    match env.elaborate_decl("const forbidden : M.Boxed Nat = M.MkBoxed Nat Zero") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "M.MkBoxed"),
+        other => panic!("strict client must not name the provider constructor: {other:?}"),
+    }
+    fs::remove_dir_all(fixture_parent).expect("remove catalog fixture");
 }
 
 // ─────────────────────────────────────────────────────────────────────────

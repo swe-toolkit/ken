@@ -2487,67 +2487,6 @@ fn expand_scope(
             other => {
                 let is_pub = other.is_pub();
                 let inner = other.unwrap_pub();
-                if is_pub && !prefix.is_empty() {
-                    if let Decl::DataDecl { name, span, .. } = inner {
-                        // Abstract export (`33 §4.2`) applies only INSIDE a
-                        // real `module { … }` (`prefix` non-empty) — there
-                        // is no "outside" to hide from at the true file
-                        // root (`prefix == ""`), exactly as a root-level
-                        // `pub` on `View`/`Let`/`TypeAlias` is already
-                        // inert there (its `exports_here` entry is
-                        // produced but discarded by `expand_and_elaborate`
-                        // as `_root_exports`). A `pub data T = MkT` at the
-                        // top level must fall through to ordinary `data`
-                        // elaboration below — `MkT` stays a real,
-                        // constructible/matchable constructor, not a
-                        // silently-stripped opaque constant with no
-                        // client to protect.
-                        //
-                        // A `pub data T = …` exports the type name only —
-                        // constructors are never `pub`-able in this
-                        // surface, so the whole ctor set is always
-                        // withheld. Rather than a real `Decl::Inductive`
-                        // with hidden-but-present ctors, declare `T` as
-                        // the kernel's EXISTING opaque constant (`11 §4`)
-                        // directly: byte-identical to a hand-written
-                        // `T : Type` postulate, no new `Decl` variant, no
-                        // kernel "abstract" flag. The constructors are
-                        // simply never registered anywhere (not in
-                        // `globals`, not in any export table) —
-                        // unconstructible and unmatchable, by every
-                        // observer, kernel included.
-                        let qualified = qualify(prefix, name);
-                        resolve::check_no_definition_collision(
-                            &qualified,
-                            &qualified,
-                            span,
-                            Some(unit_definitions),
-                        )?;
-                        let ty = ken_kernel::Term::ty(ken_kernel::Level::Zero);
-                        let id = ken_kernel::declare_postulate(
-                            &mut elab.env,
-                            qualified.clone(),
-                            vec![],
-                            ty,
-                        )
-                        .map_err(|e| ElabError::KernelRejected {
-                            error: e,
-                            span: span.clone(),
-                        })?;
-                        elab.globals.insert(qualified.clone(), id);
-                        publish_identity(&mut exports_here, name, &qualified, span)?;
-                        ids.push(crate::elab::ElabResult {
-                            name: qualified,
-                            def_id: id,
-                            obligations: vec![],
-                            foreign_binding: None,
-                            temporal_obligations: vec![],
-                            effect_row_type: None,
-                        });
-                        i += 1;
-                        continue;
-                    }
-                }
                 if is_qualifiable(inner) {
                     let bare = inner.name().to_string();
                     if is_pub {
