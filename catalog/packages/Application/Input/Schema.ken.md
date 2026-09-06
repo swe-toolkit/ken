@@ -120,14 +120,14 @@ fn schema_validation_cons
           Invalid
             (NonEmpty (SchemaIssue origin))
             (List value)
-            (NonEmptyCons (SchemaIssue origin) issue (Nil (SchemaIssue origin)));
+            (nonempty_cons (SchemaIssue origin) issue (Nil (SchemaIssue origin)));
         Invalid issues ↦
           Invalid
             (NonEmpty (SchemaIssue origin))
             (List value)
             (nonempty_append
               (SchemaIssue origin)
-              (NonEmptyCons (SchemaIssue origin) issue (Nil (SchemaIssue origin)))
+              (nonempty_cons (SchemaIssue origin) issue (Nil (SchemaIssue origin)))
               issues)
       }
   }
