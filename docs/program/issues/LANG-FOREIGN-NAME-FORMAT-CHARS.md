@@ -11,6 +11,26 @@ github: null
 origin: Architect finding at evt_3aeg25e7b35mc while approving LANG-FOREIGN-NAME-CONTROL-CHARS (dec_79sd3nnqvkrvx), explicitly non-blocking and explicitly needing an owner. Filed by the Steward 2026-08-13 rather than left in prose, because the finding this whole arc came from was about an obligation landing in nobody's node.
 ---
 
+> # SPEC LANDED 2026-09-06 (`2d72bd7e7`, PR #3367, Decision `dec_1s7jc2h3apqz8`;
+> # CV APPROVE evt_fqwjwsnt1vqv + Architect APPROVE evt_7nsaxdg1y5n18). The policy
+> # is now `spec/30-surface/31-lexical.md §1f`: whole-source, escape-only
+> # Trojan-Source rule for Unicode `Cf` — raw in-scope `Cf` is a hard lexical error
+> # everywhere (comments, tokens, string/char/byte-literal bodies), one
+> # decoded-codepoint guard before context dispatch, upstream of escape-decoding;
+> # `Cf` is a closed general-category predicate (not an enumerated roster);
+> # U+FEFF-at-offset-0 (BOM) is the sole exception; data stays expressible via an
+> # escape-value-identity round-trip. Forward-compatible with SPEC-IDENT-BLESSED
+> # (same guard), orthogonal to TR39. No crates/conformance change.
+> #
+> # WHAT REMAINS = the buildable lexer-lint node (the §1f guard in the lexer). It
+> # is a LANGUAGE-RING node, HELD behind the current match-pattern queue work — it
+> # does NOT jump the lane-2 serial queue. §1f is now its design authority (the
+> # front-loaded judgment is done); the Steward frames it shovel-ready and releases
+> # it when the language lane drains. `status: draft` reflects HELD-not-released,
+> # not awaiting-design. CV flagged a non-blocking conformance-witness follow-on
+> # (to be authored separately by CV). The recut analysis below grounded the §1f
+> # shape and is retained.
+> #
 > # RECUT 2026-09-06 — WHOLE-SOURCE LEXICAL POLICY (operator concurred).
 > #
 > # Operator ruling 2026-09-06, verbatim: "concur. reframe as whole-source lexical
