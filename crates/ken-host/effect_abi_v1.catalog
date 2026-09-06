@@ -49,7 +49,7 @@ error|io.NotEmpty|9
 error|io.Unsupported|10
 error|io.Revoked|11
 error|io.Other|12
-operation|ConsoleRead|0101|unavailable|ConsoleReadRequestV1|2|HostReplyV1|1
+operation|ConsoleRead|0101|native|ConsoleReadRequestV1|2|HostReplyV1|1
 operation|ConsoleWrite|0102|native|ConsoleWriteRequestV1|2|HostReplyV1|1
 operation|ConsoleFlush|0103|native|ConsoleStreamRequestV1|1|HostReplyV1|1
 operation|ConsoleIsTerminal|0104|native|ConsoleStreamRequestV1|1|HostReplyV1|0

@@ -153,8 +153,10 @@ canonical_runtime_roles! {
     read_some => "ReadSome",
     read_eof => "ReadEof",
     wrote => "Wrote",
-    // Clock response, Unit, and Bool.
+    // Clock and ConsoleRead responses, Unit, and Bool.
     mk_instant => "MkInstant",
+    read_chunk => "Chunk",
+    read_result_eof => "Eof",
     unit => "MkUnit",
     bool_false => "False",
     bool_true => "True",

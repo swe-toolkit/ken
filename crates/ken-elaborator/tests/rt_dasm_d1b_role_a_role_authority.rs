@@ -87,8 +87,9 @@ const PACKAGE: &str = "d1b_role_a_shadow_pkg";
 
 /// A package that declares colliding names across every class of role the two
 /// producers resolve: the six former entry-plan roles, the ITree/coproduct
-/// spine, `Unit`, `Instant`, IO errors, non-floor resource errors, progress
-/// constructors, file-error and file-operation discriminants, and the public
+/// spine, `Unit`, `Instant`, `ReadResult`, IO errors, non-floor resource
+/// errors, progress constructors, file-error and file-operation discriminants,
+/// and the public
 /// host operations.
 ///
 /// Every one of these spellings was, before this repair, a live
@@ -103,6 +104,7 @@ data ShadowPlan = MkProd | MkProcessInput | Success | Failure
 data ShadowSpine = Ret | Vis | InL | InR
 data ShadowUnit = MkUnit
 data ShadowInstant = MkInstant
+data ShadowReadResult = Chunk | Eof
 data ShadowIoErrors = NotFound | PermissionDenied | CapabilityDenied | BrokenPipe | Interrupted | AlreadyExists | InvalidInput | IsDirectory | NotDirectory | NotEmpty | Unsupported | Revoked | Other
 data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress | ResourceRevoked
 data ShadowProgress = ReadSome | ReadEof | Wrote
@@ -129,6 +131,8 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowSpine", "InR"),
     ("ShadowUnit", "MkUnit"),
     ("ShadowInstant", "MkInstant"),
+    ("ShadowReadResult", "Chunk"),
+    ("ShadowReadResult", "Eof"),
     ("ShadowIoErrors", "NotFound"),
     ("ShadowIoErrors", "PermissionDenied"),
     ("ShadowIoErrors", "CapabilityDenied"),
@@ -322,6 +326,7 @@ fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
         "ctor:d1b_role_a_shadow_pkg::Bool::",
         "ctor:d1b_role_a_shadow_pkg::Unit::",
         "ctor:d1b_role_a_shadow_pkg::Instant::",
+        "ctor:d1b_role_a_shadow_pkg::ReadResult::",
     ] {
         assert!(
             text.contains(parent),

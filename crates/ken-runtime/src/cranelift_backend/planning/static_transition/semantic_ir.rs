@@ -118,11 +118,13 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ReadEof,
     Wrote,
     MkInstant,
+    ReadChunk,
+    ReadResultEof,
     Unit,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 27] = [
+    pub(super) const ALL: [Self; 29] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -149,6 +151,8 @@ impl SynthesizedFixedConstructorRole {
         Self::ReadEof,
         Self::Wrote,
         Self::MkInstant,
+        Self::ReadChunk,
+        Self::ReadResultEof,
         Self::Unit,
     ];
 
@@ -180,6 +184,8 @@ impl SynthesizedFixedConstructorRole {
             Self::ReadEof => &symbols.read_eof,
             Self::Wrote => &symbols.wrote,
             Self::MkInstant => &symbols.mk_instant,
+            Self::ReadChunk => &symbols.read_chunk,
+            Self::ReadResultEof => &symbols.read_result_eof,
             Self::Unit => &symbols.unit,
         }
     }
@@ -727,11 +733,17 @@ pub(super) fn build_synthesized_constructor_inventory(
 > {
     let mut identities = BTreeMap::new();
     for role in SynthesizedFixedConstructorRole::ALL {
-        // ABI-A1 appends its new role after the pre-existing fixed + IOError
-        // population below. Inserting it before the IOError run would move
-        // every established semantic identity merely because Clock gained one
-        // constructor; the map does not require declaration-order allocation.
-        if role == SynthesizedFixedConstructorRole::MkInstant {
+        // ABI-A1 appends promoted response roles after the pre-existing fixed
+        // plus IOError population below. Inserting them before the IOError run
+        // would move established semantic identities merely because a native
+        // response gained constructors; the map does not require declaration-
+        // order allocation.
+        if matches!(
+            role,
+            SynthesizedFixedConstructorRole::MkInstant
+                | SynthesizedFixedConstructorRole::ReadChunk
+                | SynthesizedFixedConstructorRole::ReadResultEof
+        ) {
             continue;
         }
         let span = arena.intern(role.spelling(symbols).as_bytes())?;
@@ -754,9 +766,16 @@ pub(super) fn build_synthesized_constructor_inventory(
         }
         io_roles.push(role);
     }
-    let role = SynthesizedFixedConstructorRole::MkInstant;
-    let span = arena.intern(role.spelling(symbols).as_bytes())?;
-    identities.insert(SynthesizedConstructorRole::Fixed(role), span);
+    // Post-IOError roles append in promotion order so no established semantic
+    // identity moves when ConsoleRead adds its two constructors.
+    for role in [
+        SynthesizedFixedConstructorRole::MkInstant,
+        SynthesizedFixedConstructorRole::ReadChunk,
+        SynthesizedFixedConstructorRole::ReadResultEof,
+    ] {
+        let span = arena.intern(role.spelling(symbols).as_bytes())?;
+        identities.insert(SynthesizedConstructorRole::Fixed(role), span);
+    }
     Ok((identities, io_roles))
 }
 

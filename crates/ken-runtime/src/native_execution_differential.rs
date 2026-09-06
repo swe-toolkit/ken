@@ -3184,10 +3184,10 @@ mod tests {
     fn replace_target_body_with_effect(program: &mut RuntimeProgram) {
         program.declarations[0].kind = RuntimeDeclarationKind::Transparent {
             body: RuntimeExpr::Effect {
-                family: "Console".to_string(),
-                operation: ken_host::HostOpV1::ConsoleRead,
+                family: "Clock".to_string(),
+                operation: ken_host::HostOpV1::ClockMonotonicNow,
                 capability: None,
-                args: vec![RuntimeExpr::Value(RuntimeValue::Int((1).into()))],
+                args: Vec::new(),
             },
         };
     }
@@ -4011,12 +4011,12 @@ mod tests {
         assert!(matches!(
             report.effect_foreign_policy.status,
             NativeEffectForeignExecutableStatus::RepresentedUnavailable { ref reason }
-                if reason.contains("ConsoleRead")
+                if reason.contains("ClockMonotonicNow")
         ));
         assert!(report
             .effect_foreign_policy
             .facts
-            .contains("runtime_expr.host_op=0101:ConsoleRead"));
+            .contains("runtime_expr.host_op=0202:ClockMonotonicNow"));
         assert!(matches!(
             report.native,
             NativeExecutionLaneReport::Unavailable { .. }
@@ -4545,7 +4545,7 @@ mod tests {
         assert!(matches!(
             closeout.corpus.blockers[0].status,
             NativeExecutablePhaseStatus::Unavailable { ref reason }
-                if reason.contains("ConsoleRead")
+                if reason.contains("ClockMonotonicNow")
         ));
         assert!(matches!(
             closeout_claim_status(
@@ -4554,7 +4554,7 @@ mod tests {
                 &NativeExecutableEvidenceClaim::EffectForeignExecutablePolicy
             ),
             NativeExecutablePhaseStatus::Unavailable { reason }
-                if reason.contains("ConsoleRead")
+                if reason.contains("ClockMonotonicNow")
         ));
     }
 

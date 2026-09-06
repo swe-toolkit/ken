@@ -632,7 +632,7 @@ pub(in crate::cranelift_backend) struct AggregateRelationClosure {
 /// One argument to a compiler-synthesized constructor, in the FORM the tree
 /// declares it.
 ///
-/// ⭐ **The four forms are disjoint and the reconciliation matches on the pair
+/// ⭐ **The forms are disjoint and the reconciliation matches on the pair
 /// `(declared node, argument form)`.** A bare `Vec<Lowered>` cannot state which
 /// form an operand is meant to be, so a site-bound child could only be checked
 /// for position — and `SynthesizedAggregateNode::SiteOperand(_) => true` was
@@ -664,6 +664,12 @@ pub(super) enum SynthesizedArgument {
         index: u32,
         value: Lowered,
         source: SiteOperandSource,
+    },
+    /// A referent produced by the host reply and copied into persistent storage.
+    /// This is neither a scalar nor an effect-seat operand.
+    HostResponseReferent {
+        class: BoundaryClass,
+        value: Lowered,
     },
     /// The `ordinal`-th carried capture word of a checked-IH captured
     /// environment, together with the occurrence the emitter believes it is.
@@ -703,7 +709,8 @@ impl SynthesizedArgument {
     fn into_lowered(self) -> Result<Lowered, CraneliftBackendError> {
         match self {
             Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => Ok(value),
-            Self::SiteOperand { value, .. } => Ok(value),
+            Self::SiteOperand { value, .. }
+            | Self::HostResponseReferent { value, .. } => Ok(value),
             Self::WorkerCaptureOperand { .. } => Err(unsupported(
                 "CheckedIhCapturedEnvironment",
                 "a checked-IH capture operand reached an ordinary synthesized constructor; \
@@ -717,7 +724,8 @@ impl SynthesizedArgument {
             Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => {
                 lowered_value_kind(value)
             }
-            Self::SiteOperand { value, .. } => lowered_value_kind(value),
+            Self::SiteOperand { value, .. }
+            | Self::HostResponseReferent { value, .. } => lowered_value_kind(value),
             Self::WorkerCaptureOperand { value, .. } => match value {
                 LoweringOperand::Specialized(value) => lowered_value_kind(value),
                 LoweringOperand::Carried(_) => "carried boundary word",
@@ -3710,6 +3718,28 @@ impl<'a> Lowering<'a> {
                                 _ => false,
                             }
                         }
+                    }
+                    // The reply-generated referent has its own source and its
+                    // own exact persistent disposition. It never consults the
+                    // effect-seat operand vector.
+                    (
+                        SynthesizedAggregateNode::HostResponseReferent {
+                            class: declared_class,
+                        },
+                        SynthesizedArgument::HostResponseReferent {
+                            class: emitted_class,
+                            value,
+                        },
+                    ) => {
+                        declared_class == emitted_class
+                            && matches!(value, Lowered::ResponseBytes(_))
+                            && matches!(
+                                value.boundary_disposition(),
+                                BoundaryDisposition::RepresentedHandle {
+                                    tag: BoundaryTag::PersistentGround,
+                                    class,
+                                } if class == *declared_class
+                            )
                     }
                     // ⛔ THE CAPTURE-WORD ARM. Additive BESIDE the site-operand
                     // arm above, which is untouched: that one resolves an

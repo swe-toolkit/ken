@@ -285,6 +285,17 @@ pub fn run_bound_process_effect_observation(
     artifact: &BoundProcessExecutableArtifact,
     options: &NativeEffectRunOptionsV1,
 ) -> Result<ken_host::EffectObservation, NativeEffectRunErrorV1> {
+    run_bound_process_effect_observation_with_stdin(artifact, options, &[])
+}
+
+/// Run a linked artifact with one launcher-owned stdin fixture. The fixture is
+/// presented as a finite file, so consuming its last byte is followed by a
+/// deterministic EOF without pipe scheduling becoming part of the evidence.
+pub fn run_bound_process_effect_observation_with_stdin(
+    artifact: &BoundProcessExecutableArtifact,
+    options: &NativeEffectRunOptionsV1,
+    stdin: &[u8],
+) -> Result<ken_host::EffectObservation, NativeEffectRunErrorV1> {
     if artifact.trap_catalog.runtime_artifact != artifact.runtime_artifact {
         return Err(NativeEffectRunErrorV1::BindingMismatch);
     }
@@ -301,13 +312,26 @@ pub fn run_bound_process_effect_observation(
             .map_err(|_| NativeEffectRunErrorV1::MalformedTrace)?
             .as_nanos()
     ));
-    let mut output = Command::new(&artifact.executable_path)
+    let stdin_path = observation_root.join(format!(
+        "ken-effect-stdin-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| NativeEffectRunErrorV1::MalformedTrace)?
+            .as_nanos()
+    ));
+    fs::write(&stdin_path, stdin)?;
+    let stdin_file = fs::File::open(&stdin_path)?;
+    let output = Command::new(&artifact.executable_path)
         .args(&options.arguments)
         .env_clear()
         .envs(options.environment.iter().cloned())
         .env("KEN_HOST_OBSERVATION_PATH", &trace_path)
         .current_dir(&cwd)
-        .output()?;
+        .stdin(stdin_file)
+        .output();
+    let _ = fs::remove_file(&stdin_path);
+    let mut output = output?;
     let after = snapshot_effect_root_v1(&cwd)?;
     let trace_bytes = fs::read(&trace_path)?;
     let _ = fs::remove_file(&trace_path);

@@ -616,6 +616,8 @@ fn native_process_symbols_from_record(
         read_eof: spine.read_eof.clone(),
         wrote: spine.wrote.clone(),
         mk_instant: spine.mk_instant.clone(),
+        read_chunk: spine.read_chunk.clone(),
+        read_result_eof: spine.read_result_eof.clone(),
         unit: spine.unit.clone(),
         bool_false: spine.bool_false.clone(),
         bool_true: spine.bool_true.clone(),
