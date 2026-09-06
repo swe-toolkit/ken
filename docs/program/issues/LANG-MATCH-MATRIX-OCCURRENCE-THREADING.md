@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-MATRIX-OCCURRENCE-THREADING
 title: "the match compiler drops each column's matched value before the arm-body leaf, so no value-binding pattern form (as-pattern, and later literal/nested-binder positions) can bind the value it matched -- thread a per-position OCCURRENCE (the core term for that column's value, re-indexed at each descent depth) through RowState and the matrix descent, reusing the existing elim_D field binders and the proven under()/scrut_occurs weakening; no new core construct"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
