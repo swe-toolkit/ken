@@ -30,10 +30,14 @@ agents. Five principles (decided; the §2–§6 spellings are a starter under th
    type-theory/ CS-educated reader already knows it (`→ × ∀ ∃ λ Σ Π Ω ⊢ ⊑ ⊔ ⊓ ¬
    ∧ ∨ ∈ ≤ ≠ ≡ ℓ`). Decorative or novel glyphs are rejected — they *cost*
    legibility with no convention to amortize.
-2. **A total ASCII transliteration.** Every notation token has a typeable ASCII
-   form (§1b). A human may write either; the glyph carries **zero** extra
-   information (round-trippable), so reading the ASCII loses nothing — the
-   exploration/self-learning affordance.
+2. **A total ASCII transliteration, with one narrow exception.** Every notation
+   token has a typeable ASCII form (§1b) and a human may write either spelling —
+   **except** a glyph whose only natural ASCII form is a reserved keyword
+   denoting a **different construct**, so the glyph and that keyword must be
+   distinct tokens (§1c; the sole current instance is `∈`, whose natural ASCII
+   `in` is the `let … in` separator). Where an ASCII form
+   exists, the glyph carries **zero** extra information (round-trippable), so
+   reading the ASCII loses nothing — the exploration/self-learning affordance.
 3. **Formatter-canonicalized.** A **single mandated formatter** (gofmt-style)
    normalizes ASCII → canonical Unicode and fixes layout on save. Because humans
    read and agents write, **one canonical format** means the reader always sees
@@ -76,7 +80,7 @@ digraph where one is unambiguous, else the spelled-out name.
 | `≡` | `===` | propositional equality (`Eq`, `../10-kernel/15`) † |
 | `≤` `≥` `≠` | `<=` `>=` `/=` | comparison |
 | `¬` `∧` `∨` | `not` `/\` `\/` | logical connectives |
-| `∈` | `in` | membership |
+| `∈` | none (glyph-only) | membership notation (§1c exception) |
 | `⊑` `⊔` `⊓` | `<:` `\/` `/\` | IFC lattice flows-to / join / meet (`../60-security/61`) ‡ |
 | `×` | `><` | product type |
 | `ℓ` | `level` / `l` | universe level / label (role supplied by parser context) ‡ |
@@ -111,6 +115,29 @@ separately as `CONF-FMT8-LEVELTOK`.
   notation table. So the glyph carries **zero** extra information and **ASCII
   spellings remain accepted forever** (no program ever *requires* a special
   keyboard). This is genuinely a **lexer** capability, not only a convention.
+- **Exception — a glyph is glyph-only when its only natural ASCII form is a
+  distinct token claimed by a different construct.** The guarantee above assumes
+  a glyph's ASCII transliteration is free to be *the same token* as the glyph. It
+  fails only when a glyph's sole natural ASCII form is a word that a **different
+  construct** already forces to a **distinct** token — that word cannot then also
+  lex as the notation, so the glyph is **glyph-only** with no accepted ASCII
+  spelling. This is narrower than "the ASCII form is a reserved word": the §1a-P5
+  identifier-class aliases `∀`/`forall` and `∃`/`exists` are reserved words too,
+  but each **is** its glyph's same token (both spellings lex identically), so
+  those ASCII forms work normally and are untouched. "ASCII accepted forever"
+  does not apply to a glyph-only glyph — there is no ASCII form to accept, not
+  one that was withdrawn. The sole current instance is `∈`: its natural ASCII
+  `in` is the `let … in` separator — a distinct token claimed by that construct
+  (`31 §4`) — so `∈` lexes to its own membership token, distinct from `in`, with
+  no `in` alias. This narrows the guarantee to match the landed
+  lexer and adds no lexer/parser machinery. The narrowing costs nothing today
+  because `∈` has **no operator semantics** — no program can be written with it,
+  so none can require its ASCII form; this row fixes notation only and does not
+  introduce a membership operator. If such an operator is later introduced with
+  semantics whose ASCII-authorability matters, assigning a non-keyword ASCII
+  digraph is a separate decision then, not foreclosed here. The formatter follows
+  suit: it never rewrites the keyword `in` to `∈`, and emits `∈` with no ASCII
+  counterpart.
 - **The formatter emits canonical Unicode on save (principle 3).** The single
   mandated formatter normalizes accepted ASCII input to canonical Unicode
   glyph (and fixes layout), so the reader always sees consistent notation. This
