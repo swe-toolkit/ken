@@ -1,7 +1,7 @@
 ---
 id: ABI-A1
 title: "promote ConsoleRead and ClockWallNow to NativeTested with differential evidence"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
