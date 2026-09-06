@@ -1,16 +1,71 @@
 ---
 id: LANG-MEMBERSHIP-OPERATOR-SURFACE
 title: "membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator"
-status: ready
+status: draft
 owner: language
 size: M
 gate: none
 depends_on: []
 blocks: []
 github: null
-origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52."
+origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. See the recut banner."
 ---
 
+> # RECUT 2026-09-06 -- NOT BUILDABLE AS FRAMED (Architect evt_356e6vfg2hrs6).
+> # Hard stop #1 on this WP. The node is split, deferred, and returned to draft.
+> # This banner supersedes the Deliverables and Acceptance criteria below; the
+> # original body is retained for history.
+> #
+> # WHY IT IS NOT BUILDABLE. The Architect grounded this at origin/main 072dc688d
+> # (the WP base) and verified: (1) the infix-operator surface is CLOSED -- BinOp
+> # = {Add, WrappingAdd, Sub, Mul, EqEq} lowered through a closed numeric/structural
+> # registry, with NO open, user-extensible typeclass method-dispatch for operators;
+> # (2) membership is NOT one operation -- it is four distinct NAMED functions each
+> # needing an explicit witness (elem needs Ord a; set_member needs leq; member;
+> # rel_member), and there is NO unifying `class Membership` in the catalog;
+> # (3) `∈` has ZERO uses in the entire .ken corpus -- a reserved dead token with no
+> # consumer and no demand; (4) ASCII `in` is UNCONDITIONALLY the let-separator
+> # keyword. So AC-1 ("`∈` parses AND elaborates") has nothing honest to elaborate
+> # TO: a fixed lowering fabricates a witness out of nowhere (dishonest), and a
+> # correct general `x ∈ s` requires type-directed class-method dispatch + witness
+> # synthesis -- a MAJOR new language capability that does not exist. A parse-only
+> # arm that always errors at elaboration is strictly worse than the current clean
+> # dead-token state. Do NOT build it (honesty-about-the-boundary, docs/PRINCIPLES).
+> #
+> # THE SPLIT (Architect route §4; recut is the Steward's):
+> #
+> # (A) THE REAL DRIVER IS THE FORMATTER, and it is SPEC's, not this node's. The
+> #     only actual demand is seed-canonical-format.md:387 BLOCKED-ON-MEMBERSHIP-
+> #     ASCII-ROLE + FMT1:52 -- the formatter needs a COHERENT §1b notation row,
+> #     NOT a working value operator. D2 resolved to frame option (2): the §1b:79
+> #     row (`| ∈ | in | membership |`) is internally incoherent -- §1c/BL3's
+> #     "ASCII accepted forever, identical token" guarantee cannot be satisfied for
+> #     a glyph whose only natural ASCII form is a reserved keyword word, and the
+> #     landed lexer already chose Token::Member DISTINCT from KwIn. The Architect
+> #     recommends (spec-leader authors, evt_356e6vfg2hrs6): declare `∈` GLYPH-ONLY
+> #     with a narrow documented exception to the total-ASCII-transliteration
+> #     guarantee. That matches the landed lexer and §1a P4 exactly and discharges
+> #     the formatter blocker with ZERO parser/elaborator work. This is now a SPEC
+> #     obligation (spec-leader, in flight per the Architect's @mention) plus the
+> #     already-planned CONF-BLOCKER-MARKER-RECONCILE marker reconciliation. It is
+> #     NOT owned by this language node.
+> #
+> # (B) THE MEMBERSHIP VALUE OPERATOR (parse `∈` + elaborate) is what THIS node is
+> #     recut to, and it is DEFERRED: 0 corpus demand, no semantic target, GATED on
+> #     a membership/typeclass-dispatch capability that does not exist. No such
+> #     capability node exists yet and none is minted speculatively for zero-demand
+> #     work (ken-steward §4c) -- this node stays `draft` as the parking place for
+> #     the obligation. When a typeclass-method-dispatch capability is cut for real
+> #     demand, this node is re-cut against it; language-leader remains owner and
+> #     the Architect remains required reviewer. Do NOT release it before then.
+> #
+> # LANGUAGE STOOD DOWN CORRECTLY (language-leader evt_wyj2aqmqs316): no source
+> # edit, no implementer dispatch, nothing landed on the language side. The honest
+> # increment is Spec's row amendment, then -- if demand ever appears -- a future
+> # dispatch-capability node ahead of a re-cut (B).
+> #
+> # --- original body retained below for history (superseded by this banner) ---
+>
 > # THE ENDPOINT READING IS REFUTED BY CITATION, NOT BY PREFERENCE.
 >
 > The natural conclusion from the tree alone is that ASCII `in` is simply
