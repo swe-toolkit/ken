@@ -12,10 +12,13 @@ acceptance criteria, fixed inputs, and banned scope.
 - Risk: low-to-moderate -- it inserts a precedence level into a landed,
   normative arithmetic cascade, which is exactly where a silent reassociation
   would hide (see the node's AC-3).
-- Base / fixed inputs: current `origin/main` `d89c764f6`. Re-measure the node's
-  perishable anchors (`parser.rs:1994 -> :2012 -> :2032`, `ast.rs:558`,
-  `spec/30-surface/32-grammar.md:199/:373`) at your cut; a false anchor is a
-  finding, not something to build around.
+- Base / fixed inputs: current `origin/main` `5c055b4c9`. Anchors were refreshed
+  2026-09-06 after the first cut found them stale (see the node's ANCHOR REFRESH
+  block): cascade `parse_expr:2025 -> arrow:2056 -> infix:2093 -> additive:2111
+  -> multiplicative:2132 -> app:2148` (insert one level between multiplicative
+  and application), `BinOp` at `ast.rs:577`, grammar `32-grammar.md:215`/`:389`.
+  Re-measure at your cut anyway; a false anchor is a finding, not something to
+  build around.
 
 ## Why this is the next language deliverable
 
@@ -54,7 +57,8 @@ the ring.
 ## Contention
 
 No path contention with the concurrent runtime FsMetadata respin: this touches
-`ken-parser` + `ken-elaborator/src/elab.rs`, FsMetadata touches
+`ken-elaborator/src/parser.rs` + `ast.rs` (plus a focused elaborator test) --
+NOT `src/elab.rs`, and there is no `ken-parser` crate. FsMetadata touches
 `ken-verify`/`ken-runtime`/`ken-host` + elaborator `{compiler_driver, erasure,
 prelude}` (disjoint files). Shares the machine-wide `ken-cargo` build lock with
 the runtime lane -- runtime is lane-1 priority under the standing yield
