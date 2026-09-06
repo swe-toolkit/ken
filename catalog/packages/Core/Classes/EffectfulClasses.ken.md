@@ -65,16 +65,16 @@ import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Collections.Derived (concat_map, list_append)
 
-fn apply_to (a : Type) (b : Type) (y : a) (g : a → b) : b = g y
+pub fn apply_to (a : Type) (b : Type) (y : a) (g : a → b) : b = g y
 
-fn compose (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = g (h x)
+pub fn compose (a : Type) (b : Type) (c : Type) (g : b → c) (h : a → b) (x : a) : c = g (h x)
 
-fn functor_map_of
+pub fn functor_map_of
       (g_ty : Type → Type) (d : Functor g_ty) (a : Type) (b : Type) (h : a → b) (x : g_ty a)
     : g_ty b =
   d.map a b h x
 
-class Applicative (f : Type → Type) {
+pub class Applicative (f : Type → Type) {
   functor : Functor f;
   pure : (a : Type) → a → f a;
   ap : (a : Type) → (b : Type) → f (a → b) → f a → f b;
