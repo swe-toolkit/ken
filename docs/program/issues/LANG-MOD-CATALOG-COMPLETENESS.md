@@ -86,6 +86,26 @@ origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 st
 > as a low-priority truthful monotone report meanwhile; it forecloses neither
 > future and is the input both need.
 >
+> MECHANISM SPEC LANDED 2026-09-06 (`368e906f4`, PR #3368, Decision
+> `dec_3tp2vvx40qvw1`; CV RE-CONFIRM evt_5g6htgxcy70k4 + Architect RE-CONFIRM
+> evt_63tjcd6sr9eaw). The enclave realized "ambient intrinsic" WITHOUT reopening
+> the exact-nine roster: `spec/30-surface/30-taxonomy.md §4`'s internal-provision
+> floor arm is broadened to a conjunction — a native mechanism (kernel / effect
+> reifier / erasure-lowering / host runner) keyed to the exact identity such that
+> a same-structure source declaration fails to interoperate, AND the surface
+> contract independently requires source to name it. Under that arm
+> `Unit`/`ResourceError`/`HostIO`/`ExitCode(identity)`/`ProcessInput`/`ProgramCaps`
+> are floor-eligible; `Empty` and catalog policy wrappers (e.g. `Exit`'s
+> `exit_with`) stay import-required; the floor stays at exactly ten pending the
+> operator-gated roster extension. `33-declarations.md §3.3` establishes effect-row
+> / capability vocabulary (an `EffectName` in visits/capabilities) as a separate
+> namespace resolved by the effect system, outside the floor-vs-import binary.
+> Zero `trusted_base()` delta — TCB-neutral, no operator TCB sign-off needed. This
+> settles decision 2's MECHANISM. Decision 1 (full migration program vs
+> foundation-unblock subset) remains the operator's, now downstream of this landed
+> mechanism; the catalog-realization build follows it. No build node released off
+> this yet — event-driven on the operator's decision-1 call.
+>
 > ------------------------------------------------------------------------------
 > RECUT #2 (below) is HISTORICAL — its `StrictGreenAtBase | BlockedOn` two-class
 > total is superseded by the RECUT-#3 evidence-frontier AC-CENSUS. Retained for
