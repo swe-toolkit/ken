@@ -1827,6 +1827,7 @@ mod tests {
         assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
         assert_eq!(effect_binding("error", "io.Revoked"), 11);
         assert_eq!(effect_binding("error", "io.Other"), 12);
+        assert_eq!(effect_binding("error", "resource.ResourceRevoked"), 10);
     }
 
     #[test]
@@ -1904,6 +1905,7 @@ mod tests {
             (7, crate::ResourceErrorV1::InvalidBounds),
             (8, crate::ResourceErrorV1::NoProgress),
             (9, crate::ResourceErrorV1::AllocationFailed),
+            (10, crate::ResourceErrorV1::Revoked),
         ] {
             assert_eq!(decode_resource_error_reply(tag, zero), Some(expected));
         }
@@ -2093,6 +2095,7 @@ mod tests {
             (crate::ResourceErrorV1::InvalidBounds, 7),
             (crate::ResourceErrorV1::NoProgress, 8),
             (crate::ResourceErrorV1::AllocationFailed, 9),
+            (crate::ResourceErrorV1::Revoked, 10),
         ] {
             assert_eq!(
                 project(error),

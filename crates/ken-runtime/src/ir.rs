@@ -243,6 +243,7 @@ runtime_host_spine_v1! {
     resource_invalid_offset,
     resource_invalid_bounds,
     resource_no_progress,
+    resource_revoked,
     resource_kind_fs_handle,
     resource_kind_buffer,
     resource_trace_identity,

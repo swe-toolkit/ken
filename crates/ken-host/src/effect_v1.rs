@@ -308,6 +308,7 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_error_invalid_offset: u64,
     pub resource_error_invalid_bounds: u64,
     pub resource_error_no_progress: u64,
+    pub resource_error_revoked: u64,
     pub resource_kind_fs_handle: u64,
     pub resource_kind_buffer: u64,
     pub resource_error_reply_schema: u64,
@@ -518,6 +519,7 @@ pub fn host_effect_wire_layout_v1(
         resource_error_invalid_offset: generated_binding("error", "resource.InvalidOffset")?,
         resource_error_invalid_bounds: generated_binding("error", "resource.InvalidBounds")?,
         resource_error_no_progress: generated_binding("error", "resource.NoProgress")?,
+        resource_error_revoked: generated_binding("error", "resource.ResourceRevoked")?,
         resource_kind_fs_handle: generated_binding("tag", "resource_kind.FsHandle")?,
         resource_kind_buffer: generated_binding("tag", "resource_kind.Buffer")?,
         resource_error_reply_schema: generated_binding("lifetime", "resource_error_reply_schema")?,
@@ -927,6 +929,7 @@ pub struct PendingResourceCloseV1 {
     identity: ResourceTraceIdentityV1,
 }
 
+#[must_use = "resource admission must be drained before settlement can close or reuse a slot"]
 struct ResourceAdmissionLeaseV1 {
     entries: Vec<ResourceAdmissionLeaseEntryV1>,
     _revocation_leases: Vec<crate::revocation_v1::RevocationAdmissionLease>,
@@ -1286,25 +1289,28 @@ impl ResourceTableV1 {
                     }
                 }
             };
-            if let Some(ResourceSlotStateV1::Closing {
-                owner,
-                kind,
-                identity,
-                admitted_leases: 0,
-            }) = completed_close
-            {
-                if let ResourceOwnerV1::Buffer(buffer) = &owner {
-                    self.live_buffer_capacity = self
-                        .live_buffer_capacity
-                        .checked_sub(buffer.capacity() as u64)
-                        .expect("live buffer capacity accounting underflow");
-                }
-                Self::vacate_released_slot(&mut self.slots[entry.slot as usize], identity);
-                pending.push(PendingResourceCloseV1 {
+            match completed_close {
+                Some(ResourceSlotStateV1::Closing {
                     owner,
                     kind,
                     identity,
-                });
+                    admitted_leases: 0,
+                }) => {
+                    if let ResourceOwnerV1::Buffer(buffer) = &owner {
+                        self.live_buffer_capacity = self
+                            .live_buffer_capacity
+                            .checked_sub(buffer.capacity() as u64)
+                            .expect("live buffer capacity accounting underflow");
+                    }
+                    Self::vacate_released_slot(&mut self.slots[entry.slot as usize], identity);
+                    pending.push(PendingResourceCloseV1 {
+                        owner,
+                        kind,
+                        identity,
+                    });
+                }
+                Some(_) => unreachable!("only a fully drained closing slot can complete"),
+                None => {}
             }
         }
         pending
@@ -2002,6 +2008,82 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             ResourceErrorV1::MalformedResource,
         ));
     }
+    let request_shape_matches = matches!(
+        (operation, request),
+        (HostOpV1::ConsoleRead, CanonicalRequestV1::ConsoleRead { .. })
+            | (HostOpV1::ConsoleWrite, CanonicalRequestV1::ConsoleWrite { .. })
+            | (HostOpV1::ConsoleFlush, CanonicalRequestV1::ConsoleFlush { .. })
+            | (
+                HostOpV1::ConsoleIsTerminal,
+                CanonicalRequestV1::ConsoleIsTerminal { .. }
+            )
+            | (HostOpV1::ClockWallNow, CanonicalRequestV1::ClockWallNow)
+            | (
+                HostOpV1::ClockMonotonicNow,
+                CanonicalRequestV1::ClockMonotonicNow
+            )
+            | (
+                HostOpV1::ClockSleepUntil,
+                CanonicalRequestV1::ClockSleepUntil { .. }
+            )
+            | (
+                HostOpV1::EntropyRandomBytes,
+                CanonicalRequestV1::EntropyRandomBytes { .. }
+            )
+            | (HostOpV1::FsReadFile, CanonicalRequestV1::FsReadFile { .. })
+            | (
+                HostOpV1::FsWriteFile,
+                CanonicalRequestV1::FsWriteFile { .. }
+            )
+            | (
+                HostOpV1::FsAppendFile,
+                CanonicalRequestV1::FsAppendFile { .. }
+            )
+            | (HostOpV1::FsMetadata, CanonicalRequestV1::FsMetadata { .. })
+            | (
+                HostOpV1::FsReadDirectory,
+                CanonicalRequestV1::FsReadDirectory { .. }
+            )
+            | (
+                HostOpV1::FsCreateDirectory,
+                CanonicalRequestV1::FsCreateDirectory { .. }
+            )
+            | (
+                HostOpV1::FsRemoveFile,
+                CanonicalRequestV1::FsRemoveFile { .. }
+            )
+            | (
+                HostOpV1::FsRemoveDirectory,
+                CanonicalRequestV1::FsRemoveDirectory { .. }
+            )
+            | (HostOpV1::FsRename, CanonicalRequestV1::FsRename { .. })
+            | (
+                HostOpV1::FsChangeMode,
+                CanonicalRequestV1::FsChangeMode { .. }
+            )
+            | (HostOpV1::FsOpen, CanonicalRequestV1::FsOpen { .. })
+            | (
+                HostOpV1::FsHandleMetadata,
+                CanonicalRequestV1::FsHandleMetadata
+            )
+            | (HostOpV1::FsReadAt, CanonicalRequestV1::FsReadAt { .. })
+            | (HostOpV1::FsWriteAt, CanonicalRequestV1::FsWriteAt { .. })
+            | (
+                HostOpV1::BufferAllocate,
+                CanonicalRequestV1::BufferAllocate { .. }
+            )
+            | (
+                HostOpV1::BufferFreeze,
+                CanonicalRequestV1::BufferFreeze { .. }
+            )
+            | (
+                HostOpV1::ResourceRelease,
+                CanonicalRequestV1::ResourceRelease
+            )
+    );
+    if !request_shape_matches {
+        return Err(TerminalErrorV1::MalformedHostAbiField);
+    }
     let admission_tokens = match (operation.resource_admission_requirement(), resource) {
         (ResourceAdmissionRequirementV1::None, _) => Vec::new(),
         (ResourceAdmissionRequirementV1::Target, ResourceInputsV1::Target(target))
@@ -2346,7 +2428,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 Err(error) => Err(SemanticErrorV1::Resource(error)),
             }
         }
-        _ => return Err(TerminalErrorV1::MalformedHostAbiField),
+        _ => unreachable!("operation/request shape validated before resource admission"),
     };
     if let Some(lease) = resource_admission {
         assert!(
@@ -3181,8 +3263,9 @@ mod tests {
     /// Promise class: durable invariant. MEASURED: table-resolved root, child,
     /// and copied grants retain their exact domain nodes; revoking the root
     /// denies the child and its copy through those stored links. CLAIMED: capability
-    /// attenuation creates lineage while copy preserves it. THE GAP: D1 covers
-    /// capability grants only; resource provenance is deliberately D2.
+    /// attenuation creates lineage while copy preserves it. THE GAP: this test
+    /// covers capability grants only; the resource oracle independently checks
+    /// that acquired slots retain and consult those nodes.
     #[test]
     fn capability_grants_thread_attenuated_and_copied_lineage() {
         let mut revocation = RevocationDomain::default();
@@ -3229,7 +3312,7 @@ mod tests {
     /// dispatcher classifier's capability-gated set equals the locked path-op
     /// set and every member occurs in ABI-R3's generated catalog. CLAIMED: a
     /// capability-guarded operation cannot silently skip admission. THE GAP:
-    /// D2 separately classifies resource-token operations by provenance.
+    /// Resource-token operations have their own exhaustive D2 classifier.
     #[test]
     fn capability_admission_inventory_is_exact_and_abi_r3_closed() {
         let expected = vec![
@@ -3289,6 +3372,50 @@ mod tests {
                 "capability-admitted operation {operation:?} is absent from ABI-R3"
             );
         }
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the sealed
+    /// ABI-R3 operation inventory classifies exactly the four operations that
+    /// borrow existing resources; settlement and allocation are explicitly
+    /// outside that set. CLAIMED: every resource borrow crosses provenance
+    /// admission before backend access. THE GAP: the behavioral lineage and
+    /// no-backend-effect implications are exercised by the resource oracle.
+    #[test]
+    fn resource_admission_inventory_is_exact_and_abi_r3_closed() {
+        let expected = vec![
+            HostOpV1::FsHandleMetadata,
+            HostOpV1::FsReadAt,
+            HostOpV1::FsWriteAt,
+            HostOpV1::BufferFreeze,
+        ];
+        let classified = HostOpV1::ALL
+            .into_iter()
+            .filter(|operation| {
+                !matches!(
+                    operation.resource_admission_requirement(),
+                    ResourceAdmissionRequirementV1::None
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(classified, expected);
+        for operation in classified {
+            assert!(
+                HOST_EFFECT_ABI_V1_CATALOG
+                    .iter()
+                    .any(|row| row.1 == operation as u16),
+                "resource-admitted operation {operation:?} is absent from ABI-R3"
+            );
+        }
+        assert_eq!(
+            HostOpV1::ResourceRelease.resource_admission_requirement(),
+            ResourceAdmissionRequirementV1::None,
+            "revocation must not prevent settlement"
+        );
+        assert_eq!(
+            HostOpV1::BufferAllocate.resource_admission_requirement(),
+            ResourceAdmissionRequirementV1::None,
+            "a fresh ambient buffer has no acquiring capability"
+        );
     }
 
     /// Promise class: durable discriminator. MEASURED: two otherwise-identical
@@ -4159,6 +4286,58 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// Promise class: durable invariant. MEASURED: two independently admitted
+    /// leases on one owned file keep a requested close pending after the first
+    /// drain; the second drain yields exactly one close owner, and the retired
+    /// token cannot settle again. CLAIMED: settlement waits for every admitted
+    /// lease rather than merely one. THE GAP: this is the explicitly
+    /// single-threaded drain mechanism; PX12 owns concurrent linearization.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn resource_close_waits_for_the_last_of_multiple_admitted_leases() {
+        let (root, owner) = resource_fixture("multi-lease");
+        let mut revocation = RevocationDomain::default();
+        let grant = CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("multi-lease".to_string()),
+            crate::Cap::mint(crate::AUTH_FULL, "FS"),
+            &mut revocation,
+        );
+        let mut table = ResourceTableV1::default();
+        let (token, identity) = table.insert_fs_handle(
+            owner,
+            crate::RightSet::METADATA,
+            grant.revocation_node,
+        );
+        let first = table.admit_resources(&revocation, &[token]).unwrap();
+        let second = table.admit_resources(&revocation, &[token]).unwrap();
+        assert!(grant.revoke(&mut revocation));
+        assert!(matches!(
+            table.request_release(token),
+            Ok(ResourceReleaseReadinessV1::Waiting)
+        ));
+        assert!(table.finish_admission(first).is_empty());
+        assert!(matches!(
+            table.resolve_fs_handle(token, crate::RightSet::METADATA),
+            Err(ResourceErrorV1::Closed)
+        ));
+        let mut pending = table.finish_admission(second);
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].identity, identity);
+        let calls = std::cell::Cell::new(0);
+        ResourceTableV1::finish_release_with(pending.pop().unwrap(), |owner| {
+            calls.set(calls.get() + 1);
+            crate::close_resource_v1(owner)
+                .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+        })
+        .unwrap();
+        assert_eq!(calls.get(), 1);
+        assert!(matches!(
+            table.request_release(token),
+            Err(ResourceErrorV1::Closed)
+        ));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     /// Caller-control only: this proves explicit finalization preserves every
     /// close result after invalidation; it does not claim the OS produced the
     /// injected error.
@@ -4348,6 +4527,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     struct RealResourceBackend {
         root: crate::RootedHandle,
+        metadata_calls: usize,
+        metadata_error: Option<IoErrorIdentityV1>,
     }
 
     #[cfg(target_os = "linux")]
@@ -4397,6 +4578,307 @@ mod tests {
             )
             .map_err(|error| FileErrorCauseV1::Io(io_error_identity_v1(&error.into_io_error())))
         }
+
+        fn fs_resource_metadata(
+            &mut self,
+            handle: &crate::ResourceHandleV1,
+        ) -> Result<FileMetadataV1, IoErrorIdentityV1> {
+            self.metadata_calls += 1;
+            if let Some(error) = self.metadata_error {
+                return Err(error);
+            }
+            crate::resource_metadata_v1(handle)
+                .map(|metadata| FileMetadataV1 {
+                    size: metadata.size,
+                    kind: match metadata.kind {
+                        crate::FileKind::File => FsNodeKindV1::File,
+                        crate::FileKind::Directory => FsNodeKindV1::Directory,
+                        crate::FileKind::Symlink => FsNodeKindV1::Symlink,
+                        crate::FileKind::Other => FsNodeKindV1::Other,
+                    },
+                })
+                .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+        }
+    }
+
+    /// Promise class: durable discriminator. MEASURED: a metadata resource
+    /// acquired under a grandchild is denied with exact nullary `Revoked` and
+    /// zero backend visits after its parent is revoked, while a sibling-backed
+    /// resource remains live. Clearing only the denied slot's provenance makes
+    /// the same token reach a known backend I/O error; released, never-minted,
+    /// insufficient-right, and wrong-kind controls retain their old identities.
+    /// CLAIMED: a token-only resource operation admits through the acquiring
+    /// node's full ancestry without conflating withdrawal with lifetime, rights,
+    /// kind, or host-I/O errors. THE GAP: this is the current single-process,
+    /// single-threaded domain; distributed and concurrent revocation are out of
+    /// contract.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn resource_tokens_admit_through_acquiring_lineage_without_error_collapse() {
+        let root = std::env::temp_dir().join(format!(
+            "ken-revoke-d2-resource-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("held.bin"), b"resource-bytes").unwrap();
+        let rooted = crate::open_root(&crate::RootPath::new(&root).unwrap()).unwrap();
+        let metadata = crate::metadata(&rooted).unwrap();
+        let capability = || {
+            crate::Cap::mint_scoped(
+                crate::AUTH_PARTIAL,
+                "FS",
+                crate::FsScope::root(
+                    crate::RightSet::READ.union(crate::RightSet::METADATA),
+                    crate::FsHandle::Posix(rooted.clone()),
+                    crate::FsIdentity::Posix {
+                        device: metadata.identity.device,
+                        inode: metadata.identity.inode,
+                    },
+                    crate::SymlinkPolicy::NoFollow,
+                ),
+            )
+        };
+
+        let mut revocation = RevocationDomain::default();
+        let root_grant = CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("resource-root".to_string()),
+            capability(),
+            &mut revocation,
+        );
+        let child = root_grant
+            .attenuate(
+                CapabilityTraceIdentity("resource-child".to_string()),
+                capability(),
+                &mut revocation,
+            )
+            .unwrap();
+        let grandchild = child
+            .attenuate(
+                CapabilityTraceIdentity("resource-grandchild".to_string()),
+                capability(),
+                &mut revocation,
+            )
+            .unwrap();
+        let sibling = root_grant
+            .attenuate(
+                CapabilityTraceIdentity("resource-sibling".to_string()),
+                capability(),
+                &mut revocation,
+            )
+            .unwrap();
+        let mut capabilities = CapabilityTableV1::default();
+        let grandchild_capability = capabilities.insert(grandchild);
+        let sibling_capability = capabilities.insert(sibling);
+        let mut resources = ResourceTableV1::default();
+        let mut backend = RealResourceBackend {
+            root: rooted,
+            metadata_calls: 0,
+            metadata_error: None,
+        };
+        let open = |backend: &mut RealResourceBackend,
+                    resources: &mut ResourceTableV1,
+                    capability,
+                    mode| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                &revocation,
+                resources,
+                HostOpV1::FsOpen,
+                Some(capability),
+                ResourceInputsV1::None,
+                &CanonicalRequestV1::FsOpen {
+                    path: b"held.bin".to_vec(),
+                    mode,
+                },
+            )
+            .unwrap()
+            .resource_token
+            .unwrap()
+        };
+        let grandchild_resource = open(
+            &mut backend,
+            &mut resources,
+            grandchild_capability,
+            FsOpenModeV1::Metadata,
+        );
+        let read_only_resource = open(
+            &mut backend,
+            &mut resources,
+            grandchild_capability,
+            FsOpenModeV1::Read,
+        );
+        let sibling_resource = open(
+            &mut backend,
+            &mut resources,
+            sibling_capability,
+            FsOpenModeV1::Metadata,
+        );
+        let metadata_request = CanonicalRequestV1::FsHandleMetadata;
+        let metadata_operation = |backend: &mut RealResourceBackend,
+                                  resources: &mut ResourceTableV1,
+                                  token| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                &revocation,
+                resources,
+                HostOpV1::FsHandleMetadata,
+                None,
+                ResourceInputsV1::Target(token),
+                &metadata_request,
+            )
+            .unwrap()
+        };
+
+        let live = metadata_operation(&mut backend, &mut resources, grandchild_resource);
+        assert_eq!(
+            live.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(FileMetadataV1 {
+                size: 14,
+                kind: FsNodeKindV1::File,
+            }))
+        );
+        assert_eq!(backend.metadata_calls, 1);
+
+        assert!(child.revoke(&mut revocation));
+        let metadata_operation = |backend: &mut RealResourceBackend,
+                                  resources: &mut ResourceTableV1,
+                                  token| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                &revocation,
+                resources,
+                HostOpV1::FsHandleMetadata,
+                None,
+                ResourceInputsV1::Target(token),
+                &metadata_request,
+            )
+            .unwrap()
+        };
+        let copied_resource_token = grandchild_resource;
+        let denied = metadata_operation(&mut backend, &mut resources, copied_resource_token);
+        assert_eq!(
+            denied.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Revoked))
+        );
+        assert!(denied.resource_bindings.is_empty());
+        assert_eq!(backend.metadata_calls, 1, "revocation precedes the backend");
+
+        let sibling_live = metadata_operation(&mut backend, &mut resources, sibling_resource);
+        assert!(matches!(
+            sibling_live.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(_))
+        ));
+        assert_eq!(backend.metadata_calls, 2, "sibling lineage remains live");
+
+        let ResourceSlotStateV1::Live { provenance, .. } =
+            &mut resources.slots[grandchild_resource.slot as usize].state
+        else {
+            panic!("the denied resource remains live until settlement")
+        };
+        *provenance = None;
+        backend.metadata_error = Some(IoErrorIdentityV1::NotFound);
+        let bypass_control =
+            metadata_operation(&mut backend, &mut resources, grandchild_resource);
+        assert_eq!(
+            bypass_control.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::NotFound))
+        );
+        assert_eq!(
+            backend.metadata_calls, 3,
+            "clearing only resource provenance must make the denial vanish"
+        );
+        backend.metadata_error = None;
+
+        let ResourceSlotStateV1::Live { provenance, .. } =
+            &mut resources.slots[read_only_resource.slot as usize].state
+        else {
+            panic!("the read-only resource remains live")
+        };
+        *provenance = None;
+        let insufficient =
+            metadata_operation(&mut backend, &mut resources, read_only_resource);
+        assert_eq!(
+            insufficient.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
+                ResourceErrorV1::RightNotHeld {
+                    required: crate::RightSet::METADATA.bits(),
+                    held: crate::RightSet::READ.bits(),
+                }
+            ))
+        );
+
+        let buffer = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::BufferAllocate,
+            None,
+            ResourceInputsV1::None,
+            &CanonicalRequestV1::BufferAllocate { capacity: 1 },
+        )
+        .unwrap()
+        .resource_token
+        .unwrap();
+        assert!(matches!(
+            metadata_operation(&mut backend, &mut resources, buffer).outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
+                ResourceErrorV1::ResourceKindMismatch {
+                    expected: ResourceKindV1::FsHandle,
+                    actual: ResourceKindV1::Buffer,
+                }
+            ))
+        ));
+        assert_eq!(
+            metadata_operation(
+                &mut backend,
+                &mut resources,
+                ResourceTokenV1 {
+                    slot: u32::MAX,
+                    generation: 1,
+                },
+            )
+            .outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
+                ResourceErrorV1::MalformedResource
+            ))
+        );
+
+        let release = |backend: &mut RealResourceBackend,
+                       resources: &mut ResourceTableV1,
+                       token| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                &revocation,
+                resources,
+                HostOpV1::ResourceRelease,
+                None,
+                ResourceInputsV1::Target(token),
+                &CanonicalRequestV1::ResourceRelease,
+            )
+            .unwrap()
+        };
+        assert!(matches!(
+            release(&mut backend, &mut resources, grandchild_resource).outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(_))
+        ));
+        assert_eq!(
+            metadata_operation(&mut backend, &mut resources, grandchild_resource).outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Closed))
+        );
+        for token in [read_only_resource, sibling_resource, buffer] {
+            assert!(matches!(
+                release(&mut backend, &mut resources, token).outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(_))
+            ));
+        }
+        assert_eq!(backend.metadata_calls, 3);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(target_os = "linux")]
@@ -4425,7 +4907,11 @@ mod tests {
             &mut revocation,
         ));
         let mut resources = ResourceTableV1::default();
-        let mut backend = RealResourceBackend { root: root_handle };
+        let mut backend = RealResourceBackend {
+            root: root_handle,
+            metadata_calls: 0,
+            metadata_error: None,
+        };
         let mut events = Vec::new();
         let open_request = CanonicalRequestV1::FsOpen {
             path: b"held.bin".to_vec(),
@@ -4571,7 +5057,11 @@ mod tests {
             &mut revocation,
         ));
         let mut resources = ResourceTableV1::default();
-        let mut backend = RealResourceBackend { root: rooted };
+        let mut backend = RealResourceBackend {
+            root: rooted,
+            metadata_calls: 0,
+            metadata_error: None,
+        };
         let opened = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
@@ -4627,6 +5117,7 @@ mod tests {
     struct PositionedBackend {
         root: crate::RootedHandle,
         write_limit: Option<usize>,
+        write_calls: usize,
     }
 
     #[cfg(target_os = "linux")]
@@ -4692,12 +5183,252 @@ mod tests {
             offset: u64,
             bytes: &[u8],
         ) -> Result<usize, IoErrorIdentityV1> {
+            self.write_calls += 1;
             let limit = self.write_limit.unwrap_or(bytes.len()).min(bytes.len());
             if limit == 0 {
                 return Ok(0);
             }
             crate::resource_write_at_v1(handle, offset, &bytes[..limit])
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+        }
+    }
+
+    /// Promise class: durable discriminator. MEASURED: two otherwise-identical
+    /// positioned writes flip at resource admission. Revoke-before-admission
+    /// returns exact nullary `Revoked` with zero backend calls; admit-before-
+    /// revoke commits `AB`, preserves the backend result, denies a later write,
+    /// and defers close until the owned lease drains. Both close success and a
+    /// configured `ReleaseFailed` settle exactly once and leave the token closed.
+    /// CLAIMED: resource admission is the linearization point and settlement is
+    /// close-after-drain without rollback or reopening. THE GAP: the schedule is
+    /// staged deterministically through the same host-internal lease primitives;
+    /// concurrent linearization remains PX12 work.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn revoke_admission_order_preserves_write_and_exactly_once_settlement() {
+        for (suffix, close_error) in [
+            ("success", None),
+            ("failure", Some(IoErrorIdentityV1::Other(77))),
+        ] {
+            let root = std::env::temp_dir().join(format!(
+                "ken-revoke-d2-settlement-{}-{suffix}",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).unwrap();
+            std::fs::write(root.join("target.bin"), b"0000").unwrap();
+            let rooted = crate::open_root(&crate::RootPath::new(&root).unwrap()).unwrap();
+            let metadata = crate::metadata(&rooted).unwrap();
+            let cap = crate::Cap::mint_scoped(
+                crate::AUTH_FULL,
+                "FS",
+                crate::FsScope::root(
+                    crate::RightSet::ALL,
+                    crate::FsHandle::Posix(rooted.clone()),
+                    crate::FsIdentity::Posix {
+                        device: metadata.identity.device,
+                        inode: metadata.identity.inode,
+                    },
+                    crate::SymlinkPolicy::NoFollow,
+                ),
+            );
+            let mut revocation = RevocationDomain::default();
+            let mut capabilities = CapabilityTableV1::default();
+            let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+                CapabilityTraceIdentity(format!("settlement:{suffix}")),
+                cap,
+                &mut revocation,
+            ));
+            let mut resources = ResourceTableV1::default();
+            let mut backend = PositionedBackend {
+                root: rooted,
+                write_limit: None,
+                write_calls: 0,
+            };
+            let mut open_write = || {
+                dispatch_host_op_v1(
+                    &mut backend,
+                    &capabilities,
+                    &revocation,
+                    &mut resources,
+                    HostOpV1::FsOpen,
+                    Some(capability),
+                    ResourceInputsV1::None,
+                    &CanonicalRequestV1::FsOpen {
+                        path: b"target.bin".to_vec(),
+                        mode: FsOpenModeV1::WriteCreate(CreatePolicyV1::CreateOrKeep),
+                    },
+                )
+                .unwrap()
+            };
+            let admitted_open = open_write();
+            let admitted_file = admitted_open.resource_token.unwrap();
+            let admitted_identity = admitted_open.resource_bindings[0].1;
+            let revoke_wins_file = open_write().resource_token.unwrap();
+            drop(open_write);
+
+            let allocate_buffer = |resources: &mut ResourceTableV1| {
+                resources.insert_buffer(2).unwrap().0
+            };
+            let admitted_buffer = allocate_buffer(&mut resources);
+            let revoke_wins_buffer = allocate_buffer(&mut resources);
+            for buffer in [admitted_buffer, revoke_wins_buffer] {
+                let ResourceSlotStateV1::Live {
+                    owner: ResourceOwnerV1::Buffer(region),
+                    ..
+                } = &mut resources.slots[buffer.slot as usize].state
+                else {
+                    panic!("fresh buffer has a live buffer owner")
+                };
+                region.bytes[..2].copy_from_slice(b"AB");
+                region.install_window(0, 2);
+            }
+
+            let write_lease = resources
+                .admit_resources(&revocation, &[admitted_file, admitted_buffer])
+                .expect("live ancestry admits the positioned write");
+            assert!(capabilities
+                .resolve(capability)
+                .unwrap()
+                .revoke(&mut revocation));
+
+            let revoke_wins = dispatch_host_op_v1(
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                HostOpV1::FsWriteAt,
+                None,
+                ResourceInputsV1::FileBufferSpan {
+                    file: revoke_wins_file,
+                    target_buffer: revoke_wins_buffer,
+                    span_origin: revoke_wins_buffer,
+                },
+                &CanonicalRequestV1::FsWriteAt {
+                    file_offset: 0,
+                    buffer_start: 0,
+                    length: 2,
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                revoke_wins.outcome,
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Revoked))
+            );
+            assert_eq!(backend.write_calls, 0);
+
+            let admitted_result = resources
+                .with_fs_and_buffer_mut(
+                    admitted_file,
+                    crate::RightSet::WRITE,
+                    admitted_buffer,
+                    |handle, _, region, _| {
+                        let bytes = region
+                            .initialized_slice(0, 2)
+                            .map_err(SemanticErrorV1::Resource)?;
+                        backend
+                            .fs_resource_write_at(handle, 0, bytes)
+                            .map_err(SemanticErrorV1::Io)
+                    },
+                )
+                .unwrap();
+            assert_eq!(admitted_result, 2);
+            assert_eq!(backend.write_calls, 1);
+            assert_eq!(std::fs::read(root.join("target.bin")).unwrap(), b"AB00");
+
+            let later = dispatch_host_op_v1(
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                HostOpV1::FsWriteAt,
+                None,
+                ResourceInputsV1::FileBufferSpan {
+                    file: admitted_file,
+                    target_buffer: admitted_buffer,
+                    span_origin: admitted_buffer,
+                },
+                &CanonicalRequestV1::FsWriteAt {
+                    file_offset: 2,
+                    buffer_start: 0,
+                    length: 2,
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                later.outcome,
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Revoked))
+            );
+            assert_eq!(backend.write_calls, 1);
+
+            assert!(matches!(
+                resources.request_release(admitted_file),
+                Ok(ResourceReleaseReadinessV1::Waiting)
+            ));
+            assert!(matches!(
+                resources.resolve_fs_handle(admitted_file, crate::RightSet::WRITE),
+                Err(ResourceErrorV1::Closed)
+            ));
+            let mut pending = resources.finish_admission(write_lease);
+            assert_eq!(pending.len(), 1, "the admitted write drains exactly once");
+            let pending = pending.pop().unwrap();
+            assert_eq!(pending.identity, admitted_identity);
+            let close_calls = std::cell::Cell::new(0);
+            let settlement = ResourceTableV1::finish_release_with(pending, |owner| {
+                close_calls.set(close_calls.get() + 1);
+                if let Some(error) = close_error {
+                    drop(owner);
+                    Err(error)
+                } else {
+                    crate::close_resource_v1(owner)
+                        .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+                }
+            });
+            assert_eq!(close_calls.get(), 1);
+            match close_error {
+                None => assert_eq!(
+                    settlement,
+                    Ok(ResourceSettlementObservationV1 {
+                        schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                        resource_kind: ResourceKindV1::FsHandle,
+                        identity: admitted_identity,
+                        outcome: ResourceSettlementOutcomeV1::Released,
+                    })
+                ),
+                Some(io) => assert_eq!(
+                    settlement,
+                    Err(ResourceErrorV1::ReleaseFailed {
+                        schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                        resource_kind: ResourceKindV1::FsHandle,
+                        identity: admitted_identity,
+                        io,
+                    })
+                ),
+            }
+            assert!(matches!(
+                resources.request_release(admitted_file),
+                Err(ResourceErrorV1::Closed)
+            ));
+            assert_eq!(close_calls.get(), 1, "settlement is never retried");
+
+            for token in [revoke_wins_file, admitted_buffer, revoke_wins_buffer] {
+                let reply = dispatch_host_op_v1(
+                    &mut backend,
+                    &capabilities,
+                    &revocation,
+                    &mut resources,
+                    HostOpV1::ResourceRelease,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &CanonicalRequestV1::ResourceRelease,
+                )
+                .unwrap();
+                assert!(matches!(
+                    reply.outcome,
+                    CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(_))
+                ));
+            }
+            std::fs::remove_dir_all(root).unwrap();
         }
     }
 
@@ -4807,6 +5538,7 @@ mod tests {
         let mut backend = PositionedBackend {
             root: rooted,
             write_limit: None,
+            write_calls: 0,
         };
 
         let source = dispatch_host_op_v1(
@@ -5286,6 +6018,7 @@ mod tests {
         let mut backend = PositionedBackend {
             root: rooted,
             write_limit: None,
+            write_calls: 0,
         };
 
         let source = dispatch_host_op_v1(
@@ -5489,6 +6222,7 @@ mod tests {
         let mut backend = PositionedBackend {
             root: rooted,
             write_limit: None,
+            write_calls: 0,
         };
         let source = dispatch_host_op_v1(
             &mut backend,
