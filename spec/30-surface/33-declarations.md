@@ -278,6 +278,17 @@ is a **surface error** (`24`) — it never reaches the kernel:
   Pair-shaped definition may be definitionally equal to non-dependent Σ, but it
   has a distinct `GlobalId` and does not substitute for the floor declaration
   (`34 §"Canonical non-dependent pair floor family"`).
+- **Effect-row and capability vocabulary is a separate namespace and is not
+  subject to this rule.** An `EffectName` in a `visits [...]` row or a
+  `capabilities` clause (`32 §1` capability-declaration syntax; `36 §1` the
+  effect row, `§1.1` its lattice) is resolved by the effect-row system, never by
+  import, and
+  is not a name-resolved value or type identity — it is outside the
+  floor-versus-import binary entirely. A program writes `visits [FS]` /
+  `capabilities FS` with no import, and that ambient tag must not be conflated
+  with the import-required catalog package that provides the corresponding
+  filesystem surface (its authority, error, and path *types*), which are
+  ordinary identities under the closure rule above.
 - Every failure — unresolved name, **`AmbiguousReference`** from a top-level
   clash, or an out-of-scope private name (`§4`) — is a **surface diagnostic**;
   the flattened `Σ` the kernel receives contains only resolved, in-scope
