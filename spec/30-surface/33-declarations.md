@@ -325,6 +325,27 @@ This is the AC1/AC2 invariant made concrete: `module` / `import` / `pub` /
 `export` / abstract-export cost the trust root **nothing** — surface namespacing +
 information-hiding over the unchanged flat `Σ`.
 
+Two consequences follow directly from the framing above and from `§4.1`; they
+are stated here because the account so far addressed only the non-parameterized
+case.
+
+- **A parameterized abstract export preserves its telescope exactly.** When the
+  exported type is itself parameterized (e.g. `NonEmpty`), the opaque constant it
+  elaborates to carries the type former's **full declared kind** — byte-identity
+  to a hand-written opaque constant is byte-identity *at that same kind*
+  (`(A : Type) → …`), so the parameter is never collapsed or erased and
+  `NonEmpty a` still elaborates at a client. An opaque constant of any kind,
+  Π-kinded included, is the existing kernel mechanism (`../10-kernel/11 §4`,
+  `13`); this remains "no new kernel feature."
+- **The defining module retains transparent constructor access.** Constructor
+  hiding is a **client-side** effect: the constructors are ordinary
+  module-private globals (`§4.1`), in scope *within* their defining module and
+  invisible only outside it — name resolution is surface-only and never reaches
+  `Σ` (`§3.3`). The defining module therefore keeps transparent `match` and
+  construct on the type while clients see only the opaque view; this is the same
+  information-hiding default as §4.1, applied to constructors rather than to a
+  top-level name.
+
 ### 4.3 Re-export preserves identity and visibility
 
 Every declaration has one canonical identity, owned by its **defined-at**
