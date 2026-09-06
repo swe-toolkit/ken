@@ -114,6 +114,22 @@ side.
   Re-measure every line at your cut. If a leg needs a substrate this WP should not
   build (e.g. blocking-stdin lifecycle beyond what console-write's leg already
   assumes), that is a hard-stop finding (§6), not scope creep.
+  - **Sequencing (Steward ruling 2026-09-06, evt_2eyphkzmew385): SPLIT,
+    ClockWallNow FIRST.** ClockWallNow needs no new backend substrate; land it as
+    an accepted per-op partial (native leg + differential + promotion + its own
+    AC-4 catalog status flip), Architect + Runtime QA -> M1-M4 -> lieutenant, before
+    ConsoleRead.
+  - **ConsoleRead substrate AUTHORIZED within ABI-A1 (Architect design ruling, this
+    thread; Steward scope authorization).** ConsoleRead's sound design is a NEW
+    governed leaf planner node for a host-reply-generated persistent-store referent
+    with exact singleton owner `{PersistentStore}` (the existing Absent/Scalar/
+    SiteOperand each falsely state the child). It must have its own leaf resolution
+    path, avoid operand reconciliation, be exhaustively handled across the backend
+    matches, leave all existing mappings/owner sets byte-identical, and carry
+    exact-owner mutation + real Chunk+Eof parity + ill-formedness + native-ID/role
+    affected-closure checks. The Architect confirmed it is backend planner
+    substrate, NOT a kernel/TCB addition, so it is inside this WP's native-execution
+    scope: no separate node, no operator TCB call. It is the SECOND per-op partial.
 - **`D1` — the normalized differentials.** One per operation, per §3: an
   explicit normalizer applied to both native and interpreter observation, then
   equality on the normalized value. State the invariant each encodes in prose
