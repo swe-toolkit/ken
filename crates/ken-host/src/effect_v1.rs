@@ -771,7 +771,6 @@ pub enum ResourceErrorV1 {
     InvalidOffset,
     InvalidBounds,
     NoProgress,
-    Revoked,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -889,14 +888,6 @@ enum ResourceSlotStateV1 {
         kind: ResourceKindV1,
         rights: crate::RightSet,
         identity: ResourceTraceIdentityV1,
-        provenance: Option<crate::revocation_v1::RevocationNodeId>,
-        admitted_leases: usize,
-    },
-    Closing {
-        owner: ResourceOwnerV1,
-        kind: ResourceKindV1,
-        identity: ResourceTraceIdentityV1,
-        admitted_leases: usize,
     },
     Vacant {
         last_identity: ResourceTraceIdentityV1,
@@ -927,24 +918,6 @@ pub struct PendingResourceCloseV1 {
     identity: ResourceTraceIdentityV1,
 }
 
-struct ResourceAdmissionLeaseV1 {
-    entries: Vec<ResourceAdmissionLeaseEntryV1>,
-    _revocation_leases: Vec<crate::revocation_v1::RevocationAdmissionLease>,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct ResourceAdmissionLeaseEntryV1 {
-    slot: u32,
-    generation: u32,
-    identity: ResourceTraceIdentityV1,
-}
-
-#[derive(Debug)]
-enum ResourceReleaseReadinessV1 {
-    Ready(PendingResourceCloseV1),
-    Waiting,
-}
-
 impl ResourceTableV1 {
     pub fn with_buffer_limits(limits: BufferLimitsV1) -> Self {
         Self {
@@ -960,7 +933,6 @@ impl ResourceTableV1 {
         owner: ResourceOwnerV1,
         kind: ResourceKindV1,
         rights: crate::RightSet,
-        provenance: Option<crate::revocation_v1::RevocationNodeId>,
     ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
         self.next_acquisition_identity = self
             .next_acquisition_identity
@@ -978,8 +950,6 @@ impl ResourceTableV1 {
                 kind,
                 rights,
                 identity,
-                provenance,
-                admitted_leases: 0,
             };
             return (
                 ResourceTokenV1 {
@@ -998,29 +968,12 @@ impl ResourceTableV1 {
                 kind,
                 rights,
                 identity,
-                provenance,
-                admitted_leases: 0,
             },
         });
         (ResourceTokenV1 { slot, generation }, identity)
     }
 
-    fn insert_fs_handle(
-        &mut self,
-        owner: crate::ResourceHandleV1,
-        rights: crate::RightSet,
-        provenance: crate::revocation_v1::RevocationNodeId,
-    ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
-        self.insert_owner(
-            ResourceOwnerV1::FsHandle(owner),
-            ResourceKindV1::FsHandle,
-            rights,
-            Some(provenance),
-        )
-    }
-
-    #[cfg(test)]
-    pub(crate) fn insert_fs_handle_without_provenance_for_test(
+    pub fn insert_fs_handle(
         &mut self,
         owner: crate::ResourceHandleV1,
         rights: crate::RightSet,
@@ -1029,7 +982,6 @@ impl ResourceTableV1 {
             ResourceOwnerV1::FsHandle(owner),
             ResourceKindV1::FsHandle,
             rights,
-            None,
         )
     }
 
@@ -1053,7 +1005,6 @@ impl ResourceTableV1 {
             ResourceOwnerV1::Buffer(buffer),
             ResourceKindV1::Buffer,
             crate::RightSet::from_bits(0),
-            None,
         );
         self.live_buffer_capacity = total;
         Ok(inserted)
@@ -1073,7 +1024,6 @@ impl ResourceTableV1 {
                 identity,
                 ..
             } => (owner, kind, rights, identity),
-            ResourceSlotStateV1::Closing { .. } => return Err(ResourceErrorV1::Closed),
             ResourceSlotStateV1::Vacant { .. } => return Err(ResourceErrorV1::MalformedResource),
             ResourceSlotStateV1::Retired { .. } => return Err(ResourceErrorV1::Closed),
         };
@@ -1107,7 +1057,6 @@ impl ResourceTableV1 {
                 identity,
                 ..
             } => (owner, kind, identity),
-            ResourceSlotStateV1::Closing { .. } => return Err(ResourceErrorV1::Closed),
             ResourceSlotStateV1::Vacant { .. } => return Err(ResourceErrorV1::MalformedResource),
             ResourceSlotStateV1::Retired { .. } => return Err(ResourceErrorV1::Closed),
         };
@@ -1141,15 +1090,6 @@ impl ResourceTableV1 {
                 Err(ResourceErrorV1::Closed)
             }
             ResourceSlotStateV1::Live { .. } => Err(ResourceErrorV1::MalformedResource),
-            ResourceSlotStateV1::Closing { identity, .. }
-                if token.generation == slot.generation =>
-            {
-                Ok(*identity)
-            }
-            ResourceSlotStateV1::Closing { .. } if token.generation < slot.generation => {
-                Err(ResourceErrorV1::Closed)
-            }
-            ResourceSlotStateV1::Closing { .. } => Err(ResourceErrorV1::MalformedResource),
             ResourceSlotStateV1::Vacant { last_identity }
                 if token.generation.checked_add(1) == Some(slot.generation) =>
             {
@@ -1184,152 +1124,10 @@ impl ResourceTableV1 {
         Ok(slot)
     }
 
-    fn admit_resources(
-        &mut self,
-        revocation: &crate::RevocationDomain,
-        tokens: &[ResourceTokenV1],
-    ) -> Result<ResourceAdmissionLeaseV1, ResourceErrorV1> {
-        let mut entries = Vec::with_capacity(tokens.len());
-        let mut revocation_leases = Vec::new();
-        for token in tokens {
-            let slot = self.lookup(*token)?;
-            let (identity, provenance) = match &slot.state {
-                ResourceSlotStateV1::Live {
-                    identity,
-                    provenance,
-                    ..
-                } => (*identity, *provenance),
-                ResourceSlotStateV1::Closing { .. }
-                | ResourceSlotStateV1::Retired { .. } => {
-                    return Err(ResourceErrorV1::Closed)
-                }
-                ResourceSlotStateV1::Vacant { .. } => {
-                    return Err(ResourceErrorV1::MalformedResource)
-                }
-            };
-            if let Some(provenance) = provenance {
-                let Some(lease) = revocation.admit(provenance) else {
-                    return Err(ResourceErrorV1::Revoked);
-                };
-                revocation_leases.push(lease);
-            }
-            entries.push(ResourceAdmissionLeaseEntryV1 {
-                slot: token.slot,
-                generation: token.generation,
-                identity,
-            });
-        }
-        for entry in &entries {
-            let slot = &mut self.slots[entry.slot as usize];
-            let ResourceSlotStateV1::Live {
-                identity,
-                admitted_leases,
-                ..
-            } = &mut slot.state
-            else {
-                unreachable!("validated resource changed before synchronous admission")
-            };
-            assert_eq!(slot.generation, entry.generation);
-            assert_eq!(*identity, entry.identity);
-            *admitted_leases = admitted_leases
-                .checked_add(1)
-                .expect("resource admission lease count exhausted");
-        }
-        Ok(ResourceAdmissionLeaseV1 {
-            entries,
-            _revocation_leases: revocation_leases,
-        })
-    }
-
-    fn finish_admission(
-        &mut self,
-        lease: ResourceAdmissionLeaseV1,
-    ) -> Vec<PendingResourceCloseV1> {
-        let mut pending = Vec::new();
-        for entry in lease.entries {
-            let completed_close = {
-                let slot = &mut self.slots[entry.slot as usize];
-                assert_eq!(slot.generation, entry.generation);
-                match &mut slot.state {
-                    ResourceSlotStateV1::Live {
-                        identity,
-                        admitted_leases,
-                        ..
-                    } => {
-                        assert_eq!(*identity, entry.identity);
-                        *admitted_leases = admitted_leases
-                            .checked_sub(1)
-                            .expect("resource admission lease count underflow");
-                        None
-                    }
-                    ResourceSlotStateV1::Closing {
-                        identity,
-                        admitted_leases,
-                        ..
-                    } => {
-                        assert_eq!(*identity, entry.identity);
-                        *admitted_leases = admitted_leases
-                            .checked_sub(1)
-                            .expect("resource admission lease count underflow");
-                        (*admitted_leases == 0).then(|| {
-                            std::mem::replace(
-                                &mut slot.state,
-                                ResourceSlotStateV1::Retired {
-                                    last_identity: None,
-                                },
-                            )
-                        })
-                    }
-                    ResourceSlotStateV1::Vacant { .. }
-                    | ResourceSlotStateV1::Retired { .. } => {
-                        unreachable!("resource was reused before its admitted lease drained")
-                    }
-                }
-            };
-            if let Some(ResourceSlotStateV1::Closing {
-                owner,
-                kind,
-                identity,
-                admitted_leases: 0,
-            }) = completed_close
-            {
-                if let ResourceOwnerV1::Buffer(buffer) = &owner {
-                    self.live_buffer_capacity = self
-                        .live_buffer_capacity
-                        .checked_sub(buffer.capacity() as u64)
-                        .expect("live buffer capacity accounting underflow");
-                }
-                Self::vacate_released_slot(&mut self.slots[entry.slot as usize], identity);
-                pending.push(PendingResourceCloseV1 {
-                    owner,
-                    kind,
-                    identity,
-                });
-            }
-        }
-        pending
-    }
-
-    fn vacate_released_slot(slot: &mut ResourceSlotV1, identity: ResourceTraceIdentityV1) {
-        match slot.generation.checked_add(1) {
-            Some(next) => {
-                slot.generation = next;
-                slot.state = ResourceSlotStateV1::Vacant {
-                    last_identity: identity,
-                };
-            }
-            None => {
-                slot.state = ResourceSlotStateV1::Retired {
-                    last_identity: Some(identity),
-                }
-            }
-        }
-    }
-
-    fn request_release(
+    pub fn begin_release(
         &mut self,
         token: ResourceTokenV1,
-    ) -> Result<ResourceReleaseReadinessV1, ResourceErrorV1> {
+    ) -> Result<PendingResourceCloseV1, ResourceErrorV1> {
         if token.generation == 0 {
             return Err(ResourceErrorV1::MalformedResource);
         }
@@ -1343,12 +1141,8 @@ impl ResourceTableV1 {
             return Err(ResourceErrorV1::MalformedResource);
         }
         match &slot.state {
-            ResourceSlotStateV1::Closing { .. } | ResourceSlotStateV1::Retired { .. } => {
-                return Err(ResourceErrorV1::Closed)
-            }
-            ResourceSlotStateV1::Vacant { .. } => {
-                return Err(ResourceErrorV1::MalformedResource)
-            }
+            ResourceSlotStateV1::Vacant { .. } => return Err(ResourceErrorV1::MalformedResource),
+            ResourceSlotStateV1::Retired { .. } => return Err(ResourceErrorV1::Closed),
             ResourceSlotStateV1::Live { .. } => {}
         }
         let state = std::mem::replace(
@@ -1361,47 +1155,35 @@ impl ResourceTableV1 {
             owner,
             kind,
             identity,
-            admitted_leases,
             ..
         } = state
         else {
-            unreachable!("live resource changed before synchronous release")
+            return Err(ResourceErrorV1::Closed);
         };
-        if admitted_leases != 0 {
-            slot.state = ResourceSlotStateV1::Closing {
-                owner,
-                kind,
-                identity,
-                admitted_leases,
-            };
-            return Ok(ResourceReleaseReadinessV1::Waiting);
-        }
         if let ResourceOwnerV1::Buffer(buffer) = &owner {
             self.live_buffer_capacity = self
                 .live_buffer_capacity
                 .checked_sub(buffer.capacity() as u64)
                 .expect("live buffer capacity accounting underflow");
         }
-        Self::vacate_released_slot(slot, identity);
-        Ok(ResourceReleaseReadinessV1::Ready(
-            PendingResourceCloseV1 {
-                owner,
-                kind,
-                identity,
-            },
-        ))
-    }
-
-    fn begin_release(
-        &mut self,
-        token: ResourceTokenV1,
-    ) -> Result<PendingResourceCloseV1, ResourceErrorV1> {
-        match self.request_release(token)? {
-            ResourceReleaseReadinessV1::Ready(pending) => Ok(pending),
-            ResourceReleaseReadinessV1::Waiting => {
-                unreachable!("synchronous dispatcher cannot overlap release with a live borrow")
+        match slot.generation.checked_add(1) {
+            Some(next) => {
+                slot.generation = next;
+                slot.state = ResourceSlotStateV1::Vacant {
+                    last_identity: identity,
+                };
+            }
+            None => {
+                slot.state = ResourceSlotStateV1::Retired {
+                    last_identity: Some(identity),
+                }
             }
         }
+        Ok(PendingResourceCloseV1 {
+            owner,
+            kind,
+            identity,
+        })
     }
 
     pub fn finish_release_with(
@@ -1532,7 +1314,6 @@ impl ResourceTableV1 {
             kind: file_kind,
             rights,
             identity: file_identity,
-            ..
         } = &mut file_slot.state
         else {
             return Err(SemanticErrorV1::Resource(ResourceErrorV1::Closed));
@@ -1797,14 +1578,6 @@ enum CapabilityRequirementV1 {
     FsOpen,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ResourceAdmissionRequirementV1 {
-    None,
-    Target,
-    FileBuffer,
-    FileBufferSpan,
-}
-
 impl HostOpV1 {
     /// Exhaustive classification at the ABI-R3 inventory boundary. A new host
     /// operation cannot silently skip capability admission: it must acquire a
@@ -1866,40 +1639,6 @@ impl HostOpV1 {
             | Self::BufferAllocate
             | Self::BufferFreeze
             | Self::EntropyRandomBytes => CapabilityRequirementV1::None,
-        }
-    }
-
-    /// Exhaustive resource-borrow classification at the ABI-R3 inventory
-    /// boundary. Settlement is deliberately not a borrow: revocation must not
-    /// prevent an owned resource from closing.
-    const fn resource_admission_requirement(self) -> ResourceAdmissionRequirementV1 {
-        match self {
-            Self::FsHandleMetadata | Self::BufferFreeze => {
-                ResourceAdmissionRequirementV1::Target
-            }
-            Self::FsReadAt => ResourceAdmissionRequirementV1::FileBuffer,
-            Self::FsWriteAt => ResourceAdmissionRequirementV1::FileBufferSpan,
-            Self::ConsoleRead
-            | Self::ConsoleWrite
-            | Self::ConsoleFlush
-            | Self::ConsoleIsTerminal
-            | Self::ClockWallNow
-            | Self::ClockMonotonicNow
-            | Self::ClockSleepUntil
-            | Self::EntropyRandomBytes
-            | Self::FsReadFile
-            | Self::FsWriteFile
-            | Self::FsAppendFile
-            | Self::FsMetadata
-            | Self::FsReadDirectory
-            | Self::FsCreateDirectory
-            | Self::FsRemoveFile
-            | Self::FsRemoveDirectory
-            | Self::FsRename
-            | Self::FsChangeMode
-            | Self::FsOpen
-            | Self::ResourceRelease
-            | Self::BufferAllocate => ResourceAdmissionRequirementV1::None,
         }
     }
 }
@@ -2002,35 +1741,6 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             ResourceErrorV1::MalformedResource,
         ));
     }
-    let admission_tokens = match (operation.resource_admission_requirement(), resource) {
-        (ResourceAdmissionRequirementV1::None, _) => Vec::new(),
-        (ResourceAdmissionRequirementV1::Target, ResourceInputsV1::Target(target))
-        | (
-            ResourceAdmissionRequirementV1::Target,
-            ResourceInputsV1::BufferSpanTarget { target, .. },
-        ) => vec![target],
-        (
-            ResourceAdmissionRequirementV1::FileBuffer,
-            ResourceInputsV1::FileBuffer { file, buffer },
-        ) => vec![file, buffer],
-        (
-            ResourceAdmissionRequirementV1::FileBufferSpan,
-            ResourceInputsV1::FileBufferSpan {
-                file,
-                target_buffer,
-                ..
-            },
-        ) => vec![file, target_buffer],
-        _ => unreachable!("resource shape and admission classification disagree"),
-    };
-    let resource_admission = if admission_tokens.is_empty() {
-        None
-    } else {
-        match resources.admit_resources(revocation, &admission_tokens) {
-            Ok(lease) => Some(lease),
-            Err(error) => return Ok(resource_denied(operation, request, error)),
-        }
-    };
     let mut minted_resource = None;
     let mut resource_bindings = Vec::new();
     let outcome = match (operation, request) {
@@ -2135,11 +1845,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
         (HostOpV1::FsOpen, CanonicalRequestV1::FsOpen { path, mode }) => backend
             .fs_open_resource(grant.expect("validated FS capability"), path, *mode)
             .map(|owner| {
-                let (token, identity) = resources.insert_fs_handle(
-                    owner,
-                    mode.required_right(),
-                    grant.expect("validated FS capability").revocation_node,
-                );
+                let (token, identity) = resources.insert_fs_handle(owner, mode.required_right());
                 minted_resource = Some(token);
                 resource_bindings.push((ResourceBindingRole::Target, identity));
                 CanonicalReplyV1::ResourceAcquired {
@@ -2348,12 +2054,6 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
         }
         _ => return Err(TerminalErrorV1::MalformedHostAbiField),
     };
-    if let Some(lease) = resource_admission {
-        assert!(
-            resources.finish_admission(lease).is_empty(),
-            "synchronous dispatch cannot overlap a release request with its resource borrow"
-        );
-    }
     Ok(HostDispatchReplyV1 {
         capability_identity: grant.map(|grant| grant.identity.clone()),
         resource_token: minted_resource,
@@ -4123,8 +3823,7 @@ mod tests {
     fn caller_control_release_invalidates_before_close_and_never_retries() {
         let (root, owner) = resource_fixture("first");
         let mut table = ResourceTableV1::default();
-        let (token, identity) = table
-            .insert_fs_handle_without_provenance_for_test(owner, crate::RightSet::METADATA);
+        let (token, identity) = table.insert_fs_handle(owner, crate::RightSet::METADATA);
         assert_eq!(identity, ResourceTraceIdentityV1(1));
         assert!(table
             .resolve_fs_handle(token, crate::RightSet::METADATA)
@@ -4168,10 +3867,8 @@ mod tests {
         let (root_a, owner_a) = resource_fixture("final-a");
         let (root_b, owner_b) = resource_fixture("final-b");
         let mut table = ResourceTableV1::default();
-        let (token_a, identity_a) = table
-            .insert_fs_handle_without_provenance_for_test(owner_a, crate::RightSet::METADATA);
-        let (token_b, identity_b) = table
-            .insert_fs_handle_without_provenance_for_test(owner_b, crate::RightSet::METADATA);
+        let (token_a, identity_a) = table.insert_fs_handle(owner_a, crate::RightSet::METADATA);
+        let (token_b, identity_b) = table.insert_fs_handle(owner_b, crate::RightSet::METADATA);
         let calls = std::cell::Cell::new(0);
         let settlements = table.finalize_all_with(|owner| {
             let call = calls.get();
@@ -4223,8 +3920,7 @@ mod tests {
         let (root_b, owner_b) = resource_fixture("b");
         let (root_c, owner_c) = resource_fixture("c");
         let mut table = ResourceTableV1::default();
-        let (stale, _) = table
-            .insert_fs_handle_without_provenance_for_test(owner_a, crate::RightSet::METADATA);
+        let (stale, _) = table.insert_fs_handle(owner_a, crate::RightSet::METADATA);
         let metadata = crate::resource_metadata_v1(
             table
                 .resolve_fs_handle(stale, crate::RightSet::METADATA)
@@ -4261,8 +3957,7 @@ mod tests {
             Err(ResourceErrorV1::MalformedResource)
         ));
 
-        let (reused, second_identity) = table
-            .insert_fs_handle_without_provenance_for_test(owner_b, crate::RightSet::METADATA);
+        let (reused, second_identity) = table.insert_fs_handle(owner_b, crate::RightSet::METADATA);
         assert_eq!(reused.slot, stale.slot);
         assert_ne!(reused.generation, stale.generation);
         assert_eq!(second_identity, ResourceTraceIdentityV1(2));
@@ -4278,8 +3973,8 @@ mod tests {
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         })
         .unwrap();
-        let (after_wrap, third_identity) = table
-            .insert_fs_handle_without_provenance_for_test(owner_c, crate::RightSet::METADATA);
+        let (after_wrap, third_identity) =
+            table.insert_fs_handle(owner_c, crate::RightSet::METADATA);
         assert_ne!(
             after_wrap.slot, wrapped.slot,
             "wrapped slots retire permanently"

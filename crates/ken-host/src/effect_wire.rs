@@ -454,7 +454,6 @@ fn put_error(out: &mut Vec<u8>, error: &SemanticErrorV1) -> Result<(), EffectTra
                 ResourceErrorV1::InvalidBounds => put_u8(out, 7),
                 ResourceErrorV1::NoProgress => put_u8(out, 8),
                 ResourceErrorV1::AllocationFailed => put_u8(out, 9),
-                ResourceErrorV1::Revoked => put_u8(out, 10),
             }
         }
     }
@@ -932,7 +931,6 @@ fn get_error(cursor: &mut Cursor<'_>) -> Result<SemanticErrorV1, EffectTraceWire
             7 => ResourceErrorV1::InvalidBounds,
             8 => ResourceErrorV1::NoProgress,
             9 => ResourceErrorV1::AllocationFailed,
-            10 => ResourceErrorV1::Revoked,
             _ => return Err(EffectTraceWireError),
         }),
         _ => return Err(EffectTraceWireError),
