@@ -3591,7 +3591,8 @@ fn decode_checked_host_operation<'a>(
                     expression_lowering_error(
                         root,
                         "host_coproduct_shape",
-                        "ambient tail operation is not a checked coproduct constructor",
+                        "ambient tail operation is not a checked coproduct \
+                         constructor",
                     )
                 })?;
             if tail_arm.symbol != spine.in_l && tail_arm.symbol != spine.in_r {

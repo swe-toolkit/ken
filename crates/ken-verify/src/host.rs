@@ -265,7 +265,8 @@ impl HostHandler for ScriptedPosixHost {
             self.inner.clock_wall_now()
         } else {
             panic!(
-                "PX6 Clock.WallNow requires an explicit scripted response or explicit real-clock response"
+                "PX6 Clock.WallNow requires an explicit scripted response or \
+                 explicit real-clock response"
             )
         }
     }

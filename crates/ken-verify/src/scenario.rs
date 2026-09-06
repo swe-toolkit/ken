@@ -178,8 +178,8 @@ impl fmt::Display for ClockWallNowDifferentialError {
                 end_nanoseconds,
             } => write!(
                 formatter,
-                "{lane} ClockWallNow reading {reading} lies outside controlled window \
-                 [{start_nanoseconds}, {end_nanoseconds}]"
+                "{lane} ClockWallNow reading {reading} lies outside \
+                 controlled window [{start_nanoseconds}, {end_nanoseconds}]"
             ),
             Self::NormalizedMismatch(error) => error.fmt(formatter),
         }
@@ -241,7 +241,9 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
     Ok(run)
 }
 
-fn execute_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, HarnessError> {
+fn execute_scenario(
+    scenario: &Scenario,
+) -> Result<CanonicalDifferentialRun, HarnessError> {
     validate_native_ambient(&scenario.ambient)?;
     let roots = TwinRealRoots::create(&scenario.initial_filesystem)?;
     let build = ken_cli::build_native_program(
@@ -367,7 +369,8 @@ fn compare_clock_wall_now_observations(
         interpreter,
         interpreter_window,
     )?;
-    let native = normalize_clock_wall_now_observation("native", native, native_window)?;
+    let native =
+        normalize_clock_wall_now_observation("native", native, native_window)?;
     compare_canonical_exact(&interpreter, &native)
         .map_err(ClockWallNowDifferentialError::NormalizedMismatch)
 }
@@ -397,7 +400,9 @@ fn normalize_clock_wall_now_observation(
         {
             return Err(ClockWallNowDifferentialError::TraceShape {
                 lane,
-                reason: format!("event {index} is not the exact ambient ClockWallNow shape"),
+                reason: format!(
+                    "event {index} is not the exact ambient ClockWallNow shape"
+                ),
             });
         }
         let ken_host::CanonicalOutcomeV1::Success(
@@ -973,14 +978,15 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     }
 
     /// Promise class: durable invariant. ABI-A1's operation-specific
-    /// differential applies one identical projection to both real lanes. It retains the complete response shape
-    /// and every non-clock observation field, requires two non-decreasing
+    /// differential applies one identical projection to both real lanes. It
+    /// retains the complete response shape and every non-clock observation
+    /// field, requires two non-decreasing
     /// readings inside each lane's controlled wall window, and erases only the
     /// instant bytes before equality.
     ///
-    /// The wrong-subject half changes the second native observation to precede
-    /// the first. It must be rejected by the same normalizer, proving the
-    /// monotonic-in-this-controlled-run predicate is not decorative.
+    /// The wrong-subject controls independently violate ordering, the measured
+    /// window, exact Clock event shape, and a non-clock observation field. Each
+    /// must be rejected by the same projection that accepts the real pair.
     #[test]
     fn clock_wall_now_normalized_real_artifact_differential_discriminates() {
         let run = execute_scenario(&clock_wall_scenario())
@@ -1022,6 +1028,56 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 lane: "mutated native",
                 ..
             })
+        ));
+
+        let mut outside_window = run.native.clone();
+        let outside_reading = BigInt::from(run.native_wall_window.end_nanoseconds)
+            + BigInt::from(1u8);
+        let outside_reading = outside_reading.to_signed_bytes_be();
+        for event in &mut outside_window.effect_trace {
+            let CanonicalOutcomeV1::Success(CanonicalReplyV1::Instant(bytes)) =
+                &mut event.outcome
+            else {
+                panic!("native response must be Instant")
+            };
+            *bytes = outside_reading.clone();
+        }
+        assert!(matches!(
+            normalize_clock_wall_now_observation(
+                "outside-window native",
+                &outside_window,
+                run.native_wall_window,
+            ),
+            Err(ClockWallNowDifferentialError::OutsidePlausibleWindow {
+                lane: "outside-window native",
+                ..
+            })
+        ));
+
+        let mut wrong_shape = run.native.clone();
+        wrong_shape.effect_trace[1].operation = HostOpV1::ClockMonotonicNow;
+        assert!(matches!(
+            normalize_clock_wall_now_observation(
+                "wrong-shape native",
+                &wrong_shape,
+                run.native_wall_window,
+            ),
+            Err(ClockWallNowDifferentialError::TraceShape {
+                lane: "wrong-shape native",
+                ..
+            })
+        ));
+
+        let mut wrong_non_clock_field = run.native.clone();
+        wrong_non_clock_field.stdout.push(b'x');
+        assert!(matches!(
+            compare_clock_wall_now_observations(
+                &run.interpreter,
+                run.interpreter_wall_window,
+                &wrong_non_clock_field,
+                run.native_wall_window,
+            ),
+            Err(ClockWallNowDifferentialError::NormalizedMismatch(_))
         ));
     }
 

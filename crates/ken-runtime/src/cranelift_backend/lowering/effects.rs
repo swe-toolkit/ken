@@ -773,8 +773,8 @@ impl EffectSeatLedger {
         }
         if operation == ken_host::HostOpV1::ClockWallNow && !planned.is_empty() {
             return Err(backend_module(format!(
-                "host effect seat ledger: zero-arity ClockWallNow {effect_origin:?} planned \
-                 unexpected seats {planned:?}"
+                "host effect seat ledger: zero-arity ClockWallNow \
+                 {effect_origin:?} planned unexpected seats {planned:?}"
             )));
         }
         let id = effect_seat_group::mint(&mut self.next_group);
@@ -2362,6 +2362,18 @@ impl<'a> Lowering<'a> {
                 ),
             ));
         }
+        // `RT-DEAD-ARM-EFFECT-LOWERING` completion: admission changes whether
+        // the host operation has a native emitter, never whether the enclosing
+        // request arm is constructible. An admitted effect in a proven-dead arm
+        // must therefore take the same fail-closed trap as an unavailable one,
+        // before its unreachable operands or continuation reach a later
+        // specialized-only refusal surface.
+        if self.effect_arm_is_provably_dead(static_origin)? {
+            self.disposition_dead_arm_joins(static_origin)?;
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                dead_arm_effect_trap(family, operation),
+            )));
+        }
         let argument_base = usize::from(capability.is_some());
         let lowered = args
             .iter()
@@ -3080,8 +3092,9 @@ impl<'a> Lowering<'a> {
                 response_pointer,
                 response_len,
             )?;
-            let ok_root =
-                SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk);
+            let ok_root = SynthesizedAggregatePath::root(
+                SynthesizedAggregateRoot::HostResultOk,
+            );
             let instant = self.synthesized_constructor(
                 static_origin,
                 &ok_root,

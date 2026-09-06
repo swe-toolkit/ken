@@ -4021,7 +4021,8 @@ mod tests {
                 HostOpV1::FsRename,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "the ClockWallNow partial must not promote ConsoleRead or another deferred lane"
+            "the ClockWallNow partial must not promote ConsoleRead or another \
+             deferred lane"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,

@@ -52,14 +52,14 @@ impl NativeTestedEvidence {
         Self {
             exact_artifact_executed: run.exact_artifact_executed,
             canonical_observation_equal: run.compare_clock_wall_now().is_ok(),
-            operation_observed_in_both_lanes: [&run.interpreter, &run.native].into_iter().all(
-                |observation| {
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
                     observation
                         .effect_trace
                         .iter()
                         .any(|event| event.operation == operation)
-                },
-            ),
+                }),
         }
     }
 

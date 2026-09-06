@@ -161,7 +161,8 @@ struct ConsoleStreamRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // C has no zero-sized records; zero-arity requests never read this byte.
+// C has no zero-sized records; zero-arity requests never read this byte.
+#[allow(dead_code)]
 struct UnitRequestV1 {
     reserved: u8,
 }
@@ -1241,7 +1242,8 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::ClockWallNow if request_size == std::mem::size_of::<UnitRequestV1>() => {
+        HostOpV1::ClockWallNow
+            if request_size == std::mem::size_of::<UnitRequestV1>() => {
             if !request.cast::<UnitRequestV1>().is_aligned() {
                 return -1;
             }
@@ -2201,14 +2203,19 @@ mod tests {
         assert_eq!(reply.tag, REPLY_BYTES);
         assert_eq!(reply.detail, 0);
         assert_eq!(reply.bytes.len, std::mem::size_of::<i128>());
-        let bytes = unsafe { std::slice::from_raw_parts(reply.bytes.data, reply.bytes.len) };
-        let bytes: [u8; 16] = bytes.try_into().expect("the response is one signed i128");
+        let bytes = unsafe {
+            std::slice::from_raw_parts(reply.bytes.data, reply.bytes.len)
+        };
+        let bytes: [u8; 16] = bytes
+            .try_into()
+            .expect("the response is one signed i128");
         let reading = i128::from_be_bytes(bytes);
         let before = i128::from_be_bytes(before.try_into().unwrap());
         let after = i128::from_be_bytes(after.try_into().unwrap());
         assert!(
             before <= reading && reading <= after,
-            "raw wall reading {reading} lies outside its controlled [{before}, {after}] window"
+            "raw wall reading {reading} lies outside its controlled \
+             [{before}, {after}] window"
         );
 
         let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
