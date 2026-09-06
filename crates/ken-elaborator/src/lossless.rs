@@ -672,6 +672,9 @@ fn collect_pattern_spans(pattern: &Pattern, out: &mut Vec<Span>) {
         PatKind::Ctor(_, fields) => fields
             .iter()
             .for_each(|field| collect_pattern_spans(field, out)),
+        PatKind::Tuple(components) => components
+            .iter()
+            .for_each(|component| collect_pattern_spans(component, out)),
         PatKind::As(inner, _) => collect_pattern_spans(inner, out),
         PatKind::Wild | PatKind::Var(_) => {}
     }

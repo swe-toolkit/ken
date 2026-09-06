@@ -171,6 +171,8 @@ pub enum PatKind {
     Var(String),
     /// `C p₁ … pₙ` — constructor pattern with sub-patterns.
     Ctor(String, Vec<Pattern>),
+    /// `(p₁, …, pₙ)` — a surface tuple pattern, with `n >= 2`.
+    Tuple(Vec<Pattern>),
     /// `p as x` — match through `p` and bind `x` to that position's value.
     As(Box<Pattern>, String),
 }

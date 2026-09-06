@@ -55,6 +55,7 @@ pub enum RPatKind {
     Wild,
     Var(String),
     Ctor(String, Vec<RPattern>),
+    Tuple(Vec<RPattern>),
     As(Box<RPattern>, String, usize),
 }
 
@@ -2034,6 +2035,22 @@ fn resolve_pattern_inner(
                     span: pat.span.clone(),
                 },
                 all_names,
+            ))
+        }
+        PatKind::Tuple(components) => {
+            let mut resolved_components = Vec::with_capacity(components.len());
+            let mut all_bindings = Vec::new();
+            for component in components {
+                let (resolved, mut bindings) = resolve_pattern_inner(component, next_slot)?;
+                resolved_components.push(resolved);
+                all_bindings.append(&mut bindings);
+            }
+            Ok((
+                RPattern {
+                    kind: RPatKind::Tuple(resolved_components),
+                    span: pat.span.clone(),
+                },
+                all_bindings,
             ))
         }
         PatKind::As(inner, alias) => {

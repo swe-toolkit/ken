@@ -1381,6 +1381,12 @@ fn rewrite_rpattern(
                 .collect::<Result<Vec<_>, ElabError>>()?;
             RPatKind::Ctor(n, subs)
         }
+        RPatKind::Tuple(components) => RPatKind::Tuple(
+            components
+                .into_iter()
+                .map(|component| rewrite_rpattern(scope, exports, component))
+                .collect::<Result<Vec<_>, ElabError>>()?,
+        ),
         RPatKind::As(inner, alias, slot) => RPatKind::As(
             Box::new(rewrite_rpattern(scope, exports, *inner)?),
             alias,
