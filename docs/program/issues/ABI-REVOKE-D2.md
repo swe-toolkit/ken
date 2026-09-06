@@ -44,13 +44,27 @@ resource inherits the same node unless a future explicit reauthorization
 establishes a different sponsor — **do not invent multi-sponsor "any live grant
 wins" semantics.**
 
-**`D2.2` — the resource-side error identity.** Add the nullary
-`ResourceErrorV1::Revoked`, distinct from `Closed` / `MalformedResource` /
+**`D2.2` — the resource-side error identity.** Add the nullary resource-side
+authority-withdrawal arm, distinct from `Closed` / `MalformedResource` /
 `RightNotHeld` / `ResourceKindMismatch`. This is the "`Revoked` added downstream
 by ABI-REVOKE" arm PX8 deliberately gated — authority-withdrawal, **outside**
 PX8's bounded §1.7 population, so it does not reopen PX8, but it **will** require
 handling in the closed-sum exhaustive matches (expected, not a regression —
 `COORDINATION §7`'s no-`_ =>` completeness discipline).
+
+> **AMENDED 2026-09-06 — Gate-0 constructor-namespace ruling (Architect option B,
+> evt_5pm9ve77jqr5e).** The elaborator has ONE flat constructor namespace
+> (`data.rs` unconditional insert) + unqualified pattern resolution, so a second
+> constructor spelled `Revoked` would shadow `IOError.Revoked` and there is no
+> source form to disambiguate — type-directed/qualified resolution (option A) is
+> FORECLOSED by the settled flat-namespace spec decision (§1). So the arm takes a
+> DISTINCT SOURCE SPELLING: Ken source `ResourceRevoked`, Rust identity retained as
+> `ResourceErrorV1::Revoked`, distinct `resource.*` wire identity (next code 10).
+> Keep `IOError.Revoked` and every existing IOError match UNCHANGED. Do NOT
+> collapse into `ResourceHostIO Revoked`. The duplicate-prelude-definition
+> hardening is SEPARATE language debt, not D2 scope
+> ([[LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD]]). Runtime resumes from staged WIP
+> `0b313f3bf`; Architect remains required reviewer on the fresh candidate.
 
 **`D2.3` — close-after-drain settlement.** An owned fd closes only after all
 admitted leases drain; `ReleaseFailed` recorded once (ADR-0021); settlement
@@ -61,7 +75,8 @@ operation may borrow it.
 
 **`AC-ORACLE-RESOURCE`** — `seed-capabilities.md`
 `revoked-resource-operation-is-distinct-resourceerror` turns green, asserting the
-distinct nullary `Revoked` (not `Closed`/`RightNotHeld`).
+distinct nullary resource-authority arm (Ken source `ResourceRevoked`; not
+`Closed`/`RightNotHeld`, and distinct from `IOError.Revoked`).
 
 **`AC-ORACLE-SETTLEMENT`** — `revoke-admission-race-preserves-real-settlement`
 turns green: an operation admitted before revoke reports its real settlement, and

@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 03:09:38Z — from 555 issue file(s) in `docs/program/issues/`.
+2026-09-06 03:34:06Z — from 556 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -175,6 +175,7 @@ the committed file matches the generator's output.
 | `LANG-CHECKED-IH-BODY-VIEW-CAUSE` | An ordinary binary-tree traversal does not compile natively, and the code discards the reason: compiler_driver.rs maps any failure of checked_core_declaration_body_view to MissingClosureMetadata with map_err(|_| ...), so the label is not a diagnosis. Surface the cause before sizing anything | draft | language | S | none | — |
 | `LANG-COMMENT-CLASSIFIER-SHARED` | The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either | merged | language | S | none | — |
 | `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | merged | language | S | none | — |
+| `LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD` | Elaborator constructor namespace: a later constructor with a spelling already bound silently replaces the earlier binding (flat global map, unqualified pattern resolution). Diagnose it instead of shadowing silently. QUEUED language debt — not on any active lane. | draft | language | S | none | — |
 | `LANG-CONVOY-ENCLOSING-FIELD` | spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed | merged | language | S | none | — |
 | `LANG-CONVOY-MATCH-FIELD-PROVENANCE` | capability 2's sibling-convoy candidate range is a positional proxy for a provenance property -- carry the match-field regions explicitly on the elaboration context and skip them, closing spec 34 section 3.2's Boundary gap without the incompleteness a positional floor would introduce | merged | language | S | none | — |
 | `LANG-CTOR-PREMISE-ELABORATION-DIVERGES` | A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken | merged | kernel | L | none | — |
