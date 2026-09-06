@@ -1296,31 +1296,6 @@ fn native_resource_error_projection_follows_the_generated_wire_tail() {
     }
 }
 
-/// Promise class: normative compatibility vector. MEASURED: a real native
-/// host-call reply carrying generated resource error code 10 selects the exact
-/// nullary `ResourceRevoked` checked constructor, while a nonzero payload is
-/// rejected. CLAIMED: native projection preserves D2's distinct resource-side
-/// withdrawal identity. THE GAP: provenance admission is host-side and pinned
-/// independently; this test owns the wire-to-checked-value projection only.
-#[test]
-fn native_resource_revoked_projection_is_exact_and_nullary() {
-    let (actual, fixture) = run_px8n_arm_fixture(
-        ABI_REVOKE_D2_ERRPROJ_REVOKED,
-        abi_revoke_d2_resource_revoked_projection_fixture,
-    );
-    assert_eq!(fixture.malformed_request, 0);
-    assert_eq!(fixture.call_index, 1);
-    assert_eq!(actual, 80);
-
-    let (with_payload, fixture) = run_px8n_arm_fixture(
-        ABI_REVOKE_D2_ERRPROJ_REVOKED | PX8_ERRPROJ_NONZERO_PAYLOAD,
-        abi_revoke_d2_resource_revoked_projection_fixture,
-    );
-    assert_eq!(fixture.malformed_request, 0);
-    assert_eq!(fixture.call_index, 1);
-    assert_eq!(with_payload, -1, "the new resource constructor is nullary");
-}
-
 #[test]
 fn native_nullary_resource_error_set_rejects_payloads_and_unknown_identities() {
     let cases: &[(u64, fn(&crate::NativeProcessSymbols) -> RuntimeExpr, &str)] = &[
@@ -1883,12 +1858,6 @@ fn px8_allocation_failed_projection_fixture(symbols: &crate::NativeProcessSymbol
     px8_resource_error_projection_fixture(symbols, &symbols.resource_allocation_failed, 79)
 }
 
-fn abi_revoke_d2_resource_revoked_projection_fixture(
-    symbols: &crate::NativeProcessSymbols,
-) -> RuntimeExpr {
-    px8_resource_error_projection_fixture(symbols, &symbols.resource_revoked, 80)
-}
-
 fn px8i_metadata_big_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
     let trap = || RuntimeTrap {
         code: RuntimeTrapCode::PatternMatchFailure,
@@ -2331,7 +2300,6 @@ extern "C" fn px8n_scripted_host_dispatch(
             PX8_ERRPROJ_INVALID_BOUNDS => Some(wire.resource_error_invalid_bounds),
             PX8_ERRPROJ_NO_PROGRESS => Some(wire.resource_error_no_progress),
             PX8_ERRPROJ_ALLOCATION_FAILED => Some(wire.resource_error_allocation_failed),
-            ABI_REVOKE_D2_ERRPROJ_REVOKED => Some(wire.resource_error_revoked),
             PX8_ERRPROJ_UNKNOWN_IDENTITY => Some(u64::MAX),
             _ => None,
         };
@@ -2619,8 +2587,6 @@ const PX8_ERRPROJ_ALLOCATION_FAILED: u64 = 12;
 
 #[cfg(test)]
 const PX8_ERRPROJ_UNKNOWN_IDENTITY: u64 = 14;
-/// ABI-REVOKE-D2 distinct resource-authority withdrawal identity.
-const ABI_REVOKE_D2_ERRPROJ_REVOKED: u64 = 15;
 
 #[cfg(test)]
 const PX8_ERRPROJ_SCENARIO_MASK: u64 = 0xff;

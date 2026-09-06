@@ -7932,8 +7932,8 @@ fn a_dynamic_alternative_with_no_planned_record_refuses() {
         .expect("the error root is the resource surface");
     assert_eq!(
         population.len(),
-        12,
-        "the resource surface has twelve alternatives"
+        11,
+        "the resource surface has eleven alternatives"
     );
 
     let seed_env = NativeSeedEnvironment::empty();

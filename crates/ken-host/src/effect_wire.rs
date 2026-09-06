@@ -454,7 +454,6 @@ fn put_error(out: &mut Vec<u8>, error: &SemanticErrorV1) -> Result<(), EffectTra
                 ResourceErrorV1::InvalidBounds => put_u8(out, 7),
                 ResourceErrorV1::NoProgress => put_u8(out, 8),
                 ResourceErrorV1::AllocationFailed => put_u8(out, 9),
-                ResourceErrorV1::Revoked => put_u8(out, 10),
             }
         }
     }
@@ -932,7 +931,6 @@ fn get_error(cursor: &mut Cursor<'_>) -> Result<SemanticErrorV1, EffectTraceWire
             7 => ResourceErrorV1::InvalidBounds,
             8 => ResourceErrorV1::NoProgress,
             9 => ResourceErrorV1::AllocationFailed,
-            10 => ResourceErrorV1::Revoked,
             _ => return Err(EffectTraceWireError),
         }),
         _ => return Err(EffectTraceWireError),
@@ -1351,29 +1349,6 @@ mod tests {
                 relative_path: b"shared".to_vec(),
                 cause: FileErrorCauseV1::Revoked,
             })),
-        });
-
-        let encoded = encode_linked_effect_trace(&expected).unwrap();
-        assert_eq!(decode_linked_effect_trace(&encoded), Ok(expected));
-    }
-
-    /// Promise class: normative compatibility vector. MEASURED: the sole
-    /// effect-trace codec round-trips exact nullary resource revocation.
-    /// CLAIMED: observation transport does not collapse resource withdrawal
-    /// into a lifetime, rights, host-I/O, or file-error identity. THE GAP: the
-    /// dispatcher and checked reifiers independently pin production.
-    #[test]
-    fn linked_trace_codec_preserves_revoked_resource_error_identity() {
-        let mut expected = representative_trace();
-        expected.effect_trace.push(EffectEvent {
-            sequence: 9,
-            operation: HostOpV1::FsHandleMetadata,
-            capability: None,
-            resource_bindings: Vec::new(),
-            request: CanonicalRequestV1::FsHandleMetadata,
-            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
-                ResourceErrorV1::Revoked,
-            )),
         });
 
         let encoded = encode_linked_effect_trace(&expected).unwrap();
