@@ -265,18 +265,31 @@ Steward cuts it rather than the ring.
 >   declaration order for dependent later fields; it discharged the NoInhabitants
 >   composition discriminator including the open-record field-subset-subsumes-
 >   superset case.
-> - **Slice 4 or-patterns -- RELEASED 2026-09-06.** [[LANG-MATCH-OR-PATTERN]]
->   (`active`), an ALTERNATION over the same occurrence (not a projecting form, no
->   new carrier): every alternative binds the same name set at definitionally-equal
->   types in the common pre-branch context, coverage is the union and the arm is
->   reachable if any alternative has a non-empty residual. Its composition
->   discriminator has two parts -- a fully-subsumed or-arm gets the subsumption
->   cause never NoInhabitants, and a partially-dead or-pattern stays reachable --
->   plus the top-level refusal is lifted to see THROUGH an or-pattern (a `Wild`/`Var`
->   alternative stays refused as the catch-all it is). Base `a42b90454`.
-> - **Slices 5-6 (guards, literals)** remain future slices, each fail-closed until
->   cut. Literals stay blocked (the enclave's DecEq/expected-type finding). The
->   Steward cuts the next slice one-release-ahead as the ring drains.
+> - **Slice 4 or-patterns -- LANDED 2026-09-06.** [[LANG-MATCH-OR-PATTERN]] merged
+>   `7f80228c2` (PR #3374, CI-green) / closed `440b16dfc`, blob-verified 7/7, an
+>   ALTERNATION over the same occurrence (not a projecting form, no new carrier):
+>   every alternative binds the same name set at definitionally-equal types in the
+>   common pre-branch context, coverage is the union and the arm is reachable if any
+>   alternative has a non-empty residual. Its composition discriminator has two
+>   parts -- a fully-subsumed or-arm gets the subsumption cause never NoInhabitants,
+>   and a partially-dead or-pattern stays reachable -- plus the top-level refusal is
+>   lifted to see THROUGH an or-pattern (a `Wild`/`Var` alternative stays refused as
+>   the catch-all it is). Base `a42b90454`.
+> - **Slice 5 guards -- RELEASED 2026-09-06.** [[LANG-MATCH-GUARDS]] (`active`), an
+>   ARM-SELECTION refinement (not a pattern form, no carrier): a boolean `g`
+>   evaluated after the arm's pattern matches, gating the arm. Atomic with the
+>   coverage exception (a guarded arm does not discharge its constructor,
+>   `34 §4.1:882`) and the reachability exception (a guarded arm does not cover, so a
+>   later unguarded same-constructor arm stays reachable, `§4.2:902-904`), and
+>   non-refining (`§3.3:623`). Its composition discriminator is TWO-SIDED -- guards
+>   loosen coverage (a guard that would complete exhaustiveness makes the match
+>   non-exhaustive) and loosen reachability (a guard on an earlier arm keeps a later
+>   same-constructor unguarded arm reachable), the guard load-bearing to each
+>   verdict. Top-level `_`/`Var` refusal UNCHANGED (a guard does not lift it). Base
+>   `440b16dfc`.
+> - **Slice 6 (literals)** remains a future slice, fail-closed until cut, and stays
+>   BLOCKED (the enclave's DecEq/expected-type finding). The Steward cuts it
+>   one-release-ahead once its blocker clears.
 
 **One thing already decided and needing no further ruling:** this node does
 **not** amend `34`. The enclave ruled the chapter's obligations real, so the
