@@ -1527,9 +1527,17 @@ fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
         let mut changed = layout.clone();
         changed.request_align_shift ^= 1;
         mutations.push(changed);
-        let mut changed = layout.clone();
-        changed.request_offsets[0] ^= 1;
-        mutations.push(changed);
+        if layout.request_offsets.is_empty() {
+            assert_eq!(
+                operation,
+                ken_host::HostOpV1::ClockWallNow,
+                "only the zero-arity wall-clock request has no request field offset"
+            );
+        } else {
+            let mut changed = layout.clone();
+            changed.request_offsets[0] ^= 1;
+            mutations.push(changed);
+        }
         let mut changed = layout.clone();
         changed.reply_size ^= 1;
         mutations.push(changed);
@@ -2727,9 +2735,9 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// the frame forbids.
 ///
 /// MEASURED: for each admitted operation the ordinals carrying a contract are
-/// exactly `0..n` for some `n >= 1`, the capability slot carries one for
-/// exactly the four FS-path operations, and no unadmitted lane carries one at
-/// any slot.
+/// exactly `0..n`; `ClockWallNow` is the sole zero-arity operation, every other
+/// admitted operation has `n >= 1`, the capability slot carries one for exactly
+/// the four FS-path operations, and no unadmitted lane carries one at any slot.
 ///
 /// CLAIMED: the table has no hole and no wildcard, so an operation cannot be
 /// admitted while some seat of it silently has no contract.
@@ -2764,10 +2772,17 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
                     .is_some()
             })
             .collect::<Vec<_>>();
-        assert!(
-            !carried.is_empty(),
-            "{operation:?} is admitted but has no argument seat at all"
-        );
+        if operation == ken_host::HostOpV1::ClockWallNow {
+            assert!(
+                carried.is_empty(),
+                "ClockWallNow is zero-arity and must not acquire an argument seat"
+            );
+        } else {
+            assert!(
+                !carried.is_empty(),
+                "{operation:?} is admitted but has no argument seat at all"
+            );
+        }
         assert_eq!(
             carried,
             (0..carried.len() as u32).collect::<Vec<_>>(),
@@ -2776,7 +2791,6 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
     }
     for operation in [
         ken_host::HostOpV1::ConsoleRead,
-        ken_host::HostOpV1::ClockWallNow,
         ken_host::HostOpV1::ClockMonotonicNow,
         ken_host::HostOpV1::ClockSleepUntil,
         ken_host::HostOpV1::FsAppendFile,

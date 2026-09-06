@@ -527,6 +527,7 @@ pub(crate) struct CheckedHostSpineV1 {
     pub read_some: StableSymbol,
     pub read_eof: StableSymbol,
     pub wrote: StableSymbol,
+    pub mk_instant: StableSymbol,
     pub unit: StableSymbol,
     pub bool_false: StableSymbol,
     pub bool_true: StableSymbol,
@@ -3562,21 +3563,52 @@ fn decode_checked_host_operation<'a>(
                 "ambient coproduct arm is empty",
             )
         })?;
-        let (inner, inner_args) = constructor_application_spine(ambient).ok_or_else(|| {
-            expression_lowering_error(
-                root,
-                "host_coproduct_shape",
-                "ambient operation is not a checked coproduct constructor",
-            )
-        })?;
-        if inner.symbol != spine.in_l && inner.symbol != spine.in_r {
+        let (ambient_arm, ambient_args) =
+            constructor_application_spine(ambient).ok_or_else(|| {
+                expression_lowering_error(
+                    root,
+                    "host_coproduct_shape",
+                    "ambient operation is not a checked coproduct constructor",
+                )
+            })?;
+        if ambient_arm.symbol == spine.in_l {
+            // Coproduct ConsoleOp AmbientTailOp: the left arm is Console.
+            ambient_args.last().copied()
+        } else if ambient_arm.symbol == spine.in_r {
+            // AmbientTailOp is itself Coproduct ClockOp EntropyOp. Static
+            // decoding must peel this second layer just as the runtime-selected
+            // eliminator below does; stopping at its InL/InR wrapper mistakes a
+            // coproduct constructor for the host operation identity.
+            let tail = ambient_args.last().copied().ok_or_else(|| {
+                expression_lowering_error(
+                    root,
+                    "host_coproduct_arity",
+                    "ambient tail coproduct arm is empty",
+                )
+            })?;
+            let (tail_arm, tail_args) =
+                constructor_application_spine(tail).ok_or_else(|| {
+                    expression_lowering_error(
+                        root,
+                        "host_coproduct_shape",
+                        "ambient tail operation is not a checked coproduct constructor",
+                    )
+                })?;
+            if tail_arm.symbol != spine.in_l && tail_arm.symbol != spine.in_r {
+                return Err(expression_lowering_error(
+                    root,
+                    "host_coproduct_identity",
+                    "ambient tail coproduct constructor identity changed",
+                ));
+            }
+            tail_args.last().copied()
+        } else {
             return Err(expression_lowering_error(
                 root,
                 "host_coproduct_identity",
                 "ambient coproduct constructor identity changed",
             ));
         }
-        inner_args.last().copied()
     } else {
         return Err(expression_lowering_error(
             root,
@@ -7808,6 +7840,7 @@ mod px7l_tests {
             read_some: StableSymbol::constructor(&family("ReadProgress"), "ReadSome"),
             read_eof: StableSymbol::constructor(&family("ReadProgress"), "ReadEof"),
             wrote: StableSymbol::constructor(&family("WriteProgress"), "Wrote"),
+            mk_instant: StableSymbol::constructor(&family("Instant"), "MkInstant"),
             unit: StableSymbol::constructor(&family("Unit"), "MkUnit"),
             bool_false: StableSymbol::constructor(&family("Bool"), "False"),
             bool_true: StableSymbol::constructor(&family("Bool"), "True"),
@@ -8141,6 +8174,7 @@ mod d1b_role_b_decoder_alignment {
             read_some: sentinel("read_some"),
             read_eof: sentinel("read_eof"),
             wrote: sentinel("wrote"),
+            mk_instant: sentinel("mk_instant"),
             unit: sentinel("unit"),
             bool_false: sentinel("bool_false"),
             bool_true: sentinel("bool_true"),
@@ -8205,6 +8239,7 @@ mod d1b_role_b_decoder_alignment {
         (spine.read_some.as_str(), "read_some"),
         (spine.read_eof.as_str(), "read_eof"),
         (spine.wrote.as_str(), "wrote"),
+        (spine.mk_instant.as_str(), "mk_instant"),
         (spine.unit.as_str(), "unit"),
         (spine.bool_false.as_str(), "bool_false"),
         (spine.bool_true.as_str(), "bool_true"),

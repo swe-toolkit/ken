@@ -3,6 +3,8 @@
 use std::ffi::OsString;
 use std::fmt;
 
+use num_bigint::BigInt;
+
 #[cfg(unix)]
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
@@ -125,11 +127,86 @@ pub struct CanonicalDifferentialRun {
     artifact: BoundProcessExecutableArtifact,
     plan_hash: u64,
     roots: TwinRealRoots,
+    interpreter_wall_window: WallClockWindow,
+    native_wall_window: WallClockWindow,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct WallClockWindow {
+    start_nanoseconds: i128,
+    end_nanoseconds: i128,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ClockWallNowDifferentialError {
+    TraceShape {
+        lane: &'static str,
+        reason: String,
+    },
+    WentBackwards {
+        lane: &'static str,
+        first: BigInt,
+        second: BigInt,
+    },
+    OutsidePlausibleWindow {
+        lane: &'static str,
+        reading: BigInt,
+        start_nanoseconds: i128,
+        end_nanoseconds: i128,
+    },
+    NormalizedMismatch(ObservationMismatch),
+}
+
+impl fmt::Display for ClockWallNowDifferentialError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TraceShape { lane, reason } => {
+                write!(formatter, "{lane} ClockWallNow trace shape: {reason}")
+            }
+            Self::WentBackwards {
+                lane,
+                first,
+                second,
+            } => write!(
+                formatter,
+                "{lane} ClockWallNow went backwards: {first} then {second}"
+            ),
+            Self::OutsidePlausibleWindow {
+                lane,
+                reading,
+                start_nanoseconds,
+                end_nanoseconds,
+            } => write!(
+                formatter,
+                "{lane} ClockWallNow reading {reading} lies outside controlled window \
+                 [{start_nanoseconds}, {end_nanoseconds}]"
+            ),
+            Self::NormalizedMismatch(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for ClockWallNowDifferentialError {}
 
 impl CanonicalDifferentialRun {
     pub fn compare_exact(&self) -> Result<(), ObservationMismatch> {
         compare_canonical_exact(&self.interpreter, &self.native)
+    }
+
+    /// Apply the same ClockWallNow projection to both real lanes before
+    /// comparing. The projection erases only each instant's bytes; it retains
+    /// the complete response variant/field shape and all other observation
+    /// fields, while requiring two same-side non-decreasing readings inside
+    /// each lane's independently measured wall-clock window.
+    pub fn compare_clock_wall_now(
+        &self,
+    ) -> Result<(), ClockWallNowDifferentialError> {
+        compare_clock_wall_now_observations(
+            &self.interpreter,
+            self.interpreter_wall_window,
+            &self.native,
+            self.native_wall_window,
+        )
     }
 
     /// Mutate the real launch binding; the production decoder must fail closed.
@@ -159,6 +236,12 @@ impl CanonicalDifferentialRun {
 /// Execute the same checked program through the interpreter and the real
 /// linked artifact. Canonical equality is part of the return gate.
 pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, HarnessError> {
+    let run = execute_scenario(scenario)?;
+    compare_canonical_exact(&run.interpreter, &run.native)?;
+    Ok(run)
+}
+
+fn execute_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, HarnessError> {
     validate_native_ambient(&scenario.ambient)?;
     let roots = TwinRealRoots::create(&scenario.initial_filesystem)?;
     let build = ken_cli::build_native_program(
@@ -186,6 +269,7 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
         scenario.expected_fs.clone(),
     )
     .map_err(|error| HarnessError::Interpreter(error.to_string()))?;
+    let interpreter_window_start = wall_clock_nanoseconds();
     let mut interpreter = ken_cli::run_program_effect_observation(
         &scenario.entry.source,
         ken_cli::SourceFormat::Ken,
@@ -195,6 +279,7 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
         &mut host,
     )
     .map_err(|error| HarnessError::Interpreter(format!("{error:?}")))?;
+    let interpreter_window_end = wall_clock_nanoseconds();
     let interpreter_after = roots.snapshot_interpreter()?;
     host.finish_assertions()
         .map_err(HarnessError::Interpreter)?;
@@ -227,8 +312,10 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
         cwd: roots.native().to_path_buf(),
         plan_hash: build.plan_transport_hash,
     };
+    let native_window_start = wall_clock_nanoseconds();
     let native = ken_runtime::run_bound_process_effect_observation(&build.artifact, &options)
         .map_err(HarnessError::NativeRun)?;
+    let native_window_end = wall_clock_nanoseconds();
     let native_after = roots.snapshot_native()?;
     let native_actions = LaneActionEvidence {
         root_before: native_before,
@@ -236,7 +323,6 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
         fs_actions_after_resolve: None,
     };
 
-    compare_canonical_exact(&interpreter, &native)?;
     Ok(CanonicalDifferentialRun {
         scenario_identity: scenario.entry.identity.clone(),
         interpreter,
@@ -250,7 +336,110 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
         artifact: build.artifact,
         plan_hash: build.plan_transport_hash,
         roots,
+        interpreter_wall_window: WallClockWindow {
+            start_nanoseconds: interpreter_window_start,
+            end_nanoseconds: interpreter_window_end,
+        },
+        native_wall_window: WallClockWindow {
+            start_nanoseconds: native_window_start,
+            end_nanoseconds: native_window_end,
+        },
     })
+}
+
+fn wall_clock_nanoseconds() -> i128 {
+    match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(duration) => i128::try_from(duration.as_nanos())
+            .expect("a SystemTime duration always fits signed nanoseconds"),
+        Err(error) => -i128::try_from(error.duration().as_nanos())
+            .expect("a SystemTime duration always fits signed nanoseconds"),
+    }
+}
+
+fn compare_clock_wall_now_observations(
+    interpreter: &EffectObservation,
+    interpreter_window: WallClockWindow,
+    native: &EffectObservation,
+    native_window: WallClockWindow,
+) -> Result<(), ClockWallNowDifferentialError> {
+    let interpreter = normalize_clock_wall_now_observation(
+        "interpreter",
+        interpreter,
+        interpreter_window,
+    )?;
+    let native = normalize_clock_wall_now_observation("native", native, native_window)?;
+    compare_canonical_exact(&interpreter, &native)
+        .map_err(ClockWallNowDifferentialError::NormalizedMismatch)
+}
+
+fn normalize_clock_wall_now_observation(
+    lane: &'static str,
+    observation: &EffectObservation,
+    window: WallClockWindow,
+) -> Result<EffectObservation, ClockWallNowDifferentialError> {
+    let mut normalized = observation.clone();
+    let [first, second] = normalized.effect_trace.as_mut_slice() else {
+        return Err(ClockWallNowDifferentialError::TraceShape {
+            lane,
+            reason: format!(
+                "expected exactly two events, observed {}",
+                observation.effect_trace.len()
+            ),
+        });
+    };
+    let mut readings = Vec::with_capacity(2);
+    for (index, event) in [first, second].into_iter().enumerate() {
+        if event.sequence != index as u64
+            || event.operation != ken_host::HostOpV1::ClockWallNow
+            || event.capability.is_some()
+            || !event.resource_bindings.is_empty()
+            || event.request != ken_host::CanonicalRequestV1::ClockWallNow
+        {
+            return Err(ClockWallNowDifferentialError::TraceShape {
+                lane,
+                reason: format!("event {index} is not the exact ambient ClockWallNow shape"),
+            });
+        }
+        let ken_host::CanonicalOutcomeV1::Success(
+            ken_host::CanonicalReplyV1::Instant(bytes),
+        ) = &mut event.outcome
+        else {
+            return Err(ClockWallNowDifferentialError::TraceShape {
+                lane,
+                reason: format!("event {index} did not return Instant(bytes)"),
+            });
+        };
+        if bytes.is_empty() {
+            return Err(ClockWallNowDifferentialError::TraceShape {
+                lane,
+                reason: format!("event {index} returned an empty Instant field"),
+            });
+        }
+        readings.push(BigInt::from_signed_bytes_be(bytes));
+        // Preserve `Success(Instant(one field))`, erasing only the
+        // nondeterministic instant itself on both sides.
+        bytes.clear();
+    }
+    if readings[1] < readings[0] {
+        return Err(ClockWallNowDifferentialError::WentBackwards {
+            lane,
+            first: readings[0].clone(),
+            second: readings[1].clone(),
+        });
+    }
+    let start = BigInt::from(window.start_nanoseconds);
+    let end = BigInt::from(window.end_nanoseconds);
+    for reading in readings {
+        if reading < start || reading > end {
+            return Err(ClockWallNowDifferentialError::OutsidePlausibleWindow {
+                lane,
+                reading,
+                start_nanoseconds: window.start_nanoseconds,
+                end_nanoseconds: window.end_nanoseconds,
+            });
+        }
+    }
+    Ok(normalized)
 }
 
 fn validate_native_ambient(ambient: &AmbientScript) -> Result<(), HarnessError> {
@@ -374,6 +563,37 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
       }
     }
   }
+"#;
+
+    const CLOCK_WALL_SOURCE: &str = r#"program capabilities FS AFull
+proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [Clock] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+       (resp_coproduct (FSOp AFull) AmbientOp
+         (fs_resp AFull) ambient_resp)
+       Instant ExitCode
+    (host_clock AFull Instant wall_now)
+    (\first . match first {
+      MkInstant first_nanoseconds |->
+        bind (Coproduct (FSOp AFull) AmbientOp)
+             (resp_coproduct (FSOp AFull) AmbientOp
+               (fs_resp AFull) ambient_resp)
+             Instant ExitCode
+          (host_clock AFull Instant wall_now)
+          (\second . match second {
+            MkInstant second_nanoseconds |->
+              match leq_int 1600000000000000000 first_nanoseconds {
+                False |-> host_exit AFull (Failure 31) ;
+                True |-> match leq_int first_nanoseconds second_nanoseconds {
+                  False |-> host_exit AFull (Failure 32) ;
+                  True |-> match leq_int second_nanoseconds 4102444800000000000 {
+                    False |-> host_exit AFull (Failure 33) ;
+                    True |-> host_exit AFull Success
+                  }
+                }
+              }
+          })
+    })
 "#;
 
     const DENIAL_SOURCE: &str = r#"program capabilities FS AFull
@@ -510,6 +730,24 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 },
                 ExpectedFsEffect::ReadFile { path },
             ],
+        }
+    }
+
+    fn clock_wall_scenario() -> Scenario {
+        Scenario {
+            process_input: RawProcessInput::default(),
+            ambient: AmbientScript {
+                use_real_wall_clock: true,
+                ..AmbientScript::default()
+            },
+            program_caps: ProgramCapsShape::default(),
+            entry: CheckedProgramEntry {
+                identity: "abi-a1-clock-wall-real-artifact".to_string(),
+                package_name: "abi-a1-clock-wall-real-artifact".to_string(),
+                source: CLOCK_WALL_SOURCE.to_string(),
+            },
+            initial_filesystem: Vec::new(),
+            expected_fs: Vec::new(),
         }
     }
 
@@ -732,6 +970,76 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             self.calls += 1;
             Ok(())
         }
+    }
+
+    /// Promise class: durable invariant. ABI-A1's operation-specific
+    /// differential applies one identical projection to both real lanes. It retains the complete response shape
+    /// and every non-clock observation field, requires two non-decreasing
+    /// readings inside each lane's controlled wall window, and erases only the
+    /// instant bytes before equality.
+    ///
+    /// The wrong-subject half changes the second native observation to precede
+    /// the first. It must be rejected by the same normalizer, proving the
+    /// monotonic-in-this-controlled-run predicate is not decorative.
+    #[test]
+    fn clock_wall_now_normalized_real_artifact_differential_discriminates() {
+        let run = execute_scenario(&clock_wall_scenario())
+            .expect("ClockWallNow real-artifact differential executes");
+        run.compare_clock_wall_now()
+            .expect("symmetric temporal normalization agrees");
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::ClockWallNow,
+                NativeTestedEvidence::from_clock_wall_now_run(&run),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested),
+            "the promoted lane must be backed by normalized real-artifact evidence"
+        );
+
+        let mut wrong_native = run.native.clone();
+        let [first, second] = wrong_native.effect_trace.as_mut_slice() else {
+            panic!("clock fixture must produce two native observations")
+        };
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::Instant(first_bytes)) =
+            &first.outcome
+        else {
+            panic!("first native response must be Instant")
+        };
+        let first_reading = BigInt::from_signed_bytes_be(first_bytes);
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::Instant(second_bytes)) =
+            &mut second.outcome
+        else {
+            panic!("second native response must be Instant")
+        };
+        *second_bytes = (first_reading - BigInt::from(1u8)).to_signed_bytes_be();
+        assert!(matches!(
+            normalize_clock_wall_now_observation(
+                "mutated native",
+                &wrong_native,
+                run.native_wall_window,
+            ),
+            Err(ClockWallNowDifferentialError::WentBackwards {
+                lane: "mutated native",
+                ..
+            })
+        ));
+    }
+
+    /// Promise class: durable-invariant companion control. ABI-A1 D4 is
+    /// intentionally ignored: exact instant
+    /// equality is the wrong live gate, but running it manually demonstrates
+    /// that two correct real lanes differ before normalization.
+    #[test]
+    #[ignore = "ABI-A1 D4: demonstrates why exact instant equality is wrong"]
+    fn clock_wall_now_naive_exact_equality_is_wrong_on_correct_real_clocks() {
+        let run = execute_scenario(&clock_wall_scenario())
+            .expect("ClockWallNow real-artifact differential executes");
+        run.compare_clock_wall_now()
+            .expect("both observations are individually lawful");
+        assert!(
+            run.compare_exact().is_err(),
+            "the raw real-clock observations unexpectedly compared exactly"
+        );
     }
 
     // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.

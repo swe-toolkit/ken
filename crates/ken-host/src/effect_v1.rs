@@ -141,7 +141,7 @@ impl HostOpV1 {
             Self::ConsoleWrite => HostOpAvailabilityV1::NativeTested,
             Self::ConsoleFlush => HostOpAvailabilityV1::NativeTested,
             Self::ConsoleIsTerminal => HostOpAvailabilityV1::NativeTested,
-            Self::ClockWallNow => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ClockWallNow => HostOpAvailabilityV1::NativeTested,
             Self::ClockMonotonicNow => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ClockSleepUntil => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsReadFile => HostOpAvailabilityV1::NativeTested,
@@ -217,7 +217,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 13] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 14] = [
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
     HostOpV1::ConsoleIsTerminal,
@@ -231,6 +231,10 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 13] = [
     HostOpV1::ResourceRelease,
     HostOpV1::BufferAllocate,
     HostOpV1::BufferFreeze,
+    // New promotions append: the roster order is an internal allocation input,
+    // not the catalog's opcode order. Preserve every existing operation's
+    // position while extending the population.
+    HostOpV1::ClockWallNow,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -373,6 +377,9 @@ pub fn host_effect_wire_layout_v1(
         HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal => {
             vec![checked_u32(field("stream")?)?]
         }
+        // The C record is nonzero-sized, but WallNow has no semantic request
+        // fields. Its response payload is carried in HostReplyV1::bytes.
+        HostOpV1::ClockWallNow => Vec::new(),
         HostOpV1::FsReadFile => {
             let path = slice("path")?;
             vec![checked_u32(field("capability")?)?, path[0], path[1]]
@@ -443,12 +450,11 @@ pub fn host_effect_wire_layout_v1(
         // omit. Naming the operations that legitimately carry no wire layout
         // turns a new operation from a runtime refusal into `error[E0004]`.
         //
-        // These twelve are exactly the `RepresentedUnavailable` set, and the
-        // thirteen matched above are exactly the `NativeTested` set. That
+        // These eleven are exactly the `RepresentedUnavailable` set, and the
+        // fourteen matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
         HostOpV1::ConsoleRead
-        | HostOpV1::ClockWallNow
         | HostOpV1::ClockMonotonicNow
         | HostOpV1::ClockSleepUntil
         | HostOpV1::FsAppendFile
@@ -3986,6 +3992,42 @@ mod tests {
             assert_eq!(HostOpV1::try_from(operation as u16), Ok(operation));
         }
         assert_eq!(HostOpV1::try_from(0), Err(UnknownHostOpV1(0)));
+    }
+
+    /// Promise class: transition sentinel. ABI-S3 expanded the catalog after
+    /// ABI-A1's original seven-operation D5 estimate, so the measured partial
+    /// tail is eleven. ConsoleRead's later accepted partial updates this set;
+    /// unrelated promotions must fail it.
+    #[test]
+    fn abi_a1_clock_partial_leaves_the_exact_deferred_tail() {
+        assert_eq!(
+            HostOpV1::ALL
+                .into_iter()
+                .filter(|operation| {
+                    operation.availability()
+                        == HostOpAvailabilityV1::RepresentedUnavailable
+                })
+                .collect::<Vec<_>>(),
+            vec![
+                HostOpV1::ConsoleRead,
+                HostOpV1::ClockMonotonicNow,
+                HostOpV1::ClockSleepUntil,
+                HostOpV1::FsAppendFile,
+                HostOpV1::FsMetadata,
+                HostOpV1::FsReadDirectory,
+                HostOpV1::FsCreateDirectory,
+                HostOpV1::FsRemoveFile,
+                HostOpV1::FsRemoveDirectory,
+                HostOpV1::FsRename,
+                HostOpV1::EntropyRandomBytes,
+            ],
+            "the ClockWallNow partial must not promote ConsoleRead or another deferred lane"
+        );
+        assert_eq!(
+            HOST_EFFECT_ABI_V1.native_tested_count as usize,
+            NATIVE_TESTED_TARGETS_V1.len(),
+            "the manifest count remains derived from the promoted roster"
+        );
     }
 
     #[test]
