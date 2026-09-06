@@ -2603,7 +2603,9 @@ fn complete_native_program_preparation(
                 file_operation_write: host_spine.file_operation_write.to_string(),
                 file_operation_change_mode: host_spine.file_operation_change_mode.to_string(),
                 file_operation_append: host_spine.file_operation_append.to_string(),
-                file_operation_metadata: host_spine.file_operation_metadata.to_string(),
+                file_operation_metadata: host_spine
+                    .file_operation_metadata
+                    .to_string(),
                 file_metadata: host_spine.file_metadata.to_string(),
                 file_kind_file: host_spine.file_kind_file.to_string(),
                 file_kind_directory: host_spine.file_kind_directory.to_string(),

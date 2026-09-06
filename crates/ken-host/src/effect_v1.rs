@@ -4029,7 +4029,8 @@ mod tests {
                 HostOpV1::FsRename,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "the FsAppendFile/FsMetadata partials must not promote another deferred lane"
+            "the FsAppendFile/FsMetadata partials must not promote another \
+             deferred lane"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,
