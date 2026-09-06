@@ -1,7 +1,7 @@
 ---
 id: ABI-REVOKE-D2
 title: "resource provenance + close-after-drain settlement — a resource-token-only op cannot bypass revocation, and owned fds close only after admitted leases drain; turns the two resource oracle cases green"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
