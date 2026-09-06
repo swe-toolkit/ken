@@ -29,6 +29,7 @@ fn renderIOError (error : IOError) : String =
     NotDirectory ↦ "NotDirectory";
     NotEmpty ↦ "NotEmpty";
     Unsupported ↦ "Unsupported";
+    Revoked ↦ "Revoked";
     Other errno ↦ "Other"
   }
 

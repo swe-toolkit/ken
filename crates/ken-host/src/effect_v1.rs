@@ -615,6 +615,46 @@ impl CapabilityTokenV1 {
 pub struct CapabilityGrantV1 {
     pub identity: CapabilityTraceIdentity,
     pub capability: crate::Cap,
+    revocation_node: crate::revocation_v1::RevocationNodeId,
+}
+
+impl CapabilityGrantV1 {
+    pub fn mint_root(
+        identity: CapabilityTraceIdentity,
+        capability: crate::Cap,
+        revocation: &mut crate::RevocationDomain,
+    ) -> Self {
+        Self {
+            identity,
+            capability,
+            revocation_node: revocation.mint_root(),
+        }
+    }
+
+    pub fn attenuate(
+        &self,
+        identity: CapabilityTraceIdentity,
+        capability: crate::Cap,
+        revocation: &mut crate::RevocationDomain,
+    ) -> Option<Self> {
+        Some(Self {
+            identity,
+            capability,
+            revocation_node: revocation.attenuate(self.revocation_node)?,
+        })
+    }
+
+    pub fn copy(&self, revocation: &crate::RevocationDomain) -> Option<Self> {
+        Some(Self {
+            identity: self.identity.clone(),
+            capability: self.capability.clone(),
+            revocation_node: revocation.copy(self.revocation_node)?,
+        })
+    }
+
+    pub fn revoke(&self, revocation: &mut crate::RevocationDomain) -> bool {
+        revocation.revoke(self.revocation_node)
+    }
 }
 
 pub const RIGHT_READ_V1: u8 = crate::RightSet::READ.bits();
@@ -1531,41 +1571,94 @@ pub enum ResourceInputsV1 {
     },
 }
 
-/// The only V1 semantic operation switch. Validation and capability denial
-/// happen before a backend leaf is invoked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CapabilityRequirementV1 {
+    None,
+    Fixed(crate::FsCapabilityOperation, crate::Authority),
+    FsOpen,
+}
+
+impl HostOpV1 {
+    /// Exhaustive classification at the ABI-R3 inventory boundary. A new host
+    /// operation cannot silently skip capability admission: it must acquire a
+    /// classification here before this crate compiles.
+    const fn capability_requirement(self) -> CapabilityRequirementV1 {
+        match self {
+            Self::FsReadFile => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::Read,
+                crate::AUTH_PARTIAL,
+            ),
+            Self::FsWriteFile => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::Write,
+                crate::AUTH_FULL,
+            ),
+            Self::FsAppendFile => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::Append,
+                crate::AUTH_FULL,
+            ),
+            Self::FsMetadata => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::Metadata,
+                crate::AUTH_PARTIAL,
+            ),
+            Self::FsReadDirectory => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::Enumerate,
+                crate::AUTH_PARTIAL,
+            ),
+            Self::FsCreateDirectory => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::CreateDirectory,
+                crate::AUTH_FULL,
+            ),
+            Self::FsRemoveFile => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::RemoveFile,
+                crate::AUTH_FULL,
+            ),
+            Self::FsRemoveDirectory => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::RemoveDirectory,
+                crate::AUTH_FULL,
+            ),
+            Self::FsRename => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::RenameSource,
+                crate::AUTH_FULL,
+            ),
+            Self::FsChangeMode => CapabilityRequirementV1::Fixed(
+                crate::FsCapabilityOperation::ChangeMode,
+                crate::AUTH_FULL,
+            ),
+            Self::FsOpen => CapabilityRequirementV1::FsOpen,
+            Self::ConsoleRead
+            | Self::ConsoleWrite
+            | Self::ConsoleFlush
+            | Self::ConsoleIsTerminal
+            | Self::ClockWallNow
+            | Self::ClockMonotonicNow
+            | Self::ClockSleepUntil
+            | Self::FsHandleMetadata
+            | Self::FsReadAt
+            | Self::FsWriteAt
+            | Self::ResourceRelease
+            | Self::BufferAllocate
+            | Self::BufferFreeze
+            | Self::EntropyRandomBytes => CapabilityRequirementV1::None,
+        }
+    }
+}
+
+/// The only V1 semantic operation switch. Validation, live-lineage admission,
+/// and capability denial happen before a backend leaf is invoked.
 pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     backend: &mut B,
     capabilities: &CapabilityTableV1,
+    revocation: &crate::RevocationDomain,
     resources: &mut ResourceTableV1,
     operation: HostOpV1,
     capability: Option<CapabilityTokenV1>,
     resource: ResourceInputsV1,
     request: &CanonicalRequestV1,
 ) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
-    let required = match operation {
-        HostOpV1::FsReadFile => Some((crate::FsCapabilityOperation::Read, crate::AUTH_PARTIAL)),
-        HostOpV1::FsWriteFile => Some((crate::FsCapabilityOperation::Write, crate::AUTH_FULL)),
-        HostOpV1::FsAppendFile => Some((crate::FsCapabilityOperation::Append, crate::AUTH_FULL)),
-        HostOpV1::FsMetadata => Some((crate::FsCapabilityOperation::Metadata, crate::AUTH_PARTIAL)),
-        HostOpV1::FsReadDirectory => {
-            Some((crate::FsCapabilityOperation::Enumerate, crate::AUTH_PARTIAL))
-        }
-        HostOpV1::FsCreateDirectory => Some((
-            crate::FsCapabilityOperation::CreateDirectory,
-            crate::AUTH_FULL,
-        )),
-        HostOpV1::FsRemoveFile => {
-            Some((crate::FsCapabilityOperation::RemoveFile, crate::AUTH_FULL))
-        }
-        HostOpV1::FsRemoveDirectory => Some((
-            crate::FsCapabilityOperation::RemoveDirectory,
-            crate::AUTH_FULL,
-        )),
-        HostOpV1::FsRename => Some((crate::FsCapabilityOperation::RenameSource, crate::AUTH_FULL)),
-        HostOpV1::FsChangeMode => {
-            Some((crate::FsCapabilityOperation::ChangeMode, crate::AUTH_FULL))
-        }
-        HostOpV1::FsOpen => {
+    let required = match operation.capability_requirement() {
+        CapabilityRequirementV1::None => None,
+        CapabilityRequirementV1::Fixed(operation, authority) => Some((operation, authority)),
+        CapabilityRequirementV1::FsOpen => {
             let CanonicalRequestV1::FsOpen { mode, .. } = request else {
                 return Err(TerminalErrorV1::MalformedHostAbiField);
             };
@@ -1578,10 +1671,9 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 },
             ))
         }
-        _ => None,
     };
-    let grant = match (required, capability) {
-        (None, None) => None,
+    let (grant, _admission_lease) = match (required, capability) {
+        (None, None) => (None, None),
         (None, Some(_)) | (Some(_), None) => {
             return Ok(denied(
                 operation,
@@ -1591,8 +1683,11 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
         }
         (Some((op, authority)), Some(token)) => match capabilities.resolve(token) {
             Ok(grant) => {
+                let Some(lease) = revocation.admit(grant.revocation_node) else {
+                    return Ok(revoked(operation, request));
+                };
                 match crate::capability::check_fs_capability(&grant.capability, op, authority) {
-                    Ok(_) => Some(grant),
+                    Ok(_) => (Some(grant), Some(lease)),
                     Err(error) => {
                         return Ok(denied(operation, request, map_capability_denial(error)))
                     }
@@ -2030,12 +2125,8 @@ fn file_error(operation: HostOpV1, path: &[u8], cause: FileErrorCauseV1) -> Sema
     })
 }
 
-fn denied(
-    operation: HostOpV1,
-    request: &CanonicalRequestV1,
-    error: CapabilityDeniedV1,
-) -> HostDispatchReplyV1 {
-    let path = match request {
+fn request_path(request: &CanonicalRequestV1) -> Vec<u8> {
+    match request {
         CanonicalRequestV1::FsReadFile { path }
         | CanonicalRequestV1::FsWriteFile { path, .. }
         | CanonicalRequestV1::FsAppendFile { path, .. }
@@ -2049,17 +2140,32 @@ fn denied(
             path.clone()
         }
         _ => Vec::new(),
-    };
+    }
+}
+
+fn path_denied(
+    operation: HostOpV1,
+    request: &CanonicalRequestV1,
+    cause: FileErrorCauseV1,
+) -> HostDispatchReplyV1 {
     HostDispatchReplyV1 {
         capability_identity: None,
         resource_token: None,
         resource_bindings: Vec::new(),
-        outcome: CanonicalOutcomeV1::Error(file_error(
-            operation,
-            &path,
-            FileErrorCauseV1::Capability(error),
-        )),
+        outcome: CanonicalOutcomeV1::Error(file_error(operation, &request_path(request), cause)),
     }
+}
+
+fn denied(
+    operation: HostOpV1,
+    request: &CanonicalRequestV1,
+    error: CapabilityDeniedV1,
+) -> HostDispatchReplyV1 {
+    path_denied(operation, request, FileErrorCauseV1::Capability(error))
+}
+
+fn revoked(operation: HostOpV1, request: &CanonicalRequestV1) -> HostDispatchReplyV1 {
+    path_denied(operation, request, FileErrorCauseV1::Revoked)
 }
 
 fn resource_denied(
@@ -2255,6 +2361,7 @@ pub struct FileErrorIdentityV1 {
 pub enum FileErrorCauseV1 {
     Io(IoErrorIdentityV1),
     Capability(CapabilityDeniedV1),
+    Revoked,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2573,6 +2680,7 @@ pub struct EffectObservation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RevocationDomain;
     use sha2::{Digest, Sha256};
 
     #[derive(Default)]
@@ -2719,12 +2827,326 @@ mod tests {
         }
     }
 
+    fn read_grant_fixture(
+        authority: crate::Authority,
+    ) -> (RevocationDomain, CapabilityTableV1, CapabilityTokenV1) {
+        let mut revocation = RevocationDomain::default();
+        let mut capabilities = CapabilityTableV1::default();
+        let token = capabilities.insert(CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("test:revocation".to_string()),
+            crate::Cap::mint(authority, "FS"),
+            &mut revocation,
+        ));
+        (revocation, capabilities, token)
+    }
+
+    #[derive(Default)]
+    struct ReadFailureBackend {
+        calls: usize,
+    }
+
+    impl HostEffectBackendV1 for ReadFailureBackend {
+        fn console_write(&mut self, _: ConsoleStreamV1, _: &[u8]) -> Result<(), IoErrorIdentityV1> {
+            unreachable!()
+        }
+
+        fn console_flush(&mut self, _: ConsoleStreamV1) -> Result<(), IoErrorIdentityV1> {
+            unreachable!()
+        }
+
+        fn console_is_terminal(&mut self, _: ConsoleStreamV1) -> bool {
+            unreachable!()
+        }
+
+        fn fs_read_file(
+            &mut self,
+            _: &CapabilityGrantV1,
+            _: &[u8],
+        ) -> Result<Vec<u8>, FileErrorCauseV1> {
+            self.calls += 1;
+            Err(FileErrorCauseV1::Io(IoErrorIdentityV1::NotFound))
+        }
+
+        fn fs_write_file(
+            &mut self,
+            _: &CapabilityGrantV1,
+            _: &[u8],
+            _: CreatePolicyV1,
+            _: &[u8],
+        ) -> Result<(), FileErrorCauseV1> {
+            unreachable!()
+        }
+    }
+
+    /// Promise class: durable invariant. MEASURED: table-resolved root, child,
+    /// and copied grants retain their exact domain nodes; revoking the root
+    /// denies the child and its copy through those stored links. CLAIMED: capability
+    /// attenuation creates lineage while copy preserves it. THE GAP: D1 covers
+    /// capability grants only; resource provenance is deliberately D2.
+    #[test]
+    fn capability_grants_thread_attenuated_and_copied_lineage() {
+        let mut revocation = RevocationDomain::default();
+        let root = CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("root".to_string()),
+            crate::Cap::mint(crate::AUTH_FULL, "FS"),
+            &mut revocation,
+        );
+        let child = root
+            .attenuate(
+                CapabilityTraceIdentity("child".to_string()),
+                crate::Cap::mint(crate::AUTH_PARTIAL, "FS"),
+                &mut revocation,
+            )
+            .expect("a live root accepts attenuation");
+        let copied = child.copy(&revocation).expect("a live child is copyable");
+        assert!(root.revocation_node != child.revocation_node);
+        assert!(child.revocation_node == copied.revocation_node);
+
+        let mut capabilities = CapabilityTableV1::default();
+        let root_token = capabilities.insert(root);
+        let child_token = capabilities.insert(child);
+        let copy_token = capabilities.insert(copied);
+        assert!(
+            capabilities.resolve(child_token).unwrap().revocation_node
+                == capabilities.resolve(copy_token).unwrap().revocation_node
+        );
+        assert!(capabilities
+            .resolve(root_token)
+            .unwrap()
+            .revoke(&mut revocation));
+        assert!(
+            !revocation.is_admissible(capabilities.resolve(root_token).unwrap().revocation_node)
+        );
+        assert!(
+            !revocation.is_admissible(capabilities.resolve(child_token).unwrap().revocation_node)
+        );
+        assert!(
+            !revocation.is_admissible(capabilities.resolve(copy_token).unwrap().revocation_node)
+        );
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the exhaustive
+    /// dispatcher classifier's capability-gated set equals the locked path-op
+    /// set and every member occurs in ABI-R3's generated catalog. CLAIMED: a
+    /// capability-guarded operation cannot silently skip admission. THE GAP:
+    /// D2 separately classifies resource-token operations by provenance.
+    #[test]
+    fn capability_admission_inventory_is_exact_and_abi_r3_closed() {
+        let expected = vec![
+            HostOpV1::FsReadFile,
+            HostOpV1::FsWriteFile,
+            HostOpV1::FsAppendFile,
+            HostOpV1::FsMetadata,
+            HostOpV1::FsReadDirectory,
+            HostOpV1::FsCreateDirectory,
+            HostOpV1::FsRemoveFile,
+            HostOpV1::FsRemoveDirectory,
+            HostOpV1::FsRename,
+            HostOpV1::FsChangeMode,
+            HostOpV1::FsOpen,
+        ];
+        let classified = HostOpV1::ALL
+            .into_iter()
+            .filter(|operation| {
+                !matches!(
+                    operation.capability_requirement(),
+                    CapabilityRequirementV1::None
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(classified, expected);
+
+        const RESOURCE_SIDE_D2: [HostOpV1; 6] = [
+            HostOpV1::FsHandleMetadata,
+            HostOpV1::FsReadAt,
+            HostOpV1::FsWriteAt,
+            HostOpV1::ResourceRelease,
+            HostOpV1::BufferAllocate,
+            HostOpV1::BufferFreeze,
+        ];
+        for operation in HostOpV1::ALL {
+            let capability_admitted = expected.contains(&operation);
+            assert_eq!(
+                capability_admitted,
+                !matches!(
+                    operation.capability_requirement(),
+                    CapabilityRequirementV1::None
+                ),
+                "operation {operation:?} disagrees with the admission classifier"
+            );
+            assert!(
+                capability_admitted
+                    || operation.is_ambient()
+                    || RESOURCE_SIDE_D2.contains(&operation),
+                "operation {operation:?} has no admission owner"
+            );
+        }
+        for operation in classified {
+            assert!(
+                HOST_EFFECT_ABI_V1_CATALOG
+                    .iter()
+                    .any(|row| row.1 == operation as u16),
+                "capability-admitted operation {operation:?} is absent from ABI-R3"
+            );
+        }
+    }
+
+    /// Promise class: durable discriminator. MEASURED: two otherwise-identical
+    /// ReadFile requests flip only at admission: revoke-first yields the exact
+    /// Revoked file cause with no backend visit, while admit-first returns real
+    /// bytes and remains unchanged after revoke. Live insufficient, malformed,
+    /// and host-I/O neighbours retain distinct causes. CLAIMED: admission is
+    /// the path-side revocation linearization point. THE GAP: concurrent leases
+    /// and resource settlement are reserved for PX12 and D2 respectively.
+    #[test]
+    fn revoked_path_admission_is_distinct_and_preserves_an_admitted_result() {
+        let request = CanonicalRequestV1::FsReadFile {
+            path: b"shared".to_vec(),
+        };
+
+        let (mut live_revocation, live_capabilities, live_token) =
+            read_grant_fixture(crate::AUTH_PARTIAL);
+        let mut live_backend = AllOpsBackend::default();
+        let live = dispatch_host_op_v1(
+            &mut live_backend,
+            &live_capabilities,
+            &live_revocation,
+            &mut ResourceTableV1::default(),
+            HostOpV1::FsReadFile,
+            Some(live_token),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .unwrap();
+        assert!(live_capabilities
+            .resolve(live_token)
+            .unwrap()
+            .revoke(&mut live_revocation));
+        assert_eq!(
+            live.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(Vec::new()))
+        );
+        assert_eq!(live_backend.0, vec![HostOpV1::FsReadFile]);
+
+        // Current dispatch is synchronous, so this isolates its exact segment:
+        // acquire through the same `admit` call, revoke before the backend
+        // returns, then finish under the already-minted lease without a second
+        // liveness check or result rewrite.
+        let (mut admitted_domain, admitted_capabilities, admitted_token) =
+            read_grant_fixture(crate::AUTH_PARTIAL);
+        let admitted_grant = admitted_capabilities.resolve(admitted_token).unwrap();
+        let _lease = admitted_domain
+            .admit(admitted_grant.revocation_node)
+            .expect("live ancestry admits the operation");
+        assert!(admitted_grant.revoke(&mut admitted_domain));
+        let mut admitted_backend = AllOpsBackend::default();
+        let admitted_result = admitted_backend
+            .fs_read_file(admitted_grant, b"shared")
+            .expect("an admitted operation reports its real result");
+        assert_eq!(admitted_result, Vec::<u8>::new());
+        assert_eq!(admitted_backend.0, vec![HostOpV1::FsReadFile]);
+
+        let (mut revoked_domain, revoked_capabilities, revoked_token) =
+            read_grant_fixture(crate::AUTH_PARTIAL);
+        assert!(revoked_capabilities
+            .resolve(revoked_token)
+            .unwrap()
+            .revoke(&mut revoked_domain));
+        let mut revoked_backend = AllOpsBackend::default();
+        let revoked = dispatch_host_op_v1(
+            &mut revoked_backend,
+            &revoked_capabilities,
+            &revoked_domain,
+            &mut ResourceTableV1::default(),
+            HostOpV1::FsReadFile,
+            Some(revoked_token),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .unwrap();
+        assert_eq!(
+            revoked.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation: HostOpV1::FsReadFile,
+                relative_path: b"shared".to_vec(),
+                cause: FileErrorCauseV1::Revoked,
+            }))
+        );
+        assert!(
+            revoked_backend.0.is_empty(),
+            "revoke-before-admission must not visit the backend"
+        );
+
+        let (insufficient_domain, insufficient_capabilities, insufficient_token) =
+            read_grant_fixture(crate::AUTH_NONE);
+        let insufficient = dispatch_host_op_v1(
+            &mut AllOpsBackend::default(),
+            &insufficient_capabilities,
+            &insufficient_domain,
+            &mut ResourceTableV1::default(),
+            HostOpV1::FsReadFile,
+            Some(insufficient_token),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .unwrap();
+        assert!(matches!(
+            insufficient.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                cause: FileErrorCauseV1::Capability(CapabilityDeniedV1::RightNotHeld { .. }),
+                ..
+            }))
+        ));
+
+        let malformed = dispatch_host_op_v1(
+            &mut AllOpsBackend::default(),
+            &CapabilityTableV1::default(),
+            &RevocationDomain::default(),
+            &mut ResourceTableV1::default(),
+            HostOpV1::FsReadFile,
+            Some(CapabilityTokenV1::from_erased_identity(u64::MAX)),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .unwrap();
+        assert!(matches!(
+            malformed.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                cause: FileErrorCauseV1::Capability(CapabilityDeniedV1::MalformedCapability),
+                ..
+            }))
+        ));
+
+        let (io_domain, io_capabilities, io_token) = read_grant_fixture(crate::AUTH_PARTIAL);
+        let mut io_backend = ReadFailureBackend::default();
+        let io_failure = dispatch_host_op_v1(
+            &mut io_backend,
+            &io_capabilities,
+            &io_domain,
+            &mut ResourceTableV1::default(),
+            HostOpV1::FsReadFile,
+            Some(io_token),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .unwrap();
+        assert!(matches!(
+            io_failure.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::NotFound),
+                ..
+            }))
+        ));
+        assert_eq!(io_backend.calls, 1);
+    }
+
     #[test]
     fn all_pre_resource_operations_share_one_semantic_dispatch() {
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let token = capabilities.insert(CapabilityGrantV1 {
-            identity: CapabilityTraceIdentity("test:all".to_string()),
-            capability: crate::Cap::mint_scoped(
+        let token = capabilities.insert(CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("test:all".to_string()),
+            crate::Cap::mint_scoped(
                 crate::AUTH_FULL,
                 "FS",
                 crate::FsScope::root(
@@ -2734,7 +3156,8 @@ mod tests {
                     crate::SymlinkPolicy::NoFollow,
                 ),
             ),
-        });
+            &mut revocation,
+        ));
         let requests = [
             (
                 HostOpV1::ConsoleRead,
@@ -2850,6 +3273,7 @@ mod tests {
             dispatch_host_op_v1(
                 &mut backend,
                 &capabilities,
+                &revocation,
                 &mut resources,
                 operation,
                 capability,
@@ -2883,6 +3307,7 @@ mod tests {
     /// -- never a substitute, a cached weak source, or a silent downgrade.
     #[test]
     fn ac4_entropy_reports_unavailable_rather_than_supplying_bytes_from_elsewhere() {
+        let revocation = RevocationDomain::default();
         let capabilities = CapabilityTableV1::default();
 
         let dispatch = |source: EntropySource, count: u64| {
@@ -2891,6 +3316,7 @@ mod tests {
             dispatch_host_op_v1(
                 &mut backend,
                 &capabilities,
+                &revocation,
                 &mut resources,
                 HostOpV1::EntropyRandomBytes,
                 None,
@@ -2962,6 +3388,7 @@ mod tests {
     /// read, which the ruling forbids.
     #[test]
     fn ac3c_entropy_needs_no_capability_token_while_a_gated_op_still_does() {
+        let revocation = RevocationDomain::default();
         let capabilities = CapabilityTableV1::default();
         let dispatch = |operation, request: &CanonicalRequestV1| {
             let mut backend = AllOpsBackend::default();
@@ -2969,6 +3396,7 @@ mod tests {
             dispatch_host_op_v1(
                 &mut backend,
                 &capabilities,
+                &revocation,
                 &mut resources,
                 operation,
                 // No capability token supplied, for either operation.
@@ -3684,11 +4112,13 @@ mod tests {
                 crate::SymlinkPolicy::NoFollow,
             ),
         );
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let capability = capabilities.insert(CapabilityGrantV1 {
-            identity: crate::program_caps_fs_trace_identity_v1(),
-            capability: cap,
-        });
+        let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+            crate::program_caps_fs_trace_identity_v1(),
+            cap,
+            &mut revocation,
+        ));
         let mut resources = ResourceTableV1::default();
         let mut backend = RealResourceBackend { root: root_handle };
         let mut events = Vec::new();
@@ -3699,6 +4129,7 @@ mod tests {
         let open = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -3728,6 +4159,7 @@ mod tests {
             let reply = dispatch_host_op_v1(
                 &mut backend,
                 &capabilities,
+                &revocation,
                 &mut resources,
                 operation,
                 None,
@@ -3768,11 +4200,13 @@ mod tests {
 
     #[test]
     fn fs_open_denial_remains_a_capability_error_before_resource_mint() {
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let capability = capabilities.insert(CapabilityGrantV1 {
-            identity: crate::program_caps_fs_trace_identity_v1(),
-            capability: crate::Cap::mint(crate::AUTH_NONE, "FS"),
-        });
+        let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+            crate::program_caps_fs_trace_identity_v1(),
+            crate::Cap::mint(crate::AUTH_NONE, "FS"),
+            &mut revocation,
+        ));
         let mut resources = ResourceTableV1::default();
         let mut backend = AllOpsBackend::default();
         let request = CanonicalRequestV1::FsOpen {
@@ -3782,6 +4216,7 @@ mod tests {
         let reply = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -3823,16 +4258,19 @@ mod tests {
                 crate::SymlinkPolicy::NoFollow,
             ),
         );
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let capability = capabilities.insert(CapabilityGrantV1 {
-            identity: crate::program_caps_fs_trace_identity_v1(),
-            capability: cap,
-        });
+        let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+            crate::program_caps_fs_trace_identity_v1(),
+            cap,
+            &mut revocation,
+        ));
         let mut resources = ResourceTableV1::default();
         let mut backend = RealResourceBackend { root: rooted };
         let opened = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -3847,6 +4285,7 @@ mod tests {
         let denied = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsHandleMetadata,
             None,
@@ -3864,6 +4303,7 @@ mod tests {
         let released = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::ResourceRelease,
             None,
@@ -3970,6 +4410,7 @@ mod tests {
             dispatch_host_op_v1(
                 &mut AllOpsBackend::default(),
                 &CapabilityTableV1::default(),
+                &RevocationDomain::default(),
                 resources,
                 HostOpV1::BufferAllocate,
                 None,
@@ -4050,11 +4491,13 @@ mod tests {
                 crate::SymlinkPolicy::NoFollow,
             ),
         );
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let capability = capabilities.insert(CapabilityGrantV1 {
-            identity: crate::program_caps_fs_trace_identity_v1(),
-            capability: cap,
-        });
+        let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+            crate::program_caps_fs_trace_identity_v1(),
+            cap,
+            &mut revocation,
+        ));
         let mut resources = ResourceTableV1::with_buffer_limits(BufferLimitsV1::new(4, 6).unwrap());
         let mut backend = PositionedBackend {
             root: rooted,
@@ -4064,6 +4507,7 @@ mod tests {
         let source = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -4079,6 +4523,7 @@ mod tests {
         let buffer = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::BufferAllocate,
             None,
@@ -4095,6 +4540,7 @@ mod tests {
         let over_limit = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::BufferAllocate,
             None,
@@ -4116,6 +4562,7 @@ mod tests {
         let read = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsReadAt,
             None,
@@ -4149,6 +4596,7 @@ mod tests {
         let freeze = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::BufferFreeze,
             None,
@@ -4170,6 +4618,7 @@ mod tests {
         let target = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -4192,6 +4641,7 @@ mod tests {
         let full_write = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsWriteAt,
             None,
@@ -4225,6 +4675,7 @@ mod tests {
         let truncate = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -4241,6 +4692,7 @@ mod tests {
             let reply = dispatch_host_op_v1(
                 &mut backend,
                 &capabilities,
+                &revocation,
                 &mut resources,
                 HostOpV1::FsWriteAt,
                 None,
@@ -4269,6 +4721,7 @@ mod tests {
         let short_write = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsWriteAt,
             None,
@@ -4294,6 +4747,7 @@ mod tests {
         let zero_write = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsWriteAt,
             None,
@@ -4324,6 +4778,7 @@ mod tests {
         let short_read = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsReadAt,
             None,
@@ -4347,6 +4802,7 @@ mod tests {
         let eof = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsReadAt,
             None,
@@ -4369,6 +4825,7 @@ mod tests {
         let buffer_on_file = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::BufferFreeze,
             None,
@@ -4395,6 +4852,7 @@ mod tests {
         let file_on_buffer = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsHandleMetadata,
             None,
@@ -4415,6 +4873,7 @@ mod tests {
         let right_denied = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsWriteAt,
             None,
@@ -4436,6 +4895,7 @@ mod tests {
         let released = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::ResourceRelease,
             None,
@@ -4450,6 +4910,7 @@ mod tests {
         let closed = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::BufferFreeze,
             None,
@@ -4508,11 +4969,13 @@ mod tests {
                 crate::SymlinkPolicy::NoFollow,
             ),
         );
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let capability = capabilities.insert(CapabilityGrantV1 {
-            identity: crate::program_caps_fs_trace_identity_v1(),
-            capability: cap,
-        });
+        let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+            crate::program_caps_fs_trace_identity_v1(),
+            cap,
+            &mut revocation,
+        ));
         let mut resources =
             ResourceTableV1::with_buffer_limits(BufferLimitsV1::new(8, 16).unwrap());
         let mut backend = PositionedBackend {
@@ -4523,6 +4986,7 @@ mod tests {
         let source = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -4537,6 +5001,7 @@ mod tests {
         let target = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -4553,6 +5018,7 @@ mod tests {
             dispatch_host_op_v1(
                 backend,
                 &capabilities,
+                &revocation,
                 resources,
                 HostOpV1::BufferAllocate,
                 None,
@@ -4571,6 +5037,7 @@ mod tests {
             let read = dispatch_host_op_v1(
                 &mut backend,
                 &capabilities,
+                &revocation,
                 &mut resources,
                 HostOpV1::FsReadAt,
                 None,
@@ -4599,6 +5066,7 @@ mod tests {
             dispatch_host_op_v1(
                 backend,
                 &capabilities,
+                &revocation,
                 resources,
                 HostOpV1::BufferFreeze,
                 None,
@@ -4631,6 +5099,7 @@ mod tests {
             dispatch_host_op_v1(
                 backend,
                 &capabilities,
+                &revocation,
                 resources,
                 HostOpV1::FsWriteAt,
                 None,
@@ -4703,11 +5172,13 @@ mod tests {
                 crate::SymlinkPolicy::NoFollow,
             ),
         );
+        let mut revocation = RevocationDomain::default();
         let mut capabilities = CapabilityTableV1::default();
-        let capability = capabilities.insert(CapabilityGrantV1 {
-            identity: crate::program_caps_fs_trace_identity_v1(),
-            capability: cap,
-        });
+        let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+            crate::program_caps_fs_trace_identity_v1(),
+            cap,
+            &mut revocation,
+        ));
         let mut resources =
             ResourceTableV1::with_buffer_limits(BufferLimitsV1::new(8, 16).unwrap());
         let mut backend = PositionedBackend {
@@ -4717,6 +5188,7 @@ mod tests {
         let source = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsOpen,
             Some(capability),
@@ -4732,6 +5204,7 @@ mod tests {
         let token_a = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::BufferAllocate,
             None,
@@ -4744,6 +5217,7 @@ mod tests {
         dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::ResourceRelease,
             None,
@@ -4754,6 +5228,7 @@ mod tests {
         let token_b = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::BufferAllocate,
             None,
@@ -4784,6 +5259,7 @@ mod tests {
         let read = dispatch_host_op_v1(
             &mut backend,
             &capabilities,
+            &revocation,
             &mut resources,
             HostOpV1::FsReadAt,
             None,
@@ -4811,6 +5287,7 @@ mod tests {
             dispatch_host_op_v1(
                 backend,
                 &capabilities,
+                &revocation,
                 resources,
                 HostOpV1::BufferFreeze,
                 None,

@@ -756,13 +756,13 @@ fn initialize_process_context_with_lookup(
         _ => ProcessContextInitError::Ordinary,
     })?;
     let mut revocation = RevocationDomain::default();
-    let _root_revocation = revocation.mint_root();
     let cap = Cap::mint_scoped(authority, "FS", scope);
     let mut capabilities = CapabilityTableV1::default();
-    let capability = capabilities.insert(CapabilityGrantV1 {
-        identity: crate::program_caps_fs_trace_identity_v1(),
-        capability: cap,
-    });
+    let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+        crate::program_caps_fs_trace_identity_v1(),
+        cap,
+        &mut revocation,
+    ));
     let observation = if observation_path.is_empty() {
         None
     } else {
@@ -1054,6 +1054,7 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 crate::SemanticErrorV1::File(error) => match error.cause {
                     FileErrorCauseV1::Io(error) => io_error_tag(error),
                     FileErrorCauseV1::Capability(_) => 2,
+                    FileErrorCauseV1::Revoked => 11,
                 },
                 crate::SemanticErrorV1::Capability(_) => 2,
                 crate::SemanticErrorV1::Resource(_) => {
@@ -1077,14 +1078,14 @@ fn io_error_tag(error: IoErrorIdentityV1) -> u64 {
         IoErrorIdentityV1::NotDirectory => 8,
         IoErrorIdentityV1::NotEmpty => 9,
         IoErrorIdentityV1::Unsupported => 10,
-        IoErrorIdentityV1::Other(raw) => (u64::from(raw as u32) << 32) | 11,
+        IoErrorIdentityV1::Other(raw) => (u64::from(raw as u32) << 32) | 12,
     }
 }
 
 #[cfg(test)]
 fn io_error_from_tag(encoded: u64) -> Option<IoErrorIdentityV1> {
     let discriminator = encoded & 0xff;
-    if discriminator == 11 {
+    if discriminator == 12 {
         if encoded & 0x0000_0000_ffff_ff00 != 0 {
             return None;
         }
@@ -1430,6 +1431,7 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
     let result = dispatch_host_op_v1(
         &mut context.host,
         &context.capabilities,
+        &context.revocation,
         &mut context.resources,
         op,
         capability,
@@ -1821,7 +1823,8 @@ mod tests {
             crate::DEFAULT_BUFFER_LIMITS_V1.invocation_max_live_capacity
         );
         assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
-        assert_eq!(effect_binding("error", "io.Other"), 11);
+        assert_eq!(effect_binding("error", "io.Revoked"), 11);
+        assert_eq!(effect_binding("error", "io.Other"), 12);
     }
 
     #[test]
@@ -2104,6 +2107,78 @@ mod tests {
         );
         assert_eq!(reply.tag, REPLY_ERROR);
         assert_eq!(reply.detail, 6);
+        assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
+
+        set_reply(
+            &mut reply,
+            CanonicalOutcomeV1::Error(crate::SemanticErrorV1::File(crate::FileErrorIdentityV1 {
+                operation: HostOpV1::FsReadFile,
+                relative_path: b"shared".to_vec(),
+                cause: FileErrorCauseV1::Revoked,
+            })),
+            context,
+        );
+        assert_eq!(reply.tag, REPLY_ERROR);
+        assert_eq!(reply.detail, 11, "Revoked keeps its distinct IOError tag");
+        assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the private
+    /// native dispatch entry receives its ProcessContext's revoked root grant
+    /// and emits reply.error with the exact Revoked discriminator. CLAIMED:
+    /// native and interpreter share the path-side Revoked projection. THE GAP:
+    /// backend non-visitation is pinned at the semantic dispatcher seam, whose
+    /// counted backend is not exposed by this raw ProcessHost entrypoint.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn native_dispatch_projects_revoked_path_as_the_distinct_ioerror_tag() {
+        let directory =
+            std::env::temp_dir().join(format!("ken-revoked-native-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("shared"), b"readable").unwrap();
+        let initialized = context(&directory);
+        let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+        assert!(context
+            .capabilities
+            .resolve(context.capability)
+            .unwrap()
+            .revoke(&mut context.revocation));
+
+        let path = b"shared";
+        let request = FsReadFileRequestV1 {
+            capability: initialized.capability,
+            path: SliceV1 {
+                data: path.as_ptr(),
+                len: path.len(),
+            },
+        };
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: 0,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::FsReadFile as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<FsReadFileRequestV1>(),
+                std::ptr::from_mut(&mut reply).cast(),
+            )
+        };
+        assert_eq!(status, 0);
+        assert_eq!(reply.tag, REPLY_ERROR);
+        assert_eq!(reply.detail, 11);
+        assert_eq!(reply.bytes.len, 0);
         assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
 
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };

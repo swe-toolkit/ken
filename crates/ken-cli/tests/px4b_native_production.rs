@@ -465,6 +465,7 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
                 NotDirectory |-> host_exit APartial (Failure 63) ;
                 NotEmpty |-> host_exit APartial (Failure 63) ;
                 Unsupported |-> host_exit APartial (Failure 63) ;
+                Revoked |-> host_exit APartial (Failure 63) ;
                 Other _ |-> host_exit APartial (Failure 63)
               }
             })
@@ -762,6 +763,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     NotDirectory |-> host_exit AFull (Failure 52) ;
                     NotEmpty |-> host_exit AFull (Failure 53) ;
                     Unsupported |-> host_exit AFull (Failure 54) ;
+                    Revoked |-> host_exit AFull (Failure 54) ;
                     Other _ |-> host_exit AFull (Failure 55)
                   }
                 }

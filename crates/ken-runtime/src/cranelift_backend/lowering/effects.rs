@@ -1073,13 +1073,13 @@ impl EffectSeatLedger {
     }
 }
 /// The `IoErrorIdentityV1::Other` discriminator, as `io_error_tag`
-/// (`ken-host/src/abi_v1.rs`) encodes it: `(payload as u32 as u64) << 32 | 11`.
+/// (`ken-host/src/abi_v1.rs`) encodes it: `(payload as u32 as u64) << 32 | 12`.
 ///
 /// It is the only `IOError` variant carrying an integer whose meaning is its
 /// payload rather than its discriminator, which is what lets a synthesized
 /// pre-dispatch refusal be represented on an `IOError` surface without minting
 /// a constructor the host would never produce.
-const IO_ERROR_OTHER_DISCRIMINATOR: i64 = 11;
+const IO_ERROR_OTHER_DISCRIMINATOR: i64 = 12;
 /// `ResourceErrorV1::MalformedResource`, as the wire reply's `detail` field
 /// spells it (`ken-host/src/abi_v1.rs`).
 ///
@@ -2421,7 +2421,7 @@ impl<'a> Lowering<'a> {
             .iconst(types::I64, wire.reply_error_tag as i64);
         // Wrap a `ResourceErrorV1` code as `IOError::Other <code>`, in the exact
         // encoding `ken_host::abi_v1::io_error_tag` uses: the payload in the
-        // high 32 bits, discriminator `11` in the low byte, which the decoder
+        // high 32 bits, discriminator `12` in the low byte, which the decoder
         // below recovers with `sshr_imm(detail, 32)`.
         //
         // `ConsoleWrite` and `FsWriteFile` declare `IOError` surfaces, so their

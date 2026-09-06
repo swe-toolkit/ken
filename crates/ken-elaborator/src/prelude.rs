@@ -125,7 +125,7 @@ canonical_runtime_roles! {
     file_operation_read => "OpReadFile",
     file_operation_write => "OpWriteFile",
     file_operation_change_mode => "OpChangeMode",
-    // The twelve IO errors, in the exact order the spine's vector carries them.
+    // The thirteen IO errors, in the exact order the spine's vector carries them.
     // That order is the contract; the record's bytes depend on it.
     io_error_not_found => "NotFound",
     io_error_permission_denied => "PermissionDenied",
@@ -138,6 +138,7 @@ canonical_runtime_roles! {
     io_error_not_directory => "NotDirectory",
     io_error_not_empty => "NotEmpty",
     io_error_unsupported => "Unsupported",
+    io_error_revoked => "Revoked",
     io_error_other => "Other",
     // Resource errors and resource kinds.
     resource_kind_mismatch => "ResourceKindMismatch",
@@ -558,7 +559,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.elaborate_decl("data ReadResult = Chunk Bytes | Eof")
         .map_err(|e| ElabError::Internal(format!("prelude ReadResult failed: {}", e)))?;
     elab.elaborate_decl(
-        "data IOError = NotFound | PermissionDenied | CapabilityDenied | BrokenPipe | Interrupted | AlreadyExists | InvalidInput | IsDirectory | NotDirectory | NotEmpty | Unsupported | Other Int",
+        "data IOError = NotFound | PermissionDenied | CapabilityDenied | BrokenPipe | Interrupted | AlreadyExists | InvalidInput | IsDirectory | NotDirectory | NotEmpty | Unsupported | Revoked | Other Int",
     )
     .map_err(|e| ElabError::Internal(format!("prelude IOError failed: {}", e)))?;
     elab.elaborate_decl(

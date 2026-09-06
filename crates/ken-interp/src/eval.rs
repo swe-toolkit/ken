@@ -2286,6 +2286,7 @@ pub struct ConsoleIds {
     pub notdirectory_id: GlobalId,
     pub notempty_id: GlobalId,
     pub unsupported_id: GlobalId,
+    pub revoked_id: GlobalId,
     pub other_id: GlobalId,
     /// `GlobalId` of the `Unit` constructor (response to `Write`).
     pub unit_id: GlobalId,
@@ -2325,6 +2326,7 @@ impl ConsoleIds {
             notdirectory_id: get("NotDirectory")?,
             notempty_id: get("NotEmpty")?,
             unsupported_id: get("Unsupported")?,
+            revoked_id: get("Revoked")?,
             other_id: get("Other")?,
             unit_id: get("MkUnit")?,
             params_len: 3,
@@ -5346,6 +5348,7 @@ fn fs_dispatch<H: HostHandler>(
         return None;
     };
 
+    let mut revocation = ken_host::RevocationDomain::default();
     let mut capabilities = ken_host::CapabilityTableV1::default();
     let token = if matches!(
         operation,
@@ -5360,10 +5363,11 @@ fn fs_dispatch<H: HostHandler>(
     } else {
         match args.get(1) {
             Some(EvalVal::Cap(capability)) => {
-                Some(capabilities.insert(ken_host::CapabilityGrantV1 {
-                    identity: ken_host::program_caps_fs_trace_identity_v1(),
-                    capability: capability.clone(),
-                }))
+                Some(capabilities.insert(ken_host::CapabilityGrantV1::mint_root(
+                    ken_host::program_caps_fs_trace_identity_v1(),
+                    capability.clone(),
+                    &mut revocation,
+                )))
             }
             _ => None,
         }
@@ -5426,6 +5430,7 @@ fn fs_dispatch<H: HostHandler>(
     let reply = ken_host::dispatch_host_op_v1(
         &mut backend,
         &capabilities,
+        &revocation,
         resources,
         operation,
         token,
@@ -5641,6 +5646,7 @@ fn reify_host_reply_v1(
                 ken_host::FileErrorCauseV1::Capability(_) => {
                     make_ctor(ids.capabilitydenied_id, vec![], store)
                 }
+                ken_host::FileErrorCauseV1::Revoked => make_ctor(ids.revoked_id, vec![], store),
             };
             let file_error = file_error_value(operation_id, &error.relative_path, cause, fs, store);
             return Ok(make_result(false, file_error, ids, store));
@@ -5673,6 +5679,7 @@ fn ambient_dispatch<H: HostHandler>(
     let reply = ken_host::dispatch_host_op_v1(
         &mut backend,
         &ken_host::CapabilityTableV1::default(),
+        &ken_host::RevocationDomain::default(),
         resources,
         operation,
         None,
@@ -6337,6 +6344,7 @@ mod px0_target_classification_tests {
             notdirectory_id: unused,
             notempty_id: unused,
             unsupported_id,
+            revoked_id: unused,
             other_id: GlobalId(1),
             unit_id: unused,
             params_len: 3,
@@ -6468,6 +6476,51 @@ mod px5b_effect_observation_tests {
         }
     }
 
+    #[derive(Default)]
+    struct RevokedReadBackend {
+        read_calls: usize,
+    }
+
+    impl ken_host::HostEffectBackendV1 for RevokedReadBackend {
+        fn console_write(
+            &mut self,
+            _stream: ken_host::ConsoleStreamV1,
+            _bytes: &[u8],
+        ) -> Result<(), ken_host::IoErrorIdentityV1> {
+            unreachable!("revoked read fixture does not call console output")
+        }
+
+        fn console_flush(
+            &mut self,
+            _stream: ken_host::ConsoleStreamV1,
+        ) -> Result<(), ken_host::IoErrorIdentityV1> {
+            unreachable!("revoked read fixture does not call console flush")
+        }
+
+        fn console_is_terminal(&mut self, _stream: ken_host::ConsoleStreamV1) -> bool {
+            unreachable!("revoked read fixture does not inspect a console")
+        }
+
+        fn fs_read_file(
+            &mut self,
+            _grant: &ken_host::CapabilityGrantV1,
+            _path: &[u8],
+        ) -> Result<Vec<u8>, ken_host::FileErrorCauseV1> {
+            self.read_calls += 1;
+            Ok(b"must-not-run".to_vec())
+        }
+
+        fn fs_write_file(
+            &mut self,
+            _grant: &ken_host::CapabilityGrantV1,
+            _path: &[u8],
+            _create_policy: ken_host::CreatePolicyV1,
+            _bytes: &[u8],
+        ) -> Result<(), ken_host::FileErrorCauseV1> {
+            unreachable!("revoked read fixture does not call whole-file write")
+        }
+    }
+
     trait PositionedFailureIdentity {
         const ERROR: ken_host::IoErrorIdentityV1;
     }
@@ -6582,6 +6635,7 @@ mod px5b_effect_observation_tests {
             notdirectory_id: id(),
             notempty_id: id(),
             unsupported_id: id(),
+            revoked_id: id(),
             other_id: id(),
             unit_id: id(),
             params_len: 0,
@@ -6713,6 +6767,98 @@ mod px5b_effect_observation_tests {
             panic!("expected ResourceError constructor, got {payload:?}")
         };
         assert_eq!(*id, expected);
+    }
+
+    /// Promise class: normative compatibility vector for
+    /// security/capabilities/revoked-path-operation-is-distinct-fileerror
+    /// MEASURED: the real dispatcher denies a revoked live grant before the
+    /// backend and the existing interpreter reifier produces MkFileError with
+    /// the exact Revoked constructor. CLAIMED: the path-side public projection
+    /// is distinct from every capability and host-I/O cause. THE GAP: raw host
+    /// management drives this component oracle; revoke remains unbound in Ken.
+    #[test]
+    fn revoked_path_dispatch_reifies_exact_revoked_file_error() {
+        let ids = console_ids();
+        let fs = fs_ids();
+        let mut store = EvalStore::new();
+        let mut revocation = ken_host::RevocationDomain::default();
+        let mut capabilities = ken_host::CapabilityTableV1::default();
+        let token = capabilities.insert(ken_host::CapabilityGrantV1::mint_root(
+            ken_host::program_caps_fs_trace_identity_v1(),
+            ken_host::Cap::mint(ken_host::AUTH_PARTIAL, "FS"),
+            &mut revocation,
+        ));
+        assert!(capabilities
+            .resolve(token)
+            .expect("minted grant")
+            .revoke(&mut revocation));
+        let request = ken_host::CanonicalRequestV1::FsReadFile {
+            path: b"shared".to_vec(),
+        };
+        let mut backend = RevokedReadBackend::default();
+        let reply = ken_host::dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut ken_host::ResourceTableV1::default(),
+            ken_host::HostOpV1::FsReadFile,
+            Some(token),
+            ken_host::ResourceInputsV1::None,
+            &request,
+        )
+        .expect("revoked read is a typed host reply");
+        assert_eq!(backend.read_calls, 0);
+        let result = reify_host_reply_v1(
+            reply.outcome,
+            reply.resource_token,
+            None,
+            &request,
+            fs.op_read_file_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("interpreter reifies revoked read");
+
+        let file_error = result_payload(&result, ids.err_id);
+        let EvalVal::Ctor {
+            id: file_error_id,
+            args,
+            ..
+        } = file_error
+        else {
+            panic!("expected MkFileError, got {file_error:?}")
+        };
+        assert_eq!(*file_error_id, fs.mk_file_error_id);
+        let EvalVal::Ctor {
+            id: operation_id, ..
+        } = &args[0]
+        else {
+            panic!("expected file operation constructor")
+        };
+        assert_eq!(*operation_id, fs.op_read_file_id);
+        let EvalVal::Ctor {
+            id: path_id,
+            args: path_args,
+            ..
+        } = &args[1]
+        else {
+            panic!("expected Some path")
+        };
+        assert_eq!(*path_id, fs.some_id);
+        assert_eq!(path_args.get(1), Some(&EvalVal::Bytes(b"shared".to_vec())));
+        let EvalVal::Ctor {
+            id: cause_id,
+            args: cause_args,
+            ..
+        } = &args[2]
+        else {
+            panic!("expected IOError cause")
+        };
+        assert_eq!(*cause_id, ids.revoked_id);
+        assert!(cause_args.is_empty());
+        assert_ne!(ids.revoked_id, ids.capabilitydenied_id);
+        assert_ne!(ids.revoked_id, ids.notfound_id);
     }
 
     fn expect_resource_host_io(value: &EvalVal, expected: GlobalId, ids: &ConsoleIds, fs: &FSIds) {
@@ -6928,6 +7074,7 @@ mod px5b_effect_observation_tests {
         let reply = ken_host::dispatch_host_op_v1(
             backend,
             &ken_host::CapabilityTableV1::default(),
+            &ken_host::RevocationDomain::default(),
             resources,
             ken_host::HostOpV1::FsWriteAt,
             None,
@@ -7599,6 +7746,7 @@ mod px5b_effect_observation_tests {
         let reply = ken_host::dispatch_host_op_v1(
             &mut backend,
             &ken_host::CapabilityTableV1::default(),
+            &ken_host::RevocationDomain::default(),
             &mut resources,
             ken_host::HostOpV1::FsWriteAt,
             None,

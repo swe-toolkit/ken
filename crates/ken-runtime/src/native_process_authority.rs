@@ -99,7 +99,7 @@ impl std::fmt::Display for NativeAuthorityError {
 }
 
 /// The number of IO error constructors the lowering indexes positionally.
-const IO_ERROR_ARITY: usize = 12;
+const IO_ERROR_ARITY: usize = 13;
 
 /// Why a package-backed program was refused native admission on its **trust**.
 ///
