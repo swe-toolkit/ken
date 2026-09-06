@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS
 title: "Scaffold-retirement Tier C predecessor: publish EC's private apply_to/compose/functor_map_of/Applicative (visibility-only widen) so Validation can selectively import them, once EC itself roots-loads clean under the Language faces-3 cross-module export+import. Proven EC/Tier-B provider-publication shape; mints nothing, changes no body."
-status: draft
+status: merged
 owner: foundation
 size: S
 gate: none

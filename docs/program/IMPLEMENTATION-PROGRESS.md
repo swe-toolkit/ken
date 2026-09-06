@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-05 23:45:35Z — from 553 issue file(s) in `docs/program/issues/`.
+2026-09-06 02:19:05Z — from 553 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -71,7 +71,7 @@ the committed file matches the generator's output.
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
 | `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT` | Migrate the three orphan list_append proofs (assoc/left_unit/right_unit) from Core/Classes/LawfulFunctors into Data/Collections/Derived, the module that defines list_append, per Architect ruling evt_7khknqydxxd93. An attached proof f::law is part of f's definitional surface and can be soundly owned only by f's module; proving it elsewhere is an orphan attachment that resolves under full-catalog load but goes UnboundName under selective/standalone import. LawfulFunctors keeps its co-located bool_and/list_map/option_map proofs and gains the real standalone imports it owes; EffectfulClasses's prose owner-attribution is re-pointed to Derived. Carries the campaign rule for every future orphan attached proof. | merged | foundation | M | none | — |
 | `CAT-MAP-DEPENDENCY-CLOSURE-REPAIR` | Repair the Map package's dependency closure so Data/Collections/Map.ken.md elaborates from its own declared imports rather than relying on the map_build_acceptance.rs fixture to preload Compare/Transport/Derived/Or and to resolve undeclared list_append. | draft | foundation | unsized | none | — |
-| `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` | Scaffold-retirement Tier C predecessor: publish EC's private apply_to/compose/functor_map_of/Applicative (visibility-only widen) so Validation can selectively import them, once EC itself roots-loads clean under the Language faces-3 cross-module export+import. Proven EC/Tier-B provider-publication shape; mints nothing, changes no body. | draft | foundation | S | none | — |
+| `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` | Scaffold-retirement Tier C predecessor: publish EC's private apply_to/compose/functor_map_of/Applicative (visibility-only widen) so Validation can selectively import them, once EC itself roots-loads clean under the Language faces-3 cross-module export+import. Proven EC/Tier-B provider-publication shape; mints nothing, changes no body. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-EC-CLOSURE-PROVIDERS` | EC standalone-cleanness predecessor (off the DecEq critical path): widen the LF / Derived / Transport PUBLISHED surfaces to the exact free-symbol closure set EffectfulClasses names across package boundaries, so EC can import that closure and elaborate standalone. Mechanical export publication (mark pub + extend each provider's loader-visible inventory), INCLUDING the currently-private attached proofs EC composes with; NO proof re-authoring, NO body change, NO relocation. Reuse-not-reimplement: EC composes with the existing proofs, it does not re-prove them. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-EC-FUNCTOR-IMPORT` | Scaffold-retirement, orthogonal Core.Classes node (off the DecEq critical path): make EffectfulClasses (EC) standalone-green by publishing the four LawfulFunctors (LF) provider surfaces it consumes ambiently — LF marks class Functor + fn comp + fn idf + fn list_map pub; EC replaces ambient resolution with a real selective import from LF. Publication + one import block + loader-inventory extension; NO relocation, NO proof authoring. Not a regression fix — EC already elaborates in the full-catalog build via ambient class-install; this node removes its dependence on that scaffolding so it elaborates standalone. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-LF-BOOL-AND-CONSOLIDATION` | Core.Classes bool_and consolidation: drop LF's private bool_and dup (assoc/left_unit/right_unit) and repoint Semigroup_instance_Bool's field assignments to LC's canonical proofs, after Map's Tier C increment establishes LC's ownership of assoc + the identity laws. Reuses LC's canonical; mints nothing; no second assoc, no second unit-law identity. | merged | foundation | M | none | — |
@@ -632,7 +632,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` blocked by `CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
