@@ -414,7 +414,27 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
     Ok(run)
 }
 
+// `ElabEnv::new` alone overflowed a stated 1,992 KiB stack and passed at
+// 2,048 KiB in the ABI-A2 stack probe. The production CLI runs on an 8 MiB
+// main-thread stack, so this local equivalent retains at least 6 MiB of
+// measured headroom without depending on ambient `RUST_MIN_STACK`.
+const SCENARIO_COMPILER_STACK_BYTES: usize = 8 * 1024 * 1024;
+
 fn execute_scenario(
+    scenario: &Scenario,
+) -> Result<CanonicalDifferentialRun, HarnessError> {
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .name("ken-verify-scenario-compiler".to_string())
+            .stack_size(SCENARIO_COMPILER_STACK_BYTES)
+            .spawn_scoped(scope, || execute_scenario_on_compiler_stack(scenario))
+            .expect("the stated scenario compiler stack must spawn")
+            .join()
+            .unwrap_or_else(|payload| std::panic::resume_unwind(payload))
+    })
+}
+
+fn execute_scenario_on_compiler_stack(
     scenario: &Scenario,
 ) -> Result<CanonicalDifferentialRun, HarnessError> {
     validate_native_ambient(&scenario.ambient)?;
@@ -1268,6 +1288,38 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
   }
 "#;
 
+    // Policy refusals occur at the first metadata request. Keep this source to
+    // that single request so the policy test does not compile the deeper
+    // two-result success program three additional times.
+    const FS_METADATA_POLICY_SOURCE: &str =
+        r#"program capabilities FS APartial "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit APartial (Failure 90) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit APartial (Failure 91) ;
+        Cons path _ |-> match caps {
+          MkProgramCaps cap |->
+            bind (Coproduct (FSOp APartial) AmbientOp)
+              (resp_coproduct (FSOp APartial) AmbientOp
+                (fs_resp APartial) ambient_resp)
+              (Result FileError FileMetadata) ExitCode
+              (inject_l (FSOp APartial) AmbientOp
+                (fs_resp APartial) ambient_resp
+                (Result FileError FileMetadata)
+                (file_metadata APartial cap path))
+              (\metadata_result. match metadata_result {
+                Err _ |-> host_exit APartial (Failure 94) ;
+                Ok _ |-> host_exit APartial Success
+              })
+        }
+      }
+    }
+  }
+"#;
+
     const DENIAL_SOURCE: &str = r#"program capabilities FS AFull
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
@@ -1566,6 +1618,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     fn fs_metadata_scenario(
         identity: &str,
+        source: &str,
         rights: RightSet,
         arguments: Vec<Vec<u8>>,
         initial_filesystem: Vec<SeedNode>,
@@ -1586,7 +1639,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             entry: CheckedProgramEntry {
                 identity: identity.to_string(),
                 package_name: identity.to_string(),
-                source: FS_METADATA_SOURCE.to_string(),
+                source: source.to_string(),
             },
             initial_filesystem,
             expected_fs: expected_paths
@@ -1599,6 +1652,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn fs_metadata_success_scenario() -> Scenario {
         fs_metadata_scenario(
             "abi-a2-fs-metadata-success",
+            FS_METADATA_SOURCE,
             RightSet::METADATA,
             vec![b"file.bin".to_vec(), b"known-dir".to_vec()],
             vec![
@@ -1622,8 +1676,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn fs_metadata_escape_scenario() -> Scenario {
         fs_metadata_scenario(
             "abi-a2-fs-metadata-scope-escape",
+            FS_METADATA_POLICY_SOURCE,
             RightSet::METADATA,
-            vec![b"../outside.bin".to_vec(), b"unused".to_vec()],
+            vec![b"../outside.bin".to_vec()],
             vec![
                 SeedNode {
                     relative_path: b"data".to_vec(),
@@ -1641,8 +1696,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn fs_metadata_symlink_scenario() -> Scenario {
         fs_metadata_scenario(
             "abi-a2-fs-metadata-symlink-denied",
+            FS_METADATA_POLICY_SOURCE,
             RightSet::METADATA,
-            vec![b"link".to_vec(), b"unused".to_vec()],
+            vec![b"link".to_vec()],
             vec![
                 SeedNode {
                     relative_path: b"data".to_vec(),
@@ -1664,8 +1720,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     fn fs_metadata_missing_right_scenario() -> Scenario {
         let mut scenario = fs_metadata_scenario(
             "abi-a2-fs-metadata-missing-right",
+            FS_METADATA_POLICY_SOURCE,
             RightSet::NONE,
-            vec![b"file.bin".to_vec(), b"unused".to_vec()],
+            vec![b"file.bin".to_vec()],
             vec![
                 SeedNode {
                     relative_path: b"data".to_vec(),
