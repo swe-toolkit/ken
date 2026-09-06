@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 05:22:34Z — from 558 issue file(s) in `docs/program/issues/`.
+2026-09-06 07:23:55Z — from 558 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -81,7 +81,7 @@ the committed file matches the generator's output.
 | `CAT-MIGRATE-TIER-B-PROVIDERS` | Scaffold-retirement Tier B, provider-publication predecessor P (Tier-A shape, NO relocation): publish the two provider surfaces the DecEq class-owner relocation actually consumes — (a) LC (LawfulClasses) marks its OWN class DecEq + fn bool_eq pub (already listed public in LC's Public-API prose; markers just missing), confirming instance DecEq Bool loader-visible; and (c) StringBijection (a Tier-A-missed Data.Text provider) migrates off scaffolding onto real Transport imports and publishes string_to_list_char_injective. Publishing only; the relocation is the successor CAT-MIGRATE-TIER-B-CLASSES, gated on this. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-TIER-C-DATA-VALUE` | Scaffold-retirement Tier C (critical path): migrate the Data value modules off fixture scaffolding onto real imports from the already-published Tier-A/B providers, so each elaborates standalone. Per-module: publish the module's own export surface, replace ambient resolution with a real selective import from the published lower tiers, extend the loader-visible inventory, standalone-green. The proven Tier-A / EC publication-and-import shape; NO relocation of class instances, NO proof authoring beyond attached-owner migrations the Architect names. | merged | foundation | L | none | — |
 | `CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP` | Tier-C staging P2: swap the three raw NonEmptyCons call sites (Schema.ken.md:123,:130; ArgParse.ken.md:252) to nonempty_cons, still ambient. After this ZERO external consumer names a raw NonEmpty/Validation constructor, which is what makes the P3 abstract flip safe (no window where a live consumer names a hidden ctor). | draft | foundation | S | none | — |
-| `CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS` | Tier-C staging P1: add the two NonEmpty smart constructors (nonempty_singleton, nonempty_cons) as additive ambient pub fns. NonEmpty/Validation stay AMBIENT (no module boundary, no import lines); pub is inert under ambient loading, raw NonEmptyCons stays reachable, all harnesses stay green. The ctor-migration half of the abstract-export staging, decoupled from importability. | ready | foundation | S | none | — |
+| `CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS` | Tier-C staging P1: add the two NonEmpty smart constructors (nonempty_singleton, nonempty_cons) as additive ambient pub fns. NonEmpty/Validation stay AMBIENT (no module boundary, no import lines); pub is inert under ambient loading, raw NonEmptyCons stays reachable, all harnesses stay green. The ctor-migration half of the abstract-export staging, decoupled from importability. | merged | foundation | S | none | — |
 | `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` | Scaffold-retirement Tier C, held component: migrate the {NonEmpty, Validation} WCC off fixture scaffolding onto real imports, once their split-out predecessors are published. Same per-module publish+import+standalone shape as the Tier C ready lane; NonEmpty before Validation (the intra-tier edge). NO class-instance relocation, NO invented pub instance. | draft | foundation | M | none | — |
 | `CAT-NAT-REUSE-CONSUMERS` | Catalog-reuse rework, first scoped batch: the nine unblocked low-risk Nat arithmetic/order consumer duplicates from the census (groups 2 and 3), across six packages — each package imports add/leq_nat/sub/min from its canonical owner and drops the local reimplementation, one independently-releasable increment per package | merged | foundation | M | none | — |
 | `CAT-ORD-LEQ-PUB-EXPORT` | Export ord_leq_at as pub from Core.Classes.LawfulClasses so the group-5 ordered-list consumers can import the canonical dictionary-projection wrapper instead of reimplementing it. | merged | foundation | S | none | — |
@@ -602,7 +602,6 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS` — Tier-C staging P1: add the two NonEmpty smart constructors (nonempty_singleton, nonempty_cons) as additive ambient pub fns. NonEmpty/Validation stay AMBIENT (no module boundary, no import lines); pub is inert under ambient loading, raw NonEmptyCons stays reachable, all harnesses stay green. The ctor-migration half of the abstract-export staging, decoupled from importability.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
@@ -637,7 +636,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP` blocked by `CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS` (status: ready)
 - `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` blocked by `CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)

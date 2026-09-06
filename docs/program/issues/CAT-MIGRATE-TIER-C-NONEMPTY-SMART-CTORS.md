@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS
 title: "Tier-C staging P1: add the two NonEmpty smart constructors (nonempty_singleton, nonempty_cons) as additive ambient pub fns. NonEmpty/Validation stay AMBIENT (no module boundary, no import lines); pub is inert under ambient loading, raw NonEmptyCons stays reachable, all harnesses stay green. The ctor-migration half of the abstract-export staging, decoupled from importability."
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none
