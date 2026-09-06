@@ -1,144 +1,142 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION
-title: "Scaffold-retirement Tier C, held component: migrate the {NonEmpty, Validation} WCC off fixture scaffolding onto real imports, once their split-out predecessors are published. Same per-module publish+import+standalone shape as the Tier C ready lane; NonEmpty before Validation (the intra-tier edge). NO class-instance relocation, NO invented pub instance."
-status: draft
+title: "Tier-C staging P3 (flip-only): make {NonEmpty, Validation} strict abstract importable modules and add the import edges into their now-ambient clients. Logic-free once P1 added the smart constructors and P2 removed the last external raw-ctor consumer; this node only hides the raw constructor and wires imports. Full Architect soundness pass required (abstraction boundary + loading semantics)."
+status: active
 owner: foundation
 size: M
 gate: none
-tier: T2
+tier: T1
 depends_on: [CAT-MIGRATE-LF-SEMIGROUP-PUBLISH, CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS, LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE, LANG-ABSTRACT-EXPORT-PARAM-ELAB, CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP]
 blocks: []
 github: null
-origin: "Steward, 2026-09-03, split out of [[CAT-MIGRATE-TIER-C-DATA-VALUE]] on the confirmed D0 census (foundation evt_19kq7r92attpy, Architect confirmation evt_4hp6qxkdaqgbz). The census measured {NonEmpty, Validation} as a WCC (edge NonEmpty -> Validation) that sits behind UNPUBLISHED split-out providers, so the DAG-axis discipline holds it out of the ready lane: NonEmpty needs private LF Semigroup ([[CAT-MIGRATE-LF-SEMIGROUP-PUBLISH]]); Validation needs private EC apply_to/compose/functor_map_of/Applicative AND EC itself roots-loads red at Functor / Functor_instance_Identity, i.e. blocked on the Language roots-loader faces-3 cross-module export+import predecessor ([[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] follow-up) PLUS the EC provider-widen ([[CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS]]). Validation also names Semigroup_instance_NonEmpty (a synthesized dict) in a checked example — that resolves ONLY via the predecessor's imported-head carry, NEVER an invented pub instance. Held until all three predecessors land; then released one behind the ready lane."
+origin: "Steward, 2026-09-03, split out of [[CAT-MIGRATE-TIER-C-DATA-VALUE]] on the confirmed D0 census (foundation evt_19kq7r92attpy, Architect confirmation evt_4hp6qxkdaqgbz). RECUT 2026-09-06 to the flip-only step P3 of the Architect's 3-step additive staging DAG (evt_5fxtzhk104q96): P1 (CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS, merged 0e439f1e5) added the smart constructors; P2 (CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP, merged e75ce9b58) swapped all five external raw-ctor call sites to nonempty_cons, so the external raw-NonEmptyCons census is now ZERO. RELEASED 2026-09-06 by the Steward once P2 landed: all five depends_on are merged (LF-SEMIGROUP-PUBLISH, EC-APPLICATIVE-PROVIDERS, LANG-ROOTS-LOADER, LANG-ABSTRACT-EXPORT-PARAM-ELAB, the P2 callsite-swap). This node does ONLY the logic-free flip; the code motion (smart ctors + call-site swap) already landed ahead of it, which is what makes the abstract flip safe (no window where a live consumer names a hidden ctor)."
 ---
 
-> # RECUT 2026-09-06 to STEP P3 (flip-only) of the Architect's 3-step additive
-> # staging DAG (evt_5fxtzhk104q96). The prior monolithic scope (candidate
-> # 94b061de) is SUPERSEDED -- it bundled the smart ctors + abstract flip and
-> # reds cc7/cc8, because a strict importable module hides its raw ctor from the
-> # ambient Schema/ArgParse consumers that still name it (spec 33 §4.2/§4.3:
-> # module pub data is abstract-export only; "importable + public raw ctors" is
-> # unexpressible). So the code motion is split ahead of the flip: smart ctors ->
-> # P1 [[CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS]], raw call-site swap -> P2
-> # [[CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP]] (both additive, ambient). THIS
-> # node (P3) does ONLY the logic-free flip: {NonEmpty,Validation} -> strict
-> # abstract importable modules (raw ctors hidden, SAFE once P2 removes the last
-> # raw consumer); import lines into consumers {Schema, ArgParse,
-> # Configuration.Decoder, Forge}; cc7/cc8 (+cc1 if still ambient) harness legs ->
-> # roots loader. Atomic over its loading closure (a strict module is not
-> # ambiently visible; the roots loader resolves the whole closure together) but
-> # small + logic-free because P1/P2 moved the code ahead of it.
-> #
-> # HELD (status draft) pending P2; depends_on adds the callsite-swap (the
-> # original 4 predecessors are all merged). The Steward rewrites the
-> # Deliverables/ACs below to the FLIP-ONLY scope and flips this ready when P2
-> # lands (one-release-ahead). The BODY BELOW is the OLD monolithic
-> # D1-abstract+D2-Validation scope -- NOT the P3 spec; do NOT build from it until
-> # the recut. Carry Architect z3570 bounded notes into the P3 rewrite: (a)
-> # Validation law witnesses pub proof/theorem -> privatize (option_map precedent)
-> # or list in §7; (b) removed no-Monad-registry guard -> behavioral replacement.
-> # Architect gives P3 its FULL soundness pass (abstraction boundary + new loading
-> # semantics); P1/P2 are additive/mechanical. Prior RE-RELEASED/RE-HELD history
-> # retained below for context.
-> #
-> # RE-HELD 2026-09-06 after a D1 hard stop. It WAS released 2026-09-06 (its
-> # three original predecessors merged); the foundation ring ran D0 clean, then D1
-> # hard-stopped: `pub data NonEmpty` at the module level flips the checked
-> # `nonempty_append::assoc` proof to kernel `NotAFunction { head: Type 0 }` —
-> # publishing the data surface while retaining the module's checked law is a
-> # genuine semantic/publication boundary, not the framed selective-import
-> # migration. Architect ruling evt_4s9y6bpyzgaet: TWO elaborator defects (the
-> # module `pub data` divert mints a nullary opaque constant, dropping the
-> # parameter telescope, and withholds constructors from the defining module too);
-> # component design = make NonEmpty a proper ABSTRACT type with SMART
-> # CONSTRUCTORS, NOT concrete public constructors. Spec enclave CONFIRMED both
-> # underlying clauses are derivations of the current contract (spec-author
-> # evt_7vpq0673kjcyp).
-> #
-> # So this node is BLOCKED on the elaborator predecessor LANG-ABSTRACT-EXPORT-
-> # PARAM-ELAB (the two-faced/arity fix) — the sole depends_on edge. Its other
-> # predecessor, the §4.2 spec text LANG-ABSTRACT-EXPORT-PARAM-spec, has ALREADY
-> # LANDED (560dd455b) as the confirmed contract; it is a spec-only pin with no
-> # tracker node, so it is NOT a depends_on edge (recorded here in prose only). The
-> # Steward re-releases after ELAB lands, with D1 rescoped (below). D0's
-> # measurement stands (foundation-implementer
-> # evt_6whyzawx7qtcr: import-only NonEmpty scratch closure green; the trigger is
-> # the public-surface step). Foundation stands down until re-release.
-> #
-> # Tier C held component: {NonEmpty, Validation}. NO class-instance relocation,
-> # NO invented pub instance; the synthesized Semigroup_instance_NonEmpty resolves
-> # via imported-head carry ONLY.
+> # RELEASED 2026-09-06 to the foundation ring (lane-3), step P3 (flip-only) of
+> # the Architect's 3-step additive staging DAG (evt_5fxtzhk104q96). All five
+> # depends_on are MERGED. This is the FLIP: {NonEmpty, Validation} become strict
+> # abstract importable modules (raw ctor hidden), and their now-ambient clients
+> # gain the import edges they need. The prior monolithic scope (candidate
+> # 94b061de, which bundled smart ctors + abstract flip and reddened cc7/cc8) is
+> # SUPERSEDED and fully retired -- P1/P2 moved that code motion ahead of this
+> # flip. Base = current origin/main (e4f355b12 at release; re-measure at cut,
+> # lines drift). Architect is the REQUIRED reviewer and gives this its FULL
+> # soundness pass (abstraction boundary + loading semantics); this is not an
+> # additive/mechanical review like P1/P2. Seat: check the tier at kick -- the
+> # mechanics are small but the loading-semantics/standalone-green work
+> # hard-stopped twice in the monolithic scope, so it is provisioned T1.
 
-This node is the held WCC that [[CAT-MIGRATE-TIER-C-DATA-VALUE]] split out. It is
-NOT a regression fix — both modules elaborate today under ambient class-install;
-this brings them to the scaffold-retirement end state, exactly as the ready lane
-does for SB..Vector. Do not treat standalone-red as a bug: it is the starting
-condition each increment closes (see the parent frame's "Not a regression fix").
+## What this is
 
-## Blocked-on (the DAG axis — release only when all three have landed)
+The final step of the Tier-C {NonEmpty, Validation} scaffold retirement. With the
+smart constructors landed (P1) and every external raw-`NonEmptyCons` call site
+swapped to `nonempty_cons` (P2), no source outside NonEmpty's defining module
+names the raw constructor. This node flips {NonEmpty, Validation} to strict
+abstract importable modules -- the raw constructor becomes internal, hidden from
+clients -- and adds the selective imports the now-ambient clients need to keep
+resolving. It is logic-free: it introduces no new definition and changes no
+denotation; it only hides the raw ctor and wires imports.
 
-- **NonEmpty** needs private LF `Semigroup` -> [[CAT-MIGRATE-LF-SEMIGROUP-PUBLISH]]
-  (a visibility-only provider-widen on LF, minted alongside this).
-- **Validation** needs private EC `apply_to`/`compose`/`functor_map_of`/
-  `Applicative` -> [[CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS]], AND the EC module
-  roots-loads red at `Functor` / `Functor_instance_Identity`, blocked on the
-  Language roots-loader faces-3 cross-module export+import predecessor
-  ([[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] follow-up increment).
-- **Validation** names `Semigroup_instance_NonEmpty` (a synthesized dict) in a
-  checked example: it resolves via the predecessor's imported-head carry ONLY.
-  Never mint a `pub instance` to satisfy it.
+## Fixed inputs (D0-measured at e4f355b12; RE-MEASURE at your cut -- lines drift)
+
+- **NonEmpty** defining module: `catalog/packages/Data/Collections/NonEmpty.ken.md`.
+  Public API line (§7) currently lists `NonEmpty`/`NonEmptyCons`,
+  `nonempty_singleton`, `nonempty_cons`, `nonempty_head`, `nonempty_tail`,
+  `nonempty_to_list`, `nonempty_map`, `nonempty_append`, and
+  `Semigroup_instance_NonEmpty`.
+- **External raw-`NonEmptyCons` census = ZERO** (P2's AC-NO-RAW-CONSUMER holds;
+  re-confirm at cut). The only `NonEmptyCons` references left in the tree are
+  inside the defining module (definition, accessors, laws, the local example).
+- **Clients that must gain an import edge at the flip** (measured post-P2):
+  - `Data/Sums/Validation.ken.md` -- itself made strict/abstract by this node;
+    consumes from NonEmpty: the `NonEmpty` type, `nonempty_cons` (:77/:86),
+    `nonempty_append` (:125), and `Semigroup_instance_NonEmpty` (:113, the
+    synthesized dict -- imported-head carry ONLY, never a minted `pub instance`).
+  - `Application/CommandLine/ArgParse.ken.md` -- `NonEmpty` type + `nonempty_cons`
+    (:252).
+  - `Application/Input/Schema.ken.md` -- `NonEmpty` type + `nonempty_cons`
+    (:123/:130).
+  - `Application/Configuration/Decoder.ken.md` -- names the Validation/NonEmpty
+    TYPES only; type imports at the flip.
+  - `catalog/examples/CommandLine/Forge.ken.md` -- names the Validation/NonEmpty
+    TYPES only; type imports at the flip.
+  Re-run the census at cut; a client that names a symbol only through ambient
+  reach today needs a selective import the moment the producer goes strict.
+- **Harness legs**: cc7/cc8 (and cc1 if still ambient) move to the roots loader;
+  extend the loader inventory to cover the newly-strict modules.
 
 ## Deliverables
 
-- **D0 — re-measure at the release SHA.** By the time the predecessors land, the
-  standalone `UnresolvedCon`/`UnboundName` sets and the exact provider heads may
-  have shifted; re-census both modules against the then-published providers
-  before authoring the import blocks. NonEmpty before Validation.
-- **D1 NonEmpty — RESCOPED to abstract export + smart constructors** (Architect
-  evt_4s9y6bpyzgaet; requires the two new predecessors landed). Make NonEmpty a
-  proper ABSTRACT data type: drop raw `NonEmptyCons` from the package Public API
-  (NonEmpty.ken.md:135); add `pub fn nonempty_singleton (a:Type) (x:a) : NonEmpty
-  a = NonEmptyCons a x (Nil a)` and `pub fn nonempty_cons (a:Type) (x:a) (rest:
-  List a) : NonEmpty a = NonEmptyCons a x rest`; keep the accessor set
-  (head/tail/to_list/map/append) + the Semigroup instance/law public. The raw
-  constructor stays internal; the `nonempty_append::assoc` proof stays internal
-  and valid (it uses the constructor in the defining module, which the elaborator
-  two-faced fix restores). Then the publish + selective-import + standalone-green
-  shape as before, over the abstract surface.
-- **D2 Validation — publish + import + standalone**, after D1, unchanged in shape:
-  publish exactly the measured export surface, selective import from the published
-  lower tiers, retire ambient reach, extend the loader inventory, standalone exit
-  0. The `Semigroup_instance_NonEmpty` example still resolves via imported-head
-  carry only.
+- **D0 -- re-measure at the release SHA.** Re-run the external raw-ctor census
+  (expect zero), the per-client symbol-use sets, and the exact NonEmpty §7 Public
+  API and Validation export surfaces. NonEmpty before Validation (the intra-tier
+  edge). Any drift from the Fixed inputs is D0's to correct before authoring.
+- **D1 NonEmpty -- flip to strict abstract importable.** Hide the raw
+  `NonEmptyCons` constructor: drop `NonEmptyCons` from the §7 Public API list;
+  keep the smart constructors (`nonempty_singleton`, `nonempty_cons`) and the
+  accessors (`nonempty_head`/`nonempty_tail`/`nonempty_to_list`/`nonempty_map`/
+  `nonempty_append`) and `Semigroup_instance_NonEmpty` public. The raw
+  constructor stays internal to the defining module; the `nonempty_append` law
+  (uses the raw ctor inside the defining module) stays internal and valid -- the
+  LANG-ABSTRACT-EXPORT-PARAM-ELAB fix keeps the constructor visible to the
+  defining module. Add the selective imports of `nonempty_cons` (and any other
+  now-non-ambient symbol) into ArgParse, Schema, and Validation.
+- **D2 Validation -- flip to strict abstract importable**, after D1. Publish the
+  measured Validation export surface; add selective imports from NonEmpty (type,
+  `nonempty_cons`, `nonempty_append`, `Semigroup_instance_NonEmpty`) and from the
+  published lower tiers; retire ambient reach; add type imports into
+  Configuration.Decoder and Forge. Extend the roots-loader inventory; standalone
+  exit 0. The `Semigroup_instance_NonEmpty` example resolves via imported-head
+  carry ONLY.
+- **D3 -- honest reach.** cc7/cc8 (+cc1 if still ambient) run through the roots
+  loader over the newly-strict modules; standalone-green each module.
 
-## Acceptance criteria — proven shape, adjusted for the D1 abstract-export rescope
+## Architect bounded notes to fold (z3570/z3660 -- carry into the candidate)
 
-From [[CAT-MIGRATE-TIER-C-DATA-VALUE]]: AC-EXPORTED (per published symbol,
-loader-resolved with a still-private-sibling control), AC-EXACT-INVENTORY (per
-module, per-symbol reddening mutation), AC-STANDALONE-GREEN (removing the import
-line restores the exact prior standalone failure), AC-NO-REGRESSION (complete
-affected-target closure, scoped by changed paths, targeted via `scripts/ken-cargo`,
-never `--workspace` — green in CI is the workspace verdict).
+- **(a) Validation law witnesses that are `pub proof`/`pub theorem`.** When
+  Validation goes abstract, a law witness exported as a public proof/theorem must
+  either be PRIVATIZED (the `option_map` precedent) or explicitly listed in the
+  §7 Public API as part of the intended abstract surface. Do not leave a public
+  proof dangling across the abstraction boundary. Measure which witnesses are
+  currently `pub` and decide per witness; the Architect confirms.
+- **(b) The removed no-Monad-registry guard needs a BEHAVIORAL replacement**, not
+  just deletion -- assert the property the guard protected as a positive check the
+  node carries.
 
-**AC-VISIBILITY-ONLY — adjusted for the abstract-export rescope.** Pub-widening of
-EXISTING symbols (accessors head/tail/to_list/map/append, the Semigroup instance
-and its law) is a byte-unchanged body. The ONLY permitted new definitions are the
-two Architect-specified smart constructors (`nonempty_singleton`, `nonempty_cons`)
-whose bodies are exactly the trivial `NonEmptyCons` wrappers named in D1 — no other
-new pub symbol, NO second class/instance, NO invented `pub instance`. Raw
-`NonEmptyCons` is REMOVED from the client Public API (the type is abstract to
-clients); the raw constructor stays internal to the defining module.
+## Acceptance criteria
 
-**AC-ABSTRACT (new, per Architect evt_4s9y6bpyzgaet).** A CLIENT module cannot
-match or construct `NonEmpty` via its raw constructor (opaque view); it constructs
-only through the smart constructors and eliminates only through the accessors.
-Control: the raw-constructor reference that compiles INSIDE the defining module is
-rejected from a client.
+- **AC-EXPORTED** (per published symbol): each symbol the flip publishes is
+  loader-resolved from a client, with a still-private-sibling control proving the
+  boundary is real (a sibling NOT exported is NOT resolvable).
+- **AC-EXACT-INVENTORY** (per module): a per-symbol reddening mutation -- removing
+  any one exported symbol reddens exactly the clients that use it; the loader
+  inventory covers exactly the newly-strict modules (extra-ctor mutation nets).
+- **AC-STANDALONE-GREEN**: removing an added import line restores the exact prior
+  standalone failure for that client (the import is load-bearing, not decorative).
+- **AC-ABSTRACT** (Architect evt_4s9y6bpyzgaet): a CLIENT module cannot construct
+  or match `NonEmpty`/`Validation` via the raw constructor (opaque view) -- it
+  constructs only through the smart constructors and eliminates only through the
+  accessors. Control: the raw-constructor reference that compiles INSIDE the
+  defining module is REJECTED (UnboundName / abstract-view rejection) from a
+  client, at the exact name.
+- **AC-VISIBILITY-ONLY**: no new definition and no denotation change. Pub-widening
+  of existing symbols is a byte-unchanged body; hiding the raw ctor removes it
+  from the client-visible surface only. NO second class/instance, NO invented
+  `pub instance`, NO smart-ctor body change (they landed in P1).
+- **AC-LAW-WITNESS** (folds note (a)): every Validation law witness is either
+  privatized or listed in the §7 Public API; no public proof/theorem crosses the
+  boundary unaccounted.
+- **AC-GUARD-REPLACEMENT** (folds note (b)): the property the removed
+  no-Monad-registry guard protected is asserted by a positive behavioral check.
+- **AC-NO-REGRESSION**: full `-p ken-elaborator` green in CI over the complete
+  affected-target closure (every target that loads any module whose loading this
+  flip changes, diff-touched or not); cc1/cc7/cc8 green. Targeted via
+  `scripts/ken-cargo`, never `--workspace` -- green in CI is the workspace verdict.
 
 ## Gate, reviewer, sequencing
 
-`gate: none`. On each increment's candidate: **Architect** (required — surface
-correctness + class-uniformity + the imported-head carry for the synthesized
-dict) + **Foundation QA + CV** on the exact SHA, then Steward M1-M4 ->
-lieutenant. Released one behind the [[CAT-MIGRATE-TIER-C-DATA-VALUE]] ready lane,
-once all three predecessors have landed.
+`gate: none`. On the candidate: **Architect** (REQUIRED -- full soundness pass:
+abstraction boundary + loading semantics + the imported-head carry for the
+synthesized dict) + **Foundation QA** + **CV** on the exact SHA, then Steward
+M1-M4 -> lieutenant M5-M9. Final step of the 3-step DAG; depends_on all merged.
+NonEmpty (D1) before Validation (D2); may land as accepted partial per increment.
