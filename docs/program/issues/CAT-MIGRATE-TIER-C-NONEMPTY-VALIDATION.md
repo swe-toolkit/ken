@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION
 title: "Scaffold-retirement Tier C, held component: migrate the {NonEmpty, Validation} WCC off fixture scaffolding onto real imports, once their split-out predecessors are published. Same per-module publish+import+standalone shape as the Tier C ready lane; NonEmpty before Validation (the intra-tier edge). NO class-instance relocation, NO invented pub instance."
-status: draft
+status: active
 owner: foundation
 size: M
 gate: none
@@ -12,6 +12,16 @@ github: null
 origin: "Steward, 2026-09-03, split out of [[CAT-MIGRATE-TIER-C-DATA-VALUE]] on the confirmed D0 census (foundation evt_19kq7r92attpy, Architect confirmation evt_4hp6qxkdaqgbz). The census measured {NonEmpty, Validation} as a WCC (edge NonEmpty -> Validation) that sits behind UNPUBLISHED split-out providers, so the DAG-axis discipline holds it out of the ready lane: NonEmpty needs private LF Semigroup ([[CAT-MIGRATE-LF-SEMIGROUP-PUBLISH]]); Validation needs private EC apply_to/compose/functor_map_of/Applicative AND EC itself roots-loads red at Functor / Functor_instance_Identity, i.e. blocked on the Language roots-loader faces-3 cross-module export+import predecessor ([[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] follow-up) PLUS the EC provider-widen ([[CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS]]). Validation also names Semigroup_instance_NonEmpty (a synthesized dict) in a checked example — that resolves ONLY via the predecessor's imported-head carry, NEVER an invented pub instance. Held until all three predecessors land; then released one behind the ready lane."
 ---
 
+> # RELEASED 2026-09-06 to the foundation ring (lane-3). All three predecessors
+> # have LANDED and are merged on main: CAT-MIGRATE-LF-SEMIGROUP-PUBLISH,
+> # LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE, and CAT-MIGRATE-EC-APPLICATIVE-
+> # PROVIDERS (last one at 5a91cff93 / node close 9796f4b00). Base = current main
+> # 9796f4b00 (re-measure at cut per D0). The foundation IMPLEMENTER was
+> # phase-reseat to T2 (gpt-5.6-terra/medium) for this M/T2 node before release
+> # (leader + QA were already terra); a measured D0 drift to intrinsic T1 is a
+> # HARD STOP + separate up-reseat ruling, not a prediction. D0 FIRST (re-census
+> # both modules at the cut), then D1 NonEmpty, then D2 Validation.
+> #
 > # Tier C held component: {NonEmpty, Validation}. Same shape as the ready lane.
 > # Per-module publish own surface, real selective import from published lower
 > # tiers, extend loader inventory, standalone-green. NO class-instance
