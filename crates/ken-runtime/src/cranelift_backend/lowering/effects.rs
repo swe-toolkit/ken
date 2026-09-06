@@ -2576,8 +2576,8 @@ impl<'a> Lowering<'a> {
         // `reply_resource_error_tag`, while ConsoleWrite, FsWriteFile, and
         // FsAppendFile accept only `success` or `reply_error_tag`. Writing the
         // wrong one is not a mis-labelled error — `require_one_of_i64` refuses
-        // the reply outright and the whole compiled function fails generically, which is the defect
-        // this triple exists to make unspellable.
+        // the reply outright and the whole compiled function fails generically,
+        // which is the defect this triple exists to make unspellable.
         let mut narrow_failure: Option<(
             cranelift_codegen::ir::Value,
             cranelift_codegen::ir::Value,

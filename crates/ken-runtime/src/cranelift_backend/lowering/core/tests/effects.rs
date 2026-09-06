@@ -4404,14 +4404,13 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// it.
 ///
 /// The two inventories are the disposition itself, which IS the contract —
-/// this is a normative compatibility vector, not a snapshot. Changing either side takes
-/// a per-seat evidence decision, which is exactly the review this forces.
+/// this is a normative compatibility vector, not a snapshot. Changing either
+/// side takes a per-seat evidence decision, which is exactly the review this forces.
 ///
 /// The `SPECIALIZED_ONLY` side is not a gap in the observer. `D5` measured the
 /// original four and ABI-A2's real artifact measures the appended path seat.
 /// Their synthesized `FileError` separately declares `SiteOperand(0)`; the
-/// exact carried use is
-/// projected through the emitted helper without widening this direct-consumer
+/// exact carried use is projected through the emitted helper without widening this direct-consumer
 /// availability partition.
 #[test]
 fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
