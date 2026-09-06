@@ -249,6 +249,19 @@ Steward cuts it rather than the ring.
 
 **This node flips per slice, never as a whole.**
 
+> ## SLICE STATUS (Steward, updated 2026-09-06)
+>
+> - **Slice 1 as-patterns -- LANDED.** [[LANG-MATCH-AS-PATTERN]] merged
+>   `e6645d7c2` / closed `4cbb0c088` (consumed the landed occurrence-threading
+>   capability `LANG-MATCH-MATRIX-OCCURRENCE-THREADING`, `9ef5c3c19`).
+> - **Slice 2 tuple/pair patterns -- RELEASED 2026-09-06.**
+>   [[LANG-MATCH-TUPLE-PATTERN]] (`ready`), the first SPLITTING form; it owes the
+>   NoInhabitants composition discriminator for a redundant tuple arm.
+> - **Slices 3-6 (record, or-patterns, guards, literals)** remain future slices,
+>   each fail-closed until cut. Literals stay blocked (the enclave's DecEq/expected
+>   -type finding). The Steward cuts the next slice one-release-ahead as the ring
+>   drains.
+
 **One thing already decided and needing no further ruling:** this node does
 **not** amend `34`. The enclave ruled the chapter's obligations real, so the
 "drop it from the surface" branch is closed -- the six forms are debt to be
