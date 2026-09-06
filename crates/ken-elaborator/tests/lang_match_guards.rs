@@ -6,6 +6,7 @@
 
 use ken_elaborator::lossless::parse_lossless;
 use ken_elaborator::{error::ElabError, ArmDeadCause, Decl, ElabEnv, Expr};
+use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{whnf, Context, GlobalId, Term};
 
 fn elaborate(env: &mut ElabEnv, source: &str) -> GlobalId {
@@ -27,6 +28,24 @@ fn constructor(id: GlobalId, arguments: impl IntoIterator<Item = Term>) -> Term 
             level_args: Vec::new(),
         },
         Term::app,
+    )
+}
+
+fn interpreter_nat(env: &ElabEnv, id: GlobalId) -> usize {
+    fn count(value: EvalVal, zero: GlobalId, suc: GlobalId) -> usize {
+        match value {
+            EvalVal::Ctor { id, args, .. } if id == zero && args.is_empty() => 0,
+            EvalVal::Ctor { id, args, .. } if id == suc && args.len() == 1 => {
+                1 + count(args[0].clone(), zero, suc)
+            }
+            other => panic!("expected an interpreter Nat, got {other:?}"),
+        }
+    }
+    let mut store = EvalStore::new();
+    count(
+        eval(&[], &body(env, id), &env.env, &mut store),
+        env.globals["Zero"],
+        env.globals["Suc"],
     )
 }
 
@@ -69,6 +88,8 @@ fn guard_uses_pattern_binders_and_false_falls_through() {
         whnf(&env.env, &Context::new(), &body(&env, selected_false)),
         zero
     );
+    assert_eq!(interpreter_nat(&env, selected_true), 1);
+    assert_eq!(interpreter_nat(&env, selected_false), 0);
     assert_eq!(env.env.trusted_base(), trusted_before);
 }
 
