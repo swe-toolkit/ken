@@ -347,6 +347,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
     ken_host::HostOpV1::ConsoleIsTerminal,
+    ken_host::HostOpV1::ClockWallNow,
     ken_host::HostOpV1::FsReadFile,
     ken_host::HostOpV1::FsWriteFile,
     ken_host::HostOpV1::FsChangeMode,
@@ -357,7 +358,6 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::ResourceRelease,
     ken_host::HostOpV1::BufferAllocate,
     ken_host::HostOpV1::BufferFreeze,
-    ken_host::HostOpV1::ClockWallNow,
 ];
 
 /// The seat contract of one admitted operation at one semantic ordinal.

@@ -221,6 +221,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 14] = [
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
     HostOpV1::ConsoleIsTerminal,
+    HostOpV1::ClockWallNow,
     HostOpV1::FsReadFile,
     HostOpV1::FsWriteFile,
     HostOpV1::FsChangeMode,
@@ -231,10 +232,6 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 14] = [
     HostOpV1::ResourceRelease,
     HostOpV1::BufferAllocate,
     HostOpV1::BufferFreeze,
-    // New promotions append: the roster order is an internal allocation input,
-    // not the catalog's opcode order. Preserve every existing operation's
-    // position while extending the population.
-    HostOpV1::ClockWallNow,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
