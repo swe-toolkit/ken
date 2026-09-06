@@ -1,7 +1,7 @@
 ---
 id: LANG-INFIX-APPLICATION-DEFAULT
 title: "with symbolic operator names defined, `a <+> b` must parse as application of `<+>` at the normative default `infixl 9` -- one precedence level in the existing cascade, and it needs no fixity table"
-status: draft
+status: active
 owner: language
 size: S
 gate: none
@@ -11,6 +11,13 @@ github: null
 origin: "Architect scope ruling evt_1s7mqjg4tyxx1 (2026-08-15), part (ii) of his three-way decomposition of user-defined operators. Filed `draft` ONLY because its predecessor has not landed -- the scope is settled and the frame below is complete. Steward-filed and cut per COORDINATION section 2."
 ---
 
+ # RELEASED 2026-09-06 (Steward). Predecessor [[LANG-SYMBOLIC-OPERATOR-NAMES]]
+> # is MERGED, so this node's premise (`<+>` can be defined) is now true and the
+> # symbolic-operators bucket's next link is buildable. Flipped `active` and
+> # released to Team Language; `wp/` release pointer at
+> # `docs/program/wp/LANG-INFIX-APPLICATION-DEFAULT.md`. The historical draft
+> # rationale is retained below.
+>
 > # `draft` FOR ONE REASON: ITS PREDECESSOR HAS NOT LANDED.
 >
 > **The scope question is answered and this frame is shovel-ready.** Flip it
