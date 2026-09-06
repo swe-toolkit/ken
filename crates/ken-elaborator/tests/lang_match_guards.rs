@@ -111,7 +111,7 @@ fn guard_and_body_use_the_dependent_constructor_context() {
     elaborate(
         &mut env,
         "fn guarded_index (carrier : Type) (value : GuardIx carrier) : carrier = \
-         match value { GuardNat flag payload if flag |-> payload ; \
+         match value { GuardNat flag payload if flag |-> Zero ; \
          GuardNat _ payload |-> payload ; GuardBool flag |-> flag }",
     );
     let selected_false = elaborate(
@@ -132,7 +132,7 @@ fn guard_and_body_use_the_dependent_constructor_context() {
     );
     assert_eq!(
         whnf(&env.env, &Context::new(), &body(&env, selected_true)),
-        one
+        constructor(env.globals["Zero"], [])
     );
 }
 
