@@ -1,31 +1,44 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION
 title: "Scaffold-retirement Tier C, held component: migrate the {NonEmpty, Validation} WCC off fixture scaffolding onto real imports, once their split-out predecessors are published. Same per-module publish+import+standalone shape as the Tier C ready lane; NonEmpty before Validation (the intra-tier edge). NO class-instance relocation, NO invented pub instance."
-status: active
+status: draft
 owner: foundation
 size: M
 gate: none
 tier: T2
-depends_on: [CAT-MIGRATE-LF-SEMIGROUP-PUBLISH, CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS, LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]
+depends_on: [CAT-MIGRATE-LF-SEMIGROUP-PUBLISH, CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS, LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE, LANG-ABSTRACT-EXPORT-PARAM-ELAB]
 blocks: []
 github: null
 origin: "Steward, 2026-09-03, split out of [[CAT-MIGRATE-TIER-C-DATA-VALUE]] on the confirmed D0 census (foundation evt_19kq7r92attpy, Architect confirmation evt_4hp6qxkdaqgbz). The census measured {NonEmpty, Validation} as a WCC (edge NonEmpty -> Validation) that sits behind UNPUBLISHED split-out providers, so the DAG-axis discipline holds it out of the ready lane: NonEmpty needs private LF Semigroup ([[CAT-MIGRATE-LF-SEMIGROUP-PUBLISH]]); Validation needs private EC apply_to/compose/functor_map_of/Applicative AND EC itself roots-loads red at Functor / Functor_instance_Identity, i.e. blocked on the Language roots-loader faces-3 cross-module export+import predecessor ([[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] follow-up) PLUS the EC provider-widen ([[CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS]]). Validation also names Semigroup_instance_NonEmpty (a synthesized dict) in a checked example — that resolves ONLY via the predecessor's imported-head carry, NEVER an invented pub instance. Held until all three predecessors land; then released one behind the ready lane."
 ---
 
-> # RELEASED 2026-09-06 to the foundation ring (lane-3). All three predecessors
-> # have LANDED and are merged on main: CAT-MIGRATE-LF-SEMIGROUP-PUBLISH,
-> # LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE, and CAT-MIGRATE-EC-APPLICATIVE-
-> # PROVIDERS (last one at 5a91cff93 / node close 9796f4b00). Base = current main
-> # 9796f4b00 (re-measure at cut per D0). The foundation IMPLEMENTER was
-> # phase-reseat to T2 (gpt-5.6-terra/medium) for this M/T2 node before release
-> # (leader + QA were already terra); a measured D0 drift to intrinsic T1 is a
-> # HARD STOP + separate up-reseat ruling, not a prediction. D0 FIRST (re-census
-> # both modules at the cut), then D1 NonEmpty, then D2 Validation.
+> # RE-HELD 2026-09-06 after a D1 hard stop. It WAS released 2026-09-06 (its
+> # three original predecessors merged); the foundation ring ran D0 clean, then D1
+> # hard-stopped: `pub data NonEmpty` at the module level flips the checked
+> # `nonempty_append::assoc` proof to kernel `NotAFunction { head: Type 0 }` —
+> # publishing the data surface while retaining the module's checked law is a
+> # genuine semantic/publication boundary, not the framed selective-import
+> # migration. Architect ruling evt_4s9y6bpyzgaet: TWO elaborator defects (the
+> # module `pub data` divert mints a nullary opaque constant, dropping the
+> # parameter telescope, and withholds constructors from the defining module too);
+> # component design = make NonEmpty a proper ABSTRACT type with SMART
+> # CONSTRUCTORS, NOT concrete public constructors. Spec enclave CONFIRMED both
+> # underlying clauses are derivations of the current contract (spec-author
+> # evt_7vpq0673kjcyp).
 > #
-> # Tier C held component: {NonEmpty, Validation}. Same shape as the ready lane.
-> # Per-module publish own surface, real selective import from published lower
-> # tiers, extend loader inventory, standalone-green. NO class-instance
-> # relocation, NO invented pub instance.
+> # So this node is BLOCKED on the elaborator predecessor LANG-ABSTRACT-EXPORT-
+> # PARAM-ELAB (the two-faced/arity fix) — the sole depends_on edge. Its other
+> # predecessor, the §4.2 spec text LANG-ABSTRACT-EXPORT-PARAM-spec, has ALREADY
+> # LANDED (560dd455b) as the confirmed contract; it is a spec-only pin with no
+> # tracker node, so it is NOT a depends_on edge (recorded here in prose only). The
+> # Steward re-releases after ELAB lands, with D1 rescoped (below). D0's
+> # measurement stands (foundation-implementer
+> # evt_6whyzawx7qtcr: import-only NonEmpty scratch closure green; the trigger is
+> # the public-surface step). Foundation stands down until re-release.
+> #
+> # Tier C held component: {NonEmpty, Validation}. NO class-instance relocation,
+> # NO invented pub instance; the synthesized Semigroup_instance_NonEmpty resolves
+> # via imported-head carry ONLY.
 
 This node is the held WCC that [[CAT-MIGRATE-TIER-C-DATA-VALUE]] split out. It is
 NOT a regression fix — both modules elaborate today under ambient class-install;
@@ -52,11 +65,22 @@ condition each increment closes (see the parent frame's "Not a regression fix").
   standalone `UnresolvedCon`/`UnboundName` sets and the exact provider heads may
   have shifted; re-census both modules against the then-published providers
   before authoring the import blocks. NonEmpty before Validation.
-- **D1 NonEmpty, D2 Validation — publish + import + standalone, in that order.**
-  Each: publish exactly the export surface its consumers need (measured); add a
-  selective import from the published lower tiers for the exact set; retire the
-  ambient reach; extend the loader-visible inventory (exports + imports); the
-  module elaborates standalone (exit 0).
+- **D1 NonEmpty — RESCOPED to abstract export + smart constructors** (Architect
+  evt_4s9y6bpyzgaet; requires the two new predecessors landed). Make NonEmpty a
+  proper ABSTRACT data type: drop raw `NonEmptyCons` from the package Public API
+  (NonEmpty.ken.md:135); add `pub fn nonempty_singleton (a:Type) (x:a) : NonEmpty
+  a = NonEmptyCons a x (Nil a)` and `pub fn nonempty_cons (a:Type) (x:a) (rest:
+  List a) : NonEmpty a = NonEmptyCons a x rest`; keep the accessor set
+  (head/tail/to_list/map/append) + the Semigroup instance/law public. The raw
+  constructor stays internal; the `nonempty_append::assoc` proof stays internal
+  and valid (it uses the constructor in the defining module, which the elaborator
+  two-faced fix restores). Then the publish + selective-import + standalone-green
+  shape as before, over the abstract surface.
+- **D2 Validation — publish + import + standalone**, after D1, unchanged in shape:
+  publish exactly the measured export surface, selective import from the published
+  lower tiers, retire ambient reach, extend the loader inventory, standalone exit
+  0. The `Semigroup_instance_NonEmpty` example still resolves via imported-head
+  carry only.
 
 ## Acceptance criteria — the proven Tier-A / EC / ready-lane shape
 
