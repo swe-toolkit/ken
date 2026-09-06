@@ -275,10 +275,24 @@ fn record_fields_compose_with_tuple_constructor_and_as_patterns() {
          { payload = (Suc child as whole, other), enabled = True } |-> whole ; \
          { enabled = False } |-> Zero }",
     );
+    elaborate(&mut env, "data RecordBox = MkRecordBox Envelope");
+    elaborate(
+        &mut env,
+        "const boxed_envelope : RecordBox = MkRecordBox envelope",
+    );
+    let nested = elaborate(
+        &mut env,
+        "const boxed_record_selected : Nat = match boxed_envelope { \
+         MkRecordBox { payload = (Zero, other), enabled = True } |-> other ; \
+         MkRecordBox { payload = (Suc child as whole, other), enabled = True } |-> whole ; \
+         MkRecordBox { enabled = False } |-> Zero }",
+    );
     let zero = constructor(env.globals["Zero"], []);
+    let one = constructor(env.globals["Suc"], [zero]);
+    assert_eq!(whnf(&env.env, &Context::new(), &body(&env, selected)), one);
     assert_eq!(
-        whnf(&env.env, &Context::new(), &body(&env, selected)),
-        constructor(env.globals["Suc"], [zero])
+        whnf(&env.env, &Context::new(), &body(&env, nested)),
+        whnf(&env.env, &Context::new(), &body(&env, selected))
     );
 }
 
