@@ -103,7 +103,7 @@ data ShadowPlan = MkProd | MkProcessInput | Success | Failure
 data ShadowSpine = Ret | Vis | InL | InR
 data ShadowUnit = MkUnit
 data ShadowIoErrors = NotFound | PermissionDenied | CapabilityDenied | BrokenPipe | Interrupted | AlreadyExists | InvalidInput | IsDirectory | NotDirectory | NotEmpty | Unsupported | Revoked | Other
-data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress
+data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress | ResourceRevoked
 data ShadowProgress = ReadSome | ReadEof | Wrote
 data ShadowFileOps = MkFileError | OpReadFile | OpWriteFile | OpChangeMode
 data ShadowOps = Read | Write | Flush | IsTerminal | WallNow | MonotonicNow | SleepUntil | RandomBytes | ReadFile | WriteFile | AppendFile | Metadata | ReadDirectory | CreateDirectory | RemoveFile | RemoveDirectory | Rename | ChangeMode
@@ -146,6 +146,7 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowResource", "InvalidOffset"),
     ("ShadowResource", "InvalidBounds"),
     ("ShadowResource", "NoProgress"),
+    ("ShadowResource", "ResourceRevoked"),
     ("ShadowProgress", "ReadSome"),
     ("ShadowProgress", "ReadEof"),
     ("ShadowProgress", "Wrote"),

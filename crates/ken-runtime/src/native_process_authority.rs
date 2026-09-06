@@ -604,6 +604,7 @@ fn native_process_symbols_from_record(
         resource_invalid_offset: spine.resource_invalid_offset.clone(),
         resource_invalid_bounds: spine.resource_invalid_bounds.clone(),
         resource_no_progress: spine.resource_no_progress.clone(),
+        resource_revoked: spine.resource_revoked.clone(),
         resource_kind_fs_handle: spine.resource_kind_fs_handle.clone(),
         resource_kind_buffer: spine.resource_kind_buffer.clone(),
         resource_trace_identity: spine.resource_trace_identity.clone(),
