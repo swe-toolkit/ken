@@ -682,6 +682,9 @@ fn collect_pattern_spans(pattern: &Pattern, out: &mut Vec<Span>) {
             }
         }),
         PatKind::As(inner, _) => collect_pattern_spans(inner, out),
+        PatKind::Or(alternatives) => alternatives
+            .iter()
+            .for_each(|alternative| collect_pattern_spans(alternative, out)),
         PatKind::Wild | PatKind::Var(_) => {}
     }
 }

@@ -6,7 +6,7 @@
 //! L2 additions: `data` declarations, `type` aliases, `match` expressions,
 //! type application (`T a b`).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     BinOp, ClassField, ConstructorSignatureArg, Decl, DefKeyword, EffectRowSyntax,
@@ -67,6 +67,7 @@ pub enum RPatKind {
     Tuple(Vec<RPattern>),
     Record(Vec<RRecordPatField>),
     As(Box<RPattern>, String, usize),
+    Or(Vec<RPattern>),
 }
 
 /// A resolved match arm.
@@ -1979,7 +1980,7 @@ fn resolve_pattern(
     pat: &crate::ast::Pattern,
 ) -> Result<(RPattern, Vec<PatternBinding>), ElabError> {
     let mut next_slot = 0;
-    let (resolved, bindings) = resolve_pattern_inner(pat, &mut next_slot, false)?;
+    let (resolved, bindings) = resolve_pattern_inner(pat, &mut next_slot, false, false)?;
     for (index, binding) in bindings.iter().enumerate() {
         for other in bindings.iter().skip(index + 1) {
             if binding.name != "_"
@@ -2004,6 +2005,7 @@ fn resolve_pattern_inner(
     pat: &crate::ast::Pattern,
     next_slot: &mut usize,
     occurrence_backed: bool,
+    anonymous_occurrence_backed: bool,
 ) -> Result<(RPattern, Vec<PatternBinding>), ElabError> {
     match &pat.kind {
         PatKind::Wild => {
@@ -2011,7 +2013,17 @@ fn resolve_pattern_inner(
             *next_slot += 1;
             Ok((
                 RPattern {
-                    kind: RPatKind::Wild,
+                    // Occurrence-backed wildcards inside an or-pattern are
+                    // retained as anonymous occurrence variables until the
+                    // matrix can hide their alternative-specific core binder.
+                    kind: if anonymous_occurrence_backed {
+                        RPatKind::Var(
+                            "_".to_string(),
+                            Some(slot.expect("anonymous occurrence backing allocates a slot")),
+                        )
+                    } else {
+                        RPatKind::Wild
+                    },
                     span: pat.span.clone(),
                 },
                 vec![PatternBinding {
@@ -2042,7 +2054,12 @@ fn resolve_pattern_inner(
             let mut rsubs = Vec::new();
             let mut all_names = Vec::new();
             for sub in subs {
-                let (rpat, names) = resolve_pattern_inner(sub, next_slot, occurrence_backed)?;
+                let (rpat, names) = resolve_pattern_inner(
+                    sub,
+                    next_slot,
+                    occurrence_backed,
+                    anonymous_occurrence_backed,
+                )?;
                 rsubs.push(rpat);
                 all_names.extend(names);
             }
@@ -2058,8 +2075,12 @@ fn resolve_pattern_inner(
             let mut resolved_components = Vec::with_capacity(components.len());
             let mut all_bindings = Vec::new();
             for component in components {
-                let (resolved, mut bindings) =
-                    resolve_pattern_inner(component, next_slot, occurrence_backed)?;
+                let (resolved, mut bindings) = resolve_pattern_inner(
+                    component,
+                    next_slot,
+                    occurrence_backed,
+                    anonymous_occurrence_backed,
+                )?;
                 resolved_components.push(resolved);
                 all_bindings.append(&mut bindings);
             }
@@ -2084,7 +2105,7 @@ fn resolve_pattern_inner(
                             span: field.label_span.clone(),
                         });
                 let (pattern, mut bindings) =
-                    resolve_pattern_inner(&surface_pattern, next_slot, true)?;
+                    resolve_pattern_inner(&surface_pattern, next_slot, true, false)?;
                 resolved_fields.push(RRecordPatField {
                     label: field.label.clone(),
                     pattern,
@@ -2103,8 +2124,12 @@ fn resolve_pattern_inner(
         PatKind::As(inner, alias) => {
             let slot = *next_slot;
             *next_slot += 1;
-            let (resolved_inner, mut bindings) =
-                resolve_pattern_inner(inner, next_slot, occurrence_backed)?;
+            let (resolved_inner, mut bindings) = resolve_pattern_inner(
+                inner,
+                next_slot,
+                occurrence_backed,
+                anonymous_occurrence_backed,
+            )?;
             let mut all_bindings = vec![PatternBinding {
                 name: alias.clone(),
                 span: pat.span.clone(),
@@ -2120,6 +2145,141 @@ fn resolve_pattern_inner(
                 all_bindings,
             ))
         }
+        PatKind::Or(alternatives) => resolve_or_pattern(pat, alternatives, next_slot),
+    }
+}
+
+fn resolve_or_pattern(
+    pat: &crate::ast::Pattern,
+    alternatives: &[crate::ast::Pattern],
+    next_slot: &mut usize,
+) -> Result<(RPattern, Vec<PatternBinding>), ElabError> {
+    if alternatives.len() < 2 {
+        return Err(ElabError::Internal(
+            "resolved or-pattern must contain at least two alternatives".into(),
+        ));
+    }
+
+    let mut resolved = Vec::with_capacity(alternatives.len());
+    let mut alternative_bindings = Vec::with_capacity(alternatives.len());
+    for alternative in alternatives {
+        let mut local_slot = 0;
+        let (pattern, bindings) = resolve_pattern_inner(alternative, &mut local_slot, true, true)?;
+        let mut seen = HashSet::new();
+        for binding in bindings.iter().filter(|binding| binding.name != "_") {
+            if !seen.insert(binding.name.clone()) {
+                return Err(ElabError::ParseError {
+                    msg: format!(
+                        "or-pattern alternative binds '{}' more than once",
+                        binding.name
+                    ),
+                    span: binding.span.clone(),
+                });
+            }
+        }
+        resolved.push(pattern);
+        alternative_bindings.push(bindings);
+    }
+
+    let canonical = alternative_bindings[0]
+        .iter()
+        .filter(|binding| binding.name != "_")
+        .cloned()
+        .collect::<Vec<_>>();
+    let canonical_names = canonical
+        .iter()
+        .map(|binding| binding.name.clone())
+        .collect::<Vec<_>>();
+    let canonical_set = canonical_names.iter().cloned().collect::<HashSet<_>>();
+    for (index, bindings) in alternative_bindings.iter().enumerate().skip(1) {
+        let names = bindings
+            .iter()
+            .filter(|binding| binding.name != "_")
+            .map(|binding| binding.name.clone())
+            .collect::<HashSet<_>>();
+        if names != canonical_set {
+            let mut expected = canonical_set.iter().cloned().collect::<Vec<_>>();
+            let mut actual = names.into_iter().collect::<Vec<_>>();
+            expected.sort();
+            actual.sort();
+            return Err(ElabError::ParseError {
+                msg: format!(
+                    "or-pattern alternatives must bind the same names; expected {:?}, found {:?}",
+                    expected, actual
+                ),
+                span: alternatives[index].span.clone(),
+            });
+        }
+    }
+
+    let base_slot = *next_slot;
+    let canonical_slots = canonical_names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (name.clone(), base_slot + index))
+        .collect::<HashMap<_, _>>();
+    let mut fresh_slot = base_slot + canonical_slots.len();
+    let mut wildcard_bindings = Vec::new();
+    for (pattern, bindings) in resolved.iter_mut().zip(&mut alternative_bindings) {
+        let mut remap = HashMap::new();
+        for binding in bindings.iter_mut() {
+            let old = binding
+                .alias_slot
+                .expect("or-pattern alternatives resolve every binding through an occurrence slot");
+            let new = if binding.name == "_" {
+                let slot = fresh_slot;
+                fresh_slot += 1;
+                slot
+            } else {
+                canonical_slots[&binding.name]
+            };
+            remap.insert(old, new);
+            binding.alias_slot = Some(new);
+            if binding.name == "_" {
+                wildcard_bindings.push(binding.clone());
+            }
+        }
+        remap_pattern_occurrence_slots(pattern, &remap);
+    }
+    *next_slot = fresh_slot;
+
+    let mut bindings = canonical
+        .into_iter()
+        .map(|mut binding| {
+            binding.alias_slot = Some(canonical_slots[&binding.name]);
+            binding
+        })
+        .collect::<Vec<_>>();
+    bindings.extend(wildcard_bindings);
+    Ok((
+        RPattern {
+            kind: RPatKind::Or(resolved),
+            span: pat.span.clone(),
+        },
+        bindings,
+    ))
+}
+
+fn remap_pattern_occurrence_slots(pattern: &mut RPattern, remap: &HashMap<usize, usize>) {
+    match &mut pattern.kind {
+        RPatKind::Var(_, Some(slot)) => {
+            *slot = remap[slot];
+        }
+        RPatKind::Ctor(_, fields) | RPatKind::Tuple(fields) | RPatKind::Or(fields) => {
+            for field in fields {
+                remap_pattern_occurrence_slots(field, remap);
+            }
+        }
+        RPatKind::Record(fields) => {
+            for field in fields {
+                remap_pattern_occurrence_slots(&mut field.pattern, remap);
+            }
+        }
+        RPatKind::As(inner, _, slot) => {
+            *slot = remap[slot];
+            remap_pattern_occurrence_slots(inner, remap);
+        }
+        RPatKind::Wild | RPatKind::Var(_, None) => {}
     }
 }
 

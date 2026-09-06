@@ -1402,6 +1402,12 @@ fn rewrite_rpattern(
             alias,
             slot,
         ),
+        RPatKind::Or(alternatives) => RPatKind::Or(
+            alternatives
+                .into_iter()
+                .map(|alternative| rewrite_rpattern(scope, exports, alternative))
+                .collect::<Result<Vec<_>, ElabError>>()?,
+        ),
     };
     Ok(RPattern { kind, span: p.span })
 }

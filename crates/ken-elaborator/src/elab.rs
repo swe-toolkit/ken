@@ -388,7 +388,7 @@ struct ElabCtx<'e> {
     /// Consumer-only metadata for as-pattern aliases. Matrix traversal records
     /// an alias's type beside the existing per-position occurrence; the leaf
     /// exposes it while elaborating that arm body. Nested matches stack frames.
-    pattern_alias_type_frames: Vec<HashMap<(usize, usize), MatrixAliasType>>,
+    pattern_alias_type_frames: Vec<PatternAliasTypeFrame>,
     active_pattern_aliases: Vec<Vec<ActivePatternAlias>>,
     pattern_alias_replacement_frames: Vec<HashMap<usize, PatternAliasReplacement>>,
     next_pattern_alias_sentinel: usize,
@@ -502,6 +502,38 @@ struct MatrixAliasType {
     name: String,
     ty: Term,
     install_depth: usize,
+}
+
+#[derive(Clone, Debug)]
+struct OrBinderTypeMismatch {
+    name: String,
+    span: Span,
+}
+
+fn or_binder_type_error(mismatch: OrBinderTypeMismatch) -> ElabError {
+    ElabError::TypeMismatch {
+        span: mismatch.span,
+        reason: format!(
+            "or-pattern binder '{}' must have definitionally equal types in the common pre-branch context; use separate arms",
+            mismatch.name
+        ),
+    }
+}
+
+struct PatternAliasTypeFrame {
+    aliases: HashMap<(usize, usize), MatrixAliasType>,
+    /// Only slots originating inside `RPatKind::Or` require cross-alternative
+    /// common-context type equality. Other aliases may be revisited after a
+    /// wildcard row expands and retain their existing last-visit behavior.
+    or_slots: HashSet<(usize, usize)>,
+    /// The context depth at the matrix column where each or-slot's residual
+    /// row was duplicated. This is the exact common pre-branch context.
+    or_common_depths: HashMap<(usize, usize), usize>,
+    type_mismatch: Option<OrBinderTypeMismatch>,
+    /// Occurrence-backed variables and anonymous wildcards are lexical aliases,
+    /// not core binders. Their per-leaf core positions must be hidden while the
+    /// shared arm body is elaborated.
+    hidden_slots: HashSet<(usize, usize)>,
 }
 
 #[derive(Clone)]
@@ -725,7 +757,15 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             Ok(Term::app(f_k, a_k))
         }
 
-        RType::RVarTy(i, _, _) => Ok(Term::var(*i)),
+        RType::RVarTy(index, name, span) => cx
+            .surface_var(*index)
+            .map(|(_, actual_index)| Term::var(actual_index))
+            .ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "type variable '{}' at {}-{} is out of range",
+                    name, span.start, span.end
+                ))
+            }),
         RType::RPatternAliasTy(slot, name, _) => {
             infer_active_pattern_alias(cx, *slot, name).map(|(term, _)| term)
         }
@@ -11988,9 +12028,13 @@ fn finish_pattern_alias_frame(
         .pattern_alias_replacement_frames
         .pop()
         .expect("infer_match replacement frame must balance");
-    cx.pattern_alias_type_frames
+    let type_frame = cx
+        .pattern_alias_type_frames
         .pop()
         .expect("infer_match alias-type frame must balance");
+    if let Some(mismatch) = type_frame.type_mismatch {
+        return Err(or_binder_type_error(mismatch));
+    }
     let raw_methods = raw_methods_result?;
     if replacements.is_empty() {
         return Ok(raw_methods);
@@ -12010,9 +12054,13 @@ fn finish_pattern_alias_term_frame(
         .pattern_alias_replacement_frames
         .pop()
         .expect("infer_match replacement frame must balance");
-    cx.pattern_alias_type_frames
+    let type_frame = cx
+        .pattern_alias_type_frames
         .pop()
         .expect("infer_match alias-type frame must balance");
+    if let Some(mismatch) = type_frame.type_mismatch {
+        return Err(or_binder_type_error(mismatch));
+    }
     let body = body_result?;
     if replacements.is_empty() {
         return Ok(body);
@@ -12356,6 +12404,75 @@ impl RowState {
 /// Surface `as` keeps its inner matcher; record-contained variables become a
 /// wildcard after recording their projected value because record columns are
 /// declaration-ordered rather than lexical kernel binders.
+fn install_matrix_alias_type(
+    cx: &mut ElabCtx,
+    arm_idx: usize,
+    slot: usize,
+    alias: MatrixAliasType,
+    span: &Span,
+) {
+    let frame = cx
+        .pattern_alias_type_frames
+        .last()
+        .expect("infer_match installs an alias-type frame before matrix compilation");
+    let prior = frame.aliases.get(&(arm_idx, slot)).cloned();
+    if let Some(prior) = prior {
+        let is_or_slot = cx
+            .pattern_alias_type_frames
+            .last()
+            .expect("alias-type frame remains installed")
+            .or_slots
+            .contains(&(arm_idx, slot));
+        if !is_or_slot {
+            cx.pattern_alias_type_frames
+                .last_mut()
+                .expect("alias-type frame remains installed")
+                .aliases
+                .insert((arm_idx, slot), alias);
+            return;
+        }
+        let common_depth = *cx
+            .pattern_alias_type_frames
+            .last()
+            .expect("alias-type frame remains installed")
+            .or_common_depths
+            .get(&(arm_idx, slot))
+            .expect("an or-pattern slot is registered when its residual row expands");
+        let prior_drop = prior.install_depth.checked_sub(common_depth);
+        let alias_drop = alias.install_depth.checked_sub(common_depth);
+        let prior_common =
+            prior_drop.and_then(|drop| lower_pattern_type_to_common(&prior.ty, drop));
+        let alias_common =
+            alias_drop.and_then(|drop| lower_pattern_type_to_common(&alias.ty, drop));
+        let equal = match (prior_common, alias_common) {
+            (Some(prior_ty), Some(alias_ty)) => {
+                let mut common_ctx = cx.ctx.clone();
+                common_ctx.types.truncate(common_depth);
+                let prior_ty = cx.metas.zonk_term(&prior_ty);
+                let alias_ty = cx.metas.zonk_term(&alias_ty);
+                convert_type(cx.env, &common_ctx, &prior_ty, &alias_ty)
+            }
+            _ => false,
+        };
+        if !equal {
+            let frame = cx
+                .pattern_alias_type_frames
+                .last_mut()
+                .expect("alias-type frame remains installed");
+            frame.type_mismatch.get_or_insert(OrBinderTypeMismatch {
+                name: alias.name,
+                span: span.clone(),
+            });
+        }
+        return;
+    }
+    cx.pattern_alias_type_frames
+        .last_mut()
+        .expect("alias-type frame remains installed")
+        .aliases
+        .insert((arm_idx, slot), alias);
+}
+
 #[inline(never)]
 fn expose_current_pattern_aliases(
     cx: &mut ElabCtx,
@@ -12363,12 +12480,13 @@ fn expose_current_pattern_aliases(
     current_ty: &Term,
 ) -> RowState {
     loop {
+        let span = row.real_pats[0].span.clone();
         let (inner, name, slot, occurrence_var) = match row.real_pats[0].kind.clone() {
             RPatKind::As(inner, name, slot) => (*inner, name, slot, false),
             RPatKind::Var(name, Some(slot)) => (
                 RPattern {
                     kind: RPatKind::Wild,
-                    span: row.real_pats[0].span.clone(),
+                    span: span.clone(),
                 },
                 name,
                 slot,
@@ -12382,17 +12500,26 @@ fn expose_current_pattern_aliases(
                 .is_none_or(Option::is_none),
             "each resolver slot must receive exactly one matrix occurrence"
         );
-        cx.pattern_alias_type_frames
-            .last_mut()
-            .expect("infer_match installs an alias-type frame before matrix compilation")
-            .insert(
-                (row.arm_idx, slot),
+        if occurrence_var {
+            cx.pattern_alias_type_frames
+                .last_mut()
+                .expect("infer_match installs an alias-type frame before matrix compilation")
+                .hidden_slots
+                .insert((row.arm_idx, slot));
+        }
+        if name != "_" {
+            install_matrix_alias_type(
+                cx,
+                row.arm_idx,
+                slot,
                 MatrixAliasType {
                     name,
                     ty: current_ty.clone(),
                     install_depth: cx.ctx.len(),
                 },
+                &span,
             );
+        }
         row = row.bind_current_occurrence_at(slot);
         if occurrence_var {
             row.real_occurrences[0].source_binding = false;
@@ -12402,6 +12529,36 @@ fn expose_current_pattern_aliases(
     row
 }
 
+fn collect_or_pattern_slots(pattern: &RPattern, inside_or: bool, slots: &mut HashSet<usize>) {
+    match &pattern.kind {
+        RPatKind::Var(_, Some(slot)) if inside_or => {
+            slots.insert(*slot);
+        }
+        RPatKind::As(inner, _, slot) => {
+            if inside_or {
+                slots.insert(*slot);
+            }
+            collect_or_pattern_slots(inner, inside_or, slots);
+        }
+        RPatKind::Or(alternatives) => {
+            for alternative in alternatives {
+                collect_or_pattern_slots(alternative, true, slots);
+            }
+        }
+        RPatKind::Ctor(_, fields) | RPatKind::Tuple(fields) => {
+            for field in fields {
+                collect_or_pattern_slots(field, inside_or, slots);
+            }
+        }
+        RPatKind::Record(fields) => {
+            for field in fields {
+                collect_or_pattern_slots(&field.pattern, inside_or, slots);
+            }
+        }
+        RPatKind::Wild | RPatKind::Var(_, _) => {}
+    }
+}
+
 #[inline(never)]
 fn build_alias_rows(
     cx: &mut ElabCtx,
@@ -12409,26 +12566,43 @@ fn build_alias_rows(
     scrut_core: &Term,
     scrut_ty: &Term,
 ) -> Vec<RowState> {
-    cx.pattern_alias_type_frames.push(HashMap::new());
+    let mut or_slots = HashSet::new();
+    for (arm_idx, arm) in arms.iter().enumerate() {
+        let mut slots = HashSet::new();
+        collect_or_pattern_slots(&arm.pat, false, &mut slots);
+        or_slots.extend(slots.into_iter().map(|slot| (arm_idx, slot)));
+    }
+    cx.pattern_alias_type_frames.push(PatternAliasTypeFrame {
+        aliases: HashMap::new(),
+        or_slots,
+        or_common_depths: HashMap::new(),
+        type_mismatch: None,
+        hidden_slots: HashSet::new(),
+    });
     cx.pattern_alias_replacement_frames.push(HashMap::new());
-    arms.iter()
-        .enumerate()
-        .map(|(i, arm)| RowState {
+    let mut rows = Vec::with_capacity(arms.len());
+    for (i, arm) in arms.iter().enumerate() {
+        let row = RowState {
             real_pats: vec![arm.pat.clone()],
             real_occurrences: vec![MatrixOccurrence::live(scrut_core.clone())],
             binding_occurrences: Vec::new(),
             arm_idx: i,
-        })
-        .map(|row| expose_current_pattern_aliases(cx, row, scrut_ty))
-        .collect()
+        };
+        rows.push(expose_current_pattern_aliases(cx, row, scrut_ty));
+    }
+    rows
 }
 
 #[inline(never)]
 fn arm_has_pattern_aliases(cx: &ElabCtx, arm_idx: usize) -> bool {
-    cx.pattern_alias_type_frames
+    let frame = cx
+        .pattern_alias_type_frames
         .last()
-        .expect("infer_match alias-type frame must span matrix compilation")
+        .expect("infer_match alias-type frame must span matrix compilation");
+    frame
+        .aliases
         .keys()
+        .chain(frame.hidden_slots.iter())
         .any(|(candidate, _)| *candidate == arm_idx)
 }
 
@@ -12440,13 +12614,21 @@ fn infer_pattern_alias_leaf(
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
 ) -> Result<(Term, Term), ElabError> {
-    let alias_types = cx
+    let frame = cx
         .pattern_alias_type_frames
         .last()
-        .expect("infer_match alias-type frame must span matrix compilation")
+        .expect("infer_match alias-type frame must span matrix compilation");
+    let alias_types = frame
+        .aliases
         .iter()
         .filter(|((candidate, _), _)| *candidate == arm_idx)
         .map(|((_, slot), alias)| (*slot, alias.clone()))
+        .collect::<Vec<_>>();
+    let hidden_slots = frame
+        .hidden_slots
+        .iter()
+        .filter(|(candidate, _)| *candidate == arm_idx)
+        .map(|(_, slot)| *slot)
         .collect::<Vec<_>>();
     let mut active_aliases = Vec::with_capacity(alias_types.len());
     for (slot, alias) in alias_types {
@@ -12476,9 +12658,21 @@ fn infer_pattern_alias_leaf(
             install_depth: alias.install_depth,
         });
     }
+    let hidden_base = cx.hidden_positions.len();
+    for slot in hidden_slots {
+        let Some(Term::Var(index)) = binding_occurrences.get(slot).and_then(Option::as_ref) else {
+            continue;
+        };
+        if let Some(position) = cx.ctx.len().checked_sub(index + 1) {
+            if !cx.hidden_positions.contains(&position) {
+                cx.hidden_positions.push(position);
+            }
+        }
+    }
     cx.active_pattern_aliases.push(active_aliases);
     let inferred_body = infer(cx, &arm.body);
     cx.active_pattern_aliases.pop();
+    cx.hidden_positions.truncate(hidden_base);
     inferred_body
 }
 
@@ -12609,6 +12803,9 @@ fn compile_tuple_column(
             }
             RPatKind::As(_, _, _) => {
                 unreachable!("current-column aliases are exposed before tuple splitting")
+            }
+            RPatKind::Or(_) => {
+                unreachable!("current-column or-patterns are expanded before tuple splitting")
             }
         }
     }
@@ -12828,6 +13025,9 @@ fn compile_record_column(
             RPatKind::As(_, _, _) => {
                 unreachable!("current-column aliases are exposed before record projection")
             }
+            RPatKind::Or(_) => {
+                unreachable!("current-column or-patterns are expanded before record projection")
+            }
         }
     }
 
@@ -12875,6 +13075,75 @@ fn compile_record_column(
         Ok(projected)
     } else {
         Ok(Term::lam(col_types[0].clone(), projected))
+    }
+}
+
+fn expand_top_or_pattern(pattern: RPattern) -> Vec<RPattern> {
+    let span = pattern.span.clone();
+    match pattern.kind {
+        RPatKind::Or(alternatives) => alternatives
+            .into_iter()
+            .flat_map(expand_top_or_pattern)
+            .collect(),
+        RPatKind::As(inner, name, slot) => expand_top_or_pattern(*inner)
+            .into_iter()
+            .map(|alternative| RPattern {
+                kind: RPatKind::As(Box::new(alternative), name.clone(), slot),
+                span: span.clone(),
+            })
+            .collect(),
+        kind => vec![RPattern { kind, span }],
+    }
+}
+
+fn expanding_or_slots(pattern: &RPattern) -> Option<HashSet<usize>> {
+    match &pattern.kind {
+        RPatKind::Or(_) => {
+            let mut slots = HashSet::new();
+            collect_or_pattern_slots(pattern, false, &mut slots);
+            Some(slots)
+        }
+        RPatKind::As(inner, _, _) => expanding_or_slots(inner),
+        _ => None,
+    }
+}
+
+#[inline(never)]
+fn expand_current_or_rows(cx: &mut ElabCtx, rows: Vec<RowState>) -> Vec<RowState> {
+    let mut expanded = Vec::new();
+    for row in rows {
+        if let Some(slots) = expanding_or_slots(&row.real_pats[0]) {
+            let common_depth = cx.ctx.len();
+            let frame = cx
+                .pattern_alias_type_frames
+                .last_mut()
+                .expect("or-pattern expansion occurs inside an alias-type frame");
+            for slot in slots {
+                frame
+                    .or_common_depths
+                    .entry((row.arm_idx, slot))
+                    .or_insert(common_depth);
+            }
+        }
+        let alternatives = expand_top_or_pattern(row.real_pats[0].clone());
+        for alternative in alternatives {
+            let mut duplicate = row.clone();
+            duplicate.real_pats[0] = alternative;
+            expanded.push(duplicate);
+        }
+    }
+    expanded
+}
+
+#[inline(never)]
+fn prepare_current_or_rows(cx: &mut ElabCtx, rows: Vec<RowState>) -> Vec<RowState> {
+    if rows
+        .iter()
+        .any(|row| expanding_or_slots(&row.real_pats[0]).is_some())
+    {
+        expand_current_or_rows(cx, rows)
+    } else {
+        rows
     }
 }
 
@@ -12986,6 +13255,11 @@ fn compile_match_matrix(
             Ok(Term::lam(ih_ty, weaken(&inner, 1)))
         }
         ColKind::Real => {
+            // An or-pattern duplicates only its residual row. Every duplicate
+            // retains the same arm id and the same aligned occurrence, so the
+            // existing leaf winner accounting computes union coverage and
+            // whole-arm reachability without a parallel matrix carrier.
+            let rows = prepare_current_or_rows(cx, rows);
             let has_record = rows.iter().any(|row| {
                 matches!(
                     pattern_without_aliases(&row.real_pats[0]).kind,
@@ -13219,6 +13493,11 @@ fn build_ctor_buckets(
                 RPatKind::As(_, _, _) => {
                     unreachable!("current-column aliases are exposed before constructor bucketing")
                 }
+                RPatKind::Or(_) => {
+                    unreachable!(
+                        "current-column or-patterns are expanded before constructor bucketing"
+                    )
+                }
             }
         }
 
@@ -13436,6 +13715,152 @@ fn infer_record_match(
     ))
 }
 
+fn top_pattern_contains_or(pattern: &RPattern) -> bool {
+    match &pattern.kind {
+        RPatKind::Or(_) => true,
+        RPatKind::As(inner, _, _) => top_pattern_contains_or(inner),
+        _ => false,
+    }
+}
+
+#[inline(never)]
+fn arms_have_top_or(arms: &[RMatchArm]) -> bool {
+    arms.iter().any(|arm| top_pattern_contains_or(&arm.pat))
+}
+
+fn top_pattern_is_catchall(pattern: &RPattern) -> bool {
+    match &pattern.kind {
+        RPatKind::Wild | RPatKind::Var(_, _) => true,
+        RPatKind::As(inner, _, _) => top_pattern_is_catchall(inner),
+        RPatKind::Or(alternatives) => alternatives.iter().any(top_pattern_is_catchall),
+        RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => false,
+    }
+}
+
+fn ensure_top_pattern_ctors_belong_to_family(
+    cx: &ElabCtx,
+    pattern: &RPattern,
+    ind: &InductiveDecl,
+    d_id: GlobalId,
+) -> Result<(), ElabError> {
+    match &pattern.kind {
+        RPatKind::Ctor(name, _) => {
+            let ctor_id = *cx
+                .globals
+                .get(name)
+                .expect("constructor resolution precedes family validation");
+            if !ind
+                .constructors
+                .iter()
+                .any(|constructor| constructor.id == ctor_id)
+            {
+                return Err(ElabError::TypeMismatch {
+                    span: pattern.span.clone(),
+                    reason: format!(
+                        "constructor '{}' is not a constructor of type '{}'",
+                        name,
+                        type_name(cx, d_id)
+                    ),
+                });
+            }
+        }
+        RPatKind::As(inner, _, _) => {
+            ensure_top_pattern_ctors_belong_to_family(cx, inner, ind, d_id)?;
+        }
+        RPatKind::Or(alternatives) => {
+            for alternative in alternatives {
+                ensure_top_pattern_ctors_belong_to_family(cx, alternative, ind, d_id)?;
+            }
+        }
+        RPatKind::Wild | RPatKind::Var(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {}
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn infer_or_match(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    arms: &[RMatchArm],
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    for arm in arms {
+        if top_pattern_is_catchall(&arm.pat) {
+            return Err(ElabError::Internal(
+                "non-constructor pattern in match (wildcard/var not yet supported \
+                 at top level; use constructor patterns)"
+                    .into(),
+            ));
+        }
+    }
+
+    let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
+    let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
+    let (head, _) = peel_app(&scrut_ty);
+    let inductive = if let Term::IndFormer { id, .. } = head {
+        let ind = cx
+            .env
+            .inductive(id)
+            .ok_or_else(|| ElabError::Internal(format!("inductive {:?} not found", id)))?
+            .clone();
+        for arm in arms {
+            ensure_top_pattern_ctors_belong_to_family(cx, &arm.pat, &ind, id)?;
+        }
+        Some(id)
+    } else {
+        None
+    };
+
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
+    let mut ret_ty_slot = None;
+    let mut arm_used = vec![false; arms.len()];
+    let mut subsumed_by = vec![Vec::new(); arms.len()];
+    let body_result = compile_match_matrix(
+        cx,
+        arms,
+        std::slice::from_ref(&scrut_ty),
+        &[ColKind::Real],
+        rows,
+        0,
+        span,
+        &mut ret_ty_slot,
+        &mut arm_used,
+        &mut subsumed_by,
+    );
+    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+
+    for (i, used) in arm_used.iter().enumerate() {
+        if !used {
+            let cause = match subsumed_by[i].split_first() {
+                Some((&first, rest)) => ArmDeadCause::Subsumed {
+                    first: arms[first].span.clone(),
+                    rest: rest
+                        .iter()
+                        .map(|&winner| arms[winner].span.clone())
+                        .collect(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
+            return Err(ElabError::ReachabilityError {
+                span: arms[i].span.clone(),
+                cause,
+            });
+        }
+    }
+
+    let ret_ty = ret_ty_slot.unwrap_or_else(|| Term::ty(Level::Zero));
+    let body_core = if inductive.is_some() {
+        let function_ty = Term::pi(scrut_ty.clone(), weaken(&ret_ty, 1));
+        Term::app(
+            Term::Ascript(Box::new(body_core), Box::new(function_ty)),
+            scrut_core,
+        )
+    } else {
+        body_core
+    };
+    Ok((body_core, ret_ty))
+}
+
 fn infer_match(
     cx: &mut ElabCtx,
     scrut: &RExpr,
@@ -13444,6 +13869,9 @@ fn infer_match(
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
+    }
+    if arms_have_top_or(arms) {
+        return infer_or_match(cx, scrut, arms, span);
     }
     if arms
         .iter()
@@ -13615,6 +14043,11 @@ fn ensure_pattern_constructors_resolve(
             }
         }
         RPatKind::As(inner, _, _) => ensure_pattern_constructors_resolve(cx, inner)?,
+        RPatKind::Or(alternatives) => {
+            for alternative in alternatives {
+                ensure_pattern_constructors_resolve(cx, alternative)?;
+            }
+        }
         RPatKind::Wild | RPatKind::Var(_, _) => {}
     }
     Ok(())
@@ -13682,6 +14115,123 @@ fn type_name(cx: &ElabCtx, id: GlobalId) -> String {
 /// Used to extract the return type from a match arm body type (which was
 /// inferred in a context extended by k ctor-arg binders) back into the outer
 /// context.  Closed types (Int, Bool, Color, …) pass through unchanged.
+fn lower_pattern_type_to_common(term: &Term, k: usize) -> Option<Term> {
+    fn go(term: &Term, k: usize, cutoff: usize) -> Option<Term> {
+        let child = |term: &Term, cutoff| go(term, k, cutoff);
+        match term {
+            Term::Var(index) if *index < cutoff => Some(Term::var(*index)),
+            Term::Var(index) if *index < cutoff + k => None,
+            Term::Var(index) => Some(Term::var(*index - k)),
+            Term::Pi(domain, codomain) => Some(Term::pi(
+                child(domain, cutoff)?,
+                child(codomain, cutoff + 1)?,
+            )),
+            Term::Lam(domain, body) => {
+                Some(Term::lam(child(domain, cutoff)?, child(body, cutoff + 1)?))
+            }
+            Term::Sigma(domain, codomain) => Some(Term::sigma(
+                child(domain, cutoff)?,
+                child(codomain, cutoff + 1)?,
+            )),
+            Term::Let { ty, val, body } => Some(Term::Let {
+                ty: Box::new(child(ty, cutoff)?),
+                val: Box::new(child(val, cutoff)?),
+                body: Box::new(child(body, cutoff + 1)?),
+            }),
+            Term::App(function, argument) => Some(Term::app(
+                child(function, cutoff)?,
+                child(argument, cutoff)?,
+            )),
+            Term::Pair(first, second) => {
+                Some(Term::pair(child(first, cutoff)?, child(second, cutoff)?))
+            }
+            Term::Proj1(pair) => Some(Term::proj1(child(pair, cutoff)?)),
+            Term::Proj2(pair) => Some(Term::proj2(child(pair, cutoff)?)),
+            Term::Ascript(value, ty) => Some(Term::Ascript(
+                Box::new(child(value, cutoff)?),
+                Box::new(child(ty, cutoff)?),
+            )),
+            Term::Eq(ty, left, right) => Some(Term::Eq(
+                Box::new(child(ty, cutoff)?),
+                Box::new(child(left, cutoff)?),
+                Box::new(child(right, cutoff)?),
+            )),
+            Term::Cast(from, to, evidence, value) => Some(Term::Cast(
+                Box::new(child(from, cutoff)?),
+                Box::new(child(to, cutoff)?),
+                Box::new(child(evidence, cutoff)?),
+                Box::new(child(value, cutoff)?),
+            )),
+            Term::J(motive, base, evidence) => Some(Term::J(
+                Box::new(child(motive, cutoff)?),
+                Box::new(child(base, cutoff)?),
+                Box::new(child(evidence, cutoff)?),
+            )),
+            Term::Quot(carrier, relation) => Some(Term::Quot(
+                Box::new(child(carrier, cutoff)?),
+                Box::new(child(relation, cutoff)?),
+            )),
+            Term::QuotClass(value) => Some(Term::QuotClass(Box::new(child(value, cutoff)?))),
+            Term::Trunc(carrier) => Some(Term::Trunc(Box::new(child(carrier, cutoff)?))),
+            Term::TruncProj(value) => Some(Term::TruncProj(Box::new(child(value, cutoff)?))),
+            Term::Refl(value) => Some(Term::Refl(Box::new(child(value, cutoff)?))),
+            Term::QuotElim {
+                motive,
+                method,
+                respect,
+                scrut,
+            } => Some(Term::QuotElim {
+                motive: Box::new(child(motive, cutoff)?),
+                method: Box::new(child(method, cutoff)?),
+                respect: Box::new(child(respect, cutoff)?),
+                scrut: Box::new(child(scrut, cutoff)?),
+            }),
+            Term::Elim {
+                fam,
+                level_args,
+                params,
+                motive,
+                methods,
+                indices,
+                scrut,
+            } => Some(Term::Elim {
+                fam: *fam,
+                level_args: level_args.clone(),
+                params: params
+                    .iter()
+                    .map(|term| child(term, cutoff))
+                    .collect::<Option<Vec<_>>>()?,
+                motive: Box::new(child(motive, cutoff)?),
+                methods: methods
+                    .iter()
+                    .map(|term| child(term, cutoff))
+                    .collect::<Option<Vec<_>>>()?,
+                indices: indices
+                    .iter()
+                    .map(|term| child(term, cutoff))
+                    .collect::<Option<Vec<_>>>()?,
+                scrut: Box::new(child(scrut, cutoff)?),
+            }),
+            Term::Absurd(motive, proof) => Some(Term::Absurd(
+                Box::new(child(motive, cutoff)?),
+                Box::new(child(proof, cutoff)?),
+            )),
+            Term::Type(_)
+            | Term::Omega(_)
+            | Term::Const { .. }
+            | Term::IndFormer { .. }
+            | Term::Constructor { .. }
+            | Term::IntLit(_) => Some(term.clone()),
+        }
+    }
+
+    if k == 0 {
+        Some(term.clone())
+    } else {
+        go(term, k, 0)
+    }
+}
+
 fn lower_by(term: &Term, k: usize) -> Option<Term> {
     if k == 0 {
         return Some(term.clone());
