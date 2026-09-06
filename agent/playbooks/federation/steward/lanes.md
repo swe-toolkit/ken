@@ -91,10 +91,12 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 >   2026-09-06: "schedule it for the language ring at the end of its current
 >   queue"; it is the tail item, re-released explicitly by the Steward when the
 >   queue drains to it, D1 regression-check-vs-LANG-CONVOY first). `LANG-FOREIGN-
->   NAME-FORMAT-CHARS`: operator concurred CLOSING the spoofing vector, but the
->   node's own measurement rules out the two-`foreign`-site fix — the honest shape
->   is a whole-source lexical policy (spec/Architect lexer item), being confirmed
->   with the operator before release (held `draft`/`gate:operator`).
+>   NAME-FORMAT-CHARS`: RECUT 2026-09-06 (operator "concur. reframe as whole-source
+>   lexical policy") — retitled + rescoped to a Trojan-Source lexer lint over ALL
+>   source, `gate:operator→none`, `size XS→M`; the POLICY design is routed to Spec
+>   enclave + Architect (like the node-3 fork), and the lexer-lint IMPLEMENTATION is
+>   a language node queued behind the match-pattern work (does not jump the serial
+>   queue). Held `draft` until the policy settles.
 > - **Lane 3 (foundation): Tier-C P3 building; PX9 scheduled post-P3.**
 >   `CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION` (P3 flip-only) is active/building.
 >   Operator 2026-09-06 concurred `PX9` (cross-domain `System.Error`,

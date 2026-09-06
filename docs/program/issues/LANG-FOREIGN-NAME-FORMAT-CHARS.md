@@ -1,33 +1,45 @@
 ---
 id: LANG-FOREIGN-NAME-FORMAT-CHARS
-title: "Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FEFF -- are a visual-spoofing vector at the same `foreign`-name trust boundary the Cc control-character check just closed, and they are a DIFFERENT vector: not truncation but two distinct declarations rendering identically to the reviewer doing the check"
+title: "whole-source lexical policy for Unicode Cf format characters (bidi overrides, zero-width joiners, U+FEFF) -- a Trojan-Source lint over ALL Ken source (comments and string literals, and identifiers once blessed letters land), NOT a check at the two `foreign`-name sites, because a bidi override is expressible anywhere in source and the deception is of a human reading it"
 status: draft
 owner: language
-size: XS
-gate: operator
+size: M
+gate: none
 depends_on: []
 blocks: []
 github: null
 origin: Architect finding at evt_3aeg25e7b35mc while approving LANG-FOREIGN-NAME-CONTROL-CHARS (dec_79sd3nnqvkrvx), explicitly non-blocking and explicitly needing an owner. Filed by the Steward 2026-08-13 rather than left in prose, because the finding this whole arc came from was about an obligation landing in nobody's node.
 ---
 
-> # STEWARD RECONCILIATION 2026-09-06 — operator concurred CLOSING the vector; the
-> # shape is not the foreign-name fix, and that is being confirmed before release.
+> # RECUT 2026-09-06 — WHOLE-SOURCE LEXICAL POLICY (operator concurred).
 > #
-> # The operator concurred releasing this node (closing the visual-spoofing
-> # vector). That answers the routed threat-model question ("whose reading is the
+> # Operator ruling 2026-09-06, verbatim: "concur. reframe as whole-source lexical
+> # policy." This answers the routed threat-model question ("whose reading is the
 > # threat model?", below): the reader includes humans in terminals and web views,
-> # so the Trojan-Source spoofing vector has a real victim. BUT this node's own
-> # 2026-08-13 measurement RULES OUT the two-`foreign`-name-site fix — it would
-> # protect two strings out of the whole language surface (a bidi override is
-> # expressible in any Ken comment and any string literal today), with no placement
-> # argument. The honest shape of "close this vector" is therefore the
-> # **whole-source lexical policy** disposition (Rust's post-CVE-2021-42574
-> # `text_direction_codepoint_in_literal` lint shape) — a spec/Architect lexer-level
-> # item, NOT a language-ring parser patch at the `foreign`-name sites, and NOT this
-> # node's XS shape. The Steward is confirming this disposition with the operator
-> # before flipping the gate/status, rather than kicking the language ring at the
-> # ruled-out fix. `gate: operator` and `status: draft` stand until that confirm.
+> # so the Trojan-Source spoofing vector has a real victim, AND the honest shape of
+> # closing it is a whole-source policy, NOT the two-`foreign`-name-site fix this
+> # node's 2026-08-13 measurement ruled out (that protects two strings of the whole
+> # surface, since a bidi override is expressible in any Ken comment or string
+> # literal today). The node is recut: title + scope now the whole-source lint
+> # (Rust's post-CVE-2021-42574 `text_direction_codepoint_in_literal` shape) over
+> # all source; `gate: operator → none` (the operator answered); `size XS → M`. The
+> # body below is retained as the analysis that grounds this shape.
+> #
+> # WHAT IS ROUTED, AND WHAT IS NOT YET BUILDABLE (like the node-3 floor fork). The
+> # DESIGN is a spec/Architect lexer-level policy, not a parser patch, and it must
+> # be settled before a build ring executes (§2c front-load): (1) the threat model
+> # stated (which readers/renderers, reject vs. warn); (2) the exact `Cf` codepoint
+> # set in scope (bidi override class U+202A-U+202E/U+2066-U+2069, U+200B/U+200D,
+> # U+FEFF — and whether U+200D/U+FEFF, which have legitimate uses, are rejected or
+> # only balanced/annotated); (3) where in the lexer the lint sits so it covers
+> # comments (`skip_ws_comments`) and string literals (`lexer.rs:229`) without
+> # forbidding these codepoints in ordinary string DATA that legitimately needs
+> # them; (4) the interaction with `SPEC-IDENT-BLESSED` (once blessed Unicode
+> # letters land in identifiers, this becomes source-wide including identifiers).
+> # Routed to Spec enclave + Architect for that policy. IMPLEMENTATION (the lexer
+> # lint) is then a language-ring node, queued behind the current match-pattern
+> # work — it does NOT jump the lane-2 serial queue. `status: draft` until the
+> # policy settles; the Steward frames the buildable node from the enclave's policy.
 
 ## What this is
 
