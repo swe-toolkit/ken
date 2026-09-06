@@ -4466,7 +4466,7 @@ fn console_outcome_fixture_for_stream(
                 body: RuntimeExpr::Match {
                     scrutinee: Box::new(RuntimeExpr::Var(0)),
                     cases: vec![crate::RuntimeMatchCase {
-                        // `IOError::Other`, the last of the twelve.
+                        // `IOError::Other`, the last of the thirteen.
                         constructor: symbols.io_errors[12].clone(),
                         binders: 1,
                         body: px8n_failure(symbols, RuntimeExpr::Var(0)),
