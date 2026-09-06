@@ -11917,12 +11917,170 @@ enum ColKind {
     Ih(usize),
 }
 
+/// The core occurrence of one pending pattern-matrix column.
+///
+/// A live occurrence is valid at the row's current emitted-core depth. A
+/// pending occurrence is the `Var(0)` that will denote a constructor field
+/// once that column's existing method binder is entered. Keeping this state
+/// explicit prevents a future sibling field from being weakened before its
+/// own binder exists, while every already-live occurrence is weakened under
+/// each intervening real or IH binder.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MatrixOccurrence {
+    term: Term,
+    live: bool,
+    source_binding: bool,
+}
+
+impl MatrixOccurrence {
+    fn live(term: Term) -> Self {
+        Self {
+            term,
+            live: true,
+            source_binding: true,
+        }
+    }
+
+    fn pending_field(source_binding: bool) -> Self {
+        Self {
+            term: Term::var(0),
+            live: false,
+            source_binding,
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Default)]
+struct MatchOccurrenceTrace {
+    seeds: Vec<Term>,
+    leaves: Vec<Vec<Term>>,
+}
+
+#[cfg(test)]
+thread_local! {
+    static MATCH_OCCURRENCE_TRACE: std::cell::RefCell<Option<MatchOccurrenceTrace>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn begin_match_occurrence_trace() {
+    MATCH_OCCURRENCE_TRACE.with(|trace| {
+        *trace.borrow_mut() = Some(MatchOccurrenceTrace::default());
+    });
+}
+
+#[cfg(test)]
+fn take_match_occurrence_trace() -> MatchOccurrenceTrace {
+    MATCH_OCCURRENCE_TRACE.with(|trace| trace.borrow_mut().take().unwrap_or_default())
+}
+
 /// One row of the pattern matrix: the still-unconsumed `Real` column
-/// patterns for one arm, plus which top-level arm it came from (for
-/// reachability bookkeeping across wildcard-row expansion, `§4.2`).
+/// patterns and their aligned core occurrences, the occurrences already
+/// supplied to source binding positions, plus the originating top-level arm
+/// (for reachability bookkeeping across wildcard-row expansion, `§4.2`).
+#[derive(Clone)]
 struct RowState {
     real_pats: Vec<RPattern>,
+    real_occurrences: Vec<MatrixOccurrence>,
+    binding_occurrences: Vec<Term>,
     arm_idx: usize,
+}
+
+impl RowState {
+    fn assert_occurrence_alignment(&self) {
+        debug_assert_eq!(self.real_pats.len(), self.real_occurrences.len());
+    }
+
+    /// Enter one emitted-core binder. Occurrences that already denote live
+    /// values move under it; future constructor-field binders do not exist yet
+    /// and therefore remain pending at `Var(0)`.
+    fn under_core_binder(mut self) -> Self {
+        self.assert_occurrence_alignment();
+        for occurrence in &mut self.real_occurrences {
+            if occurrence.live {
+                occurrence.term = weaken(&occurrence.term, 1);
+            }
+        }
+        for occurrence in &mut self.binding_occurrences {
+            *occurrence = weaken(occurrence, 1);
+        }
+        self
+    }
+
+    /// Enter the existing method binder for the current real column and make
+    /// that column's value the fresh `Var(0)` occurrence at this depth.
+    fn enter_current_real_binder(mut self) -> Self {
+        self = self.under_core_binder();
+        let current = self
+            .real_occurrences
+            .first_mut()
+            .expect("a real matrix column has an aligned occurrence");
+        current.term = Term::var(0);
+        current.live = true;
+        self
+    }
+
+    /// Supply the current value to a source binding position. Generated
+    /// wildcard columns introduced while expanding a catch-all are not new
+    /// source binders and therefore never enter this list.
+    fn bind_current_occurrence(mut self) -> Self {
+        let current = self
+            .real_occurrences
+            .first()
+            .expect("a bound matrix column has an aligned occurrence");
+        debug_assert!(current.live);
+        if current.source_binding {
+            self.binding_occurrences.push(current.term.clone());
+        }
+        self
+    }
+
+    fn drop_current_column(mut self) -> Self {
+        self.assert_occurrence_alignment();
+        self.real_pats.remove(0);
+        self.real_occurrences.remove(0);
+        self
+    }
+
+    fn specialize_current_column(
+        mut self,
+        replacement_pats: Vec<RPattern>,
+        replacement_source_bindings: bool,
+    ) -> Self {
+        self.assert_occurrence_alignment();
+        self.real_pats.remove(0);
+        self.real_occurrences.remove(0);
+
+        let replacement_count = replacement_pats.len();
+        let mut real_pats = replacement_pats;
+        real_pats.append(&mut self.real_pats);
+        self.real_pats = real_pats;
+
+        let mut real_occurrences = (0..replacement_count)
+            .map(|_| MatrixOccurrence::pending_field(replacement_source_bindings))
+            .collect::<Vec<_>>();
+        real_occurrences.append(&mut self.real_occurrences);
+        self.real_occurrences = real_occurrences;
+        self.assert_occurrence_alignment();
+        self
+    }
+
+    /// The occurrence vector supplied at the leaf, in resolver binding order.
+    /// The as-pattern consumer will extend this vector with alias positions;
+    /// keeping the accessor on the production leaf boundary prevents a second
+    /// pattern walk from becoming a competing occurrence derivation.
+    fn leaf_binding_occurrences(&self) -> &[Term] {
+        self.assert_occurrence_alignment();
+        debug_assert!(self.real_pats.is_empty());
+        #[cfg(test)]
+        MATCH_OCCURRENCE_TRACE.with(|trace| {
+            if let Some(trace) = trace.borrow_mut().as_mut() {
+                trace.leaves.push(self.binding_occurrences.clone());
+            }
+        });
+        &self.binding_occurrences
+    }
 }
 
 /// The type every raw method built from `col_types`/`col_kinds` (a suffix of
@@ -12010,6 +12168,7 @@ fn compile_match_matrix(
             }
         }
         let arm = &arms[winner];
+        let _binding_occurrences = rows[0].leaf_binding_occurrences();
         let (body_core, body_ty_ctx) = infer(cx, &arm.body)?;
         if ret_ty_slot.is_none() {
             let zonked = cx.metas.zonk_term(&body_ty_ctx);
@@ -12051,6 +12210,7 @@ fn compile_match_matrix(
                 &ret_ty,
                 real_depth_so_far,
             );
+            let rows = rows.into_iter().map(RowState::under_core_binder).collect();
             let inner = compile_match_matrix(
                 cx,
                 arms,
@@ -12076,9 +12236,10 @@ fn compile_match_matrix(
                 cx.ctx.push(col_types[0].clone());
                 let new_rows: Vec<RowState> = rows
                     .into_iter()
-                    .map(|r| RowState {
-                        real_pats: r.real_pats[1..].to_vec(),
-                        arm_idx: r.arm_idx,
+                    .map(|row| {
+                        row.enter_current_real_binder()
+                            .bind_current_occurrence()
+                            .drop_current_column()
                     })
                     .collect();
                 let inner = compile_match_matrix(
@@ -12116,6 +12277,10 @@ fn compile_match_matrix(
                 .clone();
             let m0 = ind0.params.len();
 
+            let rows = rows
+                .into_iter()
+                .map(RowState::enter_current_real_binder)
+                .collect();
             let raw_methods = build_ctor_buckets(
                 cx,
                 arms,
@@ -12207,30 +12372,30 @@ fn build_ctor_buckets(
     for (k0, c0) in ind0.constructors.iter().enumerate() {
         let mut bucket: Vec<RowState> = Vec::new();
         for r in &rows {
+            r.assert_occurrence_alignment();
+            debug_assert!(
+                r.real_occurrences[0].live,
+                "a constructor split must receive the current column's live occurrence"
+            );
             match &r.real_pats[0].kind {
                 RPatKind::Ctor(name, subs) => {
                     if cx.globals.get(name).copied() == Some(c0.id) {
-                        let mut new_pats = subs.clone();
-                        new_pats.extend_from_slice(&r.real_pats[1..]);
-                        bucket.push(RowState {
-                            real_pats: new_pats,
-                            arm_idx: r.arm_idx,
-                        });
+                        bucket.push(r.clone().specialize_current_column(subs.clone(), true));
                     }
                 }
                 RPatKind::Wild | RPatKind::Var(_) => {
                     let span = r.real_pats[0].span.clone();
-                    let mut new_pats: Vec<RPattern> = (0..c0.args.len())
+                    let new_pats: Vec<RPattern> = (0..c0.args.len())
                         .map(|_| RPattern {
                             kind: RPatKind::Wild,
                             span: span.clone(),
                         })
                         .collect();
-                    new_pats.extend_from_slice(&r.real_pats[1..]);
-                    bucket.push(RowState {
-                        real_pats: new_pats,
-                        arm_idx: r.arm_idx,
-                    });
+                    bucket.push(
+                        r.clone()
+                            .bind_current_occurrence()
+                            .specialize_current_column(new_pats, false),
+                    );
                 }
             }
         }
@@ -12338,9 +12503,20 @@ fn infer_match(
         .enumerate()
         .map(|(i, arm)| RowState {
             real_pats: vec![arm.pat.clone()],
+            real_occurrences: vec![MatrixOccurrence::live(scrut_core.clone())],
+            binding_occurrences: Vec::new(),
             arm_idx: i,
         })
         .collect();
+
+    #[cfg(test)]
+    MATCH_OCCURRENCE_TRACE.with(|trace| {
+        if let Some(trace) = trace.borrow_mut().as_mut() {
+            trace
+                .seeds
+                .extend(rows.iter().map(|row| row.real_occurrences[0].term.clone()));
+        }
+    });
 
     let mut ret_ty_slot: Option<Term> = None;
     let mut arm_used = vec![false; arms.len()];
@@ -13601,6 +13777,191 @@ mod nested_lift_association_tests {
                 span,
             }) if span == *recursive.span()
         ));
+    }
+}
+
+/// `LANG-MATCH-MATRIX-OCCURRENCE-THREADING` white-box controls. These exercise
+/// the occurrence carrier directly because the first black-box value-binding
+/// consumer is the following as-pattern slice.
+#[cfg(test)]
+mod match_matrix_occurrence_tests {
+    use super::{
+        begin_match_occurrence_trace, take_match_occurrence_trace, MatrixOccurrence, RowState,
+    };
+    use crate::{
+        error::Span,
+        resolve::{RPatKind, RPattern},
+        ElabEnv,
+    };
+    use ken_kernel::Term;
+
+    fn pat(kind: RPatKind) -> RPattern {
+        RPattern {
+            kind,
+            span: Span::zero(),
+        }
+    }
+
+    fn row(pattern: RPattern, occurrence: Term) -> RowState {
+        RowState {
+            real_pats: vec![pattern],
+            real_occurrences: vec![MatrixOccurrence::live(occurrence)],
+            binding_occurrences: Vec::new(),
+            arm_idx: 0,
+        }
+    }
+
+    #[test]
+    fn two_level_split_rebases_top_nested_child_and_tail_occurrences() {
+        // Promise class: durable invariant. MEASURED: the production RowState
+        // transitions carry four independently-originating occurrences under
+        // exactly the binders introduced by a two-level split, including an
+        // intervening synthetic IH. CLAIMED: each value-binding consumer sees
+        // the core term for its own position at leaf depth. THE GAP: this is a
+        // white-box carrier proof; the as-pattern consumer supplies the
+        // independent black-box elaboration proof on the next node.
+        let outer = pat(RPatKind::Ctor(
+            "Outer".into(),
+            vec![
+                pat(RPatKind::Ctor(
+                    "Inner".into(),
+                    vec![pat(RPatKind::Var("child".into()))],
+                )),
+                pat(RPatKind::Var("tail".into())),
+            ],
+        ));
+
+        // Model a top-level alias by recording the already-live scrutinee
+        // occurrence before stripping Outer. Outer contributes two pending
+        // field columns; neither is live until its own method binder is
+        // entered.
+        let mut state = row(outer, Term::var(0)).bind_current_occurrence();
+        let outer_subpatterns = match &state.real_pats[0].kind {
+            RPatKind::Ctor(_, subpatterns) => subpatterns.clone(),
+            _ => unreachable!(),
+        };
+        state = state.specialize_current_column(outer_subpatterns, true);
+        assert!(state
+            .real_occurrences
+            .iter()
+            .all(|occurrence| { occurrence.term == Term::var(0) && !occurrence.live }));
+
+        // Enter the first outer field, whose pattern itself splits. Recording
+        // it models an alias at this nested constructor position.
+        state = state.enter_current_real_binder().bind_current_occurrence();
+        let inner_subpatterns = match &state.real_pats[0].kind {
+            RPatKind::Ctor(_, subpatterns) => subpatterns.clone(),
+            _ => unreachable!(),
+        };
+        state = state.specialize_current_column(inner_subpatterns, true);
+
+        // The nested child is an ordinary source binder.
+        state = state
+            .enter_current_real_binder()
+            .bind_current_occurrence()
+            .drop_current_column();
+        // One synthetic IH intervenes between the nested child and the outer
+        // sibling. It has no source pattern, but every live occurrence must
+        // move under it.
+        state = state.under_core_binder();
+        // The outer sibling becomes the final fresh field binder.
+        state = state
+            .enter_current_real_binder()
+            .bind_current_occurrence()
+            .drop_current_column();
+
+        assert!(state.real_pats.is_empty());
+        assert_eq!(
+            state.leaf_binding_occurrences(),
+            &[Term::var(4), Term::var(3), Term::var(2), Term::var(0)],
+            "top scrutinee, nested constructor, nested child, and tail must each \
+             name their own binder after two splits plus the intervening IH"
+        );
+    }
+
+    #[test]
+    fn production_two_level_recursive_split_rebases_binding_under_both_ihs() {
+        // Promise class: durable invariant. MEASURED: a real general-matrix
+        // compilation reaches the production leaf with `m`'s occurrence under
+        // the nested and enclosing recursive IH binders. CLAIMED: D3 rebases
+        // live occurrences at every actual matrix descent. THE GAP: tracing is
+        // test-only observation of the production carrier; the returned value
+        // independently proves the unchanged Var consumer still selects `m`.
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_decl("data NatL = LZero | LSucc NatL")
+            .expect("recursive fixture type elaborates");
+        let trusted_before = env.env.trusted_base();
+
+        begin_match_occurrence_trace();
+        env.elaborate_decl(
+            "let result : NatL = match LSucc (LSucc LZero) { \
+             LZero |-> LZero ; LSucc LZero |-> LZero ; LSucc (LSucc m) |-> m }",
+        )
+        .expect("two-level nested match elaborates through the general matrix");
+        let trace = take_match_occurrence_trace();
+        assert_eq!(
+            env.env.trusted_base(),
+            trusted_before,
+            "occurrence bookkeeping must not add a trusted declaration"
+        );
+
+        let lzero = Term::Constructor {
+            id: env.globals["LZero"],
+            level_args: Vec::new(),
+        };
+        let lsucc = Term::Constructor {
+            id: env.globals["LSucc"],
+            level_args: Vec::new(),
+        };
+        let expected_scrutinee = Term::app(lsucc.clone(), Term::app(lsucc, lzero));
+        assert_eq!(
+            trace.seeds.len(),
+            3,
+            "the three source arms must each seed one aligned top-level occurrence"
+        );
+        assert!(
+            trace.seeds.iter().all(|seed| seed == &expected_scrutinee),
+            "every initial row must carry the inferred top-level scrutinee occurrence; \
+             seeds were {:?}",
+            trace.seeds
+        );
+        assert!(
+            trace
+                .leaves
+                .iter()
+                .any(|occurrences| occurrences == &[Term::var(2)]),
+            "the nested `m` binder must cross its own and its enclosing LSucc IH; \
+             production leaf trace was {:?}",
+            trace.leaves
+        );
+    }
+
+    #[test]
+    fn pending_sibling_is_not_weakened_before_its_binder_exists() {
+        // Promise class: durable invariant. MEASURED: entering a binder weakens
+        // a live occurrence and an already-supplied binding, while a future
+        // sibling stays at its prospective Var(0). CLAIMED: occurrence
+        // rebasing follows actual binder depth rather than eagerly counting a
+        // constructor's whole field list. THE GAP: the two-level test above
+        // proves the same distinction composes through a real split shape.
+        let state = RowState {
+            real_pats: vec![
+                pat(RPatKind::Var("live".into())),
+                pat(RPatKind::Var("future".into())),
+            ],
+            real_occurrences: vec![
+                MatrixOccurrence::live(Term::var(2)),
+                MatrixOccurrence::pending_field(true),
+            ],
+            binding_occurrences: vec![Term::var(1)],
+            arm_idx: 0,
+        }
+        .under_core_binder();
+
+        assert_eq!(state.real_occurrences[0].term, Term::var(3));
+        assert_eq!(state.binding_occurrences, vec![Term::var(2)]);
+        assert_eq!(state.real_occurrences[1].term, Term::var(0));
+        assert!(!state.real_occurrences[1].live);
     }
 }
 
