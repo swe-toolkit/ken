@@ -7030,31 +7030,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             }
             Ok((result, result_type))
         }
-        RExpr::RPatternAlias(slot, name, _span) => {
-            let alias = cx
-                .active_pattern_aliases
-                .iter()
-                .rev()
-                .flat_map(|region| region.iter().rev())
-                .find(|alias| alias.slot == *slot && alias.name == *name)
-                .cloned()
-                .ok_or_else(|| {
-                    ElabError::Internal(format!(
-                        "as-pattern alias '{}' has no active matrix-leaf occurrence",
-                        name
-                    ))
-                })?;
-            let growth = cx.ctx.len().checked_sub(alias.install_depth).ok_or_else(|| {
-                ElabError::Internal(format!(
-                    "as-pattern alias '{}' escaped its installation context",
-                    name
-                ))
-            })?;
-            Ok((
-                pattern_alias_sentinel(alias.sentinel),
-                weaken(&alias.ty, growth as i64),
-            ))
-        }
+        RExpr::RPatternAlias(slot, name, _span) => infer_active_pattern_alias(cx, *slot, name),
         RExpr::RVar(i, _, _) => {
             // An installed index refinement (constructor injectivity
             // / sibling convoy) replaces the bare `Var` with its `Cast`-
@@ -11965,6 +11941,60 @@ fn pattern_alias_sentinel(id: usize) -> Term {
     Term::var(PATTERN_ALIAS_SENTINEL_BASE + id * PATTERN_ALIAS_SENTINEL_STRIDE)
 }
 
+#[inline(never)]
+fn infer_active_pattern_alias(
+    cx: &mut ElabCtx,
+    slot: usize,
+    name: &str,
+) -> Result<(Term, Term), ElabError> {
+    let alias = cx
+        .active_pattern_aliases
+        .iter()
+        .rev()
+        .flat_map(|region| region.iter().rev())
+        .find(|alias| alias.slot == slot && alias.name == name)
+        .cloned()
+        .ok_or_else(|| {
+            ElabError::Internal(format!(
+                "as-pattern alias '{}' has no active matrix-leaf occurrence",
+                name
+            ))
+        })?;
+    let growth = cx.ctx.len().checked_sub(alias.install_depth).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "as-pattern alias '{}' escaped its installation context",
+            name
+        ))
+    })?;
+    Ok((
+        pattern_alias_sentinel(alias.sentinel),
+        weaken(&alias.ty, growth as i64),
+    ))
+}
+
+#[inline(never)]
+fn finish_pattern_alias_frame(
+    cx: &mut ElabCtx,
+    raw_methods_result: Result<Vec<Term>, ElabError>,
+) -> Result<Vec<Term>, ElabError> {
+    let replacements = cx
+        .pattern_alias_replacement_frames
+        .pop()
+        .expect("infer_match replacement frame must balance");
+    cx.pattern_alias_type_frames
+        .pop()
+        .expect("infer_match alias-type frame must balance");
+    let raw_methods = raw_methods_result?;
+    if replacements.is_empty() {
+        return Ok(raw_methods);
+    }
+    Ok(raw_methods
+        .into_iter()
+        .map(|method| finalize_pattern_aliases(&method, 0, &replacements))
+        .collect())
+}
+
+#[inline(never)]
 fn finalize_pattern_aliases(
     term: &Term,
     depth: usize,
@@ -12258,6 +12288,7 @@ impl RowState {
 /// Strip only the consumer wrapper at the current position. Its value comes
 /// from the already-landed aligned occurrence; the inner pattern remains the
 /// sole matcher and therefore owns coverage and reachability exactly as before.
+#[inline(never)]
 fn expose_current_pattern_aliases(
     cx: &mut ElabCtx,
     mut row: RowState,
@@ -12288,6 +12319,86 @@ fn expose_current_pattern_aliases(
         row.real_pats[0] = *inner;
     }
     row
+}
+
+#[inline(never)]
+fn build_alias_rows(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    scrut_core: &Term,
+    scrut_ty: &Term,
+) -> Vec<RowState> {
+    cx.pattern_alias_type_frames.push(HashMap::new());
+    cx.pattern_alias_replacement_frames.push(HashMap::new());
+    arms.iter()
+        .enumerate()
+        .map(|(i, arm)| RowState {
+            real_pats: vec![arm.pat.clone()],
+            real_occurrences: vec![MatrixOccurrence::live(scrut_core.clone())],
+            binding_occurrences: Vec::new(),
+            arm_idx: i,
+        })
+        .map(|row| expose_current_pattern_aliases(cx, row, scrut_ty))
+        .collect()
+}
+
+#[inline(never)]
+fn arm_has_pattern_aliases(cx: &ElabCtx, arm_idx: usize) -> bool {
+    cx.pattern_alias_type_frames
+        .last()
+        .expect("infer_match alias-type frame must span matrix compilation")
+        .keys()
+        .any(|(candidate, _)| *candidate == arm_idx)
+}
+
+#[inline(never)]
+fn infer_pattern_alias_leaf(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    arm_idx: usize,
+    binding_occurrences: &[Term],
+    real_depth: usize,
+) -> Result<(Term, Term), ElabError> {
+    let alias_types = cx
+        .pattern_alias_type_frames
+        .last()
+        .expect("infer_match alias-type frame must span matrix compilation")
+        .iter()
+        .filter(|((candidate, _), _)| *candidate == arm_idx)
+        .map(|((_, slot), alias)| (*slot, alias.clone()))
+        .collect::<Vec<_>>();
+    let mut active_aliases = Vec::with_capacity(alias_types.len());
+    for (slot, alias) in alias_types {
+        let occurrence = binding_occurrences
+            .get(slot)
+            .unwrap_or_else(|| {
+                panic!("as-pattern slot {slot} is absent from its matrix-leaf occurrence vector")
+            })
+            .clone();
+        let sentinel = cx.next_pattern_alias_sentinel;
+        cx.next_pattern_alias_sentinel += 1;
+        cx.pattern_alias_replacement_frames
+            .last_mut()
+            .expect("infer_match replacement frame must span matrix compilation")
+            .insert(
+                sentinel,
+                PatternAliasReplacement {
+                    occurrence,
+                    real_depth,
+                },
+            );
+        active_aliases.push(ActivePatternAlias {
+            slot,
+            name: alias.name,
+            sentinel,
+            ty: alias.ty,
+            install_depth: alias.install_depth,
+        });
+    }
+    cx.active_pattern_aliases.push(active_aliases);
+    let inferred_body = infer(cx, &arm.body);
+    cx.active_pattern_aliases.pop();
+    inferred_body
 }
 
 fn pattern_without_aliases(mut pattern: &RPattern) -> &RPattern {
@@ -12382,48 +12493,12 @@ fn compile_match_matrix(
             }
         }
         let arm = &arms[winner];
-        let binding_occurrences = rows[0].leaf_binding_occurrences().to_vec();
-        let alias_types = cx
-            .pattern_alias_type_frames
-            .last()
-            .expect("infer_match alias-type frame must span matrix compilation")
-            .iter()
-            .filter(|((arm_idx, _), _)| *arm_idx == winner)
-            .map(|((_, slot), alias)| (*slot, alias.clone()))
-            .collect::<Vec<_>>();
-        let mut active_aliases = Vec::with_capacity(alias_types.len());
-        for (slot, alias) in alias_types {
-            let occurrence = binding_occurrences
-                .get(slot)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "as-pattern slot {slot} is absent from its matrix-leaf occurrence vector"
-                    )
-                })
-                .clone();
-            let sentinel = cx.next_pattern_alias_sentinel;
-            cx.next_pattern_alias_sentinel += 1;
-            cx.pattern_alias_replacement_frames
-                .last_mut()
-                .expect("infer_match replacement frame must span matrix compilation")
-                .insert(
-                    sentinel,
-                    PatternAliasReplacement {
-                        occurrence,
-                        real_depth: real_depth_so_far,
-                    },
-                );
-            active_aliases.push(ActivePatternAlias {
-                slot,
-                name: alias.name,
-                sentinel,
-                ty: alias.ty,
-                install_depth: alias.install_depth,
-            });
-        }
-        cx.active_pattern_aliases.push(active_aliases);
-        let inferred_body = infer(cx, &arm.body);
-        cx.active_pattern_aliases.pop();
+        let binding_occurrences = rows[0].leaf_binding_occurrences();
+        let inferred_body = if arm_has_pattern_aliases(cx, winner) {
+            infer_pattern_alias_leaf(cx, arm, winner, binding_occurrences, real_depth_so_far)
+        } else {
+            infer(cx, &arm.body)
+        };
         let (body_core, body_ty_ctx) = inferred_body?;
         if ret_ty_slot.is_none() {
             let zonked = cx.metas.zonk_term(&body_ty_ctx);
@@ -12762,19 +12837,7 @@ fn infer_match(
     //    compile it via the pattern-matrix algorithm (`34-data-match.md
     //    §3.1`): column-by-column, splitting on constructors, recursing on
     //    the residual matrix under each constructor's freshly-bound fields.
-    cx.pattern_alias_type_frames.push(HashMap::new());
-    cx.pattern_alias_replacement_frames.push(HashMap::new());
-    let rows: Vec<RowState> = arms
-        .iter()
-        .enumerate()
-        .map(|(i, arm)| RowState {
-            real_pats: vec![arm.pat.clone()],
-            real_occurrences: vec![MatrixOccurrence::live(scrut_core.clone())],
-            binding_occurrences: Vec::new(),
-            arm_idx: i,
-        })
-        .map(|row| expose_current_pattern_aliases(cx, row, &scrut_ty))
-        .collect();
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
 
     #[cfg(test)]
     MATCH_OCCURRENCE_TRACE.with(|trace| {
@@ -12805,17 +12868,7 @@ fn infer_match(
         &mut arm_used,
         &mut subsumed_by,
     );
-    let replacements = cx
-        .pattern_alias_replacement_frames
-        .pop()
-        .expect("infer_match replacement frame must balance");
-    cx.pattern_alias_type_frames
-        .pop()
-        .expect("infer_match alias-type frame must balance");
-    let raw_methods = raw_methods_result?
-        .into_iter()
-        .map(|method| finalize_pattern_aliases(&method, 0, &replacements))
-        .collect::<Vec<_>>();
+    let raw_methods = finish_pattern_alias_frame(cx, raw_methods_result)?;
 
     // 6. AC4: reachability — an arm that never won at any leaf (including any
     //    it was expanded into via a wildcard row) is dead code.
