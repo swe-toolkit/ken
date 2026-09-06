@@ -8,9 +8,7 @@ use num_bigint::BigInt;
 #[cfg(unix)]
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
-use ken_elaborator::capabilities::{
-    Authority, RightSet, SymlinkPolicy, AUTH_FULL, AUTH_PARTIAL,
-};
+use ken_elaborator::capabilities::{Authority, RightSet, SymlinkPolicy, AUTH_FULL};
 use ken_host::EffectObservation;
 use ken_runtime::{
     BoundProcessExecutableArtifact, NativeEffectRunErrorV1, NativeEffectRunOptionsV1,
@@ -255,6 +253,52 @@ impl fmt::Display for FsAppendFileDifferentialError {
 
 impl std::error::Error for FsAppendFileDifferentialError {}
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FsMetadataField {
+    Size,
+    Kind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FsMetadataDifferentialError {
+    Shape {
+        lane: &'static str,
+        event: usize,
+        reason: String,
+    },
+    Field {
+        lane: &'static str,
+        event: usize,
+        field: FsMetadataField,
+        reason: String,
+    },
+    Observation(ObservationMismatch),
+}
+
+impl fmt::Display for FsMetadataDifferentialError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape {
+                lane,
+                event,
+                reason,
+            } => write!(formatter, "{lane} FsMetadata event {event} shape: {reason}"),
+            Self::Field {
+                lane,
+                event,
+                field,
+                reason,
+            } => write!(
+                formatter,
+                "{lane} FsMetadata event {event} {field:?}: {reason}"
+            ),
+            Self::Observation(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for FsMetadataDifferentialError {}
+
 impl CanonicalDifferentialRun {
     pub fn compare_exact(&self) -> Result<(), ObservationMismatch> {
         compare_canonical_exact(&self.interpreter, &self.native)
@@ -309,6 +353,29 @@ impl CanonicalDifferentialRun {
             filesystem_path,
             before,
             appended,
+        )
+    }
+
+    /// Bind every FsMetadata response independently to the file or directory
+    /// that exists in that lane's real root, then compare the full canonical
+    /// observations. No response field is erased or normalized.
+    pub fn compare_fs_metadata(
+        &self,
+        paths: &[(&[u8], &[u8])],
+    ) -> Result<(), FsMetadataDifferentialError> {
+        let interpreter_expected = expected_fs_metadata(
+            "interpreter",
+            self.roots.interpreter(),
+            paths,
+        )?;
+        let native_expected =
+            expected_fs_metadata("native", self.roots.native(), paths)?;
+        compare_fs_metadata_observations(
+            &self.interpreter,
+            &self.native,
+            paths,
+            &interpreter_expected,
+            &native_expected,
         )
     }
 
@@ -760,6 +827,139 @@ fn validate_fs_append_file_observation(
     Ok(())
 }
 
+fn compare_fs_metadata_observations(
+    interpreter: &EffectObservation,
+    native: &EffectObservation,
+    paths: &[(&[u8], &[u8])],
+    interpreter_expected: &[ken_host::FileMetadataV1],
+    native_expected: &[ken_host::FileMetadataV1],
+) -> Result<(), FsMetadataDifferentialError> {
+    validate_fs_metadata_observation(
+        "interpreter",
+        interpreter,
+        paths,
+        interpreter_expected,
+    )?;
+    validate_fs_metadata_observation("native", native, paths, native_expected)?;
+    compare_canonical_exact(interpreter, native)
+        .map_err(FsMetadataDifferentialError::Observation)
+}
+
+fn validate_fs_metadata_observation(
+    lane: &'static str,
+    observation: &EffectObservation,
+    paths: &[(&[u8], &[u8])],
+    expected: &[ken_host::FileMetadataV1],
+) -> Result<(), FsMetadataDifferentialError> {
+    if observation.effect_trace.len() != paths.len() || expected.len() != paths.len() {
+        return Err(FsMetadataDifferentialError::Shape {
+            lane,
+            event: 0,
+            reason: format!(
+                "expected {} events and metadata rows, observed {} events and {} rows",
+                paths.len(),
+                observation.effect_trace.len(),
+                expected.len()
+            ),
+        });
+    }
+    if !observation.filesystem_delta.is_empty() {
+        return Err(FsMetadataDifferentialError::Shape {
+            lane,
+            event: 0,
+            reason: "read-only metadata produced a filesystem delta".to_string(),
+        });
+    }
+    for (index, ((request_path, _), expected)) in
+        paths.iter().zip(expected).enumerate()
+    {
+        let event = &observation.effect_trace[index];
+        if event.sequence != index as u64
+            || event.operation != ken_host::HostOpV1::FsMetadata
+            || event.capability.is_none()
+            || !event.resource_bindings.is_empty()
+            || event.request
+                != (ken_host::CanonicalRequestV1::FsMetadata {
+                    path: request_path.to_vec(),
+                })
+        {
+            return Err(FsMetadataDifferentialError::Shape {
+                lane,
+                event: index,
+                reason: "event is not the exact capability/request shape".to_string(),
+            });
+        }
+        let ken_host::CanonicalOutcomeV1::Success(
+            ken_host::CanonicalReplyV1::FileMetadata(actual),
+        ) = &event.outcome
+        else {
+            return Err(FsMetadataDifferentialError::Shape {
+                lane,
+                event: index,
+                reason: "event did not return FileMetadata".to_string(),
+            });
+        };
+        if actual.size != expected.size {
+            return Err(FsMetadataDifferentialError::Field {
+                lane,
+                event: index,
+                field: FsMetadataField::Size,
+                reason: format!("expected {}, observed {}", expected.size, actual.size),
+            });
+        }
+        if actual.kind != expected.kind {
+            return Err(FsMetadataDifferentialError::Field {
+                lane,
+                event: index,
+                field: FsMetadataField::Kind,
+                reason: format!("expected {:?}, observed {:?}", expected.kind, actual.kind),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn expected_fs_metadata(
+    lane: &'static str,
+    root: &std::path::Path,
+    paths: &[(&[u8], &[u8])],
+) -> Result<Vec<ken_host::FileMetadataV1>, FsMetadataDifferentialError> {
+    paths
+        .iter()
+        .enumerate()
+        .map(|(event, (_, filesystem_path))| {
+            let path = raw_os_string(filesystem_path).map_err(|error| {
+                FsMetadataDifferentialError::Shape {
+                    lane,
+                    event,
+                    reason: error.to_string(),
+                }
+            })?;
+            let metadata = std::fs::symlink_metadata(root.join(path)).map_err(|error| {
+                FsMetadataDifferentialError::Shape {
+                    lane,
+                    event,
+                    reason: format!("cannot observe fixture metadata: {error}"),
+                }
+            })?;
+            let file_type = metadata.file_type();
+            let kind = if file_type.is_file() {
+                ken_host::FsNodeKindV1::File
+            } else if file_type.is_dir() {
+                ken_host::FsNodeKindV1::Directory
+            } else if file_type.is_symlink() {
+                ken_host::FsNodeKindV1::Symlink
+            } else {
+                ken_host::FsNodeKindV1::Other
+            };
+            Ok(ken_host::FileMetadataV1 {
+                size: metadata.len(),
+                kind,
+            })
+        })
+        .collect()
+}
+
 fn validate_native_ambient(ambient: &AmbientScript) -> Result<(), HarnessError> {
     if ambient.stdin_is_terminal || ambient.stdout_is_terminal || ambient.stderr_is_terminal {
         return Err(HarnessError::UnsupportedAmbient(
@@ -806,6 +1006,7 @@ mod tests {
         apply_canonical_mutation, confirm_native_tested_transition, denial_precedes_host_action,
         CanonicalMutation, NativeTestedEvidence, RunnerOnlyProxy, StatusTransitionError,
     };
+    use ken_elaborator::capabilities::{AUTH_NONE, AUTH_PARTIAL};
     use ken_host::{
         dispatch_host_op_v1, program_caps_fs_trace_identity_v1, CanonicalOutcomeV1,
         CanonicalReplyV1, CanonicalRequestV1, CapabilityDeniedV1, CapabilityGrantV1,
@@ -985,6 +1186,68 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 (\appended. match appended {
                   Ok _ |-> host_exit AFull Success ;
                   Err _ |-> host_exit AFull (Failure 84)
+                })
+          }
+        }
+      }
+    }
+  }
+"#;
+
+    const FS_METADATA_SOURCE: &str = r#"program capabilities FS APartial "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit APartial (Failure 90) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit APartial (Failure 91) ;
+        Cons file_path more |-> match more {
+          Nil |-> host_exit APartial (Failure 92) ;
+          Cons directory_path _ |-> match caps {
+            MkProgramCaps cap |->
+              bind (Coproduct (FSOp APartial) AmbientOp)
+                (resp_coproduct (FSOp APartial) AmbientOp
+                  (fs_resp APartial) ambient_resp)
+                (Result FileError FileMetadata) ExitCode
+                (inject_l (FSOp APartial) AmbientOp
+                  (fs_resp APartial) ambient_resp
+                  (Result FileError FileMetadata)
+                  (file_metadata APartial cap file_path))
+                (\file_result. match file_result {
+                  Err _ |-> host_exit APartial (Failure 94) ;
+                  Ok file_metadata_result |-> match file_metadata_result {
+                    MkFileMetadata file_size file_kind |->
+                      match eq_int file_size 5 {
+                        False |-> host_exit APartial (Failure 95) ;
+                        True |-> match file_kind {
+                          KDirectory |-> host_exit APartial (Failure 96) ;
+                          KSymlink |-> host_exit APartial (Failure 97) ;
+                          KOther |-> host_exit APartial (Failure 98) ;
+                          KFile |->
+                            bind (Coproduct (FSOp APartial) AmbientOp)
+                              (resp_coproduct (FSOp APartial) AmbientOp
+                                (fs_resp APartial) ambient_resp)
+                              (Result FileError FileMetadata) ExitCode
+                              (inject_l (FSOp APartial) AmbientOp
+                                (fs_resp APartial) ambient_resp
+                                (Result FileError FileMetadata)
+                                (file_metadata APartial cap directory_path))
+                              (\directory_result. match directory_result {
+                                Err _ |-> host_exit APartial (Failure 99) ;
+                                Ok directory_metadata |-> match directory_metadata {
+                                  MkFileMetadata _directory_size directory_kind |->
+                                    match directory_kind {
+                                      KFile |-> host_exit APartial (Failure 100) ;
+                                      KSymlink |-> host_exit APartial (Failure 101) ;
+                                      KOther |-> host_exit APartial (Failure 102) ;
+                                      KDirectory |-> host_exit APartial Success
+                                    }
+                                }
+                              })
+                        }
+                      }
+                  }
                 })
           }
         }
@@ -1287,6 +1550,125 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 },
             ],
         )
+    }
+
+    fn fs_metadata_scenario(
+        identity: &str,
+        rights: RightSet,
+        arguments: Vec<Vec<u8>>,
+        initial_filesystem: Vec<SeedNode>,
+        expected_paths: Vec<Vec<u8>>,
+    ) -> Scenario {
+        Scenario {
+            process_input: RawProcessInput {
+                arguments,
+                environment: Vec::new(),
+            },
+            ambient: AmbientScript::default(),
+            program_caps: ProgramCapsShape {
+                fs_authority: AUTH_PARTIAL,
+                relative_root: b"data".to_vec(),
+                rights,
+                symlink: SymlinkPolicy::NoFollow,
+            },
+            entry: CheckedProgramEntry {
+                identity: identity.to_string(),
+                package_name: identity.to_string(),
+                source: FS_METADATA_SOURCE.to_string(),
+            },
+            initial_filesystem,
+            expected_fs: expected_paths
+                .into_iter()
+                .map(|path| ExpectedFsEffect::Metadata { path })
+                .collect(),
+        }
+    }
+
+    fn fs_metadata_success_scenario() -> Scenario {
+        fs_metadata_scenario(
+            "abi-a2-fs-metadata-success",
+            RightSet::METADATA,
+            vec![b"file.bin".to_vec(), b"known-dir".to_vec()],
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/file.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"five!".to_vec()),
+                },
+                SeedNode {
+                    relative_path: b"data/known-dir".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+            ],
+            vec![b"file.bin".to_vec(), b"known-dir".to_vec()],
+        )
+    }
+
+    fn fs_metadata_escape_scenario() -> Scenario {
+        fs_metadata_scenario(
+            "abi-a2-fs-metadata-scope-escape",
+            RightSet::METADATA,
+            vec![b"../outside.bin".to_vec(), b"unused".to_vec()],
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"five!".to_vec()),
+                },
+            ],
+            vec![b"../outside.bin".to_vec()],
+        )
+    }
+
+    fn fs_metadata_symlink_scenario() -> Scenario {
+        fs_metadata_scenario(
+            "abi-a2-fs-metadata-symlink-denied",
+            RightSet::METADATA,
+            vec![b"link".to_vec(), b"unused".to_vec()],
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"five!".to_vec()),
+                },
+                SeedNode {
+                    relative_path: b"data/link".to_vec(),
+                    kind: crate::SeedNodeKind::Symlink(b"../outside.bin".to_vec()),
+                },
+            ],
+            vec![b"link".to_vec()],
+        )
+    }
+
+    fn fs_metadata_missing_right_scenario() -> Scenario {
+        let mut scenario = fs_metadata_scenario(
+            "abi-a2-fs-metadata-missing-right",
+            RightSet::NONE,
+            vec![b"file.bin".to_vec(), b"unused".to_vec()],
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/file.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"five!".to_vec()),
+                },
+            ],
+            vec![b"file.bin".to_vec()],
+        );
+        scenario.entry.source = scenario.entry.source.replace("APartial", "ANone");
+        scenario.program_caps.fs_authority = AUTH_NONE;
+        scenario
     }
 
     fn denial_scenario() -> Scenario {
@@ -1782,6 +2164,151 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     &event.outcome,
                     CanonicalOutcomeV1::Error(SemanticErrorV1::File(error))
                         if error.operation == HostOpV1::FsAppendFile
+                            && error.cause
+                                == FileErrorCauseV1::Capability(expected.clone())
+                ));
+            }
+        }
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: each real lane reports both size and kind for one known
+    /// regular file and one known directory, with each response independently
+    /// bound to that lane's OS artifact before full canonical comparison.
+    /// CLAIMED: promoted native FsMetadata agrees exactly with the interpreter
+    /// on the complete landed `{size, kind}` contract for both node classes.
+    /// THE GAP: correct-vs-correct equality alone cannot show either field is
+    /// read; independent wrong-native size and kind mutations must each redden.
+    #[test]
+    fn fs_metadata_real_artifact_fields_are_exact_and_discriminating() {
+        const PATHS: &[(&[u8], &[u8])] = &[
+            (b"file.bin", b"data/file.bin"),
+            (b"known-dir", b"data/known-dir"),
+        ];
+        let run = run_scenario(&fs_metadata_success_scenario())
+            .expect("FsMetadata real-artifact differential executes");
+        run.compare_fs_metadata(PATHS)
+            .expect("exact file and directory metadata parity");
+        assert_eq!(run.interpreter.exit_status, 0);
+        assert_eq!(run.native.exit_status, 0);
+        assert_eq!(run.interpreter_actions.fs_actions_after_resolve, Some(2));
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsMetadata,
+                NativeTestedEvidence::from_fs_metadata_run(&run, PATHS),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested)
+        );
+
+        let interpreter_expected = expected_fs_metadata(
+            "interpreter",
+            run.roots.interpreter(),
+            PATHS,
+        )
+        .expect("interpreter fixtures have metadata");
+        let native_expected = expected_fs_metadata("native", run.roots.native(), PATHS)
+            .expect("native fixtures have metadata");
+
+        let mut wrong_size = run.native.clone();
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) =
+            &mut wrong_size.effect_trace[0].outcome
+        else {
+            panic!("the first metadata response must describe the file")
+        };
+        metadata.size = metadata.size.saturating_add(1);
+        assert!(matches!(
+            compare_fs_metadata_observations(
+                &run.interpreter,
+                &wrong_size,
+                PATHS,
+                &interpreter_expected,
+                &native_expected,
+            ),
+            Err(FsMetadataDifferentialError::Field {
+                lane: "native",
+                event: 0,
+                field: FsMetadataField::Size,
+                ..
+            })
+        ));
+
+        let mut wrong_kind = run.native.clone();
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) =
+            &mut wrong_kind.effect_trace[1].outcome
+        else {
+            panic!("the second metadata response must describe the directory")
+        };
+        metadata.kind = ken_host::FsNodeKindV1::File;
+        assert!(matches!(
+            compare_fs_metadata_observations(
+                &run.interpreter,
+                &wrong_kind,
+                PATHS,
+                &interpreter_expected,
+                &native_expected,
+            ),
+            Err(FsMetadataDifferentialError::Field {
+                lane: "native",
+                event: 1,
+                field: FsMetadataField::Kind,
+                ..
+            })
+        ));
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: the successful in-root scenario above performs two metadata
+    /// leaves, while escape, leaf-symlink-under-NoFollow, and missing-Metadata-
+    /// right inputs return their exact policy identities on both real lanes,
+    /// with zero post-resolution actions and byte-identical roots.
+    /// CLAIMED: native FsMetadata exercises the landed scoped-root, rights, and
+    /// no-follow policy rather than bypassing it.
+    /// THE GAP: symmetric refusals could survive a shared bypass; exact expected
+    /// outcomes plus production-site policy mutations make that bypass visible.
+    #[test]
+    fn fs_metadata_real_artifact_exercises_the_honest_policy_contract() {
+        let held = RightSet::NONE;
+        for (scenario, expected) in [
+            (
+                fs_metadata_escape_scenario(),
+                CapabilityDeniedV1::ScopeEscape,
+            ),
+            (
+                fs_metadata_symlink_scenario(),
+                CapabilityDeniedV1::SymlinkDenied,
+            ),
+            (
+                fs_metadata_missing_right_scenario(),
+                CapabilityDeniedV1::RightNotHeld {
+                    operation: ken_host::FsCapabilityOperationV1::Metadata,
+                    held_rights: held.bits(),
+                },
+            ),
+        ] {
+            let run = run_scenario(&scenario).unwrap_or_else(|error| {
+                panic!("{}: {error}", scenario.entry.identity)
+            });
+            assert_eq!(run.interpreter.exit_status, 94);
+            assert_eq!(run.native.exit_status, 94);
+            assert!(run.interpreter.filesystem_delta.is_empty());
+            assert!(run.native.filesystem_delta.is_empty());
+            assert_eq!(run.interpreter_actions.fs_actions_after_resolve, Some(0));
+            assert_eq!(
+                run.interpreter_actions.root_before,
+                run.interpreter_actions.root_after
+            );
+            assert_eq!(run.native_actions.root_before, run.native_actions.root_after);
+            for observation in [&run.interpreter, &run.native] {
+                let [event] = observation.effect_trace.as_slice() else {
+                    panic!("{} must emit one refusal", scenario.entry.identity)
+                };
+                assert_eq!(event.operation, HostOpV1::FsMetadata);
+                assert!(matches!(
+                    &event.outcome,
+                    CanonicalOutcomeV1::Error(SemanticErrorV1::File(error))
+                        if error.operation == HostOpV1::FsMetadata
                             && error.cause
                                 == FileErrorCauseV1::Capability(expected.clone())
                 ));

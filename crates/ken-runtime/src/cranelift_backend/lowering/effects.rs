@@ -248,6 +248,12 @@ fn runtime_producible_constructors(
         bool_false,
         bool_true,
         file_operation_append,
+        file_operation_metadata,
+        file_metadata,
+        file_kind_file,
+        file_kind_directory,
+        file_kind_symlink,
+        file_kind_other,
     } = symbols;
     // Every field is a constructor the native runtime can put in front of a
     // match: host-effect responses, process-entry inputs, and the primitive
@@ -295,6 +301,12 @@ fn runtime_producible_constructors(
         bool_false,
         bool_true,
         file_operation_append,
+        file_operation_metadata,
+        file_metadata,
+        file_kind_file,
+        file_kind_directory,
+        file_kind_symlink,
+        file_kind_other,
     ]
     .into_iter()
     .cloned()
@@ -2682,6 +2694,7 @@ impl<'a> Lowering<'a> {
             ken_host::HostOpV1::FsReadFile
             | ken_host::HostOpV1::FsWriteFile
             | ken_host::HostOpV1::FsAppendFile
+            | ken_host::HostOpV1::FsMetadata
             | ken_host::HostOpV1::FsChangeMode
             | ken_host::HostOpV1::FsOpen => {
                 // Lowered and claimed above, with every other operand, so the
@@ -3170,7 +3183,8 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::ConsoleRead => wire.reply_bytes_tag,
                 ken_host::HostOpV1::FsReadFile => wire.reply_bytes_tag,
                 ken_host::HostOpV1::FsOpen => wire.reply_resource_tag,
-                ken_host::HostOpV1::FsHandleMetadata => wire.reply_metadata_tag,
+                ken_host::HostOpV1::FsMetadata
+                | ken_host::HostOpV1::FsHandleMetadata => wire.reply_metadata_tag,
                 ken_host::HostOpV1::BufferAllocate => wire.reply_resource_tag,
                 ken_host::HostOpV1::BufferFreeze => wire.reply_bytes_tag,
                 ken_host::HostOpV1::FsReadAt => wire.reply_read_progress_tag,
@@ -3356,6 +3370,7 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::FsReadFile
                     | ken_host::HostOpV1::FsWriteFile
                     | ken_host::HostOpV1::FsAppendFile
+                    | ken_host::HostOpV1::FsMetadata
                     | ken_host::HostOpV1::FsChangeMode
                     | ken_host::HostOpV1::FsOpen
             ) {
@@ -3377,6 +3392,10 @@ impl<'a> Lowering<'a> {
                     ken_host::HostOpV1::FsAppendFile => (
                         SynthesizedFixedConstructorRole::FileOperationAppend,
                         self.process_symbols.file_operation_append.clone(),
+                    ),
+                    ken_host::HostOpV1::FsMetadata => (
+                        SynthesizedFixedConstructorRole::FileOperationMetadata,
+                        self.process_symbols.file_operation_metadata.clone(),
                     ),
                     ken_host::HostOpV1::FsChangeMode => (
                         SynthesizedFixedConstructorRole::FileOperationChangeMode,
@@ -3759,6 +3778,72 @@ impl<'a> Lowering<'a> {
                 )
             } else if operation == ken_host::HostOpV1::FsOpen {
                 Lowered::ResourceToken { value: detail }
+            } else if operation == ken_host::HostOpV1::FsMetadata {
+                let kind_tag = builder.ins().stack_load(
+                    types::I64,
+                    reply,
+                    i32::try_from(wire.reply_bytes_len_offset)
+                        .expect("reply bytes len offset is u32"),
+                );
+                Self::require_one_of_i64(builder, kind_tag, &[0, 1, 2, 3]);
+                let kind_root = ok_root.field(1);
+                let kind = Lowered::DynamicConstructor(DynamicConstructorV1 {
+                    discriminator: kind_tag,
+                    alternatives: vec![
+                        self.synthesized_dynamic_alternative(
+                            static_origin,
+                            &kind_root,
+                            0,
+                            0,
+                            SynthesizedFixedConstructorRole::FileKindFile,
+                            self.process_symbols.file_kind_file.clone(),
+                            Vec::new(),
+                            &seats,
+                        )?,
+                        self.synthesized_dynamic_alternative(
+                            static_origin,
+                            &kind_root,
+                            1,
+                            1,
+                            SynthesizedFixedConstructorRole::FileKindDirectory,
+                            self.process_symbols.file_kind_directory.clone(),
+                            Vec::new(),
+                            &seats,
+                        )?,
+                        self.synthesized_dynamic_alternative(
+                            static_origin,
+                            &kind_root,
+                            2,
+                            2,
+                            SynthesizedFixedConstructorRole::FileKindSymlink,
+                            self.process_symbols.file_kind_symlink.clone(),
+                            Vec::new(),
+                            &seats,
+                        )?,
+                        self.synthesized_dynamic_alternative(
+                            static_origin,
+                            &kind_root,
+                            3,
+                            3,
+                            SynthesizedFixedConstructorRole::FileKindOther,
+                            self.process_symbols.file_kind_other.clone(),
+                            Vec::new(),
+                            &seats,
+                        )?,
+                    ],
+                });
+                let size = self.lower_unsigned_u64_int(builder, detail)?;
+                self.synthesized_constructor(
+                    static_origin,
+                    &ok_root,
+                    SynthesizedFixedConstructorRole::FileMetadata,
+                    self.process_symbols.file_metadata.clone(),
+                    vec![
+                        SynthesizedArgument::Scalar(size),
+                        SynthesizedArgument::Dynamic(kind),
+                    ],
+                    &seats,
+                )?
             } else if operation == ken_host::HostOpV1::BufferAllocate {
                 Lowered::ResourceToken { value: detail }
             } else if operation == ken_host::HostOpV1::BufferFreeze {

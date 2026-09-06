@@ -126,6 +126,13 @@ canonical_runtime_roles! {
     file_operation_write => "OpWriteFile",
     file_operation_change_mode => "OpChangeMode",
     file_operation_append => "OpAppendFile",
+    // ABI-A2 Metadata roles append after every established positional role.
+    file_operation_metadata => "OpMetadata",
+    file_metadata => "MkFileMetadata",
+    file_kind_file => "KFile",
+    file_kind_directory => "KDirectory",
+    file_kind_symlink => "KSymlink",
+    file_kind_other => "KOther",
     // The thirteen IO errors, in the exact order the spine's vector carries them.
     // That order is the contract; the record's bytes depend on it.
     io_error_not_found => "NotFound",

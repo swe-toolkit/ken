@@ -343,7 +343,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 16] = [
+    [ken_host::HostOpV1; 17] = [
     ken_host::HostOpV1::ConsoleRead,
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
@@ -352,6 +352,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::FsReadFile,
     ken_host::HostOpV1::FsWriteFile,
     ken_host::HostOpV1::FsAppendFile,
+    ken_host::HostOpV1::FsMetadata,
     ken_host::HostOpV1::FsChangeMode,
     ken_host::HostOpV1::FsOpen,
     ken_host::HostOpV1::FsHandleMetadata,
@@ -364,7 +365,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
 
 /// The seat contract of one admitted operation at one semantic ordinal.
 ///
-/// **Total over the 16 admitted operations, with no `_` arm**, so a new
+/// **Total over the 17 admitted operations, with no `_` arm**, so a new
 /// admitted operation is a compile error here rather than an operation whose
 /// seats silently have no contract. `None` means the operation has no seat at
 /// that ordinal, which is an arity disagreement and is refused by the caller —
@@ -383,7 +384,7 @@ fn host_effect_seat_contract(
     use EffectSeatNeed as Need;
     use EffectSeatOperation as Semantic;
     // ⭐ The CAPABILITY half, kept ahead of the argument table because its
-    // population is the exact complement: the five FS-path operations require
+    // population is the exact complement: the six FS-path operations require
     // one, and every other admitted operation refuses one outright. A `None`
     // here is therefore not an arity gap but a capability the operation does
     // not admit, and the caller refuses it with the seat's own coordinates.
@@ -393,6 +394,7 @@ fn host_effect_seat_contract(
                 Op::FsReadFile
                 | Op::FsWriteFile
                 | Op::FsAppendFile
+                | Op::FsMetadata
                 | Op::FsChangeMode
                 | Op::FsOpen => Some((
                     Semantic::ObserveCapabilityToken,
@@ -415,7 +417,6 @@ fn host_effect_seat_contract(
                 | Op::ClockWallNow
                 | Op::ClockMonotonicNow
                 | Op::ClockSleepUntil
-                | Op::FsMetadata
                 | Op::FsReadDirectory
                 | Op::FsCreateDirectory
                 | Op::FsRemoveFile
@@ -483,13 +484,14 @@ fn host_effect_seat_contract(
         | (Op::FsAppendFile, 1) => Some(carried_bytes),
         // LEFT SPECIALIZED_ONLY for the direct operation consumer, and NOT
         // because the observer fails them — `D5` measured it succeeding at all
-        // five. Each operation's synthesized `FileError` separately declares
+        // six. Each operation's synthesized `FileError` separately declares
         // `SiteOperand(0)`. `RT-SITEOP-CARRIED-WITNESS` projects that exact
         // second use through the emitted byte-span helper without widening the
         // seat-wide `Avail` relation.
         (Op::FsReadFile, 0)
         | (Op::FsWriteFile, 0)
         | (Op::FsAppendFile, 0)
+        | (Op::FsMetadata, 0)
         | (Op::FsChangeMode, 0)
         | (Op::FsOpen, 0) => Some(bytes),
         (Op::FsWriteFile, 1) | (Op::FsOpen, 1) => Some(tag),
@@ -544,6 +546,7 @@ fn host_effect_seat_contract(
             | Op::FsReadFile
             | Op::FsWriteFile
             | Op::FsAppendFile
+            | Op::FsMetadata
             | Op::FsChangeMode
             | Op::FsOpen
             | Op::FsHandleMetadata
@@ -562,7 +565,6 @@ fn host_effect_seat_contract(
         (
             Op::ClockMonotonicNow
             | Op::ClockSleepUntil
-            | Op::FsMetadata
             | Op::FsReadDirectory
             | Op::FsCreateDirectory
             | Op::FsRemoveFile

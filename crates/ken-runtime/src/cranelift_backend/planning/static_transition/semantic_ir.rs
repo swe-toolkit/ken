@@ -121,12 +121,18 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ReadChunk,
     ReadResultEof,
     Unit,
-    /// ABI-A2 appends this role so established semantic identities do not move.
+    /// ABI-A2 appends these roles so established semantic identities do not move.
     FileOperationAppend,
+    FileOperationMetadata,
+    FileMetadata,
+    FileKindFile,
+    FileKindDirectory,
+    FileKindSymlink,
+    FileKindOther,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 30] = [
+    pub(super) const ALL: [Self; 36] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -157,6 +163,12 @@ impl SynthesizedFixedConstructorRole {
         Self::ReadResultEof,
         Self::Unit,
         Self::FileOperationAppend,
+        Self::FileOperationMetadata,
+        Self::FileMetadata,
+        Self::FileKindFile,
+        Self::FileKindDirectory,
+        Self::FileKindSymlink,
+        Self::FileKindOther,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -191,6 +203,12 @@ impl SynthesizedFixedConstructorRole {
             Self::ReadResultEof => &symbols.read_result_eof,
             Self::Unit => &symbols.unit,
             Self::FileOperationAppend => &symbols.file_operation_append,
+            Self::FileOperationMetadata => &symbols.file_operation_metadata,
+            Self::FileMetadata => &symbols.file_metadata,
+            Self::FileKindFile => &symbols.file_kind_file,
+            Self::FileKindDirectory => &symbols.file_kind_directory,
+            Self::FileKindSymlink => &symbols.file_kind_symlink,
+            Self::FileKindOther => &symbols.file_kind_other,
         }
     }
 }

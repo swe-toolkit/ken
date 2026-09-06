@@ -66,6 +66,12 @@ pub struct NativeProcessSymbols {
     pub bool_false: RuntimeSymbol,
     pub bool_true: RuntimeSymbol,
     pub file_operation_append: RuntimeSymbol,
+    pub file_operation_metadata: RuntimeSymbol,
+    pub file_metadata: RuntimeSymbol,
+    pub file_kind_file: RuntimeSymbol,
+    pub file_kind_directory: RuntimeSymbol,
+    pub file_kind_symlink: RuntimeSymbol,
+    pub file_kind_other: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -134,6 +140,13 @@ impl NativeProcessSymbols {
             bool_true: "ctor:prelude::Bool::True".to_string(),
             file_operation_append:
                 "ctor:prelude::FileOperation::OpAppendFile".to_string(),
+            file_operation_metadata:
+                "ctor:prelude::FileOperation::OpMetadata".to_string(),
+            file_metadata: "ctor:prelude::FileMetadata::MkFileMetadata".to_string(),
+            file_kind_file: "ctor:prelude::FileKind::KFile".to_string(),
+            file_kind_directory: "ctor:prelude::FileKind::KDirectory".to_string(),
+            file_kind_symlink: "ctor:prelude::FileKind::KSymlink".to_string(),
+            file_kind_other: "ctor:prelude::FileKind::KOther".to_string(),
         }
     }
 }
