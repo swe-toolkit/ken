@@ -1,7 +1,7 @@
 ---
 id: ABI-REVOKE-D1
 title: "authority-side lineage + admission lease + the path-side revoked error identity — wires RevocationDomain into the shared host dispatcher and turns the revoked-path oracle case green"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
