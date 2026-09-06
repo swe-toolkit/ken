@@ -3711,17 +3711,12 @@ fn check_match_with_lift(
     let mut subsumed_by: Vec<Option<usize>> = vec![None; arms.len()];
     for (ordinal, support_ctor) in support_decl.constructors.iter().enumerate() {
         let host_ctor = &host.constructors[ordinal];
-        let (arm, _) = guarded_constructor_arm(
-            cx,
-            arms,
-            host_ctor.id,
-            &mut arm_used,
-            &mut subsumed_by,
-        )
-        .ok_or_else(|| ElabError::ExhaustivenessError {
-            missing: missing_pattern_witness(cx, host_ctor.id),
-            span: span.clone(),
-        })?;
+        let (arm, _) =
+            guarded_constructor_arm(cx, arms, host_ctor.id, &mut arm_used, &mut subsumed_by)
+                .ok_or_else(|| ElabError::ExhaustivenessError {
+                    missing: missing_pattern_witness(cx, host_ctor.id),
+                    span: span.clone(),
+                })?;
         let sub_pats = match &arm.pat.kind {
             RPatKind::Ctor(_, fields) => fields,
             _ => unreachable!("arm selected by constructor guard"),
