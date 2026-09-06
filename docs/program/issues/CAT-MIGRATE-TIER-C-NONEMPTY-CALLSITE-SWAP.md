@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP
 title: "Tier-C staging P2: swap the five raw NonEmptyCons client call sites (Schema.ken.md:123,:130; ArgParse.ken.md:252; Validation.ken.md:77,:86) to nonempty_cons, still ambient. After this ZERO consumer outside NonEmpty's defining module names a raw NonEmpty constructor, which is what makes the P3 abstract flip safe (no window where a live consumer names a hidden ctor)."
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none
