@@ -121,7 +121,13 @@ side.
 - **`D2` — the promotion.** Flip `availability()` at `:140` and `:144`
   `RepresentedUnavailable → NativeTested`; add both to
   `NATIVE_TESTED_TARGETS_V1`. `native_tested_count` follows automatically —
-  do not touch it.
+  do not touch it. **And flip the native/availability status of exactly these two
+  operations in `effect_abi_v1.catalog` (`unavailable → native`)** — the ABI-R3
+  closure invariant (`abi_v1.rs:1785-1796`) requires catalog-native-status iff
+  runtime-NativeTested, so this status edit is part of the promotion, not a
+  violation of it; the generated manifest hash changes honestly because status
+  changed. Preserve every wire numeric id, record layout, arity, and
+  `operation_count`.
 - **`D3` — the negative control that proves each differential discriminates.**
   Per operation, a deliberately wrong native observation (a clock read that goes
   backwards; a console read that returns the wrong byte count for the fixture)
@@ -155,10 +161,18 @@ side.
 - **`AC-3` — the normalizer is necessary, not decorative.** Control: D4 shows an
   exact-equality differential for `ClockWallNow` failing on the correct
   implementation, so the normalization is load-bearing rather than a convenience.
-- **`AC-4` — no ABI numeric identity changes.** Control: `git diff` shows no edit
-  to `effect_abi_v1.catalog`; wire identities `0x0101` (ConsoleRead) and `0x0201`
-  (ClockWallNow) and `operation_count` are unchanged. This WP changes
-  availability, never the wire contract.
+- **`AC-4` — the wire contract is unchanged; only the two ops' availability
+  status moves (AMENDED 2026-09-06 on runtime-leader evt_390ght47rw2t9).** The
+  first cut banned every `effect_abi_v1.catalog` edit, which was wrong: the
+  catalog carries availability status, and the ABI-R3 closure
+  (`abi_v1.rs:1785-1796`) requires catalog-native-status iff runtime-NativeTested,
+  so the promotion MUST flip exactly these two ops' status there. Control: `git
+  diff` on `effect_abi_v1.catalog` shows a change to the native/availability status
+  of `ConsoleRead` and `ClockWallNow` ONLY — every wire numeric id (`0x0101`,
+  `0x0201`, all others), record layout, arity, and `operation_count` unchanged; no
+  operation added or removed. The manifest hash changing as a consequence of the
+  status change is correct, not a violation. Weakening or removing the
+  catalog↔runtime availability closure to avoid the edit is unsound and banned.
 - **`AC-5` — the derived closure stays green.** Control: the ABI-R3-style
   closure/partition tests in `effect_v1.rs` and `ken-verify/src/catalog.rs`
   stay green with `native_tested_count` now 15; no count assertion is
