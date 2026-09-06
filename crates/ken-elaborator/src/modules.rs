@@ -1295,6 +1295,10 @@ fn rewrite_rexpr_inner(
                 .map(|a| {
                     Ok(RMatchArm {
                         pat: rewrite_rpattern(scope, exports, a.pat)?,
+                        guard: a
+                            .guard
+                            .map(|guard| rewrite_rexpr(scope, exports, guard))
+                            .transpose()?,
                         body: rewrite_rexpr(scope, exports, a.body)?,
                         span: a.span,
                     })

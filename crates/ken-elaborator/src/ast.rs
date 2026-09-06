@@ -85,6 +85,8 @@ impl ExplicitDataCtor {
 #[derive(Clone, Debug)]
 pub struct MatchArm {
     pub pat: Pattern,
+    /// Optional arm-selection guard, checked at `Bool` after the pattern binds.
+    pub guard: Option<Expr>,
     pub body: Expr,
     pub span: Span,
 }

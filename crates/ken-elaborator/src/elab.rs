@@ -541,6 +541,9 @@ struct ActivePatternAlias {
     slot: usize,
     name: String,
     sentinel: usize,
+    occurrence: Term,
+    occurrence_depth: usize,
+    use_occurrence: bool,
     ty: Term,
     install_depth: usize,
 }
@@ -3708,18 +3711,12 @@ fn check_match_with_lift(
     let mut subsumed_by: Vec<Option<usize>> = vec![None; arms.len()];
     for (ordinal, support_ctor) in support_decl.constructors.iter().enumerate() {
         let host_ctor = &host.constructors[ordinal];
-        let (arm_index, arm) = arms
-            .iter()
-            .enumerate()
-            .find(|(_, arm)| {
-                matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(host_ctor.id))
-            })
-            .ok_or_else(|| ElabError::ExhaustivenessError {
-                missing: missing_pattern_witness(cx, host_ctor.id),
-                span: span.clone(),
-            })?;
-        arm_used[arm_index] = true;
-        mark_shared_ctor_subsumption(cx, arms, host_ctor.id, arm_index, &mut subsumed_by);
+        let (arm, _) =
+            guarded_constructor_arm(cx, arms, host_ctor.id, &mut arm_used, &mut subsumed_by)
+                .ok_or_else(|| ElabError::ExhaustivenessError {
+                    missing: missing_pattern_witness(cx, host_ctor.id),
+                    span: span.clone(),
+                })?;
         let sub_pats = match &arm.pat.kind {
             RPatKind::Ctor(_, fields) => fields,
             _ => unreachable!("arm selected by constructor guard"),
@@ -5626,17 +5623,15 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     let mut arm_used = Box::new(vec![false; arms.len()]);
     let mut subsumed_by = Box::new(vec![None; arms.len()]);
     for (k, ctor) in ind.constructors.iter().enumerate() {
-        let arm_idx = arms
-            .iter()
-            .position(|a| matches!(&a.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(ctor.id)));
+        let arm_selection =
+            guarded_constructor_arm(cx, arms, ctor.id, &mut arm_used, &mut subsumed_by);
+        let arm = arm_selection.as_ref().map(|(arm, _)| arm);
+        let unchanged_arm_index = arm_selection.as_ref().and_then(|(_, index)| *index);
         let n = ctor.args.len();
-        if let Some(arm_idx) = arm_idx {
-            arm_used[arm_idx] = true;
-            mark_shared_ctor_subsumption(cx, arms, ctor.id, arm_idx, &mut subsumed_by);
-            let arm = &arms[arm_idx];
+        if let Some(arm) = arm {
             let sub_pats = match &arm.pat.kind {
                 RPatKind::Ctor(_, subs) => subs.clone(),
-                _ => unreachable!("guarded by the position() match above"),
+                _ => unreachable!("guarded by the constructor-arm selection above"),
             };
             if sub_pats.len() != n {
                 return Err(ElabError::Internal(
@@ -5653,14 +5648,12 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 }
             }
         }
-        let shapes = Box::new(
-            recursive_shapes(cx.env, ctor, d_id, m).map_err(|error| {
-                ElabError::KernelRejected {
-                    error,
-                    span: span.clone(),
-                }
-            })?,
-        );
+        let shapes = Box::new(recursive_shapes(cx.env, ctor, d_id, m).map_err(|error| {
+            ElabError::KernelRejected {
+                error,
+                span: span.clone(),
+            }
+        })?);
         if shapes
             .iter()
             .any(|argument| argument.shape.as_legacy().is_none())
@@ -5670,7 +5663,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     "`match ... eqn:` does not support nested lifted methods".into(),
                 ));
             }
-            let arm_idx = arm_idx.ok_or_else(|| ElabError::ExhaustivenessError {
+            let arm = arm.ok_or_else(|| ElabError::ExhaustivenessError {
                 missing: missing_pattern_witness(cx, ctor.id),
                 span: span.clone(),
             })?;
@@ -5678,7 +5671,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 cx,
                 &ind,
                 k,
-                &arms[arm_idx],
+                arm,
                 expected,
                 &scrut_core,
                 &params_terms,
@@ -5723,8 +5716,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         let expected_here = &constructor_frame.expected_here;
         let convoy_refinements = constructor_frame.convoy_refinements.as_slice();
         let hidden_result_premise_slot = constructor_frame.hidden_result_premise_slot;
-        let method = if let Some(arm_idx) = arm_idx {
-            let arm = &arms[arm_idx];
+        let method = if let Some(arm) = arm {
             if equation_convoy && matches!(&arm.body, RExpr::RCon(name, _) if name == SUGAR_REFL) {
                 Term::Const {
                     id: cx.env.tt_id(),
@@ -5810,7 +5802,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             embedded_method_convoy,
             embedded_method_repairs,
             method,
-            arm_idx,
+            unchanged_arm_index,
             arms,
             k,
             &motive,
@@ -6995,29 +6987,59 @@ fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId) -> MissingPatternWitness 
     }
 }
 
-/// For the single-column, top-level-constructor-identity matching shape
-/// shared by `check_match_with_lift` and `check_match_dependent`: every OTHER
-/// arm in `arms` whose top-level pattern names `ctor_id` is subsumed by the
-/// arm that already claimed it (`claiming_idx`). At most one arm is ever
-/// marked as the claimant of a given constructor at these sites (the
-/// enclosing loop's `.find()`/`.position()` returns the lowest-index match),
-/// so `get_or_insert` never overwrites a prior claim.
-fn mark_shared_ctor_subsumption(
+/// Build the one branch expression selected by all source arms for a single
+/// top-level constructor. Guarded predecessors become nested conditionals;
+/// the first unguarded arm is the covering fallback and alone subsumes later
+/// arms. If no unguarded arm exists, return `None`: the caller must treat the
+/// constructor as omitted, proving it index-impossible or reporting it missing.
+#[inline(never)]
+fn guarded_constructor_arm(
     cx: &ElabCtx,
     arms: &[RMatchArm],
     ctor_id: GlobalId,
-    claiming_idx: usize,
+    arm_used: &mut [bool],
     subsumed_by: &mut [Option<usize>],
-) {
-    for (idx, arm) in arms.iter().enumerate() {
-        if idx == claiming_idx {
-            continue;
-        }
-        if matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(ctor_id))
-        {
-            subsumed_by[idx].get_or_insert(claiming_idx);
-        }
+) -> Option<(RMatchArm, Option<usize>)> {
+    let candidates = arms
+        .iter()
+        .enumerate()
+        .filter(|(_, arm)| {
+            matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(ctor_id))
+        })
+        .collect::<Vec<_>>();
+    let fallback = candidates.iter().position(|(_, arm)| arm.guard.is_none())?;
+    for (idx, _) in &candidates[..=fallback] {
+        arm_used[*idx] = true;
     }
+    let fallback_idx = candidates[fallback].0;
+    for (idx, _) in &candidates[fallback + 1..] {
+        subsumed_by[*idx].get_or_insert(fallback_idx);
+    }
+
+    let mut body = candidates[fallback].1.body.clone();
+    for (_, arm) in candidates[..fallback].iter().rev() {
+        let guard = arm
+            .guard
+            .clone()
+            .expect("every constructor predecessor before the fallback is guarded");
+        body = RExpr::RIf {
+            condition: Box::new(guard),
+            then_branch: Box::new(arm.body.clone()),
+            else_branch: Box::new(body),
+            span: arm.span.clone(),
+        };
+    }
+    let first = candidates[0];
+    let unchanged_arm_index = (fallback == 0).then_some(first.0);
+    Some((
+        RMatchArm {
+            pat: first.1.pat.clone(),
+            guard: None,
+            body,
+            span: first.1.span.clone(),
+        },
+        unchanged_arm_index,
+    ))
 }
 
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
@@ -12013,10 +12035,13 @@ fn infer_active_pattern_alias(
             name
         ))
     })?;
-    Ok((
-        pattern_alias_sentinel(alias.sentinel),
-        weaken(&alias.ty, growth as i64),
-    ))
+    let term = if alias.use_occurrence {
+        let occurrence_growth = cx.ctx.len().saturating_sub(alias.occurrence_depth);
+        weaken(&alias.occurrence, occurrence_growth as i64)
+    } else {
+        pattern_alias_sentinel(alias.sentinel)
+    };
+    Ok((term, weaken(&alias.ty, growth as i64)))
 }
 
 #[inline(never)]
@@ -12593,27 +12618,17 @@ fn build_alias_rows(
     rows
 }
 
-#[inline(never)]
-fn arm_has_pattern_aliases(cx: &ElabCtx, arm_idx: usize) -> bool {
-    let frame = cx
-        .pattern_alias_type_frames
-        .last()
-        .expect("infer_match alias-type frame must span matrix compilation");
-    frame
-        .aliases
-        .keys()
-        .chain(frame.hidden_slots.iter())
-        .any(|(candidate, _)| *candidate == arm_idx)
+struct PatternAliasLeafScope {
+    hidden_base: usize,
 }
 
 #[inline(never)]
-fn infer_pattern_alias_leaf(
+fn enter_pattern_alias_leaf(
     cx: &mut ElabCtx,
-    arm: &RMatchArm,
     arm_idx: usize,
     binding_occurrences: &[Option<Term>],
     real_depth: usize,
-) -> Result<(Term, Term), ElabError> {
+) -> PatternAliasLeafScope {
     let frame = cx
         .pattern_alias_type_frames
         .last()
@@ -12646,7 +12661,7 @@ fn infer_pattern_alias_leaf(
             .insert(
                 sentinel,
                 PatternAliasReplacement {
-                    occurrence,
+                    occurrence: occurrence.clone(),
                     real_depth,
                 },
             );
@@ -12654,6 +12669,9 @@ fn infer_pattern_alias_leaf(
             slot,
             name: alias.name,
             sentinel,
+            occurrence,
+            occurrence_depth: cx.ctx.len(),
+            use_occurrence: false,
             ty: alias.ty,
             install_depth: alias.install_depth,
         });
@@ -12670,10 +12688,73 @@ fn infer_pattern_alias_leaf(
         }
     }
     cx.active_pattern_aliases.push(active_aliases);
-    let inferred_body = infer(cx, &arm.body);
+    PatternAliasLeafScope { hidden_base }
+}
+
+fn leave_pattern_alias_leaf(cx: &mut ElabCtx, scope: PatternAliasLeafScope) {
     cx.active_pattern_aliases.pop();
-    cx.hidden_positions.truncate(hidden_base);
-    inferred_body
+    cx.hidden_positions.truncate(scope.hidden_base);
+}
+
+fn use_direct_pattern_alias_occurrences(cx: &mut ElabCtx, direct: bool) {
+    for alias in cx
+        .active_pattern_aliases
+        .last_mut()
+        .expect("a matrix-leaf alias region is active")
+    {
+        alias.use_occurrence = direct;
+    }
+}
+
+#[inline(never)]
+fn infer_arm_at_matrix_leaf(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    arm_idx: usize,
+    binding_occurrences: &[Option<Term>],
+    real_depth: usize,
+) -> Result<(Option<Term>, Term, Term), ElabError> {
+    let scope = enter_pattern_alias_leaf(cx, arm_idx, binding_occurrences, real_depth);
+    let result = (|| {
+        use_direct_pattern_alias_occurrences(cx, true);
+        let guard_result = arm
+            .guard
+            .as_ref()
+            .map(|guard| elaborate_if_condition(cx, guard))
+            .transpose();
+        use_direct_pattern_alias_occurrences(cx, false);
+        let guard = guard_result?;
+        let (body, body_ty) = infer(cx, &arm.body)?;
+        Ok((guard, body, body_ty))
+    })();
+    leave_pattern_alias_leaf(cx, scope);
+    result
+}
+
+#[inline(never)]
+fn check_arm_at_matrix_leaf(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    arm_idx: usize,
+    binding_occurrences: &[Option<Term>],
+    real_depth: usize,
+    expected: &Term,
+) -> Result<(Option<Term>, Term), ElabError> {
+    let scope = enter_pattern_alias_leaf(cx, arm_idx, binding_occurrences, real_depth);
+    let result = (|| {
+        use_direct_pattern_alias_occurrences(cx, true);
+        let guard_result = arm
+            .guard
+            .as_ref()
+            .map(|guard| elaborate_if_condition(cx, guard))
+            .transpose();
+        use_direct_pattern_alias_occurrences(cx, false);
+        let guard = guard_result?;
+        let body = check(cx, &arm.body, expected, &arm.body.span())?;
+        Ok((guard, body))
+    })();
+    leave_pattern_alias_leaf(cx, scope);
+    result
 }
 
 fn pattern_without_aliases(mut pattern: &RPattern) -> &RPattern {
@@ -12681,6 +12762,29 @@ fn pattern_without_aliases(mut pattern: &RPattern) -> &RPattern {
         pattern = inner;
     }
     pattern
+}
+
+fn guarded_leaf_missing_witness(pattern: &RPattern) -> MissingPatternWitness {
+    match &pattern.kind {
+        RPatKind::Ctor(name, fields) => MissingPatternWitness {
+            constructor: name.clone(),
+            arity: fields.len(),
+        },
+        RPatKind::As(inner, _, _) => guarded_leaf_missing_witness(inner),
+        RPatKind::Or(alternatives) => alternatives
+            .first()
+            .map(guarded_leaf_missing_witness)
+            .unwrap_or_else(|| MissingPatternWitness {
+                constructor: "_".into(),
+                arity: 0,
+            }),
+        RPatKind::Tuple(_) | RPatKind::Record(_) | RPatKind::Wild | RPatKind::Var(_, _) => {
+            MissingPatternWitness {
+                constructor: "_".into(),
+                arity: 0,
+            }
+        }
+    }
 }
 
 /// The type every raw method built from `col_types`/`col_kinds` (a suffix of
@@ -13147,6 +13251,98 @@ fn prepare_current_or_rows(cx: &mut ElabCtx, rows: Vec<RowState>) -> Vec<RowStat
     }
 }
 
+/// Compile one matrix leaf. Keeping guard-only vectors and conditionals in a
+/// non-recursive frame preserves the existing recursive matrix stack budget.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn compile_match_leaf(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    rows: &[RowState],
+    real_depth_so_far: usize,
+    top_span: &Span,
+    ret_ty_slot: &mut Option<Term>,
+    arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
+) -> Result<Term, ElabError> {
+    // Rows are in source order and every pattern matched this path. Guarded
+    // rows may select but never close it. Or expansion can duplicate one
+    // source arm at a leaf, so coalesce by arm id before building the chain.
+    let mut candidates = Vec::new();
+    let mut seen = HashSet::new();
+    for row in rows {
+        if seen.insert(row.arm_idx) {
+            candidates.push(row);
+        }
+    }
+    let fallback = candidates
+        .iter()
+        .position(|row| arms[row.arm_idx].guard.is_none())
+        .ok_or_else(|| ElabError::ExhaustivenessError {
+            missing: guarded_leaf_missing_witness(&arms[candidates[0].arm_idx].pat),
+            span: top_span.clone(),
+        })?;
+
+    // Only the first unguarded fallback covers and subsumes. Every guarded
+    // predecessor remains reachable because each may select its own body.
+    for row in &candidates[..=fallback] {
+        arm_used[row.arm_idx] = true;
+    }
+    let winner = candidates[fallback].arm_idx;
+    for shadowed in &candidates[fallback + 1..] {
+        if shadowed.arm_idx == winner {
+            continue;
+        }
+        let entry = &mut subsumed_by[shadowed.arm_idx];
+        if !entry.contains(&winner) {
+            entry.push(winner);
+        }
+    }
+
+    let first_row = candidates[0];
+    let first_occurrences = first_row.leaf_binding_occurrences().to_vec();
+    let (first_guard, first_body, body_ty_ctx) = infer_arm_at_matrix_leaf(
+        cx,
+        &arms[first_row.arm_idx],
+        first_row.arm_idx,
+        &first_occurrences,
+        real_depth_so_far,
+    )?;
+    let mut branches = vec![(first_row.arm_idx, first_guard, first_body)];
+    for row in &candidates[1..=fallback] {
+        let occurrences = row.leaf_binding_occurrences().to_vec();
+        let (guard, body) = check_arm_at_matrix_leaf(
+            cx,
+            &arms[row.arm_idx],
+            row.arm_idx,
+            &occurrences,
+            real_depth_so_far,
+            &body_ty_ctx,
+        )?;
+        branches.push((row.arm_idx, guard, body));
+    }
+    let (_, fallback_guard, mut body_core) = branches
+        .pop()
+        .expect("a covering leaf has an unguarded fallback");
+    debug_assert!(fallback_guard.is_none());
+    for (arm_idx, guard, body) in branches.into_iter().rev() {
+        body_core = make_if_elim(
+            cx,
+            guard.expect("only the final covering branch is unguarded"),
+            body,
+            body_core,
+            &body_ty_ctx,
+            &arms[arm_idx].span,
+        )?;
+    }
+    if ret_ty_slot.is_none() {
+        let zonked = cx.metas.zonk_term(&body_ty_ctx);
+        let lowered = lower_by(&zonked, real_depth_so_far).unwrap_or(zonked);
+        *ret_ty_slot = Some(lowered);
+    }
+    Ok(body_core)
+}
+
 /// Compile the pattern matrix `col_types`/`col_kinds` (aligned; `Real`
 /// columns are matched against `rows[_].real_pats`, `Ih` columns are
 /// synthetic and never touch row patterns) down to a nested-`elim_D` method
@@ -13172,39 +13368,16 @@ fn compile_match_matrix(
     subsumed_by: &mut [Vec<usize>],
 ) -> Result<Term, ElabError> {
     if col_types.is_empty() {
-        // Leaf: the first row in preserved (first-match-wins) order claims
-        // this path; any others are shadowed here (possibly still reachable
-        // via a different expansion elsewhere — checked globally by the
-        // caller via `arm_used`). Record each shadowed row's winner at THIS
-        // leaf into `subsumed_by` -- the same information the caller's final
-        // `arm_used` sweep needs, captured where it is already in hand
-        // rather than re-derived by a second walk. A wildcard/variable row
-        // can reach more than one leaf (expanded into every constructor
-        // bucket in `build_ctor_buckets`), so a dead arm can accumulate more
-        // than one distinct subsuming winner across the whole compile;
-        // dedup so repeats across leaves don't inflate the reported set.
-        let winner = rows[0].arm_idx;
-        arm_used[winner] = true;
-        for shadowed in &rows[1..] {
-            let entry = &mut subsumed_by[shadowed.arm_idx];
-            if !entry.contains(&winner) {
-                entry.push(winner);
-            }
-        }
-        let arm = &arms[winner];
-        let binding_occurrences = rows[0].leaf_binding_occurrences();
-        let inferred_body = if arm_has_pattern_aliases(cx, winner) {
-            infer_pattern_alias_leaf(cx, arm, winner, binding_occurrences, real_depth_so_far)
-        } else {
-            infer(cx, &arm.body)
-        };
-        let (body_core, body_ty_ctx) = inferred_body?;
-        if ret_ty_slot.is_none() {
-            let zonked = cx.metas.zonk_term(&body_ty_ctx);
-            let lowered = lower_by(&zonked, real_depth_so_far).unwrap_or(zonked);
-            *ret_ty_slot = Some(lowered);
-        }
-        return Ok(body_core);
+        return compile_match_leaf(
+            cx,
+            arms,
+            &rows,
+            real_depth_so_far,
+            top_span,
+            ret_ty_slot,
+            arm_used,
+            subsumed_by,
+        );
     }
 
     match col_kinds[0] {

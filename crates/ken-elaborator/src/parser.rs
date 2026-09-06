@@ -2349,11 +2349,18 @@ impl Parser {
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
             let arm_start = self.peek_span().start;
             let pat = self.parse_pattern()?;
+            let guard = if matches!(self.peek(), Token::KwIf) {
+                self.advance();
+                Some(self.parse_expr()?)
+            } else {
+                None
+            };
             self.expect(&Token::MapsTo)?;
             let body = self.parse_expr()?;
             let arm_end = body.span().end;
             arms.push(MatchArm {
                 pat,
+                guard,
                 body,
                 span: Span::new(arm_start, arm_end),
             });
