@@ -504,6 +504,22 @@ struct MatrixAliasType {
     install_depth: usize,
 }
 
+#[derive(Clone, Debug)]
+struct OrBinderTypeMismatch {
+    name: String,
+    span: Span,
+}
+
+fn or_binder_type_error(mismatch: OrBinderTypeMismatch) -> ElabError {
+    ElabError::TypeMismatch {
+        span: mismatch.span,
+        reason: format!(
+            "or-pattern binder '{}' must have definitionally equal types in the common pre-branch context; use separate arms",
+            mismatch.name
+        ),
+    }
+}
+
 struct PatternAliasTypeFrame {
     aliases: HashMap<(usize, usize), MatrixAliasType>,
     /// Only slots originating inside `RPatKind::Or` require cross-alternative
@@ -513,6 +529,7 @@ struct PatternAliasTypeFrame {
     /// The context depth at the matrix column where each or-slot's residual
     /// row was duplicated. This is the exact common pre-branch context.
     or_common_depths: HashMap<(usize, usize), usize>,
+    type_mismatch: Option<OrBinderTypeMismatch>,
     /// Occurrence-backed variables and anonymous wildcards are lexical aliases,
     /// not core binders. Their per-leaf core positions must be hidden while the
     /// shared arm body is elaborated.
@@ -740,7 +757,15 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             Ok(Term::app(f_k, a_k))
         }
 
-        RType::RVarTy(i, _, _) => Ok(Term::var(*i)),
+        RType::RVarTy(index, name, span) => cx
+            .surface_var(*index)
+            .map(|(_, actual_index)| Term::var(actual_index))
+            .ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "type variable '{}' at {}-{} is out of range",
+                    name, span.start, span.end
+                ))
+            }),
         RType::RPatternAliasTy(slot, name, _) => {
             infer_active_pattern_alias(cx, *slot, name).map(|(term, _)| term)
         }
@@ -12003,9 +12028,13 @@ fn finish_pattern_alias_frame(
         .pattern_alias_replacement_frames
         .pop()
         .expect("infer_match replacement frame must balance");
-    cx.pattern_alias_type_frames
+    let type_frame = cx
+        .pattern_alias_type_frames
         .pop()
         .expect("infer_match alias-type frame must balance");
+    if let Some(mismatch) = type_frame.type_mismatch {
+        return Err(or_binder_type_error(mismatch));
+    }
     let raw_methods = raw_methods_result?;
     if replacements.is_empty() {
         return Ok(raw_methods);
@@ -12025,9 +12054,13 @@ fn finish_pattern_alias_term_frame(
         .pattern_alias_replacement_frames
         .pop()
         .expect("infer_match replacement frame must balance");
-    cx.pattern_alias_type_frames
+    let type_frame = cx
+        .pattern_alias_type_frames
         .pop()
         .expect("infer_match alias-type frame must balance");
+    if let Some(mismatch) = type_frame.type_mismatch {
+        return Err(or_binder_type_error(mismatch));
+    }
     let body = body_result?;
     if replacements.is_empty() {
         return Ok(body);
@@ -12377,7 +12410,7 @@ fn install_matrix_alias_type(
     slot: usize,
     alias: MatrixAliasType,
     span: &Span,
-) -> Result<(), ElabError> {
+) {
     let frame = cx
         .pattern_alias_type_frames
         .last()
@@ -12396,7 +12429,7 @@ fn install_matrix_alias_type(
                 .expect("alias-type frame remains installed")
                 .aliases
                 .insert((arm_idx, slot), alias);
-            return Ok(());
+            return;
         }
         let common_depth = *cx
             .pattern_alias_type_frames
@@ -12422,22 +12455,22 @@ fn install_matrix_alias_type(
             _ => false,
         };
         if !equal {
-            return Err(ElabError::TypeMismatch {
+            let frame = cx
+                .pattern_alias_type_frames
+                .last_mut()
+                .expect("alias-type frame remains installed");
+            frame.type_mismatch.get_or_insert(OrBinderTypeMismatch {
+                name: alias.name,
                 span: span.clone(),
-                reason: format!(
-                    "or-pattern binder '{}' must have definitionally equal types in the common pre-branch context; use separate arms",
-                    alias.name
-                ),
             });
         }
-        return Ok(());
+        return;
     }
     cx.pattern_alias_type_frames
         .last_mut()
         .expect("alias-type frame remains installed")
         .aliases
         .insert((arm_idx, slot), alias);
-    Ok(())
 }
 
 #[inline(never)]
@@ -12445,7 +12478,7 @@ fn expose_current_pattern_aliases(
     cx: &mut ElabCtx,
     mut row: RowState,
     current_ty: &Term,
-) -> Result<RowState, ElabError> {
+) -> RowState {
     loop {
         let span = row.real_pats[0].span.clone();
         let (inner, name, slot, occurrence_var) = match row.real_pats[0].kind.clone() {
@@ -12485,7 +12518,7 @@ fn expose_current_pattern_aliases(
                     install_depth: cx.ctx.len(),
                 },
                 &span,
-            )?;
+            );
         }
         row = row.bind_current_occurrence_at(slot);
         if occurrence_var {
@@ -12493,7 +12526,7 @@ fn expose_current_pattern_aliases(
         }
         row.real_pats[0] = inner;
     }
-    Ok(row)
+    row
 }
 
 fn collect_or_pattern_slots(pattern: &RPattern, inside_or: bool, slots: &mut HashSet<usize>) {
@@ -12532,7 +12565,7 @@ fn build_alias_rows(
     arms: &[RMatchArm],
     scrut_core: &Term,
     scrut_ty: &Term,
-) -> Result<Vec<RowState>, ElabError> {
+) -> Vec<RowState> {
     let mut or_slots = HashSet::new();
     for (arm_idx, arm) in arms.iter().enumerate() {
         let mut slots = HashSet::new();
@@ -12543,6 +12576,7 @@ fn build_alias_rows(
         aliases: HashMap::new(),
         or_slots,
         or_common_depths: HashMap::new(),
+        type_mismatch: None,
         hidden_slots: HashSet::new(),
     });
     cx.pattern_alias_replacement_frames.push(HashMap::new());
@@ -12554,16 +12588,9 @@ fn build_alias_rows(
             binding_occurrences: Vec::new(),
             arm_idx: i,
         };
-        match expose_current_pattern_aliases(cx, row, scrut_ty) {
-            Ok(row) => rows.push(row),
-            Err(error) => {
-                cx.pattern_alias_type_frames.pop();
-                cx.pattern_alias_replacement_frames.pop();
-                return Err(error);
-            }
-        }
+        rows.push(expose_current_pattern_aliases(cx, row, scrut_ty));
     }
-    Ok(rows)
+    rows
 }
 
 #[inline(never)]
@@ -12732,13 +12759,13 @@ fn compile_tuple_column(
             .into_iter()
             .map(RowState::enter_current_real_binder)
             .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect();
     }
     let pair_occurrence = rows[0].real_occurrences[0].term.clone();
 
     let mut component_rows = Vec::with_capacity(rows.len());
     for row in rows {
-        let row = expose_current_pattern_aliases(cx, row, &col_types[0])?;
+        let row = expose_current_pattern_aliases(cx, row, &col_types[0]);
         match row.real_pats[0].kind.clone() {
             RPatKind::Tuple(components) if components.len() >= 2 => {
                 let first = components[0].clone();
@@ -12960,13 +12987,13 @@ fn compile_record_column(
             .into_iter()
             .map(RowState::enter_current_real_binder)
             .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect();
     }
     let record_occurrence = rows[0].real_occurrences[0].term.clone();
 
     let mut field_rows = Vec::with_capacity(rows.len());
     for row in rows {
-        let row = expose_current_pattern_aliases(cx, row, &col_types[0])?;
+        let row = expose_current_pattern_aliases(cx, row, &col_types[0]);
         match row.real_pats[0].kind.clone() {
             RPatKind::Record(fields) => {
                 let (patterns, source_bindings) =
@@ -13081,6 +13108,7 @@ fn expanding_or_slots(pattern: &RPattern) -> Option<HashSet<usize>> {
     }
 }
 
+#[inline(never)]
 fn expand_current_or_rows(cx: &mut ElabCtx, rows: Vec<RowState>) -> Vec<RowState> {
     let mut expanded = Vec::new();
     for row in rows {
@@ -13105,6 +13133,18 @@ fn expand_current_or_rows(cx: &mut ElabCtx, rows: Vec<RowState>) -> Vec<RowState
         }
     }
     expanded
+}
+
+#[inline(never)]
+fn prepare_current_or_rows(cx: &mut ElabCtx, rows: Vec<RowState>) -> Vec<RowState> {
+    if rows
+        .iter()
+        .any(|row| expanding_or_slots(&row.real_pats[0]).is_some())
+    {
+        expand_current_or_rows(cx, rows)
+    } else {
+        rows
+    }
 }
 
 /// Compile the pattern matrix `col_types`/`col_kinds` (aligned; `Real`
@@ -13219,7 +13259,7 @@ fn compile_match_matrix(
             // retains the same arm id and the same aligned occurrence, so the
             // existing leaf winner accounting computes union coverage and
             // whole-arm reachability without a parallel matrix carrier.
-            let rows = expand_current_or_rows(cx, rows);
+            let rows = prepare_current_or_rows(cx, rows);
             let has_record = rows.iter().any(|row| {
                 matches!(
                     pattern_without_aliases(&row.real_pats[0]).kind,
@@ -13281,25 +13321,12 @@ fn compile_match_matrix(
                     cx.hidden_positions.push(cx.ctx.len() - 1);
                 }
                 let current_ty = weaken(&col_types[0], 1);
-                let new_rows_result = rows
+                let new_rows: Vec<RowState> = rows
                     .into_iter()
                     .map(RowState::enter_current_real_binder)
-                    .map(|row| {
-                        expose_current_pattern_aliases(cx, row, &current_ty)
-                            .map(|row| row.bind_current_occurrence().drop_current_column())
-                    })
-                    .collect::<Result<Vec<_>, _>>();
-                let new_rows = match new_rows_result {
-                    Ok(rows) => rows,
-                    Err(error) => {
-                        if !surface_binder {
-                            let hidden = cx.hidden_positions.pop();
-                            debug_assert_eq!(hidden, Some(cx.ctx.len() - 1));
-                        }
-                        cx.ctx.pop();
-                        return Err(error);
-                    }
-                };
+                    .map(|row| expose_current_pattern_aliases(cx, row, &current_ty))
+                    .map(|row| row.bind_current_occurrence().drop_current_column())
+                    .collect();
                 let inner = compile_match_matrix(
                     cx,
                     arms,
@@ -13343,7 +13370,7 @@ fn compile_match_matrix(
                 .into_iter()
                 .map(RowState::enter_current_real_binder)
                 .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect();
             let raw_methods = build_ctor_buckets(
                 cx,
                 arms,
@@ -13555,7 +13582,7 @@ fn infer_tuple_match(
         });
     }
 
-    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty)?;
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
     #[cfg(test)]
     MATCH_OCCURRENCE_TRACE.with(|trace| {
         if let Some(trace) = trace.borrow_mut().as_mut() {
@@ -13636,7 +13663,7 @@ fn infer_record_match(
 
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
     record_pattern_projection(cx, &scrut_ty, span)?;
-    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty)?;
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
     #[cfg(test)]
     MATCH_OCCURRENCE_TRACE.with(|trace| {
         if let Some(trace) = trace.borrow_mut().as_mut() {
@@ -13694,6 +13721,11 @@ fn top_pattern_contains_or(pattern: &RPattern) -> bool {
         RPatKind::As(inner, _, _) => top_pattern_contains_or(inner),
         _ => false,
     }
+}
+
+#[inline(never)]
+fn arms_have_top_or(arms: &[RMatchArm]) -> bool {
+    arms.iter().any(|arm| top_pattern_contains_or(&arm.pat))
 }
 
 fn top_pattern_is_catchall(pattern: &RPattern) -> bool {
@@ -13779,7 +13811,7 @@ fn infer_or_match(
         None
     };
 
-    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty)?;
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
     let mut ret_ty_slot = None;
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by = vec![Vec::new(); arms.len()];
@@ -13838,7 +13870,7 @@ fn infer_match(
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
     }
-    if arms.iter().any(|arm| top_pattern_contains_or(&arm.pat)) {
+    if arms_have_top_or(arms) {
         return infer_or_match(cx, scrut, arms, span);
     }
     if arms
@@ -13900,7 +13932,7 @@ fn infer_match(
     //    compile it via the pattern-matrix algorithm (`34-data-match.md
     //    §3.1`): column-by-column, splitting on constructors, recursing on
     //    the residual matrix under each constructor's freshly-bound fields.
-    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty)?;
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
 
     #[cfg(test)]
     MATCH_OCCURRENCE_TRACE.with(|trace| {

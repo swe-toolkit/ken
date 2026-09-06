@@ -166,6 +166,27 @@ fn definitionally_equal_common_context_binder_types_are_accepted() {
 }
 
 #[test]
+fn common_context_includes_prior_dependent_pattern_columns() {
+    // MEASURED: the repeated binder type is the Sigma codomain's reference to
+    // the earlier `carrier` column, and both alternatives accept it before any
+    // alternative-specific refinement. CLAIMED: "common pre-branch" means the
+    // context at the or-column, not only the context before the whole match.
+    let mut env = ElabEnv::new().expect("base environment");
+    elaborate(
+        &mut env,
+        "const or_dependent_pair : (carrier : Type) × carrier = (Nat, Suc Zero)",
+    );
+    let selected = elaborate(
+        &mut env,
+        "const or_dependent_selected : Nat = match or_dependent_pair { \
+         (carrier, (element | element)) |-> \
+         let checked : carrier = element in Zero }",
+    );
+    let zero = constructor(env.globals["Zero"], []);
+    assert_eq!(whnf(&env.env, &Context::new(), &body(&env, selected)), zero);
+}
+
+#[test]
 fn unequal_common_context_binder_types_require_separate_arms() {
     // MEASURED: the same name receives Nat and Bool under distinct alternatives
     // and selects the specific common-context diagnostic. CLAIMED: branch-local
@@ -174,7 +195,7 @@ fn unequal_common_context_binder_types_require_separate_arms() {
     elaborate(&mut env, "data OrDifferent = OrNat Nat | OrBool Bool");
     match env.elaborate_decl(
         "const bad_types : Nat = match OrNat Zero { \
-         OrNat payload | OrBool payload |-> Zero }",
+         OrNat payload | OrBool payload |-> payload }",
     ) {
         Err(ElabError::TypeMismatch { reason, .. }) => assert_eq!(
             reason,
