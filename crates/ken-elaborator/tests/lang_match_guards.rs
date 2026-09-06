@@ -5,7 +5,7 @@
 //! reachability exceptions. A guard never contributes type refinement.
 
 use ken_elaborator::lossless::parse_lossless;
-use ken_elaborator::{error::ElabError, ArmDeadCause, ElabEnv};
+use ken_elaborator::{error::ElabError, ArmDeadCause, Decl, ElabEnv, Expr};
 use ken_kernel::{whnf, Context, GlobalId, Term};
 
 fn elaborate(env: &mut ElabEnv, source: &str) -> GlobalId {
@@ -114,15 +114,25 @@ fn guard_and_body_use_the_dependent_constructor_context() {
          match value { GuardNat flag payload if flag |-> payload ; \
          GuardNat _ payload |-> payload ; GuardBool flag |-> flag }",
     );
-    let selected = elaborate(
+    let selected_false = elaborate(
         &mut env,
-        "const guarded_index_selected : Nat = \
+        "const guarded_index_false : Nat = \
          guarded_index Nat (GuardNat False (Suc Zero))",
     );
+    let selected_true = elaborate(
+        &mut env,
+        "const guarded_index_true : Nat = \
+         guarded_index Nat (GuardNat True (Suc Zero))",
+    );
     let zero = constructor(env.globals["Zero"], []);
+    let one = constructor(env.globals["Suc"], [zero]);
     assert_eq!(
-        whnf(&env.env, &Context::new(), &body(&env, selected)),
-        constructor(env.globals["Suc"], [zero])
+        whnf(&env.env, &Context::new(), &body(&env, selected_false)),
+        one
+    );
+    assert_eq!(
+        whnf(&env.env, &Context::new(), &body(&env, selected_true)),
+        one
     );
 }
 
@@ -308,8 +318,29 @@ fn guarded_top_wildcard_and_variable_remain_refused() {
 }
 
 #[test]
-fn guarded_arm_round_trips_losslessly() {
-    let source = "const kept : Nat = match True { True if if False then True else True |-> Zero ; False |-> Zero } -- guard\n";
+fn guarded_arm_round_trips_and_owns_guard_trivia_losslessly() {
+    let source = "const kept : Nat = match True { True if if False {- guard -} then True else True |-> Zero ; False |-> Zero }\n";
     let parsed = parse_lossless(source).expect("full conditional guard parses losslessly");
     assert_eq!(parsed.reconstruct(), source);
+    let condition_span = match &parsed.typed_decls()[0] {
+        Decl::ViewDecl {
+            body: Expr::EMatch { arms, .. },
+            ..
+        } => match arms[0].guard.as_ref().expect("first arm has a guard") {
+            Expr::EIf { condition, .. } => condition.span().clone(),
+            other => panic!("expected a full conditional guard, got {other:?}"),
+        },
+        other => panic!("expected a match declaration, got {other:?}"),
+    };
+    let attachment = parsed
+        .comment_attachments()
+        .iter()
+        .find(|attachment| {
+            &source[attachment.comment_span.start..attachment.comment_span.end] == "{- guard -}"
+        })
+        .expect("guard comment is retained");
+    assert_eq!(
+        attachment.home_span, condition_span,
+        "the guard condition must remain in the lossless AST traversal"
+    );
 }
