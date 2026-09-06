@@ -1045,6 +1045,7 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 crate::ResourceErrorV1::InvalidBounds => reply.detail = 7,
                 crate::ResourceErrorV1::NoProgress => reply.detail = 8,
                 crate::ResourceErrorV1::AllocationFailed => reply.detail = 9,
+                crate::ResourceErrorV1::Revoked => reply.detail = 10,
             }
         }
         CanonicalOutcomeV1::Error(error) => {
@@ -1168,6 +1169,7 @@ fn decode_resource_error_reply(
         7 if all_zero => Some(crate::ResourceErrorV1::InvalidBounds),
         8 if all_zero => Some(crate::ResourceErrorV1::NoProgress),
         9 if all_zero => Some(crate::ResourceErrorV1::AllocationFailed),
+        10 if all_zero => Some(crate::ResourceErrorV1::Revoked),
         _ => None,
     }
 }
@@ -1543,7 +1545,7 @@ mod tests {
         };
         let (_, identity) = context
             .resources
-            .insert_fs_handle(owner, crate::RightSet::METADATA);
+            .insert_fs_handle_without_provenance_for_test(owner, crate::RightSet::METADATA);
         let close_calls = std::cell::Cell::new(0);
         context.finalize_resources_with(|owner| {
             close_calls.set(close_calls.get() + 1);
@@ -1630,7 +1632,7 @@ mod tests {
         });
         let (_, identity) = context
             .resources
-            .insert_fs_handle(owner, crate::RightSet::METADATA);
+            .insert_fs_handle_without_provenance_for_test(owner, crate::RightSet::METADATA);
 
         let raw = Box::into_raw(context) as *mut c_void;
         // SAFETY: `raw` is a uniquely-owned, freshly-boxed, properly aligned
