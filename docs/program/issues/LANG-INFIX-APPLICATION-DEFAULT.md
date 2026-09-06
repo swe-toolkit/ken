@@ -29,15 +29,42 @@ origin: "Architect scope ruling evt_1s7mqjg4tyxx1 (2026-08-15), part (ii) of his
 ## Treat every anchor here as perishable
 
 If a fixed input is false against the landed code, **say so and escalate — do
-not quietly build around it.** Measured at `e6d2716cf`.
+not quietly build around it.**
+
+> ### ANCHOR REFRESH 2026-09-06 (Steward). The ring did exactly this.
+>
+> The first cut at `5c055b4c9` found the frame's original anchors (measured at
+> `e6d2716cf`) stale and hard-stopped rather than building around them. The
+> anchors below are **re-measured at `5c055b4c9`** and confirmed by the Steward:
+>
+> - **There is no `ken-parser` crate.** Parsing lives in
+>   `crates/ken-elaborator/src/parser.rs`; the only affected package is
+>   `ken-elaborator`. `AC-5` and the `wp/` pointer's file scope are corrected
+>   accordingly — the local gate is `-p ken-elaborator` only, and the edit
+>   surface is `parser.rs` + `ast.rs`, **not** `src/elab.rs`.
+> - **Cascade:** `parse_expr:2025` → `parse_arrow_expr:2056` →
+>   `parse_infix_expr:2093` → `parse_additive_expr:2111` →
+>   `parse_multiplicative_expr:2132` → `parse_app_expr:2148`. The one-level
+>   insertion for `infixl 9` goes **between multiplicative (`:2132`) and
+>   application (`:2148`)** and is mechanically available — no restructuring.
+> - **`BinOp`** is at `ast.rs:577`, members `{Add, WrappingAdd, Sub, Mul,
+>   EqEq}`. Do not widen it.
+> - **Grammar:** `expr binop expr` at `32-grammar.md:215`; the normative
+>   `default infixl 9` at `:389`.
+> - `Token::Operator(String)` already parses as an ordinary `EVar` atom, so the
+>   prefix path `<+> a b` exists today — infix is notation over it.
+>
+> This is a pure anchor refresh: the design, scope, and Architect ruling are
+> unchanged, so no re-ruling is owed. The line numbers below in `D1` are
+> superseded by this block.
 
 ## What this is
 
-`spec/30-surface/32-grammar.md:199` carries the production:
+`spec/30-surface/32-grammar.md:215` carries the production:
 
 > `| expr binop expr -- operators (declared fixity)`
 
-and `32-grammar.md:373` supplies the default normatively:
+and `32-grammar.md:389` supplies the default normatively:
 
 > user operators take declared fixity (`infixl`/`infixr`/`infix N`, **default
 > `infixl 9`**)
@@ -50,7 +77,7 @@ and that is what makes it separable.
 
 The Steward withheld a fixture pinning `infixl 9` on the reasoning that it
 would freeze a default the pending ruling might change. **It does not.**
-`:373` states the default normatively, and the Architect's ruling
+`:389` states the default normatively, and the Architect's ruling
 (`evt_1s7mqjg4tyxx1`) confirmed that *declared fixity exists* rather than
 revisiting what the default is.
 
@@ -59,8 +86,10 @@ revisiting what the default is.
 ## Deliverables
 
 **`D1` — parse `a <+> b` as application of `<+>` to `a` and `b`.** At one
-precedence level in the existing recursive-descent cascade
-(`parser.rs:1994` → `:2012` → `:2032`), at the default binding power.
+precedence level in the existing recursive-descent cascade, inserted between
+`parse_multiplicative_expr` (`parser.rs:2132`) and `parse_app_expr` (`:2148`),
+at the default binding power. (Anchors refreshed above; the mechanical
+availability of this insertion is confirmed at `5c055b4c9`.)
 
 **`D2` — state where in the cascade you put it, and why.** `infixl 9` is
 tighter than the arithmetic operators the cascade already implements under the
@@ -93,7 +122,8 @@ which is exactly where a silent reassociation would hide.**
 accepted becomes rejected. **If anything does, stop.**
 
 **`AC-5`.** No-regression, in CI (`COORDINATION §12`). Targeted locally:
-`-p ken-parser`, `-p ken-elaborator`.
+`-p ken-elaborator` (the only affected package; there is no `ken-parser`
+crate).
 
 ## AT THIS NODE'S MERGE DECISION: PING THE ARCHITECT. Do not let this drop.
 
@@ -114,5 +144,5 @@ worst moment.
   `infixl 9` here. That is [[LANG-FIXITY-DECL-SURFACE]].
 - **Do not change the arithmetic ordering.** It is landed and normative under
   the same sentence that settles this feature's existence.
-- **Do not widen `BinOp`** (`ast.rs:558`). A user operator is an ordinary
+- **Do not widen `BinOp`** (`ast.rs:577`). A user operator is an ordinary
   function applied infix, not a new built-in.
