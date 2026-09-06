@@ -7801,10 +7801,19 @@ mod px7l_tests {
                 &family("FileOperation"),
                 "Metadata",
             ),
-            file_metadata: StableSymbol::constructor(&family("FileMetadata"), "Metadata"),
+            file_metadata: StableSymbol::constructor(
+                &family("FileMetadata"),
+                "Metadata",
+            ),
             file_kind_file: StableSymbol::constructor(&family("FileKind"), "File"),
-            file_kind_directory: StableSymbol::constructor(&family("FileKind"), "Directory"),
-            file_kind_symlink: StableSymbol::constructor(&family("FileKind"), "Symlink"),
+            file_kind_directory: StableSymbol::constructor(
+                &family("FileKind"),
+                "Directory",
+            ),
+            file_kind_symlink: StableSymbol::constructor(
+                &family("FileKind"),
+                "Symlink",
+            ),
             file_kind_other: StableSymbol::constructor(&family("FileKind"), "Other"),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),

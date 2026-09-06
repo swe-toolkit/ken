@@ -282,7 +282,10 @@ impl fmt::Display for FsMetadataDifferentialError {
                 lane,
                 event,
                 reason,
-            } => write!(formatter, "{lane} FsMetadata event {event} shape: {reason}"),
+            } => write!(
+                formatter,
+                "{lane} FsMetadata event {event} shape: {reason}"
+            ),
             Self::Field {
                 lane,
                 event,
@@ -851,12 +854,15 @@ fn validate_fs_metadata_observation(
     paths: &[(&[u8], &[u8])],
     expected: &[ken_host::FileMetadataV1],
 ) -> Result<(), FsMetadataDifferentialError> {
-    if observation.effect_trace.len() != paths.len() || expected.len() != paths.len() {
+    if observation.effect_trace.len() != paths.len()
+        || expected.len() != paths.len()
+    {
         return Err(FsMetadataDifferentialError::Shape {
             lane,
             event: 0,
             reason: format!(
-                "expected {} events and metadata rows, observed {} events and {} rows",
+                "expected {} events and metadata rows, observed {} events and \
+                 {} rows",
                 paths.len(),
                 observation.effect_trace.len(),
                 expected.len()
@@ -886,7 +892,8 @@ fn validate_fs_metadata_observation(
             return Err(FsMetadataDifferentialError::Shape {
                 lane,
                 event: index,
-                reason: "event is not the exact capability/request shape".to_string(),
+                reason: "event is not the exact capability/request shape"
+                    .to_string(),
             });
         }
         let ken_host::CanonicalOutcomeV1::Success(
@@ -904,7 +911,10 @@ fn validate_fs_metadata_observation(
                 lane,
                 event: index,
                 field: FsMetadataField::Size,
-                reason: format!("expected {}, observed {}", expected.size, actual.size),
+                reason: format!(
+                    "expected {}, observed {}",
+                    expected.size, actual.size
+                ),
             });
         }
         if actual.kind != expected.kind {
@@ -912,7 +922,10 @@ fn validate_fs_metadata_observation(
                 lane,
                 event: index,
                 field: FsMetadataField::Kind,
-                reason: format!("expected {:?}, observed {:?}", expected.kind, actual.kind),
+                reason: format!(
+                    "expected {:?}, observed {:?}",
+                    expected.kind, actual.kind
+                ),
             });
         }
     }
@@ -935,13 +948,12 @@ fn expected_fs_metadata(
                     reason: error.to_string(),
                 }
             })?;
-            let metadata = std::fs::symlink_metadata(root.join(path)).map_err(|error| {
-                FsMetadataDifferentialError::Shape {
+            let metadata = std::fs::symlink_metadata(root.join(path))
+                .map_err(|error| FsMetadataDifferentialError::Shape {
                     lane,
                     event,
                     reason: format!("cannot observe fixture metadata: {error}"),
-                }
-            })?;
+                })?;
             let file_type = metadata.file_type();
             let kind = if file_type.is_file() {
                 ken_host::FsNodeKindV1::File
@@ -2207,8 +2219,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             PATHS,
         )
         .expect("interpreter fixtures have metadata");
-        let native_expected = expected_fs_metadata("native", run.roots.native(), PATHS)
-            .expect("native fixtures have metadata");
+        let native_expected =
+            expected_fs_metadata("native", run.roots.native(), PATHS)
+                .expect("native fixtures have metadata");
 
         let mut wrong_size = run.native.clone();
         let CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) =
@@ -2299,7 +2312,10 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 run.interpreter_actions.root_before,
                 run.interpreter_actions.root_after
             );
-            assert_eq!(run.native_actions.root_before, run.native_actions.root_after);
+            assert_eq!(
+                run.native_actions.root_before,
+                run.native_actions.root_after
+            );
             for observation in [&run.interpreter, &run.native] {
                 let [event] = observation.effect_trace.as_slice() else {
                     panic!("{} must emit one refusal", scenario.entry.identity)

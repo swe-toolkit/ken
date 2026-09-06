@@ -541,7 +541,8 @@ impl HostEffectBackendV1 for ProcessHost {
         path: &[u8],
     ) -> Result<crate::FileMetadataV1, FileErrorCauseV1> {
         let (parent, leaf) = Self::parent(grant, path)?;
-        let handle = crate::open_at(&parent, &leaf, OpenRequest::Read).map_err(host_error)?;
+        let handle = crate::open_at(&parent, &leaf, OpenRequest::Read)
+            .map_err(host_error)?;
         let metadata = crate::metadata(&handle).map_err(host_error)?;
         Ok(crate::FileMetadataV1 {
             size: metadata.size,
@@ -1411,7 +1412,9 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::FsMetadata if request_size == std::mem::size_of::<FsPathRequestV1>() => {
+        HostOpV1::FsMetadata
+            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
+        {
             if !request.cast::<FsPathRequestV1>().is_aligned() {
                 return -1;
             }
