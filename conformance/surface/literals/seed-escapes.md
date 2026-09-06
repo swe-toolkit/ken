@@ -93,7 +93,9 @@ contract.
   diagnostic name and span are not pinned here. The short and non-hex escapes
   reject with `InvalidEscape` and emit no literal token. Their primary spans are
   exactly `\x4` (the closing delimiter is excluded) and `\xG` respectively.
-  The separate `0x[…]` literal form is unchanged and is not exercised here.
+  The separate `0x[…]` hex byte-literal form's lexical shape (contiguous,
+  even-length, no separator) is exercised by `seed-hex-byte-literal.md`, not
+  here.
 - why: the exhaustive value sweep catches truncation and signed-byte mistakes;
   the `\x41BC` control flips if the scanner greedily consumes later hex digits.
   The non-ASCII control prevents an implicit String-to-UTF-8 path.
