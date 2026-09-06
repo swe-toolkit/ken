@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-GUARDS
 title: "match guards `p if g` -- slice 5 of 34 §3's six absent pattern forms: an ARM-SELECTION refinement, not a pattern form and not a type refinement (34 §3.3:623-626), atomic with the coverage exception (a guarded arm does NOT discharge its constructor for exhaustiveness, 34 §4.1:882) and the reachability exception (a guarded arm does NOT cover, so a later unguarded arm for the same constructor stays reachable, 34 §4.2:902-904); the composition discriminator this slice owes is TWO-SIDED -- guards loosen coverage (a guard that would otherwise complete exhaustiveness makes the match non-exhaustive) and loosen reachability (a guard on an earlier arm keeps a later same-constructor unguarded arm reachable), the guard load-bearing to each verdict"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
