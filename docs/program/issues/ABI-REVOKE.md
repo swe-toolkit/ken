@@ -1,7 +1,7 @@
 ---
 id: ABI-REVOKE
 title: "runtime revocation membrane — the deferred runtime face of 62 §4"
-status: active
+status: merged
 owner: runtime
 size: M-L
 gate: none

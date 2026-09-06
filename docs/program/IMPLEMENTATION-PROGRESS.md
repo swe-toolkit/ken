@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 09:00:30Z — from 558 issue file(s) in `docs/program/issues/`.
+2026-09-06 09:07:15Z — from 558 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -49,7 +49,7 @@ the committed file matches the generator's output.
 | `ABI-REVOKE-D0` | RevocationDomain substrate + lineage tree — the host-internal authority-lineage foundation for the revocation membrane; no dispatch wiring, lands green with zero observable Ken change | merged | runtime | S | none | — |
 | `ABI-REVOKE-D1` | authority-side lineage + admission lease + the path-side revoked error identity — wires RevocationDomain into the shared host dispatcher and turns the revoked-path oracle case green | merged | runtime | M | none | — |
 | `ABI-REVOKE-D2` | resource provenance + close-after-drain settlement — a resource-token-only op cannot bypass revocation, and owned fds close only after admitted leases drain; turns the two resource oracle cases green | merged | runtime | M | none | — |
-| `ABI-REVOKE` | runtime revocation membrane — the deferred runtime face of 62 §4 | active | runtime | M-L | none | — |
+| `ABI-REVOKE` | runtime revocation membrane — the deferred runtime face of 62 §4 | merged | runtime | M-L | none | — |
 | `ABI-S1` | descriptor completion — seek, truncate, sync/data-sync, flags, duplication under explicit inheritance policy | draft | runtime | M | none | — |
 | `ABI-S2` | directory streaming — supersedes whole-directory read where streaming is the honest shape | draft | runtime | M | none | — |
 | `ABI-S3` | monotonic clocks, sleep/deadlines, and secure kernel entropy | merged | runtime | L | none | — |
@@ -630,9 +630,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
-- `ABI-A1` blocked by `ABI-REVOKE` (status: active)
-- `ABI-A2` blocked by `ABI-REVOKE` (status: active)
-- `ABI-A3` blocked by `ABI-REVOKE` (status: active)
 - `ABI-S1` blocked by `PX9` (status: draft)
 - `ABI-S2` blocked by `ABI-A3` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
@@ -649,7 +646,6 @@ is itself not yet `merged`/`closed`:
 - `PX11` blocked by `PX9` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
-- `PX9` blocked by `ABI-REVOKE` (status: active)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
