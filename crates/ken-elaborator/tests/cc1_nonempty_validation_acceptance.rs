@@ -54,6 +54,8 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
     assert_transparent_globals(
         &env,
         &[
+            "nonempty_singleton",
+            "nonempty_cons",
             "nonempty_head",
             "nonempty_tail",
             "nonempty_to_list",
@@ -63,6 +65,13 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
             "Semigroup_instance_NonEmpty",
         ],
     );
+
+    env.elaborate_file(
+        "const ambient_singleton : NonEmpty Nat = nonempty_singleton Nat Zero \
+         const ambient_cons : NonEmpty Nat = nonempty_cons Nat (Suc Zero) (Nil Nat) \
+         const ambient_raw : NonEmpty Nat = NonEmptyCons Nat Zero (Nil Nat)",
+    )
+    .expect("smart constructors and raw constructor remain ambiently usable during P1");
 
     env.elaborate_ken_md_file(VALIDATION_KEN_MD)
         .expect("Data/Sums/Validation.ken.md and every checked fence must elaborate");
