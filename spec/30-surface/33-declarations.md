@@ -842,6 +842,22 @@ follow-on.
 Operators are ordinary `fn`/`proc`/`const` definitions with symbolic names;
 there is nothing special about them semantically.
 
+Declared fixity is a property of the operator's **canonical identity**, not of
+any surface path or alias that reaches it. It therefore **travels with import
+and re-export**: a client, an aliased import, or a re-exported path sees the
+declaring module's fixity, because import and re-export retain that canonical
+identity and republish the same `GlobalId` rather than minting another (`§3.3`,
+`§4.3`). Fixity is **not re-scopable at a use site** — an importer cannot
+re-declare an imported operator's precedence or associativity, since the
+declaration binds the identity, not the local binding. When two **distinct**
+declarations that share an operator spelling are imported unqualified, that is
+an ordinary identity clash and resolves by the existing **`AmbiguousReference`**
+rule (`§3.3`), not by any fixity-specific merge; qualified or aliased access, or
+a selective import, disambiguates exactly as for any other name. This is
+surface-and-elaboration only: fixity guides parsing into the same core term the
+kernel re-checks regardless of which path named the operator, so it adds nothing
+to `trusted_base()`.
+
 ## 7. What WS-L must deliver here
 
 Definitions (incl. generic + mutually recursive under SCT), records (dependent +
