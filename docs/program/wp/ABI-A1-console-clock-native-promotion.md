@@ -1,10 +1,29 @@
 # ABI-A1 — promote ConsoleRead and ClockWallNow to NativeTested with a normalized differential
 
 **Owner:** Team Runtime (`runtime-leader` + `runtime-implementer` +
-`runtime-qa`). **Branch:** `wp/ABI-A1`. **Size:** M. **Tier:** T1.
-**Risk:** medium — small availability diff, but it edits the trust-boundary
-file every ABI consumer reads and the correctness content is the differential
-design, not the flip.
+`runtime-qa`). **Branch:** `wp/ABI-A1`. **Size:** L. **Tier:** T1.
+**Risk:** medium — it implements native execution at the host trust boundary and
+edits the file every ABI consumer reads; the correctness content is the native
+leg plus the differential design, not the flip.
+
+> ## D0 REFRAME 2026-09-06 — native execution is absent; the native leg is now IN
+> ## scope (subsume, don't proliferate).
+>
+> The first cut sized this M and assumed native `ConsoleRead`/`ClockWallNow`
+> execution existed and needed only a differential. Runtime's D0 (runtime-leader
+> evt_127e2d2gwmyx9, at base `05be823ad`) measured otherwise and took the frame's
+> named hard stop cleanly: `ProcessHost` has neither `console_read` nor
+> `clock_wall_now` (Unsupported/empty defaults); `ken_host_dispatch_v1` has no
+> decode arm for either and falls to `-3`; the manifest request forms mark native
+> execution deferred (`abi_v1.rs:152-262`). A differential would fake the boundary.
+> Steward ruling: NativeTested *means* native execution, and building these two
+> legs is committed ABI-program scope (`10-linux-abi-completion.md §3`: "it works
+> in the interpreter is not the bar"), the same trust surface as the 13 existing
+> NativeTested ops — so rather than mint a separate predecessor and hand off within
+> one ring, the native leg is folded into this node (new deliverable `D-NATIVE`,
+> size M→L). Same node, same ring, same `wp/ABI-A1` branch; nothing was started, so
+> no rebase. Per-operation accepted partials are fine (ClockWallNow is the simpler
+> leg).
 
 **Authority:** `docs/program/10-linux-abi-completion.md §4`, Track A, ABI-A1
 (`:124`, `:128`). **Status:** Steward frame, shovel-ready. `depends_on:
@@ -74,11 +93,27 @@ side.
 
 ## 4. Deliverables
 
-- **`D0` — re-measure at your cut.** Re-derive the `effect_v1.rs` blob and every
-  line above; confirm the native execution legs for both operations. Report the
-  exact differential harness you will extend (crate + test file) and, per
-  operation, the injected-input mechanism. Any drift is D0's to correct before
-  authoring.
+- **`D0` — DONE (runtime-leader evt_127e2d2gwmyx9).** Native execution absent for
+  both operations; the native leg is folded in as `D-NATIVE`. Re-derive the
+  `effect_v1.rs` blob at your cut and report the exact differential harness you
+  will extend (crate + test file) and the injected-input mechanism per operation.
+- **`D-NATIVE` — implement native execution for both operations (the new
+  load-bearing leg).** Following the existing NativeTested console pattern:
+  - Add `console_read` and `clock_wall_now` to the `ProcessHost` impl alongside
+    `console_write`/`console_flush`/`console_is_terminal`
+    (`crates/ken-runtime/src/object_linker_packaging.rs:3684`). `ConsoleRead
+    { stream, limit }` is a bounded `read` on the named stream; `ClockWallNow` is
+    a wall-clock read (`CLOCK_REALTIME`-shaped), returning the manifest response
+    form.
+  - Add the decode/execute arms in `ken_host_dispatch_v1`
+    (`crates/ken-host/src/abi_v1.rs:1179`) for `ConsoleRead` (`0x0101`) and
+    `ClockWallNow` (`0x0201`), removing their "native execution deferred"
+    dead-code markers (`:152-262`).
+  - Update `every_deferred_operation_has_its_own_named_native_boundary_rejection`
+    (`abi_v1.rs:1834`) so these two are no longer in the deferred-rejection set.
+  Re-measure every line at your cut. If a leg needs a substrate this WP should not
+  build (e.g. blocking-stdin lifecycle beyond what console-write's leg already
+  assumes), that is a hard-stop finding (§6), not scope creep.
 - **`D1` — the normalized differentials.** One per operation, per §3: an
   explicit normalizer applied to both native and interpreter observation, then
   equality on the normalized value. State the invariant each encodes in prose
@@ -103,6 +138,12 @@ side.
 
 ## 5. Acceptance criteria
 
+- **`AC-0` — native execution actually runs (the D-NATIVE leg).** Control: with
+  the decode arms in place, `ken_host_dispatch_v1` no longer falls to `-3` for
+  `0x0101`/`0x0201` — each executes and returns its manifest response form; the
+  `every_deferred_operation_has_its_own_named_native_boundary_rejection` test is
+  updated so the two are removed from the deferred set and no other operation is.
+  A differential that runs against a still-faked native boundary fails this AC.
 - **`AC-1` — both operations are NativeTested and prove it under the normalized
   differential.** Control: a named test per operation runs native and
   interpreter, applies the normalizer, and asserts agreement; assert on the
@@ -140,11 +181,12 @@ side.
   observation, and do not make one side's assertion looser than the other's —
   the normalizer is symmetric and applied before comparison.
 - No `spec/` or `conformance/` edit. No new crate dependency without routing.
-- **Hard stop to the Steward** if: a native execution leg for either operation
-  is genuinely absent (the promotion then needs a named predecessor, not a
-  fabricated harness); or the honest normalized invariant for either operation
-  cannot be stated without weakening it to vacuity (that is a design finding);
-  or making the differential discriminate forces touching a wire identity.
+- **Hard stop to the Steward** if: implementing a native leg needs a substrate
+  this WP should not build (name it, and the predecessor it implies — the
+  console-write leg is the reachable template, so a leg that needs materially more
+  is the finding); or the honest normalized invariant for either operation cannot
+  be stated without weakening it to vacuity (a design finding); or making the
+  differential discriminate forces touching a wire identity.
 
 ## 7. Contention
 

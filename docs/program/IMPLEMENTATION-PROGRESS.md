@@ -32,14 +32,14 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 13:23:38Z — from 560 issue file(s) in `docs/program/issues/`.
+2026-09-06 13:27:17Z — from 560 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
 | ID | Title | Status | Owner | Size | Gate | GitHub |
 |---|---|---|---|---|---|---|
 | `A3` | catalog-coverage walker | draft | TBD | TBD | none | — |
-| `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | active | runtime | M | none | — |
+| `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | active | runtime | L | none | — |
 | `ABI-A2` | promote FsAppendFile, FsMetadata, FsRename to NativeTested | draft | runtime | M | none | — |
 | `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | draft | runtime | M | none | — |
 | `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | merged | runtime | L | none | — |
