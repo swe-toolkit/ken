@@ -55,6 +55,7 @@ pub enum RPatKind {
     Wild,
     Var(String),
     Ctor(String, Vec<RPattern>),
+    As(Box<RPattern>, String, usize),
 }
 
 /// A resolved match arm.
@@ -223,6 +224,10 @@ pub struct RPropIntro {
 #[derive(Clone, Debug)]
 pub enum RExpr {
     RVar(usize, String, Span),
+    /// An as-pattern alias. The slot is its resolver-order position within
+    /// the arm pattern; matrix-leaf elaboration supplies the corresponding
+    /// landed per-position occurrence.
+    RPatternAlias(usize, String, Span),
     RCon(String, Span),
     RUniv(Option<u32>, Span),
     RApp(Box<RExpr>, Box<RExpr>, Span),
@@ -301,6 +306,7 @@ impl RExpr {
     pub fn span(&self) -> &Span {
         match self {
             RExpr::RVar(_, _, s)
+            | RExpr::RPatternAlias(_, _, s)
             | RExpr::RCon(_, s)
             | RExpr::RUniv(_, s)
             | RExpr::RApp(_, _, s)
@@ -367,7 +373,10 @@ impl RType {
 
 #[derive(Clone)]
 struct Scope {
-    bindings: Vec<(Vec<String>, Span)>,
+    /// The optional slot marks an as-pattern alias. Such an alias participates
+    /// in lexical lookup but is not a new kernel binder, so ordinary de Bruijn
+    /// indices count only entries whose slot is `None`.
+    bindings: Vec<(Vec<String>, Span, Option<usize>)>,
     /// Dictionary names on a def path resolve as elaborator-local constants,
     /// rather than core binders. This keeps existing definition telescopes
     /// unchanged while letting the shared constraints scope over contracts and
@@ -390,19 +399,24 @@ impl Scope {
     }
 
     fn push_spanned(&mut self, name: &str, span: Span) {
-        self.bindings.push((vec![name.to_string()], span));
+        self.bindings.push((vec![name.to_string()], span, None));
     }
 
     fn push_anonymous(&mut self, span: Span) {
-        self.bindings.push((Vec::new(), span));
+        self.bindings.push((Vec::new(), span, None));
+    }
+
+    fn push_pattern_alias(&mut self, name: &str, span: Span, slot: usize) {
+        self.bindings
+            .push((vec![name.to_string()], span, Some(slot)));
     }
 
     fn push_alias(&mut self, alias: &str, name: &str) {
-        if let Some((names, _)) = self
+        if let Some((names, _, _)) = self
             .bindings
             .iter_mut()
             .rev()
-            .find(|(names, _)| names.iter().any(|n| n == name))
+            .find(|(names, _, _)| names.iter().any(|n| n == name))
         {
             names.push(alias.to_string());
         }
@@ -412,20 +426,36 @@ impl Scope {
         self.bindings.pop();
     }
 
+    fn pattern_alias(&self, name: &str) -> Option<usize> {
+        self.bindings.iter().rev().find_map(|(names, _, slot)| {
+            (names.iter().any(|candidate| candidate == name)).then_some(*slot)
+        })?
+    }
+
     fn index_of(&self, name: &str) -> Option<usize> {
-        self.bindings
-            .iter()
-            .rev()
-            .position(|(names, _)| names.iter().any(|n| n == name))
+        let mut index = 0;
+        for (names, _, alias_slot) in self.bindings.iter().rev() {
+            if names.iter().any(|candidate| candidate == name) {
+                return alias_slot.is_none().then_some(index);
+            }
+            if alias_slot.is_none() {
+                index += 1;
+            }
+        }
+        None
     }
 
     fn resolve_binding(&self, name: &str) -> Option<(usize, Span)> {
-        self.bindings
-            .iter()
-            .rev()
-            .enumerate()
-            .find(|(_, (names, _))| names.iter().any(|candidate| candidate == name))
-            .map(|(index, (_, span))| (index, span.clone()))
+        let mut index = 0;
+        for (names, span, alias_slot) in self.bindings.iter().rev() {
+            if names.iter().any(|candidate| candidate == name) {
+                return alias_slot.is_none().then(|| (index, span.clone()));
+            }
+            if alias_slot.is_none() {
+                index += 1;
+            }
+        }
+        None
     }
 
     fn depth(&self) -> usize {
@@ -1634,7 +1664,9 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             if scope.is_local_dictionary(name) {
                 return Ok(RExpr::RCon(name.clone(), span.clone()));
             }
-            if let Some(i) = scope.index_of(name) {
+            if let Some(slot) = scope.pattern_alias(name) {
+                Ok(RExpr::RPatternAlias(slot, name.clone(), span.clone()))
+            } else if let Some(i) = scope.index_of(name) {
                 Ok(RExpr::RVar(i, name.clone(), span.clone()))
             } else if let Some(index) = scope.space_cells.get(name) {
                 Ok(RExpr::RCell(*index, name.clone(), span.clone()))
@@ -1879,11 +1911,13 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             for arm in arms {
                 let (rpat, bound_names) = resolve_pattern(&arm.pat)?;
                 let depth_before = scope.depth();
-                for (name, binding_span) in &bound_names {
-                    if name == "_" {
-                        scope.push_anonymous(binding_span.clone());
+                for binding in &bound_names {
+                    if let Some(slot) = binding.alias_slot {
+                        scope.push_pattern_alias(&binding.name, binding.span.clone(), slot);
+                    } else if binding.name == "_" {
+                        scope.push_anonymous(binding.span.clone());
                     } else {
-                        scope.push_spanned(name, binding_span.clone());
+                        scope.push_spanned(&binding.name, binding.span.clone());
                     }
                 }
                 if let Some(equation) = equation {
@@ -1913,33 +1947,84 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
     }
 }
 
-/// Resolve a pattern, returning the resolved pattern and the list of names
-/// bound by it in left-to-right order (for scope introduction).
+#[derive(Clone)]
+struct PatternBinding {
+    name: String,
+    span: Span,
+    alias_slot: Option<usize>,
+}
+
+/// Resolve a pattern and enumerate its source bindings in the exact order the
+/// matrix consumer supplies occurrences: an `as` alias precedes its inner
+/// pattern, and constructor fields proceed left-to-right. Alias entries remain
+/// lexical bindings but consume no kernel de Bruijn slot.
 fn resolve_pattern(
     pat: &crate::ast::Pattern,
-) -> Result<(RPattern, Vec<(String, Span)>), ElabError> {
+) -> Result<(RPattern, Vec<PatternBinding>), ElabError> {
+    let mut next_slot = 0;
+    let (resolved, bindings) = resolve_pattern_inner(pat, &mut next_slot)?;
+    for (index, binding) in bindings.iter().enumerate() {
+        for other in bindings.iter().skip(index + 1) {
+            if binding.name != "_"
+                && binding.name == other.name
+                && (binding.alias_slot.is_some() || other.alias_slot.is_some())
+            {
+                let alias = if binding.alias_slot.is_some() {
+                    binding
+                } else {
+                    other
+                };
+                return Err(ElabError::ParseError {
+                    msg: format!(
+                        "as-pattern alias '{}' collides with an existing pattern binder",
+                        alias.name
+                    ),
+                    span: alias.span.clone(),
+                });
+            }
+        }
+    }
+    Ok((resolved, bindings))
+}
+
+fn resolve_pattern_inner(
+    pat: &crate::ast::Pattern,
+    next_slot: &mut usize,
+) -> Result<(RPattern, Vec<PatternBinding>), ElabError> {
     match &pat.kind {
-        // Wild patterns consume one de Bruijn slot so outer vars remain consistent
-        // with the method lambda structure (which binds ALL ctor args, not just named ones).
-        PatKind::Wild => Ok((
-            RPattern {
-                kind: RPatKind::Wild,
-                span: pat.span.clone(),
-            },
-            vec![("_".to_string(), pat.span.clone())],
-        )),
-        PatKind::Var(name) => Ok((
-            RPattern {
-                kind: RPatKind::Var(name.clone()),
-                span: pat.span.clone(),
-            },
-            vec![(name.clone(), pat.span.clone())],
-        )),
+        PatKind::Wild => {
+            *next_slot += 1;
+            Ok((
+                RPattern {
+                    kind: RPatKind::Wild,
+                    span: pat.span.clone(),
+                },
+                vec![PatternBinding {
+                    name: "_".to_string(),
+                    span: pat.span.clone(),
+                    alias_slot: None,
+                }],
+            ))
+        }
+        PatKind::Var(name) => {
+            *next_slot += 1;
+            Ok((
+                RPattern {
+                    kind: RPatKind::Var(name.clone()),
+                    span: pat.span.clone(),
+                },
+                vec![PatternBinding {
+                    name: name.clone(),
+                    span: pat.span.clone(),
+                    alias_slot: None,
+                }],
+            ))
+        }
         PatKind::Ctor(name, subs) => {
             let mut rsubs = Vec::new();
             let mut all_names = Vec::new();
             for sub in subs {
-                let (rpat, names) = resolve_pattern(sub)?;
+                let (rpat, names) = resolve_pattern_inner(sub, next_slot)?;
                 rsubs.push(rpat);
                 all_names.extend(names);
             }
@@ -1949,6 +2034,24 @@ fn resolve_pattern(
                     span: pat.span.clone(),
                 },
                 all_names,
+            ))
+        }
+        PatKind::As(inner, alias) => {
+            let slot = *next_slot;
+            *next_slot += 1;
+            let (resolved_inner, mut bindings) = resolve_pattern_inner(inner, next_slot)?;
+            let mut all_bindings = vec![PatternBinding {
+                name: alias.clone(),
+                span: pat.span.clone(),
+                alias_slot: Some(slot),
+            }];
+            all_bindings.append(&mut bindings);
+            Ok((
+                RPattern {
+                    kind: RPatKind::As(Box::new(resolved_inner), alias.clone(), slot),
+                    span: pat.span.clone(),
+                },
+                all_bindings,
             ))
         }
     }

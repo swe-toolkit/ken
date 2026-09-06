@@ -668,10 +668,12 @@ fn collect_match_arm_spans(arm: &MatchArm, out: &mut Vec<Span>) {
 
 fn collect_pattern_spans(pattern: &Pattern, out: &mut Vec<Span>) {
     out.push(pattern.span.clone());
-    if let PatKind::Ctor(_, fields) = &pattern.kind {
-        fields
+    match &pattern.kind {
+        PatKind::Ctor(_, fields) => fields
             .iter()
-            .for_each(|field| collect_pattern_spans(field, out));
+            .for_each(|field| collect_pattern_spans(field, out)),
+        PatKind::As(inner, _) => collect_pattern_spans(inner, out),
+        PatKind::Wild | PatKind::Var(_) => {}
     }
 }
 

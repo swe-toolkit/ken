@@ -384,6 +384,13 @@ struct ElabCtx<'e> {
     /// The stable bottom-relative pre-state position plus cell types while
     /// elaborating a block-space contract. Absent for modifier `space proc`.
     space_pre_state: Option<(usize, Vec<Term>)>,
+    /// Consumer-only metadata for as-pattern aliases. Matrix traversal records
+    /// an alias's type beside the existing per-position occurrence; the leaf
+    /// exposes it while elaborating that arm body. Nested matches stack frames.
+    pattern_alias_type_frames: Vec<HashMap<(usize, usize), MatrixAliasType>>,
+    active_pattern_aliases: Vec<Vec<ActivePatternAlias>>,
+    pattern_alias_replacement_frames: Vec<HashMap<usize, PatternAliasReplacement>>,
+    next_pattern_alias_sentinel: usize,
 }
 
 impl<'e> ElabCtx<'e> {
@@ -414,6 +421,10 @@ impl<'e> ElabCtx<'e> {
             result_refinements: Vec::new(),
             space_state: None,
             space_pre_state: None,
+            pattern_alias_type_frames: Vec::new(),
+            active_pattern_aliases: Vec::new(),
+            pattern_alias_replacement_frames: Vec::new(),
+            next_pattern_alias_sentinel: 0,
         }
     }
 
@@ -483,6 +494,28 @@ struct LiftBinding {
     evidence_position: usize,
     recursive_result_position: Option<usize>,
     support: Option<GlobalId>,
+}
+
+#[derive(Clone)]
+struct MatrixAliasType {
+    name: String,
+    ty: Term,
+    install_depth: usize,
+}
+
+#[derive(Clone)]
+struct ActivePatternAlias {
+    slot: usize,
+    name: String,
+    sentinel: usize,
+    ty: Term,
+    install_depth: usize,
+}
+
+#[derive(Clone)]
+struct PatternAliasReplacement {
+    occurrence: Term,
+    real_depth: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -6997,6 +7030,31 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             }
             Ok((result, result_type))
         }
+        RExpr::RPatternAlias(slot, name, _span) => {
+            let alias = cx
+                .active_pattern_aliases
+                .iter()
+                .rev()
+                .flat_map(|region| region.iter().rev())
+                .find(|alias| alias.slot == *slot && alias.name == *name)
+                .cloned()
+                .ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "as-pattern alias '{}' has no active matrix-leaf occurrence",
+                        name
+                    ))
+                })?;
+            let growth = cx.ctx.len().checked_sub(alias.install_depth).ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "as-pattern alias '{}' escaped its installation context",
+                    name
+                ))
+            })?;
+            Ok((
+                pattern_alias_sentinel(alias.sentinel),
+                weaken(&alias.ty, growth as i64),
+            ))
+        }
         RExpr::RVar(i, _, _) => {
             // An installed index refinement (constructor injectivity
             // / sibling convoy) replaces the bare `Var` with its `Cast`-
@@ -8833,6 +8891,7 @@ fn infer_expr_row_type(
             .cloned()
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(_, _, _)
+        | RExpr::RPatternAlias(_, _, _)
         | RExpr::RCell(_, _, _)
         | RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
@@ -11006,6 +11065,7 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
     match expr {
         RExpr::RCon(n, _) => n == name,
         RExpr::RVar(_, _, _)
+        | RExpr::RPatternAlias(_, _, _)
         | RExpr::RCell(_, _, _)
         | RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
@@ -11894,6 +11954,118 @@ fn unwrap_lam(term: &Term, n: usize) -> Term {
 
 // ----- match elaboration -----
 
+/// As-pattern aliases are not kernel binders. During leaf elaboration they are
+/// represented by unreachable `Var` sentinels, then replaced after the matrix
+/// has emitted all real/split/IH binders. The low stride records any synthetic
+/// weakening applied while the matrix unwinds; the id remains stable.
+const PATTERN_ALIAS_SENTINEL_BASE: usize = 1 << 54;
+const PATTERN_ALIAS_SENTINEL_STRIDE: usize = 1 << 20;
+
+fn pattern_alias_sentinel(id: usize) -> Term {
+    Term::var(PATTERN_ALIAS_SENTINEL_BASE + id * PATTERN_ALIAS_SENTINEL_STRIDE)
+}
+
+fn finalize_pattern_aliases(
+    term: &Term,
+    depth: usize,
+    replacements: &HashMap<usize, PatternAliasReplacement>,
+) -> Term {
+    let go =
+        |term: &Term, next_depth: usize| finalize_pattern_aliases(term, next_depth, replacements);
+    match term {
+        Term::Var(index) if *index >= PATTERN_ALIAS_SENTINEL_BASE => {
+            let encoded = *index - PATTERN_ALIAS_SENTINEL_BASE;
+            let sentinel = encoded / PATTERN_ALIAS_SENTINEL_STRIDE;
+            let synthetic_depth = encoded % PATTERN_ALIAS_SENTINEL_STRIDE;
+            if let Some(replacement) = replacements.get(&sentinel) {
+                let base_depth = replacement.real_depth + synthetic_depth;
+                let local_depth = depth
+                    .checked_sub(base_depth)
+                    .expect("as-pattern sentinel appeared above its matrix-leaf binder depth");
+                weaken(&replacement.occurrence, local_depth as i64)
+            } else {
+                term.clone()
+            }
+        }
+        Term::Var(_) => term.clone(),
+        Term::Pi(domain, codomain) => Term::pi(go(domain, depth), go(codomain, depth + 1)),
+        Term::Lam(domain, body) => Term::lam(go(domain, depth), go(body, depth + 1)),
+        Term::Sigma(domain, codomain) => Term::sigma(go(domain, depth), go(codomain, depth + 1)),
+        Term::Let { ty, val, body } => Term::Let {
+            ty: Box::new(go(ty, depth)),
+            val: Box::new(go(val, depth)),
+            body: Box::new(go(body, depth + 1)),
+        },
+        Term::App(function, argument) => Term::app(go(function, depth), go(argument, depth)),
+        Term::Pair(first, second) => Term::pair(go(first, depth), go(second, depth)),
+        Term::Proj1(pair) => Term::proj1(go(pair, depth)),
+        Term::Proj2(pair) => Term::proj2(go(pair, depth)),
+        Term::Ascript(value, ty) => {
+            Term::Ascript(Box::new(go(value, depth)), Box::new(go(ty, depth)))
+        }
+        Term::Eq(ty, left, right) => Term::Eq(
+            Box::new(go(ty, depth)),
+            Box::new(go(left, depth)),
+            Box::new(go(right, depth)),
+        ),
+        Term::Cast(from, to, evidence, value) => Term::Cast(
+            Box::new(go(from, depth)),
+            Box::new(go(to, depth)),
+            Box::new(go(evidence, depth)),
+            Box::new(go(value, depth)),
+        ),
+        Term::J(motive, base, evidence) => Term::J(
+            Box::new(go(motive, depth)),
+            Box::new(go(base, depth)),
+            Box::new(go(evidence, depth)),
+        ),
+        Term::Quot(ty, relation) => {
+            Term::Quot(Box::new(go(ty, depth)), Box::new(go(relation, depth)))
+        }
+        Term::QuotClass(value) => Term::QuotClass(Box::new(go(value, depth))),
+        Term::Trunc(ty) => Term::Trunc(Box::new(go(ty, depth))),
+        Term::TruncProj(value) => Term::TruncProj(Box::new(go(value, depth))),
+        Term::Refl(value) => Term::Refl(Box::new(go(value, depth))),
+        Term::QuotElim {
+            motive,
+            method,
+            respect,
+            scrut,
+        } => Term::QuotElim {
+            motive: Box::new(go(motive, depth)),
+            method: Box::new(go(method, depth)),
+            respect: Box::new(go(respect, depth)),
+            scrut: Box::new(go(scrut, depth)),
+        },
+        Term::Elim {
+            fam,
+            level_args,
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+        } => Term::Elim {
+            fam: *fam,
+            level_args: level_args.clone(),
+            params: params.iter().map(|term| go(term, depth)).collect(),
+            motive: Box::new(go(motive, depth)),
+            methods: methods.iter().map(|term| go(term, depth)).collect(),
+            indices: indices.iter().map(|term| go(term, depth)).collect(),
+            scrut: Box::new(go(scrut, depth)),
+        },
+        Term::Absurd(motive, proof) => {
+            Term::Absurd(Box::new(go(motive, depth)), Box::new(go(proof, depth)))
+        }
+        Term::Type(_)
+        | Term::Omega(_)
+        | Term::Const { .. }
+        | Term::IndFormer { .. }
+        | Term::Constructor { .. }
+        | Term::IntLit(_) => term.clone(),
+    }
+}
+
 /// Elaborate `match scrut { C₁ x₁… => body₁ ; … }` (`34 §3`).
 ///
 /// Compiles to `Term::Elim` with one method per constructor in declaration order.
@@ -12083,6 +12255,48 @@ impl RowState {
     }
 }
 
+/// Strip only the consumer wrapper at the current position. Its value comes
+/// from the already-landed aligned occurrence; the inner pattern remains the
+/// sole matcher and therefore owns coverage and reachability exactly as before.
+fn expose_current_pattern_aliases(
+    cx: &mut ElabCtx,
+    mut row: RowState,
+    current_ty: &Term,
+) -> RowState {
+    loop {
+        let (inner, name, slot) = match row.real_pats[0].kind.clone() {
+            RPatKind::As(inner, name, slot) => (inner, name, slot),
+            _ => break,
+        };
+        debug_assert_eq!(
+            row.binding_occurrences.len(),
+            slot,
+            "resolver binding order must match matrix occurrence supply order"
+        );
+        cx.pattern_alias_type_frames
+            .last_mut()
+            .expect("infer_match installs an alias-type frame before matrix compilation")
+            .insert(
+                (row.arm_idx, slot),
+                MatrixAliasType {
+                    name,
+                    ty: current_ty.clone(),
+                    install_depth: cx.ctx.len(),
+                },
+            );
+        row = row.bind_current_occurrence();
+        row.real_pats[0] = *inner;
+    }
+    row
+}
+
+fn pattern_without_aliases(mut pattern: &RPattern) -> &RPattern {
+    while let RPatKind::As(inner, _, _) = &pattern.kind {
+        pattern = inner;
+    }
+    pattern
+}
+
 /// The type every raw method built from `col_types`/`col_kinds` (a suffix of
 /// still-pending columns) ultimately has, as a Pi-chain ending in `ret_ty`:
 /// each `Real` column contributes one arrow (regardless of whether it is
@@ -12168,8 +12382,49 @@ fn compile_match_matrix(
             }
         }
         let arm = &arms[winner];
-        let _binding_occurrences = rows[0].leaf_binding_occurrences();
-        let (body_core, body_ty_ctx) = infer(cx, &arm.body)?;
+        let binding_occurrences = rows[0].leaf_binding_occurrences().to_vec();
+        let alias_types = cx
+            .pattern_alias_type_frames
+            .last()
+            .expect("infer_match alias-type frame must span matrix compilation")
+            .iter()
+            .filter(|((arm_idx, _), _)| *arm_idx == winner)
+            .map(|((_, slot), alias)| (*slot, alias.clone()))
+            .collect::<Vec<_>>();
+        let mut active_aliases = Vec::with_capacity(alias_types.len());
+        for (slot, alias) in alias_types {
+            let occurrence = binding_occurrences
+                .get(slot)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "as-pattern slot {slot} is absent from its matrix-leaf occurrence vector"
+                    )
+                })
+                .clone();
+            let sentinel = cx.next_pattern_alias_sentinel;
+            cx.next_pattern_alias_sentinel += 1;
+            cx.pattern_alias_replacement_frames
+                .last_mut()
+                .expect("infer_match replacement frame must span matrix compilation")
+                .insert(
+                    sentinel,
+                    PatternAliasReplacement {
+                        occurrence,
+                        real_depth: real_depth_so_far,
+                    },
+                );
+            active_aliases.push(ActivePatternAlias {
+                slot,
+                name: alias.name,
+                sentinel,
+                ty: alias.ty,
+                install_depth: alias.install_depth,
+            });
+        }
+        cx.active_pattern_aliases.push(active_aliases);
+        let inferred_body = infer(cx, &arm.body);
+        cx.active_pattern_aliases.pop();
+        let (body_core, body_ty_ctx) = inferred_body?;
         if ret_ty_slot.is_none() {
             let zonked = cx.metas.zonk_term(&body_ty_ctx);
             let lowered = lower_by(&zonked, real_depth_so_far).unwrap_or(zonked);
@@ -12226,21 +12481,23 @@ fn compile_match_matrix(
             Ok(Term::lam(ih_ty, weaken(&inner, 1)))
         }
         ColKind::Real => {
-            let all_flat = rows
-                .iter()
-                .all(|r| matches!(r.real_pats[0].kind, RPatKind::Wild | RPatKind::Var(_)));
+            let all_flat = rows.iter().all(|row| {
+                matches!(
+                    pattern_without_aliases(&row.real_pats[0]).kind,
+                    RPatKind::Wild | RPatKind::Var(_)
+                )
+            });
             if all_flat {
                 // No constructor pattern in this column across any row: bind
                 // it flatly (a real `cx.ctx` push), matching the resolver's
                 // count exactly, and move on.
                 cx.ctx.push(col_types[0].clone());
+                let current_ty = weaken(&col_types[0], 1);
                 let new_rows: Vec<RowState> = rows
                     .into_iter()
-                    .map(|row| {
-                        row.enter_current_real_binder()
-                            .bind_current_occurrence()
-                            .drop_current_column()
-                    })
+                    .map(RowState::enter_current_real_binder)
+                    .map(|row| expose_current_pattern_aliases(cx, row, &current_ty))
+                    .map(|row| row.bind_current_occurrence().drop_current_column())
                     .collect();
                 let inner = compile_match_matrix(
                     cx,
@@ -12280,6 +12537,7 @@ fn compile_match_matrix(
             let rows = rows
                 .into_iter()
                 .map(RowState::enter_current_real_binder)
+                .map(|row| expose_current_pattern_aliases(cx, row, &col_types[0]))
                 .collect();
             let raw_methods = build_ctor_buckets(
                 cx,
@@ -12397,6 +12655,9 @@ fn build_ctor_buckets(
                             .specialize_current_column(new_pats, false),
                     );
                 }
+                RPatKind::As(_, _, _) => {
+                    unreachable!("current-column aliases are exposed before constructor bucketing")
+                }
             }
         }
 
@@ -12485,7 +12746,10 @@ fn infer_match(
     //    wildcard/var scrutinee-binding yet); nested sub-patterns may be
     //    arbitrary (`Ctor`, `Var`, `Wild`, recursively).
     for arm in arms {
-        if let RPatKind::Wild | RPatKind::Var(_) = arm.pat.kind {
+        if matches!(
+            pattern_without_aliases(&arm.pat).kind,
+            RPatKind::Wild | RPatKind::Var(_)
+        ) {
             return Err(ElabError::Internal(
                 "non-constructor pattern in match (wildcard/var not yet supported \
                  at top level; use constructor patterns)"
@@ -12498,6 +12762,8 @@ fn infer_match(
     //    compile it via the pattern-matrix algorithm (`34-data-match.md
     //    §3.1`): column-by-column, splitting on constructors, recursing on
     //    the residual matrix under each constructor's freshly-bound fields.
+    cx.pattern_alias_type_frames.push(HashMap::new());
+    cx.pattern_alias_replacement_frames.push(HashMap::new());
     let rows: Vec<RowState> = arms
         .iter()
         .enumerate()
@@ -12507,6 +12773,7 @@ fn infer_match(
             binding_occurrences: Vec::new(),
             arm_idx: i,
         })
+        .map(|row| expose_current_pattern_aliases(cx, row, &scrut_ty))
         .collect();
 
     #[cfg(test)]
@@ -12522,7 +12789,7 @@ fn infer_match(
     let mut arm_used = vec![false; arms.len()];
     let mut subsumed_by: Vec<Vec<usize>> = vec![Vec::new(); arms.len()];
 
-    let raw_methods = build_ctor_buckets(
+    let raw_methods_result = build_ctor_buckets(
         cx,
         arms,
         &ind,
@@ -12537,7 +12804,18 @@ fn infer_match(
         &mut ret_ty_slot,
         &mut arm_used,
         &mut subsumed_by,
-    )?;
+    );
+    let replacements = cx
+        .pattern_alias_replacement_frames
+        .pop()
+        .expect("infer_match replacement frame must balance");
+    cx.pattern_alias_type_frames
+        .pop()
+        .expect("infer_match alias-type frame must balance");
+    let raw_methods = raw_methods_result?
+        .into_iter()
+        .map(|method| finalize_pattern_aliases(&method, 0, &replacements))
+        .collect::<Vec<_>>();
 
     // 6. AC4: reachability — an arm that never won at any leaf (including any
     //    it was expanded into via a wildcard row) is dead code.
@@ -12594,16 +12872,20 @@ fn ensure_pattern_constructors_resolve(
     cx: &ElabCtx<'_>,
     pattern: &RPattern,
 ) -> Result<(), ElabError> {
-    if let RPatKind::Ctor(name, fields) = &pattern.kind {
-        if !cx.globals.contains_key(name) {
-            return Err(ElabError::UnresolvedCon {
-                name: name.clone(),
-                span: pattern.span.clone(),
-            });
+    match &pattern.kind {
+        RPatKind::Ctor(name, fields) => {
+            if !cx.globals.contains_key(name) {
+                return Err(ElabError::UnresolvedCon {
+                    name: name.clone(),
+                    span: pattern.span.clone(),
+                });
+            }
+            for field in fields {
+                ensure_pattern_constructors_resolve(cx, field)?;
+            }
         }
-        for field in fields {
-            ensure_pattern_constructors_resolve(cx, field)?;
-        }
+        RPatKind::As(inner, _, _) => ensure_pattern_constructors_resolve(cx, inner)?,
+        RPatKind::Wild | RPatKind::Var(_) => {}
     }
     Ok(())
 }
@@ -12628,7 +12910,7 @@ fn ensure_arm_ctors_belong_to_family(
     d_id: GlobalId,
 ) -> Result<(), ElabError> {
     for arm in arms {
-        if let RPatKind::Ctor(name, _) = &arm.pat.kind {
+        if let RPatKind::Ctor(name, _) = &pattern_without_aliases(&arm.pat).kind {
             let ctor_id = *cx.globals.get(name).expect(
                 "ensure_pattern_constructors_resolve already validated every top-level \
                  arm pattern name resolves in cx.globals before this function runs",
