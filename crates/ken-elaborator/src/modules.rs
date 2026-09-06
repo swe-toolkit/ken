@@ -1231,6 +1231,7 @@ fn rewrite_rexpr_inner(
             RExpr::RCon(n, span)
         }
         RExpr::RVar(i, n, s) => RExpr::RVar(i, n, s),
+        RExpr::RPatternAlias(slot, n, s) => RExpr::RPatternAlias(slot, n, s),
         RExpr::RRecursiveResult {
             selector,
             index,
@@ -1380,6 +1381,11 @@ fn rewrite_rpattern(
                 .collect::<Result<Vec<_>, ElabError>>()?;
             RPatKind::Ctor(n, subs)
         }
+        RPatKind::As(inner, alias, slot) => RPatKind::As(
+            Box::new(rewrite_rpattern(scope, exports, *inner)?),
+            alias,
+            slot,
+        ),
     };
     Ok(RPattern { kind, span: p.span })
 }
