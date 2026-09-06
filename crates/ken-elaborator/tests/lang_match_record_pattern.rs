@@ -290,11 +290,12 @@ fn module_rewriting_recurses_through_record_field_patterns() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_file(
         "module RecordOwner { \
-         record Local { flag : Bool, value : Nat } ; \
-         const local : Local = { flag = True, value = Suc Zero } ; \
+         data LocalFlag = LocalOn | LocalOff ; \
+         record Local { flag : LocalFlag, value : Nat } ; \
+         const local : Local = { flag = LocalOn, value = Suc Zero } ; \
          fn select (item : Local) : Nat = match item { \
-           { flag = True, value } |-> value ; \
-           { flag = False, value } |-> value \
+           { flag = LocalOn, value } |-> value ; \
+           { flag = LocalOff, value } |-> value \
          } ; \
          pub const result : Nat = select local \
          }",
