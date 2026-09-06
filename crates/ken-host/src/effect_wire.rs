@@ -1357,6 +1357,29 @@ mod tests {
         assert_eq!(decode_linked_effect_trace(&encoded), Ok(expected));
     }
 
+    /// Promise class: normative compatibility vector. MEASURED: the sole
+    /// effect-trace codec round-trips exact nullary resource revocation.
+    /// CLAIMED: observation transport does not collapse resource withdrawal
+    /// into a lifetime, rights, host-I/O, or file-error identity. THE GAP: the
+    /// dispatcher and checked reifiers independently pin production.
+    #[test]
+    fn linked_trace_codec_preserves_revoked_resource_error_identity() {
+        let mut expected = representative_trace();
+        expected.effect_trace.push(EffectEvent {
+            sequence: 9,
+            operation: HostOpV1::FsHandleMetadata,
+            capability: None,
+            resource_bindings: Vec::new(),
+            request: CanonicalRequestV1::FsHandleMetadata,
+            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
+                ResourceErrorV1::Revoked,
+            )),
+        });
+
+        let encoded = encode_linked_effect_trace(&expected).unwrap();
+        assert_eq!(decode_linked_effect_trace(&encoded), Ok(expected));
+    }
+
     #[test]
     fn linked_trace_codec_preserves_allocation_failure_identity() {
         let mut expected = representative_trace();
