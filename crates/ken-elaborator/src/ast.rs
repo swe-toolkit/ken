@@ -155,6 +155,15 @@ pub struct PropIntro {
     pub span: Span,
 }
 
+/// One source field inside an open record pattern (`32 §4`).
+#[derive(Clone, Debug)]
+pub struct FieldPat {
+    pub label: String,
+    /// `None` is the punned form: `label` means `label = label`.
+    pub pattern: Option<Pattern>,
+    pub label_span: Span,
+}
+
 /// A surface pattern (`34 §3`, `32 §4`).
 #[derive(Clone, Debug)]
 pub struct Pattern {
@@ -173,6 +182,8 @@ pub enum PatKind {
     Ctor(String, Vec<Pattern>),
     /// `(p₁, …, pₙ)` — a surface tuple pattern, with `n >= 2`.
     Tuple(Vec<Pattern>),
+    /// `{ label = p, … }` — an open, label-keyed record pattern.
+    Record(Vec<FieldPat>),
     /// `p as x` — match through `p` and bind `x` to that position's value.
     As(Box<Pattern>, String),
 }

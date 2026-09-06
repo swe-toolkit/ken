@@ -675,6 +675,9 @@ fn rtype_to_kernel_checked(
         }
 
         RType::RVarTy(i, _, _) => Ok(Term::var(*i)),
+        RType::RPatternAliasTy(_, name, _) => Err(ElabError::Internal(format!(
+            "record-pattern type binding '{name}' escaped into a data declaration"
+        ))),
 
         RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _) => {
             let a_k = rtype_to_kernel_checked(a, d_name, d_id, globals, ind_id_set, ctor_id_set)?;
