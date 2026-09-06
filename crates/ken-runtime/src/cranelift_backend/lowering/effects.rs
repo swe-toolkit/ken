@@ -227,7 +227,6 @@ fn runtime_producible_constructors(
         resource_invalid_offset,
         resource_invalid_bounds,
         resource_no_progress,
-        resource_revoked,
         resource_kind_fs_handle,
         resource_kind_buffer,
         resource_trace_identity,
@@ -270,7 +269,6 @@ fn runtime_producible_constructors(
         resource_invalid_offset,
         resource_invalid_bounds,
         resource_no_progress,
-        resource_revoked,
         resource_kind_fs_handle,
         resource_kind_buffer,
         resource_trace_identity,
@@ -1868,7 +1866,7 @@ impl<'a> Lowering<'a> {
         held: cranelift_codegen::ir::Value,
         actual_expected_kind: cranelift_codegen::ir::Value,
         actual_actual_kind: cranelift_codegen::ir::Value,
-        resource_error_tags_in_payload_shape_order: [u64; 11],
+        resource_error_tags_in_payload_shape_order: [u64; 10],
         expected_schema: u64,
         expected_kind: u64,
         buffer_kind: u64,
@@ -1898,7 +1896,6 @@ impl<'a> Lowering<'a> {
         let invalid_bounds_tag = next_resource_error_tag();
         let no_progress_tag = next_resource_error_tag();
         let allocation_failed_tag = next_resource_error_tag();
-        let revoked_tag = next_resource_error_tag();
         let arms = [
             closed_tag,
             malformed_reply_tag,
@@ -1996,7 +1993,6 @@ impl<'a> Lowering<'a> {
                 invalid_bounds_tag,
                 no_progress_tag,
                 allocation_failed_tag,
-                revoked_tag,
             ]
             .map(|tag| i64::try_from(tag).expect("resource error tag fits i64")),
         );
@@ -3049,7 +3045,6 @@ impl<'a> Lowering<'a> {
                     wire.resource_error_invalid_bounds,
                     wire.resource_error_no_progress,
                     wire.resource_error_allocation_failed,
-                    wire.resource_error_revoked,
                 ],
                 wire.resource_error_reply_schema,
                 wire.resource_kind_fs_handle,
@@ -3426,16 +3421,6 @@ impl<'a> Lowering<'a> {
                             checked_resource_tag(wire.resource_error_no_progress),
                             SynthesizedFixedConstructorRole::ResourceNoProgress,
                             self.process_symbols.resource_no_progress.clone(),
-                            Vec::new(),
-                            &seats,
-                        )?,
-                        self.synthesized_dynamic_alternative(
-                            static_origin,
-                            &error_root,
-                            11,
-                            checked_resource_tag(wire.resource_error_revoked),
-                            SynthesizedFixedConstructorRole::ResourceRevoked,
-                            self.process_symbols.resource_revoked.clone(),
                             Vec::new(),
                             &seats,
                         )?,

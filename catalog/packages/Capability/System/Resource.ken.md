@@ -4,10 +4,7 @@
 filesystem resource table. Resource handles are ordinary copyable Ken values:
 Ken does not make them affine. Liveness is runtime-enforced and Ward-checked.
 An escaped copy is legal, but after its bracket settles every later use returns
-`Closed`; insufficient rights return `RightNotHeld`. A live token whose acquiring
-authority lineage has been revoked instead returns the distinct nullary
-`ResourceRevoked` before backend access; revocation never prevents settlement.
-The bracket acquires
+`Closed`; insufficient authority returns `RightNotHeld`. The bracket acquires
 before its delayed body and settles on normal return, returned error, and a
 controlled runtime trap. Trap-primary/cleanup-secondary ordering is currently
 exercised by a private caller-controlled runtime fixture; Ken has no

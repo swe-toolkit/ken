@@ -4253,7 +4253,6 @@ pub struct FSIds {
     pub invalid_offset_id: GlobalId,
     pub invalid_bounds_id: GlobalId,
     pub no_progress_id: GlobalId,
-    pub resource_revoked_id: GlobalId,
     pub private_buffer_span_id: GlobalId,
     pub private_transfer_count_id: GlobalId,
     pub read_some_id: GlobalId,
@@ -4324,7 +4323,6 @@ impl FSIds {
             invalid_offset_id: get("InvalidOffset")?,
             invalid_bounds_id: get("InvalidBounds")?,
             no_progress_id: get("NoProgress")?,
-            resource_revoked_id: get("ResourceRevoked")?,
             private_buffer_span_id: elab.env.inductive(get("BufferSpan")?)?.constructors[0].id,
             private_transfer_count_id: elab.env.inductive(get("TransferCount")?)?.constructors[0]
                 .id,
@@ -5079,7 +5077,6 @@ fn resource_error_value_v1(
         ken_host::ResourceErrorV1::InvalidOffset => make_ctor(fs.invalid_offset_id, vec![], store),
         ken_host::ResourceErrorV1::InvalidBounds => make_ctor(fs.invalid_bounds_id, vec![], store),
         ken_host::ResourceErrorV1::NoProgress => make_ctor(fs.no_progress_id, vec![], store),
-        ken_host::ResourceErrorV1::Revoked => make_ctor(fs.resource_revoked_id, vec![], store),
     }
 }
 
@@ -5088,7 +5085,6 @@ fn fs_dispatch<H: HostHandler>(
     args: &[EvalVal],
     handler: &mut H,
     resources: &mut ken_host::ResourceTableV1,
-    revocation: &mut ken_host::RevocationDomain,
     fs: &FSIds,
     ids: &ConsoleIds,
     store: &mut EvalStore,
@@ -5352,6 +5348,7 @@ fn fs_dispatch<H: HostHandler>(
         return None;
     };
 
+    let mut revocation = ken_host::RevocationDomain::default();
     let mut capabilities = ken_host::CapabilityTableV1::default();
     let token = if matches!(
         operation,
@@ -5369,7 +5366,7 @@ fn fs_dispatch<H: HostHandler>(
                 Some(capabilities.insert(ken_host::CapabilityGrantV1::mint_root(
                     ken_host::program_caps_fs_trace_identity_v1(),
                     capability.clone(),
-                    revocation,
+                    &mut revocation,
                 )))
             }
             _ => None,
@@ -5433,7 +5430,7 @@ fn fs_dispatch<H: HostHandler>(
     let reply = ken_host::dispatch_host_op_v1(
         &mut backend,
         &capabilities,
-        revocation,
+        &revocation,
         resources,
         operation,
         token,
@@ -5930,10 +5927,9 @@ fn run_io_with_effect_recorder<H: HostHandler>(
     mut recorder: Option<&mut EffectTraceRecorder>,
 ) -> Result<EvalVal, RunIoError> {
     let m = ids.params_len;
-    // Resource liveness and its acquiring-authority lineage are both scoped to
-    // this invocation and must share one revocation domain across every effect.
+    // Resource liveness is invocation-scoped. PX7-F can add public resource
+    // constructors without first repairing the interpreter's state lifetime.
     let mut resources = ken_host::ResourceTableV1::default();
-    let mut revocation = ken_host::RevocationDomain::default();
     let result = (|| {
         loop {
             let next = match tree {
@@ -6104,7 +6100,6 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                             op_args,
                                             handler,
                                             &mut resources,
-                                            &mut revocation,
                                             fs,
                                             ids,
                                             store,
@@ -6688,7 +6683,6 @@ mod px5b_effect_observation_tests {
             invalid_offset_id: id(),
             invalid_bounds_id: id(),
             no_progress_id: id(),
-            resource_revoked_id: id(),
             private_buffer_span_id: id(),
             private_transfer_count_id: id(),
             read_some_id: id(),
@@ -6733,13 +6727,11 @@ mod px5b_effect_observation_tests {
         let fs = fs_ids();
         let mut store = EvalStore::new();
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         fs_dispatch(
             fs.readfile_id,
             &[EvalVal::Unknown, capability, EvalVal::Bytes(path.to_vec())],
             host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -6752,22 +6744,11 @@ mod px5b_effect_observation_tests {
         args: &[EvalVal],
         host: &mut H,
         resources: &mut ken_host::ResourceTableV1,
-        revocation: &mut ken_host::RevocationDomain,
         fs: &FSIds,
         ids: &ConsoleIds,
         store: &mut EvalStore,
     ) -> EvalVal {
-        fs_dispatch(
-            op_id,
-            args,
-            host,
-            resources,
-            revocation,
-            fs,
-            ids,
-            store,
-            None,
-        )
+        fs_dispatch(op_id, args, host, resources, fs, ids, store, None)
             .expect("recognized FS operation")
             .expect("FS reply reifies")
     }
@@ -6940,7 +6921,6 @@ mod px5b_effect_observation_tests {
         capacity: i64,
         host: &mut H,
         resources: &mut ken_host::ResourceTableV1,
-        revocation: &mut ken_host::RevocationDomain,
         fs: &FSIds,
         ids: &ConsoleIds,
         store: &mut EvalStore,
@@ -6950,7 +6930,6 @@ mod px5b_effect_observation_tests {
             &[EvalVal::Unknown, EvalVal::Int(capacity)],
             host,
             resources,
-            revocation,
             fs,
             ids,
             store,
@@ -6975,7 +6954,6 @@ mod px5b_effect_observation_tests {
         let mut resources = ken_host::ResourceTableV1::with_buffer_limits(
             ken_host::BufferLimitsV1::new(u64::MAX, u64::MAX).unwrap(),
         );
-        let mut revocation = ken_host::RevocationDomain::default();
 
         let result = run_fs(
             fs.private_buffer_allocate_id,
@@ -6985,7 +6963,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7004,7 +6981,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut policy_rejected,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7023,7 +6999,6 @@ mod px5b_effect_observation_tests {
             &FSIds,
             &mut EvalStore,
             &mut ken_host::ResourceTableV1,
-            &mut ken_host::RevocationDomain,
             ken_host::ResourceTokenV1,
             ken_host::ResourceTokenV1,
         ),
@@ -7037,7 +7012,6 @@ mod px5b_effect_observation_tests {
         let mut host = PosixHost::new_at(&root);
         let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_FULL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
         let source = open_file(
             b"source",
@@ -7045,7 +7019,6 @@ mod px5b_effect_observation_tests {
             capability.clone(),
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7058,20 +7031,11 @@ mod px5b_effect_observation_tests {
             capability,
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
         );
-        let allocated = allocate_buffer(
-            4,
-            &mut host,
-            &mut resources,
-            &mut revocation,
-            &fs,
-            &ids,
-            &mut store,
-        );
+        let allocated = allocate_buffer(4, &mut host, &mut resources, &fs, &ids, &mut store);
         let buffer = expect_resource_token(&allocated, &ids);
         let filled = run_fs(
             fs.private_fs_read_at_id,
@@ -7085,29 +7049,19 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
         );
         let _ = result_payload(&filled, ids.ok_id);
 
-        test(
-            &ids,
-            &fs,
-            &mut store,
-            &mut resources,
-            &mut revocation,
-            target,
-            buffer,
-        );
+        test(&ids, &fs, &mut store, &mut resources, target, buffer);
         std::fs::remove_dir_all(root).unwrap();
     }
 
     fn dispatch_positioned_write(
         backend: &mut impl ken_host::HostEffectBackendV1,
         resources: &mut ken_host::ResourceTableV1,
-        revocation: &mut ken_host::RevocationDomain,
         file: ken_host::ResourceTokenV1,
         buffer: ken_host::ResourceTokenV1,
         buffer_start: u64,
@@ -7120,7 +7074,7 @@ mod px5b_effect_observation_tests {
         let reply = ken_host::dispatch_host_op_v1(
             backend,
             &ken_host::CapabilityTableV1::default(),
-            revocation,
+            &ken_host::RevocationDomain::default(),
             resources,
             ken_host::HostOpV1::FsWriteAt,
             None,
@@ -7151,7 +7105,7 @@ mod px5b_effect_observation_tests {
     fn positioned_invalid_bounds_reifies_before_backend_visit() {
         with_positioned_write_fixture(
             "px8-errid-invalid-bounds",
-            |ids, fs, store, resources, revocation, file, buffer| {
+            |ids, fs, store, resources, file, buffer| {
                 let capacity = resources
                     .resolve_buffer(buffer)
                     .expect("fixture buffer remains live")
@@ -7163,14 +7117,7 @@ mod px5b_effect_observation_tests {
                 let mut backend =
                     PositionedFailureBackend::<BrokenPipePositionedFailure>::default();
                 let (request, reply) =
-                    dispatch_positioned_write(
-                        &mut backend,
-                        resources,
-                        revocation,
-                        file,
-                        buffer,
-                        out_of_range,
-                    );
+                    dispatch_positioned_write(&mut backend, resources, file, buffer, out_of_range);
                 assert_eq!(
                     backend.write_calls, 0,
                     "pre-I/O rejection must not visit backend"
@@ -7205,17 +7152,10 @@ mod px5b_effect_observation_tests {
     fn positioned_backend_zero_write_reifies_absolute_no_progress() {
         with_positioned_write_fixture(
             "px8-no-progress-absolute",
-            |ids, fs, store, resources, revocation, file, buffer| {
+            |ids, fs, store, resources, file, buffer| {
                 let mut backend = ZeroWriteBackend::default();
                 let (request, reply) =
-                    dispatch_positioned_write(
-                        &mut backend,
-                        resources,
-                        revocation,
-                        file,
-                        buffer,
-                        0,
-                    );
+                    dispatch_positioned_write(&mut backend, resources, file, buffer, 0);
                 assert_eq!(
                     backend.write_calls, 1,
                     "a real backend zero reply must produce NoProgress"
@@ -7243,72 +7183,31 @@ mod px5b_effect_observation_tests {
         );
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: the production
-    /// interpreter reifier maps the distinct host resource-withdrawal variant
-    /// to the checked nullary `ResourceRevoked` constructor. CLAIMED: the
-    /// interpreter does not collapse this identity into ResourceHostIO or a
-    /// lifetime/right error. THE GAP: host-side provenance admission is pinned
-    /// independently in ken-host.
-    #[test]
-    fn resource_revoked_reifies_as_exact_nullary_resource_constructor() {
-        with_positioned_write_fixture(
-            "abi-revoke-d2-interpreter",
-            |ids, fs, store, _, _, _, _| {
-                let request = ken_host::CanonicalRequestV1::FsHandleMetadata;
-                let result = reify_host_reply_v1(
-                    ken_host::CanonicalOutcomeV1::Error(
-                        ken_host::SemanticErrorV1::Resource(
-                            ken_host::ResourceErrorV1::Revoked,
-                        ),
-                    ),
-                    None,
-                    None,
-                    &request,
-                    fs.private_fs_handle_metadata_id,
-                    fs,
-                    ids,
-                    store,
-                )
-                .expect("interpreter reifies resource revocation");
-                expect_resource_error(&result, fs.resource_revoked_id, ids);
-            },
-        );
-    }
-
     fn assert_positioned_backend_failure<E: PositionedFailureIdentity>(
         label: &str,
         expected: impl FnOnce(&ConsoleIds) -> GlobalId,
     ) {
-        with_positioned_write_fixture(
-            label,
-            |ids, fs, store, resources, revocation, file, buffer| {
-                let mut backend = PositionedFailureBackend::<E>::default();
-                let (request, reply) = dispatch_positioned_write(
-                    &mut backend,
-                    resources,
-                    revocation,
-                    file,
-                    buffer,
-                    0,
-                );
-                assert_eq!(
-                    backend.write_calls, 1,
-                    "real synchronous backend is the producer"
-                );
-                let result = reify_host_reply_v1(
-                    reply.outcome,
-                    reply.resource_token,
-                    None,
-                    &request,
-                    fs.private_fs_write_at_id,
-                    fs,
-                    ids,
-                    store,
-                )
-                .expect("interpreter reifies the backend identity");
-                expect_resource_host_io(&result, expected(ids), ids, fs);
-            },
-        );
+        with_positioned_write_fixture(label, |ids, fs, store, resources, file, buffer| {
+            let mut backend = PositionedFailureBackend::<E>::default();
+            let (request, reply) =
+                dispatch_positioned_write(&mut backend, resources, file, buffer, 0);
+            assert_eq!(
+                backend.write_calls, 1,
+                "real synchronous backend is the producer"
+            );
+            let result = reify_host_reply_v1(
+                reply.outcome,
+                reply.resource_token,
+                None,
+                &request,
+                fs.private_fs_write_at_id,
+                fs,
+                ids,
+                store,
+            )
+            .expect("interpreter reifies the backend identity");
+            expect_resource_host_io(&result, expected(ids), ids, fs);
+        });
     }
 
     /// Durable invariant (`PX8-ERRID-SCOPE` D4 / AC-1, AC-3, AC-5): the real
@@ -7355,7 +7254,6 @@ mod px5b_effect_observation_tests {
         capability: EvalVal,
         host: &mut H,
         resources: &mut ken_host::ResourceTableV1,
-        revocation: &mut ken_host::RevocationDomain,
         fs: &FSIds,
         ids: &ConsoleIds,
         store: &mut EvalStore,
@@ -7370,7 +7268,6 @@ mod px5b_effect_observation_tests {
             ],
             host,
             resources,
-            revocation,
             fs,
             ids,
             store,
@@ -7382,7 +7279,6 @@ mod px5b_effect_observation_tests {
         token: ken_host::ResourceTokenV1,
         host: &mut H,
         resources: &mut ken_host::ResourceTableV1,
-        revocation: &mut ken_host::RevocationDomain,
         fs: &FSIds,
         ids: &ConsoleIds,
         store: &mut EvalStore,
@@ -7396,7 +7292,6 @@ mod px5b_effect_observation_tests {
             ],
             host,
             resources,
-            revocation,
             fs,
             ids,
             store,
@@ -7427,7 +7322,6 @@ mod px5b_effect_observation_tests {
         let mut host = PosixHost::new_at(&root);
         let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_PARTIAL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
         let file = open_file(
             b"short",
@@ -7435,20 +7329,11 @@ mod px5b_effect_observation_tests {
             capability,
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
         );
-        let buffer_result = allocate_buffer(
-            8,
-            &mut host,
-            &mut resources,
-            &mut revocation,
-            &fs,
-            &ids,
-            &mut store,
-        );
+        let buffer_result = allocate_buffer(8, &mut host, &mut resources, &fs, &ids, &mut store);
         let buffer = expect_resource_token(&buffer_result, &ids);
 
         let result = run_fs(
@@ -7463,7 +7348,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7537,7 +7421,6 @@ mod px5b_effect_observation_tests {
         let mut host = PosixHost::new_at(&root);
         let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_PARTIAL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
         let file = open_file(
             b"source",
@@ -7545,7 +7428,6 @@ mod px5b_effect_observation_tests {
             capability,
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7555,15 +7437,7 @@ mod px5b_effect_observation_tests {
         // == effective == 4. Pre-fix, `remaining` was `requested - count`
         // = 8 - 4 = 4 (the buffer reads as having budget left while it is
         // completely full); post-fix it must be `effective - count` = 0.
-        let buffer_result = allocate_buffer(
-            4,
-            &mut host,
-            &mut resources,
-            &mut revocation,
-            &fs,
-            &ids,
-            &mut store,
-        );
+        let buffer_result = allocate_buffer(4, &mut host, &mut resources, &fs, &ids, &mut store);
         let buffer = expect_resource_token(&buffer_result, &ids);
 
         let result = run_fs(
@@ -7578,7 +7452,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7639,7 +7512,6 @@ mod px5b_effect_observation_tests {
         let mut host = PosixHost::new_at(&root);
         let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_PARTIAL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
         let file = open_file(
             b"source",
@@ -7647,20 +7519,11 @@ mod px5b_effect_observation_tests {
             capability,
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
         );
-        let buffer_result = allocate_buffer(
-            4,
-            &mut host,
-            &mut resources,
-            &mut revocation,
-            &fs,
-            &ids,
-            &mut store,
-        );
+        let buffer_result = allocate_buffer(4, &mut host, &mut resources, &fs, &ids, &mut store);
         let buffer = expect_resource_token(&buffer_result, &ids);
 
         let result = run_fs(
@@ -7675,7 +7538,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7725,7 +7587,6 @@ mod px5b_effect_observation_tests {
         let mut host = PosixHost::new_at(&root);
         let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_FULL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
         let source_file = open_file(
             b"source",
@@ -7733,7 +7594,6 @@ mod px5b_effect_observation_tests {
             capability.clone(),
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7746,20 +7606,11 @@ mod px5b_effect_observation_tests {
             capability,
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
         );
-        let buffer_result = allocate_buffer(
-            4,
-            &mut host,
-            &mut resources,
-            &mut revocation,
-            &fs,
-            &ids,
-            &mut store,
-        );
+        let buffer_result = allocate_buffer(4, &mut host, &mut resources, &fs, &ids, &mut store);
         let buffer = expect_resource_token(&buffer_result, &ids);
         let fill = run_fs(
             fs.private_fs_read_at_id,
@@ -7773,7 +7624,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7800,7 +7650,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7845,7 +7694,6 @@ mod px5b_effect_observation_tests {
         let mut host = PosixHost::new_at(&root);
         let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_FULL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
         let source_file = open_file(
             b"source",
@@ -7853,7 +7701,6 @@ mod px5b_effect_observation_tests {
             capability.clone(),
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7866,20 +7713,11 @@ mod px5b_effect_observation_tests {
             capability,
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
         );
-        let buffer_result = allocate_buffer(
-            4,
-            &mut host,
-            &mut resources,
-            &mut revocation,
-            &fs,
-            &ids,
-            &mut store,
-        );
+        let buffer_result = allocate_buffer(4, &mut host, &mut resources, &fs, &ids, &mut store);
         let buffer = expect_resource_token(&buffer_result, &ids);
         let fill = run_fs(
             fs.private_fs_read_at_id,
@@ -7893,7 +7731,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
@@ -7909,7 +7746,7 @@ mod px5b_effect_observation_tests {
         let reply = ken_host::dispatch_host_op_v1(
             &mut backend,
             &ken_host::CapabilityTableV1::default(),
-            &revocation,
+            &ken_host::RevocationDomain::default(),
             &mut resources,
             ken_host::HostOpV1::FsWriteAt,
             None,
@@ -7971,7 +7808,6 @@ mod px5b_effect_observation_tests {
             &mut EvalStore,
             &mut PosixHost,
             &mut ken_host::ResourceTableV1,
-            &mut ken_host::RevocationDomain,
             EvalVal,
             EvalVal,
         ),
@@ -7986,14 +7822,12 @@ mod px5b_effect_observation_tests {
         let read_cap = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_PARTIAL));
         let full_cap = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_FULL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         test(
             &ids,
             &fs,
             &mut store,
             &mut host,
             &mut resources,
-            &mut revocation,
             read_cap,
             full_cap,
         );
@@ -8020,16 +7854,9 @@ mod px5b_effect_observation_tests {
     fn rt_parity_buffer_allocate_rejects_malformed_capacity_exactly() {
         with_host_width_fixture(
             "allocate",
-            |ids, fs, mut store, host, mut resources, revocation, _, _| {
-                let malformed_allocate = allocate_buffer(
-                    -1,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+            |ids, fs, mut store, host, mut resources, _, _| {
+                let malformed_allocate =
+                    allocate_buffer(-1, &mut *host, &mut resources, &fs, &ids, &mut store);
                 expect_resource_error(&malformed_allocate, fs.invalid_bounds_id, &ids);
             },
         );
@@ -8039,7 +7866,7 @@ mod px5b_effect_observation_tests {
     fn rt_parity_fs_read_at_rejects_malformed_offset_exactly() {
         with_host_width_fixture(
             "read",
-            |ids, fs, mut store, host, mut resources, revocation, read_cap, _| {
+            |ids, fs, mut store, host, mut resources, read_cap, _| {
                 let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
                 let read_file = open_file(
                     b"source",
@@ -8047,20 +7874,12 @@ mod px5b_effect_observation_tests {
                     read_cap,
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
                 );
-                let buffer_result = allocate_buffer(
-                    8,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+                let buffer_result =
+                    allocate_buffer(8, &mut *host, &mut resources, &fs, &ids, &mut store);
                 let buffer = expect_resource_token(&buffer_result, &ids);
                 let result = run_fs(
                     fs.private_fs_read_at_id,
@@ -8074,7 +7893,6 @@ mod px5b_effect_observation_tests {
                     ],
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
@@ -8088,7 +7906,7 @@ mod px5b_effect_observation_tests {
     fn rt_parity_fs_write_at_rejects_malformed_offset_exactly() {
         with_host_width_fixture(
             "write",
-            |ids, fs, mut store, host, mut resources, revocation, _, full_cap| {
+            |ids, fs, mut store, host, mut resources, _, full_cap| {
                 let create_keep = make_ctor(fs.create_or_keep_id, vec![], &mut store);
                 let write_mode =
                     make_ctor(fs.resource_write_create_id, vec![create_keep], &mut store);
@@ -8098,20 +7916,12 @@ mod px5b_effect_observation_tests {
                     full_cap,
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
                 );
-                let buffer_result = allocate_buffer(
-                    8,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+                let buffer_result =
+                    allocate_buffer(8, &mut *host, &mut resources, &fs, &ids, &mut store);
                 let buffer = expect_resource_token(&buffer_result, &ids);
                 let result = run_fs(
                     fs.private_fs_write_at_id,
@@ -8125,7 +7935,6 @@ mod px5b_effect_observation_tests {
                     ],
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
@@ -8137,44 +7946,33 @@ mod px5b_effect_observation_tests {
 
     #[test]
     fn rt_parity_buffer_freeze_rejects_malformed_bounds_exactly() {
-        with_host_width_fixture(
-            "freeze",
-            |ids, fs, mut store, host, mut resources, revocation, _, _| {
-                let buffer_result = allocate_buffer(
-                    8,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
-                let buffer = expect_resource_token(&buffer_result, &ids);
-                let result = run_fs(
-                    fs.private_buffer_freeze_id,
-                    &[
-                        EvalVal::Unknown,
-                        EvalVal::ResourceToken(buffer),
-                        EvalVal::Int(-1),
-                        EvalVal::Int(1),
-                    ],
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
-                expect_resource_error(&result, fs.invalid_bounds_id, &ids);
-            },
-        );
+        with_host_width_fixture("freeze", |ids, fs, mut store, host, mut resources, _, _| {
+            let buffer_result =
+                allocate_buffer(8, &mut *host, &mut resources, &fs, &ids, &mut store);
+            let buffer = expect_resource_token(&buffer_result, &ids);
+            let result = run_fs(
+                fs.private_buffer_freeze_id,
+                &[
+                    EvalVal::Unknown,
+                    EvalVal::ResourceToken(buffer),
+                    EvalVal::Int(-1),
+                    EvalVal::Int(1),
+                ],
+                &mut *host,
+                &mut resources,
+                &fs,
+                &ids,
+                &mut store,
+            );
+            expect_resource_error(&result, fs.invalid_bounds_id, &ids);
+        });
     }
 
     #[test]
     fn rt_parity_malformed_read_offset_precedes_closed_resource() {
         with_host_width_fixture(
             "read-closed",
-            |ids, fs, mut store, host, mut resources, revocation, read_cap, _| {
+            |ids, fs, mut store, host, mut resources, read_cap, _| {
                 let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
                 let read_file = open_file(
                     b"source",
@@ -8182,30 +7980,14 @@ mod px5b_effect_observation_tests {
                     read_cap,
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
                 );
-                let buffer_result = allocate_buffer(
-                    8,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+                let buffer_result =
+                    allocate_buffer(8, &mut *host, &mut resources, &fs, &ids, &mut store);
                 let buffer = expect_resource_token(&buffer_result, &ids);
-                release_resource(
-                    read_file,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+                release_resource(read_file, &mut *host, &mut resources, &fs, &ids, &mut store);
                 let read_closed_overlap = run_fs(
                     fs.private_fs_read_at_id,
                     &[
@@ -8218,7 +8000,6 @@ mod px5b_effect_observation_tests {
                     ],
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
@@ -8232,7 +8013,7 @@ mod px5b_effect_observation_tests {
     fn rt_parity_malformed_write_offset_precedes_missing_right() {
         with_host_width_fixture(
             "write-right",
-            |ids, fs, mut store, host, mut resources, revocation, read_cap, _| {
+            |ids, fs, mut store, host, mut resources, read_cap, _| {
                 let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
                 let read_only_file = open_file(
                     b"source",
@@ -8240,20 +8021,12 @@ mod px5b_effect_observation_tests {
                     read_cap,
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
                 );
-                let buffer_result = allocate_buffer(
-                    8,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+                let buffer_result =
+                    allocate_buffer(8, &mut *host, &mut resources, &fs, &ids, &mut store);
                 let buffer = expect_resource_token(&buffer_result, &ids);
                 let write_right_overlap = run_fs(
                     fs.private_fs_write_at_id,
@@ -8267,7 +8040,6 @@ mod px5b_effect_observation_tests {
                     ],
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
@@ -8281,26 +8053,11 @@ mod px5b_effect_observation_tests {
     fn rt_parity_malformed_freeze_bounds_precede_closed_resource() {
         with_host_width_fixture(
             "freeze-closed",
-            |ids, fs, mut store, host, mut resources, revocation, _, _| {
-                let buffer_result = allocate_buffer(
-                    8,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+            |ids, fs, mut store, host, mut resources, _, _| {
+                let buffer_result =
+                    allocate_buffer(8, &mut *host, &mut resources, &fs, &ids, &mut store);
                 let buffer = expect_resource_token(&buffer_result, &ids);
-                release_resource(
-                    buffer,
-                    &mut *host,
-                    &mut resources,
-                    revocation,
-                    &fs,
-                    &ids,
-                    &mut store,
-                );
+                release_resource(buffer, &mut *host, &mut resources, &fs, &ids, &mut store);
                 let freeze_closed_overlap = run_fs(
                     fs.private_buffer_freeze_id,
                     &[
@@ -8311,7 +8068,6 @@ mod px5b_effect_observation_tests {
                     ],
                     &mut *host,
                     &mut resources,
-                    revocation,
                     &fs,
                     &ids,
                     &mut store,
@@ -8874,7 +8630,6 @@ mod px5b_effect_observation_tests {
         let mut host = PosixHost::new_at(&root);
         let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_PARTIAL));
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut revocation = ken_host::RevocationDomain::default();
         let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
 
         // Call 1: insert a resource into `resources`.
@@ -8884,22 +8639,13 @@ mod px5b_effect_observation_tests {
             capability,
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,
         );
 
         // Call 2: a SEPARATE dispatch call releasing the token call 1 minted.
-        release_resource(
-            file,
-            &mut host,
-            &mut resources,
-            &mut revocation,
-            &fs,
-            &ids,
-            &mut store,
-        );
+        release_resource(file, &mut host, &mut resources, &fs, &ids, &mut store);
 
         // Call 3: reusing the now-retired token only pins the exact
         // already-closed identity (not just any error) if calls 1-3 all
@@ -8913,7 +8659,6 @@ mod px5b_effect_observation_tests {
             ],
             &mut host,
             &mut resources,
-            &mut revocation,
             &fs,
             &ids,
             &mut store,

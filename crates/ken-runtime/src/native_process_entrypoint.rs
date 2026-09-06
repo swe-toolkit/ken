@@ -48,7 +48,6 @@ pub struct NativeProcessSymbols {
     pub resource_invalid_offset: RuntimeSymbol,
     pub resource_invalid_bounds: RuntimeSymbol,
     pub resource_no_progress: RuntimeSymbol,
-    pub resource_revoked: RuntimeSymbol,
     pub resource_kind_fs_handle: RuntimeSymbol,
     pub resource_kind_buffer: RuntimeSymbol,
     pub resource_trace_identity: RuntimeSymbol,
@@ -110,7 +109,6 @@ impl NativeProcessSymbols {
             resource_invalid_offset: "ctor:prelude::ResourceError::InvalidOffset".to_string(),
             resource_invalid_bounds: "ctor:prelude::ResourceError::InvalidBounds".to_string(),
             resource_no_progress: "ctor:prelude::ResourceError::NoProgress".to_string(),
-            resource_revoked: "ctor:prelude::ResourceError::ResourceRevoked".to_string(),
             resource_kind_fs_handle: "ctor:prelude::ResourceKind::FsHandle".to_string(),
             resource_kind_buffer: "ctor:prelude::ResourceKind::Buffer".to_string(),
             resource_trace_identity:
