@@ -1,29 +1,45 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION
 title: "Scaffold-retirement Tier C, held component: migrate the {NonEmpty, Validation} WCC off fixture scaffolding onto real imports, once their split-out predecessors are published. Same per-module publish+import+standalone shape as the Tier C ready lane; NonEmpty before Validation (the intra-tier edge). NO class-instance relocation, NO invented pub instance."
-status: active
+status: draft
 owner: foundation
 size: M
 gate: none
 tier: T2
-depends_on: [CAT-MIGRATE-LF-SEMIGROUP-PUBLISH, CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS, LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE, LANG-ABSTRACT-EXPORT-PARAM-ELAB]
+depends_on: [CAT-MIGRATE-LF-SEMIGROUP-PUBLISH, CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS, LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE, LANG-ABSTRACT-EXPORT-PARAM-ELAB, CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP]
 blocks: []
 github: null
 origin: "Steward, 2026-09-03, split out of [[CAT-MIGRATE-TIER-C-DATA-VALUE]] on the confirmed D0 census (foundation evt_19kq7r92attpy, Architect confirmation evt_4hp6qxkdaqgbz). The census measured {NonEmpty, Validation} as a WCC (edge NonEmpty -> Validation) that sits behind UNPUBLISHED split-out providers, so the DAG-axis discipline holds it out of the ready lane: NonEmpty needs private LF Semigroup ([[CAT-MIGRATE-LF-SEMIGROUP-PUBLISH]]); Validation needs private EC apply_to/compose/functor_map_of/Applicative AND EC itself roots-loads red at Functor / Functor_instance_Identity, i.e. blocked on the Language roots-loader faces-3 cross-module export+import predecessor ([[LANG-ROOTS-LOADER-LOCAL-INSTANCE-DICT-SCOPE]] follow-up) PLUS the EC provider-widen ([[CAT-MIGRATE-EC-APPLICATIVE-PROVIDERS]]). Validation also names Semigroup_instance_NonEmpty (a synthesized dict) in a checked example — that resolves ONLY via the predecessor's imported-head carry, NEVER an invented pub instance. Held until all three predecessors land; then released one behind the ready lane."
 ---
 
-> # RE-RELEASED 2026-09-06 to the foundation ring (lane-3). BOTH predecessors of
-> # the D1 rescope have LANDED: LANG-ABSTRACT-EXPORT-PARAM-ELAB (the elaborator
-> # two-faced/arity fix, ba81c9777 / node close 68642cbc6) and the §4.2 spec text
-> # LANG-ABSTRACT-EXPORT-PARAM-spec (560dd455b). All four depends_on are merged.
-> # Base = current main 68642cbc6 (re-measure at cut per D0). Foundation seat is
-> # gpt-5.6-terra/medium (T2) -- correct for this M/T2 node; the D1 rescope
-> # (abstract type + smart constructors, executing the Architect's specified
-> # design) stays T2. D0 FIRST (re-census both modules at the new cut -- providers
-> # and anchors moved since the original D0), then the RESCOPED D1 NonEmpty (see
-> # Deliverables), then D2 Validation. A measured drift needing intrinsic-T1 work
-> # is a HARD STOP to Steward + Architect, not a push-through. The RE-HELD history
-> # below is retained for context.
+> # RECUT 2026-09-06 to STEP P3 (flip-only) of the Architect's 3-step additive
+> # staging DAG (evt_5fxtzhk104q96). The prior monolithic scope (candidate
+> # 94b061de) is SUPERSEDED -- it bundled the smart ctors + abstract flip and
+> # reds cc7/cc8, because a strict importable module hides its raw ctor from the
+> # ambient Schema/ArgParse consumers that still name it (spec 33 §4.2/§4.3:
+> # module pub data is abstract-export only; "importable + public raw ctors" is
+> # unexpressible). So the code motion is split ahead of the flip: smart ctors ->
+> # P1 [[CAT-MIGRATE-TIER-C-NONEMPTY-SMART-CTORS]], raw call-site swap -> P2
+> # [[CAT-MIGRATE-TIER-C-NONEMPTY-CALLSITE-SWAP]] (both additive, ambient). THIS
+> # node (P3) does ONLY the logic-free flip: {NonEmpty,Validation} -> strict
+> # abstract importable modules (raw ctors hidden, SAFE once P2 removes the last
+> # raw consumer); import lines into consumers {Schema, ArgParse,
+> # Configuration.Decoder, Forge}; cc7/cc8 (+cc1 if still ambient) harness legs ->
+> # roots loader. Atomic over its loading closure (a strict module is not
+> # ambiently visible; the roots loader resolves the whole closure together) but
+> # small + logic-free because P1/P2 moved the code ahead of it.
+> #
+> # HELD (status draft) pending P2; depends_on adds the callsite-swap (the
+> # original 4 predecessors are all merged). The Steward rewrites the
+> # Deliverables/ACs below to the FLIP-ONLY scope and flips this ready when P2
+> # lands (one-release-ahead). The BODY BELOW is the OLD monolithic
+> # D1-abstract+D2-Validation scope -- NOT the P3 spec; do NOT build from it until
+> # the recut. Carry Architect z3570 bounded notes into the P3 rewrite: (a)
+> # Validation law witnesses pub proof/theorem -> privatize (option_map precedent)
+> # or list in §7; (b) removed no-Monad-registry guard -> behavioral replacement.
+> # Architect gives P3 its FULL soundness pass (abstraction boundary + new loading
+> # semantics); P1/P2 are additive/mechanical. Prior RE-RELEASED/RE-HELD history
+> # retained below for context.
 > #
 > # RE-HELD 2026-09-06 after a D1 hard stop. It WAS released 2026-09-06 (its
 > # three original predecessors merged); the foundation ring ran D0 clean, then D1
