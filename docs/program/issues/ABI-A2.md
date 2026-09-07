@@ -1,7 +1,7 @@
 ---
 id: ABI-A2
 title: "promote FsAppendFile, FsMetadata, FsRename to NativeTested"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
