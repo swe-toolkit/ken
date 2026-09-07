@@ -944,6 +944,32 @@ seat can detect**, which is why it is fleet law and not a team-local item.
 > are not** — before assuming any git state is yours alone, ask whether the
 > underlying ref lives in the clone or in the worktree.
 
+### 12b. Tear down the scratch worktrees you spin up
+
+**Binding on every seat** (Steward, 2026-09-07, after the disk hit 99% / 2.7G
+free). The devcontainer disk fills with per-worktree cargo `target/` dirs
+(17–31G for an active build seat). The cause is not any one target — it is
+**scratch/review/reconcile worktrees created for a task and never removed**:
+measured at **100 worktrees, ~60 of them abandoned**, before a prune back to 40.
+
+**Whoever creates a scratch worktree removes it at task close.** An Architect
+review checkout, a lieutenant reconcile worktree, a `wp/*` build worktree — when
+the task lands or is abandoned, run **`git worktree remove <path>`**. A *clean*
+worktree holds no un-captured work (its branch and commits live in the shared
+`.git`), so removing it loses nothing and it can be re-added on demand. Do not
+leave a clean scratch worktree behind.
+
+**The Steward runs the periodic safe prune** — `steward/worktree-hygiene.md`
+(protect `main` + every `.worktrees/<role>` primary; remove only clean worktrees
+that are merged-to-`main` or aged; never `--force` a dirty one — surface it to its
+owner). Do NOT "solve" the disk with a shared `CARGO_TARGET_DIR`: one target dir
+across the fleet's many branches makes cargo constantly invalidate each seat's
+build (cross-branch cache thrash) — per-worktree targets isolate that on purpose.
+
+> Same shared-substrate family as §12a: worktrees look isolated and their disk
+> footprint is not — it is one volume, and an abandoned checkout is the whole
+> fleet's problem, not just yours.
+
 ## 13. Liveness: keep the rings turning
 
 Token rings stall — an agent finishes, forgets to hand off, and the ring goes
