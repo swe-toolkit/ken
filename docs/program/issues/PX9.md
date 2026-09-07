@@ -80,3 +80,12 @@ The **`SafeContext`** field's meaning (redaction-aware context rendering to a
 stable non-leaking label) is the Architect's reading of the charter's "safe
 context"; flagged to the operator/Spec for confirmation alongside the increment-2
 scope call. PX9-INC1 builds to that reading unless the confirmation narrows it.
+
+D0 reconciliation folded into the PX9-INC1 frame 2026-09-07 (Architect ruling
+`evt_20n7vgagrk9zy`): the identity slot reuses the existing `IOError` directly (no
+new sum — avoids the constructor-collision class), single-Revoked is scoped to the
+canonical `IOError.Revoked` classification with the surface-wide fold deferred to
+increment 2, and the retry-safety AC is stated behaviorally
+(`AC-RETRY-CONSUMES-IDEMPOTENCE`: the sanctioned classifier consumes both axes and
+no error-only retry classifier is provided) rather than as an unrepresentability
+claim.
