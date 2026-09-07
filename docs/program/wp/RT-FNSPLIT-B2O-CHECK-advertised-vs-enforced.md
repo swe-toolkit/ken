@@ -1,5 +1,75 @@
 # `RT-FNSPLIT-B2O-CHECK` — close the advertised-vs-enforced gap in the checking layer
 
+> ## AMENDED 2026-09-07 (Steward) — post-D0 remeasurement against base `44c2ca9a`. THIS BANNER IS AUTHORITATIVE where it and the body below disagree.
+>
+> The runtime ring ran the mandated full post-main D0 remeasurement (implementer
+> `evt_22ydxjtn3qj3n` + `evt_rt0jan4jvhf8`) and hit the frame/code disagreements
+> the release predicted. Dispositioned: Steward Asks 1 and 3 (measurement) +
+> Architect P1 ruling `evt_5m6z1j1e5mjej` (the C4 contract). The corrected
+> populations and current-base anchors here supersede every stale citation in the
+> body; the ring re-derives against its own D0 measurement, not the stale tables.
+>
+> ### Corrected populations (Steward, Asks 1 and 3)
+>
+> - D2 / Finding B: the inherited "12 advertised / 5 live" is STRUCK.
+>   `validate_function_units` (now `semantic_ir.rs:2329`; `partition_function_units`
+>   `:1231`) has 25 named error sites = 2 capacity guards + 23 planner-invariant
+>   sites, of which 12 are LIVE on the sole call route and 11 are
+>   shadowed/entailed. The former unprobed arm (`:1072`, "ownership edge endpoint
+>   has no semantic descriptor") is now the newly-LIVE ownership-endpoint row,
+>   witnessed via a `StaticBody` edge with an out-of-range `from`. D2's obligation
+>   is unchanged in shape (a reachability row per site: exact error string, or an
+>   explicit shadowed/entailed-by row); AC-1's "stated == rows" now counts 25.
+>   B1 (the quadratic scan, now `semantic_ir.rs:2609-2618`, shadowed by
+>   `partition_function_units`) and B3 (the construction-identity conjunct, now
+>   `:2353-2366`, carrying D2a's `- pairs`; only `self.functions.len()` differs)
+>   both survive as measured — still cost paid for a law that never fires.
+> - Slot counts: the relayed pre-B2F "2 descriptors, 10 slots" is STRUCK in both
+>   directions. Measured: wrapped-import Capture 9, bare imported-unit Result 8.
+> - Other current-base anchors (D0-confirmed): item enumerator test
+>   `control.rs:3625` / classifier `:3636` / `BACKEND_PRODUCTION_SOURCES` `:3468`
+>   (32 files); the Finding-C capture-class fixture `closure.rs:5395`;
+>   `AbiPlane::validate` `abi.rs:2561` (P2: dead `get`-arm `:2596-2598`, LIVE
+>   positional comparison `:2602-2610` — preserve it); C4
+>   `reject_imported_capture_edges` `abi.rs:1567`; `producers_of` `abi.rs:2248`.
+>
+> ### P1 / D5 contract RULED (Architect `evt_5m6z1j1e5mjej`): (ii) checked-Ken-PRODUCED values, not (i) all-public-RuntimeExpr
+>
+> Checked-Ken erasure builds every lambda's captures as bare `(0..depth)` Vars
+> (`erasure.rs:2246-2251`), so the synthetic Hole A `If{true,imported,imported}`
+> and a direct imported capture are public-RuntimeExpr-constructible but never
+> erasure-produced. Option (i) is refused: it would green synthetic Hole A while
+> leaving the always-occurring Var-capture population unmeasured. D5 splits by
+> population:
+>
+> - (a) BUILD NOW, no new authority: the unit's OWN RESULT plus any If/Let-wrapped
+>   occurrence within the unit's own semantic program — covered by the existing
+>   `producers_of` relation (If/Let forwarding + own-result). This closes Hole B,
+>   is scoped per-unit, and applies to EVERY unit, not only closure-shaped ones
+>   (the bare-Result sub-question, answered).
+> - (b) CARVED OUT AND GATED — do NOT build in this node yet: captured Vars
+>   referencing an enclosing binding that holds an imported value (the real
+>   lambda-capture route). `producers_of` terminates at Var (`_ => &[]`) and
+>   cannot cross the capture boundary, so honest coverage needs a new cross-frame
+>   Var->binding-source authority (per-value provenance; never blanket-reject Var
+>   captures, never blanket-reject imports — both are the banned over-strong form).
+>   Its DIRECTION (reject vs accept-and-link) turns on a representability fact that
+>   is B2F's, not C4's to assume. PRECONDITION before sizing: runtime-leader
+>   establishes with B2F whether a checked-Ken `(0..depth)`-Var capture of an
+>   imported value actually reaches a boundary carrier that violates the invariant
+>   — reaches-and-violates means (b) rejects and is a real resize; representable or
+>   benign means (b) collapses to accept-and-link with no rejection authority to
+>   build. That fact returns to the Steward for the sizing call (resize in-node vs
+>   a successor node). The synthetic Hole A fixture is kept ONLY as a regression
+>   control on `producers_of`'s If/Let forwarding (it must reject); it is NOT
+>   AC-3's real-population capture witness.
+>
+> ### What the ring builds NOW
+>
+> Findings A, B (D2 over the 25 sites, probe `:1072`), C, P2, and D5(a). Do NOT
+> build D5(b) until the B2F precondition and the Steward sizing call land. The
+> edited D5 and AC-3 below carry the split.
+
 **Owner:** Team Runtime · **Size:** `M` (was `S`; the `B2R` hunt added two
 findings, one of which is a design task) · **Gate:** none
 
@@ -228,13 +298,22 @@ also removes the only quadratic scan in the validator.
 **D4 — close the zero-instance class (Finding C).** One `LexicalClosure`-with-
 captures fixture plus a `capture_children > 0` counter.
 
-**D5 — repair `C4` (Finding P1).** Move the exclusion from *"the capture child's
-own top-level shape"* to *"occurrences whose value can reach a boundary slot"* —
-the middle the original repair skipped. ⛔ **Do not restore the original
-over-strong form** (*"any occurrence anywhere"*); a property test already
-rejected it, and re-landing it re-breaks intra-module values that must stay
-accepted. The obligation covers **the unit's own result**, not only capture
-children.
+**D5 — repair `C4` (Finding P1). RULED (ii) checked-Ken-produced values; SPLIT by
+population — the AMENDMENT banner at the top carries the full ruling.**
+
+- **D5(a) — build now, no new authority.** Extend the exclusion to the unit's
+  OWN RESULT plus any If/Let-wrapped occurrence within the unit's own semantic
+  program, on the existing `producers_of` relation (If/Let forwarding +
+  own-result). This closes Hole B; scope it per-unit; it applies to every unit,
+  not only closure-shaped ones. Do not restore the original over-strong form
+  (*"any occurrence anywhere"*) — a property test already rejected it and it
+  re-breaks intra-module values that must stay accepted.
+- **D5(b) — carved out and GATED; NOT built in this node yet.** The captured-Var
+  route (a Var capturing an enclosing binding that holds an imported value) needs
+  a new cross-frame Var->binding-source authority; its direction (reject vs
+  accept-and-link) is gated on the B2F representability precondition named in the
+  banner, then a Steward sizing call. Do not build it, and do not let a green
+  synthetic Hole A stand in for its real-program witness.
 
 **D6 — correct `AbiPlane::validate` (Finding P2).** Remove the dead arm and state
 what the remaining check actually enforces. ⛔ **Preserve the positional-identity
@@ -252,10 +331,16 @@ Enumerate the forms explicitly — `impl`, `mod`, `fn`, `struct`, `trait`, `enum
 as a quantifier the reader resolves is not an AC.** A per-form table with a cell
 per result is.
 
-**AC-3 — `C4` rejects both measured holes and still accepts intra-module
-values.** Both directions are required. Assert the **exact** error. ⚠ A repair
-that rejects `If { true, imported, imported }` by rejecting all `If` captures has
-reproduced the over-strong form and fails this AC.
+**AC-3 — D5(a): `C4` rejects Hole B (the unit's own imported result) and the
+synthetic Hole A wrapper, and still accepts intra-module values.** Assert the
+**exact** error on each rejection; the intra-module acceptance control is
+required. Synthetic Hole A is a regression control on `producers_of`'s If/Let
+forwarding here, **not** the real-population witness — the real captured-Var route
+witness (a checked-Ken program whose lambda captures an imported value) is
+**D5(b)'s and is deferred with it**; do not claim it satisfied on this node. A
+repair that rejects `If { true, imported, imported }` by rejecting all `If`
+captures, or that rejects all Var captures, has reproduced the banned over-strong
+form and fails this AC.
 
 **AC-4 — the dead arm in `AbiPlane::validate` is gone and the positional-identity
 law is intact.** A control that reddens if `:939`'s comparison is neutered.

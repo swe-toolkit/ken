@@ -11,6 +11,29 @@ github: null
 origin: Findings on landed B2O (origin/main e470ab65). (a) Steward's own AC-12 tally recorded one GREEN row as a reported follow-up rather than fixing it inside a subtraction WP. (b) Adversary report evt_kzc8ntfsyhn9 (thr_2seh2bm1kr5mh), P1/P2/P3. SCOPE GREW 2026-07-25 on the B2R hunt (adversary evt_3wjme1fk20dw5) plus Architect ruling evt_7ggqdk61pxzzf, which routed the C4 imported-edge repair HERE and explicitly forbade B2F from patching it; two further findings (P1 the C4 exclusion, P2 the entailed second direction in AbiPlane::validate) joined, and the size moved S -> M because P1 is a design task rather than a mechanical closure. Grounding status, stated precisely: the Steward independently re-measured Finding A's filter, Finding B1's shadowing (both call sites and both error strings), Finding B3's vacuous conjunct, and derived P2 independently against 6c6de5cc. Findings B2 (the six witness-less arms) and C (the zero-instance capture class) are the Adversary's measurements, relayed unverified; for P1 the Steward verified the code shape but NOT the fixture measurements. The ring re-measures everything and must not treat this file as anyone's corroboration. Steward-filed; Steward owns the frame and the AC/control placement.
 ---
 
+> ## AMENDED 2026-09-07 (Steward) — D0 remeasured, populations corrected, P1 RULED. Read the amended `wp/` frame for the operative deliverables.
+>
+> The runtime ring's mandated D0 remeasurement (base `44c2ca9a`; implementer
+> `evt_22ydxjtn3qj3n` + `evt_rt0jan4jvhf8`) falsified three frame inputs.
+> Dispositioned this session:
+> - Finding B / D2: "12 advertised / 5 live" STRUCK. Measured surface is 25 named
+>   error sites (2 capacity guards + 23 planner-invariant; 12 LIVE, 11
+>   shadowed/entailed), and the former unprobed `:1072` ownership-endpoint arm is
+>   now LIVE. B1 (quadratic scan) and B3 (construction-identity conjunct) survive.
+> - Finding P1 slot counts: "2 descriptors, 10 slots" STRUCK; measured 9 (wrapped
+>   Capture) / 8 (bare Result).
+> - Finding P1 / D5 contract RULED (Architect `evt_5m6z1j1e5mjej`): (ii), over
+>   checked-Ken-PRODUCED values. D5 splits into (a) build-now (own-result +
+>   within-unit If/Let, existing `producers_of`, closes Hole B, per-unit, every
+>   unit) and (b) the captured-Var route — carved out and GATED on a B2F
+>   representability precondition then a Steward sizing call (needs a new
+>   cross-frame Var->binding-source authority). Synthetic Hole A is a regression
+>   control only, never D5(b)'s real-population witness.
+>
+> The ring builds A, B, C, P2, D5(a) now; NOT D5(b). The findings recorded below
+> are the pre-B2F measurements — superseded by the D0 remeasure above and by the
+> amended frame.
+
 > ## RELEASED 2026-09-07 (Steward) to the runtime ring (lane-1 compiler program).
 > Runtime-leader named it the next deliverable (evt_w3hqa3722j7m); released +
 > anchored at kick evt_6z1eb5edjnvqg under the operator's standing compiler-program
