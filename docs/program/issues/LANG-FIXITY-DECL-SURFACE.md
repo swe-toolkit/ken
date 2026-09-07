@@ -73,10 +73,13 @@ appear textually before the first use of `<+>`, or does the parser collect
 every fixity declaration in the module first? **These differ observably** on a
 module that uses an operator above its declaration. **Report what `§6` and the
 module chapter settle.** Where the spec leaves it open, **whole-module
-collection is the natural reading** and the guided default: it is what `D2`'s
-post-resolution reassociation (shape (a)) yields for free, since reassociation
-runs after the whole module is name-resolved rather than during a single
-forward parse pass. State it as a choice if the spec does not force it.
+collection is the natural reading** and the guided default: the Architect
+confirmed `D2`'s post-resolution reassociation supports it at zero extra cost
+(sweep a unit's `fixity_decl`s into the table before reassociating its bodies,
+so a use textually preceding its operator's `fixity_decl` still sees the
+fixity), whereas declaration-before-use would need an added ordering check. He
+explicitly did not decide q1 — it stays the ring's/spec's call. State it as a
+choice if the spec does not force it.
 
 **2. Scoping across imports — MEASURED AND COSTED. A two-option fork, not an
 open question.** Measured by the Architect (`evt_33rw7w8xkdya2`) and
@@ -93,7 +96,14 @@ representation.** The two options and their prices:
 | option | meaning | price |
 |---|---|---|
 | **module-local fixity** | an operator's fixity does not cross an `import` | **zero change to `modules.rs`** |
-| **propagating fixity** | the export value widens from `String` to a record carrying fixity | **10 threading sites**: `:54`, `:176`, `:221`, `:248`, `:317`, `:819`, `:868`, `:1011`, `:1031`, `:1327` |
+| **propagating fixity** | fixity travels with the operator's canonical identity across `import`/re-export | **realized as the `D2` `GlobalId`-keyed side-table (`num_values` pattern), NOT the export widening** — export leaf untouched |
+
+> The "export leaf widens from `String` to a record" realization that this
+> table originally priced (`evt_33rw7w8xkdya2`; 10 sites, grown to 16 by
+> `9ca7c4ce5`) is **superseded** by the Architect's `D2` ruling below: fixity
+> lives in a program-threaded side-table keyed by `GlobalId`, so the export map
+> is untouched and that site count is moot. The **answer** (propagating) is
+> unchanged; only the realization is cheaper.
 
 **RULED — propagating fixity, now normative spec.** The Architect ruled
 question 2 at [[LANG-INFIX-APPLICATION-DEFAULT]]'s merge Decision
@@ -103,10 +113,9 @@ any surface path or alias, so it **travels with import and re-export** — a
 client, an aliased import, or a re-exported path sees the declaring module's
 fixity, because both republish the same `GlobalId` rather than minting another
 (`§3.3`, `§4.3`). Fixity is **not re-scopable at a use site**. ⇒ **The
-propagating option is the answer**, not module-local fixity. The export
-representation must carry fixity so it survives an `import`; the Architect's
-measured price for that stands — the 10 threading sites in the table above
-(`modules.rs:54` … `:1327`) are owed implementation, not a fork to report.
+propagating option is the answer**, not module-local fixity. Its realization is
+the `GlobalId`-keyed side-table ruled in `D2` (not an export-map widening), so
+the `modules.rs` threading-site count that priced the widening is moot.
 
 **The conflicting-fixity-on-two-imports sub-question is DROPPED.** Per `§6`, two
 **distinct** declarations that share an operator spelling, imported unqualified,
@@ -122,32 +131,60 @@ not last-wins. Reject with a diagnostic that names both declaration sites. (Two
 declarations that agree are idempotent, mirroring the `§3.3` same-identity
 rule.)
 
-**`D2` — the fixity table and WHERE it is consulted.** `infixl N op`,
-`infixr N op`, `infix N op` populate a fixity table; precedence and
-associativity then reassociate the operator spine.
+**`D2` — RULED: a post-resolution reassociation pass over a `GlobalId`-keyed
+fixity table.** Ruled by the Architect (`evt_4b66p3qb88wnn`). `infixl N op` /
+`infixr N op` / `infix N op` populate the table; a single pass reassociates the
+operator spine after name resolution. (Anchors below are perishable — verified
+at `9ca7c4ce5`; the Architect's own citations were line-shifted, these are the
+measured lines.)
 
-**Consultation is POST name-resolution, not in-parser in place.** Because fixity
-binds to the resolved canonical identity (`§6`), an operator's fixity is not
-known until `§3.3` name resolution has resolved its spelling to a `GlobalId` —
-so the infix parser cannot reassociate in one in-place pass keyed on the raw
-spelling, the way [[LANG-INFIX-APPLICATION-DEFAULT]] could for a single
-hard-wired default. Two shapes are sound; **the ring picks one and reports
-which and why** (`D1`/`AC-1`):
+**Consultation is POST name-resolution, in a distinct pre-body pass — not
+in-parser.** Because fixity binds to the resolved canonical identity (`§6`), an
+operator's fixity is unknown until `§3.3` resolution has mapped its spelling to
+a `GlobalId`. So:
 
-- **(a) fixity-neutral spine + reassociation pass.** The parser emits a flat,
-  fixity-neutral operator spine; a pass after `§3.3` resolution reassociates it
-  from the resolved identities' fixities (the GHC-renamer shape). The
-  undeclared-default `infixl 9` that [[LANG-INFIX-APPLICATION-DEFAULT]]
-  hard-wired into the parser cascade **relocates into this pass** as the
-  no-declaration default.
-- **(b) fixity pre-pass.** A pass gathers every in-scope fixity — including
-  imported and re-exported ones (`§6`) — before the module body is parsed, so
-  the parser holds the full table in place.
+- **Resolution keeps the operator run FLAT.** Name resolution does not
+  reassociate (local ids do not exist there yet); it carries the run as a flat
+  `RInfixSpine` (ordered operands + resolved operator heads) and passes it
+  through untouched.
+- **A single post-resolution pass is the sole reassociator.** It consumes the
+  neutral spine and emits ordinary `RApp`, so the existing `check`/body path is
+  UNCHANGED and only ever sees `RApp`. Reassociation is **not** type-directed —
+  association must be fixed before the body is typed (`a <+> b <+> c` has no
+  type until you know it is `(a<+>b)<+>c`), so a lazy-in-elaboration placement
+  is rejected: it would smear a purely syntactic restructuring across the
+  type-directed elaborator (reflect-don't-extend, and far harder to audit).
+- **Exact site — the predeclare→check boundary in `elaborate_mutual_group`**
+  (`crates/ken-elaborator/src/elab.rs:10931`). The group pre-admits all members,
+  binding every name in `globals` (`id = env.fresh_id(); globals.insert(name,
+  id)`) BEFORE any body is elaborated, then checks bodies. Run reassociation at
+  that boundary (and the analogous point on the singleton path). There `globals`
+  already holds imported + earlier-elaborated + this-group ids — exactly and
+  only what a spine in this group's body can reference under dependency-ordered
+  elaboration — so every head resolves to a `GlobalId` with no forward-reference
+  gap.
 
-**The in-parser `infixl 9` default that INFIX landed must not silently win over
-a declared or imported fixity.** Whichever shape is chosen, state how that
-default composes with the table and keep [[LANG-INFIX-APPLICATION-DEFAULT]]'s
-default-path fixtures green (`AC-3`).
+**Carrier — a program-threaded `HashMap<GlobalId, Fixity>`, NOT an export-map
+widening.** Use the exact shape and lifecycle of the existing
+`num_values: HashMap<GlobalId, NumericLitVal>` (`elab.rs:323`, threaded `&mut`
+through the elaborator; populated at declaration via `cx.num_values.insert`
+`elab.rs:7898`/`:7974`; read program-wide via `env.num_values.get`
+`compiler_driver.rs:3847`/`:3904`). Populate the fixity table when a
+`fixity_decl` is elaborated: resolve its named operator to its DEFINING
+`GlobalId` and insert `Fixity { assoc, prec }`. This propagates across `import`
+with **zero interface change**: `§4.3` republishes the same `GlobalId`, and the
+table is program-accumulated, so an imported operator's fixity — recorded when
+its defining unit was elaborated, dependency-first, before the importer — is
+already present when the importer's spines reassociate.
+
+**Consultation and the default.** Reassociation maps head-name → `GlobalId` (via
+the unit's resolved `globals`, which already honors qualified/aliased/selective
+import) → `fixity_table[id]` → **`infixl 9` on a table miss**. Store the
+DECLARED fixity only; the undeclared default is applied AT CONSULTATION, never
+pre-seeded — the declared/undeclared distinction is load-bearing for `D3`
+(non-associative) and the `D1`-q3 redeclaration-as-error rule. This is where
+[[LANG-INFIX-APPLICATION-DEFAULT]]'s hard-wired `infixl 9` **relocates**, and it
+keeps INFIX's default-path fixtures green (`AC-3`).
 
 **`D3` — `infix N` (non-associative) rejects `a <+> b <+> c`.** With a
 diagnostic that says so. **This is the arm most likely to be silently omitted**,
@@ -210,9 +247,17 @@ producible; the spec enclave owns the flip.
   kernel re-checks regardless of which path named the operator, so it adds
   nothing to `trusted_base()`. Zero-TCB.
 
-## AT THIS NODE'S MERGE DECISION: the Architect's build-time review returns
+## AT THIS NODE'S MERGE DECISION: the Architect's exact-SHA review returns
 
-The Architect committed to reviewing the parser's actual table-consultation
-shape once it exists. `D2` is the shape he wanted visible. **Steward: he is a
-required reviewer on this node's candidate** — route it to him for approach
-review alongside language QA before the merge Decision.
+He ruled the `D2` mechanism (`evt_4b66p3qb88wnn`) and called it shovel-ready;
+its exact-SHA review returns to him. **Steward: he is a required reviewer on
+this node's candidate** — route it to him alongside language QA before the merge
+Decision. What he will check (fold-recorded so the ring builds to it):
+
+- the reassociation pass emits ordinary `RApp` and the `check`/body path is
+  UNCHANGED (elaborator not extended);
+- the table is keyed by the canonical `GlobalId`, never a string or alias;
+- `infixl 9` on a table miss (default applied at consultation, not pre-seeded);
+- `D3` non-associative rejects `a <+> b <+> c` with its own diagnostic;
+- `AC-3` holds — undeclared operators still parse at `infixl 9` via the
+  relocated default.
