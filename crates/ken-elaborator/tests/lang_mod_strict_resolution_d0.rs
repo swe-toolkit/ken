@@ -695,6 +695,31 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // NonEmpty now declares its exact LawfulFunctors, Transport, and
+            // Derived dependencies. Its ordinary package boundary loads while
+            // the strict-floor census retains the compiler convenience names.
+            "Data.Collections.NonEmpty".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Data.Numeric.Nat.Arithmetic".to_string(),
             ["Equal", "Proved"]
                 .into_iter()
@@ -835,7 +860,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Capability.Process.Arguments",
         "Capability.System.IO",
         "Data.Collections.Map",
-        "Data.Collections.NonEmpty",
         "Data.Serialization.Json",
         "Data.Sums.Validation",
     ]

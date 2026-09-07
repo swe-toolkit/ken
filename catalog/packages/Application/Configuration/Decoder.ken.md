@@ -8,7 +8,7 @@ caller. Keys and values remain plain `Bytes` throughout.
 ## 1. Local provenance and values
 
 ```ken
-import Data.Collections.NonEmpty (NonEmpty)
+import Data.Collections.NonEmpty (NonEmpty, nonempty_map)
 
 data EnvConfigOrigin = EnvVariableOrigin String | ConfigEntryOrigin (List String)
 

@@ -11,13 +11,235 @@ mod catalog_or;
 
 use std::collections::BTreeSet;
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
+use ken_kernel::{GlobalId, Term};
 const EFFECTFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
 const NONEMPTY_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Collections/NonEmpty.ken.md");
 const VALIDATION_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Sums/Validation.ken.md");
+const NONEMPTY_MODULE: &str = "Data.Collections.NonEmpty";
+
+struct PublicationQuery {
+    surface: String,
+    source: String,
+    unpublished_names: BTreeSet<String>,
+}
+
+struct ModulePublicationQueries {
+    dependency_imports: String,
+    direct: Vec<PublicationQuery>,
+    attached: Vec<PublicationQuery>,
+}
+
+fn rename_identifier(source: &str, from: &str, to: &str) -> String {
+    let mut renamed = String::with_capacity(source.len());
+    let mut token = String::new();
+    let flush = |token: &mut String, renamed: &mut String| {
+        if token == from {
+            renamed.push_str(to);
+        } else {
+            renamed.push_str(token);
+        }
+        token.clear();
+    };
+    for character in source.chars() {
+        if character.is_alphanumeric() || character == '_' {
+            token.push(character);
+        } else {
+            flush(&mut token, &mut renamed);
+            renamed.push(character);
+        }
+    }
+    flush(&mut token, &mut renamed);
+    renamed
+}
+
+fn direct_publication_query(surface: &str, index: usize) -> PublicationQuery {
+    let alias = format!("cc1_nonempty_export_{index}");
+    PublicationQuery {
+        surface: surface.to_owned(),
+        source: format!("import {NONEMPTY_MODULE} ({surface} as {alias})"),
+        unpublished_names: BTreeSet::from([format!("{NONEMPTY_MODULE}.{surface}")]),
+    }
+}
+
+fn nonempty_publication_queries() -> ModulePublicationQueries {
+    let extracted = ken_elaborator::literate::extract_ken_md(NONEMPTY_KEN_MD)
+        .expect("NonEmpty literate source must extract");
+    let declarations =
+        parser::parse_decls(&extracted.source).expect("NonEmpty extracted source must parse");
+    let dependency_imports = declarations
+        .iter()
+        .filter(|declaration| matches!(declaration.unwrap_pub(), Decl::ImportDecl { .. }))
+        .map(|declaration| {
+            extracted.source[declaration.span().start..declaration.span().end].to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut direct = Vec::new();
+    let mut attached = Vec::new();
+
+    for declaration in &declarations {
+        let declaration = declaration.unwrap_pub();
+        match declaration {
+            Decl::ViewDecl { .. }
+            | Decl::LetDecl { .. }
+            | Decl::PropDecl { .. }
+            | Decl::TheoremDecl { .. }
+            | Decl::AxiomDecl { .. }
+            | Decl::DataDecl { .. }
+            | Decl::ExplicitDataDecl { .. }
+            | Decl::TypeAlias { .. }
+            | Decl::ClassDecl { .. } => {
+                direct.push(direct_publication_query(declaration.name(), direct.len()));
+            }
+            Decl::AttachedProofDecl {
+                proof_name,
+                subject,
+                params,
+                theorem,
+                body,
+                ..
+            } => {
+                let binders = params
+                    .iter()
+                    .map(|binder| &extracted.source[binder.span.start..binder.span.end])
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let arguments = params
+                    .iter()
+                    .flat_map(|binder| binder.names.iter())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let theorem_and_separator =
+                    &extracted.source[theorem.span().start..body.span().start];
+                let separator = theorem_and_separator
+                    .rfind('=')
+                    .expect("attached proof signature must end at its body separator");
+                let theorem = theorem_and_separator[..separator].trim_end();
+                let index = attached.len();
+                let probe = format!("cc1_nonempty_proof_probe_{index}");
+                let alias = format!("cc1_nonempty_subject_{index}");
+                let binders = rename_identifier(&binders, subject, &alias);
+                let theorem = rename_identifier(theorem, subject, &alias);
+                let surface = format!("{subject}::{proof_name}");
+                attached.push(PublicationQuery {
+                    surface: surface.clone(),
+                    source: format!(
+                        "import {NONEMPTY_MODULE} ({subject} as {alias})\n\
+                         theorem {probe} {binders} : {theorem} = {alias}::{proof_name} {arguments}"
+                    ),
+                    unpublished_names: BTreeSet::from([
+                        format!("{NONEMPTY_MODULE}.{subject}"),
+                        format!("{NONEMPTY_MODULE}.{surface}"),
+                    ]),
+                });
+            }
+            Decl::ExportDecl { form, .. } => {
+                let items = match form {
+                    ExportForm::Facade { items, .. } | ExportForm::InScope { items } => items,
+                };
+                for item in items {
+                    let surface = item.rename.as_deref().unwrap_or(&item.name);
+                    direct.push(direct_publication_query(surface, direct.len()));
+                }
+            }
+            Decl::BoundaryDecl { .. }
+            | Decl::FixityDecl { .. }
+            | Decl::SpaceDecl { .. }
+            | Decl::ProveDecl { .. }
+            | Decl::LawDecl { .. }
+            | Decl::ForeignDecl { .. }
+            | Decl::TemporalDecl { .. }
+            | Decl::RecordDecl { .. }
+            | Decl::InstanceDecl { .. }
+            | Decl::DeriveDecl { .. }
+            | Decl::ModuleDecl { .. }
+            | Decl::ImportDecl { .. } => {}
+            Decl::Pub(_) => panic!("unwrap_pub must remove the visibility wrapper"),
+        }
+    }
+
+    ModulePublicationQueries {
+        dependency_imports,
+        direct,
+        attached,
+    }
+}
+
+fn published_nonempty_surfaces() -> BTreeSet<String> {
+    let queries = nonempty_publication_queries();
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], NONEMPTY_MODULE)
+        .expect("NonEmpty must roots-load for publication probes");
+    env.elaborate_file(&queries.dependency_imports)
+        .expect("NonEmpty dependency imports must resolve for publication probes");
+
+    let mut probe = |query: &PublicationQuery| match env.elaborate_file(&query.source) {
+        Ok(_) => true,
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert!(
+                query.unpublished_names.contains(&name),
+                "publication query for {} failed at unrelated name `{name}`",
+                query.surface
+            );
+            false
+        }
+        Err(other) => panic!(
+            "publication query for {} failed unexpectedly: {other:?}\n{}",
+            query.surface, query.source
+        ),
+    };
+
+    let direct = queries
+        .direct
+        .into_iter()
+        .filter(|query| probe(query))
+        .map(|query| query.surface)
+        .collect::<BTreeSet<_>>();
+    let direct_imports = direct.iter().cloned().collect::<Vec<_>>();
+    let attached = queries
+        .attached
+        .into_iter()
+        .enumerate()
+        .filter_map(|(query_index, mut query)| {
+            let subject = query
+                .surface
+                .split_once("::")
+                .expect("attached surface has a subject")
+                .0;
+            let (subject_import, declaration) = query
+                .source
+                .split_once('\n')
+                .expect("attached query has an import and theorem");
+            let mut declaration = declaration.to_owned();
+            let mut imports = Vec::new();
+            for (index, dependency) in direct_imports
+                .iter()
+                .filter(|surface| surface.as_str() != subject)
+                .enumerate()
+            {
+                let alias = format!("cc1_nonempty_dependency_{query_index}_{index}");
+                let renamed = rename_identifier(&declaration, dependency, &alias);
+                if renamed != declaration {
+                    imports.push(format!(
+                        "import {NONEMPTY_MODULE} ({dependency} as {alias})"
+                    ));
+                    declaration = renamed;
+                }
+            }
+            imports.push(subject_import.to_owned());
+            imports.push(declaration);
+            query.source = imports.join("\n");
+            probe(&query).then_some(query.surface)
+        })
+        .collect::<BTreeSet<_>>();
+
+    direct.union(&attached).cloned().collect()
+}
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
@@ -30,6 +252,21 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_ken_md_file(EFFECTFUL_CLASSES_KEN_MD)
         .expect("Core/Classes/EffectfulClasses.ken.md must elaborate fifth");
     env
+}
+
+fn term_mentions_global(term: &Term, expected: GlobalId) -> bool {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. }
+            if *id == expected =>
+        {
+            true
+        }
+        Term::Elim { fam, .. } if *fam == expected => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions_global(child, expected)),
+    }
 }
 
 fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
@@ -45,27 +282,132 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
     }
 }
 
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: every parsed NonEmpty declaration and explicit export is queried
+/// through the real roots-loader interface, including attached proofs, and the
+/// successful names equal the stable §7 API. CLAIMED: NonEmpty exposes exactly
+/// its authorized abstract surface. THE GAP: data constructors are not direct
+/// declaration queries, so the separate two-face test below probes the raw
+/// constructor explicitly.
+#[test]
+fn nonempty_loader_visible_inventory_is_exact() {
+    let expected = [
+        "NonEmpty",
+        "Semigroup_instance_NonEmpty",
+        "nonempty_append",
+        "nonempty_cons",
+        "nonempty_head",
+        "nonempty_map",
+        "nonempty_singleton",
+        "nonempty_tail",
+        "nonempty_to_list",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect::<BTreeSet<_>>();
+    assert_eq!(
+        published_nonempty_surfaces(),
+        expected,
+        "NonEmpty's loader-visible surface must equal its stable abstract API"
+    );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: the actual roots-loaded owner bodies mention the owner's raw
+/// constructor, a client constructs and eliminates through the public API, and
+/// construction, matching, and selective import of the raw constructor each
+/// fail at its exact surface name. CLAIMED: the provider retains its transparent
+/// owner face while clients receive only the abstract face. THE GAP: the exact
+/// publication inventory above closes accidental publication of another owner
+/// declaration; the CC legs below own the real downstream import paths.
+#[test]
+fn nonempty_owner_keeps_raw_constructor_while_clients_cannot_name_it() {
+    let mut env = dependency_env();
+    let trust_before = env.env.trusted_base();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], NONEMPTY_MODULE)
+        .expect("NonEmpty must roots-load through its abstract surface");
+    let family = env.globals["Data.Collections.NonEmpty.NonEmpty"];
+    let constructor = env.globals["Data.Collections.NonEmpty.NonEmptyCons"];
+    for (owner, internal) in [
+        ("Data.Collections.NonEmpty.nonempty_singleton", constructor),
+        ("Data.Collections.NonEmpty.nonempty_cons", constructor),
+        ("Data.Collections.NonEmpty.nonempty_head", family),
+        ("Data.Collections.NonEmpty.nonempty_tail", family),
+        ("Data.Collections.NonEmpty.nonempty_to_list", family),
+        ("Data.Collections.NonEmpty.nonempty_map", constructor),
+        ("Data.Collections.NonEmpty.nonempty_append", constructor),
+        (
+            "Data.Collections.NonEmpty.nonempty_append::assoc",
+            constructor,
+        ),
+    ] {
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals[owner])
+            .unwrap_or_else(|| panic!("owner declaration `{owner}` must remain transparent"));
+        assert!(
+            term_mentions_global(&body, internal),
+            "owner declaration `{owner}` must retain its internal family or constructor identity"
+        );
+    }
+    assert_eq!(
+        env.env.trusted_base(),
+        trust_before,
+        "the abstract module boundary must add no trust"
+    );
+
+    env.elaborate_file(
+        "import Data.Collections.NonEmpty (NonEmpty, nonempty_cons, nonempty_head)\n\
+         const cc1_public_value : NonEmpty Nat = nonempty_cons Nat Zero (Nil Nat)\n\
+         const cc1_public_head : Nat = nonempty_head Nat cc1_public_value",
+    )
+    .expect("a client must construct and eliminate through the public API");
+
+    match env.elaborate_decl(
+        "const cc1_forbidden_value : NonEmpty Nat = \
+         Data.Collections.NonEmpty.NonEmptyCons Nat Zero (Nil Nat)",
+    ) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "Data.Collections.NonEmpty.NonEmptyCons")
+        }
+        other => panic!("qualified raw construction must reject at its exact name: {other:?}"),
+    }
+    match env.elaborate_decl(
+        "fn cc1_forbidden_match (xs : NonEmpty Nat) : Nat = \
+         match xs { NonEmptyCons x rest ↦ x }",
+    ) {
+        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "NonEmptyCons"),
+        other => panic!("raw constructor matching must reject at its exact name: {other:?}"),
+    }
+    match env.elaborate_file(
+        "import Data.Collections.NonEmpty (NonEmptyCons as cc1_forbidden_constructor)",
+    ) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "Data.Collections.NonEmpty.NonEmptyCons")
+        }
+        other => panic!("raw constructor import must reject at its exact name: {other:?}"),
+    }
+}
+
 #[test]
 fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
     let mut env = dependency_env();
 
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Data.Collections.NonEmpty",
-    )
-    .expect("Data.Collections.NonEmpty must roots-load");
-    catalog_or::expose_module(&mut env, "Data.Collections.NonEmpty");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
+        .expect("Data.Collections.NonEmpty must roots-load");
     assert_transparent_globals(
         &env,
         &[
-            "nonempty_singleton",
-            "nonempty_cons",
-            "nonempty_head",
-            "nonempty_tail",
-            "nonempty_to_list",
-            "nonempty_map",
-            "nonempty_append",
-            "nonempty_append::assoc",
+            "Data.Collections.NonEmpty.nonempty_singleton",
+            "Data.Collections.NonEmpty.nonempty_cons",
+            "Data.Collections.NonEmpty.nonempty_head",
+            "Data.Collections.NonEmpty.nonempty_tail",
+            "Data.Collections.NonEmpty.nonempty_to_list",
+            "Data.Collections.NonEmpty.nonempty_map",
+            "Data.Collections.NonEmpty.nonempty_append",
+            "Data.Collections.NonEmpty.nonempty_append::assoc",
         ],
     );
 
@@ -74,6 +416,15 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
 
     env.elaborate_ken_md_file(VALIDATION_KEN_MD)
         .expect("Data/Sums/Validation.ken.md and every checked fence must elaborate");
+    let canonical_dictionary = env.globals["Semigroup_instance_Data.Collections.NonEmpty.NonEmpty"];
+    let (_, checked_record) = env
+        .env
+        .transparent_body(env.globals["checked_record"])
+        .expect("the checked Validation example must remain transparent");
+    assert!(
+        term_mentions_global(&checked_record, canonical_dictionary),
+        "the checked Validation example must consume the imported canonical dictionary"
+    );
     assert_transparent_globals(
         &env,
         &[

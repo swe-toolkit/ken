@@ -12,7 +12,8 @@ positional, and subcommand descriptions; that same value drives parsing and
 help generation.
 
 ```ken
-import Data.Collections.NonEmpty (NonEmpty, nonempty_cons)
+import Data.Collections.NonEmpty
+  (NonEmpty, nonempty_cons, nonempty_map, Semigroup_instance_NonEmpty)
 
 data OptionMode = FlagOption | ValueOption
 
