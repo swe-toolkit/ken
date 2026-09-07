@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: L
 gate: none
-depends_on: [RT-DYNAMIC-ARM-SCALAR-MERGE, RT-CHECKED-IH-REALIZATION-AUTHORITY]
+depends_on: [RT-DYNAMIC-ARM-SCALAR-MERGE, RT-CHECKED-IH-REALIZATION-AUTHORITY, RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION]
 blocks: [KERNEL-NESTED-IND]
 github: null
 origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statement of c2's AC-K12 relationship, evt_77pege8j5cv14, requested at evt_6pmftb5fpxrkm. Discharges the second Steward condition on the c1/c2 cut (evt_6z7wf6dw94cym), which required c2 to state that relationship before assignment.
@@ -15,14 +15,19 @@ origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statemen
 > ## not unstarted (the schema has no `blocked` value; `draft` carries it).
 >
 > `D2` is merged; `D3`-`D5` (native execution, interpreter agreement at Nat 3,
-> the carried control no longer ignored) are gated on the planner capability
-> that [[RT-CHECKED-IH-REALIZATION-AUTHORITY]] mints — the authority `D2`
-> measured absent at `core.rs:10521`. That predecessor was RELEASED to the
-> runtime ring 2026-09-07 on the operator's fork ruling (evt_7nkzsy27p7npw: "Go
-> with A ... then continue with ABI B"). This node holds until it lands; the
-> Steward RE-RELEASES it (flip back to `active`) then. Left `active` it would
-> read as a node the ring is working while it cannot proceed — the DS-9 shape.
-> The `D2` record below stands.
+> the carried control no longer ignored) needed the checked-IH realization
+> authority that [[RT-CHECKED-IH-REALIZATION-AUTHORITY]] mints — the authority
+> `D2` measured absent at `core.rs:10521`. That predecessor LANDED 2026-09-07
+> (merged `e68ecd79` / code `d29cc8ad0`) as an accepted partial: it mints the
+> authority (both checked-IH calls realize under the 1-frame / 2-slot / 2-call
+> plan) but the seat still refuses one edge on, at a realized `RecursiveBackedge`
+> reaching the source-machine ordinary-Match continuation. Routing that residual
+> is [[RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION]] (Steward-filed 2026-09-07;
+> mechanism routed to the Architect). So `D3`-`D5` now gate on that successor,
+> not on A — this node holds until the successor lands, then the Steward
+> RE-RELEASES it (flip back to `active`). Left `active` it would read as a node
+> the ring is working while it cannot proceed — the DS-9 shape. The `D2` record
+> below stands.
 >
 > ## D2 MERGED 2026-08-14 as squash `f7ec9f59` — the D2 landing record.
 >
