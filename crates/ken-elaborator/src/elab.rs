@@ -9593,6 +9593,40 @@ fn reassociate_rdecl(
     Ok(Some(Box::new(associated)))
 }
 
+#[cfg(test)]
+mod fixity_reassociation_skip_tests {
+    use super::reassociate_rdecl;
+    use crate::error::Span;
+    use crate::resolve::{RDecl, RDeclKind, RExpr};
+    use std::collections::HashMap;
+
+    /// Promise class: durable invariant. MEASURED: resolution's negative spine
+    /// marker returns the borrowed-path sentinel without cloning or walking the
+    /// body. CLAIMED: legacy declarations do zero reassociation work. THE GAP:
+    /// the unchanged Map stated-stack controls separately bind this structural
+    /// seam to the full recursive elaboration path.
+    #[test]
+    fn spine_free_declaration_returns_the_zero_work_sentinel() {
+        let span = Span::zero();
+        let declaration = RDecl {
+            name: "legacy".to_string(),
+            ty: None,
+            body: RExpr::RUniv(None, span.clone()),
+            contains_infix_spine: false,
+            requires: vec![],
+            ensures: vec![],
+            span,
+            kind: RDeclKind::Let,
+        };
+        assert!(
+            reassociate_rdecl(&declaration, &HashMap::new(), &HashMap::new())
+                .expect("spine-free reassociation cannot fail")
+                .is_none(),
+            "a spine-free declaration must not allocate or traverse an associated clone"
+        );
+    }
+}
+
 /// V1 elaboration: returns the definition id plus any emitted obligation holes.
 pub fn elaborate_rdecl_v1(
     env: &mut GlobalEnv,
