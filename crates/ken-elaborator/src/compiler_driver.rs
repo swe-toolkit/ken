@@ -2603,6 +2603,14 @@ fn complete_native_program_preparation(
                 file_operation_write: host_spine.file_operation_write.to_string(),
                 file_operation_change_mode: host_spine.file_operation_change_mode.to_string(),
                 file_operation_append: host_spine.file_operation_append.to_string(),
+                file_operation_metadata: host_spine
+                    .file_operation_metadata
+                    .to_string(),
+                file_metadata: host_spine.file_metadata.to_string(),
+                file_kind_file: host_spine.file_kind_file.to_string(),
+                file_kind_directory: host_spine.file_kind_directory.to_string(),
+                file_kind_symlink: host_spine.file_kind_symlink.to_string(),
+                file_kind_other: host_spine.file_kind_other.to_string(),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3505,6 +3513,12 @@ fn checked_host_spine_v1(
         file_operation_write: resolve_id(roles.file_operation_write)?,
         file_operation_change_mode: resolve_id(roles.file_operation_change_mode)?,
         file_operation_append: resolve_id(roles.file_operation_append)?,
+        file_operation_metadata: resolve_id(roles.file_operation_metadata)?,
+        file_metadata: resolve_id(roles.file_metadata)?,
+        file_kind_file: resolve_id(roles.file_kind_file)?,
+        file_kind_directory: resolve_id(roles.file_kind_directory)?,
+        file_kind_symlink: resolve_id(roles.file_kind_symlink)?,
+        file_kind_other: resolve_id(roles.file_kind_other)?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -3740,6 +3754,12 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.bool_true,
         // ABI-A2 appends rather than displacing an established role index.
         &spine.file_operation_append,
+        &spine.file_operation_metadata,
+        &spine.file_metadata,
+        &spine.file_kind_file,
+        &spine.file_kind_directory,
+        &spine.file_kind_symlink,
+        &spine.file_kind_other,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -6791,6 +6811,18 @@ mod d1b_role_c1_roster_identity {
                 "file_operation_append",
                 record.spine.file_operation_append.clone(),
             ),
+            (
+                "file_operation_metadata",
+                record.spine.file_operation_metadata.clone(),
+            ),
+            ("file_metadata", record.spine.file_metadata.clone()),
+            ("file_kind_file", record.spine.file_kind_file.clone()),
+            (
+                "file_kind_directory",
+                record.spine.file_kind_directory.clone(),
+            ),
+            ("file_kind_symlink", record.spine.file_kind_symlink.clone()),
+            ("file_kind_other", record.spine.file_kind_other.clone()),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             ("io_error_permission_denied", record.spine.io_errors[1].clone()),
             ("io_error_capability_denied", record.spine.io_errors[2].clone()),

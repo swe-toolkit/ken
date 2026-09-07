@@ -260,8 +260,14 @@ runtime_host_spine_v1! {
     unit,
     bool_false,
     bool_true,
-    // ABI-A2 additive role: append to preserve every established field index.
+    // ABI-A2 additive roles preserve every established field index.
     file_operation_append,
+    file_operation_metadata,
+    file_metadata,
+    file_kind_file,
+    file_kind_directory,
+    file_kind_symlink,
+    file_kind_other,
 }
 
 /// The decoded, validated checked-runtime role record.

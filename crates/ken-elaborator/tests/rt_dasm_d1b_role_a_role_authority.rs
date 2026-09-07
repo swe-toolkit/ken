@@ -109,7 +109,8 @@ data ShadowIoErrors = NotFound | PermissionDenied | CapabilityDenied | BrokenPip
 data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress | ResourceRevoked
 data ShadowProgress = ReadSome | ReadEof | Wrote
 data ShadowFileOps =
-  MkFileError | OpReadFile | OpWriteFile | OpChangeMode | OpAppendFile
+  MkFileError | OpReadFile | OpWriteFile | OpChangeMode | OpAppendFile | OpMetadata
+data ShadowMetadata = MkFileMetadata | KFile | KDirectory | KSymlink | KOther
 data ShadowOps = Read | Write | Flush | IsTerminal | WallNow | MonotonicNow | SleepUntil | RandomBytes | ReadFile | WriteFile | AppendFile | Metadata | ReadDirectory | CreateDirectory | RemoveFile | RemoveDirectory | Rename | ChangeMode
 
 const two : Nat = Suc (Suc Zero)
@@ -162,6 +163,12 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowFileOps", "OpWriteFile"),
     ("ShadowFileOps", "OpChangeMode"),
     ("ShadowFileOps", "OpAppendFile"),
+    ("ShadowFileOps", "OpMetadata"),
+    ("ShadowMetadata", "MkFileMetadata"),
+    ("ShadowMetadata", "KFile"),
+    ("ShadowMetadata", "KDirectory"),
+    ("ShadowMetadata", "KSymlink"),
+    ("ShadowMetadata", "KOther"),
     ("ShadowOps", "Read"),
     ("ShadowOps", "Write"),
     ("ShadowOps", "Flush"),

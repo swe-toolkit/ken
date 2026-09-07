@@ -536,6 +536,12 @@ pub(crate) struct CheckedHostSpineV1 {
     /// Appended to the positional role record by ABI-A2 so every established
     /// field retains its index.
     pub file_operation_append: StableSymbol,
+    pub file_operation_metadata: StableSymbol,
+    pub file_metadata: StableSymbol,
+    pub file_kind_file: StableSymbol,
+    pub file_kind_directory: StableSymbol,
+    pub file_kind_symlink: StableSymbol,
+    pub file_kind_other: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -7791,6 +7797,24 @@ mod px7l_tests {
                 &family("FileOperation"),
                 "Append",
             ),
+            file_operation_metadata: StableSymbol::constructor(
+                &family("FileOperation"),
+                "Metadata",
+            ),
+            file_metadata: StableSymbol::constructor(
+                &family("FileMetadata"),
+                "Metadata",
+            ),
+            file_kind_file: StableSymbol::constructor(&family("FileKind"), "File"),
+            file_kind_directory: StableSymbol::constructor(
+                &family("FileKind"),
+                "Directory",
+            ),
+            file_kind_symlink: StableSymbol::constructor(
+                &family("FileKind"),
+                "Symlink",
+            ),
+            file_kind_other: StableSymbol::constructor(&family("FileKind"), "Other"),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8193,6 +8217,12 @@ mod d1b_role_b_decoder_alignment {
             bool_false: sentinel("bool_false"),
             bool_true: sentinel("bool_true"),
             file_operation_append: sentinel("file_operation_append"),
+            file_operation_metadata: sentinel("file_operation_metadata"),
+            file_metadata: sentinel("file_metadata"),
+            file_kind_file: sentinel("file_kind_file"),
+            file_kind_directory: sentinel("file_kind_directory"),
+            file_kind_symlink: sentinel("file_kind_symlink"),
+            file_kind_other: sentinel("file_kind_other"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8261,6 +8291,12 @@ mod d1b_role_b_decoder_alignment {
         (spine.bool_false.as_str(), "bool_false"),
         (spine.bool_true.as_str(), "bool_true"),
         (spine.file_operation_append.as_str(), "file_operation_append"),
+        (spine.file_operation_metadata.as_str(), "file_operation_metadata"),
+        (spine.file_metadata.as_str(), "file_metadata"),
+        (spine.file_kind_file.as_str(), "file_kind_file"),
+        (spine.file_kind_directory.as_str(), "file_kind_directory"),
+        (spine.file_kind_symlink.as_str(), "file_kind_symlink"),
+        (spine.file_kind_other.as_str(), "file_kind_other"),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(

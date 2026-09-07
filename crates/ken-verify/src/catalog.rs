@@ -118,6 +118,27 @@ impl NativeTestedEvidence {
         }
     }
 
+    /// FsMetadata evidence binds both response fields to the corresponding
+    /// regular-file and directory artifacts before requiring exact parity.
+    pub fn from_fs_metadata_run(
+        run: &CanonicalDifferentialRun,
+        paths: &[(&[u8], &[u8])],
+    ) -> Self {
+        let operation = HostOpV1::FsMetadata;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run.compare_fs_metadata(paths).is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
     /// CaptureHost and hand-fed observations can exercise comparator units but
     /// can never manufacture exact-artifact evidence.
     pub fn unit_or_negative_control(
