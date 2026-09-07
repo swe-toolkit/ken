@@ -470,41 +470,31 @@ fn let_interleaved_outer_binder_not_skipped_by_convoy() {
     );
 }
 
-/// `LANG-INTERVENING-LET-FRAME-WEAKENING` `D1` -- the three-way
-/// attribution the Architect required as a follow-up of his approval of
-/// `LANG-CONVOY-MATCH-FIELD-PROVENANCE` (`evt_5b3c38r3xrqm6`), measuring
-/// whether this fixture's failure is a regression on that merge or a
-/// pre-existing gap. The program is a fresh `let k` bound to a genuine
-/// `Vec Nat n` value (via `repl`, NOT an already-refined alias of `w` --
-/// that would be "born correct" and prove nothing), interleaved between
-/// the outer match's premise and a nested match, consumed by a further
-/// nested match on `k` itself.
+/// `LANG-INTERVENING-LET-FRAME-WEAKENING` increment 1. The fresh
+/// `let k` is introduced between two dependent matches and consumed by a
+/// third. Before the increment, an error in the middle constructor branch
+/// leaked its three fields; the enclosing `let` then popped the wrong
+/// binding and the outer match reported a misleading `Internal` from
+/// `refine_branch_goal`.
 ///
-/// **Measured, three ways, run not read (the discipline the predecessor's
-/// two recuts existed to enforce):**
+/// Promise class: transition sentinel. The structurally balanced field
+/// frame must expose the honest `VNil` exhaustiveness residual until
+/// increment 2 transports the fresh dependent let's type. Increment 2
+/// retires this rejection assertion by converting the same program to an
+/// acceptance test.
 ///
-/// 1. **Predecessor's merge-base `43bd0d597`** (pre-remedy `elab.rs`, no
-///    `match_field_regions` at all): fails.
-/// 2. **Shipped region-set `elab.rs`, capability 2's guard replaced by the
-///    prohibited positional floor** (`if abs_pos >= 3`): fails, byte-for-
-///    byte the same error.
-/// 3. **Shipped region-set `elab.rs`, as landed**: fails, byte-for-byte
-///    the same error.
-///
-/// All three: `ElabError::Internal("index refinement: could not classify
-/// the branch goal: TypeMismatch { expected: Dg67, found: ((Dg574 Dg67)
-/// @8) }")`, raised at `refine_branch_goal` (`elab.rs:2913-2917`).
-///
-/// **INVARIANT across all three ⇒ per the node's own branch condition,
-/// this is a clean pre-existing gap, independent of the merged region-set
-/// predicate -- NOT an acceptance regression on `LANG-CONVOY-MATCH-FIELD-
-/// PROVENANCE`.** This pins that measurement so it survives being findable
-/// by grep rather than living only in convo history. Diagnosing WHERE the
-/// three-way-invariant failure originates (`D2`) and whether `RVar`
-/// resolution is the actual route (`D3`) are this node's next
-/// deliverables, not this commit's -- no repair lands here.
+/// MEASURED: the unchanged source now returns the nested match's exact
+/// `ExhaustivenessError(VNil)` rather than a later `Internal` produced in a
+/// corrupted context. CLAIMED: every error return after constructor-field
+/// introduction restores `cx.ctx` before the enclosing `RLet` unwinds.
+/// THE GAP: this fixture reaches one error exit; the local `frame_try!`
+/// macro expands the same absolute restoration at every fallible method
+/// construction site without adding a recursive call frame, while a debug
+/// assertion checks ordinary success cleanup. Bypassing `frame_try!` at the
+/// reached branch-body site makes this unchanged fixture return the prior
+/// `Internal`, so the sentinel is load-bearing.
 #[test]
-fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
+fn intervening_let_fresh_binder_reports_honest_exhaustiveness_after_balanced_unwind() {
     let mut env = vec_env();
     elab_ok(
         &mut env,
@@ -525,41 +515,13 @@ fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
          }",
     );
     match &err {
-        ElabError::Internal(msg) => {
-            assert!(
-                msg.contains("could not classify the branch goal"),
-                "expected the measured `refine_branch_goal` classification \
-                 failure, got a different Internal message: {msg:?}"
-            );
-            assert!(
-                msg.contains("expected: Dg67,"),
-                "expected the measured TypeMismatch's `expected` operand \
-                 (bare `Nat`, printed `Dg67`) -- a different expected \
-                 operand means this is NOT the three-way-invariant \
-                 failure this test pins, got: {msg:?}"
-            );
-            // Structural, not the literal `Dg574`/`@8` -- both are
-            // context-shape-dependent (an unrelated prelude/`vec_env()`
-            // edit renumbers them without changing the failure this test
-            // pins). The measured instance (`Vec Nat @8`, printed
-            // `((Dg574 Dg67) @8)`) lives in the doc comment above; the
-            // check here is head-plus-Nat-id: `found` is a doubly-wrapped
-            // application whose inner argument is the SAME `Dg67` as
-            // `expected`, suffixed by a de Bruijn index -- differing from
-            // `expected` only by that wrapper, whatever its head/index
-            // numbers happen to be.
-            assert!(
-                msg.contains("found: ((") && msg.contains(" Dg67) @"),
-                "expected the measured TypeMismatch's `found` operand to \
-                 be a head applied to the same `Dg67` (Nat) id as \
-                 `expected`, wrapped with a trailing de Bruijn index -- a \
-                 different shape means this is NOT the three-way-invariant \
-                 failure this test pins, got: {msg:?}"
-            );
+        ElabError::ExhaustivenessError { missing, .. } => {
+            assert_eq!(missing.constructor, "VNil");
+            assert_eq!(missing.arity, 0);
         }
         other => panic!(
-            "expected an `ElabError::Internal` classification failure, \
-             got: {other:?}"
+            "expected the honest nested `VNil` exhaustiveness residual after \
+             balanced constructor-field unwinding, got: {other:?}"
         ),
     }
 }
@@ -568,11 +530,13 @@ fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
 /// interleaved-`let` failures, not one, independently re-measured here
 /// (not taken from the Adversary's report).
 ///
-/// **`intervening_let_fresh_binder_fails_invariantly_across_all_three_
-/// bases` (above) dies in `refine_branch_goal`, invariantly, before
-/// reaching the kernel at all.** Its `k` is a FRESH `Vec Nat n` value
-/// (via `repl`, never an alias of an existing binder), consumed by a
-/// further nested match on `k` itself.
+/// **`intervening_let_fresh_binder_reports_honest_exhaustiveness_after_
+/// balanced_unwind` (above) now exposes its nested `VNil` exhaustiveness
+/// residual after increment 1 removed the error-path frame leak.** Its `k`
+/// is a FRESH `Vec Nat n` value (via `repl`, never an alias of an existing
+/// binder), consumed by a further nested match on `k` itself. Before this
+/// increment the leaked frame masked that residual with an invariant
+/// `refine_branch_goal` `Internal` across all three D1 bases.
 ///
 /// **This fixture's `k` is a DIRECT ALIAS of the enclosing match's own
 /// peeled field** (`let k : Vec Nat m = xs`, `m`/`xs` both already bound

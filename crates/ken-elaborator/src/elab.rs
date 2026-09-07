@@ -5637,6 +5637,20 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             )?);
             continue;
         }
+        let constructor_scope_depth = cx.ctx.len();
+        // Expand restoration at each fallible site without adding a call frame
+        // to recursive dependent-match checking.
+        macro_rules! frame_try {
+            ($result:expr) => {
+                match $result {
+                    Ok(value) => value,
+                    Err(error) => {
+                        cx.ctx.types.truncate(constructor_scope_depth);
+                        return Err(error);
+                    }
+                }
+            };
+        }
         for j in 0..n {
             let raw_ty = subst_levels(
                 &subst_outer(&ctor.args[j], m, &params_terms, j),
@@ -5645,7 +5659,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             );
             cx.ctx.push(raw_ty);
         }
-        let constructor_frame = build_dependent_constructor_frame(
+        let constructor_frame = frame_try!(build_dependent_constructor_frame(
             cx,
             &ind,
             ctor,
@@ -5665,7 +5679,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             equation_convoy,
             recursive_field_index_path,
             span,
-        )?;
+        ));
         let concrete = constructor_frame.concrete.as_ref();
         let target_indices = constructor_frame.target_indices.as_slice();
         let premise_domains = constructor_frame.premise_domains.as_slice();
@@ -5679,7 +5693,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     level_args: Vec::new(),
                 }
             } else if equation_convoy && expression_mentions_recursive_group(cx, &arm.body) {
-                build_large_convoy_recursive_method(
+                frame_try!(build_large_convoy_recursive_method(
                     cx,
                     arm,
                     &ind,
@@ -5690,7 +5704,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     &expected_here,
                     sentinel_region,
                     &premise_domains,
-                )?
+                ))
             } else if equation.is_some() {
                 let eq_dom = Term::Eq(
                     Box::new(weaken(&scrut_ty, n as i64)),
@@ -5698,11 +5712,11 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     Box::new(concrete.clone()),
                 );
                 cx.ctx.push(eq_dom.clone());
-                let body = check(cx, &arm.body, &weaken(&expected_here, 1), &arm.span)?;
+                let body = frame_try!(check(cx, &arm.body, &weaken(&expected_here, 1), &arm.span,));
                 cx.ctx.pop();
                 Term::lam(eq_dom, body)
             } else {
-                check_dependent_branch_body(
+                frame_try!(check_dependent_branch_body(
                     cx,
                     arm,
                     &ind,
@@ -5721,23 +5735,28 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     &convoy_refinements,
                     equation_convoy,
                     recursive_field_index_path,
-                )?
+                ))
             }
         } else {
             let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
             let missing = missing_pattern_witness(cx, ctor.id);
-            synthesize_omitted_index_method(
+            frame_try!(synthesize_omitted_index_method(
                 cx,
                 &premise_domains,
                 &expected_here,
                 sentinel_region,
                 missing,
                 span,
-            )?
+            ))
         };
         for _ in 0..n {
             cx.ctx.pop();
         }
+        debug_assert_eq!(
+            cx.ctx.len(),
+            constructor_scope_depth,
+            "dependent constructor field context must unwind on both success and error",
+        );
 
         methods[k] = Some(finish_dependent_constructor_method(
             cx,
