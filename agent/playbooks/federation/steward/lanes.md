@@ -69,8 +69,25 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 > ### LIVE POSITION 2026-09-07 (NEWEST — read before the 2026-09-06 block below)
 >
 > Operator active this session. Roster STRUCTURE unchanged (three lanes,
-> runtime / language / foundation). Two operator rulings this session bear on
-> lane 2:
+> runtime / language / foundation). Operator rulings this session:
+>
+> - **Lane 1 (runtime): fork RULED — kernel chain (A) FIRST, then ABI (B).**
+>   The ABI-A sub-track drained (ABI-A1/A2/A3 all merged), surfacing a fork the
+>   Steward forwarded at evt_7nkzsy27p7npw: (A) release
+>   `RT-CHECKED-IH-REALIZATION-AUTHORITY` — the sole live unblocker of
+>   `RT-NESTED-IH-NATIVE-REALIZATION` → `KERNEL-NESTED-IND` → `DS-9` (every other
+>   dependency of that chain merged/closed) — vs (B) continue the ABI program.
+>   Operator, 2026-09-07, verbatim: "Go with A, unblock the kernel chain then
+>   continue with ABI B." So the runtime lane runs
+>   `RT-CHECKED-IH-REALIZATION-AUTHORITY` NOW (flipped ready→active, released +
+>   kicked; Architect required reviewer on the mechanism, evt_7mgzv23cnjm0a;
+>   tier T1), and `RT-NESTED-IH-NATIVE-REALIZATION` is flipped active→draft
+>   (blocked-on-predecessor; Steward re-releases it when A lands). When the two
+>   runtime nodes clear (kernel then takes `KERNEL-NESTED-IND`), the runtime lane
+>   RETURNS to the ABI availability program — `ABI-S2` (dep ABI-A3 met), `ABI-S4`
+>   and `ABI-M2` (dep ABI-M1 met) are the shovel-ready ABI nodes; `ABI-S1`/`ABI-S5`
+>   remain blocked on `PX9` (foundation lane). This SUPERSEDES the stale 2026-08-31
+>   LIVE-K objective in the lane-1 table cell and the 2026-09-06 ABI-A block.
 >
 > - **Floor roster ten→fifteen: spec side LANDED, code side queued.** The §4
 >   taxonomy extension (adds Equal/Prop/Proved/Top/Bottom) merged e87cd24de

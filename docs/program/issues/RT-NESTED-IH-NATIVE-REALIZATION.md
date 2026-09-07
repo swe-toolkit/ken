@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-IH-NATIVE-REALIZATION
 title: "Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3"
-status: active
+status: draft
 owner: runtime
 size: L
 gate: none
@@ -11,7 +11,20 @@ github: null
 origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statement of c2's AC-K12 relationship, evt_77pege8j5cv14, requested at evt_6pmftb5fpxrkm. Discharges the second Steward condition on the c1/c2 cut (evt_6z7wf6dw94cym), which required c2 to state that relationship before assignment.
 ---
 
-> ## D2 MERGED 2026-08-14 as squash `f7ec9f59`. THE NODE STAYS `active`.
+> ## STATUS `active` -> `draft` 2026-09-07. `draft` = BLOCKED-ON-PREDECESSOR,
+> ## not unstarted (the schema has no `blocked` value; `draft` carries it).
+>
+> `D2` is merged; `D3`-`D5` (native execution, interpreter agreement at Nat 3,
+> the carried control no longer ignored) are gated on the planner capability
+> that [[RT-CHECKED-IH-REALIZATION-AUTHORITY]] mints — the authority `D2`
+> measured absent at `core.rs:10521`. That predecessor was RELEASED to the
+> runtime ring 2026-09-07 on the operator's fork ruling (evt_7nkzsy27p7npw: "Go
+> with A ... then continue with ABI B"). This node holds until it lands; the
+> Steward RE-RELEASES it (flip back to `active`) then. Left `active` it would
+> read as a node the ring is working while it cannot proceed — the DS-9 shape.
+> The `D2` record below stands.
+>
+> ## D2 MERGED 2026-08-14 as squash `f7ec9f59` — the D2 landing record.
 >
 > **Candidate `20c12c64`** (PR #2187, CI green; Decision `dec_3e9rjnmt9e9z6`
 > resolved APPROVED by the Architect, read from the object; QA

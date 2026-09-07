@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-REALIZATION-AUTHORITY
 title: "Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -11,17 +11,19 @@ github: null
 origin: "Architect mechanism ruling evt_7mgzv23cnjm0a (2026-08-14), answering the Steward's question at evt_1469rndt5745r. The ruling is that checked-IH REALIZATION authority and RT-TERMINAL-ALL-ELIM-AUTHORITY's terminal-All ELIMINATION relation are TWO mechanisms, so this successor carries no KERNEL-NESTED-IND dependency and is framable now. Steward-filed (agents cannot create tracked work per COORDINATION §2). Every structural fact below re-verified by the Steward against main fea9cd96 before filing."
 ---
 
-> # HELD BEHIND THE OPERATOR'S PRIORITY RULING, 2026-08-14. `ready`, NOT next.
+> # RELEASED 2026-09-07 — operator priority ruling. `active`.
 >
-> **Do not release this until [[RT-LEXICAL-RECURSOR-CONSUMERS]] lands.** The
-> operator ruled the `RecursiveDescent` retirement Runtime's priority — *"that
-> is the priority for the runtime team. prioritize that work over other runtime
-> work."* That node is the single unblocked node on the retirement chain.
->
-> **This node is unchanged, unblocked, and correct** — nothing here is deferred
-> on its merits, and no dependency was added. It is `ready` and waiting on a
-> priority call, which is the operator's under `ken-steward` §3. **A reader
-> finding it idle should not diagnose framing debt.**
+> The 2026-08-14 hold is DISCHARGED: [[RT-LEXICAL-RECURSOR-CONSUMERS]] and the
+> `RecursiveDescent` retirement chain all merged. Operator ruling 2026-09-07, on
+> the runtime-lane fork the Steward forwarded at evt_7nkzsy27p7npw: "Go with A,
+> unblock the kernel chain then continue with ABI B." So the runtime ring runs
+> THIS node now — it is the sole live unblocker of the chain
+> [[RT-NESTED-IH-NATIVE-REALIZATION]] -> [[KERNEL-NESTED-IND]] -> [[DS-9]] (every
+> other dependency of those is merged/closed) — and returns to the ABI
+> availability program (ABI-S2 / ABI-S4 / ABI-M2, deps now met) once the chain
+> clears. Released to the runtime ring by the Steward; Architect is the required
+> reviewer on the mechanism (evt_7mgzv23cnjm0a). The fixed inputs below were
+> measured at `fea9cd96`; re-measure the cited coordinates at D0.
 
 ## What this is
 
