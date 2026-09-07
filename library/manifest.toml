@@ -2277,3 +2277,123 @@ validation = [
   "generated-current",
 ]
 owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/README.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = [
+  "docs/program/07-compiler-program.md#2-boundary",
+  "crates/ken-elaborator/src/lib.rs",
+  "crates/ken-kernel/src/lib.rs",
+  "crates/ken-elaborator/src/checked_core.rs",
+  "crates/ken-elaborator/src/erasure.rs",
+  "crates/ken-runtime/src/cranelift_backend.rs",
+]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/front-end.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-elaborator/src/lib.rs",
+  "crates/ken-elaborator/src/compiler_driver.rs", "crates/ken-cli/src/main.rs",
+  "spec/30-surface/39-elaboration.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/kernel.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-kernel/src/lib.rs", "crates/ken-elaborator/src/lib.rs",
+  "spec/10-kernel/11-syntax.md", "spec/60-security/64-trust-model.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/interpreter-and-values.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-runtime/src/runtime_ir_evaluator.rs",
+  "crates/ken-runtime/src/values.rs", "crates/ken-runtime/src/store.rs",
+  "spec/40-runtime/42-evaluation.md", "spec/40-runtime/41-values.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/artifacts-and-erasure.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-elaborator/src/checked_core.rs",
+  "crates/ken-elaborator/src/compiler_driver.rs", "crates/ken-elaborator/src/erasure.rs",
+  "spec/40-runtime/47-erasure-runtime-ir.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/native-backend.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-runtime/src/cranelift_backend.rs",
+  "crates/ken-runtime/src/cranelift_backend/artifact/api.rs",
+  "crates/ken-runtime/src/object_linker_packaging.rs", "docs/program/07-compiler-program.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/validation-and-limits.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-runtime/src/artifact_validation.rs",
+  "crates/ken-runtime/src/runtime_ir_evaluator.rs",
+  "crates/ken-runtime/src/cranelift_backend/artifact/api.rs",
+  "crates/ken-runtime/src/object_linker_packaging.rs",
+  "spec/40-runtime/47-erasure-runtime-ir.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/reading-workflow.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-elaborator/src/lib.rs", "crates/ken-kernel/src/lib.rs",
+  "crates/ken-elaborator/src/checked_core.rs", "crates/ken-elaborator/src/erasure.rs",
+  "crates/ken-runtime/src/runtime_ir_evaluator.rs",
+  "crates/ken-runtime/src/cranelift_backend/artifact/api.rs",
+  "docs/program/07-compiler-program.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
