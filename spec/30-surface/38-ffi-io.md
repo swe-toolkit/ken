@@ -639,6 +639,49 @@ The conformance route has four independently reaching observations:
 Each seed must prove that its named branch was reached. A suite-green result or
 an output shared by a different branch is not evidence for this contract.
 
+### 1.8 Error classification: honest retry and the single `Revoked` identity (PX9)
+
+The cross-domain error surface (`System.Error`,
+`../../docs/program/10-linux-abi-completion.md §4`, PX9) carries two
+**normative** classification properties. Each is stated as a relation a
+conformance seed can discriminate, and PX9's kernel-checked laws (the foundation
+deliverable) are their executable witness — not prose. Two relations name the
+model: `error_transience` classifies an error identity as `Transient` or
+`Permanent`; `retry_guidance` maps a transience and an operation's idempotence
+to a retry verdict.
+
+**(1) Transience does not imply retry-safety.** Transience is a property of the
+**error identity**; idempotence is a property of the **operation**. They are
+orthogonal, and a `RetryAdvised` verdict is obtainable **only** from the pair
+`(Transient, Idempotent)`. In particular `retry_guidance Transient
+NonIdempotent = RetryUnsafeNonIdempotent`, never `RetryAdvised`. The
+load-bearing form is negative: **there is no spec-blessed
+`retryable : error → Bool`.** A retry verdict that reads only the error and does
+not consume the operation's idempotence is non-conformant — "the error is
+transient" is not, by itself, permission to retry. The honest corollary, and
+the reason the negative form matters: `error_transience Revoked = Permanent` —
+a revoked authority is gone, so retry cannot help, and `Revoked` is never
+`Transient`.
+
+**(2) `Revoked` is a single identity.** The revocation observable named today by
+three carriers — `IOError.Revoked` (`§1.3.1`), `ResourceError.Revoked`
+(`§1.3.1`), and the host-boundary revoked of the progress/error partition
+(`§1.7.2`) — is **one** semantic identity: an otherwise well-formed, live,
+sufficiently-righted operation that lost at the `../60-security/62 §4.2`
+admission boundary. A conforming error surface exposes exactly **one** `Revoked`
+identity, classified `Permanent`. This is the unification `ABI-REVOKE` sequences
+before PX9 (`../../docs/program/10-linux-abi-completion.md §7`), and it
+**preserves** the `Revoked` identity rather than collapsing it — the opposite of
+mapping `Revoked` into `CapabilityDenied`, `Closed`, or a host I/O failure, which
+`§1.7.2` already forbids.
+
+These are behavioral contracts on the error surface, introducing no kernel
+feature: PX9's type and laws are re-checked Ken (the foundation deliverable),
+and this section is the normative source those laws witness. The conformance
+seed (`../../conformance/surface/ffi-io/`) discriminates each property against
+its non-conformant counterpart — a `retryable`-from-transience-alone
+implementation, and a `Revoked = Transient` or triplicated-`Revoked` surface.
+
 ## 2. The FFI surface — the `foreign` declaration
 
 A **`foreign`** declaration binds a Ken name to an external (C-ABI) symbol,
