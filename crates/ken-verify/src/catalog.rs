@@ -139,6 +139,39 @@ impl NativeTestedEvidence {
         }
     }
 
+    /// FsRename evidence binds both lanes to the same exact before/after
+    /// one-node move and Unit result classification.
+    pub fn from_fs_rename_run(
+        run: &CanonicalDifferentialRun,
+        request_source: &[u8],
+        request_destination: &[u8],
+        filesystem_source: &[u8],
+        filesystem_destination: &[u8],
+        original: &[u8],
+    ) -> Self {
+        let operation = HostOpV1::FsRename;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run
+                .compare_fs_rename(
+                    request_source,
+                    request_destination,
+                    filesystem_source,
+                    filesystem_destination,
+                    original,
+                )
+                .is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
     /// CaptureHost and hand-fed observations can exercise comparator units but
     /// can never manufacture exact-artifact evidence.
     pub fn unit_or_negative_control(

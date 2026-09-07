@@ -302,6 +302,35 @@ impl fmt::Display for FsMetadataDifferentialError {
 
 impl std::error::Error for FsMetadataDifferentialError {}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FsRenameDifferentialError {
+    Shape {
+        lane: &'static str,
+        reason: String,
+    },
+    Transition {
+        lane: &'static str,
+        reason: String,
+    },
+    Observation(ObservationMismatch),
+}
+
+impl fmt::Display for FsRenameDifferentialError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape { lane, reason } => {
+                write!(formatter, "{lane} FsRename shape: {reason}")
+            }
+            Self::Transition { lane, reason } => {
+                write!(formatter, "{lane} FsRename transition: {reason}")
+            }
+            Self::Observation(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for FsRenameDifferentialError {}
+
 impl CanonicalDifferentialRun {
     pub fn compare_exact(&self) -> Result<(), ObservationMismatch> {
         compare_canonical_exact(&self.interpreter, &self.native)
@@ -379,6 +408,29 @@ impl CanonicalDifferentialRun {
             paths,
             &interpreter_expected,
             &native_expected,
+        )
+    }
+
+    /// Require each lane to perform the same exact one-node move before
+    /// comparing every canonical observation field.
+    pub fn compare_fs_rename(
+        &self,
+        request_source: &[u8],
+        request_destination: &[u8],
+        filesystem_source: &[u8],
+        filesystem_destination: &[u8],
+        original: &[u8],
+    ) -> Result<(), FsRenameDifferentialError> {
+        compare_fs_rename_observations(
+            &self.interpreter,
+            &self.interpreter_actions,
+            &self.native,
+            &self.native_actions,
+            request_source,
+            request_destination,
+            filesystem_source,
+            filesystem_destination,
+            original,
         )
     }
 
@@ -952,6 +1004,161 @@ fn validate_fs_metadata_observation(
     Ok(())
 }
 
+fn compare_fs_rename_observations(
+    interpreter: &EffectObservation,
+    interpreter_actions: &LaneActionEvidence,
+    native: &EffectObservation,
+    native_actions: &LaneActionEvidence,
+    request_source: &[u8],
+    request_destination: &[u8],
+    filesystem_source: &[u8],
+    filesystem_destination: &[u8],
+    original: &[u8],
+) -> Result<(), FsRenameDifferentialError> {
+    for (lane, observation, actions) in [
+        ("interpreter", interpreter, interpreter_actions),
+        ("native", native, native_actions),
+    ] {
+        validate_fs_rename_observation(
+            lane,
+            observation,
+            actions,
+            request_source,
+            request_destination,
+            filesystem_source,
+            filesystem_destination,
+            original,
+        )?;
+    }
+    compare_canonical_exact(interpreter, native)
+        .map_err(FsRenameDifferentialError::Observation)
+}
+
+fn validate_fs_rename_observation(
+    lane: &'static str,
+    observation: &EffectObservation,
+    actions: &LaneActionEvidence,
+    request_source: &[u8],
+    request_destination: &[u8],
+    filesystem_source: &[u8],
+    filesystem_destination: &[u8],
+    original: &[u8],
+) -> Result<(), FsRenameDifferentialError> {
+    let [event] = observation.effect_trace.as_slice() else {
+        return Err(FsRenameDifferentialError::Shape {
+            lane,
+            reason: format!(
+                "expected one event, observed {}",
+                observation.effect_trace.len()
+            ),
+        });
+    };
+    if event.sequence != 0
+        || event.operation != ken_host::HostOpV1::FsRename
+        || event.capability.is_none()
+        || !event.resource_bindings.is_empty()
+        || event.request
+            != (ken_host::CanonicalRequestV1::FsRename {
+                source: request_source.to_vec(),
+                destination: request_destination.to_vec(),
+            })
+        || event.outcome
+            != ken_host::CanonicalOutcomeV1::Success(
+                ken_host::CanonicalReplyV1::Unit,
+            )
+        || observation.terminal_error.is_some()
+        || observation.terminal_exit != ken_host::TerminalExitClass::NormalReturn
+        || observation.exit_status != 0
+    {
+        return Err(FsRenameDifferentialError::Shape {
+            lane,
+            reason: "event/result is not the exact capability/request/Unit success shape"
+                .to_string(),
+        });
+    }
+
+    let source_before = actions
+        .root_before
+        .nodes
+        .iter()
+        .find(|node| node.relative_path == filesystem_source)
+        .ok_or_else(|| FsRenameDifferentialError::Transition {
+            lane,
+            reason: "source was absent before rename".to_string(),
+        })?;
+    if source_before.kind != crate::SnapshotNodeKind::File
+        || source_before.bytes != original
+        || actions
+            .root_before
+            .nodes
+            .iter()
+            .any(|node| node.relative_path == filesystem_destination)
+    {
+        return Err(FsRenameDifferentialError::Transition {
+            lane,
+            reason: "before-state did not contain only the exact source file"
+                .to_string(),
+        });
+    }
+    let mut expected_after = actions.root_before.clone();
+    let moved = expected_after
+        .nodes
+        .iter_mut()
+        .find(|node| node.relative_path == filesystem_source)
+        .expect("the source-before check established this node");
+    moved.relative_path = filesystem_destination.to_vec();
+    expected_after.nodes.sort();
+    if actions.root_after != expected_after {
+        return Err(FsRenameDifferentialError::Transition {
+            lane,
+            reason: format!(
+                "expected source removal plus destination creation with the original node; \
+                 before={:?}, after={:?}",
+                actions.root_before, actions.root_after
+            ),
+        });
+    }
+
+    let removed = observation.filesystem_delta.iter().find_map(|delta| {
+        if let ken_host::FsDeltaV1::Removed {
+            relative_path,
+            node,
+        } = delta
+        {
+            (relative_path == filesystem_source).then_some(node)
+        } else {
+            None
+        }
+    });
+    let created = observation.filesystem_delta.iter().find_map(|delta| {
+        if let ken_host::FsDeltaV1::Created {
+            relative_path,
+            node,
+        } = delta
+        {
+            (relative_path == filesystem_destination).then_some(node)
+        } else {
+            None
+        }
+    });
+    if observation.filesystem_delta.len() != 2
+        || removed.is_none()
+        || created.is_none()
+        || removed != created
+        || removed.and_then(|node| node.file_bytes.as_deref()) != Some(original)
+    {
+        return Err(FsRenameDifferentialError::Transition {
+            lane,
+            reason: format!(
+                "expected exactly Removed(source) and Created(destination) for \
+                 the same original node; observed {:?}",
+                observation.filesystem_delta
+            ),
+        });
+    }
+    Ok(())
+}
+
 fn expected_fs_metadata(
     lane: &'static str,
     root: &std::path::Path,
@@ -1314,6 +1521,37 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                 Err _ |-> host_exit APartial (Failure 94) ;
                 Ok _ |-> host_exit APartial Success
               })
+        }
+      }
+    }
+  }
+"#;
+
+    const FS_RENAME_SOURCE: &str = r#"program capabilities FS AFull "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit AFull (Failure 100) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit AFull (Failure 101) ;
+        Cons source more |-> match more {
+          Nil |-> host_exit AFull (Failure 102) ;
+          Cons destination _ |-> match caps {
+            MkProgramCaps cap |->
+              bind (Coproduct (FSOp AFull) AmbientOp)
+                (resp_coproduct (FSOp AFull) AmbientOp
+                  (fs_resp AFull) ambient_resp)
+                (Result FileError Unit) ExitCode
+                (inject_l (FSOp AFull) AmbientOp
+                  (fs_resp AFull) ambient_resp
+                  (Result FileError Unit)
+                  (rename_file AFull cap source destination))
+                (\renamed. match renamed {
+                  Ok _ |-> host_exit AFull Success ;
+                  Err _ |-> host_exit AFull (Failure 104)
+                })
+          }
         }
       }
     }
@@ -1738,6 +1976,180 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         scenario.entry.source = scenario.entry.source.replace("APartial", "ANone");
         scenario.program_caps.fs_authority = AUTH_NONE;
         scenario
+    }
+
+    fn fs_rename_scenario(
+        identity: &str,
+        authority: Authority,
+        rights: RightSet,
+        source: Vec<u8>,
+        destination: Vec<u8>,
+        initial_filesystem: Vec<SeedNode>,
+    ) -> Scenario {
+        let program_source = if authority == AUTH_FULL {
+            FS_RENAME_SOURCE.to_string()
+        } else {
+            FS_RENAME_SOURCE.replace("AFull", "ANone")
+        };
+        Scenario {
+            process_input: RawProcessInput {
+                arguments: vec![source.clone(), destination.clone()],
+                environment: Vec::new(),
+            },
+            ambient: AmbientScript::default(),
+            program_caps: ProgramCapsShape {
+                fs_authority: authority,
+                relative_root: b"data".to_vec(),
+                rights,
+                symlink: SymlinkPolicy::NoFollow,
+            },
+            entry: CheckedProgramEntry {
+                identity: identity.to_string(),
+                package_name: identity.to_string(),
+                source: program_source,
+            },
+            initial_filesystem,
+            expected_fs: vec![ExpectedFsEffect::Rename {
+                source,
+                destination,
+            }],
+        }
+    }
+
+    fn fs_rename_success_scenario() -> Scenario {
+        fs_rename_scenario(
+            "abi-a2-fs-rename-success",
+            AUTH_FULL,
+            RightSet::ALL,
+            b"a.bin".to_vec(),
+            b"b.bin".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/a.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"original".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_rename_source_escape_scenario() -> Scenario {
+        fs_rename_scenario(
+            "abi-a2-fs-rename-source-escape",
+            AUTH_FULL,
+            RightSet::ALL,
+            b"../outside.bin".to_vec(),
+            b"b.bin".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"outside".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_rename_destination_escape_scenario() -> Scenario {
+        fs_rename_scenario(
+            "abi-a2-fs-rename-destination-escape",
+            AUTH_FULL,
+            RightSet::ALL,
+            b"a.bin".to_vec(),
+            b"../outside.bin".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/a.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"original".to_vec()),
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"outside".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_rename_source_symlink_scenario() -> Scenario {
+        fs_rename_scenario(
+            "abi-a2-fs-rename-source-symlink-denied",
+            AUTH_FULL,
+            RightSet::ALL,
+            b"link".to_vec(),
+            b"b.bin".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"outside".to_vec()),
+                },
+                SeedNode {
+                    relative_path: b"data/link".to_vec(),
+                    kind: crate::SeedNodeKind::Symlink(b"../outside.bin".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_rename_destination_symlink_scenario() -> Scenario {
+        fs_rename_scenario(
+            "abi-a2-fs-rename-destination-symlink-denied",
+            AUTH_FULL,
+            RightSet::ALL,
+            b"a.bin".to_vec(),
+            b"link".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/a.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"original".to_vec()),
+                },
+                SeedNode {
+                    relative_path: b"outside.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"outside".to_vec()),
+                },
+                SeedNode {
+                    relative_path: b"data/link".to_vec(),
+                    kind: crate::SeedNodeKind::Symlink(b"../outside.bin".to_vec()),
+                },
+            ],
+        )
+    }
+
+    fn fs_rename_missing_right_scenario() -> Scenario {
+        fs_rename_scenario(
+            "abi-a2-fs-rename-missing-right",
+            AUTH_NONE,
+            RightSet::NONE,
+            b"a.bin".to_vec(),
+            b"b.bin".to_vec(),
+            vec![
+                SeedNode {
+                    relative_path: b"data".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                },
+                SeedNode {
+                    relative_path: b"data/a.bin".to_vec(),
+                    kind: crate::SeedNodeKind::File(b"original".to_vec()),
+                },
+            ],
+        )
     }
 
     fn denial_scenario() -> Scenario {
@@ -2382,6 +2794,156 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     &event.outcome,
                     CanonicalOutcomeV1::Error(SemanticErrorV1::File(error))
                         if error.operation == HostOpV1::FsMetadata
+                            && error.cause
+                                == FileErrorCauseV1::Capability(expected.clone())
+                ));
+            }
+        }
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: both real lanes start with `data/a.bin` only, issue the exact
+    /// FsRename request with a Unit success, and finish with `a.bin` absent and
+    /// `b.bin` present as the identical original file node.
+    /// CLAIMED: native FsRename agrees with the interpreter on the complete
+    /// landed state transition and result classification.
+    /// THE GAP: correct-vs-correct equality cannot show the transition is read;
+    /// the wrong-native control restores the complete before state and must
+    /// redden this named transition comparator.
+    #[test]
+    fn fs_rename_real_artifact_state_transition_discriminates() {
+        let run = run_scenario(&fs_rename_success_scenario())
+            .expect("FsRename real-artifact differential executes");
+        run.compare_fs_rename(
+            b"a.bin",
+            b"b.bin",
+            b"data/a.bin",
+            b"data/b.bin",
+            b"original",
+        )
+        .expect("exact rename state transition parity");
+        assert_eq!(run.interpreter_actions.fs_actions_after_resolve, Some(2));
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsRename,
+                NativeTestedEvidence::from_fs_rename_run(
+                    &run,
+                    b"a.bin",
+                    b"b.bin",
+                    b"data/a.bin",
+                    b"data/b.bin",
+                    b"original",
+                ),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested)
+        );
+
+        let mut wrong_native = run.native.clone();
+        wrong_native.filesystem_delta.clear();
+        let mut wrong_native_actions = run.native_actions.clone();
+        wrong_native_actions.root_after = wrong_native_actions.root_before.clone();
+        assert!(
+            wrong_native_actions
+                .root_after
+                .nodes
+                .iter()
+                .any(|node| node.relative_path.as_slice() == b"data/a.bin"),
+            "the wrong-native control must leave the source present"
+        );
+        assert!(matches!(
+            compare_fs_rename_observations(
+                &run.interpreter,
+                &run.interpreter_actions,
+                &wrong_native,
+                &wrong_native_actions,
+                b"a.bin",
+                b"b.bin",
+                b"data/a.bin",
+                b"data/b.bin",
+                b"original",
+            ),
+            Err(FsRenameDifferentialError::Transition {
+                lane: "native",
+                ..
+            })
+        ));
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: source and destination escape and leaf-symlink inputs plus a
+    /// missing Rename right yield their exact policy identities on both real
+    /// lanes, with the expected interpreter resolution count and no state
+    /// change.
+    /// CLAIMED: native FsRename resolves both operands through the landed
+    /// scoped-root, rights, and NoFollow policy instead of bypassing it.
+    /// THE GAP: symmetric refusals could survive a shared policy bypass; exact
+    /// outcomes, before/after roots, and production-site policy mutations make
+    /// that bypass observable.
+    #[test]
+    fn fs_rename_real_artifact_exercises_both_path_policy_operands() {
+        for (scenario, expected, resolved) in [
+            (
+                fs_rename_source_escape_scenario(),
+                CapabilityDeniedV1::ScopeEscape,
+                0,
+            ),
+            (
+                fs_rename_destination_escape_scenario(),
+                CapabilityDeniedV1::ScopeEscape,
+                1,
+            ),
+            (
+                fs_rename_source_symlink_scenario(),
+                CapabilityDeniedV1::SymlinkDenied,
+                0,
+            ),
+            (
+                fs_rename_destination_symlink_scenario(),
+                CapabilityDeniedV1::SymlinkDenied,
+                1,
+            ),
+            (
+                fs_rename_missing_right_scenario(),
+                CapabilityDeniedV1::RightNotHeld {
+                    operation:
+                        ken_host::FsCapabilityOperationV1::RenameSource,
+                    held_rights: RightSet::NONE.bits(),
+                },
+                0,
+            ),
+        ] {
+            let request_source = scenario.process_input.arguments[0].clone();
+            let run = run_scenario(&scenario).unwrap_or_else(|error| {
+                panic!("{}: {error}", scenario.entry.identity)
+            });
+            assert_eq!(run.interpreter.exit_status, 104);
+            assert_eq!(run.native.exit_status, 104);
+            assert!(run.interpreter.filesystem_delta.is_empty());
+            assert!(run.native.filesystem_delta.is_empty());
+            assert_eq!(
+                run.interpreter_actions.fs_actions_after_resolve,
+                Some(resolved)
+            );
+            assert_eq!(
+                run.interpreter_actions.root_before,
+                run.interpreter_actions.root_after
+            );
+            assert_eq!(
+                run.native_actions.root_before,
+                run.native_actions.root_after
+            );
+            for observation in [&run.interpreter, &run.native] {
+                let [event] = observation.effect_trace.as_slice() else {
+                    panic!("{} must emit one refusal", scenario.entry.identity)
+                };
+                assert_eq!(event.operation, HostOpV1::FsRename);
+                assert!(matches!(
+                    &event.outcome,
+                    CanonicalOutcomeV1::Error(SemanticErrorV1::File(error))
+                        if error.operation == HostOpV1::FsRename
+                            && error.relative_path == request_source
                             && error.cause
                                 == FileErrorCauseV1::Capability(expected.clone())
                 ));

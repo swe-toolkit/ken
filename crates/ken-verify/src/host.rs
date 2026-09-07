@@ -48,6 +48,10 @@ pub enum ExpectedFsEffect {
     Metadata {
         path: Vec<u8>,
     },
+    Rename {
+        source: Vec<u8>,
+        destination: Vec<u8>,
+    },
     ChangeMode {
         path: Vec<u8>,
         mode: u16,
@@ -61,27 +65,27 @@ impl ExpectedFsEffect {
             Self::WriteFile { .. } => HostOpV1::FsWriteFile,
             Self::AppendFile { .. } => HostOpV1::FsAppendFile,
             Self::Metadata { .. } => HostOpV1::FsMetadata,
+            Self::Rename { .. } => HostOpV1::FsRename,
             Self::ChangeMode { .. } => HostOpV1::FsChangeMode,
         }
     }
 
-    fn path(&self) -> &[u8] {
-        match self {
-            Self::ReadFile { path }
-            | Self::WriteFile { path, .. }
-            | Self::AppendFile { path, .. }
-            | Self::Metadata { path }
-            | Self::ChangeMode { path, .. } => path,
-        }
-    }
-
-    fn resolve_kind(&self) -> FsOpKind {
-        match self {
-            Self::ReadFile { .. } => FsOpKind::Read,
-            Self::WriteFile { .. } => FsOpKind::Write,
-            Self::AppendFile { .. } => FsOpKind::Append,
-            Self::Metadata { .. } => FsOpKind::Metadata,
-            Self::ChangeMode { .. } => FsOpKind::ChangeMode,
+    fn resolution(&self, operation: FsOpKind) -> Option<(&[u8], bool)> {
+        match (self, operation) {
+            (Self::ReadFile { path }, FsOpKind::Read)
+            | (Self::WriteFile { path, .. }, FsOpKind::Write)
+            | (Self::AppendFile { path, .. }, FsOpKind::Append)
+            | (Self::Metadata { path }, FsOpKind::Metadata)
+            | (Self::ChangeMode { path, .. }, FsOpKind::ChangeMode) => {
+                Some((path, true))
+            }
+            (Self::Rename { source, .. }, FsOpKind::RenameSource) => {
+                Some((source, false))
+            }
+            (Self::Rename { destination, .. }, FsOpKind::RenameDestination) => {
+                Some((destination, true))
+            }
+            _ => None,
         }
     }
 }
@@ -325,16 +329,24 @@ impl HostHandler for ScriptedPosixHost {
         symlink: capabilities::SymlinkPolicy,
     ) -> Result<Resolution<Self::Handle>, ResolveError> {
         let expected = self.expected_fs.front().cloned();
+        let mut completes_expected = true;
         if let Some(expected) = &expected {
-            let expected_components = expected
-                .path()
-                .split(|byte| *byte == b'/')
-                .filter(|part| !part.is_empty() && *part != b".")
-                .map(ToOwned::to_owned)
-                .collect::<Vec<_>>();
-            if expected.resolve_kind() != op || expected_components != components {
+            if let Some((expected_path, completes)) = expected.resolution(op) {
+                completes_expected = completes;
+                let expected_components = expected_path
+                    .split(|byte| *byte == b'/')
+                    .filter(|part| !part.is_empty() && *part != b".")
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<_>>();
+                if expected_components != components {
+                    self.fail_assertion(format!(
+                        "interpreter FS resolution diverged: expected={expected:?}, \
+                         op={op:?}, components={components:?}"
+                    ));
+                }
+            } else {
                 self.fail_assertion(format!(
-                    "interpreter FS resolution diverged: expected={expected:?}, op={op:?}, components={components:?}"
+                    "interpreter FS resolution kind diverged: expected={expected:?}, op={op:?}"
                 ));
             }
         } else {
@@ -344,7 +356,10 @@ impl HostHandler for ScriptedPosixHost {
         }
         let result = self.inner.fs_resolve(root, components, op, symlink);
         match &result {
-            Ok(_) => self.pending_fs = self.expected_fs.pop_front(),
+            Ok(_) if completes_expected => {
+                self.pending_fs = self.expected_fs.pop_front();
+            }
+            Ok(_) => {}
             Err(ResolveError::Io(_)) => {
                 self.expected_fs.pop_front();
             }
@@ -436,6 +451,8 @@ impl HostHandler for ScriptedPosixHost {
         to_parent: &Self::Handle,
         to_leaf: &[u8],
     ) -> io::Result<()> {
+        let expected = self.take_pending(HostOpV1::FsRename);
+        verify_rename_assertion(self, expected.as_ref(), from_leaf, to_leaf);
         self.inner
             .fs_rename_at(from_parent, from_leaf, to_parent, to_leaf)
     }
@@ -487,6 +504,31 @@ fn verify_append_assertion(
         host.fail_assertion(format!(
             "interpreter FS append payload diverged: expected={expected:?}, \
              bytes={bytes:?}"
+        ));
+    }
+}
+
+fn verify_rename_assertion(
+    host: &mut ScriptedPosixHost,
+    expected: Option<&ExpectedFsEffect>,
+    from_leaf: &[u8],
+    to_leaf: &[u8],
+) {
+    let matches = match expected {
+        Some(ExpectedFsEffect::Rename {
+            source,
+            destination,
+        }) => {
+            source.rsplit(|byte| *byte == b'/').next() == Some(from_leaf)
+                && destination.rsplit(|byte| *byte == b'/').next()
+                    == Some(to_leaf)
+        }
+        _ => false,
+    };
+    if !matches {
+        host.fail_assertion(format!(
+            "interpreter FS rename payload diverged: expected={expected:?}, \
+             from_leaf={from_leaf:?}, to_leaf={to_leaf:?}"
         ));
     }
 }

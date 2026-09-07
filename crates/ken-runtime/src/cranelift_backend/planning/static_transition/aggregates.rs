@@ -3308,6 +3308,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         SOME_SITE_PATH,
         IO_ERRORS,
     ];
+    const RENAME_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
+        N::nullary(R::FileOperationRename),
+        SOME_SITE_PATH,
+        IO_ERRORS,
+    ];
     const CHANGE_MODE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
         N::nullary(R::FileOperationChangeMode),
         SOME_SITE_PATH,
@@ -3328,6 +3333,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     const METADATA_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
         children: METADATA_ERROR_CHILDREN,
+    };
+    const RENAME_ERROR: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileError,
+        children: RENAME_ERROR_CHILDREN,
     };
     const CHANGE_MODE_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
@@ -3403,6 +3412,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::FsWriteFile => (WRITE_FILE_ERROR, UNIT),
         Op::FsAppendFile => (APPEND_FILE_ERROR, UNIT),
         Op::FsMetadata => (METADATA_ERROR, FILE_METADATA),
+        Op::FsRename => (RENAME_ERROR, UNIT),
         Op::FsChangeMode => (CHANGE_MODE_ERROR, UNIT),
         Op::BufferAllocate | Op::BufferFreeze => (RESOURCE_SURFACE, N::Absent),
         Op::FsHandleMetadata => (RESOURCE_SURFACE, N::Absent),
@@ -10416,6 +10426,13 @@ mod tests {
                     .collect(),
             ),
             (
+                Op::FsRename,
+                file_error(R::FileOperationRename)
+                    .into_iter()
+                    .chain(unit())
+                    .collect(),
+            ),
+            (
                 Op::FsChangeMode,
                 file_error(R::FileOperationChangeMode)
                     .into_iter()
@@ -11269,6 +11286,7 @@ mod tests {
             Op::FsWriteFile,
             Op::FsAppendFile,
             Op::FsMetadata,
+            Op::FsRename,
             Op::FsChangeMode,
             Op::BufferAllocate,
             Op::BufferFreeze,

@@ -129,10 +129,11 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     FileKindDirectory,
     FileKindSymlink,
     FileKindOther,
+    FileOperationRename,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 36] = [
+    pub(super) const ALL: [Self; 37] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -169,6 +170,7 @@ impl SynthesizedFixedConstructorRole {
         Self::FileKindDirectory,
         Self::FileKindSymlink,
         Self::FileKindOther,
+        Self::FileOperationRename,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -209,6 +211,7 @@ impl SynthesizedFixedConstructorRole {
             Self::FileKindDirectory => &symbols.file_kind_directory,
             Self::FileKindSymlink => &symbols.file_kind_symlink,
             Self::FileKindOther => &symbols.file_kind_other,
+            Self::FileOperationRename => &symbols.file_operation_rename,
         }
     }
 }
