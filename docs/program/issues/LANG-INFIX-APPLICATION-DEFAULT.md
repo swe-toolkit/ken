@@ -1,7 +1,7 @@
 ---
 id: LANG-INFIX-APPLICATION-DEFAULT
 title: "with symbolic operator names defined, `a <+> b` must parse as application of `<+>` at the normative default `infixl 9` -- one precedence level in the existing cascade, and it needs no fixity table"
-status: active
+status: merged
 owner: language
 size: S
 gate: none

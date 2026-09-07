@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-06 23:25:38Z — from 562 issue file(s) in `docs/program/issues/`.
+2026-09-07 00:15:22Z — from 562 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -197,7 +197,7 @@ the committed file matches the generator's output.
 | `LANG-GENERATED-INDEX-EVIDENCE-CLOSURE` | D2b predecessor (elaborator-only): close the generated-index reflexive-evidence terminal-vocabulary stratification — Top is admitted only at the outer entry (synth_generated_index_evidence) and not inside the Sigma recursion (synth_refl_proof), so a reflexive record index that reduces through a Sigma to a nested closed-equal field (WHNF Top) is false-rejected with `Refl expects an Eq-shaped goal`. Route the Sigma recursion through the Top-aware entry so {Eq, Sigma, Top} dispatch uniformly at every nesting depth. | merged | language | S | none | — |
 | `LANG-INDEX-REFINEMENT-OMEGA-ARM` | Make dependent-match index refinement sort-general: of five classifier decisions in elab.rs, widen the re-indexed-position helper, the branch goal, and the hidden-result outer-binding prefilter to Type union Omega, transporting Omega-classified types by a direct J arm alongside the existing Type-plus-Cast arm, while both index-type classifiers stay Type-only | merged | language | M | none | — |
 | `LANG-INDEXED-RECURSIVE-IH-DISCHARGE` | Transport the mutual-recursion sibling-call result along the dependent-match refinement equality at the elaboration boundary, so the source branch reconciles a recursive-group call's concrete indexed result with the refined motive index -- route (c) genuine J/cast transport over a PROPOSITIONAL equality via c-elab roster-aware auto-transport (the c-proof/c-elab fork RESOLVED to c-elab: D0 measured no lawful existing source carrier), surfacing the recursive-group roster into ElabCtx and inserting the transport at the equality-holding seam, NOT the reflexive same-owner discharge and NOT a new source-language carrier; the elaborator prerequisite V3-FO-CHECKER-SOUNDNESS D3 is blocked on | closed | language | M | none | — |
-| `LANG-INFIX-APPLICATION-DEFAULT` | with symbolic operator names defined, `a <+> b` must parse as application of `<+>` at the normative default `infixl 9` -- one precedence level in the existing cascade, and it needs no fixity table | active | language | S | none | — |
+| `LANG-INFIX-APPLICATION-DEFAULT` | with symbolic operator names defined, `a <+> b` must parse as application of `<+>` at the normative default `infixl 9` -- one precedence level in the existing cascade, and it needs no fixity table | merged | language | S | none | — |
 | `LANG-INTERVENING-LET-FRAME-WEAKENING` | An intervening let between an outer match's premise and a nested match reaches install_index_refinements and dies in refine_branch_goal with 'could not classify the branch goal: TypeMismatch' -- and the Architect refused 'orthogonal', because the reported found term carries LANG-CONVOY's own D1 signature and there is an influence path through RVar resolution | active | language | S | none | — |
 | `LANG-KENFMT-SELECTIVE-IMPORT-WRAP` | kenfmt: breakable selective-import item lists — teach the layout engine to wrap a selective-import item list at CANONICAL_WIDTH so a wide import renders width-conformant, with byte-idempotence and exact parse/token-shape preservation. Pure layout; zero parser/import-relation/kernel change. The reusable predecessor the Tier-C/D/E import migration needs (every multi-item dictionary import hits the 96-col wall). | merged | language | S | none | — |
 | `LANG-LEX-HEX-FLOAT` | Both spec literal tables give `0x1p-3` as a `Float` form, but the lexer has no hex-float path at all -- and unlike every other numeric form in this arc it cannot be reached by handing a string to `parse::<f64>()`, because Rust's float parser rejects hex-float syntax, so the value must be assembled and correctly rounded by hand | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1885 |
@@ -638,7 +638,6 @@ is itself not yet `merged`/`closed`:
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
-- `LANG-FIXITY-DECL-SURFACE` blocked by `LANG-INFIX-APPLICATION-DEFAULT` (status: active)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `PX10` blocked by `PX9` (status: draft)
