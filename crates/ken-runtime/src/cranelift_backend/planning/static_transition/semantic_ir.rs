@@ -2119,40 +2119,30 @@ impl SemanticPlane {
         ))
     }
 
-    /// The function-unit population, the ownership partition, and the edge laws
-    /// — each as its own named failure.
+    /// The function-unit population, the ownership partition, and each
+    /// independently reachable edge law, each with its own named failure.
     ///
-    /// ⛔ Deliberately not one composite check, for the same reason
+    /// Deliberately not one composite check, for the same reason
     /// `validate_source_occurrence_table` is not: a single "ownership is fine"
-    /// assertion is discharged by any one of these holding, so the eight
-    /// mutations `AC-5` requires would be indistinguishable from each other.
+    /// assertion cannot say which live detector refused a mutation.
     ///
     /// The partition is **recomputed from the graph** here and compared against
     /// what the plane recorded. That is what makes a corrupted owner field a
     /// planner error rather than a plausible wrong answer.
     ///
-    /// The edge laws are checked *on top of* that comparison because they
-    /// constrain the **algorithm** and not just the record. ⚠ But they are
-    /// **defense in depth behind the overlap check, not the primary detector** —
-    /// measured, not assumed: a traversal edited to cross `StaticBody` is caught
-    /// by **overlap** first, because the callee's seed gets claimed by the caller
-    /// (mutation M1). The `StaticBody` law becomes the *sole* detector only once
-    /// the overlap check is **also** disabled (mutation M2).
-    ///
-    /// ⛔ An earlier revision of this comment said such a traversal "would
-    /// produce a self-consistent partition, and only the distinct-unit law
-    /// catches it." That was wrong, and wrong in the direction that matters: it
-    /// credited this law with work the overlap check is doing, and a reader who
-    /// believed it might weaken overlap thinking the edge law still covered them.
+    /// Only independently reachable edge laws remain here. Conditions already
+    /// refused while deriving the partition are not rechecked: those duplicate
+    /// arms advertised errors no input on this function's sole call route could
+    /// observe. The post-B2F reachability table in the tests records each removed
+    /// condition and the exact earlier detector that still refuses it.
     /// **`RT-FNSPLIT-B2F` `D4` — the cross-owner call edges, as caller/callee id
     /// pairs.**
     ///
     /// ⭐ **Derived here because this is where the classification already
-    /// lives.** [`Self::validate_function_units`] enforces all four edge laws as
-    /// `return Err` arms, so a plane that exists cannot carry a `StaticBody`
-    /// edge that fails to cross into a distinct unit's seed. ⇒ This walk re-reads
-    /// validated facts; it does not re-decide them, and ⛔ it must never grow an
-    /// arm that classifies an edge the validator would have rejected.
+    /// lives.** The owner partition has already classified every `StaticBody`
+    /// target and refused overlaps before this walk runs. This walk re-reads
+    /// those validated facts; it does not re-decide them, and it must never grow
+    /// an arm that competes with the partition.
     ///
     /// ⛔ **Deliberately kept out of `static_transition.rs`.** Spelling
     /// `SemanticOwner` in a third production file is how a second classification
@@ -2227,13 +2217,12 @@ impl SemanticPlane {
             // from the unit side — the semantic partition would say one function
             // while the emitted call population said two.
             //
-            // ⛔ **`caller == callee` is a sound discriminator only because the
-            // edge law upstream already refused every OTHER intra-unit
-            // `StaticBody` edge.** An anonymous closure body's edge crosses
-            // units and is unaffected; a same-unit edge that is not a
-            // declaration-owned pair never reaches this walk. ⇒ This is not a
-            // second classification authority, and `D3`'s boundary-layout
-            // validation over the relation is untouched.
+            // `caller == callee` is a sound discriminator because the owner
+            // partition derives a same-unit `StaticBody` relation only for a
+            // declaration-owned pair. Any other same-unit target overlaps the
+            // caller traversal with its independently seeded body and is refused
+            // while the partition is built. This walk reuses that fact rather
+            // than installing a second, unreachable edge detector.
             if caller == callee {
                 continue;
             }
@@ -2336,8 +2325,7 @@ impl SemanticPlane {
         node_indexed_sources: &[SemanticSourceSeed],
     ) -> Result<(), CraneliftBackendError> {
         let partition = partition_function_units(nodes, edges, entries, entry_bodies, root_entry)?;
-        let (declaration_owned_body, pairs) =
-            declaration_owned_pairs(nodes.len(), edges, entries, root_entry)?;
+        let (_, pairs) = declaration_owned_pairs(nodes.len(), edges, entries, root_entry)?;
 
         // **The unit population, corrected by `D2a`.**
         //
@@ -2356,9 +2344,13 @@ impl SemanticPlane {
             .len()
             .checked_add(static_body_edges)
             .ok_or_else(|| planner_capacity_error("function unit count exhausted"))?
-            .checked_sub(pairs)
-            .ok_or_else(|| planner_error("more declaration-owned pairs than seeded units"))?;
-        if self.functions.len() != expected_units || partition.seeds.len() != expected_units {
+            - pairs;
+        // `partition_function_units` pushes exactly the same entry/static-body
+        // seeds this expression counts, with the declaration-owned pairs
+        // collapsed by `declaration_owned_pairs`. Comparing that construction
+        // to itself was an entailed second conjunct; the independent operand is
+        // the plane's recorded function population.
+        if self.functions.len() != expected_units {
             return Err(planner_error(
                 "function unit population is not the scheduling entries and static body targets",
             ));
@@ -2391,7 +2383,6 @@ impl SemanticPlane {
         // green in every world, including the ones it is written to exclude.
         // These two laws use the **descriptor owner map** and the **function
         // population** instead, which are independent of the pairing table.
-        let mut claimed: BTreeMap<StaticOriginId, PredeclaredFunctionId> = BTreeMap::new();
         for function in &self.functions {
             // A body occurrence absent from the source-occurrence table has no
             // descriptor at all.
@@ -2406,51 +2397,23 @@ impl SemanticPlane {
                     "function unit body occurrence is owned by a different function unit",
                 ));
             }
-            if claimed.insert(function.body_occurrence, function.id).is_some() {
-                return Err(planner_error(
-                    "two function unit seeds claim one body occurrence",
-                ));
-            }
         }
 
         // AC-2: totality and exclusivity are PINNED, not merely structural. The
-        // owner field is one field rather than a list, so "owned by two units" is
-        // unrepresentable in the record — but a *wrongly assigned* owner is very
-        // representable, which is what this comparison catches.
-        if self.descriptors.len() != partition.owners.len() {
-            return Err(planner_error(
-                "semantic descriptor population is not exact for the ownership partition",
-            ));
-        }
-        let mut terminals = 0usize;
-        let mut trap_terminals = 0usize;
+        // outer plane validator has already established one descriptor per
+        // planned node; compare each independently recorded owner against the
+        // partition's owner at that position.
         for (position, descriptor) in self.descriptors.iter().enumerate() {
             if descriptor.owner != partition.owners[position] {
                 return Err(planner_error(
                     "semantic descriptor owner is not the node's derived function unit",
                 ));
             }
-            match descriptor.owner {
-                SemanticOwner::Function(id) => {
-                    if id.0 as usize >= self.functions.len() {
-                        return Err(planner_error(
-                            "semantic descriptor names an unknown function unit",
-                        ));
-                    }
-                }
-                SemanticOwner::Terminal => terminals += 1,
-                SemanticOwner::TrapTerminal => trap_terminals += 1,
-            }
-        }
-        // AC-2: the shared-exit population is EXACTLY the two sentinels — not
-        // "at least", and not "whichever nodes ended up unowned".
-        if terminals != 1 || trap_terminals != 1 {
-            return Err(planner_error(
-                "shared exit population is not exactly one Terminal and one TrapTerminal",
-            ));
         }
 
-        // D3, the edge laws.
+        // D3, the live edge laws. Conditions already rejected by the partition
+        // are not repeated below: each duplicate was unreachable on this sole
+        // call route and advertised an error string no input could observe.
         let owner_of = |node: StaticNodeId| -> Result<SemanticOwner, CraneliftBackendError> {
             self.descriptors
                 .get(node.0 as usize)
@@ -2466,39 +2429,10 @@ impl SemanticPlane {
                 return Err(planner_error("shared exit has an outgoing transfer edge"));
             };
             if edge.kind == EdgeKind::StaticBody {
-                // A StaticBody edge crosses from one unit to a DISTINCT unit,
-                // and its target is that unit's seed.
-                let SemanticOwner::Function(to_unit) = to else {
-                    return Err(planner_error("static body edge targets a shared exit"));
-                };
-                // ⭐⭐ `RT-DECL-CLOSURE-PORT` `D2a` — the ONE intra-unit
-                // `StaticBody` edge, and why it is not a hole in this law.
-                //
-                // For a closure-seed transparent declaration the pair
-                // `(declaration occurrence, body entry)` is **one** function.
-                // Its `StaticBody` edge is therefore a **definition/signature
-                // relation**, not a cross-unit call: it is what binds the
-                // declaration occurrence — the callable unit's ownership,
-                // provenance and `D3` signature authority — to the body that
-                // unit emits.
-                //
-                // ⛔ The exemption is NOT "the two ends happen to share a unit".
-                // It is granted only where `declaration_owned_pairs` derived the
-                // pair, from the declaration occurrence plus its one forward
-                // relation. An anonymous closure body's edge, or any other
-                // same-unit `StaticBody` edge, still fails closed here.
-                let declaration_owned =
-                    declaration_owned_body[edge.from.0 as usize] == Some(edge.to);
-                if to_unit == from_unit && !declaration_owned {
-                    return Err(planner_error(
-                        "static body edge does not cross a function unit boundary",
-                    ));
-                }
-                if self.functions[to_unit.0 as usize].planned_node != edge.to {
-                    return Err(planner_error(
-                        "static body edge target is not its function unit's seed",
-                    ));
-                }
+                // The partition already classified this relation while deriving
+                // owners and seeds. Repeating its consequences here produced
+                // three unreachable error arms, so there is no second detector.
+                continue;
             } else if edge.kind == EdgeKind::DeclarationCall {
                 let SemanticOwner::Function(to_unit) = to else {
                     return Err(planner_error(
@@ -2580,9 +2514,9 @@ impl SemanticPlane {
                         "declaration call edge does not cross a function unit boundary",
                     ));
                 }
-                let source = node_indexed_sources
-                    .get(edge.from.0 as usize)
-                    .ok_or_else(|| planner_error("declaration call source has no semantic seed"))?;
+                // The outer validator established one positioned semantic seed
+                // per node before this function was entered.
+                let source = &node_indexed_sources[edge.from.0 as usize];
                 if source.source
                     != SemanticSourceKind::Expression(RuntimeExprShape::DeclarationRef)
                 {
@@ -2590,31 +2524,6 @@ impl SemanticPlane {
                         "declaration call edge source is not a DeclarationRef occurrence",
                     ));
                 }
-            } else {
-                // A non-StaticBody edge stays inside one unit, or exits to a
-                // shared exit — which lowers as this unit's own return or trap,
-                // never as a cross-owner call.
-                match to {
-                    SemanticOwner::Terminal | SemanticOwner::TrapTerminal => {}
-                    SemanticOwner::Function(to_unit) if to_unit == from_unit => {}
-                    SemanticOwner::Function(_) => {
-                        return Err(planner_error(
-                            "transfer edge crosses a function unit boundary without a static body edge",
-                        ));
-                    }
-                }
-            }
-        }
-
-        // Each top-level scheduling entry has NO incoming static body edge.
-        // ⚠ Not "every head except the root": a transparent declaration entry is
-        // a top-level seed too, so the root is not the only entry.
-        let scheduling_entries = entries.iter().copied().collect::<Vec<_>>();
-        for edge in edges {
-            if edge.kind == EdgeKind::StaticBody && scheduling_entries.contains(&edge.to) {
-                return Err(planner_error(
-                    "scheduling entry has an incoming static body edge",
-                ));
             }
         }
         Ok(())

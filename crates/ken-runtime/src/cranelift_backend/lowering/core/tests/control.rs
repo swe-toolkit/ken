@@ -3458,12 +3458,12 @@ fn the_identifier_census_survives_the_evasions_that_defeated_the_text_scan() {
 /// The backend's complete production source surface — the census's **closure
 /// proof**, not a convenience list.
 ///
-/// ⭐ Why this is a proof rather than an enumeration someone must remember: a Rust
-/// file is compiled only if an ancestor module declares it with `mod`. So pinning
-/// every production `mod` declaration across the backend pins the *file set*, and
-/// a thirteenth backend file cannot be compiled without reddening
-/// `the_backend_production_surface_inventory_is_closed` below — which is what
-/// forces whoever adds it to extend this list.
+/// Why this is a proof rather than an enumeration someone must remember: a Rust
+/// file is compiled only if an ancestor module declares it with `mod`. The
+/// structural item-head walk below finds both semicolon and braced module forms,
+/// so another backend file cannot be compiled without reddening
+/// `the_backend_production_surface_inventory_is_closed` and forcing its source
+/// into this roster.
 #[cfg(test)]
 const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     (
@@ -3621,31 +3621,183 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     ("test_support.rs", include_str!("../../../test_support.rs")),
 ];
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RustItemDelimiter {
+    Brace,
+    Semicolon,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RustItemHead<'a> {
+    kind: &'a str,
+    name: Option<&'a str>,
+    delimiter: RustItemDelimiter,
+}
+
+/// One Rust item head, classified by its leading keyword after attributes,
+/// visibility, and item modifiers.
+///
+/// This deliberately does not decide from the line's final punctuation. The
+/// punctuation distinguishes an external module from an inline one only after
+/// the item has already been seen; it never decides whether an item exists.
+fn rust_item_head(mut line: &str) -> Option<RustItemHead<'_>> {
+    line = line.split_once("//").map_or(line, |(code, _)| code).trim();
+    while let Some(attribute) = line.strip_prefix("#[") {
+        let close = attribute.find(']')?;
+        line = attribute[close + 1..].trim_start();
+    }
+    if let Some(public) = line.strip_prefix("pub") {
+        if public.starts_with('(') {
+            let close = public.find(')')?;
+            line = public[close + 1..].trim_start();
+        } else if public.starts_with(char::is_whitespace) {
+            line = public.trim_start();
+        }
+    }
+
+    loop {
+        let before = line;
+        for modifier in ["async", "unsafe", "default"] {
+            if let Some(rest) = line.strip_prefix(modifier) {
+                if rest.starts_with(char::is_whitespace) {
+                    line = rest.trim_start();
+                    break;
+                }
+            }
+        }
+        if line == before {
+            break;
+        }
+    }
+    if let Some(extern_item) = line.strip_prefix("extern") {
+        if extern_item.starts_with(char::is_whitespace) {
+            line = extern_item.trim_start();
+            if let Some(abi) = line.strip_prefix('"') {
+                let close = abi.find('"')?;
+                line = abi[close + 1..].trim_start();
+            }
+        }
+    }
+    if let Some(const_item) = line.strip_prefix("const") {
+        if const_item.starts_with(char::is_whitespace) && const_item.trim_start().starts_with("fn ")
+        {
+            line = const_item.trim_start();
+        }
+    }
+
+    let (kind, rest) = [
+        "impl", "mod", "fn", "struct", "trait", "enum", "use", "type", "const", "static",
+    ]
+    .into_iter()
+    .find_map(|kind| {
+        line.strip_prefix(kind).and_then(|rest| {
+            rest.chars()
+                .next()
+                .is_some_and(|next| !next.is_alphanumeric() && next != '_')
+                .then_some((kind, rest))
+        })
+    })?;
+    let name = (kind == "mod").then(|| {
+        rest.trim_start()
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or_default()
+    });
+    let delimiter = if line.trim_end().ends_with(';') {
+        RustItemDelimiter::Semicolon
+    } else if line.contains('{') {
+        RustItemDelimiter::Brace
+    } else {
+        return None;
+    };
+    Some(RustItemHead {
+        kind,
+        name,
+        delimiter,
+    })
+}
+
+#[test]
+fn the_item_head_enumerator_sees_every_ruled_form() {
+    // Promise class: durable structural control. Each row is an explicitly
+    // ruled Rust item class, not a sample whose reader must generalize.
+    for (source, kind, delimiter) in [
+        (
+            "#[cfg(any())] impl Trait for Type {}",
+            "impl",
+            RustItemDelimiter::Brace,
+        ),
+        ("pub(crate) mod nested {}", "mod", RustItemDelimiter::Brace),
+        (
+            "#[inline] pub(in crate::x) fn f() {}",
+            "fn",
+            RustItemDelimiter::Brace,
+        ),
+        ("pub struct S {}", "struct", RustItemDelimiter::Brace),
+        ("unsafe trait T {}", "trait", RustItemDelimiter::Brace),
+        ("pub enum E {}", "enum", RustItemDelimiter::Brace),
+        ("pub use a::{b, c};", "use", RustItemDelimiter::Semicolon),
+        ("pub type T = u8;", "type", RustItemDelimiter::Semicolon),
+        (
+            "pub const C: S = S {};",
+            "const",
+            RustItemDelimiter::Semicolon,
+        ),
+        (
+            "pub static S: u8 = 0;",
+            "static",
+            RustItemDelimiter::Semicolon,
+        ),
+    ] {
+        let head = rust_item_head(source)
+            .unwrap_or_else(|| panic!("the item-head enumerator did not see {source:?}"));
+        assert_eq!((head.kind, head.delimiter), (kind, delimiter));
+    }
+    assert_eq!(
+        rust_item_head("mod sample;"),
+        Some(RustItemHead {
+            kind: "mod",
+            name: Some("sample"),
+            delimiter: RustItemDelimiter::Semicolon,
+        }),
+        "the external-module control must retain the declared module name"
+    );
+}
+
 #[test]
 fn the_backend_production_surface_inventory_is_closed() {
-    // Every production `mod` declaration reachable in the backend, paired with the
-    // file that declares it. `mod tests;` is excluded: a sibling test module is not
-    // production surface, and its absence from the census is the point.
+    // Every production `mod` item reachable in the backend, paired with the
+    // file that declares it. `mod tests {}` is excluded: a sibling test module
+    // is not production surface, and its absence from the census is the point.
     let mut declared = Vec::new();
+    let mut external_modules = 0usize;
     for (file, source) in BACKEND_PRODUCTION_SOURCES {
-        let production = source
-            .split_once("\n#[cfg(test)]\nmod tests {")
-            .map_or(*source, |(before, _)| before);
-        for line in production.lines() {
+        let mut test_only_item = false;
+        for line in source.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("//") || !trimmed.ends_with(';') {
+            if trimmed.starts_with("#[cfg(") {
+                test_only_item |= identifier_occurrences(trimmed, "test") > 0
+                    || identifier_occurrences(trimmed, "ken_ac10_production_mint_probe") > 0;
                 continue;
             }
-            let Some(rest) = trimmed.strip_suffix(';') else {
-                continue;
-            };
-            let Some(name) = rest.rsplit_once("mod ").map(|(_, name)| name) else {
-                continue;
-            };
-            if name == "tests" || name.contains(' ') {
+            if trimmed.starts_with("#[") || trimmed.is_empty() || trimmed.starts_with("//") {
                 continue;
             }
+            let Some(head) = rust_item_head(line) else {
+                test_only_item = false;
+                continue;
+            };
+            if test_only_item && head.delimiter == RustItemDelimiter::Brace {
+                test_only_item = false;
+                continue;
+            }
+            test_only_item = false;
+            if head.kind != "mod" || head.name == Some("tests") {
+                continue;
+            }
+            let name = head.name.expect("a mod item has a name");
             declared.push((*file, name));
+            external_modules += usize::from(head.delimiter == RustItemDelimiter::Semicolon);
         }
     }
     assert_eq!(
@@ -3719,6 +3871,12 @@ fn the_backend_production_surface_inventory_is_closed() {
             // Architect's D0 corrections) and the types the moving methods
             // merely manipulate stay at the `mod.rs` hub.
             ("lowering/mod.rs", "effects"),
+            // Production inline modules share their parent's file but remain
+            // part of its item surface, so the head inventory records them.
+            ("lowering/mod.rs", "transport_identity"),
+            ("lowering/mod.rs", "safe_byte_span"),
+            ("lowering/effects.rs", "effect_seat_group"),
+            ("lowering/seed_material.rs", "tag"),
             ("planning.rs", "static_transition"),
             ("planning/static_transition.rs", "abi"),
             // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — aggregate allocation
@@ -3778,10 +3936,11 @@ fn the_backend_production_surface_inventory_is_closed() {
          file to that list."
     );
     assert_eq!(
-        declared.len() + 1,
+        external_modules + 1,
         BACKEND_PRODUCTION_SOURCES.len(),
-        "AC-4 -- every declared module must appear in the census list exactly once \
-         (+1 for `cranelift_backend.rs`, the root, which no `mod` line declares)"
+        "AC-4 -- every external module must appear in the census list exactly once \
+         (+1 for `cranelift_backend.rs`, the root, which no `mod` item declares). \
+         Inline modules remain visible in `declared` but share their parent's file."
     );
 }
 

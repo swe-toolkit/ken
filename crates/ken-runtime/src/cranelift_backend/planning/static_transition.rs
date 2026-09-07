@@ -71,6 +71,8 @@ pub(in crate::cranelift_backend) use abi::{
     expected_capture_slot,
 };
 #[cfg(test)]
+pub(in crate::cranelift_backend) use abi::with_c4_disabled_for_independent_control;
+#[cfg(test)]
 pub(in crate::cranelift_backend) use semantic_ir::with_last_io_error_role_omitted;
 #[cfg(test)]
 pub(in crate::cranelift_backend) use semantic_ir::{

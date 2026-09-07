@@ -5453,6 +5453,51 @@ mod tests {
             }
         }
 
+        // Finding C: the class named first by the interior-child rule must have
+        // a real member. The broad fixture above has lexical closures but no
+        // captures, so non-closure children alone cannot discharge this row.
+        let capture_expr = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: vec![
+                    RuntimeExpr::Value(RuntimeValue::Int((17).into())),
+                    RuntimeExpr::Value(RuntimeValue::Int((29).into())),
+                ],
+                params: Vec::new(),
+                body: Box::new(RuntimeExpr::Var(0)),
+            }),
+            args: Vec::new(),
+        };
+        let capture_plan = plan_static_transition_graph(&capture_expr, &BTreeMap::new())
+            .expect("the lexical-capture control plans");
+        let capture_sources = super::super::semantic_ir::positioned_sources(
+            &capture_plan.nodes,
+            &capture_plan.semantic_sources,
+        )
+        .expect("the capture source population positions");
+        let mut capture_children = 0usize;
+        for record in &capture_plan.semantic.records {
+            if capture_sources[record.origin.0 as usize].source
+                != SemanticSourceKind::Expression(RuntimeExprShape::LexicalClosure)
+            {
+                continue;
+            }
+            let parent_owner = capture_plan.semantic.descriptors[record.origin.0 as usize].owner;
+            for capture_index in 1..record.child_origins.len as usize {
+                let child = capture_plan
+                    .child_static_origin(record.origin, capture_index)
+                    .expect("a lexical capture has a positional child origin");
+                assert_eq!(
+                    capture_plan.semantic.descriptors[child.0 as usize].owner, parent_owner,
+                    "a lexical capture child must stay in its parent's unit"
+                );
+                capture_children += 1;
+            }
+        }
+        assert!(
+            capture_children > 0,
+            "the capture ownership class has zero instances"
+        );
+
         // ⭐ The "up" half. The boundary crossed on descent is represented by the
         // **callee seed**, and the body's return node stays inside the
         // **callee's** owner rather than being handed back to the caller. This is
@@ -5510,6 +5555,500 @@ mod tests {
         assert!(returns > 0, "no ClosureBody return successor was exercised");
     }
 
+    /// RT-FNSPLIT-B2O-CHECK D2: the post-B2F advertised-law table, with one
+    /// exact reaching witness for every live detector and an explicit
+    /// disposition for every site that cannot be observed on the sole route.
+    ///
+    /// Promise class: durable mutation proof. The table is a transition record
+    /// for the validator surface this WP audited; live rows are tied to data-side
+    /// mutations below rather than inferred from the count.
+    #[test]
+    fn b2o_check_every_function_unit_error_site_has_an_exact_disposition() {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum Disposition {
+            Capacity,
+            Live,
+            Shadowed(&'static str),
+            Entailed(&'static str),
+        }
+
+        let rows = [
+            ("function unit count exhausted", Disposition::Capacity),
+            (
+                "more declaration-owned pairs than seeded units",
+                Disposition::Entailed(
+                    "declaration_owned_pairs derives each pair from one entry and one \
+                     StaticBody edge",
+                ),
+            ),
+            (
+                "function unit population is not the scheduling entries and static body targets",
+                Disposition::Live,
+            ),
+            ("function unit identity exhausted", Disposition::Capacity),
+            ("function unit is not positional for its seed", Disposition::Live),
+            (
+                "function unit body occurrence is not a planned occurrence",
+                Disposition::Live,
+            ),
+            (
+                "function unit body occurrence is owned by a different function unit",
+                Disposition::Live,
+            ),
+            (
+                "two function unit seeds claim one body occurrence",
+                Disposition::Shadowed(
+                    "function unit body occurrence is owned by a different function unit",
+                ),
+            ),
+            (
+                "semantic descriptor population is not exact for the ownership partition",
+                Disposition::Shadowed("planned node lacks exactly one semantic definition"),
+            ),
+            (
+                "semantic descriptor owner is not the node's derived function unit",
+                Disposition::Live,
+            ),
+            (
+                "semantic descriptor names an unknown function unit",
+                Disposition::Shadowed(
+                    "semantic descriptor owner is not the node's derived function unit",
+                ),
+            ),
+            (
+                "shared exit population is not exactly one Terminal and one TrapTerminal",
+                Disposition::Shadowed(
+                    "semantic descriptor owner is not the node's derived function unit",
+                ),
+            ),
+            (
+                "ownership edge endpoint has no semantic descriptor",
+                Disposition::Live,
+            ),
+            ("shared exit has an outgoing transfer edge", Disposition::Live),
+            (
+                "static body edge targets a shared exit",
+                Disposition::Shadowed("static body target has no issued body occurrence"),
+            ),
+            (
+                "static body edge does not cross a function unit boundary",
+                Disposition::Entailed(
+                    "partition overlap rejects a non-pair same-owner StaticBody edge",
+                ),
+            ),
+            (
+                "static body edge target is not its function unit's seed",
+                Disposition::Shadowed("function unit is not positional for its seed"),
+            ),
+            (
+                "declaration call edge targets a shared exit",
+                Disposition::Live,
+            ),
+            (
+                "declaration call edge target is neither a scheduling entry nor a static body \
+                 unit head",
+                Disposition::Live,
+            ),
+            (
+                "declaration call edge target is not its function unit's seed",
+                Disposition::Live,
+            ),
+            (
+                "declaration call edge does not cross a function unit boundary",
+                Disposition::Live,
+            ),
+            (
+                "declaration call source has no semantic seed",
+                Disposition::Shadowed("planned node lacks its semantic source"),
+            ),
+            (
+                "declaration call edge source is not a DeclarationRef occurrence",
+                Disposition::Live,
+            ),
+            (
+                "transfer edge crosses a function unit boundary without a static body edge",
+                Disposition::Shadowed("planned node is owned by more than one function unit"),
+            ),
+            (
+                "scheduling entry has an incoming static body edge",
+                Disposition::Shadowed("scheduling entry is also a static body target"),
+            ),
+        ];
+        assert_eq!(rows.len(), 25);
+        assert_eq!(
+            rows.iter()
+                .filter(|(_, disposition)| *disposition == Disposition::Capacity)
+                .count(),
+            2
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|(_, disposition)| *disposition == Disposition::Live)
+                .count(),
+            12
+        );
+        let inactive = rows
+            .iter()
+            .filter_map(|(_, disposition)| match disposition {
+                Disposition::Shadowed(by) | Disposition::Entailed(by) => Some(*by),
+                Disposition::Capacity | Disposition::Live => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(inactive.len(), 11);
+        assert!(
+            inactive.iter().all(|reason| !reason.is_empty()),
+            "every inactive row must name its shadowing arm or entailment"
+        );
+
+        let expr = b2o_two_closure_fixture();
+        let plan = plan_static_transition_graph(&expr, &BTreeMap::new()).expect("base plan");
+        let exact = |label: &str, actual: CraneliftBackendError, expected: &str| {
+            assert_eq!(
+                actual,
+                planner_error(expected),
+                "{label} reached the wrong arm"
+            );
+        };
+
+        let mut population = plan.semantic.clone();
+        population.functions.pop();
+        exact(
+            "population",
+            b2o_err(&population, &plan.nodes, &plan.edges, &plan.entries, &plan),
+            rows[2].0,
+        );
+
+        let mut positional = plan.semantic.clone();
+        positional.functions[1].id = PredeclaredFunctionId(0);
+        exact(
+            "positional function",
+            b2o_err(&positional, &plan.nodes, &plan.edges, &plan.entries, &plan),
+            rows[4].0,
+        );
+
+        let mut outside = plan.semantic.clone();
+        outside.functions[1].body_occurrence = StaticOriginId(u32::MAX);
+        exact(
+            "body outside the occurrence table",
+            b2o_err(&outside, &plan.nodes, &plan.edges, &plan.entries, &plan),
+            rows[5].0,
+        );
+
+        let mut wrong_body_owner = plan.semantic.clone();
+        wrong_body_owner.functions[1].body_occurrence = plan.semantic.functions[0].body_occurrence;
+        exact(
+            "body owned by another function",
+            b2o_err(
+                &wrong_body_owner,
+                &plan.nodes,
+                &plan.edges,
+                &plan.entries,
+                &plan,
+            ),
+            rows[6].0,
+        );
+
+        let terminal = plan
+            .nodes
+            .iter()
+            .find(|node| node.transition == TransitionKind::Terminal)
+            .expect("terminal")
+            .id;
+        let mut wrong_owner = plan.semantic.clone();
+        wrong_owner.descriptors[terminal.0 as usize].owner =
+            SemanticOwner::Function(PredeclaredFunctionId(0));
+        exact(
+            "owner mismatch",
+            b2o_err(&wrong_owner, &plan.nodes, &plan.edges, &plan.entries, &plan),
+            rows[9].0,
+        );
+
+        let mut missing_endpoint = plan.edges.clone();
+        let body_edge = missing_endpoint
+            .iter_mut()
+            .find(|edge| edge.kind == EdgeKind::StaticBody)
+            .expect("a StaticBody edge");
+        body_edge.from = StaticNodeId(plan.nodes.len() as u32);
+        exact(
+            "ownership endpoint",
+            b2o_err(
+                &plan.semantic,
+                &plan.nodes,
+                &missing_endpoint,
+                &plan.entries,
+                &plan,
+            ),
+            rows[12].0,
+        );
+
+        let mut outgoing_exit = plan.clone();
+        append_edge(
+            &mut outgoing_exit,
+            terminal,
+            plan.entries[0],
+            EdgeKind::Continue,
+        );
+        exact(
+            "shared-exit outgoing edge",
+            b2o_err(
+                &plan.semantic,
+                &plan.nodes,
+                &outgoing_exit.edges,
+                &plan.entries,
+                &plan,
+            ),
+            rows[13].0,
+        );
+
+        let symbol = "decl:fixture::b2o_check".to_string();
+        let declaration = b2o_transparent_declaration(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: Vec::new(),
+            body: Box::new(RuntimeExpr::Value(RuntimeValue::Int((73).into()))),
+        });
+        let declarations = BTreeMap::from([(symbol.as_str(), &declaration)]);
+        let call_expr = RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+            body: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: symbol.clone(),
+            }),
+        };
+        let call_plan =
+            plan_static_transition_graph(&call_expr, &declarations).expect("declaration-call plan");
+        let (call_index, call) = call_plan
+            .edges
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, edge)| edge.kind == EdgeKind::DeclarationCall)
+            .expect("a DeclarationCall edge");
+        let call_terminal = call_plan
+            .nodes
+            .iter()
+            .find(|node| node.transition == TransitionKind::Terminal)
+            .expect("call terminal")
+            .id;
+
+        let call_error = |label: &str, edges: &[StaticEdge], expected: &str| {
+            exact(
+                label,
+                b2o_err(
+                    &call_plan.semantic,
+                    &call_plan.nodes,
+                    edges,
+                    &call_plan.entries,
+                    &call_plan,
+                ),
+                expected,
+            );
+        };
+
+        let mut shared_target = call_plan.edges.clone();
+        shared_target[call_index].to = call_terminal;
+        call_error(
+            "declaration call to shared exit",
+            &shared_target,
+            rows[17].0,
+        );
+
+        let caller_owner = call_plan.semantic.descriptors[call.from.0 as usize].owner;
+        let static_body_heads = call_plan
+            .edges
+            .iter()
+            .filter(|edge| edge.kind == EdgeKind::StaticBody)
+            .map(|edge| edge.to)
+            .collect::<BTreeSet<_>>();
+        let non_head = call_plan
+            .nodes
+            .iter()
+            .map(|node| node.id)
+            .find(|node| {
+                let owner = call_plan.semantic.descriptors[node.0 as usize].owner;
+                matches!(owner, SemanticOwner::Function(_))
+                    && owner != caller_owner
+                    && !call_plan.entries.contains(node)
+                    && !static_body_heads.contains(node)
+            })
+            .expect("callee owns a non-head node");
+        let mut non_head_target = call_plan.edges.clone();
+        non_head_target[call_index].to = non_head;
+        call_error("declaration call to non-head", &non_head_target, rows[18].0);
+
+        let declaration_entry = StaticNodeId(
+            call_plan
+                .declaration_occurrence_origin(symbol.as_str())
+                .expect("declaration occurrence")
+                .0,
+        );
+        let mut wrong_seed = call_plan.edges.clone();
+        wrong_seed[call_index].to = declaration_entry;
+        call_error("declaration call to non-seed head", &wrong_seed, rows[19].0);
+
+        let mut same_unit = call_plan.edges.clone();
+        same_unit[call_index].to = call_plan.entries[0];
+        call_error("same-unit declaration call", &same_unit, rows[20].0);
+
+        let positioned = super::super::semantic_ir::positioned_sources(
+            &call_plan.nodes,
+            &call_plan.semantic_sources,
+        )
+        .expect("positioned call sources");
+        let non_declaration_source = call_plan
+            .nodes
+            .iter()
+            .map(|node| node.id)
+            .find(|node| {
+                *node != call.from
+                    && call_plan.semantic.descriptors[node.0 as usize].owner == caller_owner
+                    && positioned[node.0 as usize].source
+                        != SemanticSourceKind::Expression(RuntimeExprShape::DeclarationRef)
+            })
+            .expect("caller owns a non-declaration source");
+        let mut wrong_source = call_plan.edges.clone();
+        wrong_source[call_index].from = non_declaration_source;
+        call_error("declaration call source shape", &wrong_source, rows[22].0);
+
+        // AC-5: each deleted detector's own bad condition remains refused by
+        // the earlier live law named in its table row.
+        let mut short_descriptors = plan.semantic.clone();
+        short_descriptors.descriptors.pop();
+        exact(
+            "short descriptor population",
+            b2o_err(
+                &short_descriptors,
+                &plan.nodes,
+                &plan.edges,
+                &plan.entries,
+                &plan,
+            ),
+            "planned node lacks exactly one semantic definition",
+        );
+
+        let mut unknown_owner = plan.semantic.clone();
+        unknown_owner.descriptors[terminal.0 as usize].owner =
+            SemanticOwner::Function(PredeclaredFunctionId(u32::MAX));
+        exact(
+            "unknown recorded owner",
+            b2o_err(
+                &unknown_owner,
+                &plan.nodes,
+                &plan.edges,
+                &plan.entries,
+                &plan,
+            ),
+            "semantic descriptor owner is not the node's derived function unit",
+        );
+
+        let mut missing_terminal = plan.semantic.clone();
+        missing_terminal.descriptors[terminal.0 as usize].owner = SemanticOwner::TrapTerminal;
+        exact(
+            "missing Terminal owner",
+            b2o_err(
+                &missing_terminal,
+                &plan.nodes,
+                &plan.edges,
+                &plan.entries,
+                &plan,
+            ),
+            "semantic descriptor owner is not the node's derived function unit",
+        );
+
+        let mut body_to_exit = plan.edges.clone();
+        body_to_exit
+            .iter_mut()
+            .find(|edge| edge.kind == EdgeKind::StaticBody)
+            .expect("a StaticBody edge")
+            .to = terminal;
+        exact(
+            "StaticBody target at a shared exit",
+            b2o_err(
+                &plan.semantic,
+                &plan.nodes,
+                &body_to_exit,
+                &plan.entries,
+                &plan,
+            ),
+            "static body target has no issued body occurrence",
+        );
+
+        let mut non_seed_function = plan.semantic.clone();
+        non_seed_function.functions[1].planned_node = plan.semantic.functions[0].planned_node;
+        exact(
+            "StaticBody target not recorded as its unit seed",
+            b2o_err(
+                &non_seed_function,
+                &plan.nodes,
+                &plan.edges,
+                &plan.entries,
+                &plan,
+            ),
+            "function unit is not positional for its seed",
+        );
+
+        let static_body_target = plan
+            .edges
+            .iter()
+            .find(|edge| edge.kind == EdgeKind::StaticBody)
+            .expect("a StaticBody edge")
+            .to;
+        let mut ordinary_cross_owner = plan.clone();
+        append_edge(
+            &mut ordinary_cross_owner,
+            plan.entries[0],
+            static_body_target,
+            EdgeKind::Continue,
+        );
+        exact(
+            "ordinary cross-owner transfer",
+            b2o_err(
+                &plan.semantic,
+                &plan.nodes,
+                &ordinary_cross_owner.edges,
+                &plan.entries,
+                &plan,
+            ),
+            "planned node is owned by more than one function unit",
+        );
+
+        let mut body_to_entry = plan.edges.clone();
+        body_to_entry
+            .iter_mut()
+            .find(|edge| edge.kind == EdgeKind::StaticBody)
+            .expect("a StaticBody edge")
+            .to = plan.entries[0];
+        exact(
+            "incoming StaticBody edge at a scheduling entry",
+            b2o_err(
+                &plan.semantic,
+                &plan.nodes,
+                &body_to_entry,
+                &plan.entries,
+                &plan,
+            ),
+            "scheduling entry is also a static body target",
+        );
+
+        let mut missing_call_source = call_plan.semantic_sources.clone();
+        missing_call_source.retain(|source| source.origin != StaticOriginId(call.from.0));
+        let missing_source_error = call_plan
+            .semantic
+            .validate(
+                &call_plan.nodes,
+                &call_plan.edges,
+                &call_plan.entries,
+                &|entry| call_plan.planned_entry_body(entry),
+                call_plan.root_entry,
+                &missing_call_source,
+                &call_plan.semantic_material,
+            )
+            .expect_err("a declaration call source cannot be absent");
+        exact(
+            "missing declaration call source",
+            missing_source_error,
+            "planned node lacks its semantic source",
+        );
+    }
+
     pub(in crate::cranelift_backend::planning::static_transition) fn b2o_err(
         plane: &SemanticPlane,
         nodes: &[StaticNode],
@@ -5545,12 +6084,10 @@ mod tests {
     /// "a non-`StaticBody` cross-owner edge" **is** an overlap, and no data
     /// mutation can produce one without producing the other. Both are constructed
     /// below and both redden; what cannot be claimed is that they exercise two
-    /// independent checks. The `D3` edge laws are still checked, because they
-    /// constrain the **algorithm** — but as **defense in depth behind overlap,
-    /// not as the primary detector.** Measured: a traversal edited to cross
-    /// `StaticBody` reddens at **overlap** (mutation M1), because the callee's
-    /// seed is claimed by the caller; the "crosses to a *distinct* unit" law is
-    /// the sole detector only once overlap is **also** disabled (mutation M2).
+    /// independent checks. RT-FNSPLIT-B2O-CHECK subsequently retired the
+    /// unreachable duplicate edge arms: overlap is the live detector for this
+    /// condition on the sole validation route. The endpoint, shared-exit, and
+    /// declaration-call laws that have independent witnesses remain intact.
     /// The genuinely independent edge-law control is the sentinel one (5b).
     ///
     /// ⭐ Note the shape of my own error here, since it is the reusable part: I
@@ -6004,17 +6541,15 @@ mod tests {
              vacuous"
         );
 
-        // ⭐ I named the WRONG detector here and the exact-error assertion caught
-        // it. I predicted `"static body edge does not cross a function unit
-        // boundary"` -- the edge law. It reddens at **overlap** instead, and that
-        // is correct and already documented: repointing the edge inside one unit
-        // makes the target reachable from the caller's seed *while still being a
-        // seed itself*, so the partition sees two owners before any edge law is
-        // consulted. This independently re-confirms the corrected `D3` note that
-        // overlap is the primary detector and the edge law is defense in depth.
+        // The earlier version of this control predicted the later
+        // `"static body edge does not cross a function unit boundary"` arm and
+        // instead measured overlap. RT-FNSPLIT-B2O-CHECK deleted that unreachable
+        // duplicate: repointing the edge inside one unit makes the target
+        // reachable from the caller's seed while it remains an independent seed,
+        // so the partition necessarily refuses it first.
         //
-        // ⚠ `expect_err` would have been GREEN here and would have taught the
-        // next reader that the edge law is load-bearing. Asserting the exact
+        // `expect_err` would have been green here and would have taught the next
+        // reader that the deleted arm was load-bearing. Asserting the exact
         // error is the only reason this was visible.
         assert_eq!(
             b2o_err(
