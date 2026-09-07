@@ -194,7 +194,6 @@ struct FsPathRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsRecursivePathRequestV1 {
     capability: u64,
     recursive: u64,
@@ -552,6 +551,65 @@ impl HostEffectBackendV1 for ProcessHost {
                 crate::FileKind::Other => crate::FsNodeKindV1::Other,
             },
         })
+    }
+
+    fn fs_read_directory(
+        &mut self,
+        grant: &CapabilityGrantV1,
+        path: &[u8],
+    ) -> Result<Vec<crate::DirEntryV1>, FileErrorCauseV1> {
+        let (parent, leaf) = Self::parent(grant, path)?;
+        let handle = crate::open_at(&parent, &leaf, OpenRequest::ReadDirectory)
+            .map_err(host_error)?;
+        crate::read_directory(&handle)
+            .map(|entries| {
+                entries
+                    .into_iter()
+                    .map(|entry| crate::DirEntryV1 {
+                        name: entry.name,
+                        kind: match entry.kind {
+                            crate::FileKind::File => crate::FsNodeKindV1::File,
+                            crate::FileKind::Directory => crate::FsNodeKindV1::Directory,
+                            crate::FileKind::Symlink => crate::FsNodeKindV1::Symlink,
+                            crate::FileKind::Other => crate::FsNodeKindV1::Other,
+                        },
+                    })
+                    .collect()
+            })
+            .map_err(host_error)
+    }
+
+    fn fs_create_directory(
+        &mut self,
+        grant: &CapabilityGrantV1,
+        path: &[u8],
+        _recursive: bool,
+    ) -> Result<(), FileErrorCauseV1> {
+        let (parent, leaf) = Self::parent(grant, path)?;
+        crate::create_directory(&parent, &leaf).map_err(host_error)
+    }
+
+    fn fs_remove_file(
+        &mut self,
+        grant: &CapabilityGrantV1,
+        path: &[u8],
+    ) -> Result<(), FileErrorCauseV1> {
+        let (parent, leaf) = Self::parent(grant, path)?;
+        crate::remove(&parent, &leaf, crate::RemoveKind::File).map_err(host_error)
+    }
+
+    fn fs_remove_directory(
+        &mut self,
+        grant: &CapabilityGrantV1,
+        path: &[u8],
+        recursive: bool,
+    ) -> Result<(), FileErrorCauseV1> {
+        let (parent, leaf) = Self::parent(grant, path)?;
+        if recursive {
+            crate::remove_directory_tree(&parent, &leaf).map_err(host_error)
+        } else {
+            crate::remove(&parent, &leaf, crate::RemoveKind::Directory).map_err(host_error)
+        }
     }
 
     fn fs_rename(
@@ -1030,6 +1088,67 @@ fn write_observation(
     sink.flush()
 }
 
+/// Encode the provisional whole-directory reply payload without asserting an
+/// iteration order. `HostReplyV1::tag` already carries the outer reply kind, so
+/// this is exactly the landed canonical DirectoryEntries body: count followed
+/// by length-delimited names and closed node-kind tags.
+fn encode_directory_entries_reply_v1(entries: &[crate::DirEntryV1]) -> Vec<u8> {
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(
+        &u64::try_from(entries.len())
+            .expect("an in-memory entry count fits the V1 reply width")
+            .to_le_bytes(),
+    );
+    for entry in entries {
+        encoded.extend_from_slice(
+            &u64::try_from(entry.name.len())
+                .expect("an in-memory name length fits the V1 reply width")
+                .to_le_bytes(),
+        );
+        encoded.extend_from_slice(&entry.name);
+        encoded.push(match entry.kind {
+            crate::FsNodeKindV1::File => 0,
+            crate::FsNodeKindV1::Directory => 1,
+            crate::FsNodeKindV1::Symlink => 2,
+            crate::FsNodeKindV1::Other => 3,
+        });
+    }
+    encoded
+}
+
+#[cfg(test)]
+fn decode_directory_entries_reply_v1(bytes: &[u8]) -> Option<Vec<crate::DirEntryV1>> {
+    fn u64_at(bytes: &[u8], cursor: &mut usize) -> Option<u64> {
+        let end = cursor.checked_add(8)?;
+        let word = bytes.get(*cursor..end)?.try_into().ok()?;
+        *cursor = end;
+        Some(u64::from_le_bytes(word))
+    }
+
+    let mut cursor = 0;
+    let count = usize::try_from(u64_at(bytes, &mut cursor)?).ok()?;
+    if count > bytes.len().saturating_sub(cursor) / 9 {
+        return None;
+    }
+    let mut entries = Vec::with_capacity(count);
+    for _ in 0..count {
+        let length = usize::try_from(u64_at(bytes, &mut cursor)?).ok()?;
+        let end = cursor.checked_add(length)?;
+        let name = bytes.get(cursor..end)?.to_vec();
+        cursor = end;
+        let kind = match *bytes.get(cursor)? {
+            0 => crate::FsNodeKindV1::File,
+            1 => crate::FsNodeKindV1::Directory,
+            2 => crate::FsNodeKindV1::Symlink,
+            3 => crate::FsNodeKindV1::Other,
+            _ => return None,
+        };
+        cursor += 1;
+        entries.push(crate::DirEntryV1 { name, kind });
+    }
+    (cursor == bytes.len()).then_some(entries)
+}
+
 fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut ProcessContext) {
     reply.detail = 0;
     reply.effective_request = 0;
@@ -1096,6 +1215,19 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 crate::FsNodeKindV1::Directory => 1,
                 crate::FsNodeKindV1::Symlink => 2,
                 crate::FsNodeKindV1::Other => 3,
+            };
+        }
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) => {
+            let encoded = encode_directory_entries_reply_v1(&entries);
+            context.response_arena.push(encoded.into_boxed_slice());
+            let bytes = context
+                .response_arena
+                .last()
+                .expect("directory response was appended");
+            reply.tag = REPLY_BYTES;
+            reply.bytes = SliceV1 {
+                data: bytes.as_ptr(),
+                len: bytes.len(),
             };
         }
         CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(error)) => {
@@ -1443,6 +1575,74 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
                 crate::ResourceInputsV1::None,
                 CanonicalRequestV1::FsMetadata {
+                    path: path.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsReadDirectory
+            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
+        {
+            if !request.cast::<FsPathRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return -1;
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsReadDirectory {
+                    path: path.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsCreateDirectory | HostOpV1::FsRemoveDirectory
+            if request_size == std::mem::size_of::<FsRecursivePathRequestV1>() =>
+        {
+            if !request.cast::<FsRecursivePathRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<FsRecursivePathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return -1;
+            };
+            let recursive = match wire.recursive {
+                0 => false,
+                1 => true,
+                _ => return -1,
+            };
+            let request = if op == HostOpV1::FsCreateDirectory {
+                CanonicalRequestV1::FsCreateDirectory {
+                    recursive,
+                    path: path.to_vec(),
+                }
+            } else {
+                CanonicalRequestV1::FsRemoveDirectory {
+                    recursive,
+                    path: path.to_vec(),
+                }
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                request,
+            )
+        }
+        HostOpV1::FsRemoveFile
+            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
+        {
+            if !request.cast::<FsPathRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return -1;
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsRemoveFile {
                     path: path.to_vec(),
                 },
             )
@@ -2029,6 +2229,306 @@ mod tests {
                 assert_eq!(rejected, operation);
             }
         }
+    }
+
+    /// Promise class: normative compatibility vector for ABI-A3's provisional
+    /// DirectoryEntries payload, plus a durable fail-closed decoder invariant.
+    ///
+    /// MEASURED: names and closed node kinds occupy one invocation-arena-backed
+    /// REPLY_BYTES leaf whose exact payload is count + framed entries.
+    /// CLAIMED: the native consumer can recover the complete canonical vector
+    /// without borrowing an arena pointer past the invocation.
+    /// THE GAP: this does not prove the generated decoder constructs Ken's List;
+    /// Runtime's real-artifact test consumes that list separately.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn directory_entries_reply_is_arena_backed_exact_and_fail_closed() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-directory-entries-reply-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let initialized = context(&directory);
+        let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+        let entries = vec![
+            crate::DirEntryV1 {
+                name: b"a".to_vec(),
+                kind: crate::FsNodeKindV1::File,
+            },
+            crate::DirEntryV1 {
+                name: vec![0xff, b'z'],
+                kind: crate::FsNodeKindV1::Other,
+            },
+        ];
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: usize::MAX,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        set_reply(
+            &mut reply,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(
+                entries.clone(),
+            )),
+            context,
+        );
+        assert_eq!(reply.tag, REPLY_BYTES);
+        assert_eq!(reply.detail, 0);
+        assert_eq!(reply.effective_request, 0);
+        assert!(!reply.bytes.data.is_null());
+        let encoded = unsafe { std::slice::from_raw_parts(reply.bytes.data, reply.bytes.len) };
+        assert_eq!(
+            encoded,
+            &[
+                2, 0, 0, 0, 0, 0, 0, 0,
+                1, 0, 0, 0, 0, 0, 0, 0, b'a', 0,
+                2, 0, 0, 0, 0, 0, 0, 0, 0xff, b'z', 3,
+            ]
+        );
+        assert_eq!(decode_directory_entries_reply_v1(encoded), Some(entries));
+        assert_eq!(context.response_arena.len(), 1);
+
+        let mut trailing = encoded.to_vec();
+        trailing.push(0);
+        assert_eq!(decode_directory_entries_reply_v1(&trailing), None);
+        let mut invalid_kind = encoded.to_vec();
+        *invalid_kind.last_mut().unwrap() = 4;
+        assert_eq!(decode_directory_entries_reply_v1(&invalid_kind), None);
+        let mut impossible_count = encoded.to_vec();
+        impossible_count[0] = 3;
+        assert_eq!(decode_directory_entries_reply_v1(&impossible_count), None);
+        for end in 0..encoded.len() {
+            assert_eq!(
+                decode_directory_entries_reply_v1(&encoded[..end]),
+                None,
+                "truncation at byte {end} must fail closed"
+            );
+        }
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector for the four ABI-A3 raw
+    /// ids and their already-manifested request records.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_a3_raw_dispatch_executes_all_four_directory_operations() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-abi-a3-raw-directory-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(directory.join("listing/subdir")).unwrap();
+        std::fs::write(directory.join("listing/file.bin"), b"payload").unwrap();
+        std::os::unix::fs::symlink(
+            "file.bin",
+            directory.join("listing/link"),
+        )
+        .unwrap();
+        std::fs::write(directory.join("remove.bin"), b"remove").unwrap();
+        std::fs::create_dir(directory.join("empty-dir")).unwrap();
+        let initialized = context(&directory);
+
+        let reply = || HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: usize::MAX,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let path = b"listing";
+        let request = FsPathRequestV1 {
+            capability: initialized.capability,
+            path: SliceV1 {
+                data: path.as_ptr(),
+                len: path.len(),
+            },
+        };
+        let mut listing_reply = reply();
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::FsReadDirectory as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<FsPathRequestV1>(),
+                std::ptr::from_mut(&mut listing_reply).cast(),
+            )
+        };
+        assert_eq!(status, 0);
+        assert_eq!(listing_reply.tag, REPLY_BYTES);
+        assert!(!listing_reply.bytes.data.is_null());
+        let encoded = unsafe {
+            std::slice::from_raw_parts(
+                listing_reply.bytes.data,
+                listing_reply.bytes.len,
+            )
+        };
+        let mut entries = decode_directory_entries_reply_v1(encoded)
+            .expect("raw DirectoryEntries payload decodes exactly");
+        entries.sort_by(|left, right| left.name.cmp(&right.name));
+        assert_eq!(
+            entries,
+            vec![
+                crate::DirEntryV1 {
+                    name: b"file.bin".to_vec(),
+                    kind: crate::FsNodeKindV1::File,
+                },
+                crate::DirEntryV1 {
+                    name: b"link".to_vec(),
+                    kind: crate::FsNodeKindV1::Symlink,
+                },
+                crate::DirEntryV1 {
+                    name: b"subdir".to_vec(),
+                    kind: crate::FsNodeKindV1::Directory,
+                },
+            ]
+        );
+
+        let create_path = b"created";
+        let create = FsRecursivePathRequestV1 {
+            capability: initialized.capability,
+            recursive: 1,
+            path: SliceV1 {
+                data: create_path.as_ptr(),
+                len: create_path.len(),
+            },
+        };
+        let mut create_reply = reply();
+        assert_eq!(
+            unsafe {
+                ken_host_dispatch_v1(
+                    initialized.context,
+                    u64::from(HostOpV1::FsCreateDirectory as u16),
+                    std::ptr::from_ref(&create).cast(),
+                    std::mem::size_of::<FsRecursivePathRequestV1>(),
+                    std::ptr::from_mut(&mut create_reply).cast(),
+                )
+            },
+            0
+        );
+        assert_eq!(create_reply.tag, REPLY_UNIT);
+        assert!(directory.join("created").is_dir());
+
+        let remove_path = b"remove.bin";
+        let remove_file = FsPathRequestV1 {
+            capability: initialized.capability,
+            path: SliceV1 {
+                data: remove_path.as_ptr(),
+                len: remove_path.len(),
+            },
+        };
+        let mut remove_file_reply = reply();
+        assert_eq!(
+            unsafe {
+                ken_host_dispatch_v1(
+                    initialized.context,
+                    u64::from(HostOpV1::FsRemoveFile as u16),
+                    std::ptr::from_ref(&remove_file).cast(),
+                    std::mem::size_of::<FsPathRequestV1>(),
+                    std::ptr::from_mut(&mut remove_file_reply).cast(),
+                )
+            },
+            0
+        );
+        assert_eq!(remove_file_reply.tag, REPLY_UNIT);
+        assert!(!directory.join("remove.bin").exists());
+
+        let remove_directory_path = b"empty-dir";
+        let remove_directory = FsRecursivePathRequestV1 {
+            capability: initialized.capability,
+            recursive: 0,
+            path: SliceV1 {
+                data: remove_directory_path.as_ptr(),
+                len: remove_directory_path.len(),
+            },
+        };
+        let mut remove_directory_reply = reply();
+        assert_eq!(
+            unsafe {
+                ken_host_dispatch_v1(
+                    initialized.context,
+                    u64::from(HostOpV1::FsRemoveDirectory as u16),
+                    std::ptr::from_ref(&remove_directory).cast(),
+                    std::mem::size_of::<FsRecursivePathRequestV1>(),
+                    std::ptr::from_mut(&mut remove_directory_reply).cast(),
+                )
+            },
+            0
+        );
+        assert_eq!(remove_directory_reply.tag, REPLY_UNIT);
+        assert!(!directory.join("empty-dir").exists());
+
+        let invalid_path = b"invalid-recursive";
+        let invalid_recursive = FsRecursivePathRequestV1 {
+            capability: initialized.capability,
+            recursive: 2,
+            path: SliceV1 {
+                data: invalid_path.as_ptr(),
+                len: invalid_path.len(),
+            },
+        };
+        let mut invalid_reply = reply();
+        assert_eq!(
+            unsafe {
+                ken_host_dispatch_v1(
+                    initialized.context,
+                    u64::from(HostOpV1::FsCreateDirectory as u16),
+                    std::ptr::from_ref(&invalid_recursive).cast(),
+                    std::mem::size_of::<FsRecursivePathRequestV1>(),
+                    std::ptr::from_mut(&mut invalid_reply).cast(),
+                )
+            },
+            -1
+        );
+        assert!(!directory.join("invalid-recursive").exists());
+
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        assert_eq!(
+            context
+                .effect_trace
+                .iter()
+                .map(|event| event.operation)
+                .collect::<Vec<_>>(),
+            vec![
+                HostOpV1::FsReadDirectory,
+                HostOpV1::FsCreateDirectory,
+                HostOpV1::FsRemoveFile,
+                HostOpV1::FsRemoveDirectory,
+            ]
+        );
+        assert_eq!(
+            context.effect_trace[1].request,
+            CanonicalRequestV1::FsCreateDirectory {
+                recursive: true,
+                path: create_path.to_vec(),
+            }
+        );
+        assert_eq!(
+            context.effect_trace[2].request,
+            CanonicalRequestV1::FsRemoveFile {
+                path: remove_path.to_vec(),
+            }
+        );
+        assert_eq!(
+            context.effect_trace[3].request,
+            CanonicalRequestV1::FsRemoveDirectory {
+                recursive: false,
+                path: remove_directory_path.to_vec(),
+            }
+        );
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

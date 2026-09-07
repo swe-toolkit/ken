@@ -331,6 +331,56 @@ impl fmt::Display for FsRenameDifferentialError {
 
 impl std::error::Error for FsRenameDifferentialError {}
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FsDirectoryDifferentialError {
+    Shape {
+        operation: ken_host::HostOpV1,
+        lane: &'static str,
+        reason: String,
+    },
+    Listing {
+        lane: &'static str,
+        reason: String,
+    },
+    Transition {
+        operation: ken_host::HostOpV1,
+        lane: &'static str,
+        reason: String,
+    },
+    Observation(ObservationMismatch),
+}
+
+impl fmt::Display for FsDirectoryDifferentialError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape {
+                operation,
+                lane,
+                reason,
+            } => write!(formatter, "{lane} {operation:?} shape: {reason}"),
+            Self::Listing { lane, reason } => {
+                write!(formatter, "{lane} FsReadDirectory listing: {reason}")
+            }
+            Self::Transition {
+                operation,
+                lane,
+                reason,
+            } => write!(formatter, "{lane} {operation:?} transition: {reason}"),
+            Self::Observation(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for FsDirectoryDifferentialError {}
+
+#[derive(Clone, Copy)]
+enum MutationStateContract {
+    CreateOne,
+    RemoveSubtree,
+    Unchanged,
+    MidTraversalUnconstrained,
+}
+
 impl CanonicalDifferentialRun {
     pub fn compare_exact(&self) -> Result<(), ObservationMismatch> {
         compare_canonical_exact(&self.interpreter, &self.native)
@@ -431,6 +481,133 @@ impl CanonicalDifferentialRun {
             filesystem_source,
             filesystem_destination,
             original,
+        )
+    }
+
+    /// Compare a whole-directory response as a name-sorted `{name, kind}` set.
+    /// Raw host iteration order is deliberately not part of this projection.
+    pub fn compare_fs_read_directory(
+        &self,
+        request_path: &[u8],
+        expected_entries: &[ken_host::DirEntryV1],
+    ) -> Result<(), FsDirectoryDifferentialError> {
+        compare_fs_read_directory_observations(
+            &self.interpreter,
+            &self.native,
+            request_path,
+            expected_entries,
+        )
+    }
+
+    pub fn compare_fs_create_directory(
+        &self,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+        recursive: bool,
+        expected_error: Option<ken_host::IoErrorIdentityV1>,
+    ) -> Result<(), FsDirectoryDifferentialError> {
+        compare_fs_mutation_observations(
+            &self.interpreter,
+            &self.interpreter_actions,
+            &self.native,
+            &self.native_actions,
+            ken_host::CanonicalRequestV1::FsCreateDirectory {
+                recursive,
+                path: request_path.to_vec(),
+            },
+            filesystem_path,
+            expected_error,
+            if expected_error.is_some() {
+                MutationStateContract::Unchanged
+            } else {
+                MutationStateContract::CreateOne
+            },
+        )
+    }
+
+    pub fn compare_fs_remove_file(
+        &self,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+        expected_error: Option<ken_host::IoErrorIdentityV1>,
+    ) -> Result<(), FsDirectoryDifferentialError> {
+        compare_fs_mutation_observations(
+            &self.interpreter,
+            &self.interpreter_actions,
+            &self.native,
+            &self.native_actions,
+            ken_host::CanonicalRequestV1::FsRemoveFile {
+                path: request_path.to_vec(),
+            },
+            filesystem_path,
+            expected_error,
+            if expected_error.is_some() {
+                MutationStateContract::Unchanged
+            } else {
+                MutationStateContract::RemoveSubtree
+            },
+        )
+    }
+
+    pub fn compare_fs_remove_directory(
+        &self,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+        recursive: bool,
+        expected_error: Option<ken_host::IoErrorIdentityV1>,
+    ) -> Result<(), FsDirectoryDifferentialError> {
+        compare_fs_mutation_observations(
+            &self.interpreter,
+            &self.interpreter_actions,
+            &self.native,
+            &self.native_actions,
+            ken_host::CanonicalRequestV1::FsRemoveDirectory {
+                recursive,
+                path: request_path.to_vec(),
+            },
+            filesystem_path,
+            expected_error,
+            if expected_error.is_some() {
+                MutationStateContract::Unchanged
+            } else {
+                MutationStateContract::RemoveSubtree
+            },
+        )
+    }
+
+    /// The ruled non-transactional carve-out: classification remains exact,
+    /// while no relation is asserted between the two residual trees.
+    pub fn compare_fs_remove_directory_mid_traversal_error(
+        &self,
+        request_path: &[u8],
+        expected_error: ken_host::IoErrorIdentityV1,
+    ) -> Result<(), FsDirectoryDifferentialError> {
+        if !matches!(
+            expected_error,
+            ken_host::IoErrorIdentityV1::PermissionDenied
+                | ken_host::IoErrorIdentityV1::Interrupted
+                | ken_host::IoErrorIdentityV1::Other(_)
+        ) {
+            return Err(FsDirectoryDifferentialError::Transition {
+                operation: ken_host::HostOpV1::FsRemoveDirectory,
+                lane: "contract",
+                reason: format!(
+                    "{expected_error:?} is not a ruled mid-traversal error class"
+                ),
+            });
+        }
+        compare_fs_mutation_observations(
+            &self.interpreter,
+            &self.interpreter_actions,
+            &self.native,
+            &self.native_actions,
+            ken_host::CanonicalRequestV1::FsRemoveDirectory {
+                recursive: true,
+                path: request_path.to_vec(),
+            },
+            request_path,
+            Some(expected_error),
+            MutationStateContract::MidTraversalUnconstrained,
         )
     }
 
@@ -1159,6 +1336,356 @@ fn validate_fs_rename_observation(
     Ok(())
 }
 
+fn compare_fs_read_directory_observations(
+    interpreter: &EffectObservation,
+    native: &EffectObservation,
+    request_path: &[u8],
+    expected_entries: &[ken_host::DirEntryV1],
+) -> Result<(), FsDirectoryDifferentialError> {
+    let mut expected = expected_entries.to_vec();
+    sort_directory_entries(&mut expected);
+    for (lane, observation) in [
+        ("interpreter", interpreter),
+        ("native", native),
+    ] {
+        let [event] = observation.effect_trace.as_slice() else {
+            return Err(FsDirectoryDifferentialError::Shape {
+                operation: ken_host::HostOpV1::FsReadDirectory,
+                lane,
+                reason: format!(
+                    "expected one event, observed {}",
+                    observation.effect_trace.len()
+                ),
+            });
+        };
+        if event.sequence != 0
+            || event.operation != ken_host::HostOpV1::FsReadDirectory
+            || event.capability.is_none()
+            || !event.resource_bindings.is_empty()
+            || event.request
+                != (ken_host::CanonicalRequestV1::FsReadDirectory {
+                    path: request_path.to_vec(),
+                })
+            || observation.terminal_error.is_some()
+            || observation.terminal_exit != ken_host::TerminalExitClass::NormalReturn
+            || observation.exit_status != 0
+            || !observation.filesystem_delta.is_empty()
+        {
+            return Err(FsDirectoryDifferentialError::Shape {
+                operation: ken_host::HostOpV1::FsReadDirectory,
+                lane,
+                reason: "event/result is not the exact read-only success shape"
+                    .to_string(),
+            });
+        }
+        let ken_host::CanonicalOutcomeV1::Success(
+            ken_host::CanonicalReplyV1::DirectoryEntries(entries),
+        ) = &event.outcome
+        else {
+            return Err(FsDirectoryDifferentialError::Listing {
+                lane,
+                reason: "response is not DirectoryEntries".to_string(),
+            });
+        };
+        let mut actual = entries.clone();
+        sort_directory_entries(&mut actual);
+        if actual != expected {
+            return Err(FsDirectoryDifferentialError::Listing {
+                lane,
+                reason: format!(
+                    "expected canonicalized {expected:?}, observed {actual:?}"
+                ),
+            });
+        }
+    }
+    let mut interpreter = interpreter.clone();
+    let mut native = native.clone();
+    normalize_directory_listing(&mut interpreter);
+    normalize_directory_listing(&mut native);
+    compare_canonical_exact(&interpreter, &native)
+        .map_err(FsDirectoryDifferentialError::Observation)
+}
+
+fn sort_directory_entries(entries: &mut [ken_host::DirEntryV1]) {
+    let kind = |kind| match kind {
+        ken_host::FsNodeKindV1::File => 0,
+        ken_host::FsNodeKindV1::Directory => 1,
+        ken_host::FsNodeKindV1::Symlink => 2,
+        ken_host::FsNodeKindV1::Other => 3,
+    };
+    entries.sort_by(|left, right| {
+        left.name
+            .cmp(&right.name)
+            .then_with(|| kind(left.kind).cmp(&kind(right.kind)))
+    });
+}
+
+fn normalize_directory_listing(observation: &mut EffectObservation) {
+    for event in &mut observation.effect_trace {
+        if event.operation != ken_host::HostOpV1::FsReadDirectory {
+            continue;
+        }
+        if let ken_host::CanonicalOutcomeV1::Success(
+            ken_host::CanonicalReplyV1::DirectoryEntries(entries),
+        ) = &mut event.outcome
+        {
+            sort_directory_entries(entries);
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn compare_fs_mutation_observations(
+    interpreter: &EffectObservation,
+    interpreter_actions: &LaneActionEvidence,
+    native: &EffectObservation,
+    native_actions: &LaneActionEvidence,
+    request: ken_host::CanonicalRequestV1,
+    filesystem_path: &[u8],
+    expected_error: Option<ken_host::IoErrorIdentityV1>,
+    state_contract: MutationStateContract,
+) -> Result<(), FsDirectoryDifferentialError> {
+    let operation = match &request {
+        ken_host::CanonicalRequestV1::FsCreateDirectory { .. } => {
+            ken_host::HostOpV1::FsCreateDirectory
+        }
+        ken_host::CanonicalRequestV1::FsRemoveFile { .. } => {
+            ken_host::HostOpV1::FsRemoveFile
+        }
+        ken_host::CanonicalRequestV1::FsRemoveDirectory { .. } => {
+            ken_host::HostOpV1::FsRemoveDirectory
+        }
+        _ => unreachable!("directory mutation comparator has a closed request set"),
+    };
+    for (lane, observation, actions) in [
+        ("interpreter", interpreter, interpreter_actions),
+        ("native", native, native_actions),
+    ] {
+        validate_fs_mutation_observation(
+            lane,
+            observation,
+            actions,
+            operation,
+            &request,
+            filesystem_path,
+            expected_error,
+            state_contract,
+        )?;
+    }
+    let mut interpreter = interpreter.clone();
+    let mut native = native.clone();
+    if matches!(
+        state_contract,
+        MutationStateContract::MidTraversalUnconstrained
+    ) {
+        interpreter.filesystem_delta.clear();
+        native.filesystem_delta.clear();
+    }
+    compare_canonical_exact(&interpreter, &native)
+        .map_err(FsDirectoryDifferentialError::Observation)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_fs_mutation_observation(
+    lane: &'static str,
+    observation: &EffectObservation,
+    actions: &LaneActionEvidence,
+    operation: ken_host::HostOpV1,
+    request: &ken_host::CanonicalRequestV1,
+    filesystem_path: &[u8],
+    expected_error: Option<ken_host::IoErrorIdentityV1>,
+    state_contract: MutationStateContract,
+) -> Result<(), FsDirectoryDifferentialError> {
+    let [event] = observation.effect_trace.as_slice() else {
+        return Err(FsDirectoryDifferentialError::Shape {
+            operation,
+            lane,
+            reason: format!(
+                "expected one event, observed {}",
+                observation.effect_trace.len()
+            ),
+        });
+    };
+    let request_path = match request {
+        ken_host::CanonicalRequestV1::FsCreateDirectory { path, .. }
+        | ken_host::CanonicalRequestV1::FsRemoveFile { path }
+        | ken_host::CanonicalRequestV1::FsRemoveDirectory { path, .. } => path,
+        _ => unreachable!("validated mutation request set"),
+    };
+    let expected_outcome = match expected_error {
+        Some(error) => ken_host::CanonicalOutcomeV1::Error(
+            ken_host::SemanticErrorV1::File(ken_host::FileErrorIdentityV1 {
+                operation,
+                relative_path: request_path.clone(),
+                cause: ken_host::FileErrorCauseV1::Io(error),
+            }),
+        ),
+        None => ken_host::CanonicalOutcomeV1::Success(
+            ken_host::CanonicalReplyV1::Unit,
+        ),
+    };
+    let expected_terminal_exit = if expected_error.is_some() {
+        ken_host::TerminalExitClass::ReturnedError
+    } else {
+        ken_host::TerminalExitClass::NormalReturn
+    };
+    let expected_exit_status = match expected_error {
+        None => 0,
+        Some(ken_host::IoErrorIdentityV1::NotFound) => 45,
+        Some(ken_host::IoErrorIdentityV1::PermissionDenied) => 46,
+        Some(ken_host::IoErrorIdentityV1::BrokenPipe) => 47,
+        Some(ken_host::IoErrorIdentityV1::Interrupted) => 48,
+        Some(ken_host::IoErrorIdentityV1::AlreadyExists) => 49,
+        Some(ken_host::IoErrorIdentityV1::InvalidInput) => 50,
+        Some(ken_host::IoErrorIdentityV1::IsDirectory) => 51,
+        Some(ken_host::IoErrorIdentityV1::NotDirectory) => 52,
+        Some(ken_host::IoErrorIdentityV1::NotEmpty) => 53,
+        Some(ken_host::IoErrorIdentityV1::Unsupported) => 54,
+        Some(ken_host::IoErrorIdentityV1::Other(_)) => 56,
+    };
+    if event.sequence != 0
+        || event.operation != operation
+        || event.capability.is_none()
+        || !event.resource_bindings.is_empty()
+        || &event.request != request
+        || event.outcome != expected_outcome
+        || observation.terminal_error.is_some()
+        || observation.terminal_exit != expected_terminal_exit
+        || observation.exit_status != expected_exit_status
+    {
+        return Err(FsDirectoryDifferentialError::Shape {
+            operation,
+            lane,
+            reason: format!(
+                "event/result differs from request={request:?}, outcome={expected_outcome:?}"
+            ),
+        });
+    }
+
+    match state_contract {
+        MutationStateContract::CreateOne => {
+            if actions
+                .root_before
+                .nodes
+                .iter()
+                .any(|node| node.relative_path == filesystem_path)
+            {
+                return Err(FsDirectoryDifferentialError::Transition {
+                    operation,
+                    lane,
+                    reason: "create target was already present before the operation"
+                        .to_string(),
+                });
+            }
+            let created = actions
+                .root_after
+                .nodes
+                .iter()
+                .filter(|node| node.relative_path == filesystem_path)
+                .collect::<Vec<_>>();
+            let mut without_created = actions.root_after.clone();
+            without_created
+                .nodes
+                .retain(|node| node.relative_path != filesystem_path);
+            let exact_delta = matches!(
+                observation.filesystem_delta.as_slice(),
+                [ken_host::FsDeltaV1::Created { relative_path, node }]
+                    if relative_path == filesystem_path
+                        && node.kind == ken_host::FsNodeKindV1::Directory
+                        && node.file_bytes.is_none()
+                        && node.symlink_target.is_none()
+            );
+            if created.len() != 1
+                || created[0].kind != crate::SnapshotNodeKind::Directory
+                || without_created != actions.root_before
+                || !exact_delta
+            {
+                return Err(FsDirectoryDifferentialError::Transition {
+                    operation,
+                    lane,
+                    reason: format!(
+                        "create did not add exactly one directory node; \
+                         before={:?}, after={:?}, delta={:?}",
+                        actions.root_before,
+                        actions.root_after,
+                        observation.filesystem_delta
+                    ),
+                });
+            }
+        }
+        MutationStateContract::RemoveSubtree => {
+            let prefix = [filesystem_path, b"/"].concat();
+            let removed_before = actions
+                .root_before
+                .nodes
+                .iter()
+                .filter(|node| {
+                    node.relative_path == filesystem_path
+                        || node.relative_path.starts_with(&prefix)
+                })
+                .count();
+            let mut expected_after = actions.root_before.clone();
+            expected_after.nodes.retain(|node| {
+                node.relative_path != filesystem_path
+                    && !node.relative_path.starts_with(&prefix)
+            });
+            let deltas_are_exact_removals = observation.filesystem_delta.len()
+                == removed_before
+                && observation.filesystem_delta.iter().all(|delta| {
+                    matches!(
+                        delta,
+                        ken_host::FsDeltaV1::Removed { relative_path, .. }
+                            if relative_path == filesystem_path
+                                || relative_path.starts_with(&prefix)
+                    )
+                });
+            if removed_before == 0
+                || actions.root_after != expected_after
+                || !deltas_are_exact_removals
+            {
+                return Err(FsDirectoryDifferentialError::Transition {
+                    operation,
+                    lane,
+                    reason: format!(
+                        "remove did not delete exactly the selected subtree; \
+                         before={:?}, after={:?}, delta={:?}",
+                        actions.root_before,
+                        actions.root_after,
+                        observation.filesystem_delta
+                    ),
+                });
+            }
+        }
+        MutationStateContract::Unchanged => {
+            if actions.root_before != actions.root_after
+                || !observation.filesystem_delta.is_empty()
+            {
+                return Err(FsDirectoryDifferentialError::Transition {
+                    operation,
+                    lane,
+                    reason: format!(
+                        "refusal changed deterministic state; before={:?}, after={:?}, delta={:?}",
+                        actions.root_before,
+                        actions.root_after,
+                        observation.filesystem_delta
+                    ),
+                });
+            }
+        }
+        MutationStateContract::MidTraversalUnconstrained => {
+            if expected_error.is_none() {
+                return Err(FsDirectoryDifferentialError::Transition {
+                    operation,
+                    lane,
+                    reason: "mid-traversal carve-out was applied to success"
+                        .to_string(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 fn expected_fs_metadata(
     lane: &'static str,
     root: &std::path::Path,
@@ -1552,6 +2079,229 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                   Err _ |-> host_exit AFull (Failure 104)
                 })
           }
+        }
+      }
+    }
+  }
+"#;
+
+    const FS_READ_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit AFull (Failure 110) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit AFull (Failure 111) ;
+        Cons path _ |-> match caps {
+          MkProgramCaps cap |->
+            bind (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result FileError (List DirEntry)) ExitCode
+              (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
+                (Result FileError (List DirEntry))
+                (read_directory AFull cap path))
+              (\observed. match observed {
+                Err error |-> match error {
+                  MkFileError file_operation _path cause |-> match file_operation {
+                    OpReadDirectory |-> match cause {
+                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
+                      NotFound |-> host_exit AFull (Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (Failure 47) ;
+                      Interrupted |-> host_exit AFull (Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (Failure 49) ;
+                      InvalidInput |-> host_exit AFull (Failure 50) ;
+                      IsDirectory |-> host_exit AFull (Failure 51) ;
+                      NotDirectory |-> host_exit AFull (Failure 52) ;
+                      NotEmpty |-> host_exit AFull (Failure 53) ;
+                      Unsupported |-> host_exit AFull (Failure 54) ;
+                      Revoked |-> host_exit AFull (Failure 55) ;
+                      Other _ |-> host_exit AFull (Failure 56)
+                    } ;
+                    OpReadFile |-> host_exit AFull (Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (Failure 199) ;
+                    OpMetadata |-> host_exit AFull (Failure 199) ;
+                    OpCreateDirectory |-> host_exit AFull (Failure 199) ;
+                    OpRemoveFile |-> host_exit AFull (Failure 199) ;
+                    OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
+                    OpRename |-> host_exit AFull (Failure 199)
+                  }
+                } ;
+                Ok entries |-> match entries {
+                  Nil |-> host_exit AFull (Failure 112) ;
+                  Cons _ rest1 |-> match rest1 {
+                    Nil |-> host_exit AFull (Failure 113) ;
+                    Cons _ rest2 |-> match rest2 {
+                      Nil |-> host_exit AFull (Failure 114) ;
+                      Cons _ rest3 |-> match rest3 {
+                        Nil |-> host_exit AFull Success ;
+                        Cons _ _ |-> host_exit AFull (Failure 115)
+                      }
+                    }
+                  }
+                }
+              })
+        }
+      }
+    }
+  }
+"#;
+
+    const FS_CREATE_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit AFull (Failure 120) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit AFull (Failure 121) ;
+        Cons path _ |-> match caps {
+          MkProgramCaps cap |->
+            bind (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result FileError Unit) ExitCode
+              (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
+                (Result FileError Unit)
+                (create_directory AFull cap False path))
+              (\observed. match observed {
+                Err error |-> match error {
+                  MkFileError file_operation _path cause |-> match file_operation {
+                    OpCreateDirectory |-> match cause {
+                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
+                      NotFound |-> host_exit AFull (Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (Failure 47) ;
+                      Interrupted |-> host_exit AFull (Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (Failure 49) ;
+                      InvalidInput |-> host_exit AFull (Failure 50) ;
+                      IsDirectory |-> host_exit AFull (Failure 51) ;
+                      NotDirectory |-> host_exit AFull (Failure 52) ;
+                      NotEmpty |-> host_exit AFull (Failure 53) ;
+                      Unsupported |-> host_exit AFull (Failure 54) ;
+                      Revoked |-> host_exit AFull (Failure 55) ;
+                      Other _ |-> host_exit AFull (Failure 56)
+                    } ;
+                    OpReadFile |-> host_exit AFull (Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (Failure 199) ;
+                    OpMetadata |-> host_exit AFull (Failure 199) ;
+                    OpReadDirectory |-> host_exit AFull (Failure 199) ;
+                    OpRemoveFile |-> host_exit AFull (Failure 199) ;
+                    OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
+                    OpRename |-> host_exit AFull (Failure 199)
+                  }
+                } ;
+                Ok _ |-> host_exit AFull Success
+              })
+        }
+      }
+    }
+  }
+"#;
+
+    const FS_REMOVE_FILE_SOURCE: &str = r#"program capabilities FS AFull "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit AFull (Failure 130) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit AFull (Failure 131) ;
+        Cons path _ |-> match caps {
+          MkProgramCaps cap |->
+            bind (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result FileError Unit) ExitCode
+              (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
+                (Result FileError Unit) (remove_file AFull cap path))
+              (\observed. match observed {
+                Err error |-> match error {
+                  MkFileError file_operation _path cause |-> match file_operation {
+                    OpRemoveFile |-> match cause {
+                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
+                      NotFound |-> host_exit AFull (Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (Failure 47) ;
+                      Interrupted |-> host_exit AFull (Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (Failure 49) ;
+                      InvalidInput |-> host_exit AFull (Failure 50) ;
+                      IsDirectory |-> host_exit AFull (Failure 51) ;
+                      NotDirectory |-> host_exit AFull (Failure 52) ;
+                      NotEmpty |-> host_exit AFull (Failure 53) ;
+                      Unsupported |-> host_exit AFull (Failure 54) ;
+                      Revoked |-> host_exit AFull (Failure 55) ;
+                      Other _ |-> host_exit AFull (Failure 56)
+                    } ;
+                    OpReadFile |-> host_exit AFull (Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (Failure 199) ;
+                    OpMetadata |-> host_exit AFull (Failure 199) ;
+                    OpReadDirectory |-> host_exit AFull (Failure 199) ;
+                    OpCreateDirectory |-> host_exit AFull (Failure 199) ;
+                    OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
+                    OpRename |-> host_exit AFull (Failure 199)
+                  }
+                } ;
+                Ok _ |-> host_exit AFull Success
+              })
+        }
+      }
+    }
+  }
+"#;
+
+    const FS_REMOVE_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> host_exit AFull (Failure 140) ;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> host_exit AFull (Failure 141) ;
+        Cons path _ |-> match caps {
+          MkProgramCaps cap |->
+            bind (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result FileError Unit) ExitCode
+              (inject_l (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp
+                (Result FileError Unit)
+                (remove_directory AFull cap False path))
+              (\observed. match observed {
+                Err error |-> match error {
+                  MkFileError file_operation _path cause |-> match file_operation {
+                    OpRemoveDirectory |-> match cause {
+                      CapabilityDenied |-> host_exit AFull (Failure 44) ;
+                      NotFound |-> host_exit AFull (Failure 45) ;
+                      PermissionDenied |-> host_exit AFull (Failure 46) ;
+                      BrokenPipe |-> host_exit AFull (Failure 47) ;
+                      Interrupted |-> host_exit AFull (Failure 48) ;
+                      AlreadyExists |-> host_exit AFull (Failure 49) ;
+                      InvalidInput |-> host_exit AFull (Failure 50) ;
+                      IsDirectory |-> host_exit AFull (Failure 51) ;
+                      NotDirectory |-> host_exit AFull (Failure 52) ;
+                      NotEmpty |-> host_exit AFull (Failure 53) ;
+                      Unsupported |-> host_exit AFull (Failure 54) ;
+                      Revoked |-> host_exit AFull (Failure 55) ;
+                      Other _ |-> host_exit AFull (Failure 56)
+                    } ;
+                    OpReadFile |-> host_exit AFull (Failure 199) ;
+                    OpWriteFile |-> host_exit AFull (Failure 199) ;
+                    OpChangeMode |-> host_exit AFull (Failure 199) ;
+                    OpAppendFile |-> host_exit AFull (Failure 199) ;
+                    OpMetadata |-> host_exit AFull (Failure 199) ;
+                    OpReadDirectory |-> host_exit AFull (Failure 199) ;
+                    OpCreateDirectory |-> host_exit AFull (Failure 199) ;
+                    OpRemoveFile |-> host_exit AFull (Failure 199) ;
+                    OpRename |-> host_exit AFull (Failure 199)
+                  }
+                } ;
+                Ok _ |-> host_exit AFull Success
+              })
         }
       }
     }
@@ -2152,6 +2902,282 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         )
     }
 
+    fn abi_a3_scenario(
+        identity: &str,
+        source: String,
+        authority: Authority,
+        rights: RightSet,
+        path: Vec<u8>,
+        initial_filesystem: Vec<SeedNode>,
+        expected_fs: ExpectedFsEffect,
+    ) -> Scenario {
+        Scenario {
+            process_input: RawProcessInput {
+                arguments: vec![path],
+                environment: Vec::new(),
+            },
+            ambient: AmbientScript::default(),
+            program_caps: ProgramCapsShape {
+                fs_authority: authority,
+                relative_root: b"data".to_vec(),
+                rights,
+                symlink: SymlinkPolicy::NoFollow,
+            },
+            entry: CheckedProgramEntry {
+                identity: identity.to_string(),
+                package_name: identity.to_string(),
+                source,
+            },
+            initial_filesystem,
+            expected_fs: vec![expected_fs],
+        }
+    }
+
+    fn abi_a3_base_nodes() -> Vec<SeedNode> {
+        vec![SeedNode {
+            relative_path: b"data".to_vec(),
+            kind: crate::SeedNodeKind::Directory,
+        }]
+    }
+
+    fn fs_read_directory_success_scenario() -> Scenario {
+        let mut nodes = abi_a3_base_nodes();
+        nodes.extend([
+            SeedNode {
+                relative_path: b"data/listing".to_vec(),
+                kind: crate::SeedNodeKind::Directory,
+            },
+            SeedNode {
+                relative_path: b"data/listing/file.bin".to_vec(),
+                kind: crate::SeedNodeKind::File(b"payload".to_vec()),
+            },
+            SeedNode {
+                relative_path: b"data/listing/subdir".to_vec(),
+                kind: crate::SeedNodeKind::Directory,
+            },
+            SeedNode {
+                relative_path: b"data/listing/link".to_vec(),
+                kind: crate::SeedNodeKind::Symlink(b"file.bin".to_vec()),
+            },
+        ]);
+        abi_a3_scenario(
+            "abi-a3-fs-read-directory-success",
+            FS_READ_DIRECTORY_SOURCE.to_string(),
+            AUTH_FULL,
+            RightSet::ALL,
+            b"listing".to_vec(),
+            nodes,
+            ExpectedFsEffect::ReadDirectory {
+                path: b"listing".to_vec(),
+            },
+        )
+    }
+
+    fn fs_create_directory_scenario(
+        identity: &str,
+        recursive: bool,
+        path: &[u8],
+        nodes: Vec<SeedNode>,
+    ) -> Scenario {
+        let source = if recursive {
+            FS_CREATE_DIRECTORY_SOURCE.replace("cap False", "cap True")
+        } else {
+            FS_CREATE_DIRECTORY_SOURCE.to_string()
+        };
+        abi_a3_scenario(
+            identity,
+            source,
+            AUTH_FULL,
+            RightSet::ALL,
+            path.to_vec(),
+            nodes,
+            ExpectedFsEffect::CreateDirectory {
+                path: path.to_vec(),
+                recursive,
+            },
+        )
+    }
+
+    fn fs_remove_file_scenario(
+        identity: &str,
+        path: &[u8],
+        nodes: Vec<SeedNode>,
+    ) -> Scenario {
+        abi_a3_scenario(
+            identity,
+            FS_REMOVE_FILE_SOURCE.to_string(),
+            AUTH_FULL,
+            RightSet::ALL,
+            path.to_vec(),
+            nodes,
+            ExpectedFsEffect::RemoveFile {
+                path: path.to_vec(),
+            },
+        )
+    }
+
+    fn fs_remove_directory_scenario(
+        identity: &str,
+        recursive: bool,
+        path: &[u8],
+        nodes: Vec<SeedNode>,
+    ) -> Scenario {
+        let source = if recursive {
+            FS_REMOVE_DIRECTORY_SOURCE.replace("cap False", "cap True")
+        } else {
+            FS_REMOVE_DIRECTORY_SOURCE.to_string()
+        };
+        abi_a3_scenario(
+            identity,
+            source,
+            AUTH_FULL,
+            RightSet::ALL,
+            path.to_vec(),
+            nodes,
+            ExpectedFsEffect::RemoveDirectory {
+                path: path.to_vec(),
+                recursive,
+            },
+        )
+    }
+
+    #[derive(Clone, Copy)]
+    enum AbiA3PolicyCase {
+        Escape,
+        Symlink,
+        MissingRight,
+    }
+
+    fn abi_a3_policy_scenario(
+        operation: HostOpV1,
+        policy: AbiA3PolicyCase,
+    ) -> (Scenario, CapabilityDeniedV1) {
+        let (source, expected_fs, required) = match operation {
+            HostOpV1::FsReadDirectory => (
+                FS_READ_DIRECTORY_SOURCE.to_string(),
+                ExpectedFsEffect::ReadDirectory {
+                    path: Vec::new(),
+                },
+                ken_host::FsCapabilityOperationV1::Enumerate,
+            ),
+            HostOpV1::FsCreateDirectory => (
+                FS_CREATE_DIRECTORY_SOURCE.to_string(),
+                ExpectedFsEffect::CreateDirectory {
+                    path: Vec::new(),
+                    recursive: false,
+                },
+                ken_host::FsCapabilityOperationV1::CreateDirectory,
+            ),
+            HostOpV1::FsRemoveFile => (
+                FS_REMOVE_FILE_SOURCE.to_string(),
+                ExpectedFsEffect::RemoveFile {
+                    path: Vec::new(),
+                },
+                ken_host::FsCapabilityOperationV1::RemoveFile,
+            ),
+            HostOpV1::FsRemoveDirectory => (
+                FS_REMOVE_DIRECTORY_SOURCE.to_string(),
+                ExpectedFsEffect::RemoveDirectory {
+                    path: Vec::new(),
+                    recursive: false,
+                },
+                ken_host::FsCapabilityOperationV1::RemoveDirectory,
+            ),
+            _ => unreachable!("ABI-A3 policy has exactly four operations"),
+        };
+        let mut nodes = abi_a3_base_nodes();
+        let (identity, path, authority, rights, source, expected) = match policy {
+            AbiA3PolicyCase::Escape => {
+                nodes.push(SeedNode {
+                    relative_path: b"outside".to_vec(),
+                    kind: crate::SeedNodeKind::Directory,
+                });
+                (
+                    "escape",
+                    b"../outside".to_vec(),
+                    AUTH_FULL,
+                    RightSet::ALL,
+                    source,
+                    CapabilityDeniedV1::ScopeEscape,
+                )
+            }
+            AbiA3PolicyCase::Symlink => {
+                nodes.extend([
+                    SeedNode {
+                        relative_path: b"outside".to_vec(),
+                        kind: crate::SeedNodeKind::Directory,
+                    },
+                    SeedNode {
+                        relative_path: b"data/link".to_vec(),
+                        kind: crate::SeedNodeKind::Symlink(
+                            b"../outside".to_vec(),
+                        ),
+                    },
+                ]);
+                (
+                    "symlink",
+                    b"link".to_vec(),
+                    AUTH_FULL,
+                    RightSet::ALL,
+                    source,
+                    CapabilityDeniedV1::SymlinkDenied,
+                )
+            }
+            AbiA3PolicyCase::MissingRight => {
+                nodes.push(SeedNode {
+                    relative_path: b"data/target".to_vec(),
+                    kind: if operation == HostOpV1::FsRemoveFile {
+                        crate::SeedNodeKind::File(b"payload".to_vec())
+                    } else {
+                        crate::SeedNodeKind::Directory
+                    },
+                });
+                (
+                    "missing-right",
+                    b"target".to_vec(),
+                    AUTH_NONE,
+                    RightSet::NONE,
+                    source.replace("AFull", "ANone"),
+                    CapabilityDeniedV1::RightNotHeld {
+                        operation: required,
+                        held_rights: RightSet::NONE.bits(),
+                    },
+                )
+            }
+        };
+        let expected_fs = match expected_fs {
+            ExpectedFsEffect::ReadDirectory { .. } => {
+                ExpectedFsEffect::ReadDirectory { path: path.clone() }
+            }
+            ExpectedFsEffect::CreateDirectory { recursive, .. } => {
+                ExpectedFsEffect::CreateDirectory {
+                    path: path.clone(),
+                    recursive,
+                }
+            }
+            ExpectedFsEffect::RemoveFile { .. } => {
+                ExpectedFsEffect::RemoveFile { path: path.clone() }
+            }
+            ExpectedFsEffect::RemoveDirectory { recursive, .. } => {
+                ExpectedFsEffect::RemoveDirectory {
+                    path: path.clone(),
+                    recursive,
+                }
+            }
+            _ => unreachable!("ABI-A3 policy expected-effect set"),
+        };
+        let scenario = abi_a3_scenario(
+            &format!("abi-a3-{operation:?}-{identity}"),
+            source,
+            authority,
+            rights,
+            path.clone(),
+            nodes,
+            expected_fs,
+        );
+        (scenario, expected)
+    }
+
     fn denial_scenario() -> Scenario {
         let path = b"../escape".to_vec();
         Scenario {
@@ -2520,6 +3546,588 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 ..
             })
         ));
+    }
+
+    /// Promise class: durable invariant over the provisional whole-directory
+    /// payload. Intended streaming replacement keeps this set-level test green.
+    #[test]
+    fn fs_read_directory_real_artifact_is_order_independent_and_discriminating() {
+        let expected = vec![
+            ken_host::DirEntryV1 {
+                name: b"file.bin".to_vec(),
+                kind: ken_host::FsNodeKindV1::File,
+            },
+            ken_host::DirEntryV1 {
+                name: b"subdir".to_vec(),
+                kind: ken_host::FsNodeKindV1::Directory,
+            },
+            ken_host::DirEntryV1 {
+                name: b"link".to_vec(),
+                kind: ken_host::FsNodeKindV1::Symlink,
+            },
+        ];
+        let run = execute_scenario(&fs_read_directory_success_scenario())
+            .expect("FsReadDirectory real-artifact differential executes");
+        run.compare_fs_read_directory(b"listing", &expected)
+            .expect("name/kind set parity");
+        assert_eq!(run.interpreter_actions.fs_actions_after_resolve, Some(1));
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsReadDirectory,
+                NativeTestedEvidence::from_fs_read_directory_run(
+                    &run,
+                    b"listing",
+                    &expected,
+                ),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested)
+        );
+
+        let mut reordered = run.native.clone();
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
+            &mut reordered.effect_trace[0].outcome
+        else {
+            panic!("listing fixture must return DirectoryEntries")
+        };
+        entries.reverse();
+        compare_fs_read_directory_observations(
+            &run.interpreter,
+            &reordered,
+            b"listing",
+            &expected,
+        )
+        .expect("raw listing order is not contractual");
+
+        let mut missing = run.native.clone();
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
+            &mut missing.effect_trace[0].outcome
+        else {
+            panic!("listing fixture must return DirectoryEntries")
+        };
+        entries.pop();
+        assert!(matches!(
+            compare_fs_read_directory_observations(
+                &run.interpreter,
+                &missing,
+                b"listing",
+                &expected,
+            ),
+            Err(FsDirectoryDifferentialError::Listing {
+                lane: "native",
+                ..
+            })
+        ));
+
+        let mut wrong_name = run.native.clone();
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
+            &mut wrong_name.effect_trace[0].outcome
+        else {
+            panic!("listing fixture must return DirectoryEntries")
+        };
+        entries[0].name.push(0xff);
+        assert!(matches!(
+            compare_fs_read_directory_observations(
+                &run.interpreter,
+                &wrong_name,
+                b"listing",
+                &expected,
+            ),
+            Err(FsDirectoryDifferentialError::Listing {
+                lane: "native",
+                ..
+            })
+        ));
+
+        let mut wrong_kind = run.native.clone();
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
+            &mut wrong_kind.effect_trace[0].outcome
+        else {
+            panic!("listing fixture must return DirectoryEntries")
+        };
+        entries[0].kind = ken_host::FsNodeKindV1::Other;
+        assert!(matches!(
+            compare_fs_read_directory_observations(
+                &run.interpreter,
+                &wrong_kind,
+                b"listing",
+                &expected,
+            ),
+            Err(FsDirectoryDifferentialError::Listing {
+                lane: "native",
+                ..
+            })
+        ));
+    }
+
+    /// Promise class: durable state-transition and failure-classification
+    /// invariant. The recursive flag's inertness is explicitly part of the
+    /// promoted-as-is contract, not a parent-chain capability claim.
+    #[test]
+    fn fs_create_directory_real_artifact_matches_the_landed_inert_flag_contract() {
+        let success = fs_create_directory_scenario(
+            "abi-a3-create-success",
+            false,
+            b"created",
+            abi_a3_base_nodes(),
+        );
+        let run = run_scenario(&success).expect("create success executes");
+        run.compare_fs_create_directory(
+            b"created",
+            b"data/created",
+            false,
+            None,
+        )
+        .expect("exact create transition");
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsCreateDirectory,
+                NativeTestedEvidence::from_fs_create_directory_run(
+                    &run,
+                    b"created",
+                    b"data/created",
+                    false,
+                ),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested)
+        );
+        let mut wrong_native = run.native.clone();
+        wrong_native.filesystem_delta.clear();
+        let mut wrong_actions = run.native_actions.clone();
+        wrong_actions.root_after = wrong_actions.root_before.clone();
+        assert!(matches!(
+            compare_fs_mutation_observations(
+                &run.interpreter,
+                &run.interpreter_actions,
+                &wrong_native,
+                &wrong_actions,
+                CanonicalRequestV1::FsCreateDirectory {
+                    recursive: false,
+                    path: b"created".to_vec(),
+                },
+                b"data/created",
+                None,
+                MutationStateContract::CreateOne,
+            ),
+            Err(FsDirectoryDifferentialError::Transition {
+                operation: HostOpV1::FsCreateDirectory,
+                lane: "native",
+                ..
+            })
+        ));
+
+        let mut existing_nodes = abi_a3_base_nodes();
+        existing_nodes.push(SeedNode {
+            relative_path: b"data/existing".to_vec(),
+            kind: crate::SeedNodeKind::Directory,
+        });
+        let existing = run_scenario(&fs_create_directory_scenario(
+            "abi-a3-create-existing",
+            false,
+            b"existing",
+            existing_nodes,
+        ))
+        .expect("create-existing executes");
+        existing
+            .compare_fs_create_directory(
+                b"existing",
+                b"data/existing",
+                false,
+                Some(IoErrorIdentityV1::AlreadyExists),
+            )
+            .expect("create-existing classification/state");
+
+        for recursive in [false, true] {
+            let missing = run_scenario(&fs_create_directory_scenario(
+                if recursive {
+                    "abi-a3-create-missing-true"
+                } else {
+                    "abi-a3-create-missing-false"
+                },
+                recursive,
+                b"missing/child",
+                abi_a3_base_nodes(),
+            ))
+            .expect("missing-parent create executes");
+            missing
+                .compare_fs_create_directory(
+                    b"missing/child",
+                    b"data/missing/child",
+                    recursive,
+                    Some(IoErrorIdentityV1::NotFound),
+                )
+                .expect("both recursive values preserve the landed NotFound/no-op behavior");
+        }
+    }
+
+    /// Promise class: durable state-transition and exact failure-classification
+    /// invariant for unlinking a non-directory node.
+    #[test]
+    fn fs_remove_file_real_artifact_distinguishes_success_wrong_kind_and_missing() {
+        let mut success_nodes = abi_a3_base_nodes();
+        success_nodes.push(SeedNode {
+            relative_path: b"data/remove.bin".to_vec(),
+            kind: crate::SeedNodeKind::File(b"payload".to_vec()),
+        });
+        let run = run_scenario(&fs_remove_file_scenario(
+            "abi-a3-remove-file-success",
+            b"remove.bin",
+            success_nodes,
+        ))
+        .expect("remove-file success executes");
+        run.compare_fs_remove_file(
+            b"remove.bin",
+            b"data/remove.bin",
+            None,
+        )
+        .expect("exact remove-file transition");
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsRemoveFile,
+                NativeTestedEvidence::from_fs_remove_file_run(
+                    &run,
+                    b"remove.bin",
+                    b"data/remove.bin",
+                ),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested)
+        );
+        let mut wrong_native = run.native.clone();
+        wrong_native.filesystem_delta.clear();
+        let mut wrong_actions = run.native_actions.clone();
+        wrong_actions.root_after = wrong_actions.root_before.clone();
+        assert!(matches!(
+            compare_fs_mutation_observations(
+                &run.interpreter,
+                &run.interpreter_actions,
+                &wrong_native,
+                &wrong_actions,
+                CanonicalRequestV1::FsRemoveFile {
+                    path: b"remove.bin".to_vec(),
+                },
+                b"data/remove.bin",
+                None,
+                MutationStateContract::RemoveSubtree,
+            ),
+            Err(FsDirectoryDifferentialError::Transition {
+                operation: HostOpV1::FsRemoveFile,
+                lane: "native",
+                ..
+            })
+        ));
+
+        let mut directory_nodes = abi_a3_base_nodes();
+        directory_nodes.push(SeedNode {
+            relative_path: b"data/not-a-file".to_vec(),
+            kind: crate::SeedNodeKind::Directory,
+        });
+        let wrong_kind = run_scenario(&fs_remove_file_scenario(
+            "abi-a3-remove-file-wrong-kind",
+            b"not-a-file",
+            directory_nodes,
+        ))
+        .expect("remove-file wrong-kind executes");
+        wrong_kind
+            .compare_fs_remove_file(
+                b"not-a-file",
+                b"data/not-a-file",
+                Some(IoErrorIdentityV1::IsDirectory),
+            )
+            .expect("wrong-kind classification/state");
+
+        let missing = run_scenario(&fs_remove_file_scenario(
+            "abi-a3-remove-file-missing",
+            b"missing",
+            abi_a3_base_nodes(),
+        ))
+        .expect("remove-file missing executes");
+        missing
+            .compare_fs_remove_file(
+                b"missing",
+                b"data/missing",
+                Some(IoErrorIdentityV1::NotFound),
+            )
+            .expect("missing classification/state");
+    }
+
+    /// Promise class: durable error-class-keyed differential. Deterministic
+    /// classes assert exact state; the ruled mid-traversal class deliberately
+    /// compares classification only.
+    #[test]
+    fn fs_remove_directory_real_artifact_honors_the_nontransactional_carve_out() {
+        let mut tree_nodes = abi_a3_base_nodes();
+        tree_nodes.extend([
+            SeedNode {
+                relative_path: b"data/tree".to_vec(),
+                kind: crate::SeedNodeKind::Directory,
+            },
+            SeedNode {
+                relative_path: b"data/tree/child".to_vec(),
+                kind: crate::SeedNodeKind::Directory,
+            },
+            SeedNode {
+                relative_path: b"data/tree/file".to_vec(),
+                kind: crate::SeedNodeKind::File(b"payload".to_vec()),
+            },
+        ]);
+        let run = run_scenario(&fs_remove_directory_scenario(
+            "abi-a3-rmdir-recursive-success",
+            true,
+            b"tree",
+            tree_nodes.clone(),
+        ))
+        .expect("recursive rmdir success executes");
+        run.compare_fs_remove_directory(
+            b"tree",
+            b"data/tree",
+            true,
+            None,
+        )
+        .expect("exact recursive success transition");
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsRemoveDirectory,
+                NativeTestedEvidence::from_fs_remove_directory_run(
+                    &run,
+                    b"tree",
+                    b"data/tree",
+                    true,
+                ),
+            ),
+            Ok(HostOpAvailabilityV1::NativeTested)
+        );
+        let mut wrong_native = run.native.clone();
+        wrong_native.filesystem_delta.clear();
+        let mut wrong_actions = run.native_actions.clone();
+        wrong_actions.root_after = wrong_actions.root_before.clone();
+        assert!(matches!(
+            compare_fs_mutation_observations(
+                &run.interpreter,
+                &run.interpreter_actions,
+                &wrong_native,
+                &wrong_actions,
+                CanonicalRequestV1::FsRemoveDirectory {
+                    recursive: true,
+                    path: b"tree".to_vec(),
+                },
+                b"data/tree",
+                None,
+                MutationStateContract::RemoveSubtree,
+            ),
+            Err(FsDirectoryDifferentialError::Transition {
+                operation: HostOpV1::FsRemoveDirectory,
+                lane: "native",
+                ..
+            })
+        ));
+
+        let mut empty_nodes = abi_a3_base_nodes();
+        empty_nodes.push(SeedNode {
+            relative_path: b"data/empty".to_vec(),
+            kind: crate::SeedNodeKind::Directory,
+        });
+        let empty = run_scenario(&fs_remove_directory_scenario(
+            "abi-a3-rmdir-empty",
+            false,
+            b"empty",
+            empty_nodes,
+        ))
+        .expect("non-recursive empty rmdir executes");
+        empty
+            .compare_fs_remove_directory(
+                b"empty",
+                b"data/empty",
+                false,
+                None,
+            )
+            .expect("empty directory is removed exactly");
+
+        let nonempty = run_scenario(&fs_remove_directory_scenario(
+            "abi-a3-rmdir-nonempty",
+            false,
+            b"tree",
+            tree_nodes,
+        ))
+        .expect("non-recursive non-empty rmdir executes");
+        nonempty
+            .compare_fs_remove_directory(
+                b"tree",
+                b"data/tree",
+                false,
+                Some(IoErrorIdentityV1::NotEmpty),
+            )
+            .expect("NotEmpty preserves the exact tree");
+
+        let mut partial_nodes = abi_a3_base_nodes();
+        partial_nodes.extend([
+            SeedNode {
+                relative_path: b"data/partial".to_vec(),
+                kind: crate::SeedNodeKind::Directory,
+            },
+            SeedNode {
+                relative_path: b"data/partial/locked".to_vec(),
+                kind: crate::SeedNodeKind::DirectoryWithMode(0o500),
+            },
+            SeedNode {
+                relative_path: b"data/partial/locked/held".to_vec(),
+                kind: crate::SeedNodeKind::File(b"held".to_vec()),
+            },
+            SeedNode {
+                relative_path: b"data/partial/removable".to_vec(),
+                kind: crate::SeedNodeKind::File(b"remove".to_vec()),
+            },
+        ]);
+        let partial = execute_scenario(&fs_remove_directory_scenario(
+            "abi-a3-rmdir-mid-traversal",
+            true,
+            b"partial",
+            partial_nodes,
+        ))
+        .expect("mid-traversal rmdir executes both lanes");
+        assert_eq!(
+            partial.interpreter_actions.fs_actions_after_resolve,
+            Some(1),
+            "the mid-traversal fixture must reach the backend after resolution"
+        );
+        partial
+            .compare_fs_remove_directory_mid_traversal_error(
+                b"partial",
+                IoErrorIdentityV1::PermissionDenied,
+            )
+            .expect("classification agrees while residuals remain unconstrained");
+        assert!(matches!(
+            partial.compare_fs_remove_directory_mid_traversal_error(
+                b"partial",
+                IoErrorIdentityV1::NotEmpty,
+            ),
+            Err(FsDirectoryDifferentialError::Transition {
+                lane: "contract",
+                ..
+            })
+        ));
+
+        let mut different_residual = partial.native.clone();
+        different_residual.filesystem_delta.clear();
+        let mut different_actions = partial.native_actions.clone();
+        different_actions.root_after = different_actions.root_before.clone();
+        compare_fs_mutation_observations(
+            &partial.interpreter,
+            &partial.interpreter_actions,
+            &different_residual,
+            &different_actions,
+            CanonicalRequestV1::FsRemoveDirectory {
+                recursive: true,
+                path: b"partial".to_vec(),
+            },
+            b"partial",
+            Some(IoErrorIdentityV1::PermissionDenied),
+            MutationStateContract::MidTraversalUnconstrained,
+        )
+        .expect("a different residual remains lawful in the mid-traversal class");
+
+        let mut wrong_class = partial.native.clone();
+        let CanonicalOutcomeV1::Error(SemanticErrorV1::File(error)) =
+            &mut wrong_class.effect_trace[0].outcome
+        else {
+            panic!("mid-traversal fixture must return FileError")
+        };
+        error.cause = FileErrorCauseV1::Io(IoErrorIdentityV1::NotEmpty);
+        assert!(matches!(
+            compare_fs_mutation_observations(
+                &partial.interpreter,
+                &partial.interpreter_actions,
+                &wrong_class,
+                &partial.native_actions,
+                CanonicalRequestV1::FsRemoveDirectory {
+                    recursive: true,
+                    path: b"partial".to_vec(),
+                },
+                b"partial",
+                Some(IoErrorIdentityV1::PermissionDenied),
+                MutationStateContract::MidTraversalUnconstrained,
+            ),
+            Err(FsDirectoryDifferentialError::Shape {
+                operation: HostOpV1::FsRemoveDirectory,
+                lane: "native",
+                ..
+            })
+        ));
+    }
+
+    fn assert_abi_a3_path_policy(operation: HostOpV1) {
+        for policy in [
+            AbiA3PolicyCase::Escape,
+            AbiA3PolicyCase::Symlink,
+            AbiA3PolicyCase::MissingRight,
+        ] {
+            let (scenario, expected) =
+                abi_a3_policy_scenario(operation, policy);
+            let request_path = scenario.process_input.arguments[0].clone();
+            let run = run_scenario(&scenario).unwrap_or_else(|error| {
+                panic!("{}: {error}", scenario.entry.identity)
+            });
+            assert_eq!(
+                run.interpreter_actions.fs_actions_after_resolve,
+                Some(0),
+                "{} reached a post-resolution action",
+                scenario.entry.identity
+            );
+            assert_eq!(
+                run.interpreter_actions.root_before,
+                run.interpreter_actions.root_after,
+                "{} changed the interpreter root",
+                scenario.entry.identity
+            );
+            assert_eq!(
+                run.native_actions.root_before,
+                run.native_actions.root_after,
+                "{} changed the native root",
+                scenario.entry.identity
+            );
+            for observation in [&run.interpreter, &run.native] {
+                assert_eq!(observation.exit_status, 44);
+                assert!(observation.filesystem_delta.is_empty());
+                let [event] = observation.effect_trace.as_slice() else {
+                    panic!("{} must emit one refusal", scenario.entry.identity)
+                };
+                assert_eq!(event.operation, operation);
+                assert!(matches!(
+                    &event.outcome,
+                    CanonicalOutcomeV1::Error(SemanticErrorV1::File(error))
+                        if error.operation == operation
+                            && error.relative_path == request_path
+                            && error.cause
+                                == FileErrorCauseV1::Capability(expected.clone())
+                ));
+            }
+        }
+    }
+
+    /// Promise class: durable invariant over the landed scoped-root, NoFollow,
+    /// and Enumerate-right gate.
+    #[test]
+    fn fs_read_directory_exercises_every_path_policy_refusal() {
+        assert_abi_a3_path_policy(HostOpV1::FsReadDirectory);
+    }
+
+    /// Promise class: durable invariant over the landed scoped-root, NoFollow,
+    /// and Create-right gate.
+    #[test]
+    fn fs_create_directory_exercises_every_path_policy_refusal() {
+        assert_abi_a3_path_policy(HostOpV1::FsCreateDirectory);
+    }
+
+    /// Promise class: durable invariant over the landed scoped-root, NoFollow,
+    /// and RemoveFile right gate.
+    #[test]
+    fn fs_remove_file_exercises_every_path_policy_refusal() {
+        assert_abi_a3_path_policy(HostOpV1::FsRemoveFile);
+    }
+
+    /// Promise class: durable invariant over the landed scoped-root, NoFollow,
+    /// and RemoveDirectory right gate.
+    #[test]
+    fn fs_remove_directory_exercises_every_path_policy_refusal() {
+        assert_abi_a3_path_policy(HostOpV1::FsRemoveDirectory);
     }
 
     /// Promise class: durable invariant.

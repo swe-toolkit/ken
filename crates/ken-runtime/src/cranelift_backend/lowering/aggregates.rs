@@ -286,7 +286,7 @@ fn governed_allocation_hit() {
 /// class"; the sum admits neither, so the choke's two refusals are total over
 /// the domain rather than over the cases someone enumerated.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum CarrierAllocationRequest {
+pub(super) enum CarrierAllocationRequest {
     /// A scalar, spill, byte-bodied, `HostResult` or borrowed allocation. It
     /// names no record and never enters `E`.
     ///
@@ -2414,7 +2414,7 @@ impl<'a> Lowering<'a> {
         /// because the result `Value` is half the event's identity and does not
         /// exist before it. That ordering is what makes "one allocation, one pair"
         /// checkable at all.
-        fn emit_carrier_alloc(
+        pub(super) fn emit_carrier_alloc(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             request: CarrierAllocationRequest,
@@ -3037,7 +3037,7 @@ impl<'a> Lowering<'a> {
 
 impl<'a> Lowering<'a> {
         /// `store_scalar(arena, word, value) -> status`.
-        fn emit_carrier_store_scalar(
+        pub(super) fn emit_carrier_store_scalar(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             target: CarriedBoundaryWord,
@@ -3740,6 +3740,18 @@ impl<'a> Lowering<'a> {
                                     class,
                                 } if class == *declared_class
                             )
+                    }
+                    // A repeated response-list link is emitted only by the
+                    // DirectoryEntries loop, which validates its planned shape
+                    // before allocating and writes the prior/next carried word
+                    // directly. Reaching the ordinary template reconciler would
+                    // invent a specialized representation for that carried link.
+                    (SynthesizedAggregateNode::RepeatedAggregateLink { .. }, _) => {
+                        return Err(unsupported(
+                            "Constructor",
+                            "a repeated response-list link reached the ordinary \
+                             synthesized-child reconciler",
+                        ));
                     }
                     // ⛔ THE CAPTURE-WORD ARM. Additive BESIDE the site-operand
                     // arm above, which is untouched: that one resolves an

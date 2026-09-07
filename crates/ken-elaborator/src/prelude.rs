@@ -134,6 +134,12 @@ canonical_runtime_roles! {
     file_kind_symlink => "KSymlink",
     file_kind_other => "KOther",
     file_operation_rename => "OpRename",
+    // ABI-A3 appends directory reply/error roles without moving prior fields.
+    file_operation_read_directory => "OpReadDirectory",
+    file_operation_create_directory => "OpCreateDirectory",
+    file_operation_remove_file => "OpRemoveFile",
+    file_operation_remove_directory => "OpRemoveDirectory",
+    dir_entry => "MkDirEntry",
     // The thirteen IO errors, in the exact order the spine's vector carries them.
     // That order is the contract; the record's bytes depend on it.
     io_error_not_found => "NotFound",

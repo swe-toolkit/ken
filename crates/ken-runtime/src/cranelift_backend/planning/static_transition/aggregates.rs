@@ -3111,6 +3111,14 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateNode {
     /// set is the singleton `{PersistentStore}` because the response span is
     /// copied before the parent is published.
     HostResponseReferent { class: BoundaryClass },
+    /// A previously allocated value linked by a generated response loop.
+    ///
+    /// ABI-A3's provisional whole-directory decoder allocates one `List::Cons`
+    /// per decoded entry. Each tail is either the next Cons from the same
+    /// allocation site or the response's Nil node. Both are persistent-store
+    /// constructor handles, so the owner set is exact without pretending the
+    /// loop accumulator came from an effect operand or directly from the host.
+    RepeatedAggregateLink { class: BoundaryClass },
     /// **A carried continuation-envelope worker-capture word, by position.**
     ///
     /// The child at position `i` is the `i`-th `WorkerCapture` operand of the
@@ -3287,6 +3295,12 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         // The seat's operand 0 — the path the caller passed.
         children: &[N::SiteOperand(0)],
     };
+    const SOME_RECURSIVE_SITE_PATH: SynthesizedAggregateNode = N::Fixed {
+        role: R::OptionSome,
+        // CreateDirectory/RemoveDirectory carry recursive at operand 0 and path
+        // at operand 1.
+        children: &[N::SiteOperand(1)],
+    };
     /// `FileError(FileOperation*, Option::Some(<site path>), IOError)`.
     const READ_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
         N::nullary(R::FileOperationRead),
@@ -3313,6 +3327,26 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         SOME_SITE_PATH,
         IO_ERRORS,
     ];
+    const READ_DIRECTORY_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
+        N::nullary(R::FileOperationReadDirectory),
+        SOME_SITE_PATH,
+        IO_ERRORS,
+    ];
+    const CREATE_DIRECTORY_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
+        N::nullary(R::FileOperationCreateDirectory),
+        SOME_RECURSIVE_SITE_PATH,
+        IO_ERRORS,
+    ];
+    const REMOVE_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
+        N::nullary(R::FileOperationRemoveFile),
+        SOME_SITE_PATH,
+        IO_ERRORS,
+    ];
+    const REMOVE_DIRECTORY_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
+        N::nullary(R::FileOperationRemoveDirectory),
+        SOME_RECURSIVE_SITE_PATH,
+        IO_ERRORS,
+    ];
     const CHANGE_MODE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
         N::nullary(R::FileOperationChangeMode),
         SOME_SITE_PATH,
@@ -3337,6 +3371,22 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     const RENAME_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
         children: RENAME_ERROR_CHILDREN,
+    };
+    const READ_DIRECTORY_ERROR: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileError,
+        children: READ_DIRECTORY_ERROR_CHILDREN,
+    };
+    const CREATE_DIRECTORY_ERROR: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileError,
+        children: CREATE_DIRECTORY_ERROR_CHILDREN,
+    };
+    const REMOVE_FILE_ERROR: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileError,
+        children: REMOVE_FILE_ERROR_CHILDREN,
+    };
+    const REMOVE_DIRECTORY_ERROR: SynthesizedAggregateNode = N::Fixed {
+        role: R::FileError,
+        children: REMOVE_DIRECTORY_ERROR_CHILDREN,
     };
     const CHANGE_MODE_ERROR: SynthesizedAggregateNode = N::Fixed {
         role: R::FileError,
@@ -3393,6 +3443,28 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         role: R::FileMetadata,
         children: &[N::native_int(), FILE_KIND],
     };
+    const DIRECTORY_ENTRY: SynthesizedAggregateNode = N::Fixed {
+        role: R::DirEntry,
+        children: &[
+            N::HostResponseReferent {
+                class: BoundaryClass::Bytes,
+            },
+            FILE_KIND,
+        ],
+    };
+    const DIRECTORY_LIST: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::nullary(R::ListNil),
+            N::Fixed {
+                role: R::ListCons,
+                children: &[
+                    DIRECTORY_ENTRY,
+                    N::RepeatedAggregateLink {
+                        class: BoundaryClass::Constructor,
+                    },
+                ],
+            },
+        ]));
     const UNIT: SynthesizedAggregateNode = N::nullary(R::Unit);
 
     let (error, ok) = match operation {
@@ -3412,6 +3484,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::FsWriteFile => (WRITE_FILE_ERROR, UNIT),
         Op::FsAppendFile => (APPEND_FILE_ERROR, UNIT),
         Op::FsMetadata => (METADATA_ERROR, FILE_METADATA),
+        Op::FsReadDirectory => (READ_DIRECTORY_ERROR, DIRECTORY_LIST),
+        Op::FsCreateDirectory => (CREATE_DIRECTORY_ERROR, UNIT),
+        Op::FsRemoveFile => (REMOVE_FILE_ERROR, UNIT),
+        Op::FsRemoveDirectory => (REMOVE_DIRECTORY_ERROR, UNIT),
         Op::FsRename => (RENAME_ERROR, UNIT),
         Op::FsChangeMode => (CHANGE_MODE_ERROR, UNIT),
         Op::BufferAllocate | Op::BufferFreeze => (RESOURCE_SURFACE, N::Absent),
@@ -3476,6 +3552,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn collect_site_op
         // would claim the seat supplies an argument it does not have.
         SynthesizedAggregateNode::WorkerCaptureOperand(_)
         | SynthesizedAggregateNode::HostResponseReferent { .. }
+        | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
         | SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors)
         | SynthesizedAggregateNode::Scalar { .. }
         | SynthesizedAggregateNode::Absent => {}
@@ -3632,6 +3709,7 @@ fn collect_reachable_uses(
         SynthesizedAggregateNode::Scalar { .. }
         | SynthesizedAggregateNode::SiteOperand(_)
         | SynthesizedAggregateNode::HostResponseReferent { .. }
+        | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
         // A capture word is a leaf and, more to the point, is never reachable
         // from a host-effect recipe at all: this walk starts at
         // `host_effect_recipe_tree(operation)`, and no recipe names a capture.
@@ -3672,7 +3750,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn node_referent_o
             BoundaryReferentOwner::NoReferent,
             BoundaryReferentOwner::PersistentStore,
         ]),
-        SynthesizedAggregateNode::HostResponseReferent { .. } => {
+        SynthesizedAggregateNode::HostResponseReferent { .. }
+        | SynthesizedAggregateNode::RepeatedAggregateLink { .. } => {
             Ok(vec![BoundaryReferentOwner::PersistentStore])
         }
         // A nested fixed constructor IS a referent, and its owner is
@@ -3835,6 +3914,7 @@ fn fixed_node_selected_owner_of(
         | SynthesizedAggregateNode::Scalar { .. }
         | SynthesizedAggregateNode::SiteOperand(_)
         | SynthesizedAggregateNode::HostResponseReferent { .. }
+        | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
         | SynthesizedAggregateNode::WorkerCaptureOperand(_)
         | SynthesizedAggregateNode::Absent => Err(planner_error(
             "a dynamic aggregate alternative is not a constructor, so it \
@@ -9451,6 +9531,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 | SynthesizedAggregateNode::Scalar { .. }
                 | SynthesizedAggregateNode::SiteOperand(_)
                 | SynthesizedAggregateNode::HostResponseReferent { .. }
+                | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
                 | SynthesizedAggregateNode::WorkerCaptureOperand(_)
                 | SynthesizedAggregateNode::Absent,
             ) => Err(planner_error(
@@ -9530,6 +9611,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 | (SynthesizedAggregateNode::Scalar { .. }, _)
                 | (SynthesizedAggregateNode::SiteOperand(_), _)
                 | (SynthesizedAggregateNode::HostResponseReferent { .. }, _)
+                | (SynthesizedAggregateNode::RepeatedAggregateLink { .. }, _)
                 | (SynthesizedAggregateNode::WorkerCaptureOperand(_), _)
                 | (SynthesizedAggregateNode::Absent, _) => {
                     return Err(planner_error(
@@ -9691,6 +9773,7 @@ impl<'src> StaticTransitionPlan<'src> {
                         | SynthesizedAggregateNode::Scalar { .. }
                         | SynthesizedAggregateNode::SiteOperand(_)
                         | SynthesizedAggregateNode::HostResponseReferent { .. }
+                        | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
                         | SynthesizedAggregateNode::WorkerCaptureOperand(_)
                         | SynthesizedAggregateNode::Absent => Err(planner_error(
                             "a dynamic aggregate alternative is not a constructor, so it \
@@ -9713,6 +9796,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 | SynthesizedAggregateNode::Scalar { .. }
                 | SynthesizedAggregateNode::SiteOperand(_)
                 | SynthesizedAggregateNode::HostResponseReferent { .. }
+                | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
                 // A capture word is a leaf, never a dynamic alternative set.
                 | SynthesizedAggregateNode::WorkerCaptureOperand(_)
                 | SynthesizedAggregateNode::Absent => Ok(None),
@@ -11286,6 +11370,10 @@ mod tests {
             Op::FsWriteFile,
             Op::FsAppendFile,
             Op::FsMetadata,
+            Op::FsReadDirectory,
+            Op::FsCreateDirectory,
+            Op::FsRemoveFile,
+            Op::FsRemoveDirectory,
             Op::FsRename,
             Op::FsChangeMode,
             Op::BufferAllocate,
@@ -11342,6 +11430,7 @@ mod tests {
             | SynthesizedAggregateNode::Scalar { .. }
             | SynthesizedAggregateNode::SiteOperand(_)
             | SynthesizedAggregateNode::HostResponseReferent { .. }
+            | SynthesizedAggregateNode::RepeatedAggregateLink { .. }
             // A leaf, and never in a host-effect recipe tree, which is what
             // this walker is pointed at.
             | SynthesizedAggregateNode::WorkerCaptureOperand(_)

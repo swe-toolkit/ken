@@ -270,6 +270,12 @@ runtime_host_spine_v1! {
     file_kind_other,
     // ABI-A2 final partial appends without moving established role indices.
     file_operation_rename,
+    // ABI-A3 directory roles append without moving established role indices.
+    file_operation_read_directory,
+    file_operation_create_directory,
+    file_operation_remove_file,
+    file_operation_remove_directory,
+    dir_entry,
 }
 
 /// The decoded, validated checked-runtime role record.
