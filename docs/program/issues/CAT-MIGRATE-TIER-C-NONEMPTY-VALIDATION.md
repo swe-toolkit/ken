@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-C-NONEMPTY-VALIDATION
 title: "Tier-C staging P3 (flip-only): make NonEmpty a strict abstract importable module (hide the raw NonEmptyCons ctor) and add the import edges into its now-ambient clients. Logic-free once P1 added the smart constructors and P2 removed the last external raw-ctor consumer; this node only hides the raw constructor and wires imports. Full Architect soundness pass required (abstraction boundary + loading semantics). Validation was SPLIT OUT of this node to CAT-MIGRATE-TIER-C-VALIDATION-STRICT-IMPORT -- its abstract flip was refuted and it goes strict-transparent instead."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
