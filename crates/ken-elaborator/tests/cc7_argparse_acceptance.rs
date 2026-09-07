@@ -11,8 +11,6 @@ use ken_kernel::{Decl, GlobalId, Term};
 
 const EFFECTFUL_CLASSES_KEN_MD: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
-const NONEMPTY_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Collections/NonEmpty.ken.md");
 const VALIDATION_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Sums/Validation.ken.md");
 const DIAGNOSTIC_KEN_MD: &str =
@@ -60,10 +58,15 @@ fn dependency_env() -> ElabEnv {
     }
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
     catalog_or::load_lawful_functors_importing_fixture(&mut env);
+    env.elaborate_ken_md_file(EFFECTFUL_CLASSES_KEN_MD)
+        .expect("Core.Classes.EffectfulClasses must elaborate in dependency order");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
+        .expect("Data.Collections.NonEmpty must roots-load before its clients");
+    let before_nonempty_client = env.module_state.clone();
+    env.elaborate_ken_md_file(VALIDATION_KEN_MD)
+        .expect("Data.Sums.Validation must import NonEmpty from its module surface");
+    env.module_state = before_nonempty_client;
     for (source, label) in [
-        (EFFECTFUL_CLASSES_KEN_MD, "Core.Classes.EffectfulClasses"),
-        (NONEMPTY_KEN_MD, "Data.Collections.NonEmpty"),
-        (VALIDATION_KEN_MD, "Data.Sums.Validation"),
         (DIAGNOSTIC_KEN_MD, "Capability.Diagnostics.Core"),
         (CODEC_KEN_MD, "Data.Text.Codec"),
     ] {
@@ -90,12 +93,16 @@ fn full_env() -> ElabEnv {
     let mut env = dependency_env();
     env.elaborate_ken_md_file(DIAGNOSTIC_RENDER_KEN_MD)
         .expect("Capability.Diagnostics.Render must elaborate after Capability.Diagnostics.Core and Capability.Formatting.Doc");
+    let before_nonempty_clients = env.module_state.clone();
     env.elaborate_ken_md_file(SCHEMA_KEN_MD)
-        .expect("Schema must elaborate before either decoder client");
+        .expect("Schema must import NonEmpty before either decoder client");
+    env.module_state = before_nonempty_clients.clone();
     env.elaborate_ken_md_file(ARGPARSE_KEN_MD)
-        .expect("ArgParse must elaborate after the complete substrate");
+        .expect("ArgParse must import NonEmpty after the complete substrate");
+    env.module_state = before_nonempty_clients.clone();
     env.elaborate_ken_md_file(EXAMPLE_KEN_MD)
-        .expect("the separate forge client must elaborate after ArgParse");
+        .expect("the separate forge client must import NonEmpty after ArgParse");
+    env.module_state = before_nonempty_clients;
     env
 }
 
@@ -277,7 +284,7 @@ fn invalid_diagnostics<'a>(env: &ElabEnv, result: &'a EvalVal) -> Vec<&'a EvalVa
     let nonempty = ctor_args(
         env,
         invalid.last().expect("Invalid payload"),
-        "NonEmptyCons",
+        "Data.Collections.NonEmpty.NonEmptyCons",
     );
     let mut result = vec![&nonempty[1]];
     result.extend(list_elements(env, &nonempty[2]));

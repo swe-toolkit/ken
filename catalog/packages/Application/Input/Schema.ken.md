@@ -9,6 +9,8 @@ the clients.
 ## 1. Description vocabulary
 
 ```ken
+import Data.Collections.NonEmpty (NonEmpty, nonempty_append, nonempty_cons)
+
 data SchemaPresence = SchemaRequired | SchemaOptional
 
 data SchemaValueShape = SchemaFlag | SchemaBytes

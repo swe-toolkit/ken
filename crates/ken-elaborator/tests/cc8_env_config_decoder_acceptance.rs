@@ -13,7 +13,6 @@ use ken_kernel::{Decl, GlobalId};
 const BYTES_KEYS: &str = include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
 const EFFECTFUL_CLASSES: &str =
     include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
-const NONEMPTY: &str = include_str!("../../../catalog/packages/Data/Collections/NonEmpty.ken.md");
 const VALIDATION: &str = include_str!("../../../catalog/packages/Data/Sums/Validation.ken.md");
 const DIAGNOSTIC: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
@@ -59,10 +58,15 @@ fn dependency_env() -> ElabEnv {
     }
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
     catalog_or::load_lawful_functors_importing_fixture(&mut env);
+    env.elaborate_ken_md_file(EFFECTFUL_CLASSES)
+        .expect("Core.Classes.EffectfulClasses must elaborate in dependency order");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
+        .expect("Data.Collections.NonEmpty must roots-load before its clients");
+    let before_nonempty_client = env.module_state.clone();
+    env.elaborate_ken_md_file(VALIDATION)
+        .expect("Data.Sums.Validation must import NonEmpty from its module surface");
+    env.module_state = before_nonempty_client;
     for (source, label) in [
-        (EFFECTFUL_CLASSES, "Core.Classes.EffectfulClasses"),
-        (NONEMPTY, "Data.Collections.NonEmpty"),
-        (VALIDATION, "Data.Sums.Validation"),
         (DIAGNOSTIC, "Capability.Diagnostics.Core"),
         (CODEC, "Data.Text.Codec"),
     ] {
@@ -89,6 +93,7 @@ fn dependency_env() -> ElabEnv {
 
 fn full_env() -> ElabEnv {
     let mut env = dependency_env();
+    let before_nonempty_clients = env.module_state.clone();
     for (source, label) in [
         (SCHEMA, "Schema"),
         (ARGPARSE, "ArgParse"),
@@ -96,7 +101,8 @@ fn full_env() -> ElabEnv {
         (EXAMPLE, "Application.CommandLine.Forge"),
     ] {
         env.elaborate_ken_md_file(source)
-            .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
+            .unwrap_or_else(|err| panic!("{label} must import NonEmpty: {err:?}"));
+        env.module_state = before_nonempty_clients.clone();
     }
     env
 }
@@ -375,7 +381,7 @@ fn two_missing_fields_accumulate_exact_environment_origins() {
     let errors = ctor_args(
         &env,
         invalid.last().expect("Invalid payload"),
-        "NonEmptyCons",
+        "Data.Collections.NonEmpty.NonEmptyCons",
     );
     let mut diagnostics = vec![&errors[1]];
     diagnostics.extend(list_elements(&env, &errors[2]));
@@ -405,7 +411,7 @@ fn config_failures_keep_config_key_origins_distinct_from_environment() {
     let errors = ctor_args(
         &env,
         invalid.last().expect("Invalid payload"),
-        "NonEmptyCons",
+        "Data.Collections.NonEmpty.NonEmptyCons",
     );
     let mut diagnostics = vec![&errors[1]];
     diagnostics.extend(list_elements(&env, &errors[2]));

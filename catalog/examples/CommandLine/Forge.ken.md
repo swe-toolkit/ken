@@ -6,6 +6,8 @@ thin applications of `ArgParse`; adding an option changes both behaviors from
 the single specification value.
 
 ```ken
+import Data.Collections.NonEmpty (NonEmpty)
+
 const forge_build_options : List OptionSpec =
   Cons
     OptionSpec
