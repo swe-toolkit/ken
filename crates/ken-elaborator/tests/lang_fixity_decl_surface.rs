@@ -120,10 +120,11 @@ fn operator_run_stays_flat_through_resolution() {
 #[test]
 fn pure_fixed_arithmetic_retains_merge_base_shape_and_skips_reassociation() {
     let mut decls = ken_elaborator::parser::parse_decls(
-        "fn arithmeticUse (a : Nat) (b : Nat) (c : Nat) : Nat = a + b * c",
+        "fn arithmeticUse (a : Nat) (b : Nat) (c : Nat) : Nat = a + b * c\n\
+         fn <+> (a : Nat) (b : Nat) : Nat = a",
     )
-    .expect("fixed arithmetic parses");
-    let decl = decls.pop().expect("one declaration");
+    .expect("fixed arithmetic parses in a unit that also has a user operator");
+    let decl = decls.remove(0);
     let Decl::ViewDecl { body, .. } = &decl else {
         panic!("expected view declaration, got {decl:?}");
     };
