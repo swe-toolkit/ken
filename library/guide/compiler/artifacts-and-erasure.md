@@ -17,11 +17,11 @@ does not silently proceed as a runtime target.
 ## Erasure is a consumer of checked core
 
 The [erasure module](../../../crates/ken-elaborator/src/erasure.rs) consumes a
-`CheckedCorePackage` and produces a `RuntimeProgram`. It validates the package, validates semantic integrity, and
-retains runtime metadata for obligations, assumptions, trusted-base deltas,
-dependencies, lowerability, effects, capabilities, and runtime checks. Raw
-source identity may remain available for provenance, but source text is not an
-input to runtime meaning at this boundary.
+`CheckedCorePackage` and produces a `RuntimeProgram`. It validates the package,
+validates semantic integrity, and retains runtime metadata for obligations,
+assumptions, trusted-base deltas, dependencies, lowerability, effects,
+capabilities, and runtime checks. Raw source identity may remain available for
+provenance, but source text is not an input to runtime meaning at this boundary.
 
 Proof-irrelevant material is not simply discarded by convention. The erasure
 path can reject unsupported expression lowering and missing or inconsistent

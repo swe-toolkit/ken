@@ -30,9 +30,10 @@ path; it does not mean that a native artifact was produced.
 
 ## What follows admission
 
-The [compiler driver](../../../crates/ken-elaborator/src/compiler_driver.rs)
-can collect admitted declarations into a `CheckedCorePackage`. That package carries stable symbols and semantic metadata
-for later consumers, rather than passing raw source text to erasure. Read
+The [compiler driver](../../../crates/ken-elaborator/src/compiler_driver.rs) can
+collect admitted declarations into a `CheckedCorePackage`. That package carries
+stable symbols and semantic metadata for later consumers, rather than passing
+raw source text to erasure. Read
 [Artifacts and erasure](artifacts-and-erasure.md) for the boundary it creates,
 or [The trusted kernel](kernel.md) for the checker that admits the core terms.
 

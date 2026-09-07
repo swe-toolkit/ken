@@ -4,9 +4,10 @@
 
 [`ken-kernel`](../../../crates/ken-kernel/src/lib.rs) is the trust root for
 fully explicit core terms. Its public surface includes checking, conversion,
-environments, inductives, substitution, and terms. The crate explicitly forbids unsafe Rust. The surrounding compiler may
-construct a candidate term, but it cannot turn that candidate into a valid Ken
-proof without this checker accepting it.
+environments, inductives, substitution, and terms. The crate explicitly forbids
+unsafe Rust. The surrounding compiler may construct a candidate term, but it
+cannot turn that candidate into a valid Ken proof without this checker accepting
+it.
 
 The kernel is separate from the elaborator. The elaborator resolves and
 elaborates surface declarations; the kernel checks the resulting core term
@@ -28,6 +29,7 @@ are useful evidence about execution, not proof that a term type-checks.
 
 The [front end](front-end.md) shows how source reaches a checker invocation.
 After admission, [artifacts and erasure](artifacts-and-erasure.md) explains the
-checked-core package passed to runtime-oriented stages. The normative account
-of the trust boundary is the [kernel specification](../../../spec/10-kernel/11-syntax.md)
-and the [trust model](../../../spec/60-security/64-trust-model.md).
+checked-core package passed to runtime-oriented stages. The normative account of
+the trust boundary is the
+[kernel specification](../../../spec/10-kernel/11-syntax.md) and the
+[trust model](../../../spec/60-security/64-trust-model.md).

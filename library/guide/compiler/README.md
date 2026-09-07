@@ -19,8 +19,9 @@ source and later execution stages.
 Read the [CLI entry point](../../../crates/ken-cli/src/main.rs),
 [elaborator entry module](../../../crates/ken-elaborator/src/lib.rs), and
 [compiler driver](../../../crates/ken-elaborator/src/compiler_driver.rs) for
-source admission, then the [kernel entry module](../../../crates/ken-kernel/src/lib.rs)
-for checking. The durable artifact is defined in
+source admission, then the
+[kernel entry module](../../../crates/ken-kernel/src/lib.rs) for checking. The
+durable artifact is defined in
 [checked core](../../../crates/ken-elaborator/src/checked_core.rs); its runtime
 consumer is [erasure](../../../crates/ken-elaborator/src/erasure.rs).
 

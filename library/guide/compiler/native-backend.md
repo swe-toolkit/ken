@@ -16,10 +16,12 @@ an unchecked source-text fallback for such a program.
 
 ## Object and executable path
 
-The [artifact API](../../../crates/ken-runtime/src/cranelift_backend/artifact/api.rs)
+The
+[artifact API](../../../crates/ken-runtime/src/cranelift_backend/artifact/api.rs)
 compiles a selected runtime expression into a Cranelift object and records
-object bytes, an object hash, target information, verifier status,
-assumptions, and unsupported entries. The [packaging layer](../../../crates/ken-runtime/src/object_linker_packaging.rs)
+object bytes, an object hash, target information, verifier status, assumptions,
+and unsupported entries. The
+[packaging layer](../../../crates/ken-runtime/src/object_linker_packaging.rs)
 can then write an object, create a starter stub, invoke a linker, and record a
 linked executable artifact.
 
@@ -37,8 +39,9 @@ unavailable lanes for library ABI, C and Rust interoperation, cross-package
 native linking, host-effect or FFI execution, translation validation, and a
 whole-compiler proof.
 
-A backend verifier or a successful smoke run is evidence about that artifact;
-it is not kernel checking of native output. For the intended compiler boundary
-and fidelity vocabulary, see the [compiler program](../../../docs/program/07-compiler-program.md).
-Read [Validation and limits](validation-and-limits.md) before treating a native
+A backend verifier or a successful smoke run is evidence about that artifact; it
+is not kernel checking of native output. For the intended compiler boundary and
+fidelity vocabulary, see the
+[compiler program](../../../docs/program/07-compiler-program.md). Read
+[Validation and limits](validation-and-limits.md) before treating a native
 result as more than its recorded evidence.
