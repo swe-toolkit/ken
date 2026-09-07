@@ -11,7 +11,7 @@ asserting the rule on its own authority.
 never a hand-typed date. Every page's authority class and sources are
 declared in [`manifest.toml`](manifest.toml).
 
-## Five ways in
+## Six ways in
 
 | If you want to... | Go here | Status |
 |---|---|---|
@@ -20,6 +20,7 @@ declared in [`manifest.toml`](manifest.toml).
 | **Look something up** — a rule, a diagnostic, a CLI option | [`reference/toolchain/`](reference/toolchain/README.md) | current — toolchain command reference available |
 | **Find a package** — browse the catalog by task | [`catalog/packages/`](../catalog/packages/README.md) directly, for now | map only — Wave 5 generated portal |
 | **Load agent context** — select product knowledge for a coding agent | [`agents/README.md`](agents/README.md) | current |
+| **Read the compiler** — trace the implemented source-to-native route | [`guide/compiler/README.md`](guide/compiler/README.md) | partial — implemented-path map and reading workflow available |
 
 A route with no library page yet is **mapped**, not silently missing — see
 [the Waves table](../docs/program/12-documentation-program.md#4-waves).
