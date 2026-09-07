@@ -542,6 +542,7 @@ pub(crate) struct CheckedHostSpineV1 {
     pub file_kind_directory: StableSymbol,
     pub file_kind_symlink: StableSymbol,
     pub file_kind_other: StableSymbol,
+    pub file_operation_rename: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -7815,6 +7816,10 @@ mod px7l_tests {
                 "Symlink",
             ),
             file_kind_other: StableSymbol::constructor(&family("FileKind"), "Other"),
+            file_operation_rename: StableSymbol::constructor(
+                &family("FileOperation"),
+                "Rename",
+            ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8223,6 +8228,7 @@ mod d1b_role_b_decoder_alignment {
             file_kind_directory: sentinel("file_kind_directory"),
             file_kind_symlink: sentinel("file_kind_symlink"),
             file_kind_other: sentinel("file_kind_other"),
+            file_operation_rename: sentinel("file_operation_rename"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8297,6 +8303,7 @@ mod d1b_role_b_decoder_alignment {
         (spine.file_kind_directory.as_str(), "file_kind_directory"),
         (spine.file_kind_symlink.as_str(), "file_kind_symlink"),
         (spine.file_kind_other.as_str(), "file_kind_other"),
+        (spine.file_operation_rename.as_str(), "file_operation_rename"),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(

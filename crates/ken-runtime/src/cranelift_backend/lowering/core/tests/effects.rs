@@ -2728,7 +2728,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// set, and it is derived from the operation and the slot alone.**
 ///
 /// ⛔ **Nothing here compiles or runs a program.** The point of the seat
-/// authority is that the population is STATIC: it is a fact about the 17
+/// authority is that the population is STATIC: it is a fact about the 18
 /// admitted operations, not about the arms some execution happened to take. A
 /// control that established it by compiling a fixture would prove the property
 /// only for the seats that fixture reaches, which is the row-driven discovery
@@ -2737,7 +2737,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// MEASURED: for each admitted operation the ordinals carrying a contract are
 /// exactly `0..n`; `ClockWallNow` is the sole zero-arity operation, every other
 /// admitted operation has `n >= 1`, the capability slot carries one for exactly
-/// the six FS-path operations, and no unadmitted lane carries one at any slot.
+/// the seven FS-path operations, and no unadmitted lane carries one at any slot.
 ///
 /// CLAIMED: the table has no hole and no wildcard, so an operation cannot be
 /// admitted while some seat of it silently has no contract.
@@ -2757,6 +2757,7 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         ken_host::HostOpV1::FsWriteFile,
         ken_host::HostOpV1::FsAppendFile,
         ken_host::HostOpV1::FsMetadata,
+        ken_host::HostOpV1::FsRename,
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
     ];
@@ -2784,35 +2785,40 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         )),
         "ConsoleRead.limit is the bounded host-width Int seat"
     );
-    for (slot, expected) in [
-        (
-            EffectSeatSlot::Capability,
-            (
-                EffectSeatOperation::ObserveCapabilityToken,
-                EffectSeatNeed::CapabilityTokenScalar,
-            ),
-        ),
-        (
-            EffectSeatSlot::Argument(0),
-            (
-                EffectSeatOperation::ProjectBytesSpan,
-                EffectSeatNeed::BytesPointerLength,
-            ),
-        ),
-        (
-            EffectSeatSlot::Argument(1),
-            (
-                EffectSeatOperation::ProjectBytesSpan,
-                EffectSeatNeed::BytesPointerLength,
-            ),
-        ),
+    for operation in [
+        ken_host::HostOpV1::FsAppendFile,
+        ken_host::HostOpV1::FsRename,
     ] {
-        assert_eq!(
-            host_effect_seat_contract_of(ken_host::HostOpV1::FsAppendFile, slot)
-                .map(|(operation, need, _)| (operation, need)),
-            Some(expected),
-            "FsAppendFile has its exact capability/path/contents seat contract"
-        );
+        for (slot, expected) in [
+            (
+                EffectSeatSlot::Capability,
+                (
+                    EffectSeatOperation::ObserveCapabilityToken,
+                    EffectSeatNeed::CapabilityTokenScalar,
+                ),
+            ),
+            (
+                EffectSeatSlot::Argument(0),
+                (
+                    EffectSeatOperation::ProjectBytesSpan,
+                    EffectSeatNeed::BytesPointerLength,
+                ),
+            ),
+            (
+                EffectSeatSlot::Argument(1),
+                (
+                    EffectSeatOperation::ProjectBytesSpan,
+                    EffectSeatNeed::BytesPointerLength,
+                ),
+            ),
+        ] {
+            assert_eq!(
+                host_effect_seat_contract_of(operation, slot)
+                    .map(|(semantic, need, _)| (semantic, need)),
+                Some(expected),
+                "{operation:?} has its exact capability/two-bytes seat contract"
+            );
+        }
     }
     for (slot, expected) in [
         (
@@ -2875,7 +2881,6 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         ken_host::HostOpV1::FsCreateDirectory,
         ken_host::HostOpV1::FsRemoveFile,
         ken_host::HostOpV1::FsRemoveDirectory,
-        ken_host::HostOpV1::FsRename,
         ken_host::HostOpV1::EntropyRandomBytes,
     ] {
         assert!(
@@ -4431,10 +4436,11 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// side takes a per-seat evidence decision, which is exactly the review this forces.
 ///
 /// The `SPECIALIZED_ONLY` side is not a gap in the observer. `D5` measured the
-/// original four and ABI-A2's real artifacts measure append and metadata paths.
-/// Their synthesized `FileError` separately declares `SiteOperand(0)`; the
-/// exact carried use is projected through the emitted helper without widening
-/// this direct-consumer availability partition.
+/// original four and ABI-A2's real artifacts measure append, metadata, and
+/// rename paths. FsRename destination is the additional directly observed
+/// carried span. Each synthesized `FileError` separately declares
+/// `SiteOperand(0)`; that carried source-path use is projected through the
+/// emitted helper without widening its direct-consumer availability.
 #[test]
 fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     let mut either_phase = Vec::new();
@@ -4466,6 +4472,7 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::ConsoleWrite, EffectSeatSlot::Argument(1)),
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(2)),
             (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(1)),
+            (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(1)),
         ],
         "the EITHER_PHASE byte-span inventory is not the evidence-backed set"
     );
@@ -4476,6 +4483,7 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsMetadata, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsChangeMode, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsOpen, EffectSeatSlot::Argument(0)),
         ],
@@ -4483,8 +4491,8 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     );
     assert_eq!(
         either_phase.len() + specialized_only.len(),
-        9,
-        "the byte-span seat population is nine; a change needs its own disposition"
+        11,
+        "the byte-span seat population is eleven; a change needs its own disposition"
     );
 }
 
@@ -4933,15 +4941,16 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
 /// rather than a stylistic choice.** With the match applied to a scrutinee
 /// lowering can resolve statically, the unselected arm is folded and its effect
 /// is never lowered at all -- instrumenting `lower_process_host_effect` on an
-/// earlier draft showed only the `BufferAllocate` calls and no `FsRename`
-/// whatever. Both rows then compiled for the same trivial reason and the
+/// earlier draft showed only the `BufferAllocate` calls and no
+/// `FsReadDirectory` whatever. Both rows then compiled for the same trivial
+/// reason and the
 /// control proved nothing. Routing the value through a closure parameter forces
 /// the runtime tag dispatch that lowers EVERY arm, which is the shape the real
 /// `FSOp` request handler has.
 #[cfg(test)]
 fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
-    const REQUEST: &str = "ctor:fixture::DeadArmRequest::Rename";
+    const REQUEST: &str = "ctor:fixture::DeadArmRequest::ReadDirectory";
     const SIBLING: &str = "ctor:fixture::DeadArmRequest::Other";
     const UNRELATED: &str = "ctor:fixture::DeadArmRequest::Unrelated";
     let exit_success = || RuntimeExpr::Construct {
@@ -4998,12 +5007,11 @@ fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
                     binders: 0,
                     body: RuntimeExpr::Effect {
                         family: "FS".to_string(),
-                        operation: ken_host::HostOpV1::FsRename,
+                        operation: ken_host::HostOpV1::FsReadDirectory,
                         capability: None,
-                        args: vec![
-                            RuntimeExpr::Value(RuntimeValue::Bytes(b"from".to_vec())),
-                            RuntimeExpr::Value(RuntimeValue::Bytes(b"to".to_vec())),
-                        ],
+                        args: vec![RuntimeExpr::Value(RuntimeValue::Bytes(
+                            b"directory".to_vec(),
+                        ))],
                     },
                 },
                 RuntimeMatchCase {

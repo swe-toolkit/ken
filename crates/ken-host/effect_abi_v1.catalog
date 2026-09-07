@@ -65,7 +65,7 @@ operation|FsReadDirectory|0305|unavailable|FsPathRequestV1|2|HostReplyV1|1
 operation|FsCreateDirectory|0306|unavailable|FsRecursivePathRequestV1|3|HostReplyV1|1
 operation|FsRemoveFile|0307|unavailable|FsPathRequestV1|2|HostReplyV1|1
 operation|FsRemoveDirectory|0308|unavailable|FsRecursivePathRequestV1|3|HostReplyV1|1
-operation|FsRename|0309|unavailable|FsRenameRequestV1|3|HostReplyV1|1
+operation|FsRename|0309|native|FsRenameRequestV1|3|HostReplyV1|1
 operation|FsChangeMode|030A|native|FsChangeModeRequestV1|3|HostReplyV1|1
 operation|FsOpen|030B|native|FsOpenRequestV1|3|HostReplyV1|1
 operation|FsHandleMetadata|030C|native|ResourceRequestV1|1|HostReplyV1|1

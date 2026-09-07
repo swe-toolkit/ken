@@ -133,6 +133,7 @@ canonical_runtime_roles! {
     file_kind_directory => "KDirectory",
     file_kind_symlink => "KSymlink",
     file_kind_other => "KOther",
+    file_operation_rename => "OpRename",
     // The thirteen IO errors, in the exact order the spine's vector carries them.
     // That order is the contract; the record's bytes depend on it.
     io_error_not_found => "NotFound",

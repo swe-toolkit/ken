@@ -202,7 +202,6 @@ struct FsRecursivePathRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsRenameRequestV1 {
     capability: u64,
     source: SliceV1,
@@ -553,6 +552,24 @@ impl HostEffectBackendV1 for ProcessHost {
                 crate::FileKind::Other => crate::FsNodeKindV1::Other,
             },
         })
+    }
+
+    fn fs_rename(
+        &mut self,
+        grant: &CapabilityGrantV1,
+        source: &[u8],
+        destination: &[u8],
+    ) -> Result<(), FileErrorCauseV1> {
+        let (source_parent, source_leaf) = Self::parent(grant, source)?;
+        let (destination_parent, destination_leaf) =
+            Self::parent(grant, destination)?;
+        crate::rename(
+            &source_parent,
+            &source_leaf,
+            &destination_parent,
+            &destination_leaf,
+        )
+        .map_err(host_error)
     }
 
     fn fs_change_mode(
@@ -1427,6 +1444,28 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 crate::ResourceInputsV1::None,
                 CanonicalRequestV1::FsMetadata {
                     path: path.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsRename
+            if request_size == std::mem::size_of::<FsRenameRequestV1>() =>
+        {
+            if !request.cast::<FsRenameRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<FsRenameRequestV1>()) };
+            let (Some(source), Some(destination)) = (
+                unsafe { borrowed_slice(&wire.source) },
+                unsafe { borrowed_slice(&wire.destination) },
+            ) else {
+                return -1;
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsRename {
+                    source: source.to_vec(),
+                    destination: destination.to_vec(),
                 },
             )
         }
@@ -2458,6 +2497,90 @@ mod tests {
 
         let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
         assert_eq!(context.effect_trace.len(), 2);
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: normative compatibility vector for the existing raw
+    /// boundary.
+    ///
+    /// MEASURED: raw id 0x0309 plus the manifested three-field request renames
+    /// one in-root file, returns Unit, and records the exact canonical request
+    /// and result event.
+    /// CLAIMED: FsRename reaches ProcessHost and the typed dispatcher without
+    /// changing its wire identity or request/reply shape.
+    /// THE GAP: this does not prove checked-source lowering or policy parity;
+    /// the real-artifact transition and refusal scenarios pin those.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fs_rename_raw_dispatch_performs_the_exact_state_transition() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-fs-rename-native-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("a.bin"), b"original").unwrap();
+        let initialized = context(&directory);
+        let source = b"a.bin";
+        let destination = b"b.bin";
+        let request = FsRenameRequestV1 {
+            capability: initialized.capability,
+            source: SliceV1 {
+                data: source.as_ptr(),
+                len: source.len(),
+            },
+            destination: SliceV1 {
+                data: destination.as_ptr(),
+                len: destination.len(),
+            },
+        };
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: usize::MAX,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::FsRename as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<FsRenameRequestV1>(),
+                std::ptr::from_mut(&mut reply).cast(),
+            )
+        };
+
+        assert_eq!(status, 0, "FsRename must not take the -3 fallback");
+        assert_eq!(reply.tag, REPLY_UNIT);
+        assert_eq!(reply.detail, 0);
+        assert_eq!(reply.bytes.len, 0);
+        assert!(!directory.join("a.bin").exists());
+        assert_eq!(
+            std::fs::read(directory.join("b.bin")).unwrap(),
+            b"original"
+        );
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        let [event] = context.effect_trace.as_slice() else {
+            panic!("one raw rename must record exactly one event")
+        };
+        assert_eq!(event.operation, HostOpV1::FsRename);
+        assert_eq!(
+            event.request,
+            CanonicalRequestV1::FsRename {
+                source: source.to_vec(),
+                destination: destination.to_vec(),
+            }
+        );
+        assert_eq!(
+            event.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        );
+
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         std::fs::remove_dir_all(directory).unwrap();
     }

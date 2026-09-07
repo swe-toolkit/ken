@@ -152,7 +152,7 @@ impl HostOpV1 {
             Self::FsCreateDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsRemoveFile => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsRemoveDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::FsRename => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsRename => HostOpAvailabilityV1::NativeTested,
             Self::FsChangeMode => HostOpAvailabilityV1::NativeTested,
             Self::FsOpen => HostOpAvailabilityV1::NativeTested,
             Self::FsHandleMetadata => HostOpAvailabilityV1::NativeTested,
@@ -217,7 +217,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 17] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 18] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -227,6 +227,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 17] = [
     HostOpV1::FsWriteFile,
     HostOpV1::FsAppendFile,
     HostOpV1::FsMetadata,
+    HostOpV1::FsRename,
     HostOpV1::FsChangeMode,
     HostOpV1::FsOpen,
     HostOpV1::FsHandleMetadata,
@@ -411,6 +412,17 @@ pub fn host_effect_wire_layout_v1(
                 bytes[1],
             ]
         }
+        HostOpV1::FsRename => {
+            let source = slice("source")?;
+            let destination = slice("destination")?;
+            vec![
+                checked_u32(field("capability")?)?,
+                source[0],
+                source[1],
+                destination[0],
+                destination[1],
+            ]
+        }
         HostOpV1::FsChangeMode => {
             let path = slice("path")?;
             vec![
@@ -465,8 +477,8 @@ pub fn host_effect_wire_layout_v1(
         // omit. Naming the operations that legitimately carry no wire layout
         // turns a new operation from a runtime refusal into `error[E0004]`.
         //
-        // These eight are exactly the `RepresentedUnavailable` set, and the
-        // seventeen matched above are exactly the `NativeTested` set. That
+        // These seven are exactly the `RepresentedUnavailable` set, and the
+        // eighteen matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
         HostOpV1::ClockMonotonicNow
@@ -475,7 +487,6 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsCreateDirectory
         | HostOpV1::FsRemoveFile
         | HostOpV1::FsRemoveDirectory
-        | HostOpV1::FsRename
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation))
         }
@@ -4006,11 +4017,11 @@ mod tests {
         assert_eq!(HostOpV1::try_from(0), Err(UnknownHostOpV1(0)));
     }
 
-    /// Promise class: transition sentinel. The accepted ABI-A2 partials move
-    /// only FsAppendFile and FsMetadata, so the exact deferred tail is eight:
-    /// rename, the A3 directory operations, Clock siblings, and Entropy.
+    /// Promise class: transition sentinel. ABI-A2 moves only FsAppendFile,
+    /// FsMetadata, and FsRename, so the exact deferred tail is seven: the A3
+    /// directory operations, Clock siblings, and Entropy.
     #[test]
-    fn abi_a2_fs_append_and_metadata_partials_leave_the_exact_deferred_tail() {
+    fn abi_a2_partials_leave_the_exact_deferred_tail() {
         assert_eq!(
             HostOpV1::ALL
                 .into_iter()
@@ -4026,11 +4037,10 @@ mod tests {
                 HostOpV1::FsCreateDirectory,
                 HostOpV1::FsRemoveFile,
                 HostOpV1::FsRemoveDirectory,
-                HostOpV1::FsRename,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "the FsAppendFile/FsMetadata partials must not promote another \
-             deferred lane"
+            "the FsAppendFile/FsMetadata/FsRename partials must not promote \
+             another deferred lane"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,
@@ -4133,7 +4143,7 @@ mod tests {
         );
         for needle in [
             "ConsoleWrite|0102|native|ConsoleWriteRequestV1|2|HostReplyV1|1",
-            "FsRename|0309|unavailable|FsRenameRequestV1|3|HostReplyV1|1",
+            "FsRename|0309|native|FsRenameRequestV1|3|HostReplyV1|1",
             "FsChangeMode|030a|native|FsChangeModeRequestV1|3|HostReplyV1|1",
             "FsOpen|030b|native|FsOpenRequestV1|3|HostReplyV1|1",
             "FsHandleMetadata|030c|native|ResourceRequestV1|1|HostReplyV1|1",

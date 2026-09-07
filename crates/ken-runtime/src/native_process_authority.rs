@@ -628,6 +628,7 @@ fn native_process_symbols_from_record(
         file_kind_directory: spine.file_kind_directory.clone(),
         file_kind_symlink: spine.file_kind_symlink.clone(),
         file_kind_other: spine.file_kind_other.clone(),
+        file_operation_rename: spine.file_operation_rename.clone(),
     }
 }
 

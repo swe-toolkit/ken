@@ -72,6 +72,7 @@ pub struct NativeProcessSymbols {
     pub file_kind_directory: RuntimeSymbol,
     pub file_kind_symlink: RuntimeSymbol,
     pub file_kind_other: RuntimeSymbol,
+    pub file_operation_rename: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -147,6 +148,8 @@ impl NativeProcessSymbols {
             file_kind_directory: "ctor:prelude::FileKind::KDirectory".to_string(),
             file_kind_symlink: "ctor:prelude::FileKind::KSymlink".to_string(),
             file_kind_other: "ctor:prelude::FileKind::KOther".to_string(),
+            file_operation_rename:
+                "ctor:prelude::FileOperation::OpRename".to_string(),
         }
     }
 }
