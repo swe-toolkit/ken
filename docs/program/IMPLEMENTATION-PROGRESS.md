@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-07 02:45:24Z — from 562 issue file(s) in `docs/program/issues/`.
+2026-09-07 03:12:40Z — from 563 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -42,6 +42,7 @@ the committed file matches the generator's output.
 | `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | merged | runtime | L | none | — |
 | `ABI-A2` | promote FsAppendFile, FsMetadata, FsRename to NativeTested | merged | runtime | L | none | — |
 | `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | active | runtime | M | none | — |
+| `ABI-FSCREATE-RECURSIVE-CONTRACT` | FsCreateDirectory's `recursive` flag is structurally inert -- resolve the behavioral contract: give it `mkdir -p` meaning, or retire the dead field | draft | spec | S | none | — |
 | `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | merged | runtime | L | none | — |
 | `ABI-M2` | runtime facility/operation probes, distinct from build-time facts | draft | runtime | M | none | — |
 | `ABI-R1` | correct stale filesystem capability prose — scoped roots, rights, symlink policy and no-follow resolution have landed | closed | foundation | S | none | — |

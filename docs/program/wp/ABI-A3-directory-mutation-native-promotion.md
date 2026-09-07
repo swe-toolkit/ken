@@ -129,12 +129,21 @@ one side.
   — entries sorted by name, each `{name, kind}` compared — native vs interpreter.
   Order is not part of the contract (see §1.1 and the ABI-S2 banner). Requires the
   read right; a read outside the root or across a no-follow symlink is refused.
-- **`FsCreateDirectory`** (state transition + `recursive`). In-root create yields
-  the directory present afterward. The `recursive` flag governs missing parents:
-  `recursive=false` on a missing parent is refused with the op's
-  parent-missing classification; `recursive=true` creates the chain. Create where
-  the target already exists is the exists-classification, asserted identically on
-  both sides. Requires the write right.
+- **`FsCreateDirectory`** (state transition). In-root create yields the directory
+  present afterward. **The `recursive` flag is STRUCTURALLY INERT and A3 promotes
+  it as-is** (D0 finding, Architect §6 ruling `evt_3hfxk94v9f9n7`): the landed
+  `lib.rs::create_directory(parent, leaf)` is a single `mkdirat` with no recursive
+  parameter, so the `recursive:u64` field of `FsRecursivePathRequestV1`
+  (`abi_v1.rs:200`) has no branch to reach — `recursive=true` and `=false` are
+  identical (single leaf; `NotFound` on a missing parent; `AlreadyExists` on an
+  existing target), and the interpreter matches. **Assert both-`NotFound` on a
+  missing parent with the target absent before/after; do NOT assert parent-chain
+  creation.** Create where the target already exists is the exists-classification,
+  asserted identically on both sides. Requires the write right. A3 is a promotion
+  — it does not give the flag meaning. **Giving the flag `mkdir -p` semantics OR
+  retiring the dead field is a separate Spec-owned behavioral-contract question,
+  registered as [[ABI-FSCREATE-RECURSIVE-CONTRACT]], and is explicitly NOT A3's
+  scope.**
 - **`FsRemoveFile`** (state transition). In-root remove yields the file absent
   afterward; remove of a directory is refused with the wrong-kind classification;
   remove of a missing path is the not-found classification. Requires the write
@@ -142,11 +151,20 @@ one side.
 - **`FsRemoveDirectory`** (state transition + partial-failure, the sharpest arm).
   `recursive=false` on a **non-empty** directory is refused with the not-empty
   classification (the directory is unchanged); on an empty directory it is
-  removed. `recursive=true` removes the tree. State the observable contract for a
-  recursive removal that fails partway (what is guaranteed about the tree after a
-  mid-traversal error) — if the landed `remove_directory_tree` primitive does not
-  make this observable/deterministic enough for a differential, that is a D0
-  finding (§6), not a fabricated guarantee.
+  removed. `recursive=true` removes the tree. **RULED non-transactional** (D0
+  finding, Architect §6 ruling `evt_3hfxk94v9f9n7`): `remove_directory_tree`
+  delegates directly to `std::fs::remove_dir_all` (`lib.rs:461-467`), which is
+  non-atomic with no rollback and **no residual guarantee on a mid-traversal
+  error**. The comparator's carve-out is therefore **keyed on the error CLASS,
+  and classification equality is asserted on EVERY path**:
+  - **Deterministic classes** — `recursive=true` success → empty root;
+    `recursive=false` non-empty → `NotEmpty` with the tree intact: assert exact
+    twin-root state AND classification.
+  - **Mid-traversal-error class** — `PermissionDenied` and any IO error arising
+    DURING removal: assert classification ONLY; the residual tree is unconstrained
+    and native/interpreter may legitimately diverge there. Do NOT assert an exact
+    residual and do NOT invent an allowed-residual invariant — that would test a
+    `remove_dir_all` non-contract (reflect-don't-extend).
 
 ## 4. Deliverables
 
@@ -158,7 +176,11 @@ one side.
   parent missing, non-empty rmdir, wrong-kind remove) and the recursive-removal
   partial-failure guarantee — grounded in the `lib.rs` primitives, not invented.
   If a needed classification or observability is genuinely missing, that is a
-  hard-stop finding (§6).
+  hard-stop finding (§6). **DISCHARGED** (runtime-implementer
+  `evt_4k04typ5a45mg`): D0 measured cleanly and fired two §6 hard-stops — the
+  inert `recursive`-create flag and the non-deterministic recursive-removal
+  residual. Both are RULED (Steward scope + Architect §6 contract,
+  `evt_3hfxk94v9f9n7`) and folded into §3 above; D-NATIVE is the live deliverable.
 - **`D-NATIVE` — native execution for the four ops.** Add the four ProcessHost
   backend methods and the four `ken_host_dispatch_v1` decode/execute arms for
   `0x0305`–`0x0308`, on the reused resolution substrate (§3), removing their
@@ -205,11 +227,25 @@ one side.
   Control: a named test per op runs native and interpreter, applies the op's
   comparator (canonicalized-listing / state-transition+classification), and
   asserts agreement on the compared projection, not "it runs".
-- **`AC-2` — partial-failure edges are non-vacuous.** Control: each mutation's
-  differential drives its edge — create-target-exists, create-parent-missing
-  (recursive vs not), remove-wrong-kind, non-empty rmdir (recursive vs not) — and
-  native and interpreter agree on the classification AND the before/after state.
-  A differential that only exercises the success path fails this AC.
+- **`AC-2` — partial-failure edges are non-vacuous, asserted AS THE BASE
+  BEHAVES** (amended per the §6 ruling `evt_3hfxk94v9f9n7`). Control: each
+  mutation's differential drives its edge and native/interpreter agree, with the
+  classification asserted on every path:
+  - **create-target-exists** → `AlreadyExists`, both sides, target present
+    before/after.
+  - **create-parent-missing, recursive=true AND recursive=false** → both
+    `NotFound`, both sides, target absent before/after. **The two arms are
+    identical (the flag is inert); do NOT assert parent-chain creation** — that
+    is not A3's contract (§3, [[ABI-FSCREATE-RECURSIVE-CONTRACT]]).
+  - **remove-wrong-kind** (remove-file on a directory) → the wrong-kind
+    classification, both sides, node present before/after.
+  - **non-empty rmdir, recursive=false** → `NotEmpty` with the tree intact
+    (deterministic): assert classification AND exact before/after state.
+  - **recursive rmdir mid-traversal error** → classification ONLY; the residual
+    is unconstrained (§3 removal carve-out). Classification equality still holds.
+
+  A differential that only exercises the success path fails this AC; so does one
+  that asserts an exact residual on the mid-traversal-error class.
 - **`AC-3` — the path policy is exercised (reused from ABI-A2).** Control: for
   each op the in-root success AND at least the escape, symlink-no-follow, and
   missing-right refusals run on both native and interpreter and agree; neutering
