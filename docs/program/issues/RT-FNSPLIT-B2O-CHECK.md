@@ -1,7 +1,7 @@
 ---
 id: RT-FNSPLIT-B2O-CHECK
 title: "the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,16 @@ github: null
 origin: Findings on landed B2O (origin/main e470ab65). (a) Steward's own AC-12 tally recorded one GREEN row as a reported follow-up rather than fixing it inside a subtraction WP. (b) Adversary report evt_kzc8ntfsyhn9 (thr_2seh2bm1kr5mh), P1/P2/P3. SCOPE GREW 2026-07-25 on the B2R hunt (adversary evt_3wjme1fk20dw5) plus Architect ruling evt_7ggqdk61pxzzf, which routed the C4 imported-edge repair HERE and explicitly forbade B2F from patching it; two further findings (P1 the C4 exclusion, P2 the entailed second direction in AbiPlane::validate) joined, and the size moved S -> M because P1 is a design task rather than a mechanical closure. Grounding status, stated precisely: the Steward independently re-measured Finding A's filter, Finding B1's shadowing (both call sites and both error strings), Finding B3's vacuous conjunct, and derived P2 independently against 6c6de5cc. Findings B2 (the six witness-less arms) and C (the zero-instance capture class) are the Adversary's measurements, relayed unverified; for P1 the Steward verified the code shape but NOT the fixture measurements. The ring re-measures everything and must not treat this file as anyone's corroboration. Steward-filed; Steward owns the frame and the AC/control placement.
 ---
 
+> ## RELEASED 2026-09-07 (Steward) to the runtime ring (lane-1 compiler program).
+> Runtime-leader named it the next deliverable (evt_w3hqa3722j7m); released +
+> anchored at kick evt_6z1eb5edjnvqg under the operator's standing compiler-program
+> mandate (the ring runs continuously, no per-slice gating). Deps RT-FNSPLIT-B2O +
+> RT-FNSPLIT-B2F both merged. MANDATORY START: the frame's counts/anchors/
+> populations predate B2F and are STALE — begin with a full post-main D0
+> remeasurement against current origin/main; any frame/code disagreement is a HARD
+> STOP to the Steward, never a silent reconciliation. Reviewers: Architect
+> (required, owns the C4 imported-edge routing evt_7ggqdk61pxzzf) + Runtime QA.
+>
 > ## ▶ THE FRAME IS WRITTEN — read it, not this file
 >
 > `docs/program/wp/RT-FNSPLIT-B2O-CHECK-advertised-vs-enforced.md`
