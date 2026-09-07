@@ -5637,6 +5637,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             )?);
             continue;
         }
+        let constructor_scope_depth = cx.ctx.len();
         for j in 0..n {
             let raw_ty = subst_levels(
                 &subst_outer(&ctor.args[j], m, &params_terms, j),
@@ -5645,99 +5646,112 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             );
             cx.ctx.push(raw_ty);
         }
-        let constructor_frame = build_dependent_constructor_frame(
-            cx,
-            &ind,
-            ctor,
-            &params_terms,
-            &family_level_args,
-            &scrut_indices,
-            &scrut_ty,
-            &scrut_core,
-            expected,
-            &motive,
-            n,
-            sentinel_region,
-            context_convoy,
-            embedded_method_convoy,
-            embedded_method_repairs,
-            hidden_group_result_refinement,
-            equation_convoy,
-            recursive_field_index_path,
-            span,
-        )?;
-        let concrete = constructor_frame.concrete.as_ref();
-        let target_indices = constructor_frame.target_indices.as_slice();
-        let premise_domains = constructor_frame.premise_domains.as_slice();
-        let expected_here = &constructor_frame.expected_here;
-        let convoy_refinements = constructor_frame.convoy_refinements.as_slice();
-        let hidden_result_premise_slot = constructor_frame.hidden_result_premise_slot;
-        let method = if let Some(arm) = arm {
-            if equation_convoy && matches!(&arm.body, RExpr::RCon(name, _) if name == SUGAR_REFL) {
-                Term::Const {
-                    id: cx.env.tt_id(),
-                    level_args: Vec::new(),
-                }
-            } else if equation_convoy && expression_mentions_recursive_group(cx, &arm.body) {
-                build_large_convoy_recursive_method(
-                    cx,
-                    arm,
-                    &ind,
-                    &params_terms,
-                    &target_indices,
-                    &scrut_indices,
-                    n,
-                    &expected_here,
-                    sentinel_region,
-                    &premise_domains,
-                )?
-            } else if equation.is_some() {
-                let eq_dom = Term::Eq(
-                    Box::new(weaken(&scrut_ty, n as i64)),
-                    Box::new(weaken(&scrut_core, n as i64)),
-                    Box::new(concrete.clone()),
-                );
-                cx.ctx.push(eq_dom.clone());
-                let body = check(cx, &arm.body, &weaken(&expected_here, 1), &arm.span)?;
-                cx.ctx.pop();
-                Term::lam(eq_dom, body)
-            } else {
-                check_dependent_branch_body(
-                    cx,
-                    arm,
-                    &ind,
-                    &params_terms,
-                    &family_level_args,
-                    &target_indices,
-                    &scrut_indices,
-                    n,
-                    &expected_here,
-                    &premise_domains,
-                    hidden_result_premise_slot,
-                    &scrut_ty,
-                    &concrete,
-                    &scrut_core,
-                    sentinel_region,
-                    &convoy_refinements,
-                    equation_convoy,
-                    recursive_field_index_path,
-                )?
-            }
-        } else {
-            let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
-            let missing = missing_pattern_witness(cx, ctor.id);
-            synthesize_omitted_index_method(
+        // Constructor fields form one scoped frame. Capture every fallible
+        // method-building path so the frame is restored before propagating it.
+        let method_outcome = (|| -> Result<Term, ElabError> {
+            let constructor_frame = build_dependent_constructor_frame(
                 cx,
-                &premise_domains,
-                &expected_here,
+                &ind,
+                ctor,
+                &params_terms,
+                &family_level_args,
+                &scrut_indices,
+                &scrut_ty,
+                &scrut_core,
+                expected,
+                &motive,
+                n,
                 sentinel_region,
-                missing,
+                context_convoy,
+                embedded_method_convoy,
+                embedded_method_repairs,
+                hidden_group_result_refinement,
+                equation_convoy,
+                recursive_field_index_path,
                 span,
-            )?
-        };
+            )?;
+            let concrete = constructor_frame.concrete.as_ref();
+            let target_indices = constructor_frame.target_indices.as_slice();
+            let premise_domains = constructor_frame.premise_domains.as_slice();
+            let expected_here = &constructor_frame.expected_here;
+            let convoy_refinements = constructor_frame.convoy_refinements.as_slice();
+            let hidden_result_premise_slot = constructor_frame.hidden_result_premise_slot;
+            let method = if let Some(arm) = arm {
+                if equation_convoy
+                    && matches!(&arm.body, RExpr::RCon(name, _) if name == SUGAR_REFL)
+                {
+                    Term::Const {
+                        id: cx.env.tt_id(),
+                        level_args: Vec::new(),
+                    }
+                } else if equation_convoy && expression_mentions_recursive_group(cx, &arm.body) {
+                    build_large_convoy_recursive_method(
+                        cx,
+                        arm,
+                        &ind,
+                        &params_terms,
+                        &target_indices,
+                        &scrut_indices,
+                        n,
+                        &expected_here,
+                        sentinel_region,
+                        &premise_domains,
+                    )?
+                } else if equation.is_some() {
+                    let eq_dom = Term::Eq(
+                        Box::new(weaken(&scrut_ty, n as i64)),
+                        Box::new(weaken(&scrut_core, n as i64)),
+                        Box::new(concrete.clone()),
+                    );
+                    cx.ctx.push(eq_dom.clone());
+                    let body_outcome = check(cx, &arm.body, &weaken(&expected_here, 1), &arm.span);
+                    cx.ctx.pop();
+                    Term::lam(eq_dom, body_outcome?)
+                } else {
+                    check_dependent_branch_body(
+                        cx,
+                        arm,
+                        &ind,
+                        &params_terms,
+                        &family_level_args,
+                        &target_indices,
+                        &scrut_indices,
+                        n,
+                        &expected_here,
+                        &premise_domains,
+                        hidden_result_premise_slot,
+                        &scrut_ty,
+                        concrete,
+                        &scrut_core,
+                        sentinel_region,
+                        &convoy_refinements,
+                        equation_convoy,
+                        recursive_field_index_path,
+                    )?
+                }
+            } else {
+                let expected_here = simplify_branch_goal(cx.env, &cx.ctx, expected_here);
+                let missing = missing_pattern_witness(cx, ctor.id);
+                synthesize_omitted_index_method(
+                    cx,
+                    &premise_domains,
+                    &expected_here,
+                    sentinel_region,
+                    missing,
+                    span,
+                )?
+            };
+            Ok(method)
+        })();
         for _ in 0..n {
             cx.ctx.pop();
         }
+        debug_assert_eq!(
+            cx.ctx.len(),
+            constructor_scope_depth,
+            "dependent constructor field context must unwind on both success and error",
+        );
+        let method = method_outcome?;
 
         methods[k] = Some(finish_dependent_constructor_method(
             cx,
