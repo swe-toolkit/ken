@@ -308,12 +308,18 @@ population — the AMENDMENT banner at the top carries the full ruling.**
   not only closure-shaped ones. Do not restore the original over-strong form
   (*"any occurrence anywhere"*) — a property test already rejected it and it
   re-breaks intra-module values that must stay accepted.
-- **D5(b) — carved out and GATED; NOT built in this node yet.** The captured-Var
-  route (a Var capturing an enclosing binding that holds an imported value) needs
-  a new cross-frame Var->binding-source authority; its direction (reject vs
-  accept-and-link) is gated on the B2F representability precondition named in the
-  banner, then a Steward sizing call. Do not build it, and do not let a green
-  synthetic Hole A stand in for its real-program witness.
+- **D5(b) — DISCHARGED (landed close, 2026-09-07).** The captured-Var route (a
+  Var capturing an enclosing binding that holds an imported value) was gated on
+  the B2F representability precondition then a Steward sizing call. The
+  precondition was measured (runtime-implementer `evt_72pqq2k98hp2z`): a
+  checked-Ken `(0..depth)`-Var capture of an imported value reaches the boundary
+  carrier and is REPRESENTABLE/BENIGN (all `ValueWord`), so C4 correctly ACCEPTS
+  it — the `accept-and-link, no new authority` branch. Steward sizing
+  disposition (`evt_1fjks4135qpy0`): no resize, no successor node, no new
+  cross-frame Var->binding-source authority. AC-3 satisfied by measurement (real
+  capture route exercised, benign; synthetic Hole A stayed a regression control).
+  The native `ImportedDeclarationRef requires dependency linking` refusal is out
+  of scope (distinct native-linking capability gap, separate phase).
 
 **D6 — correct `AbiPlane::validate` (Finding P2).** Remove the dead arm and state
 what the remaining check actually enforces. ⛔ **Preserve the positional-identity

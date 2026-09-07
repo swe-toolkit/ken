@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-07 16:48:39Z — from 564 issue file(s) in `docs/program/issues/`.
+2026-09-07 17:25:36Z — from 564 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -421,7 +421,7 @@ the committed file matches the generator's output.
 | `RT-FNSPLIT-B2B` | RT-NATIVE-FNSPLIT Boundary B2b — full emission census, finite differences, and the explicit growth verdict | closed | runtime | M | none | — |
 | `RT-FNSPLIT-B2E` | semantic boundary-value elimination — an opaque boundary inhabitant plus a mechanically closed operation-by-class disposition ledger over every reachable Lowered consumer, inert | closed | runtime | L | none | — |
 | `RT-FNSPLIT-B2F` | functionization and authority switch — per-static-origin Cranelift target functions, atomic with switch-over, equivalence evidence, and old-path removal | merged | runtime | L | none | 1192 |
-| `RT-FNSPLIT-B2O-CHECK` | the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms | active | runtime | M | none | — |
+| `RT-FNSPLIT-B2O-CHECK` | the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/3413 |
 | `RT-FNSPLIT-B2O` | static body ownership — a total, validated occurrence → PredeclaredFunction mapping in the semantic plane, inert | merged | runtime | M | none | 963 |
 | `RT-FNSPLIT-B2R` | representation and call-ABI contract — a stable executable contract for every value that crosses a generated-function boundary, inert | merged | runtime | L | none | 967 |
 | `RT-FNSPLIT-B2V` | executable boundary-value ABI — one closed 64-bit tagged word for ValueWord/ResultWord plus the emitted-code interface to construct, discriminate and project it | merged | runtime | L | none | — |

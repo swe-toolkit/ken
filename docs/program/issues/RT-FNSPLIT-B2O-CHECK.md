@@ -1,16 +1,34 @@
 ---
 id: RT-FNSPLIT-B2O-CHECK
 title: "the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-FNSPLIT-B2O, RT-FNSPLIT-B2F]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/3413
 origin: Findings on landed B2O (origin/main e470ab65). (a) Steward's own AC-12 tally recorded one GREEN row as a reported follow-up rather than fixing it inside a subtraction WP. (b) Adversary report evt_kzc8ntfsyhn9 (thr_2seh2bm1kr5mh), P1/P2/P3. SCOPE GREW 2026-07-25 on the B2R hunt (adversary evt_3wjme1fk20dw5) plus Architect ruling evt_7ggqdk61pxzzf, which routed the C4 imported-edge repair HERE and explicitly forbade B2F from patching it; two further findings (P1 the C4 exclusion, P2 the entailed second direction in AbiPlane::validate) joined, and the size moved S -> M because P1 is a design task rather than a mechanical closure. Grounding status, stated precisely: the Steward independently re-measured Finding A's filter, Finding B1's shadowing (both call sites and both error strings), Finding B3's vacuous conjunct, and derived P2 independently against 6c6de5cc. Findings B2 (the six witness-less arms) and C (the zero-instance capture class) are the Adversary's measurements, relayed unverified; for P1 the Steward verified the code shape but NOT the fixture measurements. The ring re-measures everything and must not treat this file as anyone's corroboration. Steward-filed; Steward owns the frame and the AC/control placement.
 ---
 
+> ## CLOSED 2026-09-07 (Steward) — LANDED `eb0704360` (PR #3413), CI-green, blob-verified 9/9.
+>
+> The complete deliverable = A + B + C + P2 + D5(a), plus **D5(b) DISCHARGED**.
+> D5(b) (the captured-Var route) was carved out and gated on a B2F
+> representability precondition then a Steward sizing call. The precondition was
+> measured (runtime-implementer `evt_72pqq2k98hp2z`): a checked-Ken
+> `(0..depth)`-Var capture of an imported value reaches the boundary carrier and
+> is REPRESENTABLE/BENIGN (all `ValueWord`), so C4 correctly ACCEPTS it — the
+> frame's `representable/benign => accept-and-link, no new authority` branch.
+> Steward sizing disposition (`evt_1fjks4135qpy0`): **no resize, no successor
+> node, no new cross-frame Var->binding-source authority**. AC-3 is satisfied by
+> measurement — the real capture route is exercised and benign; synthetic Hole A
+> remained a regression control only. The later native
+> `ImportedDeclarationRef requires dependency linking` refusal is OUT OF SCOPE
+> (a distinct native-linking capability gap, separate phase; not lane-blocking).
+> So there is no D5(b) follow-on: this node closes the whole B2O-CHECK finding
+> set.
+>
 > ## AMENDED 2026-09-07 (Steward) — D0 remeasured, populations corrected, P1 RULED. Read the amended `wp/` frame for the operative deliverables.
 >
 > The runtime ring's mandated D0 remeasurement (base `44c2ca9a`; implementer
