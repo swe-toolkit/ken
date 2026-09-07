@@ -11,6 +11,43 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
+> # RE-RELEASED 2026-09-07 (Steward) — the scheduled slot has arrived.
+> #
+> # The 2026-09-06 scheduling note below required an explicit Steward re-release
+> # when the language queue drained to this tail item. It has drained: the
+> # match-pattern slices and the 2026-09-04 language sequence completed through
+> # the user-operator trilogy ([[LANG-SYMBOLIC-OPERATOR-NAMES]] +
+> # [[LANG-INFIX-APPLICATION-DEFAULT]] + [[LANG-FIXITY-DECL-SURFACE]], all
+> # merged), and the sole `depends_on` [[LANG-CONVOY-MATCH-FIELD-PROVENANCE]] is
+> # merged. **This banner IS the release** (the scheduling note is not). Released
+> # to the language ring on `origin/main 2e516e452`.
+> #
+> # THE `D1`-FIRST-ALONE GATE STANDS, AND IT IS A RE-RUN AGAINST CURRENT MAIN.
+> # `D1`'s three-way attribution merged at `fe7be8386` (2026-08-15) reading
+> # **invariant** — the "returns to the Architect" second row did NOT fire. But
+> # that run predates the predecessor's full merge; the scheduling note
+> # (authored AFTER [[LANG-CONVOY-MATCH-FIELD-PROVENANCE]] merged) asks for `D1`
+> # first and alone as the regression check against the CURRENT merged predicate.
+> # So: **re-run `D1` first and alone at your candidate base**, carrying the prior
+> # invariant as the expected result. If it still reads invariant across the three
+> # bases, `D2` proceeds; if it now fires the second row, STOP and return to the
+> # Architect (`AC-3`) — do not repair a merged node's regression on the ring's
+> # authority.
+> #
+> # LIVE STARTING DELIVERABLES, in order: (1) `D1` re-run (three-way attribution)
+> # PLUS its reconciliation second half — reconcile your repro against the
+> # Adversary's interleaved-`let` variant and settle whether this node is ONE
+> # failure or TWO (the half added after the original release, never delivered);
+> # (2) the `D4` discriminating fixture (guards' rejection CLASSES differ); THEN
+> # (3) `D2`'s semantic diagnosis, conditional on `D1` = invariant, `AC-2` gate
+> # (no repair before the diagnosis is stated). Re-derive all coordinates at your
+> # base per "Fixed inputs" — the predecessor moved `elab.rs`; the line numbers
+> # in this node are from its review, not your tree.
+> #
+> # Merges via the standard path: Architect (required — the "orthogonal" refusal
+> # and the reachability/`RVar` question are his) + language-QA + Adversary ->
+> # Steward M1-M4 -> lieutenant. Size S, T1 (semantic elaborator repair).
+>
 > # SCHEDULED 2026-09-06 (operator) — resume at the END of the language queue.
 > #
 > # Operator directive, 2026-09-06: schedule this node for the language ring at
