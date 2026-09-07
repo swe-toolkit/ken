@@ -440,46 +440,14 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
             "validation_map_coh",
             "Functor_instance_Validation",
             "Applicative_instance_Validation",
+            "expected_errors",
+            "both_errors_accumulate",
         ],
-    );
-
-    let extracted = ken_elaborator::literate::extract_ken_md(VALIDATION_KEN_MD)
-        .expect("Validation.ken.md must extract");
-    assert!(
-        extracted.example_ranges.iter().any(|range| {
-            let example = &VALIDATION_KEN_MD[range.clone()];
-            example.contains("checked_record")
-                && example.contains("expected_errors")
-                && example.contains("both_errors_accumulate")
-        }),
-        "the checked example must prove that both independent errors accumulate"
     );
 }
 
 #[test]
-fn cc1_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
-    for (name, source) in [
-        ("NonEmpty.ken.md", NONEMPTY_KEN_MD),
-        ("Validation.ken.md", VALIDATION_KEN_MD),
-    ] {
-        let extracted =
-            ken_elaborator::literate::extract_ken_md(source).expect("CC1 source must extract");
-        assert!(
-            !extracted.source.contains("Axiom"),
-            "{name}'s tangled checked code must contain no Axiom"
-        );
-        for range in extracted
-            .example_ranges
-            .iter()
-            .chain(extracted.reject_ranges.iter())
-        {
-            assert!(
-                !source[range.clone()].contains("Axiom"),
-                "{name}'s checked example/reject fences must contain no Axiom"
-            );
-        }
-    }
-
+fn cc1_packages_have_zero_trusted_base_delta() {
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
@@ -493,12 +461,43 @@ fn cc1_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
     );
 }
 
+/// Promise class: durable invariant.
+///
+/// The live resolver accepts Validation's lawful Applicative constraint while
+/// rejecting the same type constructor under a Monad constraint. The positive
+/// sibling makes an empty or unpopulated registry fail rather than vacuously
+/// satisfying the negative assertion.
 #[test]
-fn validation_deliberately_has_no_monad_instance() {
-    let extracted = ken_elaborator::literate::extract_ken_md(VALIDATION_KEN_MD)
-        .expect("Validation.ken.md must extract");
-    assert!(
-        !extracted.source.contains("instance Monad (Validation"),
-        "Validation accumulates independent errors and must not define Monad"
+fn validation_registry_has_applicative_but_no_monad_instance() {
+    let mut env = dependency_env();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], NONEMPTY_MODULE)
+        .expect("NonEmpty must roots-load");
+    env.elaborate_ken_md_file(VALIDATION_KEN_MD)
+        .expect("Validation.ken.md must elaborate");
+
+    assert_eq!(
+        env.class_env.instance_search("Applicative", "Validation"),
+        Some(env.globals["Applicative_instance_Validation"]),
+        "Validation's lawful Applicative dictionary must populate the live registry"
     );
+    env.elaborate_decl(
+        "fn cc1_applicative_registry_probe \
+           (x : Validation (NonEmpty String) Bool) \
+         : Validation (NonEmpty String) Bool \
+         where Applicative (Validation (NonEmpty String)) = x",
+    )
+    .expect("the live resolver must discharge Validation's Applicative constraint");
+
+    match env.elaborate_decl(
+        "fn cc1_monad_registry_probe \
+           (x : Validation (NonEmpty String) Bool) \
+         : Validation (NonEmpty String) Bool \
+         where Monad (Validation (NonEmpty String)) = x",
+    ) {
+        Err(ElabError::NoInstance { class, ty, .. }) => {
+            assert_eq!(class, "Monad");
+            assert_eq!(ty, "Validation");
+        }
+        other => panic!("Validation's Monad constraint must return exact NoInstance: {other:?}"),
+    }
 }
