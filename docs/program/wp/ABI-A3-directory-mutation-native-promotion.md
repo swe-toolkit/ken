@@ -279,10 +279,42 @@ the landed policy is a finding, not a blocker to route around.
 ## 7. Contention check
 
 Touches `crates/ken-host/` (`effect_v1.rs`, `abi_v1.rs`, `effect_abi_v1.catalog`,
-`lib.rs`) and `crates/ken-runtime/` test/harness surfaces. **Disjoint from the
-language lane** (ken-elaborator) and **the foundation lane** (catalog/) — no
-file-level contention with LANG-FIXITY-DECL-SURFACE or the Tier-C migration. The
-one shared-slot risk is the build/test slot under `scripts/ken-cargo` (the
+`lib.rs`) and `crates/ken-runtime/` test/harness surfaces.
+
+**Authorized `ken-elaborator` spillover (Steward amendment, 2026-09-07).** The
+original disjointness claim below was a mis-estimate: the complete native
+promotion needs canonical constructor identities for the five new
+directory-mutation ops (`OpReadDirectory`, `OpCreateDirectory`, `OpRemoveFile`,
+`OpRemoveDirectory`, `MkDirEntry`) carried through the **landed checked
+positional-role record** — reusing a neighbouring role or resolving by spelling
+would violate that already-blessed exact-identity mechanism (a soundness ground,
+not a convenience). These five identities are A3's own ops; their role
+registration is the additive carrier that makes them exist at native codegen, so
+it is A3-scope under a single owner (Runtime), not a separable language WP —
+splitting it out would be ownership inversion. The following four Runtime-owned
+`ken-elaborator` paths are in scope, additive only, with **no parser/elaboration
+behaviour change**:
+
+- `src/prelude.rs` — append the five canonical captured roles.
+- `src/erasure.rs` — append the fields and their decoder fixtures.
+- `src/compiler_driver.rs` — project/encode/census them.
+- `tests/rt_dasm_d1b_role_a_role_authority.rs` — extend the shadow/roster control.
+
+**File-disjoint from the live language lane** (`LANG-INTERVENING-LET-FRAME-
+WEAKENING` touches `elab.rs` + `ds5b_dependent_match_refinement_acceptance.rs` —
+no overlap with the four paths above, and the FS-op role record is semantically
+unrelated to match-refinement) and **from the foundation lane** (catalog/). No
+file-level contention with either active candidate.
+
+**Pre-handoff census (surface add).** Because this appends fields/roles to a
+shared record, the pre-git_request gate MUST run the full-crate test COMPILE
+census — `cargo test -p ken-elaborator --no-run` AND `-p ken-runtime --no-run`,
+each with NO `--test` filter (single-crate, compile-only, within the
+targeted-only rule) — to catch any exhaustive consumer of the new surface that a
+filtered `--test` run never compiles. This is the AC-6b add-surface axis; it is
+separate from any stack-budget check.
+
+The one shared-slot risk is the build/test slot under `scripts/ken-cargo` (the
 laptop's single lock); runtime validations are short. No enclave route (the path
 policy and native substrate are landed).
 
