@@ -269,6 +269,25 @@ acceptance tests OUTSIDE the declared diff scope. Running only the focused
 fixity tests is the too-narrow QA scope that let the first candidate reach
 publish (`evt_7rfr3n4867xjr`).
 
+**AC-6b — the FULL-CRATE test COMPILE is the mandatory pre-git_request census
+(the add-surface exhaustiveness axis).** This node adds surface — a new
+`ElabEnv` field, `Expr::EInfixSpine`, `Decl::FixityDecl`. Every **exhaustive
+consumer** of that surface (struct destructures, `match` arms in
+`lossless.rs`/`resolve.rs`/`modules.rs` and in **test-support modules** such as
+`tests/seal2_support/mod.rs`) must be updated or the workspace fails to
+**compile** — an `E0027`/non-exhaustive-match error, not a test failure. A
+filtered `--test lang_fixity` / `--test map_build` run **never compiles those
+other test binaries**, so it cannot see the break; the second candidate
+(`eb8303c2`, CI `cargo test --no-run --workspace --locked` exit 101) reached the
+publisher on exactly this gap. **The ring's pre-git_request gate MUST run the
+crate's full test compile — `cargo test -p ken-elaborator --no-run` with NO
+`--test` filter** (single-crate, compile-only, within the targeted-only rule of
+`COORDINATION §12`). That command compiles every `ken-elaborator` test binary and
+is the **sound census** of exhaustive consumers; repairing only the individually
+named sites inherits the blind spot of whoever enumerated them. The full-workspace
+`--locked` verdict still runs in CI, but this cheap local compile catches the
+class before a git_request spends a Decision.
+
 **`AC-7` — zero-cost when the feature is unused (the load-bearing repair AC).** A
 body/declaration that uses **no** fixity/infix surface must pay **no** new
 compile-stack cost from the reassociation pass. **Control:** the two
