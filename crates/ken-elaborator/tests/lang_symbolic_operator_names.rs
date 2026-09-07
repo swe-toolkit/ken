@@ -5,7 +5,6 @@
 //! fixity must not change these prefix-name, fixed-token, and identity results.
 
 use ken_elaborator::lexer::{Lexer, Token};
-use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl as KernelDecl, Term};
 
@@ -272,24 +271,16 @@ fn symbolic_name_uses_existing_duplicate_definition_diagnostic() {
     }
 }
 
-/// MEASURED: prefix `<+> a b` elaborates, while the same operands in
-/// `a <+> b` position produce a ParseError naming the unconsumed operator.
-/// CLAIMED: D1/D2 add names and definitions without adding infix application.
-/// THE GAP: any accidental inclusion in the application-argument start set
-/// would accept the negative form; this paired fixture differs only by order.
+/// MEASURED: prefix `<+> a b` still elaborates through the ordinary application
+/// path after infix notation is added. CLAIMED: adding infix use does not remove
+/// or special-case prefix-position symbolic globals. THE GAP: lexer acceptance
+/// alone would not exercise name resolution or application elaboration, so this
+/// drives the complete existing consumer path.
 #[test]
-fn symbolic_prefix_reference_accepts_but_infix_application_still_rejects() {
+fn symbolic_prefix_reference_remains_ordinary_application() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_decl("fn <+> (a : Nat) (b : Nat) : Nat = a")
         .expect("symbolic definition");
     env.elaborate_decl("fn prefixOk (a : Nat) (b : Nat) : Nat = <+> a b")
         .expect("prefix application is ordinary application");
-
-    match parse_decls("fn infixStillOut (a : Nat) (b : Nat) : Nat = a <+> b") {
-        Err(ElabError::ParseError { msg, .. }) => assert!(
-            msg.contains("Operator(\"<+>\")"),
-            "rejection must be caused by the unconsumed user operator, got {msg}"
-        ),
-        other => panic!("infix user application must remain outside D1/D2, got {other:?}"),
-    }
 }
