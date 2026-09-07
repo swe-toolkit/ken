@@ -9653,12 +9653,49 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
     let self_reference_waits_for_preadmission = !globals.contains_key(&rdecl.name)
         && rexpr_mentions_name(&rdecl.body, &rdecl.name)
         && matches!(rdecl.kind, RDeclKind::View { .. } | RDeclKind::Let);
-    let associated = if self_reference_waits_for_preadmission {
-        None
-    } else {
-        reassociate_rdecl(rdecl, globals, fixities)?
-    };
-    let rdecl = associated.as_deref().unwrap_or(rdecl);
+    if self_reference_waits_for_preadmission || !rdecl.contains_infix_spine {
+        return elaborate_associated_rdecl(
+            env,
+            globals,
+            num_values,
+            numeric_env,
+            class_env,
+            effect_rows,
+            fixities,
+            fixity_spans,
+            declared_fixity,
+            rdecl,
+        );
+    }
+    let associated = reassociate_rdecl(rdecl, globals, fixities)?
+        .expect("a declaration marked with an infix spine must be reassociated");
+    elaborate_associated_rdecl(
+        env,
+        globals,
+        num_values,
+        numeric_env,
+        class_env,
+        effect_rows,
+        fixities,
+        fixity_spans,
+        declared_fixity,
+        &associated,
+    )
+}
+
+#[inline(never)]
+fn elaborate_associated_rdecl(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    class_env: &mut ClassEnv,
+    effect_rows: &HashMap<String, crate::effects::RowType>,
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    declared_fixity: Option<(Fixity, Span)>,
+    rdecl: &RDecl,
+) -> Result<ElabResult, ElabError> {
     if matches!(
         rdecl.kind,
         RDeclKind::View {
