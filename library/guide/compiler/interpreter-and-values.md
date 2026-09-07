@@ -2,8 +2,9 @@
 
 > **Availability:** partial. **Authority:** explanatory.
 
-The runtime IR evaluator executes `RuntimeExpr` from a `RuntimeProgram`. Its
-own module draws a strict line around that result: a successful direct
+The [runtime-IR evaluator](../../../crates/ken-runtime/src/runtime_ir_evaluator.rs)
+executes `RuntimeExpr` from a `RuntimeProgram`. Its own module draws a strict
+line around that result: a successful direct
 runtime-IR evaluation is an observation, not kernel evidence, native-backend
 validation, object validation, linker validation, or a source-level proof.
 
@@ -14,13 +15,15 @@ the evaluator or the supplied interpreter a proof-producing component.
 
 ## Values and storage
 
-The runtime has a value carrier for scalar and closure-free compound data, and
-a separate operational carrier for ordinary closures. The value module excludes
-ordinary closures from the canonical carrier. That prevents a closure, or a
+The [runtime values module](../../../crates/ken-runtime/src/values.rs) has a
+value carrier for scalar and closure-free compound data, and a separate
+operational carrier for ordinary closures. It excludes ordinary closures from
+the canonical carrier. That prevents a closure, or a
 graph containing one, from acquiring canonical bytes, a content-addressed
 identity, or persistence by accident.
 
-The store interns compound canonical values in a space-owned arena and index.
+The [value store](../../../crates/ken-runtime/src/store.rs) interns compound
+canonical values in a space-owned arena and index.
 It returns a new or existing slot for equal canonical bytes and releases a
 space's pages on reset. Those slot and allocation details are implementation
 mechanisms, not the value model's portable identity rule.

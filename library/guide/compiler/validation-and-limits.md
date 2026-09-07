@@ -8,23 +8,24 @@ terms. Checked-core validation verifies package identity, semantic hashes, and
 lowerability metadata. Runtime and native stages each have their own supported
 subset and refusal paths.
 
-The runtime artifact validator recomputes a bounded set of facts from a
-`RuntimeProgram`. Its module states the limit directly: it does not certify
+The [runtime artifact validator](../../../crates/ken-runtime/src/artifact_validation.rs)
+recomputes a bounded set of facts from a `RuntimeProgram`. Its module states the limit directly: it does not certify
 Cranelift, native execution, object layout, or whole-compiler correctness. A
 separate proof-erasure boundary witness likewise checks facts recomputed from a
 concrete runtime artifact; it is not a certificate for all lowering.
 
 ## Comparison evidence
 
-The runtime-IR evaluator can produce a direct observation and compare it to a
-caller-supplied interpreter observation with matching artifact and target
-identity. The native backend can compare a native result with runtime-IR or
-interpreter observations. These comparisons are useful only for the supported
+The [runtime-IR evaluator](../../../crates/ken-runtime/src/runtime_ir_evaluator.rs)
+can produce a direct observation and compare it to a caller-supplied interpreter
+observation with matching artifact and target identity. The
+[native artifact API](../../../crates/ken-runtime/src/cranelift_backend/artifact/api.rs)
+can compare a native result with runtime-IR or interpreter observations. These comparisons are useful only for the supported
 inputs they identify; disagreement and unsupported cases remain explicit
 outcomes.
 
-The object-packaging route verifies its selected reports and can perform a
-smoke run. It records toolchain and artifact facts, but native bytes and linker
+The [object-packaging route](../../../crates/ken-runtime/src/object_linker_packaging.rs)
+verifies its selected reports and can perform a smoke run. It records toolchain and artifact facts, but native bytes and linker
 success remain evidence artifacts rather than Ken semantic authority.
 
 ## Boundaries to keep visible

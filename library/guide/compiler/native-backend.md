@@ -2,8 +2,9 @@
 
 > **Availability:** partial. **Authority:** explanatory.
 
-The runtime's native backend lowers runtime IR through Cranelift. The backend
-facade describes its native boundary as narrow: scalar results can be returned
+The runtime's [native backend](../../../crates/ken-runtime/src/cranelift_backend.rs)
+lowers runtime IR through Cranelift. The backend facade describes its native
+boundary as narrow: scalar results can be returned
 directly, while aggregate observations pass through an opaque Rust-side token
 mechanism. Native addresses, object layout, allocation order, ABI details, and
 Cranelift internals are not Ken-observable meaning.
@@ -15,11 +16,12 @@ an unchecked source-text fallback for such a program.
 
 ## Object and executable path
 
-The object path compiles a selected runtime expression into a Cranelift object
-and records object bytes, an object hash, target information, verifier status,
-assumptions, and unsupported entries. The packaging layer can then write an
-object, create a starter stub, invoke a linker, and record a linked executable
-artifact.
+The [artifact API](../../../crates/ken-runtime/src/cranelift_backend/artifact/api.rs)
+compiles a selected runtime expression into a Cranelift object and records
+object bytes, an object hash, target information, verifier status,
+assumptions, and unsupported entries. The [packaging layer](../../../crates/ken-runtime/src/object_linker_packaging.rs)
+can then write an object, create a starter stub, invoke a linker, and record a
+linked executable artifact.
 
 This is an implemented starter route, not a general native-library facility.
 Packaging validates an entrypoint package, platform-support report, and

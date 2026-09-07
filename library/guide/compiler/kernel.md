@@ -2,9 +2,9 @@
 
 > **Availability:** partial. **Authority:** explanatory.
 
-`ken-kernel` is the trust root for fully explicit core terms. Its public surface
-includes checking, conversion, environments, inductives, substitution, and
-terms. The crate explicitly forbids unsafe Rust. The surrounding compiler may
+[`ken-kernel`](../../../crates/ken-kernel/src/lib.rs) is the trust root for
+fully explicit core terms. Its public surface includes checking, conversion,
+environments, inductives, substitution, and terms. The crate explicitly forbids unsafe Rust. The surrounding compiler may
 construct a candidate term, but it cannot turn that candidate into a valid Ken
 proof without this checker accepting it.
 

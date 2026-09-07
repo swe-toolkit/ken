@@ -3,8 +3,9 @@
 > **Availability:** partial. **Authority:** explanatory.
 
 The front end turns Ken source into declarations that the kernel can admit. Its
-crate entry module states the implemented sequence: lexing, parsing,
-resolution, elaboration, and kernel checking. These are distinct stages:
+[crate entry module](../../../crates/ken-elaborator/src/lib.rs) states the
+implemented sequence: lexing, parsing, resolution, elaboration, and kernel
+checking. These are distinct stages:
 parsing establishes source structure, resolution relates names to declarations,
 and elaboration produces explicit core terms before the kernel checks them.
 
@@ -15,8 +16,9 @@ validity; the elaborator prepares terms and metadata for that authority.
 
 ## Entry points
 
-The command-line driver selects `ken check` for elaboration without I/O and
-`ken run` for elaboration followed by program execution. Both construct an
+The [command-line driver](../../../crates/ken-cli/src/main.rs) selects `ken
+check` for elaboration without I/O and `ken run` for elaboration followed by
+program execution. Both construct an
 elaboration environment and choose the ordinary or literate-source path from
 the filename. A catalog-addressed entry uses the roots loader and then checks
 that entry's checked fences.
@@ -28,8 +30,8 @@ path; it does not mean that a native artifact was produced.
 
 ## What follows admission
 
-The compiler driver can collect admitted declarations into a
-`CheckedCorePackage`. That package carries stable symbols and semantic metadata
+The [compiler driver](../../../crates/ken-elaborator/src/compiler_driver.rs)
+can collect admitted declarations into a `CheckedCorePackage`. That package carries stable symbols and semantic metadata
 for later consumers, rather than passing raw source text to erasure. Read
 [Artifacts and erasure](artifacts-and-erasure.md) for the boundary it creates,
 or [The trusted kernel](kernel.md) for the checker that admits the core terms.

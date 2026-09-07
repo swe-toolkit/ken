@@ -2,8 +2,9 @@
 
 > **Availability:** partial. **Authority:** explanatory.
 
-`CheckedCorePackage v0` is the implemented artifact between kernel admission
-and execution-oriented stages. It gives declarations stable symbols, separates
+[`CheckedCorePackage v0`](../../../crates/ken-elaborator/src/checked_core.rs)
+is the implemented artifact between kernel admission and execution-oriented
+stages. It gives declarations stable symbols, separates
 semantic inputs from the non-semantic artifact envelope, and carries hashes for
 both. The compiler driver emits this package after elaborating source into an
 admitted environment.
@@ -15,8 +16,8 @@ does not silently proceed as a runtime target.
 
 ## Erasure is a consumer of checked core
 
-The erasure module consumes a `CheckedCorePackage` and produces a
-`RuntimeProgram`. It validates the package, validates semantic integrity, and
+The [erasure module](../../../crates/ken-elaborator/src/erasure.rs) consumes a
+`CheckedCorePackage` and produces a `RuntimeProgram`. It validates the package, validates semantic integrity, and
 retains runtime metadata for obligations, assumptions, trusted-base deltas,
 dependencies, lowerability, effects, capabilities, and runtime checks. Raw
 source identity may remain available for provenance, but source text is not an
