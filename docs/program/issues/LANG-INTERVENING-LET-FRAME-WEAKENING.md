@@ -11,6 +11,35 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
+> # INCREMENT 1 VOID 2026-09-07 (candidate-caused CI red) — re-spin carries the stack-budget closure AC below.
+> #
+> # Increment 1 (accepted partial, exact `f5b6af5e` / rebased `ec6555683`, PR
+> # #3402, Decision `dec_5r9c4rskerrq8` spent) was VOIDED: candidate-caused CI
+> # red, A/B + locally reproduced (lieutenant `evt_60apq4m618rmj`, Steward
+> # disposition `evt_7qtt3sad1seaw`). Its `elab.rs` dependent-match/refinement
+> # change grows frame depth on a SHARED recursive elaboration path; three
+> # ken-cli native-process programs OUTSIDE the declared 2-path scope overflow a
+> # stack-budget test — `mrc_4a_cross_crate_census` and
+> # `px4b_native_production::{fs_scope_denial_reaches_ken_as_the_named_error,
+> # linked_console_broken_pipe_reaches_ken_instead_of_signal_termination}`. This
+> # is the affected-closure-along-stack-depth axis (5th occurrence; same shape as
+> # the FIXITY Map overflow and the FsMetadata compile-depth).
+> #
+> # RE-SPIN REPAIR — the ruled pattern, NOT a re-baseline: make the added depth
+> # ZERO-COST when unused / bounded — guard the new recursion or context-threading
+> # so shallow / common-case inputs pay no extra frames (a provable no-op), OR take
+> # the deepening off the shared recursive path. Do NOT raise `RUST_MIN_STACK`,
+> # re-baseline the stack budget, or add any thread/stack workaround (that masks a
+> # real regression; reflect-don't-extend). A genuine user-op body still
+> # overflowing after the guard is a hard stop to the Steward, not a budget bump.
+> #
+> # AC-STACK (pre-git_request closure, binds this node's every increment). The
+> # stack-budget affected-closure for an `elab.rs` recursion change is BROADER
+> # than `map_build_acceptance` (it passed 2/2 for Inc1 and did NOT catch this).
+> # The pre-handoff gate MUST run, green, `map_build_acceptance` AND the ken-cli
+> # native-process suite (`mrc_4a_cross_crate_census` + `px4b_native_production`),
+> # regardless of the increment's declared diff scope.
+>
 > # D4 SUPERSEDED 2026-09-07 (Architect ruling, Steward fold) — no new discriminator owed; D2 unblocked.
 > #
 > # Architect ruling `evt_3r16wn5bxk6zs` (grounded from `origin/main 908fc247d`
