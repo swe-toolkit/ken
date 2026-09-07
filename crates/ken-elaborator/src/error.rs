@@ -191,6 +191,26 @@ pub enum ElabError {
     /// A second top-level definition of a name already defined in the same
     /// compilation unit (`33 §3`, ADR 0014 MRES-5/MRES-7).
     DuplicateDefinition { name: String, span: Span },
+    /// A fixity declaration does not name a symbolic definition owned by this
+    /// module. Imported identities cannot be re-scoped (`33 §6`).
+    FixityTargetNotLocal { operator: String, span: Span },
+    /// Two declarations assign different canonical fixities to one identity.
+    ConflictingFixity {
+        operator: String,
+        first: crate::ast::Fixity,
+        second: crate::ast::Fixity,
+        first_span: Span,
+        second_span: Span,
+    },
+    /// A non-associative operator was chained at one precedence without
+    /// parentheses (`32 §6`).
+    NonAssociativeInfix {
+        operator: String,
+        first_span: Span,
+        second_span: Span,
+    },
+    /// A declared precedence is outside this surface's chosen `0..=9` range.
+    InvalidFixityPrecedence { written: String, span: Span },
     /// A cross-file import revisited a unit on the active import stack
     /// (`33 §3.2`, ADR 0014 MRES-2). `cycle` is the closed path in import-edge
     /// order, rooted at the entry unit (for example, `A`, `B`, `A`).
@@ -493,6 +513,46 @@ impl fmt::Display for ElabError {
                 f,
                 "duplicate definition '{}' at {}-{}: name already defined in this compilation unit",
                 name, span.start, span.end,
+            ),
+            ElabError::FixityTargetNotLocal { operator, span } => write!(
+                f,
+                "fixity declaration for '{}' at {}-{} must name a symbolic operator defined in this module; imported fixity is not re-scopable",
+                operator, span.start, span.end,
+            ),
+            ElabError::ConflictingFixity {
+                operator,
+                first,
+                second,
+                first_span,
+                second_span,
+            } => write!(
+                f,
+                "conflicting fixity declarations for '{}' at {}-{} and {}-{}: {:?} versus {:?}",
+                operator,
+                first_span.start,
+                first_span.end,
+                second_span.start,
+                second_span.end,
+                first,
+                second,
+            ),
+            ElabError::NonAssociativeInfix {
+                operator,
+                first_span,
+                second_span,
+            } => write!(
+                f,
+                "non-associative operator '{}' cannot be chained without parentheses at {}-{} and {}-{}",
+                operator,
+                first_span.start,
+                first_span.end,
+                second_span.start,
+                second_span.end,
+            ),
+            ElabError::InvalidFixityPrecedence { written, span } => write!(
+                f,
+                "invalid fixity precedence '{}' at {}-{}: expected a level in 0..=9",
+                written, span.start, span.end,
             ),
             ElabError::ImportCycle { cycle, span } => write!(
                 f,

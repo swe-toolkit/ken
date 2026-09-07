@@ -85,7 +85,6 @@ pub use literate::{
     KenMdFenceRole,
 };
 pub use numbers::{int_lit_val, NumericEnv, NumericLitVal};
-pub use strings::NfcString;
 pub use prelude::PreludeEnv;
 pub use protocol::{
     deserialize_atom_id, deserialize_formula_path, hole_id_string, obligation_id_string,
@@ -103,6 +102,7 @@ pub use prover::{
 #[cfg(feature = "z3-process")]
 pub use prover::{attempt_d_with_z3_process, Z3ProcessConfig};
 pub use resolve::{RDecl, RDeclKind, RExpr, RType};
+pub use strings::NfcString;
 pub use temporal::{
     closed, elaborate_temporal_expr, temporal_hoas_inductive_spec, temporal_inductive_spec, Pred,
     Temporal, TemporalExpr, TemporalObligation, Var,
@@ -128,6 +128,13 @@ pub struct ElabEnv {
     /// Numeric literal values keyed by their opaque-postulate GlobalId.
     /// Accumulated during elaboration; copied to `EvalStore.num_values` for eval.
     pub num_values: HashMap<GlobalId, NumericLitVal>,
+    /// Declared user-operator fixities keyed only by canonical kernel identity.
+    /// A missing entry means the normative default `infixl 9`.
+    pub fixities: HashMap<GlobalId, ast::Fixity>,
+    /// First declaration site for the conflict diagnostic. This parallel
+    /// attribution map is not consulted for association. It is public so
+    /// structural tests can exhaustively classify every `ElabEnv` namespace.
+    pub fixity_spans: HashMap<GlobalId, Span>,
     /// The numeric tower (registered op ids, dispatch tables).
     pub numeric_env: NumericEnv,
     /// The Bytes layer (L6): type ids, I/O effect row registry (`38 §1`, `41`).
@@ -198,6 +205,8 @@ impl ElabEnv {
             env,
             globals,
             num_values: HashMap::new(),
+            fixities: HashMap::new(),
+            fixity_spans: HashMap::new(),
             numeric_env,
             bytes_env,
             foreign_env: foreign::ForeignEnv::empty(),

@@ -21,16 +21,15 @@ use ken_kernel::{
     Term,
 };
 
-use crate::ast::{BinOp, DefKeyword, NumLit, RecursiveResultSelector};
+use crate::ast::{BinOp, DefKeyword, Fixity, FixityAssoc, NumLit, RecursiveResultSelector};
 use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceInfo};
 use crate::data;
 use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
-    RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
-    RPropIntro, RRecordField, RRecordPatField, RSpaceDecl, RType, SUGAR_ABSURD, SUGAR_AXIOM,
-    SUGAR_ELIM_TRUNC,
-    SUGAR_EQ, SUGAR_J, SUGAR_REFL, SUGAR_TRUNC_INTRO,
+    RClassField, RDecl, RDeclKind, RExpr, RInfixOperator, RInstanceConstraint, RMatchArm, RPatKind,
+    RPattern, RPropIntro, RRecordField, RRecordPatField, RSpaceDecl, RType, SUGAR_ABSURD,
+    SUGAR_AXIOM, SUGAR_ELIM_TRUNC, SUGAR_EQ, SUGAR_J, SUGAR_REFL, SUGAR_TRUNC_INTRO,
 };
 
 // ----- obligation model -----
@@ -973,7 +972,8 @@ fn check_record(
         span: span.clone(),
         reason: "record literal is unavailable in this elaboration context".into(),
     })?;
-    let projection = class_env
+    let projection =
+        class_env
         .projection_by_type_id(owner_id)
         .ok_or_else(|| ElabError::TypeMismatch {
             span: span.clone(),
@@ -1143,8 +1143,7 @@ fn check_variable_with_index_views(
     let local_ty = weaken(stored_ty, (actual_index as i64) + 1);
     let local_term = Term::var(actual_index);
 
-    let Some((raw_refined_term, raw_refined_ty, install_depth)) =
-        cx.var_refinements.get(&position)
+    let Some((raw_refined_term, raw_refined_ty, install_depth)) = cx.var_refinements.get(&position)
     else {
         unify_types(&mut cx.metas, expected, &local_ty);
         return Ok(local_term);
@@ -1591,9 +1590,7 @@ fn carry_coherent_frame_data(
     for datum in [
         CoherentFrameCarriedDatum::EqualityLeaves(leaves),
         CoherentFrameCarriedDatum::IndexEquation(index_equation),
-        CoherentFrameCarriedDatum::MotiveReturnTelescopeArguments(
-            telescope_argument_substitutions,
-        ),
+        CoherentFrameCarriedDatum::MotiveReturnTelescopeArguments(telescope_argument_substitutions),
     ] {
         datum.carry_into(&mut carried);
     }
@@ -1819,8 +1816,12 @@ fn scrut_occurs(term: &Term, scrut_core: &Term) -> bool {
         Term::App(f, a) | Term::Pair(f, a) => {
             scrut_occurs(f, scrut_core) || scrut_occurs(a, scrut_core)
         }
-        Term::Proj1(p) | Term::Proj2(p) | Term::QuotClass(p) | Term::Trunc(p)
-        | Term::TruncProj(p) | Term::Refl(p) => scrut_occurs(p, scrut_core),
+        Term::Proj1(p)
+        | Term::Proj2(p)
+        | Term::QuotClass(p)
+        | Term::Trunc(p)
+        | Term::TruncProj(p)
+        | Term::Refl(p) => scrut_occurs(p, scrut_core),
         Term::Ascript(t, a) | Term::Quot(t, a) | Term::Absurd(t, a) => {
             scrut_occurs(t, scrut_core) || scrut_occurs(a, scrut_core)
         }
@@ -2716,11 +2717,8 @@ fn build_index_equation_convoy_body(
                 .map(|leaf| (leaf.scrutinee.clone(), leaf.target.clone()))
                 .collect()
         };
-        let carried = carry_coherent_frame_data(
-            leaves,
-            raw_evidence,
-            telescope_argument_substitutions,
-        );
+        let carried =
+            carry_coherent_frame_data(leaves, raw_evidence, telescope_argument_substitutions);
         let raw_evidence = carried.index_equation.ok_or_else(|| {
             ElabError::Internal("coherent-frame index equation was not carried".into())
         })?;
@@ -2742,8 +2740,7 @@ fn build_index_equation_convoy_body(
                 let telescope_substitutions = carried.telescope_argument_substitutions;
                 let mut goal_substitutions = telescope_substitutions.clone();
                 goal_substitutions.push((weaken(scrut_core, depth as i64), Term::var(1)));
-                let mut goal =
-                    subst_term_generalize_many(&expected_at_depth, &goal_substitutions);
+                let mut goal = subst_term_generalize_many(&expected_at_depth, &goal_substitutions);
 
                 // Ambient context-convoy entries are the already-bound half of
                 // the same telescope class. Rebind them inside the selected
@@ -2941,19 +2938,19 @@ fn recursive_field_index_path(
         || scrut_indices.len() != 1
         || !matches!(scrut_core, Term::Var(_))
         || !matches!(scrut_indices[0], Term::Var(_))
-        || !compute_context_convoy(
-            &cx.ctx,
-            scrut_core,
-            scrut_indices,
-            &cx.match_field_regions,
-        )
+        || !compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions)
         .is_empty()
     {
         return Ok(RecursiveFieldIndexPath::CoupledRefinement);
     }
 
     let zonked_ctx = Context {
-        types: cx.ctx.types.iter().map(|term| cx.metas.zonk_term(term)).collect(),
+        types: cx
+            .ctx
+            .types
+            .iter()
+            .map(|term| cx.metas.zonk_term(term))
+            .collect(),
     };
     let index_ty = cx.metas.zonk_term(&subst_levels(
         &subst_outer(&ind.indices[0], ind.params.len(), params, 0),
@@ -2970,13 +2967,7 @@ fn recursive_field_index_path(
                 level_args,
             )));
         }
-        let target_indices = ctor_target_indices(
-            ctor,
-            ind,
-            params,
-            level_args,
-            field_count,
-        )
+        let target_indices = ctor_target_indices(ctor, ind, params, level_args, field_count)
         .into_iter()
         .map(|term| cx.metas.zonk_term(&term))
         .collect::<Vec<_>>();
@@ -3031,12 +3022,8 @@ fn ordinary_coherent_frame_plan(
     motive_local_indices: &[Term],
     recursive_field_index_path: RecursiveFieldIndexPath,
 ) -> Box<CoherentFrameMotivePlan> {
-    let context_convoy = compute_context_convoy(
-        &cx.ctx,
-        scrut_core,
-        scrut_indices,
-        &cx.match_field_regions,
-    );
+    let context_convoy =
+        compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions);
     let motive_rebase = dependent_rebase_subs(
         scrut_core,
         scrut_indices,
@@ -3121,8 +3108,7 @@ fn plan_coherent_frame_motive(
         && scrut_indices
             .iter()
             .any(|index| !matches!(index, Term::Var(_)));
-    let equation_convoy = (!cx.match_field_regions.is_empty()
-        && has_nontrivial_coupled_sides)
+    let equation_convoy = (!cx.match_field_regions.is_empty() && has_nontrivial_coupled_sides)
         || forced_telescope_convoy;
     if equation_convoy {
         if !probe_context_convoy.is_empty() && !forced_telescope_convoy {
@@ -4677,13 +4663,7 @@ fn build_dependent_constructor_frame(
     let mut premise_domains = if plain_declared {
         Vec::new()
     } else {
-        method_index_premises(
-            ind,
-            params,
-            &target_indices,
-            scrut_indices,
-            field_count,
-        )
+        method_index_premises(ind, params, &target_indices, scrut_indices, field_count)
     };
     let mut expected_here = if plain_declared {
         let mut specialized = weaken(motive, field_count as i64);
@@ -4752,24 +4732,13 @@ fn build_dependent_constructor_frame(
             })
             .map(|leaf| (leaf.scrutinee.clone(), leaf.target.clone()))
             .collect();
-        let carried = carry_coherent_frame_data(
-            leaves,
-            index_equation,
-            telescope_argument_substitutions,
-        );
+        let carried =
+            carry_coherent_frame_data(leaves, index_equation, telescope_argument_substitutions);
         for ty in &mut types_inner_first {
-            *ty = subst_term_generalize_many(
-                ty,
-                &carried.telescope_argument_substitutions,
-            );
+            *ty = subst_term_generalize_many(ty, &carried.telescope_argument_substitutions);
         }
     }
-    expected_here = redirect_convoy_body(
-        context_convoy,
-        field_count,
-        &sentinels,
-        expected_here,
-    );
+    expected_here = redirect_convoy_body(context_convoy, field_count, &sentinels, expected_here);
     let mut convoy_refinements = Vec::with_capacity(context_convoy.len());
     for (index, entry) in context_convoy.iter().enumerate() {
         let bottom_position = cx.ctx.len() - 1 - (entry.var + field_count);
@@ -4793,8 +4762,7 @@ fn build_dependent_constructor_frame(
             embedded_method_repairs,
             embedded_slot_base,
         )?;
-        expected_here =
-            refresh_embedded_elim_evidence(cx.env, &cx.ctx, &expected_here, span)?;
+        expected_here = refresh_embedded_elim_evidence(cx.env, &cx.ctx, &expected_here, span)?;
         let branch_rebase = dependent_rebase_subs(
             scrut_core,
             scrut_indices,
@@ -4882,10 +4850,7 @@ fn large_convoy_branch_goal(
             "large index convoy branch did not compute to its evidence premise".into(),
         ));
     };
-    let mut goal = subst0(
-        &codomain,
-        &index_refinement_sentinel(sentinel_region, 0),
-    );
+    let mut goal = subst0(&codomain, &index_refinement_sentinel(sentinel_region, 0));
     for convoy_slot in 0..context_convoy_len {
         let Term::Pi(_, codomain) = whnf(env, ctx, &goal) else {
             return Err(ElabError::Internal(
@@ -5001,8 +4966,7 @@ fn finish_dependent_constructor_method(
         shapes,
         field_count,
         expected,
-        (equation_convoy
-            || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
+        (equation_convoy || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
             .then_some(motive),
         scrut_core,
         ind,
@@ -5092,7 +5056,12 @@ fn install_plain_declared_index_aliases(
     // zonked it. Every raw-kernel query below must see the same zonked context,
     // target indices, and level-instantiated constructor.
     let zonked_ctx = Context {
-        types: cx.ctx.types.iter().map(|term| cx.metas.zonk_term(term)).collect(),
+        types: cx
+            .ctx
+            .types
+            .iter()
+            .map(|term| cx.metas.zonk_term(term))
+            .collect(),
     };
     for (ordinal, (actual, target)) in scrut_indices.iter().zip(target_indices).enumerate() {
         let Term::Var(actual_index) = actual else {
@@ -5101,11 +5070,7 @@ fn install_plain_declared_index_aliases(
             ));
         };
         let actual_index = actual_index + field_count;
-        let position = cx
-            .ctx
-            .len()
-            .checked_sub(1 + actual_index)
-            .ok_or_else(|| {
+        let position = cx.ctx.len().checked_sub(1 + actual_index).ok_or_else(|| {
                 ElabError::Internal(
                     "plain declared-index variable escaped its constructor context".into(),
                 )
@@ -5139,14 +5104,8 @@ fn install_plain_declared_index_aliases(
         ));
     };
     let scrut_index = scrut_index + field_count;
-    let scrut_position = cx
-        .ctx
-        .len()
-        .checked_sub(1 + scrut_index)
-        .ok_or_else(|| {
-            ElabError::Internal(
-                "plain declared-index scrutinee escaped its constructor context".into(),
-            )
+    let scrut_position = cx.ctx.len().checked_sub(1 + scrut_index).ok_or_else(|| {
+        ElabError::Internal("plain declared-index scrutinee escaped its constructor context".into())
         })?;
     let concrete = cx.metas.zonk_term(concrete);
     let concrete_ty = kernel_infer(cx.env, &zonked_ctx, &concrete).map_err(|error| {
@@ -5233,8 +5192,8 @@ fn check_dependent_branch_body(
 
         let preserve_nested_goal =
             !ind.indices.is_empty() && matches!(arm.body, RExpr::RMatch { .. });
-        let expected_unrefined =
-            if preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+        let expected_unrefined = if preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _))
+        {
                 expected_here.clone()
             } else {
                 simplify_branch_goal(cx.env, &cx.ctx, expected_here)
@@ -5250,8 +5209,7 @@ fn check_dependent_branch_body(
             });
         }
         let obligation_base = cx.obligations.len();
-        let attempt = check(cx, &arm.body, &expected_unrefined, &arm.span)
-        .and_then(|checked| {
+        let attempt = check(cx, &arm.body, &expected_unrefined, &arm.span).and_then(|checked| {
             let wrapped =
                 wrap_premise_lams_finalized(checked.clone(), premise_domains, sentinel_region);
             let wrapped_ty = wrap_premise_pis_finalized(
@@ -5278,9 +5236,7 @@ fn check_dependent_branch_body(
         });
         let checked = match attempt {
             Ok(checked) => checked,
-            Err(error)
-                if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared =>
-            {
+            Err(error) if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared => {
                 cx.obligations.truncate(obligation_base);
                 return Err(error);
             }
@@ -5406,8 +5362,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     let original_expected = expected_zonked.as_ref();
     let (scrut_core, scrut_ty) = infer_dependent_match_scrutinee(cx, scrut)?;
 
-    let (d_id, family_level_args, scrut_args) =
-        dependent_scrutinee_family(&scrut_ty, span)?;
+    let (d_id, family_level_args, scrut_args) = dependent_scrutinee_family(&scrut_ty, span)?;
     let ind = dependent_inductive(cx.env, d_id)?;
     ensure_arm_ctors_belong_to_family(cx, arms, &ind, d_id)?;
     if equation.is_some()
@@ -7043,6 +6998,15 @@ fn guarded_constructor_arm(
     ))
 }
 
+#[cold]
+#[inline(never)]
+fn unassociated_infix_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::Internal(format!(
+        "unassociated infix spine reached type-directed elaboration at {}-{}",
+        span.start, span.end
+    )))
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -7318,6 +7282,8 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         RExpr::RByteStr(bytes, span) => elab_bytes_lit(cx, bytes, span),
 
         RExpr::RBinOp(op, lhs, rhs, span) => elab_binop(cx, op, lhs, rhs, span),
+
+        RExpr::RInfixSpine { span, .. } => unassociated_infix_error(span),
 
         RExpr::RMatch {
             scrut: _,
@@ -8040,8 +8006,10 @@ fn elab_char_lit(cx: &mut ElabCtx, c: char, span: &Span) -> Result<(Term, Term),
             error: e,
             span: span.clone(),
         })?;
-    cx.num_values
-        .insert(lit_id, NumericLitVal::Int(num_bigint::BigInt::from(c as u32)));
+    cx.num_values.insert(
+        lit_id,
+        NumericLitVal::Int(num_bigint::BigInt::from(c as u32)),
+    );
     Ok((Term::const_(lit_id, vec![]), char_ty))
 }
 
@@ -8984,6 +8952,28 @@ fn infer_expr_row_type(
             .join(projected_field_row_type(e, field, projection_ctx)),
         RExpr::RBinOp(_, l, r, _) => infer_expr_row_type(l, effect_rows, projection_ctx)
             .join(infer_expr_row_type(r, effect_rows, projection_ctx)),
+        RExpr::RInfixSpine {
+            operands,
+            operators,
+            ..
+        } => {
+            let mut row = operands
+                .iter()
+                .fold(crate::effects::RowType::empty(), |row, operand| {
+                    row.join(infer_expr_row_type(operand, effect_rows, projection_ctx))
+                });
+            for operator in operators {
+                if let RInfixOperator::User(name, _) = operator {
+                    row = row.join(
+                        effect_rows
+                            .get(name)
+                            .cloned()
+                            .unwrap_or_else(crate::effects::RowType::empty),
+                    );
+                }
+            }
+            row
+        }
         RExpr::RMatch { scrut, arms, .. } => {
             let mut row = infer_expr_row_type(scrut, effect_rows, projection_ctx);
             for arm in arms {
@@ -9121,6 +9111,522 @@ pub fn check_surface_purity(
     Ok(())
 }
 
+fn builtin_fixity(operator: BinOp) -> Fixity {
+    match operator {
+        BinOp::EqEq => Fixity {
+            associativity: FixityAssoc::Left,
+            precedence: 4,
+        },
+        BinOp::Add | BinOp::WrappingAdd | BinOp::Sub => Fixity {
+            associativity: FixityAssoc::Left,
+            precedence: 6,
+        },
+        BinOp::Mul => Fixity {
+            associativity: FixityAssoc::Left,
+            precedence: 7,
+        },
+    }
+}
+
+fn resolved_operator_fixity(
+    operator: &RInfixOperator,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+) -> Result<(Fixity, String), ElabError> {
+    match operator {
+        RInfixOperator::Builtin(operator, _) => {
+            Ok((builtin_fixity(*operator), format!("{operator:?}")))
+        }
+        RInfixOperator::User(name, span) => {
+            let id = globals
+                .get(name)
+                .copied()
+                .ok_or_else(|| ElabError::UnboundName {
+                    name: name.clone(),
+                    span: span.clone(),
+                })?;
+            Ok((
+                fixities.get(&id).copied().unwrap_or(Fixity::DEFAULT),
+                name.clone(),
+            ))
+        }
+    }
+}
+
+fn reduce_resolved_operator(values: &mut Vec<RExpr>, operator: RInfixOperator) {
+    let rhs = values.pop().expect("an infix operator has a right operand");
+    let lhs = values.pop().expect("an infix operator has a left operand");
+    let span = Span::merge(lhs.span(), rhs.span());
+    let combined = match operator {
+        RInfixOperator::Builtin(operator, _) => {
+            RExpr::RBinOp(operator, Box::new(lhs), Box::new(rhs), span)
+        }
+        RInfixOperator::User(name, operator_span) => {
+            let head = RExpr::RCon(name, operator_span.clone());
+            let first_span = Span::merge(head.span(), lhs.span());
+            let applied = RExpr::RApp(Box::new(head), Box::new(lhs), first_span);
+            RExpr::RApp(Box::new(applied), Box::new(rhs), span)
+        }
+    };
+    values.push(combined);
+}
+
+fn should_reduce_before(
+    top: &RInfixOperator,
+    incoming: &RInfixOperator,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+) -> Result<bool, ElabError> {
+    let (top_fixity, top_name) = resolved_operator_fixity(top, globals, fixities)?;
+    let (incoming_fixity, incoming_name) = resolved_operator_fixity(incoming, globals, fixities)?;
+    if top_fixity.precedence != incoming_fixity.precedence {
+        return Ok(top_fixity.precedence > incoming_fixity.precedence);
+    }
+    if top_fixity.associativity == FixityAssoc::NonAssociative
+        || incoming_fixity.associativity == FixityAssoc::NonAssociative
+    {
+        let operator = if top_fixity.associativity == FixityAssoc::NonAssociative {
+            top_name
+        } else {
+            incoming_name
+        };
+        return Err(ElabError::NonAssociativeInfix {
+            operator,
+            first_span: top.span().clone(),
+            second_span: incoming.span().clone(),
+        });
+    }
+    match (top_fixity.associativity, incoming_fixity.associativity) {
+        (FixityAssoc::Left, FixityAssoc::Left) => Ok(true),
+        (FixityAssoc::Right, FixityAssoc::Right) => Ok(false),
+        _ => Err(ElabError::TypeMismatch {
+            span: Span::merge(top.span(), incoming.span()),
+            reason: format!(
+                "operators '{}' and '{}' have conflicting associativity at precedence {}",
+                top_name, incoming_name, top_fixity.precedence
+            ),
+        }),
+    }
+}
+
+fn reassociate_rexpr(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+) -> Result<RExpr, ElabError> {
+    Ok(match expr {
+        RExpr::RApp(function, argument, span) => RExpr::RApp(
+            Box::new(reassociate_rexpr(*function, globals, fixities)?),
+            Box::new(reassociate_rexpr(*argument, globals, fixities)?),
+            span,
+        ),
+        RExpr::RLam(name, body, span) => RExpr::RLam(
+            name,
+            Box::new(reassociate_rexpr(*body, globals, fixities)?),
+            span,
+        ),
+        RExpr::RLet(name, ty, value, body, span) => RExpr::RLet(
+            name,
+            ty.map(|ty| reassociate_rtype(ty, globals, fixities))
+                .transpose()?,
+            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*body, globals, fixities)?),
+            span,
+        ),
+        RExpr::RAsc(value, ty, span) => RExpr::RAsc(
+            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rtype(*ty, globals, fixities)?),
+            span,
+        ),
+        RExpr::ROld(value, span) => RExpr::ROld(
+            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            span,
+        ),
+        RExpr::RBecomes(index, name, value, span) => RExpr::RBecomes(
+            index,
+            name,
+            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            span,
+        ),
+        RExpr::RBinOp(operator, lhs, rhs, span) => RExpr::RBinOp(
+            operator,
+            Box::new(reassociate_rexpr(*lhs, globals, fixities)?),
+            Box::new(reassociate_rexpr(*rhs, globals, fixities)?),
+            span,
+        ),
+        RExpr::RInfixSpine {
+            operands,
+            operators,
+            ..
+        } => {
+            let mut operands = operands
+                .into_iter()
+                .map(|operand| reassociate_rexpr(operand, globals, fixities));
+            let mut values = vec![operands
+                .next()
+                .expect("a parsed spine has one more operand")?];
+            let mut pending: Vec<RInfixOperator> = Vec::new();
+            for (operator, rhs) in operators.into_iter().zip(operands) {
+                while let Some(top) = pending.last() {
+                    if !should_reduce_before(top, &operator, globals, fixities)? {
+                        break;
+                    }
+                    reduce_resolved_operator(
+                        &mut values,
+                        pending.pop().expect("pending operator exists"),
+                    );
+                }
+                pending.push(operator);
+                values.push(rhs?);
+            }
+            while let Some(operator) = pending.pop() {
+                reduce_resolved_operator(&mut values, operator);
+            }
+            values.pop().expect("reassociation produces one expression")
+        }
+        RExpr::RMatch {
+            scrut,
+            equation,
+            arms,
+            span,
+        } => RExpr::RMatch {
+            scrut: Box::new(reassociate_rexpr(*scrut, globals, fixities)?),
+            equation,
+            arms: arms
+                .into_iter()
+                .map(|arm| {
+                    Ok(RMatchArm {
+                        pat: arm.pat,
+                        guard: arm
+                            .guard
+                            .map(|guard| reassociate_rexpr(guard, globals, fixities))
+                            .transpose()?,
+                        body: reassociate_rexpr(arm.body, globals, fixities)?,
+                        span: arm.span,
+                    })
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
+            span,
+        },
+        RExpr::RIf {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        } => RExpr::RIf {
+            condition: Box::new(reassociate_rexpr(*condition, globals, fixities)?),
+            then_branch: Box::new(reassociate_rexpr(*then_branch, globals, fixities)?),
+            else_branch: Box::new(reassociate_rexpr(*else_branch, globals, fixities)?),
+            span,
+        },
+        RExpr::RPair(components, span) => RExpr::RPair(
+            components
+                .into_iter()
+                .map(|component| reassociate_rexpr(component, globals, fixities))
+                .collect::<Result<Vec<_>, _>>()?,
+            span,
+        ),
+        RExpr::RRecord { base, fields, span } => RExpr::RRecord {
+            base: base
+                .map(|base| reassociate_rexpr(*base, globals, fixities).map(Box::new))
+                .transpose()?,
+            fields: fields
+                .into_iter()
+                .map(|(name, value, name_span)| {
+                    Ok((
+                        name,
+                        reassociate_rexpr(value, globals, fixities)?,
+                        name_span,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
+            span,
+        },
+        RExpr::RProj(value, field, span) => RExpr::RProj(
+            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            field,
+            span,
+        ),
+        RExpr::RPosProj(value, index, span) => RExpr::RPosProj(
+            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            index,
+            span,
+        ),
+        RExpr::RPi(name, domain, codomain, span) => RExpr::RPi(
+            name,
+            Box::new(reassociate_rtype(*domain, globals, fixities)?),
+            Box::new(reassociate_rexpr(*codomain, globals, fixities)?),
+            span,
+        ),
+        RExpr::RArrow(domain, codomain, span) => RExpr::RArrow(
+            Box::new(reassociate_rexpr(*domain, globals, fixities)?),
+            Box::new(reassociate_rexpr(*codomain, globals, fixities)?),
+            span,
+        ),
+        RExpr::RTrunc(inner, span) => RExpr::RTrunc(
+            Box::new(reassociate_rexpr(*inner, globals, fixities)?),
+            span,
+        ),
+        leaf => leaf,
+    })
+}
+
+fn reassociate_rtype(
+    ty: RType,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+) -> Result<RType, ElabError> {
+    Ok(match ty {
+        RType::RPi(name, domain, codomain, span) => RType::RPi(
+            name,
+            Box::new(reassociate_rtype(*domain, globals, fixities)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            span,
+        ),
+        RType::RSigma(name, domain, codomain, span) => RType::RSigma(
+            name,
+            Box::new(reassociate_rtype(*domain, globals, fixities)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            span,
+        ),
+        RType::RArr(domain, codomain, span) => RType::RArr(
+            Box::new(reassociate_rtype(*domain, globals, fixities)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            span,
+        ),
+        RType::REffectArr(domain, row, codomain, span) => RType::REffectArr(
+            Box::new(reassociate_rtype(*domain, globals, fixities)?),
+            row,
+            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            span,
+        ),
+        RType::RRefine(name, carrier, predicate, span) => RType::RRefine(
+            name,
+            Box::new(reassociate_rtype(*carrier, globals, fixities)?),
+            Box::new(reassociate_rexpr(*predicate, globals, fixities)?),
+            span,
+        ),
+        RType::RApp(function, argument, span) => RType::RApp(
+            Box::new(reassociate_rtype(*function, globals, fixities)?),
+            Box::new(reassociate_rtype(*argument, globals, fixities)?),
+            span,
+        ),
+        leaf => leaf,
+    })
+}
+
+fn install_fixity_binding(
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    id: GlobalId,
+    operator: &str,
+    declared: Option<(Fixity, Span)>,
+) -> Result<bool, ElabError> {
+    let Some((fixity, span)) = declared else {
+        return Ok(false);
+    };
+    match fixities.get(&id).copied() {
+        None => {
+            fixities.insert(id, fixity);
+            fixity_spans.insert(id, span);
+            Ok(true)
+        }
+        Some(existing) if existing == fixity => Ok(false),
+        Some(existing) => Err(ElabError::ConflictingFixity {
+            operator: operator.to_string(),
+            first: existing,
+            second: fixity,
+            first_span: fixity_spans.get(&id).cloned().unwrap_or_default(),
+            second_span: span,
+        }),
+    }
+}
+
+pub(crate) fn reassociate_space_decl(
+    space: &RSpaceDecl,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+) -> Result<Option<Box<RSpaceDecl>>, ElabError> {
+    if !space.contains_infix_spine {
+        return Ok(None);
+    }
+    let mut associated = space.clone();
+    for cell in &mut associated.cells {
+        cell.ty = reassociate_rtype(cell.ty.clone(), globals, fixities)?;
+        cell.init = reassociate_rexpr(cell.init.clone(), globals, fixities)?;
+    }
+    for operation in &mut associated.operations {
+        for (_, parameter_type) in &mut operation.params {
+            *parameter_type = reassociate_rtype(parameter_type.clone(), globals, fixities)?;
+        }
+        operation.ret_ty = reassociate_rtype(operation.ret_ty.clone(), globals, fixities)?;
+        operation.requires = operation
+            .requires
+            .clone()
+            .into_iter()
+            .map(|expr| reassociate_rexpr(expr, globals, fixities))
+            .collect::<Result<Vec<_>, _>>()?;
+        operation.ensures = operation
+            .ensures
+            .clone()
+            .into_iter()
+            .map(|expr| reassociate_rexpr(expr, globals, fixities))
+            .collect::<Result<Vec<_>, _>>()?;
+        operation.body = reassociate_rexpr(operation.body.clone(), globals, fixities)?;
+    }
+    Ok(Some(Box::new(associated)))
+}
+
+fn reassociate_rdecl(
+    rdecl: &RDecl,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+) -> Result<Option<Box<RDecl>>, ElabError> {
+    if !rdecl.contains_infix_spine {
+        return Ok(None);
+    }
+    let mut associated = rdecl.clone();
+    associated.ty = associated
+        .ty
+        .map(|ty| reassociate_rtype(ty, globals, fixities))
+        .transpose()?;
+    associated.body = reassociate_rexpr(associated.body, globals, fixities)?;
+    associated.requires = associated
+        .requires
+        .into_iter()
+        .map(|expr| reassociate_rexpr(expr, globals, fixities))
+        .collect::<Result<Vec<_>, _>>()?;
+    associated.ensures = associated
+        .ensures
+        .into_iter()
+        .map(|expr| reassociate_rexpr(expr, globals, fixities))
+        .collect::<Result<Vec<_>, _>>()?;
+    match &mut associated.kind {
+        RDeclKind::View { constraints, .. } => {
+            for constraint in constraints {
+                constraint.head_type =
+                    reassociate_rtype(constraint.head_type.clone(), globals, fixities)?;
+            }
+        }
+        RDeclKind::Prop { intros } => {
+            for intro in intros {
+                intro.ty = reassociate_rtype(intro.ty.clone(), globals, fixities)?;
+            }
+        }
+        RDeclKind::Law { fields, .. } => {
+            for (_, field) in fields {
+                *field = reassociate_rexpr(field.clone(), globals, fixities)?;
+            }
+        }
+        RDeclKind::DataDecl { ctors, .. } => {
+            for ctor in ctors {
+                ctor.args = ctor
+                    .args
+                    .clone()
+                    .into_iter()
+                    .map(|ty| reassociate_rtype(ty, globals, fixities))
+                    .collect::<Result<Vec<_>, _>>()?;
+            }
+        }
+        RDeclKind::ExplicitDataDecl {
+            params,
+            indices,
+            ctors,
+            ..
+        } => {
+            for entry in params.iter_mut().chain(indices.iter_mut()) {
+                entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities)?;
+            }
+            for ctor in ctors {
+                for entry in &mut ctor.args {
+                    entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities)?;
+                }
+                ctor.result = ctor
+                    .result
+                    .clone()
+                    .map(|ty| reassociate_rtype(ty, globals, fixities))
+                    .transpose()?;
+            }
+        }
+        RDeclKind::TypeAlias { ty } => {
+            *ty = reassociate_rtype(ty.clone(), globals, fixities)?;
+        }
+        RDeclKind::RecordDecl { fields } => {
+            for field in fields {
+                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities)?;
+            }
+        }
+        RDeclKind::ClassDecl {
+            param_kind, fields, ..
+        } => {
+            *param_kind = param_kind
+                .clone()
+                .map(|ty| reassociate_rtype(ty, globals, fixities))
+                .transpose()?;
+            for field in fields {
+                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities)?;
+            }
+        }
+        RDeclKind::InstanceDecl {
+            head_type,
+            constraints,
+            fields,
+            ..
+        } => {
+            *head_type = reassociate_rtype(head_type.clone(), globals, fixities)?;
+            for constraint in constraints {
+                constraint.head_type =
+                    reassociate_rtype(constraint.head_type.clone(), globals, fixities)?;
+            }
+            for (_, field) in fields {
+                *field = reassociate_rexpr(field.clone(), globals, fixities)?;
+            }
+        }
+        RDeclKind::Let
+        | RDeclKind::Prove
+        | RDeclKind::Theorem
+        | RDeclKind::AttachedProof { .. }
+        | RDeclKind::Foreign { .. }
+        | RDeclKind::Temporal { .. }
+        | RDeclKind::DeriveDecl { .. } => {}
+    }
+    Ok(Some(Box::new(associated)))
+}
+
+#[cfg(test)]
+mod fixity_reassociation_skip_tests {
+    use super::reassociate_rdecl;
+    use crate::error::Span;
+    use crate::resolve::{RDecl, RDeclKind, RExpr};
+    use std::collections::HashMap;
+
+    /// Promise class: durable invariant. MEASURED: resolution's negative spine
+    /// marker returns the borrowed-path sentinel without cloning or walking the
+    /// body. CLAIMED: legacy declarations do zero reassociation work. THE GAP:
+    /// the unchanged Map stated-stack controls separately bind this structural
+    /// seam to the full recursive elaboration path.
+    #[test]
+    fn spine_free_declaration_returns_the_zero_work_sentinel() {
+        let span = Span::zero();
+        let declaration = RDecl {
+            name: "legacy".to_string(),
+            ty: None,
+            body: RExpr::RUniv(None, span.clone()),
+            contains_infix_spine: false,
+            requires: vec![],
+            ensures: vec![],
+            span,
+            kind: RDeclKind::Let,
+        };
+        assert!(
+            reassociate_rdecl(&declaration, &HashMap::new(), &HashMap::new())
+                .expect("spine-free reassociation cannot fail")
+                .is_none(),
+            "a spine-free declaration must not allocate or traverse an associated clone"
+        );
+    }
+}
+
 /// V1 elaboration: returns the definition id plus any emitted obligation holes.
 pub fn elaborate_rdecl_v1(
     env: &mut GlobalEnv,
@@ -9130,6 +9636,8 @@ pub fn elaborate_rdecl_v1(
     class_env: &mut ClassEnv,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
+    let mut fixities = HashMap::new();
+    let mut fixity_spans = HashMap::new();
     elaborate_rdecl_v1_with_effect_rows(
         env,
         globals,
@@ -9137,6 +9645,9 @@ pub fn elaborate_rdecl_v1(
         numeric_env,
         class_env,
         &HashMap::new(),
+        &mut fixities,
+        &mut fixity_spans,
+        None,
         rdecl,
     )
 }
@@ -9168,6 +9679,55 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
     effect_rows: &HashMap<String, crate::effects::RowType>,
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    declared_fixity: Option<(Fixity, Span)>,
+    rdecl: &RDecl,
+) -> Result<ElabResult, ElabError> {
+    let self_reference_waits_for_preadmission = !globals.contains_key(&rdecl.name)
+        && rexpr_mentions_name(&rdecl.body, &rdecl.name)
+        && matches!(rdecl.kind, RDeclKind::View { .. } | RDeclKind::Let);
+    if self_reference_waits_for_preadmission || !rdecl.contains_infix_spine {
+        return elaborate_associated_rdecl(
+            env,
+            globals,
+            num_values,
+            numeric_env,
+            class_env,
+            effect_rows,
+            fixities,
+            fixity_spans,
+            declared_fixity,
+            rdecl,
+        );
+    }
+    let associated = reassociate_rdecl(rdecl, globals, fixities)?
+        .expect("a declaration marked with an infix spine must be reassociated");
+    elaborate_associated_rdecl(
+        env,
+        globals,
+        num_values,
+        numeric_env,
+        class_env,
+        effect_rows,
+        fixities,
+        fixity_spans,
+        declared_fixity,
+        &associated,
+    )
+}
+
+#[inline(never)]
+fn elaborate_associated_rdecl(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    class_env: &mut ClassEnv,
+    effect_rows: &HashMap<String, crate::effects::RowType>,
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     if matches!(
@@ -9228,6 +9788,9 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
                 class_env,
                 rdecl,
                 &local_dicts,
+                fixities,
+                fixity_spans,
+                declared_fixity.clone(),
             );
             if let Ok(result) = &mut result {
                 result.effect_row_type = effect_row_type;
@@ -9242,6 +9805,9 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
             class_env,
             rdecl,
             &HashMap::new(),
+            fixities,
+            fixity_spans,
+            declared_fixity.clone(),
         ),
         RDeclKind::Prove => elaborate_prove(env, globals, num_values, numeric_env, rdecl),
         RDeclKind::Prop { intros } => {
@@ -9912,11 +10478,11 @@ fn elab_instance_decl(
         constraints
             .iter()
             .map(|constraint| {
-                let class = class_env
-                    .class(&constraint.class_name)
-                    .ok_or_else(|| ElabError::UnresolvedCon {
+                let class = class_env.class(&constraint.class_name).ok_or_else(|| {
+                    ElabError::UnresolvedCon {
                         name: constraint.class_name.clone(),
                         span: span.clone(),
+                    }
                     })?;
                 let head = elab_type(&mut cx, &constraint.head_type)?;
                 Ok(if class.projection.head_param.is_some() {
@@ -10275,6 +10841,9 @@ fn elaborate_view_or_let(
     class_env: &ClassEnv,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    declared_fixity: Option<(Fixity, Span)>,
 ) -> Result<ElabResult, ElabError> {
     // Check for implicit ensures from a return-type refinement (`22 §2.1`).
     let has_refine_return = rdecl
@@ -10292,6 +10861,9 @@ fn elaborate_view_or_let(
             class_env,
             rdecl,
             local_dicts,
+            fixities,
+            fixity_spans,
+            declared_fixity,
         );
     }
     // V1 path: has requires/ensures or implicit return-type refinement obligation
@@ -10757,13 +11329,26 @@ fn elaborate_v0(
     class_env: &ClassEnv,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    declared_fixity: Option<(Fixity, Span)>,
 ) -> Result<ElabResult, ElabError> {
     // A self-recursive view/let (body mentions its own name) must be admitted
     // through the SCT gate with the name pre-bound, so the body's self-call
     // resolves — `declare_def` allocates the id only after the body is built,
     // which is too late for a self-reference. Route to the recursive path.
     if rexpr_mentions_name(&rdecl.body, &rdecl.name) {
-        return elaborate_recursive_view(env, globals, num_values, numeric_env, class_env, rdecl);
+        return elaborate_recursive_view(
+            env,
+            globals,
+            num_values,
+            numeric_env,
+            class_env,
+            fixities,
+            fixity_spans,
+            declared_fixity,
+            rdecl,
+        );
     }
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
@@ -10850,6 +11435,9 @@ fn elaborate_recursive_view(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     // 1. Elaborate the declared type (recursive views are annotated).
@@ -10871,14 +11459,53 @@ fn elaborate_recursive_view(
         ty: ty_core.clone(),
     });
     globals.insert(rdecl.name.clone(), id);
+    let fixity_inserted =
+        match install_fixity_binding(fixities, fixity_spans, id, &rdecl.name, declared_fixity) {
+            Ok(inserted) => inserted,
+            Err(error) => {
+                env.remove_last();
+                globals.remove(&rdecl.name);
+                return Err(error);
+            }
+        };
 
-    // 3. Elaborate the body (self-ref resolves to `id` via globals).
-    let (body_core, body_obligations) = {
+    // 3. Reassociate once, after predeclaration and before type-directed body
+    // elaboration. The existing checker sees ordinary RApp/RBinOp only.
+    let associated = match reassociate_rdecl(rdecl, globals, fixities) {
+        Ok(associated) => associated,
+        Err(error) => {
+            env.remove_last();
+            globals.remove(&rdecl.name);
+            if fixity_inserted {
+                fixities.remove(&id);
+                fixity_spans.remove(&id);
+            }
+            return Err(error);
+        }
+    };
+    let associated = associated.as_deref().unwrap_or(rdecl);
+    let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env);
-        let body_c = check(&mut cx, &rdecl.body, &ty_core, &rdecl.span)?;
+        let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
-        (cx.metas.zonk_term(&body_c), obligations)
+        Ok((cx.metas.zonk_term(&body_c), obligations))
+    })();
+    let (body_core, body_obligations) = match body_result {
+        Ok(body) => body,
+        Err(error) => {
+            while let Some(d) = env.remove_last() {
+                if d.id() == id {
+                    break;
+                }
+            }
+            globals.remove(&rdecl.name);
+            if fixity_inserted {
+                fixities.remove(&id);
+                fixity_spans.remove(&id);
+            }
+            return Err(error);
+        }
     };
 
     // 4. Kernel type-check + SCT gate (singleton recursive group).
@@ -10908,6 +11535,10 @@ fn elaborate_recursive_view(
                 }
             }
             globals.remove(&rdecl.name);
+            if fixity_inserted {
+                fixities.remove(&id);
+                fixity_spans.remove(&id);
+            }
             Err(ElabError::KernelRejected {
                 error: e,
                 span: rdecl.span.clone(),
@@ -10934,6 +11565,9 @@ pub fn elaborate_mutual_group(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    fixities: &mut HashMap<GlobalId, Fixity>,
+    fixity_spans: &mut HashMap<GlobalId, Span>,
+    declared_fixities: &[Option<(Fixity, Span)>],
     members: &[RDecl],
 ) -> Result<Vec<ElabResult>, ElabError> {
     // 1. Elaborate every member's declared type FIRST (the signature
@@ -10967,6 +11601,72 @@ pub fn elaborate_mutual_group(
         globals.insert(rdecl.name.clone(), id);
         ids.push(id);
     }
+
+    if declared_fixities.len() != members.len() {
+        for id in ids.iter().rev() {
+            env.remove_last();
+            let _ = id;
+        }
+        for rdecl in members {
+            globals.remove(&rdecl.name);
+        }
+        return Err(ElabError::Internal(
+            "mutual-group fixity metadata length does not match members".into(),
+        ));
+    }
+    let mut inserted_fixity_ids = Vec::new();
+    for ((rdecl, id), declared) in members.iter().zip(&ids).zip(declared_fixities) {
+        match install_fixity_binding(fixities, fixity_spans, *id, &rdecl.name, declared.clone()) {
+            Ok(true) => inserted_fixity_ids.push(*id),
+            Ok(false) => {}
+            Err(error) => {
+                for inserted in &inserted_fixity_ids {
+                    fixities.remove(inserted);
+                    fixity_spans.remove(inserted);
+                }
+                for id in ids.iter().rev() {
+                    while let Some(decl) = env.remove_last() {
+                        if decl.id() == *id {
+                            break;
+                        }
+                    }
+                }
+                for member in members {
+                    globals.remove(&member.name);
+                }
+                return Err(error);
+            }
+        }
+    }
+    let associated_members = match members
+        .iter()
+        .map(|member| reassociate_rdecl(member, globals, fixities))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(members) => members,
+        Err(error) => {
+            for inserted in &inserted_fixity_ids {
+                fixities.remove(inserted);
+                fixity_spans.remove(inserted);
+            }
+            for id in ids.iter().rev() {
+                while let Some(decl) = env.remove_last() {
+                    if decl.id() == *id {
+                        break;
+                    }
+                }
+            }
+            for member in members {
+                globals.remove(&member.name);
+            }
+            return Err(error);
+        }
+    };
+    let members = associated_members
+        .iter()
+        .zip(members.iter())
+        .map(|(associated, original)| associated.as_deref().unwrap_or(original))
+        .collect::<Vec<_>>();
 
     // Proof declarations share the same signature-first admission path as
     // computations, but retain their existing Ω and attached-subject guards
@@ -11005,8 +11705,12 @@ pub fn elaborate_mutual_group(
                 }
             }
         }
-        for rdecl in members {
+        for rdecl in &members {
             globals.remove(&rdecl.name);
+        }
+        for inserted in &inserted_fixity_ids {
+            fixities.remove(inserted);
+            fixity_spans.remove(inserted);
         }
         return Err(e);
     }
@@ -11040,8 +11744,12 @@ pub fn elaborate_mutual_group(
                 }
             }
         }
-        for rdecl in members {
+        for rdecl in &members {
             globals.remove(&rdecl.name);
+        }
+        for inserted in &inserted_fixity_ids {
+            fixities.remove(inserted);
+            fixity_spans.remove(inserted);
         }
         return Err(e);
     }
@@ -11091,8 +11799,12 @@ pub fn elaborate_mutual_group(
                     }
                 }
             }
-            for rdecl in members {
+            for rdecl in &members {
                 globals.remove(&rdecl.name);
+            }
+            for inserted in &inserted_fixity_ids {
+                fixities.remove(inserted);
+                fixity_spans.remove(inserted);
             }
             Err(ElabError::KernelRejected {
                 error: e,
@@ -11128,9 +11840,26 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::ROld(e, _) => rexpr_mentions_name(e, name),
         RExpr::RBecomes(_, _, e, _) => rexpr_mentions_name(e, name),
         RExpr::RBinOp(_, l, r, _) => rexpr_mentions_name(l, name) || rexpr_mentions_name(r, name),
+        RExpr::RInfixSpine {
+            operands,
+            operators,
+            ..
+        } => {
+            operands
+                .iter()
+                .any(|operand| rexpr_mentions_name(operand, name))
+                || operators.iter().any(
+                    |operator| matches!(operator, RInfixOperator::User(operator_name, _) if operator_name == name),
+                )
+        }
         RExpr::RMatch { scrut, arms, .. } => {
             rexpr_mentions_name(scrut, name)
-                || arms.iter().any(|a| rexpr_mentions_name(&a.body, name))
+                || arms.iter().any(|arm| {
+                    arm.guard
+                        .as_ref()
+                        .is_some_and(|guard| rexpr_mentions_name(guard, name))
+                        || rexpr_mentions_name(&arm.body, name)
+                })
         }
         RExpr::RIf {
             condition,
@@ -11493,6 +12222,7 @@ fn elaborate_prop_decl(
             requires: vec![],
             ensures: vec![],
             span: intro.span.clone(),
+            contains_infix_spine: false,
             kind: RDeclKind::Theorem,
         };
         let helper = elaborate_checked_theorem(
@@ -12030,7 +12760,11 @@ fn infer_active_pattern_alias(
                 name
             ))
         })?;
-    let growth = cx.ctx.len().checked_sub(alias.install_depth).ok_or_else(|| {
+    let growth = cx
+        .ctx
+        .len()
+        .checked_sub(alias.install_depth)
+        .ok_or_else(|| {
         ElabError::Internal(format!(
             "as-pattern alias '{}' escaped its installation context",
             name

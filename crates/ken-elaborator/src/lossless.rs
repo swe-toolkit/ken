@@ -69,7 +69,10 @@ mod comment_kind_mapping_tests {
             TriviaKind::from(CommentKind::DocLine),
             TriviaKind::DocLineComment
         );
-        assert_eq!(TriviaKind::from(CommentKind::Block), TriviaKind::BlockComment);
+        assert_eq!(
+            TriviaKind::from(CommentKind::Block),
+            TriviaKind::BlockComment
+        );
         assert_eq!(
             TriviaKind::from(CommentKind::DocBlock),
             TriviaKind::DocBlockComment
@@ -648,6 +651,7 @@ fn collect_decl_spans(decl: &Decl, out: &mut Vec<Span>) {
         }
         Decl::Pub(inner) => collect_decl_spans(inner, out),
         Decl::BoundaryDecl { .. }
+        | Decl::FixityDecl { .. }
         | Decl::TemporalDecl { .. }
         | Decl::DeriveDecl { .. }
         | Decl::ImportDecl { .. }
@@ -701,6 +705,18 @@ fn collect_expr_spans(expr: &Expr, out: &mut Vec<Span>) {
         | Expr::EArrow(function, argument, _) => {
             collect_expr_spans(function, out);
             collect_expr_spans(argument, out);
+        }
+        Expr::EInfixSpine {
+            operands,
+            operators,
+            ..
+        } => {
+            operands
+                .iter()
+                .for_each(|operand| collect_expr_spans(operand, out));
+            operators
+                .iter()
+                .for_each(|operator| out.push(operator.span().clone()));
         }
         Expr::ELam(_, body, _)
         | Expr::EOld(body, _)
