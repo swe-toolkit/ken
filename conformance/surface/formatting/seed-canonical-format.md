@@ -16,16 +16,21 @@ succeeds, and the original body layout otherwise remains byte-identical.
 **Formatting-seed fixture census.** The marker above is occurrence 1 of 20 at
 the candidate base. It is a scope declaration, not a fixture; the 18 marked
 cases and FMT9's marked scope declaration are adjudicated in place below. Of
-those 18 cases, 14 name fixtures the landed lexer and formatter surface can
-produce. Four are blocked: three direct cases respectively require an ASCII
-membership role, bracketed hexadecimal bytes, and user-declared fixity, while
-FMT1 aggregates all three. The lexer emits `KwIn` for ASCII `in`, emits
-`Member` only for source `∈`, and has no bracketed-byte token; the parser has
-neither a membership-expression arm nor a fixity-declaration arm. No blocker
-has landed any of those missing surfaces. Ownership is filed as
-[[LANG-MEMBERSHIP-OPERATOR-SURFACE]], [[LANG-BYTES-HEX-LIST-LITERAL]], and
-[[LANG-FIXITY-DECL-SURFACE]]; filing a blocker does not make its fixture
-producible.
+those 18 cases, 16 name fixtures the landed lexer and formatter surface can
+produce. Two remain blocked: FMT8's membership case and the FMT1 aggregate that
+includes it. The bracketed-hexadecimal-byte and user-declared-fixity surfaces
+have since landed ([[LANG-BYTES-HEX-LIST-LITERAL]], [[LANG-FIXITY-DECL-SURFACE]]):
+the lexer now routes `0x[` to a bracketed byte-list scanner emitting the same
+`ByteStr` token as `b"..."`, and the parser now has the `infixl`/`infixr`/`infix`
+fixity-declaration arm and a user-operator infix spine, so FMT6's `0x[...]` bytes
+and FMT8's user-declared fixity are producible. What has not landed is the
+membership-expression surface: the lexer emits `Member` for source `∈` and
+`KwIn` for ASCII `in`, but the parser still has no membership-expression arm, so
+a `∈` proposition cannot be constructed. The glyph-only spec pin
+([[LANG-MEMBERSHIP-ASCII-ROLE-spec]]) fixes ASCII `in` as solely the keyword —
+there is no ASCII membership alias to wait for — so the sole remaining blocker
+is the `∈`-operator parser arm, filed as [[LANG-MEMBERSHIP-OPERATOR-SURFACE]]
+(recut, not yet landed); filing a blocker does not make its fixture producible.
 
 This census is formatting-seed-only. Seven markers elsewhere in conformance are
 not swept: five in
@@ -52,16 +57,16 @@ substring replacement is never an acceptable witness.
 - expect: **RED-UNTIL-BUILT (B3/B4/C)** — byte-for-byte
   `fmt(fmt(source)) == fmt(source)`. The comparison includes final newline,
   blank lines, comment placement, fence markers, and Markdown outside fences.
-- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE
-  ([[LANG-MEMBERSHIP-OPERATOR-SURFACE]]),
-  BLOCKED-ON-HEX-BYTE-LIST-SURFACE ([[LANG-BYTES-HEX-LIST-LITERAL]]), AND
-  BLOCKED-ON-USER-FIXITY-SURFACE ([[LANG-FIXITY-DECL-SURFACE]])** — production
-  exposes
-  `format_ken` and `format_ken_md` for the other referenced fixtures, but this
-  aggregate also includes all three unproducible direct cases: FMT8's ASCII
-  membership role, FMT6's bracketed `0x[...]` bytes, and FMT8's user-declared
-  fixity expression. All three blockers are filed, but none has landed its
-  surface; production still has no surface for any of the three.
+- fixture: **BLOCKED-ON-MEMBERSHIP-OPERATOR-SURFACE
+  ([[LANG-MEMBERSHIP-OPERATOR-SURFACE]])** — the bracketed-byte
+  ([[LANG-BYTES-HEX-LIST-LITERAL]]) and user-fixity ([[LANG-FIXITY-DECL-SURFACE]])
+  surfaces have landed, so FMT6's `0x[...]` bytes and FMT8's user-declared
+  fixity expression are now producible through `format_ken`. The one remaining
+  unproducible direct case this aggregate includes is FMT8's membership
+  expression: the parser has no `∈`-expression arm, and the glyph-only pin
+  ([[LANG-MEMBERSHIP-ASCII-ROLE-spec]]) settles that ASCII `in` never bears a
+  membership role, so there is no ASCII-alias case to wait for — only the
+  `∈`-operator surface. The aggregate stays blocked until that arm lands.
 - why: a formatter that oscillates between flat and broken groups, relocates a
   comment on each pass, or repeatedly rewrites a fence marker can satisfy
   parse preservation while failing to define one canonical form. Byte identity
@@ -207,12 +212,12 @@ substring replacement is never an acceptable witness.
   source lexeme is byte-identical after formatting: base, separators, suffix,
   exponent, delimiter, escape spelling, and payload all survive. Alias-looking
   bytes inside any protected region are not converted to glyphs.
-- fixture: **BLOCKED-ON-HEX-BYTE-LIST-SURFACE
-  ([[LANG-BYTES-HEX-LIST-LITERAL]])** — the blocker is filed, not landed.
-  Production can lex the other listed literal families, but has no `0x[...]`
-  byte-list token or AST path. Source `0x[` enters radix-integer lexing and
-  fails for having no hexadecimal digit before `[`, so the complete fixture
-  cannot be parsed and handed to `format_ken`.
+- fixture: **PRODUCIBLE** — the hex-byte-list surface has landed
+  ([[LANG-BYTES-HEX-LIST-LITERAL]]): the lexer routes `0x[` to a bracketed
+  byte-list scanner that emits the same `ByteStr` token as `b"..."`, and
+  `parse_lossless`/`format_ken` accept the complete literal-census fixture, so
+  it reaches the formatter. Producibility does not assert the verbatim-survival
+  verdict above is green; that remains the RED-UNTIL-BUILT formatter claim.
 - why: this exercises each literal form independently. Testing only an ordinary
   string would leave raw/multiline strings, chars, bytes, numeric spellings,
   comments, foreign names, and temporal payloads unguarded.
@@ -387,18 +392,29 @@ accepting both arms is insufficient.
 
 ### surface/formatting/in-keyword-and-membership-token-stay-distinct (ambiguity)
 
-- spec: `31 §1b`/`§1d`, `32` (`let ... in ...` and membership `∈`)
-- given: a `let x = value in body` expression beside membership written with
-  its accepted ASCII alias in an otherwise fixed proposition
-- expect: **RED-UNTIL-BUILT (B2/B3/C)** — the keyword remains ASCII `in`; the
-  parsed membership operator prints `∈`
-- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE
-  ([[LANG-MEMBERSHIP-OPERATOR-SURFACE]])** — the blocker is filed, not landed.
-  The lexer maps ASCII `in` only to `KwIn`, maps source `∈` to `Member`, and
-  the parser has no membership-expression arm. Production therefore cannot
-  assign the accepted ASCII bytes the membership role this `given` requires.
-- why: the same input bytes occupy opposite token roles. Replacing every `in`
-  either corrupts the keyword or fails to canonicalize membership.
+- spec: `31 §1b`/`§1d`, `32` (`let ... in ...` and membership `∈`);
+  glyph-only membership pin ([[LANG-MEMBERSHIP-ASCII-ROLE-spec]])
+- given: a `let x = value in body` expression beside a membership proposition
+  written with the `∈` glyph in an otherwise fixed proposition. There is no
+  ASCII membership alias: the glyph-only pin fixes ASCII `in` as solely the
+  keyword, so the keyword and the membership operator are lexically distinct
+  tokens, not one spelling in two roles.
+- expect: **RED-UNTIL-BUILT (B2/B3/C)** — ASCII `in` remains the keyword `in`,
+  and the `∈` membership operator prints `∈`; the formatter never rewrites the
+  keyword `in` to the `∈` glyph and never renders `∈` as ASCII
+- fixture: **BLOCKED-ON-MEMBERSHIP-OPERATOR-SURFACE
+  ([[LANG-MEMBERSHIP-OPERATOR-SURFACE]])** — the lexer maps ASCII `in` to `KwIn`
+  and source `∈` to `Member`, but the parser still has no membership-expression
+  arm (the operator surface was recut, not landed), so the `∈` proposition
+  cannot yet be constructed and handed to `format_ken`. The earlier
+  "accepted ASCII alias" framing is retired: the glyph-only pin removed any
+  shared-byte ambiguity, leaving only the operator-arm blocker above.
+- why: the keyword `in` and the membership glyph `∈` are lexically distinct but
+  semantically adjacent, so a glyph-canonicalizer that maps ASCII `in` to `∈`
+  (as it maps `->` to `→`) would corrupt the keyword, and one that renders `∈`
+  as ASCII would produce the keyword spelling. Formatting each in its own role
+  makes either conflation observable — the same over-fire discriminator as the
+  `l`/`level`/`ℓ` case above.
 
 ### surface/formatting/lambda-and-dependent-arrow-remain-distinct (ambiguity)
 
@@ -420,12 +436,14 @@ accepting both arms is insufficient.
 - expect: **RED-UNTIL-BUILT (B3/C)** — formatted output reparses to the exact
   same tree for each construct, inserting mandatory-clarity parentheses where
   needed but never changing grouping
-- fixture: **BLOCKED-ON-USER-FIXITY-SURFACE
-  ([[LANG-FIXITY-DECL-SURFACE]])** — the blocker is filed, not landed. The
-  landed parser represents ascription, binders, arrows, application, and
-  built-in arithmetic precedence, but exposes no fixity-declaration arm or
-  user-fixity token. Production therefore cannot construct the named
-  user-declared-fixity orientation.
+- fixture: **PRODUCIBLE** — the user-fixity surface has landed
+  ([[LANG-FIXITY-DECL-SURFACE]]): the parser exposes the
+  `infixl`/`infixr`/`infix` fixity-declaration arm and a user-operator infix
+  spine (`33 §6`), so a fixity declaration plus its use joins the ascription,
+  binder, arrow, application, and arithmetic constructs the parser already
+  represented. `parse_lossless`/`format_ken` accept the combined orientation, so
+  it reaches the formatter; the reparse-to-same-tree verdict above remains the
+  RED-UNTIL-BUILT formatter claim.
 - why: catches a pretty-printer that preserves tokens yet changes the parse at
   a line break or precedence boundary.
 
