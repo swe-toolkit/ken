@@ -1,7 +1,7 @@
 ---
 id: LANG-FIXITY-DECL-SURFACE
 title: "`infixl N op` / `infixr N op` / `infix N op` populate a fixity table the parser consults -- the third and last part of user-defined operators, and the only one carrying a real design call: declaration-before-use versus whole-module collection, and scoping across imports"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
