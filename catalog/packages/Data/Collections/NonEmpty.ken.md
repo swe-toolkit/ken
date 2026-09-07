@@ -30,33 +30,39 @@ The `nonempty_` prefix keeps these operations distinct from the ordinary-list
 combinators in `Data.Collections` while preserving the same familiar names.
 
 ```ken
-data NonEmpty a = NonEmptyCons a (List a)
+import Core.Classes.LawfulFunctors (Semigroup)
+
+import Core.Logic.Transport (cong)
+
+import Data.Collections.Derived (list_append)
+
+pub data NonEmpty a = NonEmptyCons a (List a)
 
 pub fn nonempty_singleton (a : Type) (x : a) : NonEmpty a = NonEmptyCons a x (Nil a)
 
 pub fn nonempty_cons (a : Type) (x : a) (rest : List a) : NonEmpty a = NonEmptyCons a x rest
 
-fn nonempty_head (a : Type) (xs : NonEmpty a) : a =
+pub fn nonempty_head (a : Type) (xs : NonEmpty a) : a =
   match xs {
     NonEmptyCons x rest ↦ x
   }
 
-fn nonempty_tail (a : Type) (xs : NonEmpty a) : List a =
+pub fn nonempty_tail (a : Type) (xs : NonEmpty a) : List a =
   match xs {
     NonEmptyCons x rest ↦ rest
   }
 
-fn nonempty_to_list (a : Type) (xs : NonEmpty a) : List a =
+pub fn nonempty_to_list (a : Type) (xs : NonEmpty a) : List a =
   match xs {
     NonEmptyCons x rest ↦ Cons a x rest
   }
 
-fn nonempty_map (a : Type) (b : Type) (f : a → b) (xs : NonEmpty a) : NonEmpty b =
+pub fn nonempty_map (a : Type) (b : Type) (f : a → b) (xs : NonEmpty a) : NonEmpty b =
   match xs {
     NonEmptyCons x rest ↦ NonEmptyCons b (f x) (map a b f rest)
   }
 
-fn nonempty_append (a : Type) (xs : NonEmpty a) (ys : NonEmpty a) : NonEmpty a =
+pub fn nonempty_append (a : Type) (xs : NonEmpty a) (ys : NonEmpty a) : NonEmpty a =
   match xs {
     NonEmptyCons x rest ↦
       match ys {
@@ -71,7 +77,8 @@ Construction itself supplies the non-empty guarantee. Forgetting that
 guarantee with `nonempty_to_list` always produces a `Cons`.
 
 ```ken example
-const one_two : NonEmpty Nat = NonEmptyCons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat))
+const one_two : NonEmpty Nat =
+  nonempty_cons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat))
 
 const first_of_one_two : Nat = nonempty_head Nat one_two
 
@@ -112,6 +119,8 @@ instance Semigroup (NonEmpty a) {
   op = nonempty_append a;
   assoc = nonempty_append::assoc a
 }
+
+export Semigroup_instance_NonEmpty
 ```
 
 ## 5. Design notes
@@ -136,10 +145,11 @@ list-append associativity.
 
 ## 7. Trust & derivation
 
-**Public API (stable names):** `NonEmpty`/`NonEmptyCons`,
-`nonempty_singleton`, `nonempty_cons`, `nonempty_head`, `nonempty_tail`,
-`nonempty_to_list`, `nonempty_map`, `nonempty_append`, and
-`Semigroup_instance_NonEmpty`.
+**Public API (stable names):** abstract `NonEmpty`, `nonempty_singleton`,
+`nonempty_cons`, `nonempty_head`, `nonempty_tail`, `nonempty_to_list`,
+`nonempty_map`, `nonempty_append`, and `Semigroup_instance_NonEmpty`.
+`NonEmptyCons` is internal; the smart constructors are the public construction
+surface.
 
 **Source map:**
 

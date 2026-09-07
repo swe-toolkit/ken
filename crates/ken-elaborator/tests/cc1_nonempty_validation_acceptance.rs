@@ -49,8 +49,12 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
 fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
     let mut env = dependency_env();
 
-    env.elaborate_ken_md_file(NONEMPTY_KEN_MD)
-        .expect("Data/Collections/NonEmpty.ken.md and every checked fence must elaborate");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Collections.NonEmpty",
+    )
+    .expect("Data.Collections.NonEmpty must roots-load");
+    catalog_or::expose_module(&mut env, "Data.Collections.NonEmpty");
     assert_transparent_globals(
         &env,
         &[
@@ -62,22 +66,11 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
             "nonempty_map",
             "nonempty_append",
             "nonempty_append::assoc",
-            "Semigroup_instance_NonEmpty",
         ],
     );
 
-    env.elaborate_file(
-        "const ambient_singleton : NonEmpty Nat = nonempty_singleton Nat Zero \
-         const ambient_cons : NonEmpty Nat = nonempty_cons Nat (Suc Zero) (Nil Nat) \
-         const ambient_raw : NonEmpty Nat = NonEmptyCons Nat Zero (Nil Nat) \
-         theorem singleton_denotation : Equal (NonEmpty Nat) \
-           (nonempty_singleton Nat Zero) \
-           (NonEmptyCons Nat Zero (Nil Nat)) = Refl \
-         theorem cons_denotation : Equal (NonEmpty Nat) \
-           (nonempty_cons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))) \
-           (NonEmptyCons Nat Zero (Cons Nat (Suc Zero) (Nil Nat))) = Refl",
-    )
-    .expect("smart constructors and raw constructor remain ambiently usable during P1");
+    // Validation's roots-loaded import is the imported-head witness for the
+    // synthesized Semigroup dictionary; it must not become a flat alias.
 
     env.elaborate_ken_md_file(VALIDATION_KEN_MD)
         .expect("Data/Sums/Validation.ken.md and every checked fence must elaborate");
@@ -138,8 +131,8 @@ fn cc1_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
 
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(NONEMPTY_KEN_MD)
-        .expect("NonEmpty.ken.md must elaborate");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
+        .expect("NonEmpty must roots-load");
     env.elaborate_ken_md_file(VALIDATION_KEN_MD)
         .expect("Validation.ken.md must elaborate");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();

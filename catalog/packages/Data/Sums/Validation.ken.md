@@ -31,6 +31,9 @@ only successful values. `validation_ap` accumulates errors from both sides in
 left-to-right order.
 
 ```ken
+import Data.Collections.NonEmpty
+  (NonEmpty, nonempty_cons, nonempty_append, Semigroup_instance_NonEmpty)
+
 data Validation e a = Invalid e | Valid a
 
 fn validation_map
