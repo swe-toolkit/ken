@@ -1,7 +1,7 @@
 ---
 id: ABI-A3
 title: "promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested"
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
@@ -13,12 +13,14 @@ origin: docs/program/10-linux-abi-completion.md §4 (the ABI-completion program)
 
 > ## Authority: `10-linux-abi-completion.md` §4 — read that, not this
 >
-> ⛔ **This is a tracker/DAG node, NOT a shovel-ready WP frame.** A
-> `docs/program/wp/` frame carrying deliverables, acceptance criteria, fixed
-> inputs, negative controls, and a contention check **must be authored before
-> release** (§2c front-load rule: the T1 enclave does the design judgment so the
-> build ring executes mechanically). **Do not release this on the strength of
-> this file.**
+> ## RELEASED 2026-09-07 — the shovel-ready frame is authored.
+>
+> `docs/program/wp/ABI-A3-directory-mutation-native-promotion.md` carries the
+> deliverables, acceptance criteria, fixed inputs (measured at `3d85beb03`),
+> negative controls, hard-stop protocol, and contention check. Node flipped
+> `draft -> active` on release to the runtime ring; ABI-A2 completed
+> (`3d85beb03`), and `depends_on: [ABI-REVOKE, ABI-R3]` are both merged. Build
+> from the frame, not this tracker node.
 
 ## Objective
 
