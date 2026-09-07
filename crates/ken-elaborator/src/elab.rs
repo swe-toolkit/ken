@@ -355,6 +355,12 @@ struct ElabCtx<'e> {
     /// body` later relocates to the convoy binder — so the resolved term is a
     /// bare `Var` in that case, not a `Cast`.
     var_refinements: HashMap<usize, (Term, Term, usize)>,
+    /// Generated equality leaves for each active indexed-match branch. The
+    /// leaves are stored at `install_depth`; a fresh local binder rebases their
+    /// endpoints by later context growth before refining its recorded type.
+    /// This is type-at-introduction bookkeeping only: fresh binders are not
+    /// added to `var_refinements`.
+    active_index_refinements: Vec<ActiveIndexRefinement>,
     /// Bottom-relative `[start, end)` ranges of `cx.ctx` positions bound as
     /// constructor fields by a match arm currently under elaboration,
     /// innermost last. Capability 2 (sibling convoy) must skip these: a field
@@ -415,6 +421,7 @@ impl<'e> ElabCtx<'e> {
             class_env: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
+            active_index_refinements: Vec::new(),
             match_field_regions: Vec::new(),
             hidden_positions: Vec::new(),
             lift_bindings: HashMap::new(),
@@ -816,6 +823,64 @@ fn prepare_let_rhs(
         }
         None => infer(cx, rhs),
     }
+}
+
+/// Refine a fresh `let` binder by every enclosing indexed-match branch. Each
+/// leaf was projected where its branch fields were installed, so weaken both
+/// endpoints by the intervening context growth before applying the same
+/// `scrutinee -> target` substitution as `refine_branch_goal`. Apply it to the
+/// RHS core and its recorded type in lockstep: the fresh binder itself is not
+/// in scope in either, and it is not added to `var_refinements`.
+#[inline(never)]
+fn refine_let_rhs(
+    cx: &ElabCtx,
+    rhs_core: &mut Term,
+    rhs_ty: &mut Term,
+) -> Result<(), ElabError> {
+    for frame in &cx.active_index_refinements {
+        let growth = cx
+            .ctx
+            .len()
+            .checked_sub(frame.install_depth)
+            .ok_or_else(|| {
+                ElabError::Internal("let type refinement escaped its branch context".into())
+            })? as i64;
+        for leaf in &frame.leaves {
+            let scrutinee = weaken(&leaf.scrutinee, growth);
+            let target = weaken(&leaf.target, growth);
+            let candidate_ty = subst_term_generalize(rhs_ty, &scrutinee, &target);
+            if candidate_ty != *rhs_ty {
+                *rhs_core = subst_term_generalize(rhs_core, &scrutinee, &target);
+                *rhs_ty = candidate_ty;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Check a local `let` outside `check`'s always-paid recursive frame. The
+/// helper remains live only for an actual `RLet`; unrelated deep match trees
+/// pay the original single-call dispatch frame.
+#[inline(never)]
+fn check_let(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>,
+    rhs: &RExpr,
+    body: &RExpr,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
+    refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
+    cx.ctx.push(rhs_ty.clone());
+    let body_result = check(cx, body, &weaken(expected, 1), span);
+    cx.ctx.pop();
+    let body_core = body_result?;
+    Ok(Term::Let {
+        ty: Box::new(rhs_ty),
+        val: Box::new(rhs_core),
+        body: Box::new(body_core),
+    })
 }
 
 fn elaborate_if_condition(cx: &mut ElabCtx<'_>, condition: &RExpr) -> Result<Term, ElabError> {
@@ -1375,16 +1440,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             }
         }
         RExpr::RLet(_name, ty_opt, rhs, body, span) => {
-            let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
-            cx.ctx.push(rhs_ty.clone());
-            let body_result = check(cx, body, &weaken(expected, 1), span);
-            cx.ctx.pop();
-            let body_core = body_result?;
-            Ok(Term::Let {
-                ty: Box::new(rhs_ty),
-                val: Box::new(rhs_core),
-                body: Box::new(body_core),
-            })
+            check_let(cx, ty_opt, rhs, body, expected, span)
         }
         RExpr::ROld(inner, span) => {
             let Some(pre_state) = cx.space_pre_state.clone() else {
@@ -1546,6 +1602,12 @@ struct IndexEqualityLeaf {
     target: Term,
     scrutinee: Term,
     proof: Term,
+}
+
+#[derive(Clone)]
+struct ActiveIndexRefinement {
+    leaves: Vec<IndexEqualityLeaf>,
+    install_depth: usize,
 }
 
 /// The complete inventory of data carried by a coherent dependent-match
@@ -5146,6 +5208,7 @@ fn check_dependent_branch_body(
 ) -> Result<Term, ElabError> {
     let outer_scope_depth = cx.ctx.len() - n;
     let var_refinement_snapshot = cx.var_refinements.clone();
+    let active_index_refinement_base = cx.active_index_refinements.len();
     let result_refinement_base = cx.result_refinements.len();
     cx.match_field_regions.push(outer_scope_depth..cx.ctx.len());
 
@@ -5263,6 +5326,8 @@ fn check_dependent_branch_body(
     })();
 
     cx.result_refinements.truncate(result_refinement_base);
+    cx.active_index_refinements
+        .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
     cx.match_field_regions.pop();
     outcome
@@ -6541,6 +6606,12 @@ fn install_index_refinements(
         }
     }
 
+    if !leaves.is_empty() {
+        cx.active_index_refinements.push(ActiveIndexRefinement {
+            leaves,
+            install_depth: cx.ctx.len(),
+        });
+    }
     Ok(installed)
 }
 

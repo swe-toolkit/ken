@@ -470,38 +470,34 @@ fn let_interleaved_outer_binder_not_skipped_by_convoy() {
     );
 }
 
-/// `LANG-INTERVENING-LET-FRAME-WEAKENING` increment 1. The fresh
+/// `LANG-INTERVENING-LET-FRAME-WEAKENING` increments 1 and 2. The fresh
 /// `let k` is introduced between two dependent matches and consumed by a
-/// third. Before the increment, an error in the middle constructor branch
-/// leaked its three fields; the enclosing `let` then popped the wrong
-/// binding and the outer match reported a misleading `Internal` from
-/// `refine_branch_goal`.
+/// third. Increment 1 made the constructor field frame error-safe, exposing
+/// the honest `VNil` exhaustiveness residual. Increment 2 retires that
+/// transition sentinel: the active outer-branch equality now refines the
+/// fresh RHS core and its recorded type together, so `VNil` is
+/// index-impossible in the nested match.
 ///
-/// Promise class: transition sentinel. The structurally balanced field
-/// frame must expose the honest `VNil` exhaustiveness residual until
-/// increment 2 transports the fresh dependent let's type. Increment 2
-/// retires this rejection assertion by converting the same program to an
-/// acceptance test.
+/// Promise class: durable invariant. Intended extensions may add other
+/// branch-local binders or indexed families; a fresh dependent `let` must
+/// inherit every active generated-index equality at its introduction site.
 ///
-/// MEASURED: the unchanged source now returns the nested match's exact
-/// `ExhaustivenessError(VNil)` rather than a later `Internal` produced in a
-/// corrupted context. CLAIMED: every error return after constructor-field
-/// introduction restores `cx.ctx` before the enclosing `RLet` unwinds.
-/// THE GAP: this fixture reaches one error exit; the local `frame_try!`
-/// macro expands the same absolute restoration at every fallible method
-/// construction site without adding a recursive call frame, while a debug
-/// assertion checks ordinary success cleanup. Bypassing `frame_try!` at the
-/// reached branch-body site makes this unchanged fixture return the prior
-/// `Internal`, so the sentinel is load-bearing.
+/// MEASURED: the original fresh-binder source elaborates, and an annotated
+/// sibling with an additional intervening `let` elaborates after rebasing the
+/// same equality leaves through one context-growth step. CLAIMED: generated
+/// branch-index refinement reaches fresh `RLet` RHS terms and recorded types
+/// without creating a `k` entry in `var_refinements`. THE GAP: withholding the
+/// introduction transport makes the unchanged original source reject with the
+/// exact former `ExhaustivenessError(VNil)` residual.
 #[test]
-fn intervening_let_fresh_binder_reports_honest_exhaustiveness_after_balanced_unwind() {
+fn intervening_let_fresh_binder_inherits_branch_index_refinement() {
     let mut env = vec_env();
     elab_ok(
         &mut env,
         "fn repl (n : Nat) : Vec Nat n = \
          match n { Zero |-> VNil Nat; Suc m |-> VCons Nat m Zero (repl m) }",
     );
-    let err = expect_err_val(
+    elab_ok(
         &mut env,
         "fn zipK (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
          match v { \
@@ -514,29 +510,36 @@ fn intervening_let_fresh_binder_reports_honest_exhaustiveness_after_balanced_unw
              } \
          }",
     );
-    match &err {
-        ElabError::ExhaustivenessError { missing, .. } => {
-            assert_eq!(missing.constructor, "VNil");
-            assert_eq!(missing.arity, 0);
-        }
-        other => panic!(
-            "expected the honest nested `VNil` exhaustiveness residual after \
-             balanced constructor-field unwinding, got: {other:?}"
-        ),
-    }
+    elab_ok(
+        &mut env,
+        "fn zipKRebased (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
+         match v { \
+           VNil |-> VNil Nat; \
+           VCons m a xs |-> \
+             let pad = Zero in \
+             let k : Vec Nat n = repl n in \
+             match w { \
+               VCons _ b ys |-> \
+                 match k { \
+                   VCons _ c ks |-> VCons Nat m a (zipKRebased m xs ys) \
+                 } \
+             } \
+         }",
+    );
 }
 
 /// `LANG-INTERVENING-LET-FRAME-WEAKENING` reconciliation -- TWO DIFFERENT
 /// interleaved-`let` failures, not one, independently re-measured here
 /// (not taken from the Adversary's report).
 ///
-/// **`intervening_let_fresh_binder_reports_honest_exhaustiveness_after_
-/// balanced_unwind` (above) now exposes its nested `VNil` exhaustiveness
-/// residual after increment 1 removed the error-path frame leak.** Its `k`
-/// is a FRESH `Vec Nat n` value (via `repl`, never an alias of an existing
-/// binder), consumed by a further nested match on `k` itself. Before this
-/// increment the leaked frame masked that residual with an invariant
-/// `refine_branch_goal` `Internal` across all three D1 bases.
+/// **`intervening_let_fresh_binder_inherits_branch_index_refinement`
+/// (above) now accepts after increment 2 transports its RHS core and recorded
+/// type through the active branch equality.** Its `k` is a FRESH `Vec Nat n`
+/// value (via `repl`, never an alias of an existing binder), consumed by a
+/// further nested match on `k` itself. Before increment 1 the leaked frame
+/// masked the residual with an invariant `refine_branch_goal` `Internal`
+/// across all three D1 bases; after increment 1 and before increment 2 the
+/// balanced path exposed the honest `ExhaustivenessError(VNil)`.
 ///
 /// **This fixture's `k` is a DIRECT ALIAS of the enclosing match's own
 /// peeled field** (`let k : Vec Nat m = xs`, `m`/`xs` both already bound
@@ -737,7 +740,7 @@ fn production_source_preserves_reachable_non_sort_prefilter_skip() {
         }
         other => panic!(
             "the non-sort must be silently skipped until final Pi admission: {other:?}"
-        ),
+        )
     }
 }
 
