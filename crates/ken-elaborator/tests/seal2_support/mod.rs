@@ -113,6 +113,8 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         // alias/value table carrying no `Term`. Named explicitly, with a reason,
         // so the build breaks the instant one of these stops being true.
         num_values,   // literal VALUES keyed by GlobalId — no type of their own
+        fixities,     // GlobalId -> surface fixity metadata — carries no Term
+        fixity_spans, // GlobalId -> diagnostic spans — carries no Term
         numeric_env,  // GlobalId op / dispatch tables — types live in global_env
         bytes_env,    // GlobalId type / op ids — types live in global_env
         foreign_env,  // FFI postulate GlobalIds — types live in global_env
@@ -123,6 +125,8 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
     } = env;
     let _ = (
         num_values,
+        fixities,
+        fixity_spans,
         numeric_env,
         bytes_env,
         foreign_env,
@@ -645,6 +649,11 @@ pub fn type_names_in_expr(e: &Expr, out: &mut BTreeSet<String>) {
             type_names_in_expr(a, out);
             type_names_in_expr(b, out);
         }
+        Expr::EInfixSpine { operands, .. } => {
+            for operand in operands {
+                type_names_in_expr(operand, out);
+            }
+        }
         Expr::ELam(_, body, _)
         | Expr::EOld(body, _)
         | Expr::EProj(body, _, _)
@@ -1047,7 +1056,7 @@ fn walk_decl(decl: &SurfaceDecl, facts: &mut RootFacts) {
                     .push((format!("{name}.{}", operation.name), operation_refs));
             }
         }
-        SurfaceDecl::BoundaryDecl { .. } => {}
+        SurfaceDecl::BoundaryDecl { .. } | SurfaceDecl::FixityDecl { .. } => {}
         // A nested module carries a scope graph this certificate does not
         // reproduce, so it remains fail-closed.
         SurfaceDecl::ModuleDecl { name, .. } => {

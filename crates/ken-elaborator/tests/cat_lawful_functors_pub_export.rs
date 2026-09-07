@@ -244,6 +244,7 @@ fn module_publication_queries() -> ModulePublicationQueries {
                 }
             }
             Decl::BoundaryDecl { .. }
+            | Decl::FixityDecl { .. }
             | Decl::SpaceDecl { .. }
             | Decl::ProveDecl { .. }
             | Decl::LawDecl { .. }

@@ -132,8 +132,9 @@ pub struct ElabEnv {
     /// A missing entry means the normative default `infixl 9`.
     pub fixities: HashMap<GlobalId, ast::Fixity>,
     /// First declaration site for the conflict diagnostic. This parallel
-    /// attribution map is not consulted for association.
-    pub(crate) fixity_spans: HashMap<GlobalId, Span>,
+    /// attribution map is not consulted for association. It is public so
+    /// structural tests can exhaustively classify every `ElabEnv` namespace.
+    pub fixity_spans: HashMap<GlobalId, Span>,
     /// The numeric tower (registered op ids, dispatch tables).
     pub numeric_env: NumericEnv,
     /// The Bytes layer (L6): type ids, I/O effect row registry (`38 §1`, `41`).

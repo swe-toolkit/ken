@@ -212,6 +212,7 @@ fn module_publication_queries(module: &str, ken_md: &str) -> ModulePublicationQu
                 }
             }
             Decl::BoundaryDecl { .. }
+            | Decl::FixityDecl { .. }
             | Decl::SpaceDecl { .. }
             | Decl::ProveDecl { .. }
             | Decl::LawDecl { .. }

@@ -160,6 +160,7 @@ fn publication_queries() -> Vec<PublicationQuery> {
                 }
             }
             Decl::BoundaryDecl { .. }
+            | Decl::FixityDecl { .. }
             | Decl::SpaceDecl { .. }
             | Decl::ProveDecl { .. }
             | Decl::LawDecl { .. }
