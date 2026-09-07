@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-C-VALIDATION-STRICT-IMPORT
 title: "Strict-transparent Validation: make Validation a strict, selectively-importable module -- export Valid, Invalid, the type, and the existing smart constructors as public importable symbols (NOT abstract; the raw constructors stay visible), retire ambient reach, and add the selective import edges into its clients. Flip-only and logic-free: no new definition, no eliminator, no denotation change. Validation carries no representation invariant, so abstraction is not warranted; the strict-roots goal here is importability, not opacity."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
