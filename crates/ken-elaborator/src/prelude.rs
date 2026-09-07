@@ -596,6 +596,94 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.elaborate_decl("data CreatePolicy = CreateNew | CreateOrTruncate | CreateOrKeep")
         .map_err(|e| ElabError::Internal(format!("prelude CreatePolicy failed: {}", e)))?;
 
+    let px9_surface_trusted_before: std::collections::BTreeSet<GlobalId> =
+        elab.env.trusted_base().into_iter().collect();
+    // PX9-INC1: one domain-general system-error envelope, initially populated
+    // only by filesystem operations and resources. Reuse the existing flat
+    // `IOError` identity vocabulary and wrap `FileOperation`; re-spelling their
+    // constructors in new inductives would silently rebind the live globals.
+    elab.elaborate_decl("data Transience = Transient | Permanent")
+        .map_err(|e| ElabError::Internal(format!("prelude Transience failed: {e}")))?;
+    elab.elaborate_decl("data Idempotence = Idempotent | NonIdempotent")
+        .map_err(|e| ElabError::Internal(format!("prelude Idempotence failed: {e}")))?;
+    elab.elaborate_decl(
+        "data RetryGuidance = RetryAdvised | RetryUnsafeNonIdempotent | DoNotRetryPermanent",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude RetryGuidance failed: {e}")))?;
+    elab.elaborate_decl("data Operation = FilesystemOp FileOperation")
+        .map_err(|e| ElabError::Internal(format!("prelude Operation failed: {e}")))?;
+    elab.elaborate_decl("data ResourceRef = FilesystemResource (Option Bytes)")
+        .map_err(|e| ElabError::Internal(format!("prelude ResourceRef failed: {e}")))?;
+    elab.elaborate_decl("data SafeContext = NoSafeContext | RedactedSafeContext")
+        .map_err(|e| ElabError::Internal(format!("prelude SafeContext failed: {e}")))?;
+    elab.elaborate_decl(
+        "data SystemError = MkSystemError Operation ResourceRef IOError SafeContext",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude SystemError failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn error_transience (identity : IOError) : Transience = \
+         match identity { \
+           NotFound |-> Permanent; \
+           PermissionDenied |-> Permanent; \
+           CapabilityDenied |-> Permanent; \
+           BrokenPipe |-> Permanent; \
+           Interrupted |-> Transient; \
+           AlreadyExists |-> Permanent; \
+           InvalidInput |-> Permanent; \
+           IsDirectory |-> Permanent; \
+           NotDirectory |-> Permanent; \
+           NotEmpty |-> Permanent; \
+           Unsupported |-> Permanent; \
+           Revoked |-> Permanent; \
+           Other _ |-> Permanent \
+         }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude error_transience failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn operation_idempotence (operation : Operation) : Idempotence = \
+         match operation { \
+           FilesystemOp file_operation |-> match file_operation { \
+             OpReadFile |-> Idempotent; \
+             OpWriteFile |-> NonIdempotent; \
+             OpAppendFile |-> NonIdempotent; \
+             OpMetadata |-> Idempotent; \
+             OpReadDirectory |-> Idempotent; \
+             OpCreateDirectory |-> NonIdempotent; \
+             OpRemoveFile |-> NonIdempotent; \
+             OpRemoveDirectory |-> NonIdempotent; \
+             OpRename |-> NonIdempotent; \
+             OpChangeMode |-> Idempotent \
+           } \
+         }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude operation_idempotence failed: {e}")))?;
+    elab.elaborate_decl(
+        "fn retry_guidance (transience : Transience) (idempotence : Idempotence) \
+           : RetryGuidance = \
+         match transience { \
+           Transient |-> match idempotence { \
+             Idempotent |-> RetryAdvised; \
+             NonIdempotent |-> RetryUnsafeNonIdempotent \
+           }; \
+           Permanent |-> match idempotence { \
+             Idempotent |-> DoNotRetryPermanent; \
+             NonIdempotent |-> DoNotRetryPermanent \
+           } \
+         }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude retry_guidance failed: {e}")))?;
+    let px9_surface_trusted_after: std::collections::BTreeSet<GlobalId> =
+        elab.env.trusted_base().into_iter().collect();
+    let px9_surface_trusted_delta: std::collections::BTreeSet<GlobalId> = px9_surface_trusted_after
+        .difference(&px9_surface_trusted_before)
+        .copied()
+        .collect();
+    if !px9_surface_trusted_delta.is_empty() {
+        return Err(ElabError::Internal(format!(
+            "PX9-INC1 types and classifiers must add no trust, got {px9_surface_trusted_delta:?}"
+        )));
+    }
+
     // `ITree (E:Type) (Resp:E->Type) (R:Type)` — the LIFTED, effect-generic
     // interaction tree (State-effect-build, VAL2 #10 / OQ-C·C2, `36 §4.5.6`).
     // Dependent-response `Vis` (`Resp op`, non-`Unit` for `State.Get`) can't be
@@ -931,6 +1019,84 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // needs no dedicated check-mode arm; the `check()` fallback (infer,
     // then unify against `expected`) handles it like any other constant.
     elab.globals.insert("Proved".to_string(), elab.env.tt_id());
+
+    let px9_laws_trusted_before: std::collections::BTreeSet<GlobalId> =
+        elab.env.trusted_base().into_iter().collect();
+    // PX9-INC1 checked classifier equations. All proofs close by conversion
+    // over the transparent, exhaustive functions above; no trust is added.
+    elab.elaborate_decl(
+        "theorem retry_guidance_transient_idempotent \
+           : Equal RetryGuidance (retry_guidance Transient Idempotent) RetryAdvised = Proved",
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude retry_guidance_transient_idempotent failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        "theorem retry_guidance_transient_nonidempotent \
+           : Equal RetryGuidance (retry_guidance Transient NonIdempotent) \
+             RetryUnsafeNonIdempotent = Proved",
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude retry_guidance_transient_nonidempotent failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        "theorem retry_guidance_permanent_idempotent \
+           : Equal RetryGuidance (retry_guidance Permanent Idempotent) \
+             DoNotRetryPermanent = Proved",
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude retry_guidance_permanent_idempotent failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        "theorem retry_guidance_permanent_nonidempotent \
+           : Equal RetryGuidance (retry_guidance Permanent NonIdempotent) \
+             DoNotRetryPermanent = Proved",
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude retry_guidance_permanent_nonidempotent failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        "theorem error_transience_revoked_permanent \
+           : Equal Transience (error_transience Revoked) Permanent = Proved",
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude error_transience_revoked_permanent failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        "theorem retry_guidance_idempotence_flip \
+           : Equal (Prod RetryGuidance RetryGuidance) \
+             (MkProd RetryGuidance RetryGuidance \
+               (retry_guidance Transient Idempotent) \
+               (retry_guidance Transient NonIdempotent)) \
+             (MkProd RetryGuidance RetryGuidance \
+               RetryAdvised RetryUnsafeNonIdempotent) = Refl",
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude retry_guidance_idempotence_flip failed: {e}"
+        ))
+    })?;
+    let px9_laws_trusted_after: std::collections::BTreeSet<GlobalId> =
+        elab.env.trusted_base().into_iter().collect();
+    let px9_laws_trusted_delta: std::collections::BTreeSet<GlobalId> = px9_laws_trusted_after
+        .difference(&px9_laws_trusted_before)
+        .copied()
+        .collect();
+    if !px9_laws_trusted_delta.is_empty() {
+        return Err(ElabError::Internal(format!(
+            "PX9-INC1 laws must add no trust, got {px9_laws_trusted_delta:?}"
+        )));
+    }
 
     // `Bottom : Ω₀` — the kernel's prelude falsity proposition (K5, `16
     // §1.3`), already unconditionally declared by `GlobalEnv::new()`, same
