@@ -5,8 +5,8 @@
 //! Promise class: durable invariants. The structural checks distinguish
 //! association and precedence without relying on operator evaluation.
 
-use ken_elaborator::resolve::{resolve_decl, RExpr};
-use ken_elaborator::{Decl, ElabEnv, ElabError, Expr};
+use ken_elaborator::resolve::{resolve_decl, RExpr, RInfixOperator};
+use ken_elaborator::{BinOp, Decl, ElabEnv, ElabError, Expr};
 use ken_kernel::Term;
 
 fn definition_body(env: &ElabEnv, name: &str) -> Term {
@@ -73,7 +73,7 @@ fn assert_right_chain(env: &ElabEnv, consumer: &str, operator_name: &str) {
 #[test]
 fn operator_run_stays_flat_through_resolution() {
     let mut decls = ken_elaborator::parser::parse_decls(
-        "fn flatUse (a : Nat) (b : Nat) (c : Nat) : Nat = a <+> b <+> c",
+        "fn flatUse (a : Nat) (b : Nat) (c : Nat) : Nat = a + b <+> c",
     )
     .expect("unit declaration parses");
     let decl = decls.pop().expect("one declaration");
@@ -90,6 +90,7 @@ fn operator_run_stays_flat_through_resolution() {
     ));
 
     let resolved = resolve_decl(&decl).expect("declaration resolves");
+    assert!(resolved.contains_infix_spine);
     let mut body = &resolved.body;
     for _ in 0..3 {
         let RExpr::RLam(_, next, _) = body else {
@@ -103,7 +104,48 @@ fn operator_run_stays_flat_through_resolution() {
             operands,
             operators,
             ..
-        } if operands.len() == 3 && operators.len() == 2
+        } if operands.len() == 3
+            && matches!(operators.as_slice(), [
+                RInfixOperator::Builtin(BinOp::Add, _),
+                RInfixOperator::User(name, _),
+            ] if name == "<+>")
+    ));
+}
+
+/// MEASURED: a pure fixed-arithmetic run is an `EBinOp`/`RBinOp` tree and its
+/// resolution-side declaration marker is false. CLAIMED: legacy arithmetic
+/// never pays for the declaration-dependent reassociation traversal. THE GAP:
+/// checking only the final value would allow the expensive neutral spine to
+/// return, so both AST seams and the skip marker are asserted.
+#[test]
+fn pure_fixed_arithmetic_retains_merge_base_shape_and_skips_reassociation() {
+    let mut decls = ken_elaborator::parser::parse_decls(
+        "fn arithmeticUse (a : Nat) (b : Nat) (c : Nat) : Nat = a + b * c",
+    )
+    .expect("fixed arithmetic parses");
+    let decl = decls.pop().expect("one declaration");
+    let Decl::ViewDecl { body, .. } = &decl else {
+        panic!("expected view declaration, got {decl:?}");
+    };
+    assert!(matches!(
+        body,
+        Expr::EBinOp(BinOp::Add, _, rhs, _)
+            if matches!(rhs.as_ref(), Expr::EBinOp(BinOp::Mul, _, _, _))
+    ));
+
+    let resolved = resolve_decl(&decl).expect("fixed arithmetic resolves");
+    assert!(!resolved.contains_infix_spine);
+    let mut body = &resolved.body;
+    for _ in 0..3 {
+        let RExpr::RLam(_, next, _) = body else {
+            panic!("expected resolved parameter lambda, got {body:?}");
+        };
+        body = next;
+    }
+    assert!(matches!(
+        body,
+        RExpr::RBinOp(BinOp::Add, _, rhs, _)
+            if matches!(rhs.as_ref(), RExpr::RBinOp(BinOp::Mul, _, _, _))
     ));
 }
 

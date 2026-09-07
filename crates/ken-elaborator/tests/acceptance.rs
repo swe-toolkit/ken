@@ -283,6 +283,7 @@ fn shadow_outer_not_captured() {
         requires: vec![],
         ensures: vec![],
         span: sp,
+        contains_infix_spine: false,
         kind: ken_elaborator::resolve::RDeclKind::Let,
     };
 
