@@ -190,6 +190,12 @@ pub use lowering::joins::{
     DasmC2ScalarMergeObservationScope,
 };
 
+#[cfg(feature = "checked-ih-realization-observation")]
+pub use lowering::{
+    checked_ih_realization_observation_scope, CheckedIhMatchRefusalSite,
+    CheckedIhRealizationObservation, CheckedIhRealizationObservationScope,
+};
+
 // `RT-MATCH-RECURSOR-CONSUMERS` 4a.1: the child-process transport of that same
 // recorder, and the one item in this pair that is deliberately NOT gated.
 //

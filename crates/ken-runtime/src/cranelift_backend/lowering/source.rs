@@ -1746,6 +1746,14 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                         } => {
                             self.enter_source_occurrence_plan(static_origin)?;
                             control.continuation = *next;
+                            #[cfg(any(
+                                test,
+                                feature = "checked-ih-realization-observation"
+                            ))]
+                            let refusal_operand_kind = match &value {
+                                LoweringOperand::Specialized(value) => lowered_value_kind(value),
+                                LoweringOperand::Carried(_) => "Carried",
+                            };
                             match value {
                                 LoweringOperand::Specialized(Lowered::BoundedNat(nat)) => {
                                     return self.lower_source_bounded_nat_match(
@@ -1958,6 +1966,16 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     );
                                 }
                                 LoweringOperand::Specialized(_) => {
+                                    #[cfg(any(
+                                        test,
+                                        feature = "checked-ih-realization-observation"
+                                    ))]
+                                    record_checked_ih_realization_observation(
+                                        CheckedIhRealizationObservation::MatchRefusal {
+                                            site: CheckedIhMatchRefusalSite::SourceMachineSelector,
+                                            operand_kind: refusal_operand_kind,
+                                        },
+                                    );
                                     return Err(unsupported(
                                         "Match",
                                         "scrutinee is not a constructor value",

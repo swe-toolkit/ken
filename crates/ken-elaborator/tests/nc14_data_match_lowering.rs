@@ -6,11 +6,11 @@ use ken_elaborator::checked_core::{
     LowerabilityStatus, StableSymbol, StableSymbolTable, SymbolNamespace,
 };
 use ken_elaborator::compiler_driver::{
-    compile_ken_package_sources, CompilerManifest, CompilerSource, CompilerTargetKind,
-    TargetSelector,
+    compile_ken_package_sources, prepare_native_target_sources, CompilerManifest, CompilerSource,
+    CompilerTargetKind, TargetSelector,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
-use ken_elaborator::{ElabError, ElabEnv};
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 use ken_runtime::{
@@ -180,6 +180,29 @@ fn nested_checked_runtime_program_for_source(
     source: &str,
 ) -> RuntimeProgram {
     let target = decl_symbol(package_name, target_name);
+    prepare_native_target_sources(
+        &CompilerManifest::new(package_name, Vec::new()),
+        vec![CompilerSource::new("src/main.ken", source)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![package_name.to_string()],
+            ),
+            symbol: target,
+            kind: CompilerTargetKind::Executable,
+        },
+    )
+    .expect("recursive source emits a checked plan-bearing target")
+    .runtime_program()
+    .clone()
+}
+
+fn nested_unplanned_runtime_program_for_source(
+    package_name: &str,
+    target_name: &str,
+    source: &str,
+) -> RuntimeProgram {
+    let target = decl_symbol(package_name, target_name);
     let out = compile_ken_package_sources(
         &CompilerManifest::new(package_name, Vec::new()),
         vec![CompilerSource::new("src/main.ken", source)],
@@ -188,14 +211,14 @@ fn nested_checked_runtime_program_for_source(
                 SymbolNamespace::Module,
                 vec![package_name.to_string()],
             ),
-            symbol: target.clone(),
+            symbol: target,
             kind: CompilerTargetKind::Executable,
         },
     )
-    .expect("recursive source emits checked-core package");
+    .expect("recursive source emits checked core");
     let closure = out.closures.first().expect("selected target closure");
     erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
-        .expect("recursive checked artifact erases")
+        .expect("the unplanned control erases")
 }
 
 fn assert_nested_checked_pipeline_nat(
@@ -236,23 +259,19 @@ fn assert_nested_checked_pipeline_nat(
 }
 
 #[test]
-fn nested_recursive_match_applies_case_field_then_stops_without_checked_ih_authority() {
-    // The D1 transition sentinel is retired deliberately: D2's settled Match
-    // repair removes the predecessor Closure refusal. This separately named
-    // transition control owns the later boundary and must be retired when the
-    // successor planning-capability node supplies checked-IH authority.
+fn nested_recursive_match_realizes_checked_ih_then_refuses_recursive_backedge() {
+    // Promise classes: the plan and positional ABI assertions are normative
+    // compatibility vectors over compiler-owned checked identities. The final
+    // exact refusal is a transition sentinel: the successor that gives the
+    // realized RecursiveBackedge its source-control route retires it.
     //
-    // MEASURED: the real erased program has no oriented-plan metadata; after
-    // the selected case closure consumes its field, native lowering reaches
-    // ordinary Match selection and reports its exact unrealized-capsule
-    // refusal, with zero scalar-merge arrivals.
-    //
-    // CLAIMED: D2 advances the predecessor refusal to the truthful stop where
-    // checked-IH plan and call-template authority have not been minted.
-    //
-    // THE GAP: this control does not license minting that authority or define
-    // its representation. The successor planning-capability node owns the
-    // pending call, exact template, slot, parent, and segment authority.
+    // MEASURED: the real checked target carries one oriented frame, two slots,
+    // two call templates, and Runtime markers bound to each. Native lowering
+    // enters both pending markers and realizes each exact slot/parent authority.
+    // CLAIMED: the unrealized ComputationalRecursorClosure no longer reaches
+    // the source-machine selector; both checked capsules are realized first,
+    // and the refused operand advances to `RecursiveBackedge`.
+    // THE GAP: this node does not authorize routing that protocol marker.
     let package_name = "nested_inductive_native_stop_pkg";
     let target_name = "liftSizeResult";
     let expected = 3;
@@ -272,14 +291,50 @@ fn nested_recursive_match_applies_case_field_then_stops_without_checked_ih_autho
         ],
     )
     .to_string();
-    assert!(
-        !program
+    let oriented_plan = ken_runtime::OrientedSubcontinuationPlanV1::decode(
+        program
             .erased_core
             .metadata
             .checked_core
             .metadata
-            .contains_key(&oriented_plan_symbol),
-        "the D2 transition fixture must not carry successor-owned checked-IH plan authority"
+            .get(&oriented_plan_symbol)
+            .expect("the checked target must carry its compiler-derived oriented plan"),
+    )
+    .expect("the checked target's oriented plan validates");
+    assert_eq!(oriented_plan.frames.len(), 1);
+    let slots = oriented_plan
+        .computational_ih_slots
+        .iter()
+        .map(|slot| {
+            assert_eq!(slot.runtime_marker_locations.len(), 1);
+            (
+                slot.slot_template_id,
+                slot.checked_match_ordinal,
+                slot.recursive_position,
+                slot.method_binder_ordinal,
+                slot.frame_template_id,
+                slot.segment_site_id,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(slots, vec![(0, 0, 2, 0, 0, 0), (1, 0, 3, 1, 0, 0)]);
+    let calls = oriented_plan
+        .computational_ih_calls
+        .iter()
+        .map(|call| {
+            assert_eq!(call.runtime_marker_locations.len(), 1);
+            (
+                call.call_template_id,
+                call.slot_template_id,
+                call.arity,
+                call.parent_frame_template_id,
+                call.parent_segment_site_id,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        calls,
+        vec![(0, 0, 0, Some(0), Some(0)), (1, 1, 0, Some(0), Some(0))]
     );
 
     let target = decl_symbol(package_name, target_name);
@@ -298,37 +353,198 @@ fn nested_recursive_match_applies_case_field_then_stops_without_checked_ih_autho
         }),
     };
     program.examples = vec![example.clone()];
-    let runtime = runtime_ir_report_for_example(&program, &example, "D2 authority stop");
+    let runtime = runtime_ir_report_for_example(&program, &example, "checked-IH authority stop");
     let scalar_merge_scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
+    let realization_scope = ken_runtime::checked_ih_realization_observation_scope();
     let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &runtime,
         &ken_runtime::NativeSeedEnvironment::empty(),
         "ken_nested_ih_authority_stop",
     );
+    let observations = realization_scope.finish();
     let scalar_merge_arrivals = scalar_merge_scope.finish();
     assert!(
         scalar_merge_arrivals.is_empty(),
-        "the nested-IH native-emission attempt was expected to decline before the existing \
-         scalar-merge in-edge, but recorded {scalar_merge_arrivals:#?}"
+        "the advancing refusal remains before the existing scalar-merge in-edge: \
+         {scalar_merge_arrivals:#?}"
+    );
+    let pending = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::PendingMarker {
+                call_template_id,
+                kind,
+                ..
+            } => Some((*call_template_id, *kind)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        pending,
+        vec![
+            (
+                0,
+                ken_runtime::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+            ),
+            (
+                1,
+                ken_runtime::CheckedComputationalIHInvocationKind::OrdinaryApplication,
+            ),
+        ],
+        "each exact checked application must mint one pending marker before realization: \
+         {observations:#?}"
+    );
+    let realized = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::RealizedInvocation {
+                call_template_id,
+                slot_template_id,
+                parent_frame_template_id,
+                parent_segment_site_id,
+                frame_count,
+                slot_count,
+                call_count,
+            } => Some((
+                *call_template_id,
+                *slot_template_id,
+                *parent_frame_template_id,
+                *parent_segment_site_id,
+                *frame_count,
+                *slot_count,
+                *call_count,
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        realized,
+        vec![(0, 0, 0, 0, 1, 2, 2), (1, 1, 0, 0, 1, 2, 2)],
+        "the pending marker must resolve the exact call, slot, parent, and complete plan: \
+         {observations:#?}"
+    );
+    let match_refusals = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::MatchRefusal { site, operand_kind } => {
+                Some((*site, *operand_kind))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        match_refusals,
+        vec![(
+            ken_runtime::CheckedIhMatchRefusalSite::SourceMachineSelector,
+            "RecursiveBackedge",
+        )],
+        "after both capsules are realized, the next stop must name its exact seat and the \
+         advanced protocol operand: {observations:#?}"
     );
     match native {
         Err(ken_runtime::CraneliftBackendError::Unsupported(refusal)) => {
-            assert_eq!(refusal.construct, "Match");
             assert_eq!(
-                refusal.reason,
-                "scrutinee is not a constructor value"
+                (refusal.construct, refusal.reason.as_str()),
+                ("Match", "scrutinee is not a constructor value"),
+                "D3 retains the fail-closed text while the site observation proves the \
+                 refused operand advanced from a capsule to RecursiveBackedge"
             );
         }
         Ok(artifact) => panic!(
-            "nested-IH D2 unexpectedly emitted `{}` without successor-owned checked-IH \
-             planning authority",
+            "checked-IH authority unexpectedly advanced past the join hard stop in `{}`",
             artifact.entry_symbol
         ),
-        Err(other) => panic!(
-            "nested-IH D2 reached a different native-emission boundary: {other}"
-        ),
+        Err(other) => panic!("checked-IH authority reached a different boundary: {other}"),
     }
+}
+
+#[test]
+fn checked_ih_abi_and_match_refusal_site_are_discriminated_before_authority() {
+    // Promise class: normative compatibility vector. The selected static case
+    // contributes one matched field followed by two captures; their positions
+    // are the declared unit-call ABI, not an incidental vector length.
+    //
+    // The unplanned twin is deliberate: D4's vector is constructed before the
+    // authority stop, and D5 must retain a source-machine refusal witness after
+    // the planned twin advances to a RecursiveBackedge at that same seat.
+    let package_name = "nested_inductive_native_unplanned_control_pkg";
+    let target_name = "liftSizeResult";
+    let expected = 3;
+    let mut program = nested_unplanned_runtime_program_for_source(
+        package_name,
+        target_name,
+        NESTED_LIFT_NAT_THREE_SOURCE,
+    );
+    let target = decl_symbol(package_name, target_name);
+    let example = ken_runtime::RuntimeExample {
+        name: "checked-ih-unplanned-abi-control".to_string(),
+        checked_core_shape: "unplanned nested-inductive control".to_string(),
+        ir: lowered_body(&program, &target),
+        observation: RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
+            constructor: StableSymbol::constructor(
+                &decl_symbol(package_name, "Nat"),
+                if expected == 0 { "Zero" } else { "Suc" },
+            )
+            .to_string(),
+            args: Vec::new(),
+        }),
+    };
+    program.examples = vec![example.clone()];
+    let runtime = runtime_ir_report_for_example(&program, &example, "checked-IH D4/D5 control");
+    let scope = ken_runtime::checked_ih_realization_observation_scope();
+    let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
+        &program,
+        &runtime,
+        &ken_runtime::NativeSeedEnvironment::empty(),
+        "ken_checked_ih_unplanned_control",
+    );
+    let observations = scope.finish();
+    let abi = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::StaticMatchCaseCallAbi {
+                matched_field_count,
+                capture_count,
+                matched_field_prefix_in_source_order,
+            } => Some((
+                *matched_field_count,
+                *capture_count,
+                *matched_field_prefix_in_source_order,
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        abi,
+        vec![(1, 2, true), (1, 2, true)],
+        "D4 observes both non-degenerate constructions and pins matched fields before captures: \
+         {observations:#?}"
+    );
+    let refusals = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::MatchRefusal { site, operand_kind } => {
+                Some((*site, *operand_kind))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        refusals,
+        vec![(
+            ken_runtime::CheckedIhMatchRefusalSite::SourceMachineSelector,
+            "ComputationalRecursorClosure",
+        )],
+        "D5 must identify the source-machine emitter and its unrealized capsule: \
+         {observations:#?}"
+    );
+    assert!(matches!(
+        native,
+        Err(ken_runtime::CraneliftBackendError::Unsupported(refusal))
+            if refusal.construct == "Match"
+                && refusal.reason == "scrutinee is not a constructor value"
+    ));
 }
 
 #[test]

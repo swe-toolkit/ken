@@ -4104,6 +4104,109 @@ impl StaticWorkerBinding {
 /// projected faithfully — the marker denotes the complete application
 /// occurrence, which this file already states — and it is not a route, an
 /// arity, a binder index, a call ordinal, or any inferred shape.
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheckedIhMatchRefusalSite {
+    GenericExpressionSelector,
+    SourceMachineSelector,
+}
+
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+#[doc(hidden)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CheckedIhRealizationObservation {
+    PendingMarker {
+        call_template_id: u64,
+        kind: crate::CheckedComputationalIHInvocationKind,
+    },
+    RealizedInvocation {
+        call_template_id: u64,
+        slot_template_id: u64,
+        parent_frame_template_id: u64,
+        parent_segment_site_id: u64,
+        frame_count: usize,
+        slot_count: usize,
+        call_count: usize,
+    },
+    StaticMatchCaseCallAbi {
+        matched_field_count: usize,
+        capture_count: usize,
+        matched_field_prefix_in_source_order: bool,
+    },
+    MatchRefusal {
+        site: CheckedIhMatchRefusalSite,
+        operand_kind: &'static str,
+    },
+}
+
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+thread_local! {
+    static CHECKED_IH_REALIZATION_OBSERVATIONS:
+        std::cell::RefCell<Vec<CheckedIhRealizationObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static CHECKED_IH_REALIZATION_OBSERVATION_ENABLED: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+fn record_checked_ih_realization_observation(observation: CheckedIhRealizationObservation) {
+    let enabled = CHECKED_IH_REALIZATION_OBSERVATION_ENABLED.with(std::cell::Cell::get);
+    if enabled {
+        CHECKED_IH_REALIZATION_OBSERVATIONS.with(|events| {
+            events.borrow_mut().push(observation);
+        });
+    }
+}
+
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+#[doc(hidden)]
+pub struct CheckedIhRealizationObservationScope {
+    previous_enabled: bool,
+    previous_observations: Option<Box<Vec<CheckedIhRealizationObservation>>>,
+}
+
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+impl CheckedIhRealizationObservationScope {
+    fn restore(&mut self) {
+        let Some(previous_observations) = self.previous_observations.take() else {
+            return;
+        };
+        CHECKED_IH_REALIZATION_OBSERVATION_ENABLED
+            .with(|enabled| enabled.set(self.previous_enabled));
+        CHECKED_IH_REALIZATION_OBSERVATIONS.with(|events| {
+            *events.borrow_mut() = *previous_observations;
+        });
+    }
+
+    pub fn finish(mut self) -> Vec<CheckedIhRealizationObservation> {
+        let observations = CHECKED_IH_REALIZATION_OBSERVATIONS
+            .with(|events| std::mem::take(&mut *events.borrow_mut()));
+        self.restore();
+        observations
+    }
+}
+
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+impl Drop for CheckedIhRealizationObservationScope {
+    fn drop(&mut self) {
+        self.restore();
+    }
+}
+
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
+#[doc(hidden)]
+pub fn checked_ih_realization_observation_scope() -> CheckedIhRealizationObservationScope {
+    let previous_observations = CHECKED_IH_REALIZATION_OBSERVATIONS
+        .with(|events| std::mem::take(&mut *events.borrow_mut()));
+    let previous_enabled =
+        CHECKED_IH_REALIZATION_OBSERVATION_ENABLED.with(|enabled| enabled.replace(true));
+    CheckedIhRealizationObservationScope {
+        previous_enabled,
+        previous_observations: Some(Box::new(previous_observations)),
+    }
+}
+
 #[derive(Clone, Copy)]
 struct PendingCheckedIhCall {
     call_template_id: u64,
@@ -11439,6 +11542,11 @@ impl<'a> Lowering<'a> {
                 ),
             ));
         }
+        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+        record_checked_ih_realization_observation(CheckedIhRealizationObservation::PendingMarker {
+            call_template_id,
+            kind,
+        });
         Ok(())
     }
 
@@ -11809,6 +11917,18 @@ impl<'a> Lowering<'a> {
             ));
         }
         invocation.dynamic_splice_edges.push(edge_id);
+        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+        record_checked_ih_realization_observation(
+            CheckedIhRealizationObservation::RealizedInvocation {
+                call_template_id,
+                slot_template_id: call.slot_template_id,
+                parent_frame_template_id,
+                parent_segment_site_id: segment_site_id,
+                frame_count: plan.frames.len(),
+                slot_count: plan.computational_ih_slots.len(),
+                call_count: plan.computational_ih_calls.len(),
+            },
+        );
         Ok(Some(instance))
     }
 

@@ -91,12 +91,13 @@ pub fn erase_checked_core_package_for_target<'a>(
     target_closure: impl IntoIterator<Item = &'a StableSymbol>,
 ) -> Result<RuntimeProgram, ErasureError> {
     let targets: Vec<StableSymbol> = target_closure.into_iter().cloned().collect();
-    erase_checked_package_with_host_root(package, targets, None, None)
+    erase_checked_package_with_host_root(package, targets, None, None, None)
 }
 
 fn erase_checked_package_with_host_root(
     package: &CheckedCorePackage,
     mut targets: Vec<StableSymbol>,
+    planned_root: Option<&StableSymbol>,
     host_root: Option<(&StableSymbol, &CheckedHostSpineV1)>,
     mut native_plans: Option<&mut NativeLoweringPlanCollector>,
 ) -> Result<RuntimeProgram, ErasureError> {
@@ -166,6 +167,44 @@ fn erase_checked_package_with_host_root(
             prelowered.insert(symbol, declaration.kind);
         }
         targets = executable.into_iter().collect();
+    } else if let Some(root) = planned_root {
+        let plans = native_plans.as_deref_mut().ok_or_else(|| {
+            expression_lowering_error(
+                root,
+                "checked_native_plan_missing",
+                "a planned ordinary target has no compiler-owned plan collector",
+            )
+        })?;
+        let root_declaration = lower_symbol_with_plans(package, &targets, root, plans)?;
+        let mut executable = BTreeSet::from([root.clone()]);
+        let mut queue = runtime_declaration_refs_in_kind(&root_declaration.kind)
+            .into_iter()
+            .filter_map(|reference| {
+                targets
+                    .iter()
+                    .find(|symbol| symbol.to_string() == reference)
+                    .cloned()
+            })
+            .collect::<Vec<_>>();
+        prelowered.insert(root.clone(), root_declaration.kind);
+        while let Some(symbol) = queue.pop() {
+            if !executable.insert(symbol.clone()) {
+                continue;
+            }
+            let declaration = lower_symbol_with_plans(package, &targets, &symbol, plans)?;
+            queue.extend(
+                runtime_declaration_refs_in_kind(&declaration.kind)
+                    .into_iter()
+                    .filter_map(|reference| {
+                        targets
+                            .iter()
+                            .find(|candidate| candidate.to_string() == reference)
+                            .cloned()
+                    }),
+            );
+            prelowered.insert(symbol, declaration.kind);
+        }
+        targets = executable.into_iter().collect();
     }
     consume_checked_core_package_for_target(package, targets.iter())?;
     reject_reachable_unsupported(package, &targets)?;
@@ -201,6 +240,13 @@ fn erase_checked_package_with_host_root(
                 kind,
                 metadata: metadata_for_symbol(package, target),
             });
+        } else if let Some(plans) = native_plans.as_deref_mut() {
+            declarations.push(lower_symbol_with_plans(
+                package,
+                &targets,
+                target,
+                plans,
+            )?);
         } else {
             declarations.push(lower_symbol(package, &targets, target)?);
         }
@@ -661,7 +707,7 @@ struct NativeJoinPlanCollector {
 
 #[derive(Clone)]
 struct NativeLoweringPlanCollector {
-    joins: NativeJoinPlanCollector,
+    joins: Option<NativeJoinPlanCollector>,
     oriented: OrientedSubcontinuationPlanCollector,
     recursive_invocations: BTreeMap<(StableSymbol, u64), CheckedRecursiveInvocationSeed>,
     consumed_recursive_invocations: BTreeSet<u64>,
@@ -825,7 +871,7 @@ fn with_host_vis_injection_mutation<R>(
 
 impl NativeLoweringPlanCollector {
     fn new(
-        answer_symbols: CheckedJoinAnswerSymbols,
+        answer_symbols: Option<CheckedJoinAnswerSymbols>,
         recursive_invocations: Vec<CheckedRecursiveInvocationSeed>,
         computational_ih_slots: Vec<CheckedComputationalIHSlotSeed>,
         computational_ih_calls: Vec<CheckedComputationalIHCallSeed>,
@@ -853,7 +899,7 @@ impl NativeLoweringPlanCollector {
             .map(|seed| ((seed.slot_template_id, seed.occurrence_ordinal), seed))
             .collect();
         Self {
-            joins: NativeJoinPlanCollector::new(answer_symbols),
+            joins: answer_symbols.map(NativeJoinPlanCollector::new),
             oriented: OrientedSubcontinuationPlanCollector::default(),
             recursive_invocations,
             consumed_recursive_invocations: BTreeSet::new(),
@@ -877,7 +923,13 @@ impl NativeLoweringPlanCollector {
         ken_runtime::OrientedSubcontinuationPlanV1,
     ) {
         (
-            self.joins.finish(),
+            self.joins.map_or_else(
+                || NativeJoinPlanV1 {
+                    representation_rule_version: NativeJoinPlanV1::REPRESENTATION_RULE_VERSION,
+                    sites: Vec::new(),
+                },
+                NativeJoinPlanCollector::finish,
+            ),
             self.oriented.finish(
                 self.recursive_invocations,
                 self.consumed_recursive_invocations,
@@ -890,6 +942,16 @@ impl NativeLoweringPlanCollector {
                 self.pending_computational_ih_calls,
             ),
         )
+    }
+
+    fn owner_has_computational_ih(&self, owner: &StableSymbol) -> bool {
+        self.computational_ih_slots
+            .values()
+            .any(|slot| slot.owner == *owner)
+            || self
+                .computational_ih_calls
+                .values()
+                .any(|call| call.owner == *owner)
     }
 
     fn validate_total_computational_ih_seed_consumption(&self) -> Result<(), ErasureError> {
@@ -1638,7 +1700,56 @@ pub(crate) fn erase_checked_host_package_for_target<'a>(
     spine: &CheckedHostSpineV1,
 ) -> Result<RuntimeProgram, ErasureError> {
     let targets: Vec<StableSymbol> = target_closure.into_iter().cloned().collect();
-    erase_checked_package_with_host_root(package, targets, Some((root, spine)), None)
+    erase_checked_package_with_host_root(package, targets, None, Some((root, spine)), None)
+}
+
+pub(crate) fn erase_checked_package_for_target_with_oriented_plan<'a>(
+    package: &CheckedCorePackage,
+    target_closure: impl IntoIterator<Item = &'a StableSymbol>,
+    root: &StableSymbol,
+    recursive_invocations: Vec<CheckedRecursiveInvocationSeed>,
+    computational_ih_slots: Vec<CheckedComputationalIHSlotSeed>,
+    computational_ih_calls: Vec<CheckedComputationalIHCallSeed>,
+) -> Result<(RuntimeProgram, OrientedSubcontinuationPlanV1), ErasureError> {
+    let targets: Vec<StableSymbol> = target_closure.into_iter().cloned().collect();
+    if !targets.contains(root) {
+        return Err(ErasureError::MissingRuntimeMetadata {
+            symbol: root.clone(),
+            section: "planned target closure root",
+        });
+    }
+    let has_computational_ih =
+        !computational_ih_slots.is_empty() || !computational_ih_calls.is_empty();
+    let mut collector = NativeLoweringPlanCollector::new(
+        None,
+        recursive_invocations,
+        computational_ih_slots,
+        computational_ih_calls,
+    );
+    let mut program = erase_checked_package_with_host_root(
+        package,
+        targets,
+        has_computational_ih.then_some(root),
+        None,
+        Some(&mut collector),
+    )?;
+    collector.validate_total_computational_ih_seed_consumption()?;
+    let (_empty_join_plan, mut oriented_plan) = collector.finish();
+    let retained_recursive_calls = oriented_plan
+        .recursive_calls
+        .iter()
+        .map(|call| call.call_template_id)
+        .collect::<BTreeSet<_>>();
+    for declaration in &mut program.declarations {
+        if let RuntimeDeclarationKind::Transparent { body } = &mut declaration.kind {
+            remove_unplanned_recursive_invocation_markers(body, &retained_recursive_calls);
+        }
+    }
+    for example in &mut program.examples {
+        remove_unplanned_recursive_invocation_markers(&mut example.ir, &retained_recursive_calls);
+    }
+    bind_oriented_runtime_marker_locations(root, &program, &mut oriented_plan)?;
+    Ok((program, oriented_plan))
 }
 
 pub(crate) fn erase_checked_host_package_for_target_with_join_plan<'a>(
@@ -1660,7 +1771,7 @@ pub(crate) fn erase_checked_host_package_for_target_with_join_plan<'a>(
 > {
     let targets: Vec<StableSymbol> = target_closure.into_iter().cloned().collect();
     let mut collector = NativeLoweringPlanCollector::new(
-        answer_symbols,
+        Some(answer_symbols),
         recursive_invocations,
         computational_ih_slots,
         computational_ih_calls,
@@ -1668,6 +1779,7 @@ pub(crate) fn erase_checked_host_package_for_target_with_join_plan<'a>(
     let mut program = erase_checked_package_with_host_root(
         package,
         targets,
+        None,
         Some((root, spine)),
         Some(&mut collector),
     )?;
@@ -2163,10 +2275,11 @@ fn lower_checked_host_root(
             "checked host root must accept ProgramCaps",
         ));
     };
-    if let Some(native_plans) = native_plans.as_deref_mut() {
-        native_plans
-            .joins
-            .record_root_exit_answer(root, &declaration.checked_type);
+    if let Some(joins) = native_plans
+        .as_deref_mut()
+        .and_then(|plans| plans.joins.as_mut())
+    {
+        joins.record_root_exit_answer(root, &declaration.checked_type);
     }
     let mut stack = vec![root.clone()];
     let lowered = lower_checked_host_computation(
@@ -2418,6 +2531,39 @@ fn lower_body_term_with_plans(
                 };
                 parameter_count += 1;
                 body = inner;
+            }
+            // A checked-IH template is bound to its declaring symbol and its
+            // Runtime marker locations. Inlining that declaration here would
+            // transplant the same checked occurrence into the caller while the
+            // standalone declaration is also emitted, giving one affine
+            // template two declaration owners. Keep the complete application
+            // as a declaration call; no operand or call identity is inferred.
+            if parameter_count == arguments.len()
+                && native_plans.owner_has_computational_ih(symbol)
+            {
+                let mut args = Vec::with_capacity(arguments.len());
+                for (index, argument) in arguments.iter().enumerate() {
+                    let mut child_path = path.to_vec();
+                    child_path.extend([11, index as u64]);
+                    args.push(lower_body_term_with_plans(
+                        argument,
+                        declarations,
+                        semantic,
+                        stack,
+                        root,
+                        context_depth,
+                        branch_remap,
+                        &child_path,
+                        native_plans,
+                        parent_oriented_frame,
+                    )?);
+                }
+                return Ok(RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::DeclarationRef {
+                        symbol: symbol.to_string(),
+                    }),
+                    args,
+                });
             }
             if parameter_count == arguments.len() && !admitted_recursive_member(semantic, symbol) {
                 if stack.contains(symbol) {
@@ -2792,7 +2938,10 @@ fn lower_body_term_with_plans(
             };
             let join_site = native_plans
                 .joins
-                .record_match(&owner, path, view, &runtime)?;
+                .as_mut()
+                .map(|joins| joins.record_match(&owner, path, view, &runtime))
+                .transpose()?
+                .flatten();
             let runtime = if let Some(pending) = pending {
                 let frame_id = native_plans.oriented.finish_match(pending, &runtime)?;
                 RuntimeExpr::CheckedSubcontinuationFrame {
@@ -3087,7 +3236,8 @@ fn lower_checked_host_computation(
         };
         let join_site = native_plans
             .as_deref_mut()
-            .map(|plans| plans.joins.record_match(root, path, view, &runtime))
+            .and_then(|plans| plans.joins.as_mut())
+            .map(|joins| joins.record_match(root, path, view, &runtime))
             .transpose()?
             .flatten();
         let runtime = if let Some(pending) = pending_oriented_frame {
@@ -4086,6 +4236,46 @@ fn lower_symbol(
     })
 }
 
+fn lower_symbol_with_plans(
+    package: &CheckedCorePackage,
+    target_closure: &[StableSymbol],
+    symbol: &StableSymbol,
+    native_plans: &mut NativeLoweringPlanCollector,
+) -> Result<RuntimeDeclaration, ErasureError> {
+    let semantic = &package.artifact.semantic;
+    let kind = if let Some(meta) = semantic.primitive_metadata.get(symbol) {
+        lower_primitive(symbol, meta)?
+    } else if let Some(meta) = semantic.data_metadata.get(symbol) {
+        lower_data(symbol, meta)?
+    } else if let Some(meta) = semantic.record_sigma_metadata.get(symbol) {
+        lower_record(symbol, meta)?
+    } else if let Some(meta) = semantic.recursion_metadata.get(symbol) {
+        lower_recursion(symbol, meta)?
+    } else if let Some(meta) = semantic.effects_foreign_metadata.get(symbol) {
+        lower_effects(symbol, meta)?
+    } else if let Some(meta) = semantic.class_instance_metadata.get(symbol) {
+        lower_class_instance(symbol, meta)?
+    } else if semantic.declarations.contains_key(symbol) {
+        lower_transparent_declaration_with_plans(
+            package,
+            target_closure,
+            symbol,
+            native_plans,
+        )?
+    } else {
+        return Err(ErasureError::MissingRuntimeMetadata {
+            symbol: symbol.clone(),
+            section: "runtime-lowerable metadata",
+        });
+    };
+
+    Ok(RuntimeDeclaration {
+        symbol: symbol.to_string(),
+        kind,
+        metadata: metadata_for_symbol(package, symbol),
+    })
+}
+
 fn lower_transparent_declaration(
     package: &CheckedCorePackage,
     target_closure: &[StableSymbol],
@@ -4166,6 +4356,82 @@ fn lower_top_level_body(
             .collect(),
         body: Box::new(body),
     })
+}
+
+fn lower_transparent_declaration_with_plans(
+    package: &CheckedCorePackage,
+    target_closure: &[StableSymbol],
+    symbol: &StableSymbol,
+    native_plans: &mut NativeLoweringPlanCollector,
+) -> Result<RuntimeDeclarationKind, ErasureError> {
+    let semantic = &package.artifact.semantic;
+    let reachable_declarations = target_closure
+        .iter()
+        .filter(|candidate| {
+            semantic.declarations.contains_key(*candidate)
+                && !has_runtime_metadata(semantic, candidate)
+        })
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let selection = CheckedCoreBodyViewSelection {
+        package_identity: package.header.package_identity.clone(),
+        package_core_semantic_hash: package.core_semantic_hash,
+        package_artifact_hash: package.artifact_hash,
+        target_symbol: symbol.clone(),
+        reachable_declarations,
+        external_symbols: external_declaration_symbols(&package.artifact.semantic),
+        dependency_semantic_hashes: package.artifact.semantic.dependency_semantic_hashes.clone(),
+    };
+    let declarations = checked_host_declaration_closure(package, &selection, symbol)?;
+    let declaration = declarations.get(symbol).ok_or_else(|| {
+        expression_lowering_error(
+            symbol,
+            "missing_expression_body_view",
+            "body view did not return the selected transparent declaration",
+        )
+    })?;
+    let mut parameter_count = 0usize;
+    let mut body = &declaration.body;
+    let mut path = Vec::new();
+    while let CheckedCoreBodyTerm::Lambda { body: inner, .. } = body {
+        parameter_count += 1;
+        path.push(14);
+        body = inner;
+    }
+    if has_free_variable_at_or_above(body, parameter_count) {
+        return Err(expression_lowering_error(
+            symbol,
+            "implicit_closure_capture",
+            "top-level lambda body references a de Bruijn binding outside its explicit \
+             parameter list",
+        ));
+    }
+    let mut stack = vec![symbol.clone()];
+    let body = lower_body_term_with_plans(
+        body,
+        &declarations,
+        semantic,
+        &mut stack,
+        symbol,
+        parameter_count,
+        None,
+        &path,
+        native_plans,
+        None,
+    )?;
+    if parameter_count == 0 {
+        Ok(RuntimeDeclarationKind::Transparent { body })
+    } else {
+        Ok(RuntimeDeclarationKind::Transparent {
+            body: RuntimeExpr::Closure {
+                captures: Vec::new(),
+                params: (0..parameter_count)
+                    .map(|index| format!("arg{index}"))
+                    .collect(),
+                body: Box::new(body),
+            },
+        })
+    }
 }
 
 fn has_runtime_metadata(
@@ -6919,7 +7185,7 @@ mod px7l_tests {
             ih_interface: test_answer_interface(),
         };
         let collector = NativeLoweringPlanCollector::new(
-            test_answer_symbols(),
+            Some(test_answer_symbols()),
             Vec::new(),
             vec![seed],
             Vec::new(),
@@ -6947,7 +7213,7 @@ mod px7l_tests {
             result_interface: test_answer_interface(),
         };
         let collector = NativeLoweringPlanCollector::new(
-            test_answer_symbols(),
+            Some(test_answer_symbols()),
             Vec::new(),
             Vec::new(),
             vec![seed],
@@ -7017,7 +7283,7 @@ mod px7l_tests {
             result_interface: test_answer_interface(),
         };
         let mut collector = NativeLoweringPlanCollector::new(
-            test_answer_symbols(),
+            Some(test_answer_symbols()),
             Vec::new(),
             vec![slot.clone()],
             vec![call],
@@ -7594,7 +7860,7 @@ mod px7l_tests {
             result_interface: test_answer_interface(),
         };
         let mut plans = NativeLoweringPlanCollector::new(
-            test_answer_symbols(),
+            Some(test_answer_symbols()),
             Vec::new(),
             Vec::new(),
             vec![seed],
