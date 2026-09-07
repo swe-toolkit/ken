@@ -1,7 +1,7 @@
 ---
 id: PX9
 title: "cross-domain System.Error — semantic identity, raw errno, operation, resource, safe context, and honest retry classification"
-status: draft
+status: active
 owner: foundation
 size: L
 gate: none
@@ -43,3 +43,40 @@ across two large surfaces"*).
 
 ⚠ **`ABI-REVOKE` is sequenced BEFORE PX9 deliberately** so PX9 absorbs the
 distinct `revoked` identity rather than having it retrofitted (§7).
+
+## Decomposition (Architect design ruling `evt_5rabg6z700p9s`, 2026-09-07)
+
+The Architect delivered the type shape + classification model + increment cut,
+grounded at `origin/main @ a93fbee33`. Core insight: the semantic identities are
+**already domain-general** (`IOError` incl. `Other Int`/`Interrupted`/`Revoked`);
+only the `(operation, resource)` binding is fs-bound and the retry classification
+is net-new. So `SystemError` = generalize `FileError`'s carrier + add the honest
+classification + unify the triplicated `revoked`. The increments and their coupled
+Spec contract are framed as:
+
+- **PX9-INC1** (`docs/program/wp/PX9-INC1-system-error-type-and-classification.md`,
+  owner Foundation, size M, tier T1): the prelude `SystemError` type + honest
+  two-axis retry classification (`error_transience` ⊥ `operation_idempotence` →
+  `retry_guidance`; **no** `retryable : SystemError -> Bool`) + kernel-checked
+  laws, with **filesystem as the first and only populated domain**. No host-wire
+  change, no operation re-threading. Unambiguously in PX9 (Architect). **Released
+  to the foundation ring 2026-09-07.**
+- **PX9-C** (`docs/program/wp/PX9-C-error-classification-contract.md`, owner Spec,
+  size S): the `/spec` normative anchor for the transient≠retry-safety property
+  and the revoked-unification, so PX9-INC1's law ACs cite a normative clause.
+  Coupled to PX9-INC1 at merge-order only (build in parallel). **Routed to
+  spec-leader 2026-09-07.**
+- **Increment 2** (fs migration + host-wire unification, TCB-adjacent): re-thread
+  the ~16 FS/resource operations onto `SystemError` (`FileError` becomes the
+  fs-domain projection; `ResourceError`'s revoked folds in) and unify the host wire
+  revoked enums. **Not yet framed** — whether it lives inside PX9 or a sequenced
+  successor node is an **operator scope call** (TCB-adjacent), forwarded
+  2026-09-07. Not a dependency of PX9-INC1.
+- **PX10/PX11-owned (NOT PX9):** each later domain adds `Operation`/`ResourceRef`
+  arms + new identities as **pure additions** — never a reshape. This is what
+  landing the domain-general shape now (fs first) buys.
+
+The **`SafeContext`** field's meaning (redaction-aware context rendering to a
+stable non-leaking label) is the Architect's reading of the charter's "safe
+context"; flagged to the operator/Spec for confirmation alongside the increment-2
+scope call. PX9-INC1 builds to that reading unless the confirmation narrows it.
