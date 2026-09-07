@@ -60,7 +60,13 @@ Spec contract are framed as:
   `retry_guidance`; **no** `retryable : SystemError -> Bool`) + kernel-checked
   laws, with **filesystem as the first and only populated domain**. No host-wire
   change, no operation re-threading. Unambiguously in PX9 (Architect). **Released
-  to the foundation ring 2026-09-07.**
+  2026-09-07; LANDED `ede8b6b72` (PR #3416).** Gates Architect (required,
+  soundness core) + Foundation QA + CV all APPROVE on the exact reviewed SHA
+  `92f424250`; Adversary M8 post-merge hunt NO OBJECTION with zero-TCB confirmed
+  independently (the in-prelude `trusted_base()` before/after guards are
+  non-vacuous). The PX9-C conformance seed
+  `conformance/surface/ffi-io/seed-error-classification.md` lifted RED→GREEN in
+  CI as ruled.
 - **PX9-C** (`docs/program/wp/PX9-C-error-classification-contract.md`, owner Spec,
   size S): the `/spec` normative anchor for the transient≠retry-safety property
   and the revoked-unification, so PX9-INC1's law ACs cite a normative clause.
@@ -80,6 +86,22 @@ The **`SafeContext`** field's meaning (redaction-aware context rendering to a
 stable non-leaking label) is the Architect's reading of the charter's "safe
 context"; flagged to the operator/Spec for confirmation alongside the increment-2
 scope call. PX9-INC1 builds to that reading unless the confirmation narrows it.
+
+Carried to increment 2 (non-blocking riders from the INC1 review, folded here so
+the next increment that touches this surface picks them up):
+- **CV/Adversary cite fix:** the INC1 test docstring
+  (`crates/ken-elaborator/tests/px9_system_error_classification.rs`) cites
+  `spec/40-effects/41-system-effects.md §1.8`, which does not exist — §1.8 landed
+  in `spec/30-surface/38-ffi-io.md`. Comment-only; not worth a respin (would drop
+  three exact-SHA approvals). Fix it when INC2 next edits that file.
+- **Sole-producer lock (Adversary obs 2):** the INC1 control locks
+  `retry_guidance` as the ONLY `RetryGuidance` producer. If INC2 adds a composed
+  `SystemError -> RetryGuidance` convenience, that control must be updated (it is
+  intended INC1 tightness, not a defect).
+- **Prelude namespace (Adversary obs 1):** INC1 adds generic prelude globals
+  (`Operation`, `Transient`, `Permanent`, `Idempotent`, `NonIdempotent`) to every
+  program's namespace. CI-green = no current collision; the user-namespace
+  crowding tradeoff is the Architect's namespace call as PX10/PX11 add arms.
 
 D0 reconciliation folded into the PX9-INC1 frame 2026-09-07 (Architect ruling
 `evt_20n7vgagrk9zy`): the identity slot reuses the existing `IOError` directly (no
