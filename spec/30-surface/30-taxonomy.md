@@ -154,17 +154,32 @@ it is not a census of selected registration helpers. That inventory is exactly
 - the opaque primitive former `Cap : Auth → Type` names `Auth`, and
   `Resource : ResourceKind → Type` names `ResourceKind`.
 
-The internal-provision arm adds exactly `{Nat, Pair}`. This is one general arm
-over internal origin, not a Pair-specific exception or third membership route.
-`Nat` is the kernel-origin member: the ordinary checked inductive
-`data Nat = Zero | Suc Nat` that source must use as the canonical natural/index
-carrier. `Pair` is the compiler-bootstrap member: one checked transparent type
-identity whose surface meaning is the non-dependent kernel Sigma (`34`). Thus
-the Ken-defined **type floor** is the closed ten-member set
-**`{Auth, Bool, Char, List, Nat, Option, Pair, ResourceKind, Result,
-Utf8Error}`**.
+The internal-provision arm adds `{Nat, Pair}` and the five kernel-machinery-keyed
+proposition and equality members `{Equal, Prop, Proved, Top, Bottom}`. This is
+one general arm over internal origin, not a Pair-specific exception or third
+membership route. `Nat` is the kernel-origin member: the ordinary checked
+inductive `data Nat = Zero | Suc Nat` that source must use as the canonical
+natural/index carrier. `Pair` is the compiler-bootstrap member: one checked
+transparent type identity whose surface meaning is the non-dependent kernel
+Sigma (`34`). The five proposition/equality members are each keyed to the
+kernel's own machinery, so a source-defined equivalent fails to interoperate
+(`../10-kernel/16 §1`): `Top` and `Bottom` are the kernel's `Ω₀` truth and
+falsity prelude constants and `Proved : Top` their canonical proof; `Equal` is
+the surface-nameable definition whose body **is** the kernel's computing
+observational equality `Eq` (a source `data Equal` forfeits `Eq`'s `J`/`refl`
+computation); `Prop` is the surface-nameable alias for the proposition sort
+`Ω₀` (its own kernel type is `Type (suc 0)`, its body is `Ω₀`), present only
+because the surface grammar has no `Ω` token and used only in type-annotation
+position. Each is a kernel constant or a re-checked definition — **out** of
+`trusted_base()` exactly as the original ten, adding no entry. Thus the
+Ken-defined **type floor** is the closed fifteen-member set
+**`{Auth, Bool, Bottom, Char, Equal, List, Nat, Option, Pair, Prop, Proved,
+ResourceKind, Result, Top, Utf8Error}`**.
 
-The type count is ten, not twelve or thirteen. `Pair`'s floor-binding closure
+The type count is fifteen — the former ten plus the five kernel-machinery-keyed
+proposition/equality members — not ten; the definable `And`/`Dec`/`Yes`/`No`/
+`Empty` stay **out** (source-constructible, with a `Core/Logic` package home,
+failing the machinery-keying witness). `Pair`'s floor-binding closure
 also contains the exact three companions `{mk_pair, pair_fst, pair_snd}`. They
 are operations, not type members. Their checked types reference the canonical
 `Pair` identity, and their bodies use the kernel pair-introduction and
@@ -201,8 +216,11 @@ exact witnessed set — and which mechanism keys each identity — is recorded b
 the per-name intrinsic ledger; **extending the closed roster and its count to
 that set is an operator-owned floor-membership change**, adding no
 `trusted_base()` entry (every added member is re-checked and out of the trusted
-base, exactly as the ten above) and landing atomically with the roster. Until
-it lands, the floor is the ten stated above.
+base, exactly as the fifteen above) and landing atomically with the roster. The
+floor now stands at the fifteen stated above; this effect-surface and
+entrypoint-ABI set remains a further per-name application of the same arm, an
+operator-gated floor-membership change floored as the ledger confirms each
+witness.
 
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
@@ -212,9 +230,9 @@ but that enlarges the built-in set for no minimality gain and is **not** taken.
 The derivation-path table (`../../conformance/surface/taxonomy/`) pins the exact
 closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 
-**Implementation staging.** The specification fixes the ten-type and
+**Implementation staging.** The specification fixes the fifteen-type and
 three-companion target as the current floor; the effect-surface and
-entrypoint-ABI extension above grows it only under the operator-gated
+entrypoint-ABI extension above grows it further only under the operator-gated
 floor-membership change. Until the floor-realization build captures and admits
 the four existing Pair-family identities, current Strict loading may still
 reject their bare names. That implementation gap is not a package boundary and

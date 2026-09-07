@@ -74,7 +74,11 @@ and no-allocation witnesses. This is the surface analog of the kernel's closed
 
 The signature arm therefore closes to exactly **`{Auth, Bool, Char, List,
 Option, ResourceKind, Result, Utf8Error}`**; the internal-provision arm adds
-exactly **`{Nat, Pair}`**. Their union is the exact ten-type floor. For every
+**`{Nat, Pair}`** and the five kernel-machinery-keyed proposition/equality
+members **`{Equal, Prop, Proved, Top, Bottom}`** (`30-taxonomy §4`). Their union
+is the fifteen-type floor; the executable configured floor reaches fifteen only
+when the sequenced `PRELUDE_FLOOR_NAMES` extension lands, so the executable case
+below stays RED until then. For every
 inductive member, the floor admits constructors only by matching their
 kernel-recorded parent `GlobalId`; `Char` and transparent `Pair` have no
 constructor arm. Pair's companion inventory is exactly
@@ -91,13 +95,14 @@ inventories are not admitted by mere possession.
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
   `Decl::Inductive` or checked `Decl::Transparent`. Independently snapshot the
-  ten expected type ids, every constructor id and recorded parent, the three
+  fifteen expected type ids, every constructor id and recorded parent, the three
   Pair companion ids and checked types, `declarations().len()`,
   `next_global_id()`, and `trusted_base()`. Do not select declarations by helper
   name, source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
-  internal-provision set `{Nat, Pair}` equals the exact ten-type floor. The
+  internal-provision set `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}` equals
+  the exact fifteen-type floor. The
   constructor set is exactly the constructors recorded under the seven
   inductive signature members plus `Nat`; no same-spelling constructor with
   another parent qualifies. The separate companion set is exactly
@@ -122,15 +127,18 @@ inventories are not admitted by mere possession.
   the compiler installs transparent `Pair = g232`, `mk_pair = g233`,
   `pair_fst = g234`, and `pair_snd = g235`, all outside `trusted_base()`, while
   the current configured floor remains nine. **CLAIMED:** the exact internal
-  witness set is `{Nat, Pair}`, its union with the signature set is the ten-type
-  target, and the three companions form a separate binding inventory.
+  witness set is `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}`, its union with
+  the signature set is the fifteen-type target, and the three companions form a
+  separate binding inventory.
   **THE GAP:** the floor-realization build must make the executable derivation
   and Strict resolution match those closed inventories. Production resolution
   must not auto-admit an unreviewed newly observed name.
 
 This case and the Pair strict source-reaching cases in
 `../modules/seed-modules.md` are **RED UNTIL the redirected
-`LANG-MOD-CANONICAL-PAIR-PACKAGE` floor-realization build**.
+`LANG-MOD-CANONICAL-PAIR-PACKAGE` floor-realization build** and, for the five
+`30-taxonomy §4` proposition/equality members, the sequenced
+`PRELUDE_FLOOR_NAMES` floor extension.
 
 **AC2 bloat finding — `OrdResult`.** `data OrdResult = Lt | Eq | Gt`
 (`prelude.rs`) sits in the elaborator prelude, but no primitive signature names
@@ -173,7 +181,7 @@ Verdicts + Ω-sort witnesses:
 
 | Entry | Form | Verdict | Witness / action |
 |---|---|---|---|
-| **`Equal : Π(A). A→A→Ω`** | `declare_postulate` | **REDUNDANT — shadows a *computing* primitive** | the kernel provides native **`Eq A a b : Ω`** (computes, with `refl`/`J` — `16 §2`, `term.rs`). The postulate forfeits `Eq`'s computation + `J`-elim. **Action: delete, reference `Eq`** (not "define"). |
+| **`Equal : Π(A). A→A→Ω`** | `declare_def` (`prelude.rs:805`) | **DEMOTED (landed) — a re-checked def aliasing computing `Eq`; a §4 floor member** | the ES2 demotion landed: `Equal`'s body **is** the kernel's native `Eq A a b : Ω` (computes, with `refl`/`J` — `16 §2`, `term.rs`), so it is a `Decl::Transparent` def **out** of `trusted_base()`, not the earlier shadowing postulate. As the surface-nameable alias for kernel equality it is kernel-keyed (a source `data Equal` forfeits `Eq`'s `J`/`refl` — fails to interoperate), so it is a prelude floor member (`30-taxonomy §4`), no longer a bloat instance. |
 | **`And : Ω→Ω→Ω`** | `declare_postulate` | **DERIVABLE** | `data And (A B:Ω):Ω := conj (a:A)(b:B)` → **Ω** via both-keyed `sort_sigma` (Σ of two Ω → Ω); or `16 §1.3` derived connectives. |
 | **`isSorted : Π(A). List A→Ω`** | `declare_postulate` | **DERIVABLE (★ soundness)** | Ω-recursion `isSorted (x::y::r)= And (x≤y)(isSorted (y::r))`. **Needs a Prop-valued `≤ : A→A→Ω`** — if `Ord` exposes only `Bool` `leq`, add `Le`/`IsTrue (leq a b):Ω` (else it's `Type`, a relevance leak). |
 | **`Perm : Π(A). List A→List A→Ω`** | `declare_postulate` | **DERIVABLE (★ soundness)** | **Ω-sort fork:** the inductive relation (`refl\|swap\|trans\|cons`) is proof-**relevant** (`Type`) ⇒ needs **truncation** `∥·∥` to be an Ω predicate; count-equality (`Π x. Eq Nat (count x xs)(count x ys)`) is **natively Ω** but DecEq-dependent. Either is derivable; spec picks the form. |
@@ -230,12 +238,14 @@ ordinary data representation.
 
 - **AC1** (invariant normative + minimal set exact; both directions): §A
   (irreducibility, no bloat) + §C (completeness, no hidden built-in) — the
-  table exercises **bloat** (§B `OrdResult`, §D `Equal`/`And`/…) **and**
+  table exercises **bloat** (§B `OrdResult`, §D `And`/…; `Equal` was the
+  shadowing case, now demoted and floored per `30-taxonomy §4`) **and**
   hidden-built-in (§C, none found; the floor named).
 - **AC2** (prelude closed by the two-arm rule): §B — executable traversal of
   every primitive type closes the eight-member signature set; exact-identity,
-  origin, and no-allocation witnesses add the internal set `{Nat, Pair}` and
-  yield the ten-type floor plus three Pair companions. The `OrdResult` bloat
+  origin, and no-allocation witnesses add the internal set `{Nat, Pair}` (and
+  the five kernel-machinery-keyed `30-taxonomy §4` members) and yield the
+  fifteen-type floor plus three Pair companions. The `OrdResult` bloat
   finding proves the opposite direction (ruled remove; `Ordering`→package,
   §6).
 - **AC3** (load-bearing predicates specified as definitions): §D — `And`/
