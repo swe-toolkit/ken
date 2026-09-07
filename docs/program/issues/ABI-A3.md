@@ -1,7 +1,7 @@
 ---
 id: ABI-A3
 title: "promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none

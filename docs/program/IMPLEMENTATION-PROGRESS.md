@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-07 05:02:47Z — from 563 issue file(s) in `docs/program/issues/`.
+2026-09-07 06:10:03Z — from 563 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -41,7 +41,7 @@ the committed file matches the generator's output.
 | `A3` | catalog-coverage walker | draft | TBD | TBD | none | — |
 | `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | merged | runtime | L | none | — |
 | `ABI-A2` | promote FsAppendFile, FsMetadata, FsRename to NativeTested | merged | runtime | L | none | — |
-| `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | active | runtime | M | none | — |
+| `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | merged | runtime | M | none | — |
 | `ABI-FSCREATE-RECURSIVE-CONTRACT` | FsCreateDirectory's `recursive` flag is structurally inert -- resolve the behavioral contract: give it `mkdir -p` meaning, or retire the dead field | draft | spec | S | none | — |
 | `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | merged | runtime | L | none | — |
 | `ABI-M2` | runtime facility/operation probes, distinct from build-time facts | draft | runtime | M | none | — |
@@ -633,7 +633,6 @@ Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
 - `ABI-S1` blocked by `PX9` (status: draft)
-- `ABI-S2` blocked by `ABI-A3` (status: active)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
