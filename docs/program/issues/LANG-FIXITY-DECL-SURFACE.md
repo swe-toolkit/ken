@@ -196,6 +196,43 @@ what happens outside it. `32-grammar.md:373` gives the default as `9`; if the
 spec bounds the range, cite it — **if it does not, say so and pick, stating the
 choice as a choice.**
 
+> ## VOID + REPAIR 2026-09-07 — first candidate regressed the compile-stack peak (Architect `evt_7rfr3n4867xjr`)
+>
+> Candidate `65f8a93e` was **void** (§2; the z3930 approval does not carry). The
+> lieutenant's pre-publish A/B was decisive: `map_build_acceptance.rs`'s
+> `cat4_union_intersection_difference_execute_over_nat` +
+> `local_prebinding_preserves_legacy_map_union_stack_budget` are green on
+> merge-base `2b85460c2` and deterministically SIGABRT together on the candidate
+> — a file OUTSIDE the declared 10-path scope, not a concurrency artifact.
+>
+> **Mechanism (Architect, grounded at `65f8a93e`):** the candidate added a NEW
+> unconditional full-body recursive elaboration pass (`reassociate_rdecl`
+> `elab.rs:9471` → `reassociate_rexpr` `elab.rs:9206`, no guard), and arithmetic
+> `+`/`*`/`+%` was routed through the SAME spine (`parser.rs:2152-2172` emits
+> `EInfixSpine`), so even arithmetic-bearing bodies enter the deep pass. Its peak
+> exceeds the legacy compile-stack budget the `map_build` guard calibrates.
+>
+> **Invariant violated:** zero-cost-when-unused on the shared elaboration path
+> (now `AC-7`). **Sanctioned structural levers** (the ring measures + combines;
+> the Architect reviews the result):
+> - **(A) skip guard — primary.** Do not run the reassociation traversal over a
+>   body/decl that contains no `RInfixSpine` — the pass is provably identity on a
+>   spine-free tree, so skipping is behavior-preserving. Restores the merge-base
+>   peak for all pre-fixity code, including the `map_build` suite.
+> - **(B) take arithmetic off the spine (reflect-don't-extend).** Return `+`/`*`/
+>   `+%` to direct `EBinOp` via the merge-base cascade so arithmetic-bearing
+>   bodies are spine-free; keep
+>   `declared_precedence_compares_with_arithmetic_levels` + the arithmetic-order
+>   fixtures byte-identical.
+> - Frame-discipline (`#[inline(never)]` per-arm split / iterative spine
+>   reduction) on `reassociate_rexpr` itself **only if** a genuine USER-operator
+>   body still overflows after (A)+(B).
+>
+> **Prohibited** (Architect + language-leader concur): no `RUST_MIN_STACK`, no
+> larger-stack thread wrapping the pass, no relaxing/serializing the `map_build`
+> stack-budget test. That guard caught a real regression; it stays as-is and
+> must go GREEN.
+
 ## Acceptance criteria
 
 **`AC-1`.** `D1` is reported with citations before `D2` is implemented. **A
@@ -223,7 +260,27 @@ failing by another route.
 **`AC-6`.** No-regression, in CI (`COORDINATION §12`). Targeted locally:
 `-p ken-elaborator`. **There is no `ken-parser` crate** — parsing lives in
 `crates/ken-elaborator/src/parser.rs`, and name resolution and the
-reassociation this node adds live in the same crate.
+reassociation this node adds live in the same crate. **The affected-closure / QA
+scope for this node MUST include
+`crates/ken-elaborator/tests/map_build_acceptance.rs`** (the deep-expression /
+compile-stack-budget suite): the reassociation pass is a shared full-body
+elaboration traversal, so its affected closure extends to deep-expression
+acceptance tests OUTSIDE the declared diff scope. Running only the focused
+fixity tests is the too-narrow QA scope that let the first candidate reach
+publish (`evt_7rfr3n4867xjr`).
+
+**`AC-7` — zero-cost when the feature is unused (the load-bearing repair AC).** A
+body/declaration that uses **no** fixity/infix surface must pay **no** new
+compile-stack cost from the reassociation pass. **Control:** the two
+`map_build_acceptance.rs` guards
+(`cat4_union_intersection_difference_execute_over_nat` +
+`local_prebinding_preserves_legacy_map_union_stack_budget`) — which use no user
+operators and predate this feature — compile at the **merge-base** compile-stack
+profile and pass, run together, on the candidate. A candidate whose new
+traversal raises the legacy stack peak (a SIGABRT or a budget-guard red) fails
+this AC. The invariant is zero-cost-when-unused on the shared elaboration path;
+the VOID + REPAIR banner above carries the sanctioned levers (spine-free skip;
+arithmetic off the spine).
 
 ## What this unblocks, and the follow-through that is NOT yours
 
@@ -261,3 +318,12 @@ Decision. What he will check (fold-recorded so the ring builds to it):
 - `D3` non-associative rejects `a <+> b <+> c` with its own diagnostic;
 - `AC-3` holds — undeclared operators still parse at `infixl 9` via the
   relocated default.
+
+**Re-review of the fresh (post-void) candidate additionally checks** (Architect
+`evt_7rfr3n4867xjr`): (a) spine-free bodies skip the reassociation pass —
+zero-cost-when-unused restored (`AC-7`); (b) BOTH `map_build` guards green AND
+the fixity feature intact (14/14 + propagation / conflict / `D3` / `D4` / SCC);
+(c) if lever (B) is taken, the arithmetic ordering is byte-identical. **QA's
+affected closure MUST include `map_build_acceptance.rs`**, not only the focused
+fixity tests. The void approval does not carry (`§2`); a fresh exact-SHA review
+is required.
