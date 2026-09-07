@@ -25,6 +25,10 @@ pub enum Token {
     KwThen,
     KwElse,
     KwType,
+    // User-defined operator fixity declarations (`32 §6`).
+    KwInfixl,
+    KwInfixr,
+    KwInfix,
     // V1 keywords
     KwRequires,
     KwEnsures,
@@ -1000,6 +1004,9 @@ impl<'s> Lexer<'s> {
                 "then" => Token::KwThen,
                 "else" => Token::KwElse,
                 "Type" => Token::KwType,
+                "infixl" => Token::KwInfixl,
+                "infixr" => Token::KwInfixr,
+                "infix" => Token::KwInfix,
                 "requires" => Token::KwRequires,
                 "ensures" => Token::KwEnsures,
                 "prove" => Token::KwProve,

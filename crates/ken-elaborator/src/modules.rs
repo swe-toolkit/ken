@@ -24,12 +24,13 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{
-    BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, ImportItem, ImportKind, Type,
+    BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, Fixity, ImportItem, ImportKind,
+    Type,
 };
 use crate::error::{ElabError, Span};
 use crate::resolve::{
-    self, RCtorDecl, RDecl, RDeclKind, RExplicitCtorDecl, RExpr, RMatchArm, RPatKind, RPattern,
-    RPropIntro, RTelescopeEntry, RType,
+    self, RCtorDecl, RDecl, RDeclKind, RExplicitCtorDecl, RExpr, RInfixOperator, RMatchArm,
+    RPatKind, RPattern, RPropIntro, RTelescopeEntry, RType,
 };
 use crate::ElabEnv;
 
@@ -1283,6 +1284,27 @@ fn rewrite_rexpr_inner(
             Box::new(rewrite_rexpr(scope, exports, *r)?),
             s,
         ),
+        RExpr::RInfixSpine {
+            operands,
+            operators,
+            span,
+        } => RExpr::RInfixSpine {
+            operands: operands
+                .into_iter()
+                .map(|operand| rewrite_rexpr(scope, exports, operand))
+                .collect::<Result<Vec<_>, _>>()?,
+            operators: operators
+                .into_iter()
+                .map(|operator| match operator {
+                    RInfixOperator::Builtin(op, span) => Ok(RInfixOperator::Builtin(op, span)),
+                    RInfixOperator::User(name, span) => Ok(RInfixOperator::User(
+                        resolve_ref(scope, exports, &name, &span)?,
+                        span,
+                    )),
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
+            span,
+        },
         RExpr::RMatch {
             scrut,
             equation,
@@ -1722,6 +1744,7 @@ fn register_declared_effect_row(
 fn elaborate_checked(
     elab: &mut ElabEnv,
     rdecl: &crate::resolve::RDecl,
+    declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
     crate::elab::check_surface_purity(rdecl, &elab.effect_rows, &elab.globals, &elab.class_env)?;
     let result = crate::elab::elaborate_rdecl_v1_with_effect_rows(
@@ -1731,8 +1754,14 @@ fn elaborate_checked(
         &elab.numeric_env,
         &mut elab.class_env,
         &elab.effect_rows,
+        &mut elab.fixities,
+        &mut elab.fixity_spans,
+        declared_fixity.map(|pending| (pending.fixity, pending.declaration_span.clone())),
         rdecl,
     )?;
+    if let Some(pending) = declared_fixity {
+        install_declared_fixity(elab, &result.name, result.def_id, pending)?;
+    }
     register_effect_row(elab, &result);
     Ok(result)
 }
@@ -1951,7 +1980,9 @@ fn decl_namespace_effect(decl: &Decl) -> DeclNamespaceEffect<'_> {
             span,
         },
         Decl::ImportDecl { .. } | Decl::ExportDecl { .. } => DeclNamespaceEffect::ReferenceOnly,
-        Decl::BoundaryDecl { .. } | Decl::ModuleDecl { .. } => DeclNamespaceEffect::NoBinding,
+        Decl::BoundaryDecl { .. } | Decl::FixityDecl { .. } | Decl::ModuleDecl { .. } => {
+            DeclNamespaceEffect::NoBinding
+        }
     }
 }
 
@@ -2176,6 +2207,131 @@ fn prebind_scope_declarations(
     Ok(())
 }
 
+#[derive(Clone)]
+struct PendingFixity {
+    fixity: Fixity,
+    declaration_span: Span,
+}
+
+fn conflicting_fixity(
+    operator: &str,
+    first: Fixity,
+    first_span: &Span,
+    second: Fixity,
+    second_span: &Span,
+) -> ElabError {
+    ElabError::ConflictingFixity {
+        operator: operator.to_string(),
+        first,
+        second,
+        first_span: first_span.clone(),
+        second_span: second_span.clone(),
+    }
+}
+
+fn install_declared_fixity(
+    elab: &mut ElabEnv,
+    operator: &str,
+    id: ken_kernel::GlobalId,
+    pending: &PendingFixity,
+) -> Result<(), ElabError> {
+    match elab.fixities.get(&id).copied() {
+        None => {
+            elab.fixities.insert(id, pending.fixity);
+            elab.fixity_spans
+                .insert(id, pending.declaration_span.clone());
+            Ok(())
+        }
+        Some(existing) if existing == pending.fixity => Ok(()),
+        Some(existing) => Err(conflicting_fixity(
+            operator,
+            existing,
+            elab.fixity_spans
+                .get(&id)
+                .unwrap_or(&pending.declaration_span),
+            pending.fixity,
+            &pending.declaration_span,
+        )),
+    }
+}
+
+/// Collect this complete module's declarations before any body is associated.
+/// The temporary string key is only a pre-identity staging coordinate: every
+/// consultation uses the `GlobalId` table after the target is admitted.
+fn collect_scope_fixities(
+    elab: &mut ElabEnv,
+    decls: &[Decl],
+    scope: &Scope,
+) -> Result<HashMap<String, PendingFixity>, ElabError> {
+    let mut pending: HashMap<String, PendingFixity> = HashMap::new();
+    for decl in decls {
+        let Decl::FixityDecl {
+            fixity,
+            operator,
+            operator_span,
+            span,
+        } = decl.unwrap_pub()
+        else {
+            continue;
+        };
+        if !scope.locals.contains(operator) {
+            return Err(ElabError::FixityTargetNotLocal {
+                operator: operator.clone(),
+                span: operator_span.clone(),
+            });
+        }
+        let canonical = scope
+            .bindings
+            .get(operator)
+            .expect("a local binding has one canonical spelling")
+            .clone();
+        let candidate = PendingFixity {
+            fixity: *fixity,
+            declaration_span: span.clone(),
+        };
+        if let Some(first) = pending.get(&canonical) {
+            if first.fixity != candidate.fixity {
+                return Err(conflicting_fixity(
+                    operator,
+                    first.fixity,
+                    &first.declaration_span,
+                    candidate.fixity,
+                    &candidate.declaration_span,
+                ));
+            }
+            continue;
+        }
+        pending.insert(canonical, candidate);
+    }
+
+    // Validate every already-admitted target before mutating the program table,
+    // so one later conflict cannot leave earlier declarations installed.
+    for (canonical, candidate) in &pending {
+        let Some(id) = elab.globals.get(canonical).copied() else {
+            continue;
+        };
+        if let Some(existing) = elab.fixities.get(&id).copied() {
+            if existing != candidate.fixity {
+                return Err(conflicting_fixity(
+                    canonical,
+                    existing,
+                    elab.fixity_spans
+                        .get(&id)
+                        .unwrap_or(&candidate.declaration_span),
+                    candidate.fixity,
+                    &candidate.declaration_span,
+                ));
+            }
+        }
+    }
+    for (canonical, candidate) in &pending {
+        if let Some(id) = elab.globals.get(canonical).copied() {
+            install_declared_fixity(elab, canonical, id, candidate)?;
+        }
+    }
+    Ok(pending)
+}
+
 /// Expand and elaborate a compilation unit's raw decls (one `elaborate_*`
 /// call's `Vec<Decl>`) at nesting `prefix` ("" at the file root), threading
 /// `scope` (built fresh for a `module { … }` block; the persisted root
@@ -2221,12 +2377,18 @@ fn expand_scope(
         &elab.module_state.prelude_binding_names,
         &mut exports_here,
     )?;
+    let declared_fixities = collect_scope_fixities(elab, decls, scope)?;
 
     let mut ids = Vec::new();
     let mut i = 0;
     while i < decls.len() {
         let decl = &decls[i];
         match decl {
+            Decl::FixityDecl { .. } => {
+                // Metadata was collected for this complete scope before any
+                // body was reassociated. It emits no elaboration result.
+                i += 1;
+            }
             Decl::BoundaryDecl { span, .. } => {
                 if !allow_boundary || i != 0 {
                     return Err(ElabError::ParseError {
@@ -2310,7 +2472,9 @@ fn expand_scope(
                 }
                 let resolved =
                     resolve::resolve_space_decl(&qualified_name, cells, operations, span)?;
-                ids.extend(crate::elab::elaborate_space_decl(elab, &resolved)?);
+                let associated =
+                    crate::elab::reassociate_space_decl(&resolved, &elab.globals, &elab.fixities)?;
+                ids.extend(crate::elab::elaborate_space_decl(elab, &associated)?);
                 i += 1;
             }
             // A maximal run of non-`pub` definitions — auto-grouped by
@@ -2322,12 +2486,18 @@ fn expand_scope(
             _ if is_recursive_candidate(decl.unwrap_pub()) => {
                 let run_end = {
                     let mut e = i;
-                    while e < decls.len() && is_recursive_candidate(decls[e].unwrap_pub()) {
+                    while e < decls.len()
+                        && (is_recursive_candidate(decls[e].unwrap_pub())
+                            || matches!(decls[e].unwrap_pub(), Decl::FixityDecl { .. }))
+                    {
                         e += 1;
                     }
                     e
                 };
-                let run = &decls[i..run_end];
+                let run: Vec<&Decl> = decls[i..run_end]
+                    .iter()
+                    .filter(|candidate| is_recursive_candidate(candidate.unwrap_pub()))
+                    .collect();
 
                 // Resolve + rewrite every run member up front — safe because
                 // a run contains no import/module, so `scope`/`exports`
@@ -2335,7 +2505,7 @@ fn expand_scope(
                 // state it would have seen processed alone at its position.
                 let mut bare_names: Vec<String> = Vec::with_capacity(run.len());
                 let mut rdecls: Vec<crate::resolve::RDecl> = Vec::with_capacity(run.len());
-                for d in run {
+                for d in &run {
                     let inner = d.unwrap_pub();
                     let renamed = qualify_decl_name(inner, prefix);
                     let rdecl = resolve_scoped_decl(
@@ -2391,7 +2561,8 @@ fn expand_scope(
                             ));
                     if !recursive {
                         let rdecl = &rdecls[k];
-                        let result = elaborate_checked(elab, rdecl)?;
+                        let result =
+                            elaborate_checked(elab, rdecl, declared_fixities.get(&rdecl.name))?;
                         ids.push(result);
                     } else {
                         let members: Vec<crate::resolve::RDecl> =
@@ -2459,12 +2630,23 @@ fn expand_scope(
                                 &elab.class_env,
                             )?;
                         }
+                        let member_fixities = members
+                            .iter()
+                            .map(|member| {
+                                declared_fixities.get(&member.name).map(|pending| {
+                                    (pending.fixity, pending.declaration_span.clone())
+                                })
+                            })
+                            .collect::<Vec<_>>();
                         let results = crate::elab::elaborate_mutual_group(
                             &mut elab.env,
                             &mut elab.globals,
                             &mut elab.num_values,
                             &elab.numeric_env,
                             &elab.class_env,
+                            &mut elab.fixities,
+                            &mut elab.fixity_spans,
+                            &member_fixities,
                             &members,
                         )?;
                         for (rdecl, result) in members.iter().zip(results) {
@@ -2552,7 +2734,8 @@ fn expand_scope(
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
-                    let result = elaborate_checked(elab, &rdecl)?;
+                    let result =
+                        elaborate_checked(elab, &rdecl, declared_fixities.get(&rdecl.name))?;
                     if is_pub {
                         if let Decl::AttachedProofDecl {
                             subject,
@@ -2585,7 +2768,8 @@ fn expand_scope(
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
-                    let result = elaborate_checked(elab, &rdecl)?;
+                    let result =
+                        elaborate_checked(elab, &rdecl, declared_fixities.get(&rdecl.name))?;
                     if is_pub && matches!(inner, Decl::ClassDecl { .. }) {
                         publish_identity(
                             &mut exports_here,
