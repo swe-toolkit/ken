@@ -1195,6 +1195,14 @@ pub fn compile_ken_package_sources(
     sources: Vec<CompilerSource>,
     selector: TargetSelector,
 ) -> Result<CompilerDriverOutput, CompilerDriverError> {
+    compile_ken_package_sources_with_env(manifest, sources, selector).map(|(output, _env)| output)
+}
+
+fn compile_ken_package_sources_with_env(
+    manifest: &CompilerManifest,
+    sources: Vec<CompilerSource>,
+    selector: TargetSelector,
+) -> Result<(CompilerDriverOutput, ElabEnv), CompilerDriverError> {
     if manifest.package_name.is_empty() {
         return Err(CompilerDriverError::EmptyPackageName);
     }
@@ -1218,12 +1226,15 @@ pub fn compile_ken_package_sources(
     let closures = build_target_closures(&package, &selected)?;
     let executable_entrypoints = package_executable_entrypoints(&package, &closures)?;
     let report = build_target_selection_report(&package, selected);
-    Ok(CompilerDriverOutput {
-        package,
-        report,
-        closures,
-        executable_entrypoints,
-    })
+    Ok((
+        CompilerDriverOutput {
+            package,
+            report,
+            closures,
+            executable_entrypoints,
+        },
+        env,
+    ))
 }
 
 fn checked_answer_interface_from_term(
@@ -2069,6 +2080,148 @@ fn checked_computational_ih_templates(
         }
     }
     Ok((collector.slots, collector.calls))
+}
+
+/// Immutable plan-bearing Runtime program for one selected checked Ken target.
+///
+/// This is the target-shaped sibling of [`NativeProgramPreparationV1`]. The
+/// compiler derives every oriented frame, checked-IH slot, and checked-IH call
+/// from the live checked environment before erasure; callers may inspect the
+/// resulting program but cannot author or replace any plan input.
+#[derive(Clone, Debug)]
+pub struct NativeTargetPreparationV1 {
+    runtime_program: Box<ken_runtime::RuntimeProgram>,
+}
+
+impl NativeTargetPreparationV1 {
+    pub fn runtime_program(&self) -> &ken_runtime::RuntimeProgram {
+        &self.runtime_program
+    }
+}
+
+/// Elaborate, select, and plan one ordinary executable target without imposing
+/// the `Program I` host-entry ABI.
+///
+/// The emitted Runtime program is the same checked target closure returned by
+/// ordinary compilation, but its computational-IH applications carry the
+/// compiler-derived markers and its checked metadata carries their validated
+/// oriented plan. This is the only way an ordinary target obtains that
+/// realization authority; no plan is accepted from the caller.
+pub fn prepare_native_target_sources(
+    manifest: &CompilerManifest,
+    sources: Vec<CompilerSource>,
+    selector: TargetSelector,
+) -> Result<NativeTargetPreparationV1, NativeProgramBuildError> {
+    let (output, env) = compile_ken_package_sources_with_env(manifest, sources, selector)
+        .map_err(NativeProgramBuildError::Driver)?;
+    let [closure] = output.closures.as_slice() else {
+        return Err(NativeProgramBuildError::Driver(
+            CompilerDriverError::AmbiguousManifestTarget {
+                package_identity: output.package.header.package_identity.clone(),
+                count: output.closures.len(),
+            },
+        ));
+    };
+    if closure.target.kind != CompilerTargetKind::Executable {
+        return Err(NativeProgramBuildError::Driver(
+            CompilerDriverError::MissingClosureMetadata {
+                section: "executable native target",
+                symbol: closure.target.symbol.clone(),
+            },
+        ));
+    }
+    let root = closure.target.symbol.clone();
+    let (symbols, symbol_table) = stable_symbols_for_env(&manifest.package_name, &env, false);
+    let mut bodies = BTreeMap::new();
+    for symbol in &closure.reachable_declarations {
+        if !output
+            .package
+            .artifact
+            .semantic
+            .declarations
+            .contains_key(symbol)
+        {
+            continue;
+        }
+        let id = symbols
+            .iter()
+            .find_map(|(id, candidate)| (candidate == symbol).then_some(*id))
+            .ok_or_else(|| {
+                NativeProgramBuildError::Driver(CompilerDriverError::MissingClosureMetadata {
+                    section: "planned target declaration identity",
+                    symbol: symbol.clone(),
+                })
+            })?;
+        if let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) {
+            bodies.insert(symbol.clone(), body.clone());
+        }
+    }
+    let recursive_invocations = checked_recursive_invocation_templates(
+        &env.env,
+        &symbols,
+        &symbol_table,
+        &output.package.artifact.semantic.recursion_metadata,
+        &bodies,
+    )
+    .map_err(NativeProgramBuildError::Driver)?;
+    let body_view_selection = body_view_selection_for_closure(&output.package, closure);
+    let (computational_ih_slots, computational_ih_calls) = checked_computational_ih_templates(
+        &env.env,
+        &symbols,
+        &symbol_table,
+        &output.package,
+        &body_view_selection,
+        &bodies,
+    )
+    .map_err(NativeProgramBuildError::Driver)?;
+    let (mut runtime_program, oriented_plan) =
+        crate::erasure::erase_checked_package_for_target_with_oriented_plan(
+            &output.package,
+            closure.reachable_declarations.iter(),
+            &root,
+            recursive_invocations,
+            computational_ih_slots,
+            computational_ih_calls,
+        )
+        .map_err(NativeProgramBuildError::Erasure)?;
+
+    let mut planned_package = output.package;
+    let oriented_plan_symbol = StableSymbol::new(
+        SymbolNamespace::Metadata,
+        vec![
+            manifest.package_name.clone(),
+            "OrientedSubcontinuationPlanV1".to_string(),
+        ],
+    );
+    planned_package
+        .artifact
+        .semantic
+        .symbols
+        .insert(oriented_plan_symbol.clone());
+    planned_package
+        .artifact
+        .semantic
+        .metadata
+        .insert(oriented_plan_symbol, oriented_plan.canonical_bytes());
+    planned_package = emit_checked_core_package(
+        planned_package.header.clone(),
+        planned_package.artifact.clone(),
+    )
+    .map_err(CompilerDriverError::from)
+    .map_err(NativeProgramBuildError::Driver)?;
+
+    runtime_program.core_semantic_hash = planned_package.core_semantic_hash;
+    runtime_program.artifact_hash = planned_package.artifact_hash;
+    runtime_program.erased_core.metadata.checked_core.metadata = planned_package
+        .artifact
+        .semantic
+        .metadata
+        .iter()
+        .map(|(symbol, bytes)| (symbol.to_string(), bytes.clone()))
+        .collect();
+    Ok(NativeTargetPreparationV1 {
+        runtime_program: Box::new(runtime_program),
+    })
 }
 
 /// Compile one exact checked Program I `main` through lowering and linked

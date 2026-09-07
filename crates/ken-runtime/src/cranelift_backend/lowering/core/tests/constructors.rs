@@ -1014,11 +1014,13 @@ fn constructor_field_bridge_removal_recovers_exact_refusal() {
             default,
         }),
     };
+    let refusal_scope = checked_ih_realization_observation_scope();
     let err = emit_process_entrypoint_object_with_cranelift(
         &eagerly_materialized,
         "ken_px7p_constructor_field_bridge_removed",
     )
     .expect_err("eager field lowering must recover the pre-PX7-P boundary");
+    let refusal_observations = refusal_scope.finish();
     assert!(
         matches!(
             err,
@@ -1028,6 +1030,15 @@ fn constructor_field_bridge_removal_recovers_exact_refusal() {
             }) if reason == "scrutinee is not a constructor value"
         ),
         "{err:?}"
+    );
+    assert_eq!(
+        refusal_observations,
+        vec![CheckedIhRealizationObservation::MatchRefusal {
+            site: CheckedIhMatchRefusalSite::GenericExpressionSelector,
+            operand_kind: "ProcessExitStatus",
+        }],
+        "D5: the byte-identical refusal must be attributed to the generic selector, \
+         independently of the source-machine control: {refusal_observations:#?}"
     );
 }
 #[test]

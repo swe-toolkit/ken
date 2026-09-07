@@ -33,6 +33,7 @@ default = []
 px8-ds-test-support = []
 r3-4b-observation = []
 dasm-c2-observation = []
+checked-ih-realization-observation = []
 
 [dependencies]
 ken-host = { path = "../ken-host" }

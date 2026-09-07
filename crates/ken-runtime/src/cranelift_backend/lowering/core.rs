@@ -15281,11 +15281,25 @@ impl<'a> Lowering<'a> {
                         "Match",
                     );
                 }
+                #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                let refusal_operand_kind = match &lowered_scrutinee {
+                    LoweringOperand::Specialized(value) => lowered_value_kind(value),
+                    LoweringOperand::Carried(_) => {
+                        unreachable!("the carried Match arm returned above")
+                    }
+                };
                 let LoweringOperand::Specialized(Lowered::Constructor {
                     constructor,
                     args,
                     ..
                 }) = lowered_scrutinee else {
+                    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                    record_checked_ih_realization_observation(
+                        CheckedIhRealizationObservation::MatchRefusal {
+                            site: CheckedIhMatchRefusalSite::GenericExpressionSelector,
+                            operand_kind: refusal_operand_kind,
+                        },
+                    );
                     return Err(unsupported("Match", "scrutinee is not a constructor value"));
                 };
                 let Some((index, case)) = cases
@@ -15364,6 +15378,16 @@ impl<'a> Lowering<'a> {
                                 )
                             })
                             .collect::<Result<Vec<_>, _>>()?;
+                        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                        let matched_field_words = inputs
+                            .iter()
+                            .map(|input| match input {
+                                LoweringOperand::Carried(word) => word.word,
+                                LoweringOperand::Specialized(_) => unreachable!(
+                                    "carry_call_input always returns a carried field"
+                                ),
+                            })
+                            .collect::<Vec<_>>();
                         inputs.extend(
                             captures
                                 .iter()
@@ -15386,6 +15410,24 @@ impl<'a> Lowering<'a> {
                                     )
                                 })
                                 .collect::<Result<Vec<_>, _>>()?,
+                        );
+                        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                        record_checked_ih_realization_observation(
+                            CheckedIhRealizationObservation::StaticMatchCaseCallAbi {
+                                matched_field_count: args.len(),
+                                capture_count: captures.len(),
+                                matched_field_prefix_in_source_order: inputs
+                                    .iter()
+                                    .take(args.len())
+                                    .zip(&matched_field_words)
+                                    .all(|(input, expected)| {
+                                        matches!(
+                                            input,
+                                            LoweringOperand::Carried(word)
+                                                if word.word == *expected
+                                        )
+                                    }),
+                            },
                         );
                         let closure_body = self
                             .child_occurrence(body.static_origin, 0, closure_body)?
