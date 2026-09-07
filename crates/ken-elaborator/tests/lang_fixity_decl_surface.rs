@@ -407,6 +407,24 @@ fn mutual_symbolic_group_reassociates_after_all_members_are_preadmitted() {
     }
 }
 
+/// MEASURED: the layout formatter preserves a fixity declaration and the
+/// formatted unit re-elaborates with the same right-associated result.
+/// CLAIMED: the new metadata/spine nodes participate in the existing lossless
+/// formatting surface. THE GAP: byte preservation alone would not prove the
+/// formatted declaration is consumed, so the result shape is checked.
+#[test]
+fn fixity_declarations_survive_layout_formatting() {
+    let source = "fn <+> (a : Nat) (b : Nat) : Nat = a\n\
+                  infixr 5 <+>\n\
+                  fn formattedUse (a : Nat) (b : Nat) (c : Nat) : Nat = a <+> b <+> c";
+    let formatted = ken_elaborator::layout::format_ken(source).expect("source formats");
+    assert!(formatted.contains("infixr 5 <+>"));
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&formatted)
+        .expect("formatted fixity unit elaborates");
+    assert_right_chain(&env, "formattedUse", "<+>");
+}
+
 /// MEASURED: an undeclared operator has no side-table entry and its three-use
 /// term remains left-associated. CLAIMED: table absence, not a pre-seeded row,
 /// selects default infixl 9. THE GAP: the structural assertion alone could pass

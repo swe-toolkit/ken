@@ -2209,8 +2209,22 @@ fn prebind_scope_declarations(
 
 #[derive(Clone)]
 struct PendingFixity {
+    /// Pre-admission coordinate produced by ordinary module resolution. It is
+    /// never consulted for associativity; once the declaration has an id, the
+    /// program `GlobalId -> Fixity` table is the sole carrier.
+    canonical_name: String,
+    source_operator: String,
     fixity: Fixity,
     declaration_span: Span,
+}
+
+fn pending_fixity_for<'a>(
+    pending: &'a [PendingFixity],
+    canonical_name: &str,
+) -> Option<&'a PendingFixity> {
+    pending
+        .iter()
+        .find(|candidate| candidate.canonical_name == canonical_name)
 }
 
 fn conflicting_fixity(
@@ -2256,14 +2270,14 @@ fn install_declared_fixity(
 }
 
 /// Collect this complete module's declarations before any body is associated.
-/// The temporary string key is only a pre-identity staging coordinate: every
+/// Canonical names are only pre-identity staging coordinates: every fixity
 /// consultation uses the `GlobalId` table after the target is admitted.
 fn collect_scope_fixities(
     elab: &mut ElabEnv,
     decls: &[Decl],
     scope: &Scope,
-) -> Result<HashMap<String, PendingFixity>, ElabError> {
-    let mut pending: HashMap<String, PendingFixity> = HashMap::new();
+) -> Result<Vec<PendingFixity>, ElabError> {
+    let mut pending: Vec<PendingFixity> = Vec::new();
     for decl in decls {
         let Decl::FixityDecl {
             fixity,
@@ -2286,10 +2300,12 @@ fn collect_scope_fixities(
             .expect("a local binding has one canonical spelling")
             .clone();
         let candidate = PendingFixity {
+            canonical_name: canonical.clone(),
+            source_operator: operator.clone(),
             fixity: *fixity,
             declaration_span: span.clone(),
         };
-        if let Some(first) = pending.get(&canonical) {
+        if let Some(first) = pending_fixity_for(&pending, &canonical) {
             if first.fixity != candidate.fixity {
                 return Err(conflicting_fixity(
                     operator,
@@ -2301,19 +2317,19 @@ fn collect_scope_fixities(
             }
             continue;
         }
-        pending.insert(canonical, candidate);
+        pending.push(candidate);
     }
 
     // Validate every already-admitted target before mutating the program table,
     // so one later conflict cannot leave earlier declarations installed.
-    for (canonical, candidate) in &pending {
-        let Some(id) = elab.globals.get(canonical).copied() else {
+    for candidate in &pending {
+        let Some(id) = elab.globals.get(&candidate.canonical_name).copied() else {
             continue;
         };
         if let Some(existing) = elab.fixities.get(&id).copied() {
             if existing != candidate.fixity {
                 return Err(conflicting_fixity(
-                    canonical,
+                    &candidate.source_operator,
                     existing,
                     elab.fixity_spans
                         .get(&id)
@@ -2324,9 +2340,9 @@ fn collect_scope_fixities(
             }
         }
     }
-    for (canonical, candidate) in &pending {
-        if let Some(id) = elab.globals.get(canonical).copied() {
-            install_declared_fixity(elab, canonical, id, candidate)?;
+    for candidate in &pending {
+        if let Some(id) = elab.globals.get(&candidate.canonical_name).copied() {
+            install_declared_fixity(elab, &candidate.source_operator, id, candidate)?;
         }
     }
     Ok(pending)
@@ -2561,8 +2577,11 @@ fn expand_scope(
                             ));
                     if !recursive {
                         let rdecl = &rdecls[k];
-                        let result =
-                            elaborate_checked(elab, rdecl, declared_fixities.get(&rdecl.name))?;
+                        let result = elaborate_checked(
+                            elab,
+                            rdecl,
+                            pending_fixity_for(&declared_fixities, &rdecl.name),
+                        )?;
                         ids.push(result);
                     } else {
                         let members: Vec<crate::resolve::RDecl> =
@@ -2633,7 +2652,7 @@ fn expand_scope(
                         let member_fixities = members
                             .iter()
                             .map(|member| {
-                                declared_fixities.get(&member.name).map(|pending| {
+                                pending_fixity_for(&declared_fixities, &member.name).map(|pending| {
                                     (pending.fixity, pending.declaration_span.clone())
                                 })
                             })
@@ -2734,8 +2753,11 @@ fn expand_scope(
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
-                    let result =
-                        elaborate_checked(elab, &rdecl, declared_fixities.get(&rdecl.name))?;
+                    let result = elaborate_checked(
+                        elab,
+                        &rdecl,
+                        pending_fixity_for(&declared_fixities, &rdecl.name),
+                    )?;
                     if is_pub {
                         if let Decl::AttachedProofDecl {
                             subject,
@@ -2768,8 +2790,11 @@ fn expand_scope(
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
-                    let result =
-                        elaborate_checked(elab, &rdecl, declared_fixities.get(&rdecl.name))?;
+                    let result = elaborate_checked(
+                        elab,
+                        &rdecl,
+                        pending_fixity_for(&declared_fixities, &rdecl.name),
+                    )?;
                     if is_pub && matches!(inner, Decl::ClassDecl { .. }) {
                         publish_identity(
                             &mut exports_here,
