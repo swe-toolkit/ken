@@ -11,6 +11,63 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
+> # D4 SUPERSEDED 2026-09-07 (Architect ruling, Steward fold) — no new discriminator owed; D2 unblocked.
+> #
+> # Architect ruling `evt_3r16wn5bxk6zs` (grounded from `origin/main 908fc247d`
+> # + commit `020201806`), folded here. Net: `D4` is SUPERSEDED, NO new
+> # discriminating fixture is owed by this node, and `D4` does NOT block `D2`.
+> #
+> # (1) `D4` PREMISE MEASURED-FALSE, retirement ALREADY LANDED. `D4`'s premise —
+> # the two guards reject in DIFFERENT classes (region set -> kernel
+> # `TypeMismatch` @9/@4 vs floor -> SCT `NotTerminating`) — is empirically FALSE
+> # at current main. `020201806`
+> # ([[LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE]], ancestor of main) closed
+> # the type-level convoy gap: the aliased `let k : Vec Nat m = xs` now carries
+> # through the nested `match w` index refinement as one telescope, so the alias
+> # type-checks past the convoy and BOTH guards now reach `NotTerminating`. That
+> # commit ALREADY renamed the fixture
+> # (`..._rejects_differently_under_region_set` ->
+> # `..._rejects_after_convoy_closes_type_gap`), made the arm class-only
+> # `NotTerminating(_)`, deleted the `@9`/`@4` substring assertions, and scoped
+> # the termination gap out of this node. **That IS the correct disposition** —
+> # the landed class-only fixture is `D4`'s successor. Do NOT re-release `D4` to
+> # assert differing classes (premise is measured-false) and do NOT synthesize a
+> # new discriminator: class-axis discriminating power is now ZERO (a floor
+> # reintroduction would produce the same class the region set produces), and the
+> # residual internal difference (depth-7 binder retained by regions, suppressed
+> # by floor; skipped census 54->88) is an implementation-internal quantity, NOT
+> # a fixture-assertable behavioral contract. Manufacturing a fixture to keep
+> # `D4` alive is proliferation and "asserts more than was measured."
+> #
+> # (2) `D4` does NOT block `D2`, and `AC-6` is RE-SCOPED at current main.
+> # `D2` diagnoses the DISTINCT `D1` fresh-binder failure
+> # (`intervening_let_fresh_binder_fails_invariantly_across_all_three_bases`,
+> # dies pre-kernel in `refine_branch_goal`, INVARIANT). `020201806` touched only
+> # the ALIAS variant's type layer; the fresh-binder repro never reaches the
+> # kernel, so it is untouched — the two are independent, `D2` proceeds on the
+> # invariant `D1` failure. `AC-3` is NOT tripped (`D1` invariant, second row did
+> # not fire, region-stack unchanged). RE-DERIVE `AC-6` at `origin/main
+> # 908fc247d` (the "bare read = your tree, not the SHA" hazard): the `@9`/`@4`
+> # literals (`D4`'s, old `:599`/`:604`) are DELETED, so that portion of `AC-6`
+> # is DISCHARGED not owed; the `D1` `expected` assertion is already
+> # comma-anchored (`contains("expected: Dg67,")`). `D2`'s only remaining `AC-6`
+> # obligation is whatever the `D1` `found` assertion still needs vs Finding-1's
+> # head-plus-difference — do NOT revive deleted assertions.
+> #
+> # (3) BOUNDARY NOTE (Steward-placed per the Architect's routing; advisory,
+> # blocks NOTHING). The census shows the positional floor SUPPRESSES the depth-7
+> # binder yet STILL reaches `NotTerminating`, so on THIS fixture the region
+> # set's provenance-correctness no longer changes the observable outcome — this
+> # fixture no longer witnesses that the shipped region set is preferable to the
+> # prohibited floor. Whether the region-stack mechanism still has a LIVE
+> # observable witness anywhere is a provenance question about the PREDECESSOR
+> # node [[LANG-CONVOY-MATCH-FIELD-PROVENANCE]] / the region-stack, NOT this
+> # closeout node: if the region-stack's justification is meant to rest on an
+> # observable control, the landed convoy rebase may have made the positional
+> # floor observably-equivalent on this fixture, and it now needs a DIFFERENT
+> # witness program. Not a defect, not a block — a boundary note placed against
+> # the predecessor's mechanism justification and carried to the operator brief.
+>
 > # RE-RELEASED 2026-09-07 (Steward) — the scheduled slot has arrived.
 > #
 > # The 2026-09-06 scheduling note below required an explicit Steward re-release
@@ -38,8 +95,10 @@ origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytre
 > # PLUS its reconciliation second half — reconcile your repro against the
 > # Adversary's interleaved-`let` variant and settle whether this node is ONE
 > # failure or TWO (the half added after the original release, never delivered);
-> # (2) the `D4` discriminating fixture (guards' rejection CLASSES differ); THEN
-> # (3) `D2`'s semantic diagnosis, conditional on `D1` = invariant, `AC-2` gate
+> # (2) [SUPERSEDED — see the D4-SUPERSEDED banner above: `D4`'s
+> # differing-classes premise is measured-false at current main and its
+> # retirement already landed with `020201806`; do NOT author a discriminator];
+> # THEN (3) `D2`'s semantic diagnosis, conditional on `D1` = invariant, `AC-2` gate
 > # (no repair before the diagnosis is stated). Re-derive all coordinates at your
 > # base per "Fixed inputs" — the predecessor moved `elab.rs`; the line numbers
 > # in this node are from its review, not your tree.
