@@ -15,6 +15,8 @@ help generation.
 import Data.Collections.NonEmpty
   (NonEmpty, nonempty_cons, nonempty_map, Semigroup_instance_NonEmpty)
 
+import Data.Sums.Validation (Invalid, Valid, Validation, validation_ap, validation_map)
+
 data OptionMode = FlagOption | ValueOption
 
 data OptionSpec = MkOptionSpec String (Option String) OptionMode String

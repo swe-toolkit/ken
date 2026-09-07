@@ -8,6 +8,8 @@ the single specification value.
 ```ken
 import Data.Collections.NonEmpty (NonEmpty)
 
+import Data.Sums.Validation (Validation)
+
 const forge_build_options : List OptionSpec =
   Cons
     OptionSpec
