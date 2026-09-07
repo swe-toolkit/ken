@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-REALIZATION-AUTHORITY
 title: "Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
