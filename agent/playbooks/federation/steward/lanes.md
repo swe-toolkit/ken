@@ -66,7 +66,40 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-06 (NEWEST — read before the 2026-09-05 blocks below)
+> ### LIVE POSITION 2026-09-07 (NEWEST — read before the 2026-09-06 block below)
+>
+> Operator active this session. Roster STRUCTURE unchanged (three lanes,
+> runtime / language / foundation). Two operator rulings this session bear on
+> lane 2:
+>
+> - **Floor roster ten→fifteen: spec side LANDED, code side queued.** The §4
+>   taxonomy extension (adds Equal/Prop/Proved/Top/Bottom) merged e87cd24de
+>   (PR #3410); the code twin `LANG-FLOOR-ROSTER-FIFTEEN-code`
+>   (`PRELUDE_FLOOR_NAMES` ten→fifteen, branch `d8b0d895f`) is framed and merges
+>   immediately behind it (no-mismatch-window; §B conformance red-until it lands,
+>   documented/expected per Nat/Pair precedent).
+> - **Lane-2 ring change: LANGUAGE → VERIFY at the next lane-2 seam, objective =
+>   CI-time reduction below the 20-minute ceiling.** Operator, 2026-09-07,
+>   verbatim: "CI is now regularly over 20 minutes. At the next seam, task L2
+>   (verify) with analyzing CI time cost and reducing it below the 20 minute
+>   threshold." This REVIVES the 2026-08-28 verify-on-lane-2 plan that was
+>   superseded 2026-08-31 by "CI is acceptable atm" — that supersession is itself
+>   now reversed; CI time is again the lane-2 priority. The objective node
+>   ALREADY EXISTS and is well-framed: **`CI-NATIVE-PARITY-DURATION`** (active,
+>   owner verify; D1-D3 landed `c555f843a`; D4 stale-readmission detector + D5
+>   split-the-574s-shard remain; ceiling <20min, target <10min). RING CHANGE
+>   within lane 2, NOT a fourth lane.
+>   - **Seam trigger:** the language ring's current WP is `LANG-FIXITY-DECL-SURFACE`
+>     (CI-red respin in QA). When FIXITY reaches a seam (lands or hard-stops), the
+>     Steward switches lane 2 to verify and RE-RELEASES `CI-NATIVE-PARITY-DURATION`
+>     (explicit Steward release — verify-leader awaits it) + kicks.
+>   - **Consequence flagged to operator:** switching to verify DEFERS the
+>     floor-code closer, so the spec/code floor mismatch (§B conformance
+>     red-until) stays open through the verify campaign — an accepted/documented
+>     window. Floor-code lands when lane 2 next returns to language, unless the
+>     operator slots it first.
+>
+> ### LIVE POSITION 2026-09-06 (read before the 2026-09-05 blocks below)
 >
 > Operator active this session. Roster STRUCTURE unchanged (three lanes,
 > runtime / language / foundation). Live position per lane, with the operator
