@@ -388,7 +388,7 @@ mod tests {
         b2r_plan, contspec_nested_fixture, contspec_parameter_match, contspec_plan, unit,
     };
     use crate::cranelift_backend::surface::NativeSeedEnvironment;
-    use crate::RuntimeGroundValue;
+    use crate::{RuntimeGroundValue, RuntimeValue};
 
     /// A closure whose captures arrive by the **seed** provenance: the captures
     /// are symbols resolved against the seed environment at JIT time.
@@ -441,12 +441,11 @@ mod tests {
         }
     }
 
-    /// `AC-1` — descriptor totality over the owner partition, **both
-    /// directions**.
+    /// `AC-1` — descriptor population equality and positional identity.
     ///
-    /// ⚠ A one-directional check passes happily on an orphan, so both are
-    /// asserted: every unit has exactly one descriptor, and every descriptor
-    /// names a member of the partition.
+    /// Population equality supplies both cardinality directions. The separate
+    /// live law is positional: each descriptor names the function at its own
+    /// ordinal and repeats that function's seed and body occurrence.
     ///
     /// Promise class: **durable invariant** — a relation between two populations,
     /// not a frozen count.
@@ -464,14 +463,14 @@ mod tests {
              true and this control observes nothing"
         );
 
-        // Direction 1 — every unit is covered.
+        // Population equality — every unit is covered and there is no orphan.
         assert_eq!(
             plan.abi.descriptors.len(),
             plan.semantic.functions.len(),
             "AC-1: the descriptor population is not exact for the function unit \
              partition"
         );
-        // Direction 2 — every descriptor names a member, positionally.
+        // Positional identity — distinct from population equality.
         for (ordinal, descriptor) in plan.abi.descriptors.iter().enumerate() {
             let function = &plan.semantic.functions[ordinal];
             assert_eq!(descriptor.function, function.id, "AC-1: descriptor/unit id");
@@ -481,8 +480,7 @@ mod tests {
             );
         }
 
-        // And an ORPHAN must be refused, so direction 2 is a real detector
-        // rather than a restatement of how the builder happens to loop.
+        // A missing descriptor must be refused by population equality.
         let mut orphaned = plan.abi.clone();
         orphaned.descriptors.pop();
         let err = orphaned
@@ -500,9 +498,33 @@ mod tests {
         // ⛔ The EXACT failure, not `is_err()`. A control that reddens does not
         // confirm which detector caught it, and `is_err()` would stay green if
         // some unrelated law started firing first.
-        assert!(
-            format!("{err:?}").contains("not exact for the function unit partition"),
-            "AC-1: the orphan was refused, but not by the totality law. Got: {err:?}"
+        assert_eq!(
+            err,
+            planner_error("abi descriptor population is not exact for the function unit partition"),
+            "AC-1: the missing descriptor reached the wrong detector"
+        );
+
+        // AC-4's live neighbour: preserving the population while corrupting one
+        // descriptor's function identity must still reach the positional law.
+        // If that comparison is neutered, this mutation plans green.
+        let mut mispositioned = plan.abi.clone();
+        mispositioned.descriptors[1].function = PredeclaredFunctionId(0);
+        let err = mispositioned
+            .validate(
+                &plan.semantic,
+                &plan.nodes,
+                &plan.semantic_sources,
+                &plan.edges,
+                &plan.entries,
+                &plan.declaration_occurrences.values().copied().collect(),
+                plan.root_entry.expect("root entry"),
+                plan.root_ingress,
+            )
+            .expect_err("a non-positional descriptor must be refused");
+        assert_eq!(
+            err,
+            planner_error("abi descriptor is not positional for its function unit"),
+            "AC-4: the positional-identity mutation reached the wrong detector"
         );
     }
 
@@ -688,53 +710,181 @@ mod tests {
         );
     }
 
-    /// `AC-5` / `C4` — cross-module linking is a **checked** exclusion, paired
-    /// with a positive intra-module control so the exclusion is distinguishable
-    /// from a gap.
+    /// `C4` — imported values reaching a unit result or an in-unit lexical
+    /// capture through `If`/`Let` are refused, without rejecting the matching
+    /// intra-module values.
     ///
-    /// Promise class: **durable mutation proof** plus a positive control.
+    /// Promise class: **durable mutation proof** plus positive controls.
     #[test]
     fn b2r_ac5_an_imported_capture_edge_is_refused_and_intra_module_recursion_is_not() {
-        // The exclusion. A lexical closure's captures are arbitrary source
-        // expressions, so this is a real plan in which an imported value would
-        // have to cross into a frame and be given a carrier.
-        let imported = b2r_lexical_closure(
-            vec![RuntimeExpr::ImportedDeclarationRef {
+        fn imported() -> RuntimeExpr {
+            RuntimeExpr::ImportedDeclarationRef {
                 symbol: "decl:other::thing".to_string(),
                 dependency: "other".to_string(),
                 dependency_semantic_hash: "hash".to_string(),
-            }],
-            RuntimeExpr::Var(0),
-        );
-        let declarations = BTreeMap::new();
-        let err = match plan_static_transition_graph(&imported, &declarations) {
-            Ok(_) => panic!(
-                "AC-5/C4: an imported capture edge must be REFUSED before emission, \
-                 and it planned green instead"
-            ),
-            Err(err) => err,
-        };
-        assert!(
-            matches!(err, CraneliftBackendError::Unsupported(ref u) if u.construct == "ImportedDeclarationRef"),
-            "AC-5/C4: the refusal must be the EXISTING dependency-linking \
-             unsupported result, not a generic planner error. Got: {err:?}"
-        );
+            }
+        }
+        fn exact_import_error(expr: &RuntimeExpr) {
+            let err = match plan_static_transition_graph(expr, &BTreeMap::new()) {
+                Ok(_) => panic!("an imported value at this unit boundary planned green"),
+                Err(err) => err,
+            };
+            let CraneliftBackendError::Unsupported(unsupported) = err else {
+                panic!("C4 reached the wrong error class: {err:?}");
+            };
+            assert_eq!(unsupported.construct, "ImportedDeclarationRef");
+            assert_eq!(
+                unsupported.reason,
+                "imported declaration requires dependency linking, so it receives no callable \
+                 descriptor in the intra-module representation contract"
+            );
+        }
 
-        // ⚠ The positive control. Without it, the assertion above is
-        // indistinguishable from a planner that refuses closures generally.
-        let intra = b2r_lexical_closure(
-            vec![RuntimeExpr::DeclarationRef {
-                symbol: "decl:fixture::b2o".to_string(),
+        // The pre-existing public-runtime-IR exclusion remains exact even
+        // though checked-Ken erasure does not produce a direct imported capture.
+        exact_import_error(&b2r_lexical_closure(
+            vec![imported()],
+            RuntimeExpr::Var(0),
+        ));
+
+        // Hole B in its closure spelling: the unit's own result is imported.
+        exact_import_error(&b2r_lexical_closure(Vec::new(), imported()));
+        // The same own-result law applies to every unit, including the root
+        // scheduling unit rather than only closure-shaped definitions. Both
+        // admitted forwarding forms are exercised at that boundary too.
+        exact_import_error(&imported());
+        exact_import_error(&RuntimeExpr::If {
+            scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+            then_expr: Box::new(imported()),
+            else_expr: Box::new(imported()),
+        });
+        exact_import_error(&RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+            body: Box::new(imported()),
+        });
+
+        // Synthetic Hole A is not a checked-Ken capture producer. It is retained
+        // only as a regression control proving that the shared `producers_of`
+        // relation follows both result branches of an `If` at a capture slot.
+        exact_import_error(&b2r_lexical_closure(
+            vec![RuntimeExpr::If {
+                scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+                then_expr: Box::new(imported()),
+                else_expr: Box::new(imported()),
+            }],
+            RuntimeExpr::Var(0),
+        ));
+        // `Let` is the other explicitly admitted forwarding form.
+        exact_import_error(&b2r_lexical_closure(
+            vec![RuntimeExpr::Let {
+                value: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+                body: Box::new(imported()),
+            }],
+            RuntimeExpr::Var(0),
+        ));
+
+        // Positive controls on the same three boundary shapes. Without these, a
+        // validator that rejects all results, all If/Let nodes, or all lexical
+        // captures satisfies every negative row above.
+        let intra_result = RuntimeExpr::Value(RuntimeValue::Bool(true));
+        plan_static_transition_graph(&intra_result, &BTreeMap::new())
+            .expect("an intra-module root result remains accepted");
+        plan_static_transition_graph(
+            &RuntimeExpr::Let {
+                value: Box::new(intra_result.clone()),
+                body: Box::new(RuntimeExpr::If {
+                    scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+                    then_expr: Box::new(intra_result.clone()),
+                    else_expr: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(false))),
+                }),
+            },
+            &BTreeMap::new(),
+        )
+        .expect("intra-module If/Let forwarding remains accepted");
+        plan_static_transition_graph(
+            &b2r_lexical_closure(Vec::new(), intra_result.clone()),
+            &BTreeMap::new(),
+        )
+        .expect("an intra-module closure result remains accepted");
+        plan_static_transition_graph(
+            &b2r_lexical_closure(
+                vec![RuntimeExpr::DeclarationRef {
+                    symbol: "decl:fixture::b2o".to_string(),
+                }],
+                RuntimeExpr::Var(0),
+            ),
+            &BTreeMap::new(),
+        )
+        .expect("an intra-module declaration capture remains accepted");
+        let intra_capture = b2r_lexical_closure(
+            vec![RuntimeExpr::If {
+                scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+                then_expr: Box::new(intra_result.clone()),
+                else_expr: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(false))),
             }],
             RuntimeExpr::Var(0),
         );
-        let plan = plan_static_transition_graph(&intra, &declarations)
-            .expect("AC-5/C4: an INTRA-module declaration capture must plan green");
+        let plan = plan_static_transition_graph(&intra_capture, &BTreeMap::new())
+            .expect("an intra-module forwarded capture remains accepted");
         assert!(
             plan.abi.descriptors.len() > 1,
-            "AC-5/C4: the positive control produced no boundary, so it does not \
-             discriminate"
+            "the capture control produced no unit boundary"
         );
+    }
+
+    /// D5(b)'s ruled positive control: the exact runtime-IR shape produced when
+    /// checked-Ken erasure captures an enclosing imported binding is
+    /// representable at the closure boundary.
+    ///
+    /// Promise class: durable behavioural invariant. The imported producer is
+    /// deliberately outside the closure; the capture itself is the ordinary
+    /// `(0..runtime_depth)` `Var`, so a blanket import or Var rejection would
+    /// make this plan fail.
+    #[test]
+    fn b2o_check_imported_binding_var_capture_has_a_value_word_carrier() {
+        let expr = RuntimeExpr::Let {
+            value: Box::new(RuntimeExpr::ImportedDeclarationRef {
+                symbol: "decl:dep-pkg::Dep::answer".to_string(),
+                dependency: "dep:dep-pkg::checked-core".to_string(),
+                dependency_semantic_hash: "sha256:dep-answer-v1".to_string(),
+            }),
+            body: Box::new(RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::LexicalClosure {
+                    captures: vec![RuntimeExpr::Var(0)],
+                    params: vec!["arg0".to_string()],
+                    body: Box::new(RuntimeExpr::Var(1)),
+                }),
+                args: vec![RuntimeExpr::Value(RuntimeValue::Int((7).into()))],
+            }),
+        };
+        let plan = plan_static_transition_graph(&expr, &BTreeMap::new())
+            .expect("the checked-Ken-shaped imported Var capture is representable");
+        let capture_slots = plan
+            .abi
+            .descriptors
+            .iter()
+            .filter_map(|descriptor| match descriptor.definition {
+                AbiUnitDefinition::ClosureBody { .. } => Some(descriptor),
+                AbiUnitDefinition::SchedulingEntry { .. }
+                | AbiUnitDefinition::CallableDeclaration { .. }
+                | AbiUnitDefinition::ContinuationSpecialization { .. }
+                | AbiUnitDefinition::StaticContinuationFusion { .. } => None,
+            })
+            .flat_map(|descriptor| {
+                let start = descriptor.slots.start as usize;
+                let end = start + descriptor.slots.len as usize;
+                plan.abi.slots[start..end]
+                    .iter()
+                    .filter(|slot| slot.kind == AbiSlotKind::Capture)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            capture_slots.len(),
+            1,
+            "the fixture must reach exactly one real capture boundary"
+        );
+        assert_eq!(capture_slots[0].carrier, AbiCarrier::ValueWord);
+        assert_eq!(capture_slots[0].ownership, AbiOwnership::OwnedByFrame);
     }
 
     /// `AC-10` — the **predicted** descriptor population, measured.

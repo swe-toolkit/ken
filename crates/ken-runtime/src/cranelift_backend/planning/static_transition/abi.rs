@@ -796,7 +796,7 @@ pub(super) fn build_abi_plane(
     // `C4`, and deliberately before any descriptor is minted: an imported edge
     // must receive **no** callable descriptor at all, so the exclusion runs
     // before construction rather than as a filter afterwards.
-    reject_imported_capture_edges(plane, sources, &definitions)?;
+    reject_imported_unit_boundary_values(plane, sources, &definitions)?;
 
     let mut abi = AbiPlane::default();
     for (ordinal, function) in plane.functions.iter().enumerate() {
@@ -864,7 +864,7 @@ thread_local! {
     /// **`RT-DECL-CLOSURE-PORT` `D3` causal control — the SILENT population
     /// shrink.**
     ///
-    /// Restore `C4`'s pre-`D2` matching, where `reject_imported_capture_edges`
+    /// Restore `C4`'s pre-`D2` matching, where the imported-boundary check
     /// recognised `ClosureBody` alone. ⭐ This is the defect no green run can
     /// reveal: the exclusion keeps returning "no violation" for a population
     /// that no longer contains the declaration-owned units, so **every test
@@ -873,10 +873,30 @@ thread_local! {
     /// declaration-owned unit, asserted to be REFUSED.
     pub(super) static D3_C4_MATCHES_CLOSURE_BODY_ONLY: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
+    /// Isolates orthogonal test subjects from C4. The ordinary planner never
+    /// disables C4; B2F's causal control and the all-expression source-layout
+    /// control use this to test their own mechanisms independently.
+    pub(super) static B2O_CHECK_DISABLE_C4: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
     /// Compile-preserving D4 mutation: construction begins without the exact
     /// capacity preflight, so the first descriptor grows boundary storage.
     pub(super) static SKIP_CONTINUATION_ABI_PREFLIGHT: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_c4_disabled_for_independent_control<T>(
+    run: impl FnOnce() -> T,
+) -> T {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            B2O_CHECK_DISABLE_C4.with(|cell| cell.set(false));
+        }
+    }
+    B2O_CHECK_DISABLE_C4.with(|cell| cell.set(true));
+    let _reset = Reset;
+    run()
 }
 
 /// Installs the complete Slice 1 population as dormant continuation ABI.
@@ -1538,42 +1558,36 @@ fn append_static_continuation_fusion_descriptor(
     Ok(())
 }
 
-/// **`C4`/`AC-5` — cross-module linking is a CHECKED exclusion.**
+/// **`C4` — cross-module values at unit boundaries are a checked exclusion.**
 ///
-/// An imported declaration receives **no callable descriptor** and fails here,
-/// before emission, with the existing dependency-linking unsupported result —
-/// not with a generic planner error, and not in a comment.
+/// This is deliberately per-unit, not a whole-plan search for imported mentions.
+/// Every unit's own result is checked, and each lexical capture is followed
+/// through the established in-program `If`/`Let` producer relation. An imported
+/// declaration that reaches either boundary fails before emission with the
+/// existing dependency-linking unsupported result.
 ///
-/// ⭐ **The scope is an imported EDGE, not an imported mention, and getting that
-/// wrong is a real defect I shipped once.** My first implementation rejected
-/// every occurrence whose result carrier is unrepresentable, which condemned any
-/// plan that merely *contained* an `ImportedDeclarationRef` anywhere. That is
-/// strictly stronger than `C4`, and
-/// `every_expression_typed_field_is_a_reachable_positional_child_origin` — a
-/// pre-existing property test that legitimately enumerates every expression
-/// shape — caught it. `C4` excludes the position where an imported value would
-/// have to **cross a frame boundary and be given a carrier**, which is a capture
-/// slot, not an arbitrary evaluation site.
-///
-/// ⚠ **Non-vacuity is constructed, not assumed.** A lexical closure's captures
-/// are arbitrary source expressions (`static_transition.rs:884`), so
-/// `LexicalClosure { captures: [ImportedDeclarationRef { .. }], .. }` is a real,
-/// buildable plan in which an imported value crosses into a frame. That is the
-/// imported edge, and it is what the paired positive control varies against.
-///
-/// ⚠ The **seed** provenance cannot carry one at all: its captures resolve to a
-/// `RuntimeGroundValue`, closed at six variants none of which is a declaration
-/// reference. The asymmetry is stated rather than left to look like coverage.
-fn reject_imported_capture_edges(
+/// Checked-Ken erasure represents a real outer binding captured by a lambda as a
+/// bare `Var`. B2F measures that capture at a genuine `ValueWord` boundary and
+/// establishes it is representable, so this checker deliberately accepts the
+/// `Var` rather than tracing through its enclosing binding. Resolving the import
+/// itself is the separate dependency-linking capability; rejecting every `Var`
+/// capture or every plan containing an import would be strictly over-strong.
+fn reject_imported_unit_boundary_values(
     plane: &SemanticPlane,
     sources: &[SemanticSourceSeed],
     definitions: &[AbiUnitDefinition],
 ) -> Result<(), CraneliftBackendError> {
-    for definition in definitions {
-        // ⛔ `D2`: a callable declaration unit captures exactly as a closure body
-        // does, so it is in this exclusion's population too. Matching only
-        // `ClosureBody` here would have silently exempted every ported
-        // declaration from `C4` — the check would still pass, on a smaller set.
+    #[cfg(test)]
+    if B2O_CHECK_DISABLE_C4.with(std::cell::Cell::get) {
+        return Ok(());
+    }
+    for (function, definition) in plane.functions.iter().zip(definitions) {
+        // Every function unit has a Result slot, independently of whether its
+        // definition is closure-shaped.
+        require_representable_producers(plane, sources, function.body_occurrence)?;
+
+        // A callable declaration unit captures exactly as an anonymous closure
+        // body does, so both closure-shaped definition arms share this route.
         #[cfg(test)]
         let recognised = if D3_C4_MATCHES_CLOSURE_BODY_ONLY.with(std::cell::Cell::get) {
             match *definition {
@@ -1595,8 +1609,7 @@ fn reject_imported_capture_edges(
             continue;
         }
         for capture in lexical_capture_origins(plane, defining_origin)? {
-            let seed = source_for(sources, capture)?;
-            result_carrier(seed.source)?;
+            require_representable_producers(plane, sources, capture)?;
         }
     }
     Ok(())
@@ -2105,23 +2118,19 @@ fn frame_header(
 const MAX_PRODUCER_DEPTH: usize = 64;
 
 /// **`AC-11` — every boundary transfer `B2F` emits is representable, established
-/// HERE and not inherited from `C4`.**
+/// HERE rather than inherited from `C4`.**
 ///
-/// ⛔ **`C4` does not establish this and must not be cited as though it did.**
-/// `reject_imported_capture_edges` iterates a lexical closure's **direct capture
-/// children** and asks `result_carrier(seed.source)` — which answers *"is this
-/// capture expression's own top-level shape `ImportedDeclarationRef`?"*, not
-/// *"can an imported value reach this frame slot?"*. Two consequences, both
-/// buildable plans that plan green:
+/// `C4` now uses this same `producers_of` relation for each unit's own result and
+/// its in-program lexical capture expressions. That checking-layer exclusion is
+/// not a substitute for this emission-boundary proof: this function walks the
+/// descriptors and exact slot runs the selected emitter will consume, including
+/// the fixed protocol carriers C4 does not inspect.
 ///
-/// | | |
-/// |---|---|
-/// | **Hole A** | any wrapper defeats it — `If { Bool(true), imported, imported }` is **binder-free**, so no de Bruijn reading makes its result anything but the imported value, and it receives a full `Capture` slot |
-/// | **Hole B** | needs no wrapper — `LexicalClosure { captures: [], body: ImportedDeclarationRef }`; the function iterates capture children only, so the unit's own **result** slot is never carrier-checked |
-///
-/// ⛔ **This is a NEW, `B2F`-owned check. It does not touch `C4`**, whose repair
-/// rides `RT-FNSPLIT-B2O-CHECK` — an `L` node on an atomic boundary does not
-/// absorb a checking-layer repair.
+/// A checked-Ken lambda captures an enclosing binding as a bare `Var`. The
+/// durable positive control measures that its closure slot is a `ValueWord`, so
+/// accepting the `Var` here is the representability result rather than a gap.
+/// The imported producer's later dependency-linking refusal is a separate native
+/// capability and does not turn this boundary carrier into an invalid one.
 ///
 /// ⛔ **And it runs BEFORE any unit is declared or defined** (clause 3): its call
 /// site in `compile_expr_into_module` precedes `declare_unit_bundle`, so no path
@@ -2176,12 +2185,10 @@ pub(super) fn validate_emitted_transfers(
             }
         }
 
-        // ⭐ Hole B: the unit's OWN result. `C4` never carrier-checks this, and
-        // `LexicalClosure { captures: [], body: ImportedDeclarationRef }` needs
-        // no wrapper at all to exploit it.
+        // The unit's own result, independently checked at the emission boundary.
         require_representable_producers(plane, sources, descriptor.body_occurrence)?;
 
-        // ⭐ Hole A: each capture, traced through binder-free wrappers rather
+        // Each capture, traced through the admitted in-program wrappers rather
         // than read off the child's own top-level shape.
         if let AbiUnitDefinition::ClosureBody {
             defining_origin,
@@ -2590,12 +2597,12 @@ impl AbiPlane {
         )?;
 
         for (ordinal, descriptor) in self.descriptors.iter().enumerate() {
-            // `AC-1`, direction 2 — every descriptor names a member of the
-            // partition, positionally. A one-directional check passes happily on
-            // an orphan, so both directions are asserted.
-            let function = plane.functions.get(ordinal).ok_or_else(|| {
-                planner_error("abi descriptor names a function unit outside the partition")
-            })?;
+            // `AC-1`, positional identity. The population equality above makes
+            // `ordinal` an in-range function index; it already supplies both
+            // population directions. What remains live here is a different law:
+            // each descriptor must name the function at its own position and
+            // repeat that function's exact seed and body occurrence.
+            let function = &plane.functions[ordinal];
             let id = PredeclaredFunctionId(
                 u32::try_from(ordinal)
                     .map_err(|_| planner_capacity_error("abi descriptor identity exhausted"))?,
@@ -2667,7 +2674,7 @@ impl AbiPlane {
             }
         }
 
-        reject_imported_capture_edges(plane, sources, &definitions)?;
+        reject_imported_unit_boundary_values(plane, sources, &definitions)?;
         self.validate_boundary_layouts(plane, sources, edges)?;
         self.validate_declaration_call_targets(plane, edges)?;
         Ok(())

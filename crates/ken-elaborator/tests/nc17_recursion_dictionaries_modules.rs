@@ -9,10 +9,10 @@ use ken_elaborator::checked_core::{
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 use ken_runtime::{
-    evaluate_runtime_ir_example, RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExample,
-    RuntimeExpr, RuntimeGroundValue, RuntimeIrSeedEnvironment, RuntimeLowerabilityStatus,
-    RuntimeMetadata, RuntimeObservation, RuntimePartiality, RuntimePrimitive, RuntimeProgram,
-    RuntimeSymbolMetadata, RuntimeValue,
+    evaluate_runtime_ir_example, run_example_with_seed_observation, NativeSeedEnvironment,
+    RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExample, RuntimeExpr, RuntimeGroundValue,
+    RuntimeIrSeedEnvironment, RuntimeLowerabilityStatus, RuntimeMetadata, RuntimeObservation,
+    RuntimePartiality, RuntimePrimitive, RuntimeProgram, RuntimeSymbolMetadata, RuntimeValue,
 };
 
 fn decl_symbol(package: &str, name: &str) -> StableSymbol {
@@ -466,6 +466,118 @@ fn imported_declaration_ref_requires_exact_dependency_seed_identity() {
         }
         other => panic!("expected missing dependency identity lane, got {other:?}"),
     }
+}
+
+/// RT-FNSPLIT-B2O-CHECK D5(b)'s positive twin: checked-Ken erasure captures an
+/// enclosing imported binding through the ordinary bare-Var route, and the
+/// checking layer accepts that representable boundary before native lowering
+/// reaches the separately unsupported dependency-linking operation.
+///
+/// Promise class: durable behavioral invariant. The runtime result proves the
+/// capture is used; the exact late native error proves C4/B2F did not replace it
+/// with a blanket Var/import rejection.
+#[test]
+fn checked_core_imported_value_crosses_an_accepted_var_capture() {
+    let (mut package, target, imported, dependency, dependency_hash) = imported_package();
+    let table = table_many(&[
+        (GlobalId(1), target.clone()),
+        (GlobalId(90), imported.clone()),
+    ]);
+    let ty = Term::Type(Level::zero());
+    package.artifact.semantic.declarations.insert(
+        target.clone(),
+        canonical_decl_bytes(
+            &transparent(
+                GlobalId(1),
+                Term::Let {
+                    ty: Box::new(ty.clone()),
+                    val: Box::new(Term::Const {
+                        id: GlobalId(90),
+                        level_args: Vec::new(),
+                    }),
+                    // let captured = import in (lambda ignored. captured) captured
+                    body: Box::new(Term::App(
+                        Box::new(Term::Lam(Box::new(ty), Box::new(Term::Var(1)))),
+                        Box::new(Term::Var(0)),
+                    )),
+                },
+            ),
+            &table,
+        )
+        .expect("canonical imported-capture declaration"),
+    );
+    package = reemit(package);
+
+    let mut program = erase_checked_core_package_for_target(&package, [&target])
+        .expect("the checked-core imported capture erases");
+    let body = lowered_body(&program, &target);
+    let RuntimeExpr::Let {
+        value,
+        body: let_body,
+    } = &body
+    else {
+        panic!("checked-core capture did not lower to Let: {body:?}");
+    };
+    assert!(matches!(
+        value.as_ref(),
+        RuntimeExpr::ImportedDeclarationRef {
+            symbol,
+            dependency: actual_dependency,
+            dependency_semantic_hash: actual_hash,
+        } if symbol == &imported.to_string()
+            && actual_dependency == &dependency.to_string()
+            && actual_hash == &dependency_hash
+    ));
+    let RuntimeExpr::Call { callee, args } = let_body.as_ref() else {
+        panic!("the enclosing Let did not call its closure: {let_body:?}");
+    };
+    assert!(matches!(
+        callee.as_ref(),
+        RuntimeExpr::LexicalClosure {
+            captures,
+            params,
+            body,
+        } if matches!(captures.as_slice(), [RuntimeExpr::Var(0)])
+            && params.as_slice() == ["arg0"]
+            && matches!(body.as_ref(), RuntimeExpr::Var(1))
+    ));
+    assert!(matches!(args.as_slice(), [RuntimeExpr::Var(0)]));
+
+    let example = RuntimeExample {
+        name: "checked-core-imported-var-capture".to_string(),
+        checked_core_shape:
+            "let captured = dep-pkg.Dep.answer in (lambda ignored. captured) captured"
+                .to_string(),
+        ir: body,
+        observation: RuntimeObservation::Returned(RuntimeGroundValue::Int((9).into())),
+    };
+    program.examples.push(example.clone());
+    let mut interpreter_env = RuntimeIrSeedEnvironment::empty();
+    interpreter_env.insert_imported_declaration(
+        imported.to_string(),
+        dependency.to_string(),
+        dependency_hash.clone(),
+        RuntimeGroundValue::Int((9).into()),
+    );
+    let interpreted = evaluate_runtime_ir_example(&program, &example, &interpreter_env)
+        .expect("the imported value crosses the ordinary Var capture");
+    assert_eq!(interpreted.observation.observation, example.observation);
+
+    let native = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty());
+    let error = native.expect_err(
+        "the representable capture reaches the separate dependency-linking gap",
+    );
+    let ken_runtime::CraneliftBackendError::Unsupported(unsupported) = error else {
+        panic!("the checked-Ken capture reached the wrong native failure: {error:?}");
+    };
+    assert_eq!(unsupported.construct, "ImportedDeclarationRef");
+    assert_eq!(
+        unsupported.reason,
+        format!(
+            "imported declaration {imported} from {dependency} @ {dependency_hash} requires \
+             dependency linking"
+        )
+    );
 }
 
 #[test]

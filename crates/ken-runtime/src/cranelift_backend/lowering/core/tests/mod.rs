@@ -1023,7 +1023,17 @@ fn two_child_record() -> RuntimeExpr {
 fn every_expression_typed_field_is_a_reachable_positional_child_origin() {
     let mut unreachable = Vec::new();
     for (name, occurrence) in every_variant_occurrence() {
-        let (plan, origin) = planned_root_occurrence(&occurrence);
+        // This test measures positional source registration, independently of
+        // C4's imported-boundary policy. The imported variant is itself a root
+        // result and is now deliberately refused by C4, so isolate this older
+        // all-variants control from that upstream policy check.
+        let (plan, origin) = if name == "ImportedDeclarationRef" {
+            crate::cranelift_backend::planning::with_c4_disabled_for_independent_control(|| {
+                planned_root_occurrence(&occurrence)
+            })
+        } else {
+            planned_root_occurrence(&occurrence)
+        };
         let children = expression_children(&occurrence);
 
         // Every enumerated position resolves to a real preallocated origin.
@@ -2474,21 +2484,27 @@ fn ac11_imported() -> RuntimeExpr {
 /// working discriminator while measuring nothing.
 #[cfg(test)]
 pub(super) fn ac11_compiles(expr: &RuntimeExpr) -> Result<(), CraneliftBackendError> {
-    let module = new_jit_module().expect("jit module");
-    compile_expr_into_module(
-        module,
-        "b2f_ac11_probe",
-        Linkage::Local,
-        expr,
-        &NativeSeedEnvironment::empty(),
-        BTreeMap::new(),
-        None,
-        false,
-        None,
-        None,
-        None,
-    )
-    .map(|_| ())
+    // C4 now rejects the same imported result/If/Let population earlier during
+    // ABI construction. Disable only that upstream checker here so this B2F
+    // control continues to prove the independently-owned emission-boundary walk
+    // refuses before declaring a unit rather than passing behind C4's result.
+    crate::cranelift_backend::planning::with_c4_disabled_for_independent_control(|| {
+        let module = new_jit_module().expect("jit module");
+        compile_expr_into_module(
+            module,
+            "b2f_ac11_probe",
+            Linkage::Local,
+            expr,
+            &NativeSeedEnvironment::empty(),
+            BTreeMap::new(),
+            None,
+            false,
+            None,
+            None,
+            None,
+        )
+        .map(|_| ())
+    })
 }
 
 /// Compile the exact governed bracket source as a process object.
