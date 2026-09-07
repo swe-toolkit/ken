@@ -9,9 +9,10 @@
 //! was `type`); `T a b` type app.
 
 use crate::ast::{
-    Binder, BoundaryKind, CapabilityDecl, ClassField, ConstructorSignature,
+    BinOp, Binder, BoundaryKind, CapabilityDecl, ClassField, ConstructorSignature,
     ConstructorSignatureArg, CtorDecl, Decl, DefKeyword, EffectRowSyntax, ExplicitDataCtor, Expr,
-    FieldPat, LetBinding, MatchArm, PatKind, Pattern, PropIntro, SpaceCell, SpaceOperation, Type,
+    FieldPat, Fixity, FixityAssoc, InfixOperator, LetBinding, MatchArm, PatKind, Pattern,
+    PropIntro, SpaceCell, SpaceOperation, Type,
 };
 use crate::error::{ElabError, Span};
 use crate::lexer::Token;
@@ -193,9 +194,7 @@ impl Parser {
     fn parse_decl_group(&mut self) -> Result<Vec<Decl>, ElabError> {
         let decl = self.parse_decl()?;
         let derive_target = match decl.unwrap_pub() {
-            Decl::DataDecl { name, .. } | Decl::ExplicitDataDecl { name, .. } => {
-                Some(name.clone())
-            }
+            Decl::DataDecl { name, .. } | Decl::ExplicitDataDecl { name, .. } => Some(name.clone()),
             _ => None,
         };
         let Some(data_name) = derive_target else {
@@ -214,9 +213,7 @@ impl Parser {
         };
 
         let mut group = vec![decl];
-        if matches!(self.peek(), Token::KwDerive)
-            && matches!(self.lookahead(1), Token::LParen)
-        {
+        if matches!(self.peek(), Token::KwDerive) && matches!(self.lookahead(1), Token::LParen) {
             let derives = self.parse_postfix_derives(data_name)?;
             if let Some(start) = pub_start {
                 let end = derives
@@ -261,6 +258,9 @@ impl Parser {
     fn parse_decl(&mut self) -> Result<Decl, ElabError> {
         let start = self.peek_span().start;
         match self.peek().clone() {
+            Token::KwInfixl => self.parse_fixity_decl(start, FixityAssoc::Left),
+            Token::KwInfixr => self.parse_fixity_decl(start, FixityAssoc::Right),
+            Token::KwInfix => self.parse_fixity_decl(start, FixityAssoc::NonAssociative),
             Token::KwSpace => self.parse_space_decl(start),
             Token::KwMut => Err(ElabError::MutationOutsideSpace {
                 construct: "mut".to_string(),
@@ -313,6 +313,55 @@ impl Parser {
                 span: self.peek_span().clone(),
             }),
         }
+    }
+
+    fn parse_fixity_decl(
+        &mut self,
+        start: usize,
+        associativity: FixityAssoc,
+    ) -> Result<Decl, ElabError> {
+        self.advance();
+        let (precedence, precedence_span) = match self.advance() {
+            (Token::Nat(precedence), span) if precedence <= 9 => (precedence as u8, span),
+            (Token::Nat(precedence), span) => {
+                return Err(ElabError::InvalidFixityPrecedence {
+                    written: precedence.to_string(),
+                    span,
+                });
+            }
+            (Token::IntLit(precedence), span) => {
+                return Err(ElabError::InvalidFixityPrecedence {
+                    written: precedence.to_string(),
+                    span,
+                });
+            }
+            (other, span) => {
+                return Err(ElabError::ParseError {
+                    msg: format!("expected fixity precedence in 0..=9, found {:?}", other),
+                    span,
+                });
+            }
+        };
+        let _ = precedence_span;
+        let (operator, operator_span) = match self.advance() {
+            (Token::Operator(operator), span) => (operator, span),
+            (other, span) => {
+                return Err(ElabError::ParseError {
+                    msg: format!("expected user-defined symbolic operator, found {:?}", other),
+                    span,
+                });
+            }
+        };
+        let span = Span::new(start, operator_span.end);
+        Ok(Decl::FixityDecl {
+            fixity: Fixity {
+                associativity,
+                precedence,
+            },
+            operator,
+            operator_span,
+            span,
+        })
     }
 
     fn parse_record_expr(&mut self) -> Result<Expr, ElabError> {
@@ -2089,80 +2138,42 @@ impl Parser {
         Ok(lhs)
     }
 
-    /// `parse_infix_expr` — handles `==` (lowest precedence infix).
+    /// Parse one complete infix run without assigning precedence or
+    /// associativity. Built-ins join the same neutral spine so declared user
+    /// levels compare directly with arithmetic levels 6 and 7. Parenthesized
+    /// subexpressions form nested spines and therefore remain explicit groups.
     fn parse_infix_expr(&mut self) -> Result<Expr, ElabError> {
-        use crate::ast::BinOp;
-        let mut lhs = self.parse_additive_expr()?;
+        let first = self.parse_app_expr()?;
+        let mut operands = vec![first];
+        let mut operators = Vec::new();
         loop {
-            if matches!(self.peek(), Token::EqEq) {
-                self.advance();
-                let rhs = self.parse_additive_expr()?;
-                let span = Span::merge(lhs.span(), rhs.span());
-                lhs = Expr::EBinOp(BinOp::EqEq, Box::new(lhs), Box::new(rhs), span);
-            } else {
-                break;
-            }
-        }
-        Ok(lhs)
-    }
-
-    /// `parse_additive_expr` — handles `+`, `+%`, `-` (left-associative,
-    /// binds looser than `*`, VAL2 #11's conventional-precedence pin).
-    fn parse_additive_expr(&mut self) -> Result<Expr, ElabError> {
-        use crate::ast::BinOp;
-        let mut lhs = self.parse_multiplicative_expr()?;
-        loop {
-            let op = match self.peek() {
-                Token::Plus => BinOp::Add,
-                Token::PlusPercent => BinOp::WrappingAdd,
-                Token::Minus => BinOp::Sub,
+            let operator = match self.peek().clone() {
+                Token::EqEq => InfixOperator::Builtin(BinOp::EqEq, self.peek_span().clone()),
+                Token::Plus => InfixOperator::Builtin(BinOp::Add, self.peek_span().clone()),
+                Token::PlusPercent => {
+                    InfixOperator::Builtin(BinOp::WrappingAdd, self.peek_span().clone())
+                }
+                Token::Minus => InfixOperator::Builtin(BinOp::Sub, self.peek_span().clone()),
+                Token::Star => InfixOperator::Builtin(BinOp::Mul, self.peek_span().clone()),
+                Token::Operator(name) => InfixOperator::User(name, self.peek_span().clone()),
                 _ => break,
             };
             self.advance();
-            let rhs = self.parse_multiplicative_expr()?;
-            let span = Span::merge(lhs.span(), rhs.span());
-            lhs = Expr::EBinOp(op, Box::new(lhs), Box::new(rhs), span);
+            operators.push(operator);
+            operands.push(self.parse_app_expr()?);
         }
-        Ok(lhs)
-    }
-
-    /// `parse_multiplicative_expr` — handles `*` (binds tighter than `+`/`-`,
-    /// left-associative; VAL2 #11's conventional-precedence pin — fixes the
-    /// latent bug where `+`/`*` shared one flat precedence level).
-    fn parse_multiplicative_expr(&mut self) -> Result<Expr, ElabError> {
-        use crate::ast::BinOp;
-        let mut lhs = self.parse_default_infix_expr()?;
-        loop {
-            let op = match self.peek() {
-                Token::Star => BinOp::Mul,
-                _ => break,
-            };
-            self.advance();
-            let rhs = self.parse_default_infix_expr()?;
-            let span = Span::merge(lhs.span(), rhs.span());
-            lhs = Expr::EBinOp(op, Box::new(lhs), Box::new(rhs), span);
+        if operators.is_empty() {
+            return Ok(operands.pop().expect("an infix run has its first operand"));
         }
-        Ok(lhs)
-    }
-
-    /// User-defined operators without a fixity declaration use the normative
-    /// default `infixl 9`: tighter than level-7 multiplication and looser than
-    /// ordinary application. Infix notation lowers directly to the existing
-    /// prefix application shape `operator lhs rhs`.
-    fn parse_default_infix_expr(&mut self) -> Result<Expr, ElabError> {
-        let mut lhs = self.parse_app_expr()?;
-        while let Token::Operator(operator_name) = self.peek().clone() {
-            let operator_span = self.peek_span().clone();
-            self.advance();
-            let rhs = self.parse_app_expr()?;
-
-            let first_span = Span::merge(lhs.span(), &operator_span);
-            let operator = Expr::EVar(operator_name, operator_span);
-            let operator_and_lhs = Expr::EApp(Box::new(operator), Box::new(lhs), first_span);
-            let span = Span::merge(operator_and_lhs.span(), rhs.span());
-            lhs = Expr::EApp(Box::new(operator_and_lhs), Box::new(rhs), span);
-        }
-        Ok(lhs)
+        let span = Span::merge(
+            operands.first().expect("nonempty operands").span(),
+            operands.last().expect("nonempty operands").span(),
+        );
+        Ok(Expr::EInfixSpine {
+            operands,
+            operators,
+            span,
+        })
     }
 
     fn parse_app_expr(&mut self) -> Result<Expr, ElabError> {
@@ -2677,7 +2688,10 @@ impl Parser {
             Token::Nat(n) => {
                 let span = self.peek_span().clone();
                 self.advance();
-                Ok(Expr::ENumLit(NumLit::Int(num_bigint::BigInt::from(n)), span))
+                Ok(Expr::ENumLit(
+                    NumLit::Int(num_bigint::BigInt::from(n)),
+                    span,
+                ))
             }
             Token::IntLit(n) => {
                 let span = self.peek_span().clone();
@@ -2732,13 +2746,19 @@ impl Parser {
                     && matches!(self.lookahead(2), Token::Ident(word) if word == "for")
                     && matches!(self.lookahead(3), Token::Ident(_))
                 {
-                    Some(("result", crate::ast::RecursiveResultSelector::RecursiveResult))
+                    Some((
+                        "result",
+                        crate::ast::RecursiveResultSelector::RecursiveResult,
+                    ))
                 } else if s == "induction"
                     && matches!(self.lookahead(1), Token::Ident(word) if word == "hypothesis")
                     && matches!(self.lookahead(2), Token::Ident(word) if word == "for")
                     && matches!(self.lookahead(3), Token::Ident(_))
                 {
-                    Some(("hypothesis", crate::ast::RecursiveResultSelector::InductionHypothesis))
+                    Some((
+                        "hypothesis",
+                        crate::ast::RecursiveResultSelector::InductionHypothesis,
+                    ))
                 } else {
                     None
                 };
@@ -2864,6 +2884,15 @@ impl Parser {
                         Expr::ECharLit(c, _) => Expr::ECharLit(c, span),
                         Expr::EByteStr(b, _) => Expr::EByteStr(b, span),
                         Expr::EBinOp(op, l, r, _) => Expr::EBinOp(op, l, r, span),
+                        Expr::EInfixSpine {
+                            operands,
+                            operators,
+                            ..
+                        } => Expr::EInfixSpine {
+                            operands,
+                            operators,
+                            span,
+                        },
                         Expr::EMatch {
                             scrut,
                             equation,
@@ -2942,7 +2971,212 @@ impl Parser {
                 span: self.peek_span().clone(),
             });
         }
-        Ok(e)
+        Ok(reassociate_default_expr(e))
+    }
+}
+
+fn default_precedence(operator: &InfixOperator) -> u8 {
+    match operator {
+        InfixOperator::Builtin(BinOp::EqEq, _) => 4,
+        InfixOperator::Builtin(BinOp::Add | BinOp::WrappingAdd | BinOp::Sub, _) => 6,
+        InfixOperator::Builtin(BinOp::Mul, _) => 7,
+        InfixOperator::User(_, _) => Fixity::DEFAULT.precedence,
+    }
+}
+
+fn reduce_default_surface(values: &mut Vec<Expr>, operator: InfixOperator) {
+    let rhs = values.pop().expect("an infix operator has a right operand");
+    let lhs = values.pop().expect("an infix operator has a left operand");
+    let span = Span::merge(lhs.span(), rhs.span());
+    let combined = match operator {
+        InfixOperator::Builtin(operator, _) => {
+            Expr::EBinOp(operator, Box::new(lhs), Box::new(rhs), span)
+        }
+        InfixOperator::User(name, operator_span) => {
+            let head = Expr::EVar(name, operator_span.clone());
+            let first_span = Span::merge(head.span(), lhs.span());
+            let applied = Expr::EApp(Box::new(head), Box::new(lhs), first_span);
+            Expr::EApp(Box::new(applied), Box::new(rhs), span)
+        }
+    };
+    values.push(combined);
+}
+
+/// Preserve the historical standalone-parser view: without a surrounding unit
+/// there can be no declarations, so every user operator takes the default.
+/// Unit parsing deliberately does not call this function.
+fn reassociate_default_expr(expr: Expr) -> Expr {
+    match expr {
+        Expr::EApp(function, argument, span) => Expr::EApp(
+            Box::new(reassociate_default_expr(*function)),
+            Box::new(reassociate_default_expr(*argument)),
+            span,
+        ),
+        Expr::ELam(names, body, span) => {
+            Expr::ELam(names, Box::new(reassociate_default_expr(*body)), span)
+        }
+        Expr::ELet(bindings, body, span) => Expr::ELet(
+            bindings
+                .into_iter()
+                .map(|mut binding| {
+                    binding.annotation = binding.annotation.map(reassociate_default_type);
+                    binding.value = Box::new(reassociate_default_expr(*binding.value));
+                    binding
+                })
+                .collect(),
+            Box::new(reassociate_default_expr(*body)),
+            span,
+        ),
+        Expr::EAsc(value, ty, span) => Expr::EAsc(
+            Box::new(reassociate_default_expr(*value)),
+            Box::new(reassociate_default_type(*ty)),
+            span,
+        ),
+        Expr::EOld(value, span) => Expr::EOld(Box::new(reassociate_default_expr(*value)), span),
+        Expr::EBecomes(cell, value, span) => Expr::EBecomes(
+            Box::new(reassociate_default_expr(*cell)),
+            Box::new(reassociate_default_expr(*value)),
+            span,
+        ),
+        Expr::EBinOp(operator, lhs, rhs, span) => Expr::EBinOp(
+            operator,
+            Box::new(reassociate_default_expr(*lhs)),
+            Box::new(reassociate_default_expr(*rhs)),
+            span,
+        ),
+        Expr::EInfixSpine {
+            operands,
+            operators,
+            ..
+        } => {
+            let mut operands = operands.into_iter().map(reassociate_default_expr);
+            let mut values = vec![operands.next().expect("a spine has one more operand")];
+            let mut pending: Vec<InfixOperator> = Vec::new();
+            for (operator, rhs) in operators.into_iter().zip(operands) {
+                while pending
+                    .last()
+                    .is_some_and(|top| default_precedence(top) >= default_precedence(&operator))
+                {
+                    reduce_default_surface(
+                        &mut values,
+                        pending.pop().expect("pending operator exists"),
+                    );
+                }
+                pending.push(operator);
+                values.push(rhs);
+            }
+            while let Some(operator) = pending.pop() {
+                reduce_default_surface(&mut values, operator);
+            }
+            values.pop().expect("reassociation produces one expression")
+        }
+        Expr::EMatch {
+            scrut,
+            equation,
+            arms,
+            span,
+        } => Expr::EMatch {
+            scrut: Box::new(reassociate_default_expr(*scrut)),
+            equation,
+            arms: arms
+                .into_iter()
+                .map(|arm| MatchArm {
+                    pat: arm.pat,
+                    guard: arm.guard.map(reassociate_default_expr),
+                    body: reassociate_default_expr(arm.body),
+                    span: arm.span,
+                })
+                .collect(),
+            span,
+        },
+        Expr::EIf {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        } => Expr::EIf {
+            condition: Box::new(reassociate_default_expr(*condition)),
+            then_branch: Box::new(reassociate_default_expr(*then_branch)),
+            else_branch: Box::new(reassociate_default_expr(*else_branch)),
+            span,
+        },
+        Expr::EPair(components, span) => Expr::EPair(
+            components
+                .into_iter()
+                .map(reassociate_default_expr)
+                .collect(),
+            span,
+        ),
+        Expr::ERecord { base, fields, span } => Expr::ERecord {
+            base: base.map(|base| Box::new(reassociate_default_expr(*base))),
+            fields: fields
+                .into_iter()
+                .map(|mut field| {
+                    field.value = reassociate_default_expr(field.value);
+                    field
+                })
+                .collect(),
+            span,
+        },
+        Expr::EProj(value, field, span) => {
+            Expr::EProj(Box::new(reassociate_default_expr(*value)), field, span)
+        }
+        Expr::EPosProj(value, index, span) => {
+            Expr::EPosProj(Box::new(reassociate_default_expr(*value)), index, span)
+        }
+        Expr::EPi(name, domain, codomain, span) => Expr::EPi(
+            name,
+            Box::new(reassociate_default_type(*domain)),
+            Box::new(reassociate_default_expr(*codomain)),
+            span,
+        ),
+        Expr::EArrow(domain, codomain, span) => Expr::EArrow(
+            Box::new(reassociate_default_expr(*domain)),
+            Box::new(reassociate_default_expr(*codomain)),
+            span,
+        ),
+        Expr::ETrunc(inner, span) => Expr::ETrunc(Box::new(reassociate_default_expr(*inner)), span),
+        leaf => leaf,
+    }
+}
+
+fn reassociate_default_type(ty: Type) -> Type {
+    match ty {
+        Type::TPi(name, domain, codomain, span) => Type::TPi(
+            name,
+            Box::new(reassociate_default_type(*domain)),
+            Box::new(reassociate_default_type(*codomain)),
+            span,
+        ),
+        Type::TSigma(name, domain, codomain, span) => Type::TSigma(
+            name,
+            Box::new(reassociate_default_type(*domain)),
+            Box::new(reassociate_default_type(*codomain)),
+            span,
+        ),
+        Type::TArr(domain, codomain, span) => Type::TArr(
+            Box::new(reassociate_default_type(*domain)),
+            Box::new(reassociate_default_type(*codomain)),
+            span,
+        ),
+        Type::TEffectArr(domain, row, codomain, span) => Type::TEffectArr(
+            Box::new(reassociate_default_type(*domain)),
+            row,
+            Box::new(reassociate_default_type(*codomain)),
+            span,
+        ),
+        Type::TRefine(name, carrier, predicate, span) => Type::TRefine(
+            name,
+            Box::new(reassociate_default_type(*carrier)),
+            Box::new(reassociate_default_expr(*predicate)),
+            span,
+        ),
+        Type::TApp(function, argument, span) => Type::TApp(
+            Box::new(reassociate_default_type(*function)),
+            Box::new(reassociate_default_type(*argument)),
+            span,
+        ),
+        leaf => leaf,
     }
 }
 
@@ -2986,6 +3220,7 @@ fn pub_eligibility(decl: &Decl) -> PubEligibility {
             ..
         } => PubEligibility::Ineligible("a `package` header"),
         Decl::SpaceDecl { .. } => PubEligibility::PublicSpace,
+        Decl::FixityDecl { .. } => PubEligibility::Ineligible("a fixity declaration"),
         Decl::ProveDecl { .. } => PubEligibility::Ineligible("a `prove` obligation"),
         Decl::LawDecl { .. } => PubEligibility::Ineligible("a `law` declaration"),
         Decl::ForeignDecl { .. } => PubEligibility::Ineligible("a `foreign` declaration"),

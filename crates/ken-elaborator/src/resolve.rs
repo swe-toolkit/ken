@@ -10,7 +10,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     BinOp, ClassField, ConstructorSignatureArg, Decl, DefKeyword, EffectRowSyntax,
-    ExplicitDataCtor, Expr, InstanceConstraint, NumLit, PatKind, SpaceCell, SpaceOperation, Type,
+    ExplicitDataCtor, Expr, InfixOperator, InstanceConstraint, NumLit, PatKind, SpaceCell,
+    SpaceOperation, Type,
 };
 use crate::error::{ElabError, Span};
 use num_bigint::BigInt;
@@ -233,6 +234,22 @@ pub struct RPropIntro {
     pub span: Span,
 }
 
+/// One operator in a resolved-but-still-flat infix spine. User names are
+/// canonicalized by `modules.rs` before the pre-body reassociation pass.
+#[derive(Clone, Debug)]
+pub enum RInfixOperator {
+    Builtin(BinOp, Span),
+    User(String, Span),
+}
+
+impl RInfixOperator {
+    pub fn span(&self) -> &Span {
+        match self {
+            Self::Builtin(_, span) | Self::User(_, span) => span,
+        }
+    }
+}
+
 /// A resolved expression — names replaced by de Bruijn indices.
 #[derive(Clone, Debug)]
 pub enum RExpr {
@@ -262,8 +279,15 @@ pub enum RExpr {
     RCharLit(char, Span),
     /// Byte-string literal (`31 §3`) -- decoded bytes.
     RByteStr(Vec<u8>, Span),
-    /// Infix binary op (`35 §3`); names resolved, operands still unelab'd.
+    /// Infix binary op (`35 §3`); emitted only after reassociation.
     RBinOp(BinOp, Box<RExpr>, Box<RExpr>, Span),
+    /// A flat operator run preserved through module name resolution. The
+    /// post-predeclaration pass consumes it before type-directed elaboration.
+    RInfixSpine {
+        operands: Vec<RExpr>,
+        operators: Vec<RInfixOperator>,
+        span: Span,
+    },
     /// `match scrut { P₁ => body₁ ; … }` — pattern match (`34 §3`).
     RMatch {
         scrut: Box<RExpr>,
@@ -342,7 +366,8 @@ impl RExpr {
             | RExpr::RAttachedProofRef { span: s, .. }
             | RExpr::RRecursiveResult { span: s, .. }
             | RExpr::RTrunc(_, s)
-            | RExpr::RBinOp(_, _, _, s) => s,
+            | RExpr::RBinOp(_, _, _, s)
+            | RExpr::RInfixSpine { span: s, .. } => s,
             RExpr::RMatch { span, .. } | RExpr::RIf { span, .. } => span,
         }
     }
@@ -663,7 +688,8 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EPosProj(..)
         | Expr::EAttachedProofRef { .. }
         | Expr::ERecursiveResult { .. }
-        | Expr::ETrunc(..) => Err(unsupported_constructor_type_expr(expr)),
+        | Expr::ETrunc(..)
+        | Expr::EInfixSpine { .. } => Err(unsupported_constructor_type_expr(expr)),
     }
 }
 
@@ -1000,6 +1026,7 @@ pub(crate) fn resolve_decl_in_unit(
         decl,
         Decl::BoundaryDecl { .. }
             | Decl::SpaceDecl { .. }
+            | Decl::FixityDecl { .. }
             | Decl::ModuleDecl { .. }
             | Decl::ImportDecl { .. }
             | Decl::ExportDecl { .. }
@@ -1036,6 +1063,7 @@ pub(crate) fn resolve_decl_in_unit(
         // for `Decl`'s other (non-`ken-elaborator`-internal) callers.
         Decl::BoundaryDecl { .. }
         | Decl::SpaceDecl { .. }
+        | Decl::FixityDecl { .. }
         | Decl::ModuleDecl { .. }
         | Decl::ImportDecl { .. }
         | Decl::ExportDecl { .. }
@@ -1812,6 +1840,27 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             let rr = resolve_expr_ctx(scope, r, ctx)?;
             Ok(RExpr::RBinOp(*op, Box::new(rl), Box::new(rr), span.clone()))
         }
+
+        Expr::EInfixSpine {
+            operands,
+            operators,
+            span,
+        } => Ok(RExpr::RInfixSpine {
+            operands: operands
+                .iter()
+                .map(|operand| resolve_expr_ctx(scope, operand, ctx))
+                .collect::<Result<Vec<_>, _>>()?,
+            operators: operators
+                .iter()
+                .map(|operator| match operator {
+                    InfixOperator::Builtin(op, span) => RInfixOperator::Builtin(*op, span.clone()),
+                    InfixOperator::User(name, span) => {
+                        RInfixOperator::User(name.clone(), span.clone())
+                    }
+                })
+                .collect(),
+            span: span.clone(),
+        }),
 
         Expr::EProj(e, field, span) => {
             let re = resolve_expr_ctx(scope, e, ctx)?;

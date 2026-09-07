@@ -233,6 +233,15 @@ pub enum Decl {
         is_space_op: bool,
         span: Span,
     },
+    /// `infixl N op` / `infixr N op` / `infix N op` (`32 §6`).
+    /// Pure surface metadata: it binds one [`Fixity`] to an ordinary symbolic
+    /// definition's canonical identity and emits no kernel declaration.
+    FixityDecl {
+        fixity: Fixity,
+        operator: String,
+        operator_span: Span,
+        span: Span,
+    },
     /// `space S { mut c : T = e ; proc ... }` (`36 §4`).
     ///
     /// This is elaborator-only surface structure. The kernel receives only
@@ -489,7 +498,7 @@ impl Decl {
             Decl::Pub(inner) => inner.name(),
             // A boundary has no declared name. This sentinel is never entered
             // into a scope or the flat kernel environment.
-            Decl::BoundaryDecl { .. } => "",
+            Decl::BoundaryDecl { .. } | Decl::FixityDecl { .. } => "",
             Decl::ModuleDecl { name, .. } => name,
             // `ImportDecl` has no declared name of its own; callers that
             // need a per-decl name must special-case it (it's never
@@ -521,6 +530,7 @@ impl Decl {
         match self {
             Decl::Pub(inner) => inner.span(),
             Decl::BoundaryDecl { span, .. }
+            | Decl::FixityDecl { span, .. }
             | Decl::ViewDecl { span, .. }
             | Decl::SpaceDecl { span, .. }
             | Decl::LetDecl { span, .. }
@@ -588,6 +598,44 @@ pub enum BinOp {
     EqEq,
 }
 
+/// Associativity attached to a user-defined symbolic operator (`32 §6`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FixityAssoc {
+    Left,
+    Right,
+    NonAssociative,
+}
+
+/// Declared operator fixity. Ken accepts the conventional finite precedence
+/// range `0..=9`; absence from the program side table means `infixl 9`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Fixity {
+    pub associativity: FixityAssoc,
+    pub precedence: u8,
+}
+
+impl Fixity {
+    pub const DEFAULT: Self = Self {
+        associativity: FixityAssoc::Left,
+        precedence: 9,
+    };
+}
+
+/// One operator in a flat, fixity-neutral surface spine.
+#[derive(Clone, Debug)]
+pub enum InfixOperator {
+    Builtin(BinOp, Span),
+    User(String, Span),
+}
+
+impl InfixOperator {
+    pub fn span(&self) -> &Span {
+        match self {
+            Self::Builtin(_, span) | Self::User(_, span) => span,
+        }
+    }
+}
+
 /// One source binding in a sequential local `let` group.
 #[derive(Clone, Debug)]
 pub struct LetBinding {
@@ -636,8 +684,16 @@ pub enum Expr {
     ECharLit(char, Span),
     /// Byte-string literal `b"…"` (`31 §3`) -- decoded bytes.
     EByteStr(Vec<u8>, Span),
-    /// Infix binary operation (`35 §3`).
+    /// Infix binary operation (`35 §3`). Produced by the post-resolution
+    /// reassociator for built-ins, and by the standalone default parser view.
     EBinOp(BinOp, Box<Expr>, Box<Expr>, Span),
+    /// A flat operator run. Unit parsing preserves this neutral form through
+    /// name resolution; the pre-body reassociation pass removes it.
+    EInfixSpine {
+        operands: Vec<Expr>,
+        operators: Vec<InfixOperator>,
+        span: Span,
+    },
     /// `match scrut { P₁ => body₁ ; … }` — pattern matching (`34 §3`).
     EMatch {
         scrut: Box<Expr>,
@@ -722,6 +778,7 @@ impl Expr {
             | Expr::EAttachedProofRef { span: s, .. }
             | Expr::ERecursiveResult { span: s, .. }
             | Expr::EBinOp(_, _, _, s)
+            | Expr::EInfixSpine { span: s, .. }
             | Expr::EIf { span: s, .. }
             | Expr::EPair(_, s)
             | Expr::ERecord { span: s, .. }
