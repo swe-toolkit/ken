@@ -1,7 +1,7 @@
 ---
 id: LANG-INTERVENING-LET-FRAME-WEAKENING
 title: "An intervening let between an outer match's premise and a nested match reaches install_index_refinements and dies in refine_branch_goal with 'could not classify the branch goal: TypeMismatch' -- and the Architect refused 'orthogonal', because the reported found term carries LANG-CONVOY's own D1 signature and there is an influence path through RVar resolution"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
@@ -11,6 +11,21 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
+> # CLOSED 2026-09-07 (Steward, status active -> merged). The repair landed in
+> # two increments, both CI-green with publisher closeouts, and the language-leader
+> # (evt_25ncqq97vqah9) blob-verified Increment 2's two paths on main and signals
+> # the node COMPLETE with no remaining work owed:
+> #   - Increment 1 (error-safe unwind) landed 8fd1e5d18 (PR #3404).
+> #   - Increment 2 (fresh-let index transport) landed 2f8da96ac (PR #3405).
+> # D3 (three-way attribution) is DISCHARGED BY THE D2 DIAGNOSIS, not a further
+> # deliverable: bypassing the refined middle `w` RVar lookup turned the spurious
+> # Internal into the honest exhaustiveness rejection (RVar refinement is the
+> # reachability enabler, not the corrupt value), and fresh `k` resolving raw with
+> # no refinement entry identified the distinct missing introduction transport that
+> # Increment 2 landed. Architect final approval (evt_9c2tbnnbjvx7) confirms the two
+> # increments close the repair: Internal -> honest VNil rejection -> acceptance.
+> # The void candidate (f5b6af5e) and the spent Decisions are historical.
+>
 > # INCREMENT 1 VOID 2026-09-07 (candidate-caused CI red) — re-spin carries the stack-budget closure AC below.
 > #
 > # Increment 1 (accepted partial, exact `f5b6af5e` / rebased `ec6555683`, PR
