@@ -106,10 +106,16 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 >   owner verify; D1-D3 landed `c555f843a`; D4 stale-readmission detector + D5
 >   split-the-574s-shard remain; ceiling <20min, target <10min). RING CHANGE
 >   within lane 2, NOT a fourth lane.
->   - **Seam trigger:** the language ring's current WP is `LANG-FIXITY-DECL-SURFACE`
->     (CI-red respin in QA). When FIXITY reaches a seam (lands or hard-stops), the
->     Steward switches lane 2 to verify and RE-RELEASES `CI-NATIVE-PARITY-DURATION`
->     (explicit Steward release — verify-leader awaits it) + kicks.
+>   - **Seam trigger FIRED — SWITCH EXECUTED 2026-09-07.** `LANG-FIXITY-DECL-SURFACE`
+>     landed (`2282b6fdc`, node `merged`, ~05:01 UTC) — the language WP is done, so
+>     lane 2 is now the **verify** ring. `CI-NATIVE-PARITY-DURATION` RE-RELEASED to
+>     verify-leader (Steward kick anchor `evt_56a2rbag3h5fw`, top-level): resume D4
+>     (stale-readmission detector) + D5 (split-574s-shard), re-measure against
+>     current main first. NOTE: the switch was owed from FIXITY's landing (~17h) and
+>     was missed for that window — a stale `language-qa` "reviewing FIXITY respin"
+>     participant status plus a dangling later respin branch (`f7e116a3b`, never
+>     merged; the merged candidate squashed to `2282b6fdc`) read as "FIXITY still in
+>     QA." Lane 2 stays verify until it lands/hard-stops or the operator re-scopes.
 >   - **Consequence flagged to operator:** switching to verify DEFERS the
 >     floor-code closer, so the spec/code floor mismatch (§B conformance
 >     red-until) stays open through the verify campaign — an accepted/documented
