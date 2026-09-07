@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-07 02:28:36Z — from 562 issue file(s) in `docs/program/issues/`.
+2026-09-07 02:45:24Z — from 562 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -41,7 +41,7 @@ the committed file matches the generator's output.
 | `A3` | catalog-coverage walker | draft | TBD | TBD | none | — |
 | `ABI-A1` | promote ConsoleRead and ClockWallNow to NativeTested with differential evidence | merged | runtime | L | none | — |
 | `ABI-A2` | promote FsAppendFile, FsMetadata, FsRename to NativeTested | merged | runtime | L | none | — |
-| `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | draft | runtime | M | none | — |
+| `ABI-A3` | promote FsReadDirectory, FsCreateDirectory, FsRemoveFile, FsRemoveDirectory to NativeTested | active | runtime | M | none | — |
 | `ABI-M1` | manifest v2 — family-scoped, versioned, generated from family schemas | merged | runtime | L | none | — |
 | `ABI-M2` | runtime facility/operation probes, distinct from build-time facts | draft | runtime | M | none | — |
 | `ABI-R1` | correct stale filesystem capability prose — scoped roots, rights, symlink policy and no-follow resolution have landed | closed | foundation | S | none | — |
@@ -632,7 +632,7 @@ Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
 - `ABI-S1` blocked by `PX9` (status: draft)
-- `ABI-S2` blocked by `ABI-A3` (status: draft)
+- `ABI-S2` blocked by `ABI-A3` (status: active)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
