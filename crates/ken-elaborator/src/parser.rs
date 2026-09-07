@@ -24,14 +24,25 @@ pub struct Parser {
     /// The original source — retained so a `temporal{}` block can carry its
     /// verbatim formula text (human-visible, not erased, `72 §4`).
     src: String,
+    /// True only for a source that lexically contains a user operator. A
+    /// source without one takes the exact merge-base arithmetic parser.
+    contains_user_operator: bool,
+    /// Set while parsing a declaration-dependent user-operator spine. Pure
+    /// fixed arithmetic stays on the merge-base `EBinOp` path.
+    contains_infix_spine: bool,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<(Token, Span)>, src: String) -> Self {
+        let contains_user_operator = tokens
+            .iter()
+            .any(|(token, _)| matches!(token, Token::Operator(_)));
         Self {
             tokens,
             pos: 0,
             src,
+            contains_user_operator,
+            contains_infix_spine: false,
         }
     }
 
@@ -2138,11 +2149,64 @@ impl Parser {
         Ok(lhs)
     }
 
-    /// Parse one complete infix run without assigning precedence or
-    /// associativity. Built-ins join the same neutral spine so declared user
-    /// levels compare directly with arithmetic levels 6 and 7. Parenthesized
-    /// subexpressions form nested spines and therefore remain explicit groups.
+    /// Select the exact merge-base fixed-arithmetic parser for a source with
+    /// no user operator. Sources that can contain a declared operator retain
+    /// a neutral mixed run until canonical identities and fixities are known.
+    #[inline(always)]
     fn parse_infix_expr(&mut self) -> Result<Expr, ElabError> {
+        if self.contains_user_operator {
+            self.parse_mixed_infix_expr()
+        } else {
+            self.parse_fixed_infix_expr()
+        }
+    }
+
+    /// Merge-base `==` level for sources with no user-defined operators.
+    fn parse_fixed_infix_expr(&mut self) -> Result<Expr, ElabError> {
+        let mut lhs = self.parse_fixed_additive_expr()?;
+        while matches!(self.peek(), Token::EqEq) {
+            self.advance();
+            let rhs = self.parse_fixed_additive_expr()?;
+            let span = Span::merge(lhs.span(), rhs.span());
+            lhs = Expr::EBinOp(BinOp::EqEq, Box::new(lhs), Box::new(rhs), span);
+        }
+        Ok(lhs)
+    }
+
+    /// Merge-base `+`/`+%`/`-` level for sources with no user operators.
+    fn parse_fixed_additive_expr(&mut self) -> Result<Expr, ElabError> {
+        let mut lhs = self.parse_fixed_multiplicative_expr()?;
+        loop {
+            let operator = match self.peek() {
+                Token::Plus => BinOp::Add,
+                Token::PlusPercent => BinOp::WrappingAdd,
+                Token::Minus => BinOp::Sub,
+                _ => break,
+            };
+            self.advance();
+            let rhs = self.parse_fixed_multiplicative_expr()?;
+            let span = Span::merge(lhs.span(), rhs.span());
+            lhs = Expr::EBinOp(operator, Box::new(lhs), Box::new(rhs), span);
+        }
+        Ok(lhs)
+    }
+
+    /// Merge-base `*` level for sources with no user-defined operators.
+    fn parse_fixed_multiplicative_expr(&mut self) -> Result<Expr, ElabError> {
+        let mut lhs = self.parse_app_expr()?;
+        while matches!(self.peek(), Token::Star) {
+            self.advance();
+            let rhs = self.parse_app_expr()?;
+            let span = Span::merge(lhs.span(), rhs.span());
+            lhs = Expr::EBinOp(BinOp::Mul, Box::new(lhs), Box::new(rhs), span);
+        }
+        Ok(lhs)
+    }
+
+    /// A run containing a user operator stays neutral so its declared level
+    /// can compare with fixed arithmetic after resolution. A pure fixed run
+    /// within such a source still returns directly to `EBinOp`.
+    fn parse_mixed_infix_expr(&mut self) -> Result<Expr, ElabError> {
         let first = self.parse_app_expr()?;
         let mut operands = vec![first];
         let mut operators = Vec::new();
@@ -2165,6 +2229,13 @@ impl Parser {
         if operators.is_empty() {
             return Ok(operands.pop().expect("an infix run has its first operand"));
         }
+        if operators
+            .iter()
+            .all(|operator| matches!(operator, InfixOperator::Builtin(_, _)))
+        {
+            return Ok(associate_surface_spine(operands, operators));
+        }
+        self.contains_infix_spine = true;
         let span = Span::merge(
             operands.first().expect("nonempty operands").span(),
             operands.last().expect("nonempty operands").span(),
@@ -2971,7 +3042,11 @@ impl Parser {
                 span: self.peek_span().clone(),
             });
         }
-        Ok(reassociate_default_expr(e))
+        if self.contains_infix_spine {
+            Ok(reassociate_default_expr(e))
+        } else {
+            Ok(e)
+        }
     }
 }
 
@@ -3000,6 +3075,32 @@ fn reduce_default_surface(values: &mut Vec<Expr>, operator: InfixOperator) {
         }
     };
     values.push(combined);
+}
+
+fn associate_surface_spine(
+    operands: Vec<Expr>,
+    operators: Vec<InfixOperator>,
+) -> Expr {
+    let mut operands = operands.into_iter();
+    let mut values = vec![operands.next().expect("a spine has one more operand")];
+    let mut pending: Vec<InfixOperator> = Vec::new();
+    for (operator, rhs) in operators.into_iter().zip(operands) {
+        while pending
+            .last()
+            .is_some_and(|top| default_precedence(top) >= default_precedence(&operator))
+        {
+            reduce_default_surface(
+                &mut values,
+                pending.pop().expect("pending operator exists"),
+            );
+        }
+        pending.push(operator);
+        values.push(rhs);
+    }
+    while let Some(operator) = pending.pop() {
+        reduce_default_surface(&mut values, operator);
+    }
+    values.pop().expect("reassociation produces one expression")
 }
 
 /// Preserve the historical standalone-parser view: without a surrounding unit
@@ -3048,28 +3149,13 @@ fn reassociate_default_expr(expr: Expr) -> Expr {
             operands,
             operators,
             ..
-        } => {
-            let mut operands = operands.into_iter().map(reassociate_default_expr);
-            let mut values = vec![operands.next().expect("a spine has one more operand")];
-            let mut pending: Vec<InfixOperator> = Vec::new();
-            for (operator, rhs) in operators.into_iter().zip(operands) {
-                while pending
-                    .last()
-                    .is_some_and(|top| default_precedence(top) >= default_precedence(&operator))
-                {
-                    reduce_default_surface(
-                        &mut values,
-                        pending.pop().expect("pending operator exists"),
-                    );
-                }
-                pending.push(operator);
-                values.push(rhs);
-            }
-            while let Some(operator) = pending.pop() {
-                reduce_default_surface(&mut values, operator);
-            }
-            values.pop().expect("reassociation produces one expression")
-        }
+        } => associate_surface_spine(
+            operands
+                .into_iter()
+                .map(reassociate_default_expr)
+                .collect(),
+            operators,
+        ),
         Expr::EMatch {
             scrut,
             equation,

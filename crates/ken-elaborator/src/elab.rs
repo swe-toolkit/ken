@@ -6998,6 +6998,15 @@ fn guarded_constructor_arm(
     ))
 }
 
+#[cold]
+#[inline(never)]
+fn unassociated_infix_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::Internal(format!(
+        "unassociated infix spine reached type-directed elaboration at {}-{}",
+        span.start, span.end
+    )))
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -7274,10 +7283,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RBinOp(op, lhs, rhs, span) => elab_binop(cx, op, lhs, rhs, span),
 
-        RExpr::RInfixSpine { span, .. } => Err(ElabError::Internal(format!(
-            "unassociated infix spine reached type-directed elaboration at {}-{}",
-            span.start, span.end
-        ))),
+        RExpr::RInfixSpine { span, .. } => unassociated_infix_error(span),
 
         RExpr::RMatch {
             scrut: _,
@@ -9440,7 +9446,10 @@ pub(crate) fn reassociate_space_decl(
     space: &RSpaceDecl,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
-) -> Result<RSpaceDecl, ElabError> {
+) -> Result<Option<Box<RSpaceDecl>>, ElabError> {
+    if !space.contains_infix_spine {
+        return Ok(None);
+    }
     let mut associated = space.clone();
     for cell in &mut associated.cells {
         cell.ty = reassociate_rtype(cell.ty.clone(), globals, fixities)?;
@@ -9465,14 +9474,17 @@ pub(crate) fn reassociate_space_decl(
             .collect::<Result<Vec<_>, _>>()?;
         operation.body = reassociate_rexpr(operation.body.clone(), globals, fixities)?;
     }
-    Ok(associated)
+    Ok(Some(Box::new(associated)))
 }
 
 fn reassociate_rdecl(
     rdecl: &RDecl,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
-) -> Result<RDecl, ElabError> {
+) -> Result<Option<Box<RDecl>>, ElabError> {
+    if !rdecl.contains_infix_spine {
+        return Ok(None);
+    }
     let mut associated = rdecl.clone();
     associated.ty = associated
         .ty
@@ -9578,7 +9590,7 @@ fn reassociate_rdecl(
         | RDeclKind::Temporal { .. }
         | RDeclKind::DeriveDecl { .. } => {}
     }
-    Ok(associated)
+    Ok(Some(Box::new(associated)))
 }
 
 /// V1 elaboration: returns the definition id plus any emitted obligation holes.
@@ -9644,9 +9656,9 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
     let associated = if self_reference_waits_for_preadmission {
         None
     } else {
-        Some(reassociate_rdecl(rdecl, globals, fixities)?)
+        reassociate_rdecl(rdecl, globals, fixities)?
     };
-    let rdecl = associated.as_ref().unwrap_or(rdecl);
+    let rdecl = associated.as_deref().unwrap_or(rdecl);
     if matches!(
         rdecl.kind,
         RDeclKind::View {
@@ -11400,6 +11412,7 @@ fn elaborate_recursive_view(
             return Err(error);
         }
     };
+    let associated = associated.as_deref().unwrap_or(rdecl);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env);
@@ -11578,7 +11591,11 @@ pub fn elaborate_mutual_group(
             return Err(error);
         }
     };
-    let members = associated_members.as_slice();
+    let members = associated_members
+        .iter()
+        .zip(members.iter())
+        .map(|(associated, original)| associated.as_deref().unwrap_or(original))
+        .collect::<Vec<_>>();
 
     // Proof declarations share the same signature-first admission path as
     // computations, but retain their existing Ω and attached-subject guards
@@ -11617,7 +11634,7 @@ pub fn elaborate_mutual_group(
                 }
             }
         }
-        for rdecl in members {
+        for rdecl in &members {
             globals.remove(&rdecl.name);
         }
         for inserted in &inserted_fixity_ids {
@@ -11656,7 +11673,7 @@ pub fn elaborate_mutual_group(
                 }
             }
         }
-        for rdecl in members {
+        for rdecl in &members {
             globals.remove(&rdecl.name);
         }
         for inserted in &inserted_fixity_ids {
@@ -11711,7 +11728,7 @@ pub fn elaborate_mutual_group(
                     }
                 }
             }
-            for rdecl in members {
+            for rdecl in &members {
                 globals.remove(&rdecl.name);
             }
             for inserted in &inserted_fixity_ids {
@@ -12134,6 +12151,7 @@ fn elaborate_prop_decl(
             requires: vec![],
             ensures: vec![],
             span: intro.span.clone(),
+            contains_infix_spine: false,
             kind: RDeclKind::Theorem,
         };
         let helper = elaborate_checked_theorem(

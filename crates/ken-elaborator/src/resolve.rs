@@ -6,7 +6,11 @@
 //! L2 additions: `data` declarations, `type` aliases, `match` expressions,
 //! type application (`T a b`).
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use crate::ast::{
     BinOp, ClassField, ConstructorSignatureArg, Decl, DefKeyword, EffectRowSyntax,
@@ -106,6 +110,9 @@ pub struct RSpaceDecl {
     pub cells: Vec<RSpaceCell>,
     pub operations: Vec<RSpaceOperation>,
     pub span: Span,
+    /// Set during resolution, so spine-free legacy declarations never enter
+    /// the post-predeclaration reassociation traversal.
+    pub contains_infix_spine: bool,
 }
 
 /// A resolved declaration (`21 §6.2`).
@@ -114,6 +121,9 @@ pub struct RDecl {
     pub name: String,
     pub ty: Option<RType>,
     pub body: RExpr,
+    /// Set during resolution, so spine-free legacy declarations never enter
+    /// the post-predeclaration reassociation traversal.
+    pub contains_infix_spine: bool,
     /// Resolved `requires` propositions (V1; empty for V0 programs).
     pub requires: Vec<RExpr>,
     /// Resolved `ensures` propositions (V1; result in scope).
@@ -424,6 +434,9 @@ struct Scope {
     /// bodies.
     local_dictionaries: std::collections::HashSet<String>,
     space_cells: std::collections::HashMap<String, usize>,
+    /// Shared by cloned branch scopes so discovering a spine anywhere in one
+    /// declaration remains an O(1) resolution-side fact.
+    contains_infix_spine: Rc<Cell<bool>>,
 }
 
 impl Scope {
@@ -432,7 +445,16 @@ impl Scope {
             bindings: Vec::new(),
             local_dictionaries: std::collections::HashSet::new(),
             space_cells: std::collections::HashMap::new(),
+            contains_infix_spine: Rc::new(Cell::new(false)),
         }
+    }
+
+    fn saw_infix_spine(&self) {
+        self.contains_infix_spine.set(true);
+    }
+
+    fn has_infix_spine(&self) -> bool {
+        self.contains_infix_spine.get()
     }
 
     fn push(&mut self, name: &str) {
@@ -942,6 +964,7 @@ pub(crate) fn resolve_space_decl(
     let mut cell_scope = Scope::new();
     cell_scope.install_space_cells(cells)?;
 
+    let mut contains_infix_spine = false;
     let mut resolved_cells = Vec::with_capacity(cells.len());
     for cell in cells {
         let mut scope = Scope::new();
@@ -951,6 +974,7 @@ pub(crate) fn resolve_space_decl(
             init: resolve_expr(&mut scope, &cell.init)?,
             span: cell.span.clone(),
         });
+        contains_infix_spine |= scope.has_infix_spine();
     }
 
     let mut operation_names = HashSet::new();
@@ -991,6 +1015,7 @@ pub(crate) fn resolve_space_decl(
             .map(|expr| resolve_prop(&mut scope, expr, PropCtx::SpaceOpEnsures))
             .collect::<Result<Vec<_>, _>>()?;
         scope.pop();
+        contains_infix_spine |= scope.has_infix_spine();
         resolved_operations.push(RSpaceOperation {
             name: operation.name.clone(),
             params,
@@ -1008,6 +1033,7 @@ pub(crate) fn resolve_space_decl(
         cells: resolved_cells,
         operations: resolved_operations,
         span: span.clone(),
+        contains_infix_spine,
     })
 }
 
@@ -1157,6 +1183,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: resolved_requires,
                 ensures: resolved_ensures,
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::View {
                     keyword: *keyword,
                     is_space_op: *is_space_op,
@@ -1185,6 +1212,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::Let,
             })
         }
@@ -1199,6 +1227,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::Prove,
             })
         }
@@ -1245,6 +1274,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::Prop {
                     intros: resolved_intros,
                 },
@@ -1268,6 +1298,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::Theorem,
             })
         }
@@ -1288,6 +1319,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::Theorem,
             })
         }
@@ -1310,6 +1342,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::AttachedProof {
                     subject: subject.clone(),
                     proof_name: proof_name.clone(),
@@ -1341,6 +1374,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::Law {
                     param: param.clone(),
                     fields: resolved_fields,
@@ -1389,6 +1423,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::DataDecl {
                     type_params: type_params.clone(),
                     ctors: rctors,
@@ -1438,6 +1473,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::ExplicitDataDecl {
                     params: rparams,
                     indices,
@@ -1457,6 +1493,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::TypeAlias { ty: rty },
             })
         }
@@ -1479,6 +1516,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::Foreign {
                     symbol: symbol.clone(),
                     library: library.clone(),
@@ -1503,6 +1541,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: false,
                 kind: RDeclKind::Temporal {
                     formula: formula.clone(),
                     source: source.clone(),
@@ -1531,6 +1570,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::RecordDecl {
                     fields: resolved_fields,
                 },
@@ -1581,6 +1621,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::ClassDecl {
                     param: param.clone(),
                     param_kind: resolved_param_kind,
@@ -1618,6 +1659,7 @@ pub(crate) fn resolve_decl_in_unit(
                 requires: vec![],
                 ensures: vec![],
                 span: span.clone(),
+                contains_infix_spine: scope.has_infix_spine(),
                 kind: RDeclKind::InstanceDecl {
                     head_params,
                     head_type: rhead,
@@ -1638,6 +1680,7 @@ pub(crate) fn resolve_decl_in_unit(
             requires: vec![],
             ensures: vec![],
             span: span.clone(),
+            contains_infix_spine: false,
             kind: RDeclKind::DeriveDecl {
                 data_name: data_name.clone(),
             },
@@ -1692,6 +1735,36 @@ fn resolve_expr(scope: &mut Scope, expr: &Expr) -> Result<RExpr, ElabError> {
 /// Resolve an expression in a proposition context (for spec clauses).
 fn resolve_prop(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
     resolve_expr_ctx(scope, expr, ctx)
+}
+
+#[cold]
+#[inline(never)]
+fn resolve_infix_spine(
+    scope: &mut Scope,
+    operands: &[Expr],
+    operators: &[InfixOperator],
+    span: &Span,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    scope.saw_infix_spine();
+    Ok(RExpr::RInfixSpine {
+        operands: operands
+            .iter()
+            .map(|operand| resolve_expr_ctx(scope, operand, ctx))
+            .collect::<Result<Vec<_>, _>>()?,
+        operators: operators
+            .iter()
+            .map(|operator| match operator {
+                InfixOperator::Builtin(operator, span) => {
+                    RInfixOperator::Builtin(*operator, span.clone())
+                }
+                InfixOperator::User(name, span) => {
+                    RInfixOperator::User(name.clone(), span.clone())
+                }
+            })
+            .collect(),
+        span: span.clone(),
+    })
 }
 
 fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
@@ -1845,22 +1918,7 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             operands,
             operators,
             span,
-        } => Ok(RExpr::RInfixSpine {
-            operands: operands
-                .iter()
-                .map(|operand| resolve_expr_ctx(scope, operand, ctx))
-                .collect::<Result<Vec<_>, _>>()?,
-            operators: operators
-                .iter()
-                .map(|operator| match operator {
-                    InfixOperator::Builtin(op, span) => RInfixOperator::Builtin(*op, span.clone()),
-                    InfixOperator::User(name, span) => {
-                        RInfixOperator::User(name.clone(), span.clone())
-                    }
-                })
-                .collect(),
-            span: span.clone(),
-        }),
+        } => resolve_infix_spine(scope, operands, operators, span, ctx),
 
         Expr::EProj(e, field, span) => {
             let re = resolve_expr_ctx(scope, e, ctx)?;
