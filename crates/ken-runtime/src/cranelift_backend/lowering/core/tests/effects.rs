@@ -905,6 +905,170 @@ fn compile_b2f_carried_site_operand_fixture(
     )
 }
 
+thread_local! {
+    static DIRECTORY_REPLY_PAYLOAD: std::cell::RefCell<Vec<u8>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+extern "C" fn directory_reply_probe(
+    _host_context: *const std::ffi::c_void,
+    operation: i64,
+    _request: *const std::ffi::c_void,
+    _request_size: i64,
+    reply: *mut std::ffi::c_void,
+) -> i64 {
+    if operation != ken_host::HostOpV1::FsReadDirectory as i64 || reply.is_null() {
+        return -1;
+    }
+    let layout = ken_host::host_effect_wire_layout_v1(
+        ken_host::HostOpV1::FsReadDirectory,
+    )
+    .expect("FsReadDirectory has a generated wire layout");
+    DIRECTORY_REPLY_PAYLOAD.with(|payload| {
+        let payload = payload.borrow();
+        unsafe {
+            std::ptr::write_bytes(reply.cast::<u8>(), 0, layout.reply_size as usize);
+            *(reply
+                .cast::<u8>()
+                .add(layout.reply_tag_offset as usize)
+                .cast::<u64>()) = layout.reply_bytes_tag;
+            *(reply
+                .cast::<u8>()
+                .add(layout.reply_bytes_data_offset as usize)
+                .cast::<*const u8>()) = payload.as_ptr();
+            *(reply
+                .cast::<u8>()
+                .add(layout.reply_bytes_len_offset as usize)
+                .cast::<usize>()) = payload.len();
+        }
+    });
+    0
+}
+
+fn directory_reply_fixture() -> RuntimeExpr {
+    RuntimeExpr::Let {
+        value: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::FsReadDirectory,
+            capability: Some(crate::RuntimeCapabilityUse {
+                identity: "directory.reply.capability".to_string(),
+                value: Box::new(RuntimeExpr::Var(1)),
+            }),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Bytes(
+                b"directory".to_vec(),
+            ))],
+        }),
+        body: Box::new(RuntimeExpr::Construct {
+            constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+            args: Vec::new(),
+        }),
+    }
+}
+
+fn compile_directory_reply_fixture(
+) -> Result<CompiledModule<JITModule>, CraneliftBackendError> {
+    let isa = native_isa().expect("native ISA");
+    let mut jit = JITBuilder::with_isa(isa, default_libcall_names());
+    jit.symbol(
+        "ken_host_dispatch_v1",
+        directory_reply_probe as *const u8,
+    );
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    compile_expr_into_module(
+        JITModule::new(jit),
+        "abi_a3_directory_reply_decoder",
+        Linkage::Local,
+        &directory_reply_fixture(),
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        Some(&symbols),
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    )
+}
+
+fn run_directory_reply_fixture(payload: Vec<u8>) -> i64 {
+    DIRECTORY_REPLY_PAYLOAD.with(|held| *held.borrow_mut() = payload);
+    let compiled = compile_directory_reply_fixture()
+        .expect("DirectoryEntries decoder fixture lowers");
+    let input = BorrowedFixtureValue {
+        kind: 1,
+        tag: 0,
+        data: std::ptr::null(),
+        len: 0,
+    };
+    let mut context = 0u64;
+    let ingress = RootIngressFixture {
+        process_input: &input,
+        host_context: (&mut context as *mut u64).cast(),
+        capability: 1_u64 << 32,
+    };
+    compiled
+        .run(Some((&ingress as *const RootIngressFixture).cast()))
+        .expect("directory decoder fixture runs")
+        .1
+        .expect("directory decoder returns a status")
+}
+
+/// Promise class: durable fail-closed decoder invariant. The valid control
+/// reaches one copied name/kind entry; every truncation, trailing byte,
+/// over-count, or invalid closed kind fails before the result is published.
+#[test]
+fn directory_entries_decoder_is_bounded_and_consumes_the_whole_payload() {
+    let valid = vec![
+        1, 0, 0, 0, 0, 0, 0, 0,
+        1, 0, 0, 0, 0, 0, 0, 0, b'a', 0,
+    ];
+    assert_eq!(run_directory_reply_fixture(vec![0; 8]), 0);
+    assert_eq!(run_directory_reply_fixture(valid.clone()), 0);
+
+    for end in [0, 7, 8, 16, 17] {
+        assert_eq!(
+            run_directory_reply_fixture(valid[..end].to_vec()),
+            -1,
+            "payload truncation at {end} must fail closed"
+        );
+    }
+    let mut trailing = valid.clone();
+    trailing.push(0);
+    assert_eq!(run_directory_reply_fixture(trailing), -1);
+    let mut invalid_kind = valid.clone();
+    *invalid_kind.last_mut().unwrap() = 4;
+    assert_eq!(run_directory_reply_fixture(invalid_kind), -1);
+    let mut impossible_count = valid;
+    impossible_count[0] = 2;
+    assert_eq!(run_directory_reply_fixture(impossible_count), -1);
+    DIRECTORY_REPLY_PAYLOAD.with(|held| held.borrow_mut().clear());
+}
+
+/// Promise class: durable ownership-source invariant for each decoded name.
+/// The mutation keeps the same response span and entry arity but presents that
+/// span as a scalar; exact child reconciliation must reject it.
+#[test]
+fn directory_entry_name_is_a_governed_host_response_referent() {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+        }
+    }
+    let _reset = Reset;
+    set_effect_seat_dispatch_mutation(
+        EffectSeatDispatchMutation::HostResponseAsScalar,
+    );
+    let error = match compile_directory_reply_fixture() {
+        Ok(_) => panic!("a scalar inherited the response-name owner proof"),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        error.contains("HostResponseReferent")
+            && error.contains("different node"),
+        "the refusal must come from exact response-name reconciliation: {error}"
+    );
+}
+
 /// `RT-SITEOP-CARRIED-WITNESS` `AC-1`: the carried path is projected through
 /// the emitted helper, but the source seat's authority cannot be lent to a
 /// different lowered value.
@@ -2737,7 +2901,7 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// MEASURED: for each admitted operation the ordinals carrying a contract are
 /// exactly `0..n`; `ClockWallNow` is the sole zero-arity operation, every other
 /// admitted operation has `n >= 1`, the capability slot carries one for exactly
-/// the seven FS-path operations, and no unadmitted lane carries one at any slot.
+/// the eleven FS-path operations, and no unadmitted lane carries one at any slot.
 ///
 /// CLAIMED: the table has no hole and no wildcard, so an operation cannot be
 /// admitted while some seat of it silently has no contract.
@@ -2757,6 +2921,10 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         ken_host::HostOpV1::FsWriteFile,
         ken_host::HostOpV1::FsAppendFile,
         ken_host::HostOpV1::FsMetadata,
+        ken_host::HostOpV1::FsReadDirectory,
+        ken_host::HostOpV1::FsCreateDirectory,
+        ken_host::HostOpV1::FsRemoveFile,
+        ken_host::HostOpV1::FsRemoveDirectory,
         ken_host::HostOpV1::FsRename,
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
@@ -2877,10 +3045,6 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
     for operation in [
         ken_host::HostOpV1::ClockMonotonicNow,
         ken_host::HostOpV1::ClockSleepUntil,
-        ken_host::HostOpV1::FsReadDirectory,
-        ken_host::HostOpV1::FsCreateDirectory,
-        ken_host::HostOpV1::FsRemoveFile,
-        ken_host::HostOpV1::FsRemoveDirectory,
         ken_host::HostOpV1::EntropyRandomBytes,
     ] {
         assert!(
@@ -4427,7 +4591,7 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// contents seat are activated, and no others.
 /// **THE GAP this closes:** a forbidden list only reddens on a seat someone
 /// thought to name. This scans the authoritative population and asserts the
-/// whole partition, so a ninth byte-span seat, or a later flip of one nobody
+/// whole partition, so a new byte-span seat, or a later flip of one nobody
 /// re-derived evidence for, reddens here even though this test never mentions
 /// it.
 ///
@@ -4483,6 +4647,10 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsMetadata, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::FsReadDirectory, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::FsCreateDirectory, EffectSeatSlot::Argument(1)),
+            (ken_host::HostOpV1::FsRemoveFile, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::FsRemoveDirectory, EffectSeatSlot::Argument(1)),
             (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsChangeMode, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsOpen, EffectSeatSlot::Argument(0)),
@@ -4491,8 +4659,8 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     );
     assert_eq!(
         either_phase.len() + specialized_only.len(),
-        11,
-        "the byte-span seat population is eleven; a change needs its own disposition"
+        15,
+        "the byte-span seat population is fifteen; a change needs its own disposition"
     );
 }
 
@@ -4942,9 +5110,8 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
 /// lowering can resolve statically, the unselected arm is folded and its effect
 /// is never lowered at all -- instrumenting `lower_process_host_effect` on an
 /// earlier draft showed only the `BufferAllocate` calls and no
-/// `FsReadDirectory` whatever. Both rows then compiled for the same trivial
-/// reason and the
-/// control proved nothing. Routing the value through a closure parameter forces
+/// `ClockMonotonicNow` whatever. Both rows then compiled for the same trivial
+/// reason and the control proved nothing. Routing the value through a closure parameter forces
 /// the runtime tag dispatch that lowers EVERY arm, which is the shape the real
 /// `FSOp` request handler has.
 #[cfg(test)]
@@ -5006,12 +5173,10 @@ fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
                     constructor: REQUEST.to_string(),
                     binders: 0,
                     body: RuntimeExpr::Effect {
-                        family: "FS".to_string(),
-                        operation: ken_host::HostOpV1::FsReadDirectory,
+                        family: "Clock".to_string(),
+                        operation: ken_host::HostOpV1::ClockMonotonicNow,
                         capability: None,
-                        args: vec![RuntimeExpr::Value(RuntimeValue::Bytes(
-                            b"directory".to_vec(),
-                        ))],
+                        args: Vec::new(),
                     },
                 },
                 RuntimeMatchCase {

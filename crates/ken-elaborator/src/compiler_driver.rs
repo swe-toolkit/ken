@@ -2612,6 +2612,19 @@ fn complete_native_program_preparation(
                 file_kind_symlink: host_spine.file_kind_symlink.to_string(),
                 file_kind_other: host_spine.file_kind_other.to_string(),
                 file_operation_rename: host_spine.file_operation_rename.to_string(),
+                file_operation_read_directory: host_spine
+                    .file_operation_read_directory
+                    .to_string(),
+                file_operation_create_directory: host_spine
+                    .file_operation_create_directory
+                    .to_string(),
+                file_operation_remove_file: host_spine
+                    .file_operation_remove_file
+                    .to_string(),
+                file_operation_remove_directory: host_spine
+                    .file_operation_remove_directory
+                    .to_string(),
+                dir_entry: host_spine.dir_entry.to_string(),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3521,6 +3534,11 @@ fn checked_host_spine_v1(
         file_kind_symlink: resolve_id(roles.file_kind_symlink)?,
         file_kind_other: resolve_id(roles.file_kind_other)?,
         file_operation_rename: resolve_id(roles.file_operation_rename)?,
+        file_operation_read_directory: resolve_id(roles.file_operation_read_directory)?,
+        file_operation_create_directory: resolve_id(roles.file_operation_create_directory)?,
+        file_operation_remove_file: resolve_id(roles.file_operation_remove_file)?,
+        file_operation_remove_directory: resolve_id(roles.file_operation_remove_directory)?,
+        dir_entry: resolve_id(roles.dir_entry)?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -3763,6 +3781,12 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_kind_symlink,
         &spine.file_kind_other,
         &spine.file_operation_rename,
+        // ABI-A3 appends without changing any established positional identity.
+        &spine.file_operation_read_directory,
+        &spine.file_operation_create_directory,
+        &spine.file_operation_remove_file,
+        &spine.file_operation_remove_directory,
+        &spine.dir_entry,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -6830,6 +6854,23 @@ mod d1b_role_c1_roster_identity {
                 "file_operation_rename",
                 record.spine.file_operation_rename.clone(),
             ),
+            (
+                "file_operation_read_directory",
+                record.spine.file_operation_read_directory.clone(),
+            ),
+            (
+                "file_operation_create_directory",
+                record.spine.file_operation_create_directory.clone(),
+            ),
+            (
+                "file_operation_remove_file",
+                record.spine.file_operation_remove_file.clone(),
+            ),
+            (
+                "file_operation_remove_directory",
+                record.spine.file_operation_remove_directory.clone(),
+            ),
+            ("dir_entry", record.spine.dir_entry.clone()),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             ("io_error_permission_denied", record.spine.io_errors[1].clone()),
             ("io_error_capability_denied", record.spine.io_errors[2].clone()),

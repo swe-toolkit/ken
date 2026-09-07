@@ -11,13 +11,16 @@ use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(unix)]
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 #[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 static NEXT_ROOTS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SeedNodeKind {
     Directory,
+    /// Directory whose final POSIX mode is applied only after every child has
+    /// been seeded, so a mid-traversal removal failure is reproducible.
+    DirectoryWithMode(u16),
     File(Vec<u8>),
     Symlink(Vec<u8>),
 }
@@ -149,12 +152,32 @@ impl TwinRealRoots {
 
 impl Drop for TwinRealRoots {
     fn drop(&mut self) {
+        #[cfg(unix)]
+        make_fixture_tree_removable(&self.base);
         let _ = fs::remove_dir_all(&self.base);
+    }
+}
+
+#[cfg(unix)]
+fn make_fixture_tree_removable(path: &Path) {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return;
+    };
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return;
+    }
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o700));
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        make_fixture_tree_removable(&entry.path());
     }
 }
 
 fn seed_root(root: &Path, seed: &[SeedNode]) -> Result<(), TwinRootError> {
     let mut nodes = seed.to_vec();
+    let mut final_directory_modes = Vec::new();
     nodes.sort_by(|left, right| {
         path_depth(&left.relative_path)
             .cmp(&path_depth(&right.relative_path))
@@ -164,6 +187,10 @@ fn seed_root(root: &Path, seed: &[SeedNode]) -> Result<(), TwinRootError> {
         let path = join_raw_relative(root, &node.relative_path)?;
         match node.kind {
             SeedNodeKind::Directory => fs::create_dir_all(path)?,
+            SeedNodeKind::DirectoryWithMode(mode) => {
+                fs::create_dir_all(&path)?;
+                final_directory_modes.push((path, mode));
+            }
             SeedNodeKind::File(bytes) => {
                 if let Some(parent) = path.parent() {
                     fs::create_dir_all(parent)?;
@@ -177,6 +204,14 @@ fn seed_root(root: &Path, seed: &[SeedNode]) -> Result<(), TwinRootError> {
                 create_symlink(&target, &path)?;
             }
         }
+    }
+    #[cfg(unix)]
+    for (path, mode) in final_directory_modes {
+        fs::set_permissions(path, fs::Permissions::from_mode(u32::from(mode)))?;
+    }
+    #[cfg(not(unix))]
+    if !final_directory_modes.is_empty() {
+        return Err(TwinRootError::UnsupportedPlatform);
     }
     Ok(())
 }

@@ -148,10 +148,10 @@ impl HostOpV1 {
             Self::FsWriteFile => HostOpAvailabilityV1::NativeTested,
             Self::FsAppendFile => HostOpAvailabilityV1::NativeTested,
             Self::FsMetadata => HostOpAvailabilityV1::NativeTested,
-            Self::FsReadDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::FsCreateDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::FsRemoveFile => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::FsRemoveDirectory => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsReadDirectory => HostOpAvailabilityV1::NativeTested,
+            Self::FsCreateDirectory => HostOpAvailabilityV1::NativeTested,
+            Self::FsRemoveFile => HostOpAvailabilityV1::NativeTested,
+            Self::FsRemoveDirectory => HostOpAvailabilityV1::NativeTested,
             Self::FsRename => HostOpAvailabilityV1::NativeTested,
             Self::FsChangeMode => HostOpAvailabilityV1::NativeTested,
             Self::FsOpen => HostOpAvailabilityV1::NativeTested,
@@ -217,7 +217,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 18] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 22] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -227,6 +227,10 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 18] = [
     HostOpV1::FsWriteFile,
     HostOpV1::FsAppendFile,
     HostOpV1::FsMetadata,
+    HostOpV1::FsReadDirectory,
+    HostOpV1::FsCreateDirectory,
+    HostOpV1::FsRemoveFile,
+    HostOpV1::FsRemoveDirectory,
     HostOpV1::FsRename,
     HostOpV1::FsChangeMode,
     HostOpV1::FsOpen,
@@ -385,9 +389,21 @@ pub fn host_effect_wire_layout_v1(
         // The C record is nonzero-sized, but WallNow has no semantic request
         // fields. Its response payload is carried in HostReplyV1::bytes.
         HostOpV1::ClockWallNow => Vec::new(),
-        HostOpV1::FsReadFile | HostOpV1::FsMetadata => {
+        HostOpV1::FsReadFile
+        | HostOpV1::FsMetadata
+        | HostOpV1::FsReadDirectory
+        | HostOpV1::FsRemoveFile => {
             let path = slice("path")?;
             vec![checked_u32(field("capability")?)?, path[0], path[1]]
+        }
+        HostOpV1::FsCreateDirectory | HostOpV1::FsRemoveDirectory => {
+            let path = slice("path")?;
+            vec![
+                checked_u32(field("capability")?)?,
+                checked_u32(field("recursive")?)?,
+                path[0],
+                path[1],
+            ]
         }
         HostOpV1::FsWriteFile => {
             let path = slice("path")?;
@@ -477,16 +493,12 @@ pub fn host_effect_wire_layout_v1(
         // omit. Naming the operations that legitimately carry no wire layout
         // turns a new operation from a runtime refusal into `error[E0004]`.
         //
-        // These seven are exactly the `RepresentedUnavailable` set, and the
-        // eighteen matched above are exactly the `NativeTested` set. That
+        // These three are exactly the `RepresentedUnavailable` set, and the
+        // twenty-two matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
         HostOpV1::ClockMonotonicNow
         | HostOpV1::ClockSleepUntil
-        | HostOpV1::FsReadDirectory
-        | HostOpV1::FsCreateDirectory
-        | HostOpV1::FsRemoveFile
-        | HostOpV1::FsRemoveDirectory
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation))
         }
@@ -4017,11 +4029,11 @@ mod tests {
         assert_eq!(HostOpV1::try_from(0), Err(UnknownHostOpV1(0)));
     }
 
-    /// Promise class: transition sentinel. ABI-A2 moves only FsAppendFile,
-    /// FsMetadata, and FsRename, so the exact deferred tail is seven: the A3
-    /// directory operations, Clock siblings, and Entropy.
+    /// Promise class: transition sentinel. ABI-A3 completes Track A, so the
+    /// exact deferred tail is the two Clock siblings and Entropy. A later
+    /// availability slice must deliberately retire or update this sentinel.
     #[test]
-    fn abi_a2_partials_leave_the_exact_deferred_tail() {
+    fn abi_a3_completion_leaves_only_the_non_track_a_deferred_tail() {
         assert_eq!(
             HostOpV1::ALL
                 .into_iter()
@@ -4033,14 +4045,9 @@ mod tests {
             vec![
                 HostOpV1::ClockMonotonicNow,
                 HostOpV1::ClockSleepUntil,
-                HostOpV1::FsReadDirectory,
-                HostOpV1::FsCreateDirectory,
-                HostOpV1::FsRemoveFile,
-                HostOpV1::FsRemoveDirectory,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "the FsAppendFile/FsMetadata/FsRename partials must not promote \
-             another deferred lane"
+            "ABI-A3 may promote only the four Track-A directory operations"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,

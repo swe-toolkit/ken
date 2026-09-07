@@ -48,6 +48,20 @@ pub enum ExpectedFsEffect {
     Metadata {
         path: Vec<u8>,
     },
+    ReadDirectory {
+        path: Vec<u8>,
+    },
+    CreateDirectory {
+        path: Vec<u8>,
+        recursive: bool,
+    },
+    RemoveFile {
+        path: Vec<u8>,
+    },
+    RemoveDirectory {
+        path: Vec<u8>,
+        recursive: bool,
+    },
     Rename {
         source: Vec<u8>,
         destination: Vec<u8>,
@@ -65,6 +79,10 @@ impl ExpectedFsEffect {
             Self::WriteFile { .. } => HostOpV1::FsWriteFile,
             Self::AppendFile { .. } => HostOpV1::FsAppendFile,
             Self::Metadata { .. } => HostOpV1::FsMetadata,
+            Self::ReadDirectory { .. } => HostOpV1::FsReadDirectory,
+            Self::CreateDirectory { .. } => HostOpV1::FsCreateDirectory,
+            Self::RemoveFile { .. } => HostOpV1::FsRemoveFile,
+            Self::RemoveDirectory { .. } => HostOpV1::FsRemoveDirectory,
             Self::Rename { .. } => HostOpV1::FsRename,
             Self::ChangeMode { .. } => HostOpV1::FsChangeMode,
         }
@@ -76,6 +94,10 @@ impl ExpectedFsEffect {
             | (Self::WriteFile { path, .. }, FsOpKind::Write)
             | (Self::AppendFile { path, .. }, FsOpKind::Append)
             | (Self::Metadata { path }, FsOpKind::Metadata)
+            | (Self::ReadDirectory { path }, FsOpKind::Enumerate)
+            | (Self::CreateDirectory { path, .. }, FsOpKind::CreateDirectory)
+            | (Self::RemoveFile { path }, FsOpKind::RemoveFile)
+            | (Self::RemoveDirectory { path, .. }, FsOpKind::RemoveDirectory)
             | (Self::ChangeMode { path, .. }, FsOpKind::ChangeMode) => {
                 Some((path, true))
             }
@@ -419,6 +441,7 @@ impl HostHandler for ScriptedPosixHost {
     }
 
     fn fs_read_directory_at(&mut self, handle: &Self::Handle) -> io::Result<Vec<HostDirEntry>> {
+        self.take_pending(HostOpV1::FsReadDirectory);
         self.inner.fs_read_directory_at(handle)
     }
 
@@ -428,10 +451,24 @@ impl HostHandler for ScriptedPosixHost {
         leaf: &[u8],
         recursive: bool,
     ) -> io::Result<()> {
+        let expected = self.take_pending(HostOpV1::FsCreateDirectory);
+        if !matches!(
+            expected,
+            Some(ExpectedFsEffect::CreateDirectory {
+                recursive: expected,
+                ..
+            }) if expected == recursive
+        ) {
+            self.fail_assertion(format!(
+                "interpreter FS create-directory flag diverged: expected={expected:?}, \
+                 recursive={recursive}"
+            ));
+        }
         self.inner.fs_create_directory_at(parent, leaf, recursive)
     }
 
     fn fs_remove_file_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()> {
+        self.take_pending(HostOpV1::FsRemoveFile);
         self.inner.fs_remove_file_at(parent, leaf)
     }
 
@@ -441,6 +478,19 @@ impl HostHandler for ScriptedPosixHost {
         leaf: &[u8],
         recursive: bool,
     ) -> io::Result<()> {
+        let expected = self.take_pending(HostOpV1::FsRemoveDirectory);
+        if !matches!(
+            expected,
+            Some(ExpectedFsEffect::RemoveDirectory {
+                recursive: expected,
+                ..
+            }) if expected == recursive
+        ) {
+            self.fail_assertion(format!(
+                "interpreter FS remove-directory flag diverged: expected={expected:?}, \
+                 recursive={recursive}"
+            ));
+        }
         self.inner.fs_remove_directory_at(parent, leaf, recursive)
     }
 

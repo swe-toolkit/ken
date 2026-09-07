@@ -139,6 +139,108 @@ impl NativeTestedEvidence {
         }
     }
 
+    /// FsReadDirectory evidence uses the same order-independent `{name, kind}`
+    /// projection as its real-artifact comparator.
+    pub fn from_fs_read_directory_run(
+        run: &CanonicalDifferentialRun,
+        request_path: &[u8],
+        expected_entries: &[ken_host::DirEntryV1],
+    ) -> Self {
+        let operation = HostOpV1::FsReadDirectory;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run
+                .compare_fs_read_directory(request_path, expected_entries)
+                .is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
+    pub fn from_fs_create_directory_run(
+        run: &CanonicalDifferentialRun,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+        recursive: bool,
+    ) -> Self {
+        let operation = HostOpV1::FsCreateDirectory;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run
+                .compare_fs_create_directory(
+                    request_path,
+                    filesystem_path,
+                    recursive,
+                    None,
+                )
+                .is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
+    pub fn from_fs_remove_file_run(
+        run: &CanonicalDifferentialRun,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+    ) -> Self {
+        let operation = HostOpV1::FsRemoveFile;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run
+                .compare_fs_remove_file(request_path, filesystem_path, None)
+                .is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
+    pub fn from_fs_remove_directory_run(
+        run: &CanonicalDifferentialRun,
+        request_path: &[u8],
+        filesystem_path: &[u8],
+        recursive: bool,
+    ) -> Self {
+        let operation = HostOpV1::FsRemoveDirectory;
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: run
+                .compare_fs_remove_directory(
+                    request_path,
+                    filesystem_path,
+                    recursive,
+                    None,
+                )
+                .is_ok(),
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|observation| {
+                    observation
+                        .effect_trace
+                        .iter()
+                        .any(|event| event.operation == operation)
+                }),
+        }
+    }
+
     /// FsRename evidence binds both lanes to the same exact before/after
     /// one-node move and Unit result classification.
     pub fn from_fs_rename_run(

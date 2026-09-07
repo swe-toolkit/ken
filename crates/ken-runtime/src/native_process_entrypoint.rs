@@ -73,6 +73,11 @@ pub struct NativeProcessSymbols {
     pub file_kind_symlink: RuntimeSymbol,
     pub file_kind_other: RuntimeSymbol,
     pub file_operation_rename: RuntimeSymbol,
+    pub file_operation_read_directory: RuntimeSymbol,
+    pub file_operation_create_directory: RuntimeSymbol,
+    pub file_operation_remove_file: RuntimeSymbol,
+    pub file_operation_remove_directory: RuntimeSymbol,
+    pub dir_entry: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -150,6 +155,15 @@ impl NativeProcessSymbols {
             file_kind_other: "ctor:prelude::FileKind::KOther".to_string(),
             file_operation_rename:
                 "ctor:prelude::FileOperation::OpRename".to_string(),
+            file_operation_read_directory:
+                "ctor:prelude::FileOperation::OpReadDirectory".to_string(),
+            file_operation_create_directory:
+                "ctor:prelude::FileOperation::OpCreateDirectory".to_string(),
+            file_operation_remove_file:
+                "ctor:prelude::FileOperation::OpRemoveFile".to_string(),
+            file_operation_remove_directory:
+                "ctor:prelude::FileOperation::OpRemoveDirectory".to_string(),
+            dir_entry: "ctor:prelude::DirEntry::MkDirEntry".to_string(),
         }
     }
 }

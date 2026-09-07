@@ -8580,6 +8580,31 @@ fn console_stream_tag(value: &Lowered) -> Option<i64> {
         None
     }
 }
+fn bool_tag(value: &Lowered) -> Option<i64> {
+    if let Lowered::Bool {
+        known: Some(value),
+        ..
+    } = value
+    {
+        return Some(i64::from(*value));
+    }
+    let Lowered::Constructor {
+        constructor, args, ..
+    } = value
+    else {
+        return None;
+    };
+    if !args.is_empty() {
+        return None;
+    }
+    if constructor.ends_with("::False") {
+        Some(0)
+    } else if constructor.ends_with("::True") {
+        Some(1)
+    } else {
+        None
+    }
+}
 fn create_policy_tag(value: &Lowered) -> Option<i64> {
     let Lowered::Constructor {
         constructor, args, ..

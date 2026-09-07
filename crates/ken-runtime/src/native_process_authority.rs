@@ -629,6 +629,11 @@ fn native_process_symbols_from_record(
         file_kind_symlink: spine.file_kind_symlink.clone(),
         file_kind_other: spine.file_kind_other.clone(),
         file_operation_rename: spine.file_operation_rename.clone(),
+        file_operation_read_directory: spine.file_operation_read_directory.clone(),
+        file_operation_create_directory: spine.file_operation_create_directory.clone(),
+        file_operation_remove_file: spine.file_operation_remove_file.clone(),
+        file_operation_remove_directory: spine.file_operation_remove_directory.clone(),
+        dir_entry: spine.dir_entry.clone(),
     }
 }
 

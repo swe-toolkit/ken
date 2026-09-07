@@ -130,10 +130,18 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     FileKindSymlink,
     FileKindOther,
     FileOperationRename,
+    /// ABI-A3 appends directory response/error roles without moving prior ids.
+    FileOperationReadDirectory,
+    FileOperationCreateDirectory,
+    FileOperationRemoveFile,
+    FileOperationRemoveDirectory,
+    DirEntry,
+    ListNil,
+    ListCons,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 37] = [
+    pub(super) const ALL: [Self; 44] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -171,6 +179,13 @@ impl SynthesizedFixedConstructorRole {
         Self::FileKindSymlink,
         Self::FileKindOther,
         Self::FileOperationRename,
+        Self::FileOperationReadDirectory,
+        Self::FileOperationCreateDirectory,
+        Self::FileOperationRemoveFile,
+        Self::FileOperationRemoveDirectory,
+        Self::DirEntry,
+        Self::ListNil,
+        Self::ListCons,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -212,6 +227,13 @@ impl SynthesizedFixedConstructorRole {
             Self::FileKindSymlink => &symbols.file_kind_symlink,
             Self::FileKindOther => &symbols.file_kind_other,
             Self::FileOperationRename => &symbols.file_operation_rename,
+            Self::FileOperationReadDirectory => &symbols.file_operation_read_directory,
+            Self::FileOperationCreateDirectory => &symbols.file_operation_create_directory,
+            Self::FileOperationRemoveFile => &symbols.file_operation_remove_file,
+            Self::FileOperationRemoveDirectory => &symbols.file_operation_remove_directory,
+            Self::DirEntry => &symbols.dir_entry,
+            Self::ListNil => &symbols.list_nil,
+            Self::ListCons => &symbols.list_cons,
         }
     }
 }
