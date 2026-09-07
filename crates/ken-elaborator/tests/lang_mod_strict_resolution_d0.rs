@@ -750,6 +750,31 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // Validation now declares its EffectfulClasses, LawfulFunctors,
+            // Transport, and NonEmpty dependencies. Its transparent package
+            // boundary loads while the census retains compiler conveniences.
+            "Data.Sums.Validation".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // Codec now declares its exact Transport dependency. Its ordinary
             // package boundary loads, while strict mode still records the
             // compiler-convenience `Equal` alias outside the formal floor.
@@ -861,7 +886,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Capability.System.IO",
         "Data.Collections.Map",
         "Data.Serialization.Json",
-        "Data.Sums.Validation",
     ]
     .into_iter()
     .map(str::to_string)

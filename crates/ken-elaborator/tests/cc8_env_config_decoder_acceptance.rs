@@ -11,9 +11,8 @@ use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
 const BYTES_KEYS: &str = include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
-const EFFECTFUL_CLASSES: &str =
-    include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
-const VALIDATION: &str = include_str!("../../../catalog/packages/Data/Sums/Validation.ken.md");
+const VALIDATION_VALID: &str = "Data.Sums.Validation.Valid";
+const VALIDATION_INVALID: &str = "Data.Sums.Validation.Invalid";
 const DIAGNOSTIC: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
@@ -58,14 +57,16 @@ fn dependency_env() -> ElabEnv {
     }
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
     catalog_or::load_lawful_functors_importing_fixture(&mut env);
-    env.elaborate_ken_md_file(EFFECTFUL_CLASSES)
-        .expect("Core.Classes.EffectfulClasses must elaborate in dependency order");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Core.Classes.EffectfulClasses",
+    )
+    .expect("Core.Classes.EffectfulClasses must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Core.Classes.EffectfulClasses");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
         .expect("Data.Collections.NonEmpty must roots-load before its clients");
-    let before_nonempty_client = env.module_state.clone();
-    env.elaborate_ken_md_file(VALIDATION)
-        .expect("Data.Sums.Validation must import NonEmpty from its module surface");
-    env.module_state = before_nonempty_client;
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Validation")
+        .expect("Data.Sums.Validation must roots-load through its declared dependencies");
     for (source, label) in [
         (DIAGNOSTIC, "Capability.Diagnostics.Core"),
         (CODEC, "Data.Text.Codec"),
@@ -93,7 +94,7 @@ fn dependency_env() -> ElabEnv {
 
 fn full_env() -> ElabEnv {
     let mut env = dependency_env();
-    let before_nonempty_clients = env.module_state.clone();
+    let before_validation_clients = env.module_state.clone();
     for (source, label) in [
         (SCHEMA, "Schema"),
         (ARGPARSE, "ArgParse"),
@@ -101,8 +102,8 @@ fn full_env() -> ElabEnv {
         (EXAMPLE, "Application.CommandLine.Forge"),
     ] {
         env.elaborate_ken_md_file(source)
-            .unwrap_or_else(|err| panic!("{label} must import NonEmpty: {err:?}"));
-        env.module_state = before_nonempty_clients.clone();
+            .unwrap_or_else(|err| panic!("{label} must import NonEmpty and Validation: {err:?}"));
+        env.module_state = before_validation_clients.clone();
     }
     env
 }
@@ -359,7 +360,7 @@ fn invalid_utf8_environment_value_survives_the_full_pipeline() {
         "decode_process_environment",
         [schema, input],
     );
-    let valid = ctor_args(&env, &result, "Valid");
+    let valid = ctor_args(&env, &result, VALIDATION_VALID);
     let values = list_elements(&env, valid.last().expect("Valid payload"));
     assert_eq!(values[0], &EvalVal::Bytes(invalid));
 }
@@ -377,7 +378,7 @@ fn two_missing_fields_accumulate_exact_environment_origins() {
         "decode_process_environment",
         [schema, input],
     );
-    let invalid = ctor_args(&env, &result, "Invalid");
+    let invalid = ctor_args(&env, &result, VALIDATION_INVALID);
     let errors = ctor_args(
         &env,
         invalid.last().expect("Invalid payload"),
@@ -407,7 +408,7 @@ fn config_failures_keep_config_key_origins_distinct_from_environment() {
     let schema = eval_global(&env, &mut store, "cc8_base_schema");
     let entries = environment_value(&env, std::iter::empty());
     let result = call_global(&env, &mut store, "decode_config_entries", [schema, entries]);
-    let invalid = ctor_args(&env, &result, "Invalid");
+    let invalid = ctor_args(&env, &result, VALIDATION_INVALID);
     let errors = ctor_args(
         &env,
         invalid.last().expect("Invalid payload"),

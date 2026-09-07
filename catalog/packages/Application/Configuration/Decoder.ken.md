@@ -10,6 +10,8 @@ caller. Keys and values remain plain `Bytes` throughout.
 ```ken
 import Data.Collections.NonEmpty (NonEmpty, nonempty_map)
 
+import Data.Sums.Validation (Invalid, Valid, Validation)
+
 data EnvConfigOrigin = EnvVariableOrigin String | ConfigEntryOrigin (List String)
 
 fn env_config_origin_to_origin (origin : EnvConfigOrigin) : Origin =

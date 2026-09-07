@@ -9,10 +9,8 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const EFFECTFUL_CLASSES_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Core/Classes/EffectfulClasses.ken.md");
-const VALIDATION_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Data/Sums/Validation.ken.md");
+const VALIDATION_VALID: &str = "Data.Sums.Validation.Valid";
+const VALIDATION_INVALID: &str = "Data.Sums.Validation.Invalid";
 const DIAGNOSTIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str =
@@ -58,14 +56,16 @@ fn dependency_env() -> ElabEnv {
     }
     catalog_or::load_derived_importing_fixture_many(&mut env, &["concat_map", "length"]);
     catalog_or::load_lawful_functors_importing_fixture(&mut env);
-    env.elaborate_ken_md_file(EFFECTFUL_CLASSES_KEN_MD)
-        .expect("Core.Classes.EffectfulClasses must elaborate in dependency order");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Core.Classes.EffectfulClasses",
+    )
+    .expect("Core.Classes.EffectfulClasses must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Core.Classes.EffectfulClasses");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
         .expect("Data.Collections.NonEmpty must roots-load before its clients");
-    let before_nonempty_client = env.module_state.clone();
-    env.elaborate_ken_md_file(VALIDATION_KEN_MD)
-        .expect("Data.Sums.Validation must import NonEmpty from its module surface");
-    env.module_state = before_nonempty_client;
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Validation")
+        .expect("Data.Sums.Validation must roots-load through its declared dependencies");
     for (source, label) in [
         (DIAGNOSTIC_KEN_MD, "Capability.Diagnostics.Core"),
         (CODEC_KEN_MD, "Data.Text.Codec"),
@@ -93,16 +93,16 @@ fn full_env() -> ElabEnv {
     let mut env = dependency_env();
     env.elaborate_ken_md_file(DIAGNOSTIC_RENDER_KEN_MD)
         .expect("Capability.Diagnostics.Render must elaborate after Capability.Diagnostics.Core and Capability.Formatting.Doc");
-    let before_nonempty_clients = env.module_state.clone();
+    let before_validation_clients = env.module_state.clone();
     env.elaborate_ken_md_file(SCHEMA_KEN_MD)
-        .expect("Schema must import NonEmpty before either decoder client");
-    env.module_state = before_nonempty_clients.clone();
+        .expect("Schema must import NonEmpty and Validation before either decoder client");
+    env.module_state = before_validation_clients.clone();
     env.elaborate_ken_md_file(ARGPARSE_KEN_MD)
-        .expect("ArgParse must import NonEmpty after the complete substrate");
-    env.module_state = before_nonempty_clients.clone();
+        .expect("ArgParse must import NonEmpty and Validation after the complete substrate");
+    env.module_state = before_validation_clients.clone();
     env.elaborate_ken_md_file(EXAMPLE_KEN_MD)
-        .expect("the separate forge client must import NonEmpty after ArgParse");
-    env.module_state = before_nonempty_clients;
+        .expect("the separate forge client must import NonEmpty and Validation after ArgParse");
+    env.module_state = before_validation_clients;
     env
 }
 
@@ -263,7 +263,7 @@ fn neutralize_fixture_proofs(env: &ElabEnv, store: &mut EvalStore) {
 }
 
 fn parsed_arguments<'a>(env: &ElabEnv, result: &'a EvalVal) -> Vec<&'a EvalVal> {
-    let valid = ctor_args(env, result, "Valid");
+    let valid = ctor_args(env, result, VALIDATION_VALID);
     let command = ctor_args(env, valid.last().expect("Valid payload"), "MkParsedCommand");
     list_elements(env, command.last().expect("parsed argument list"))
 }
@@ -280,7 +280,7 @@ fn diagnostic_location(env: &ElabEnv, diagnostic: &EvalVal) -> (usize, usize, us
 }
 
 fn invalid_diagnostics<'a>(env: &ElabEnv, result: &'a EvalVal) -> Vec<&'a EvalVal> {
-    let invalid = ctor_args(env, result, "Invalid");
+    let invalid = ctor_args(env, result, VALIDATION_INVALID);
     let nonempty = ctor_args(
         env,
         invalid.last().expect("Invalid payload"),
@@ -353,7 +353,7 @@ fn forge_parses_flags_raw_values_and_positionals_and_renders_derived_help() {
     let inspect_parsed = call_global(&env, &mut store, "forge_parse", [inspect_arguments]);
     let inspect_command = ctor_args(
         &env,
-        ctor_args(&env, &inspect_parsed, "Valid")
+        ctor_args(&env, &inspect_parsed, VALIDATION_VALID)
             .last()
             .expect("Valid payload"),
         "MkParsedCommand",

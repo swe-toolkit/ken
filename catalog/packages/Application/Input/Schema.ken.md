@@ -11,6 +11,8 @@ the clients.
 ```ken
 import Data.Collections.NonEmpty (NonEmpty, nonempty_append, nonempty_cons)
 
+import Data.Sums.Validation (Invalid, Valid, Validation)
+
 data SchemaPresence = SchemaRequired | SchemaOptional
 
 data SchemaValueShape = SchemaFlag | SchemaBytes

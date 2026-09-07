@@ -31,12 +31,18 @@ only successful values. `validation_ap` accumulates errors from both sides in
 left-to-right order.
 
 ```ken
+import Core.Classes.EffectfulClasses (Applicative, apply_to, compose, functor_map_of)
+
+import Core.Classes.LawfulFunctors (Functor, Semigroup, comp, idf)
+
+import Core.Logic.Transport (cong)
+
 import Data.Collections.NonEmpty
   (NonEmpty, nonempty_cons, nonempty_append, Semigroup_instance_NonEmpty)
 
-data Validation e a = Invalid e | Valid a
+pub data Validation e a = Invalid e | Valid a
 
-fn validation_map
+pub fn validation_map
       (e : Type) (a : Type) (b : Type) (g : a → b) (x : Validation e a)
     : Validation e b =
   match x {
@@ -44,9 +50,9 @@ fn validation_map
     Valid value ↦ Valid e b (g value)
   }
 
-fn validation_pure (e : Type) (a : Type) (x : a) : Validation e a = Valid e a x
+pub fn validation_pure (e : Type) (a : Type) (x : a) : Validation e a = Valid e a x
 
-fn validation_ap
+pub fn validation_ap
       (e : Type)
       (sg : Semigroup e)
       (a : Type)
@@ -304,6 +310,8 @@ instance Applicative (Validation e) where Semigroup e {
   ap_cmp = validation_ap_cmp e d;
   map_coh = validation_map_coh e d
 }
+
+export Invalid, Valid, Functor_instance_Validation, Applicative_instance_Validation
 ```
 
 ## 5. Design notes
@@ -330,8 +338,8 @@ empty-error `Invalid` value from being required.
 
 ## 7. Trust & derivation
 
-**Public API (stable names):** `Validation`/`Invalid`/`Valid`,
-`validation_map`, `validation_pure`, `validation_ap`,
+**Public API (stable names):** transparent `Validation` with raw constructors
+`Invalid` and `Valid`, plus `validation_map`, `validation_pure`, `validation_ap`,
 `Functor_instance_Validation`, and `Applicative_instance_Validation`.
 
 **Source map:**
