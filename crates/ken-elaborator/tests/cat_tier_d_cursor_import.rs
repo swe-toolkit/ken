@@ -16,6 +16,9 @@ const DIAGNOSTICS_CORE_SOURCE: &str =
 const FORMATTING_DOC: &str = "Capability.Formatting.Doc";
 const FORMATTING_DOC_SOURCE: &str =
     include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
+const PARSING_CURSOR: &str = "Capability.Parsing.Cursor";
+const PARSING_CURSOR_SOURCE: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()
@@ -30,6 +33,12 @@ fn provider_modules(module: &str) -> &'static [&'static str] {
             "Core.Logic.Transport",
             "Data.Collections.Derived",
             "Data.Numeric.Nat.Arithmetic",
+        ],
+        PARSING_CURSOR => &[
+            DIAGNOSTICS_CORE,
+            "Data.Collections.Derived",
+            "Data.Numeric.Nat.Arithmetic",
+            "Data.Numeric.Nat.Order",
         ],
         _ => &[],
     }
@@ -241,4 +250,74 @@ fn formatting_doc_imports_are_canonical_and_visibility_only() {
     );
     assert_private(FORMATTING_DOC, "Nest");
     assert_private(FORMATTING_DOC, "doc_content");
+}
+
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: every publishable Parsing.Cursor declaration and constructor is
+/// queried through its real DC-first roots closure, and exactly the 17-name
+/// downstream union imports together. CLAIMED: Cursor exposes its shared
+/// dictionary, argument carriers, operations, and laws without publishing
+/// implementation state. THE GAP: provider use and the private boundary are
+/// checked independently below.
+#[test]
+fn parsing_cursor_loader_visible_inventory_is_exact() {
+    let expected = names(&[
+        "ArgCursor",
+        "ArgLocation",
+        "CursorAdvanceProgress",
+        "CursorEndValid",
+        "CursorLaws",
+        "CursorOps",
+        "CursorPeekHasRemaining",
+        "MkArgLocation",
+        "MkCursorOps",
+        "arg_cursor_ops",
+        "arg_cursor_start",
+        "arg_length",
+        "cursor_advance",
+        "cursor_locate",
+        "cursor_nat_lt",
+        "cursor_peek",
+        "cursor_remaining",
+    ]);
+    assert_eq!(
+        catalog_publication::published_module_surfaces(
+            PARSING_CURSOR_SOURCE,
+            PARSING_CURSOR,
+            "parsing_cursor",
+        ),
+        expected
+    );
+    assert_selective_identities(PARSING_CURSOR, &expected);
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: Cursor roots-loads after DC and the published lower tiers with no
+/// trust/class/instance growth; every one of its eleven imported provider
+/// identities occurs in an owned checked declaration; private representation
+/// operations remain unimportable. CLAIMED: DC is the sole intra-slice value
+/// edge and every lower-tier value dependency is explicit. THE GAP: each import
+/// item's necessity is established by the population-side removal campaign.
+#[test]
+fn parsing_cursor_imports_are_canonical_and_visibility_only() {
+    assert_providers_consumed(
+        PARSING_CURSOR,
+        &[
+            "Capability.Diagnostics.Core.ArgumentOrigin",
+            "Capability.Diagnostics.Core.MkByteRange",
+            "Capability.Diagnostics.Core.Origin",
+            "Capability.Diagnostics.Core.origin_argument_index",
+            "Capability.Diagnostics.Core.origin_range_end",
+            "Capability.Diagnostics.Core.origin_range_start",
+            "Data.Collections.Derived.bytes_nat_length",
+            "Data.Collections.Derived.length",
+            "Data.Collections.Derived.nth",
+            "Data.Numeric.Nat.Arithmetic.add",
+            "Data.Numeric.Nat.Order.sub",
+        ],
+    );
+    assert_private(PARSING_CURSOR, "MkArgCursor");
+    assert_private(PARSING_CURSOR, "arg_location_origin");
 }

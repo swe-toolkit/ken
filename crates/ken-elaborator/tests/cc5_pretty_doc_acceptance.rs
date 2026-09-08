@@ -19,9 +19,7 @@ fn dependency_env() -> ElabEnv {
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
-    let provider_state = env.module_state.clone();
-    catalog_or::load_derived_fixture(&mut env);
-    env.module_state = provider_state;
+    catalog_or::load_derived_importing_fixture_many(&mut env, &["length", "list_append"]);
     env
 }
 
