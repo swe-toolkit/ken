@@ -8,11 +8,14 @@ mod catalog_publication;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::GlobalId;
+use ken_kernel::{Decl as KernelDecl, GlobalId, Term};
 
 const DIAGNOSTICS_CORE: &str = "Capability.Diagnostics.Core";
 const DIAGNOSTICS_CORE_SOURCE: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
+const FORMATTING_DOC: &str = "Capability.Formatting.Doc";
+const FORMATTING_DOC_SOURCE: &str =
+    include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()
@@ -21,6 +24,13 @@ fn names(items: &[&str]) -> BTreeSet<String> {
 fn provider_modules(module: &str) -> &'static [&'static str] {
     match module {
         DIAGNOSTICS_CORE => &["Core.Classes.LawfulClasses"],
+        FORMATTING_DOC => &[
+            "Core.Classes.LawfulClasses",
+            "Core.Logic.Or",
+            "Core.Logic.Transport",
+            "Data.Collections.Derived",
+            "Data.Numeric.Nat.Arithmetic",
+        ],
         _ => &[],
     }
 }
@@ -76,6 +86,41 @@ fn assert_selective_identities(module: &str, surfaces: &BTreeSet<String>) {
             env.globals[&format!("{module}.{surface}")],
             before,
             "selective import must not remint {module}.{surface}"
+        );
+    }
+}
+
+fn term_mentions(term: &Term, target: GlobalId) -> bool {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. }
+            if *id == target =>
+        {
+            true
+        }
+        Term::Elim { fam, .. } if *fam == target => true,
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| term_mentions(child, target)),
+    }
+}
+
+fn assert_providers_consumed(module: &str, providers: &[&str]) {
+    let (env, owned) = load_module(module);
+    for provider in providers {
+        let provider_id = env.globals[*provider];
+        let consumers = owned
+            .iter()
+            .filter(|id| match env.env.lookup(**id) {
+                Some(KernelDecl::Transparent { ty, body, .. }) => {
+                    term_mentions(ty, provider_id) || term_mentions(body, provider_id)
+                }
+                _ => false,
+            })
+            .count();
+        assert!(
+            consumers > 0,
+            "{module} must consume the canonical provider {provider}"
         );
     }
 }
@@ -146,4 +191,54 @@ fn diagnostics_core_publication_is_visibility_only() {
     let _ = load_module(DIAGNOSTICS_CORE);
     assert_private(DIAGNOSTICS_CORE, "MkSourceId");
     assert_private(DIAGNOSTICS_CORE, "environment_origin");
+}
+
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: every publishable Formatting.Doc declaration, constructor, and
+/// attached proof is queried through the roots loader; exactly the six-name
+/// downstream surface resolves in one selective client. CLAIMED: Doc publishes
+/// only its current carrier/construction boundary. THE GAP: declaration queries
+/// do not show provider use, which the sibling identity test covers.
+#[test]
+fn formatting_doc_loader_visible_inventory_is_exact() {
+    let expected = names(&["Concat", "Doc", "Group", "Line", "Text", "text_string"]);
+    assert_eq!(
+        catalog_publication::published_module_surfaces(
+            FORMATTING_DOC_SOURCE,
+            FORMATTING_DOC,
+            "formatting_doc",
+        ),
+        expected
+    );
+    assert_selective_identities(FORMATTING_DOC, &expected);
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: standalone roots loading preserves trust and class populations,
+/// every declared lower-tier provider is mentioned by a checked Doc definition,
+/// and private constructors/functions remain unimportable. CLAIMED: Doc's five
+/// imports replace ambient value resolution without widening its public API.
+/// THE GAP: import necessity is established by the per-item population-side
+/// removal campaign rather than this positive structural observation.
+#[test]
+fn formatting_doc_imports_are_canonical_and_visibility_only() {
+    assert_providers_consumed(
+        FORMATTING_DOC,
+        &[
+            "Core.Classes.LawfulClasses.leq_nat",
+            "Core.Logic.Or.Inl",
+            "Core.Logic.Or.Inr",
+            "Core.Logic.Or.Or",
+            "Core.Logic.Transport.cong",
+            "Core.Logic.Transport.sym",
+            "Core.Logic.Transport.trans",
+            "Data.Collections.Derived.length",
+            "Data.Collections.Derived.list_append",
+            "Data.Numeric.Nat.Arithmetic.add",
+        ],
+    );
+    assert_private(FORMATTING_DOC, "Nest");
+    assert_private(FORMATTING_DOC, "doc_content");
 }
