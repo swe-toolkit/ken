@@ -50,31 +50,38 @@ could not tell the two per-specialization realizations apart:
    emittable population, the template vanished, the D7 gate (`calls.rs:577-680`,
    refusal `calls.rs:623-630`) refuses retained callable 71. Closed PER GATE-0
    MEASUREMENT: C LIVE -> plan-level worker obligation (dual emission).
-4. **HS#4 — join-ownership (RULED `evt_557xhr47qtzrg`, THIS recut).** After (a)
-   issues the worker, body 61's spine — incl. source join `StaticOriginId(44)` —
-   is emitted TWICE. But `function_owner` -> `required_join_origins`
-   (`joins_traps.rs:675`) key by source origin ALONE and are SINGLE-OWNER
-   (`validate_function_units` `semantic_ir.rs:2395` forbids double-owner). So
-   exactly ONE emission owns+disposes its copy of 44; the other carries 44's code
-   with no scoped disposition -> `finalize_join_disposition` UNDER-coverage at
-   `joins.rs:2145`: `function left planned source join StaticOriginId(44) neither
-   emitted nor statically unselected`. (`joins.rs:2140` is the OVER-coverage face
-   — HS#1's "classified outside its owning function".)
+4. **HS#4 — join-ownership (RULED `evt_557xhr47qtzrg`; population corrected by
+   measurement `evt_34t60sqcw27mv` / disposition `evt_52xmt58zxxyqv`, THIS recut).**
+   Join ownership by source origin ALONE (`function_owner` ->
+   `required_join_origins`, `joins_traps.rs:675`, SINGLE-OWNER via
+   `validate_function_units` `semantic_ir.rs:2395`) MIS-CHARGES source join
+   `StaticOriginId(44)` to F, which never emits it. MEASURED: 44 is emitted EXACTLY
+   ONCE, by worker 6 (`PredeclaredFunctionId(6)`, body 50, consumes `{50, 44}`); F
+   (`PFI(3)`, body 82) consumes `{30, 33, 36, 50, 72, 73}` and never emits 44; the
+   genuinely dual-emitted join is `50`, not 44. Source-origin-alone leaves F with a
+   PHANTOM requirement for 44 it never emits or disposes ->
+   `finalize_join_disposition` UNDER-coverage at `joins.rs:2145`: `function left
+   planned source join StaticOriginId(44) neither emitted nor statically
+   unselected`. (`joins.rs:2140` is the OVER-coverage face — HS#1's "classified
+   outside its owning function".)
 
 ## Mechanism (the closure, grounded @ `496d8637b`)
 
 DISPOSITION = WITHIN-LANE STRUCTURAL CLOSURE (not a 5th point-fix; not — on the
 grounding — the operator hard-stop, with a measured escape). Bring the
 join-ownership plane into the per-`(owning-emission / specialization, origin)`
-keying the backend uses everywhere else. Each emission of body 61 owns and
-disposes its OWN copy of the spine's joins: 44 under F's specialization (z4027,
-unchanged) AND 44 under the worker's specialization (new, worker-scoped).
-`function_owner` / `required_join_origins` become resolved PER OWNING EMISSION;
-single-owner becomes single-owner-PER-EMISSION — precisely what the
-context/continuation machinery already assumes. A source origin appearing in two
-specializations' partitions is EXPECTED and sound under `(specialization, origin)`
-keying; it is a "double-owner" defect ONLY under the source-origin-alone keying
-that is the actual bug.
+keying the backend uses everywhere else. Each emission owns and disposes exactly
+the spine joins it ACTUALLY emits (measured per emission, `evt_34t60sqcw27mv`):
+worker 6 (`PredeclaredFunctionId(6)`, body 50) emits+consumes `{50, 44}`; F
+(`PFI(3)`, body 82) emits+consumes `{30, 33, 36, 50, 72, 73}` and never emits 44.
+Join 44 is emitted EXACTLY ONCE (worker 6); the genuinely dual-emitted join is
+`50` (both F and worker 6 emit it). `function_owner` / `required_join_origins`
+become resolved PER OWNING EMISSION; single-owner becomes
+single-owner-PER-EMISSION — precisely what the context/continuation machinery
+already assumes. A source origin appearing in two emissions' partitions (join 50)
+is EXPECTED and sound under `(specialization, origin)` keying; charging 44 to F is
+a PHANTOM obligation ONLY under the source-origin-alone keying that is the actual
+bug.
 
 Why within-lane: this threads the SAME specialization identity the backend
 already computes and carries (through continuations / responses / aggregates)
@@ -104,9 +111,16 @@ shape-read). Complete the dual emission across BOTH layers:
 2. **Join-ownership per-specialization (HS#4, this recut).** Thread the existing
    `(specialization / owning-emission, origin)` keying into `function_owner`,
    `required_join_origins`, `finalize_join_disposition`, and
-   `validate_function_units`, so each emission owns+disposes its own spine joins.
-   44 under F stays F's (z4027); 44 under the worker's specialization is new and
-   worker-scoped. Additive; no global double-owner.
+   `validate_function_units`, so each function is required to own exactly its
+   MEASURED emitted joins (option A, `evt_52xmt58zxxyqv`): required(F) =
+   `{30,33,36,50,72,73}` (44 REMOVED — F never emits it); required(worker 6) =
+   `{50,44}`; required(worker `PFI(5)`/body 61) = none. Move 44's required-ownership
+   to worker 6, its measured emitter — this resolves BOTH the F under-coverage and
+   the worker's missing disposition from one change. Do NOT make F emit a second
+   copy of 44 (option B refused: it fabricates a disposition lowering never
+   performs, and re-electing the realization to inline body 50 into F IS the
+   Condition-2 construct — do not mint it). Additive; the only dual-charged join is
+   50 (both emitters).
 
 The ordinary-`Match` selector and the `source.rs` catch-all stay untouched.
 
@@ -158,11 +172,13 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
   satisfied, not bypassed. Identity BY origin 61 across both realizations, NOT
   deduped; the worker carries its OWN `StaticBody` call boundary.
 - **AC-JOIN-PER-SPECIALIZATION (HS#4):** `function_owner` / `required_join_origins`
-  / `finalize_join_disposition` resolve PER owning emission; each emission of body
-  61 owns+disposes its own copy of the spine joins (incl. 44). The `joins.rs:2145`
-  under-coverage refusal clears WITHOUT a join bypass, owner special-case, or
-  `NativeJoinPlanV1`. `validate_function_units` passes under
-  single-owner-per-emission (no global double-owner).
+  / `finalize_join_disposition` resolve PER owning emission; each function is
+  required to own exactly its MEASURED emitted joins (worker 6 owns `{50,44}`; F
+  owns `{30,33,36,50,72,73}` — 44 excluded; the dual-emitted 50 charged to both).
+  The `joins.rs:2145` under-coverage refusal clears WITHOUT a join bypass, owner
+  special-case, `NativeJoinPlanV1`, or an F second-copy of 44.
+  `validate_function_units` passes under single-owner-per-emission (no global
+  double-owner).
 - **AC-DISCRIMINATOR-GATE (SEPARATE — derivability):** 61's body identity and 71's
   capture SCHEMA are compiler-owned/static; if any part is runtime-DETERMINED, the
   disposition FLIPS to must-refuse and the B2F durable-carrier is the OPERATOR FORK.
@@ -170,10 +186,11 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
   (reify-and-seal on origin 71's plan), not per-function — assert neither refusal
   recurs at a second use of 71.
 - **AC-RECURSOR-UNTOUCHED (critical; per-emission):** z4027/z4029 are F's-emission
-  facts and are PRESERVED. Under per-specialization keying, join 50 and join 44
-  UNDER F still resolve to F, partition + ABI stops stay closed, recursor edges
-  stay `RealizedRecursorTransfer`. The worker's join-ownership is ADDITIVE (its
-  specialization owns its own copies); neither realization's edge kind or ownership
+  facts and are PRESERVED. F owns exactly what it EMITS — `{30,33,36,50,72,73}`
+  (join 44 EXCLUDED; F never emits it); the dual-emitted join 50 resolves to F for
+  F's own copy. Partition + ABI stops stay closed, recursor edges stay
+  `RealizedRecursorTransfer`. The worker's join-ownership is ADDITIVE (worker 6's
+  specialization owns `{50,44}`); neither realization's edge kind or ownership
   leaks into the other.
 - **AC-COMPLETE-PARITY (the goal):** native execution COMPLETES and native result
   == interpreter == `Nat 3`.
@@ -185,8 +202,14 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
   `worker_templates`, `declare_retained_body_targets_in_func`, the D7 gate), AND
   the join-ownership plane (`function_owner`, `required_join_origins`,
   `finalize_join_disposition`, `validate_function_units`) — and confirm each is
-  per-specialization-correct for the dual emission. IF a plane the census finds
-  CANNOT be made per-specialization by threading the existing
+  per-specialization-correct for the dual emission. Charge EVERY source join to
+  the emission(s) that ACTUALLY emit it (measured owner run): a join charged by
+  source-origin-alone to a function that does not emit it (44 -> F) is the defect
+  being fixed; the genuinely dual-emitted join (50) is charged to BOTH emitters.
+  FALSIFIABLE GUARDRAIL: after the change, for every function required == emitted;
+  any residual required-not-emitted or emitted-not-covered join is either a further
+  plane to thread or a real drop — surface it, do not paper it. IF a plane the
+  census finds CANNOT be made per-specialization by threading the existing
   `(specialization, origin)` identity, THAT plane is the Condition-2 escape — STOP
   and route it. A reason a consumer must still see the old form must be SHOWN.
 
