@@ -24,6 +24,10 @@ import Core.Classes.LawfulClasses (leq_nat)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
+import Core.Logic.Transport (cong, sym, trans)
+
+import Data.Collections.Derived (length, list_append)
+
 import Data.Numeric.Nat.Arithmetic (add)
 
 data Doc : Type where {
@@ -34,6 +38,8 @@ data Doc : Type where {
   Group : Doc → Doc;
   Alt : Doc → Doc → Doc
 }
+
+export Doc, Text, Line, Concat, Group
 
 fn doc_content (doc : Doc) : List Char =
   match doc {
@@ -358,7 +364,7 @@ String conversion is deliberately thin and proof-free. Every verified law
 above remains at the structural `List Char` layer.
 
 ```ken
-fn text_string (value : String) : Doc = Text (string_to_list_char value)
+pub fn text_string (value : String) : Doc = Text (string_to_list_char value)
 
 fn render_string (width : Nat) (doc : Doc) : String = list_char_to_string (render width doc)
 ```
