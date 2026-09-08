@@ -89,7 +89,10 @@ fn nested_checked_ih_native_result_is_exactly_interpreter_nat_three() {
         &mut host,
     )
     .expect("the identical checked source runs through the interpreter");
-    assert_eq!(interpreted.exit_status, 0, "the interpreter result was not Nat 3");
+    assert_eq!(
+        interpreted.exit_status, 0,
+        "the interpreter result was not Nat 3"
+    );
 
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
