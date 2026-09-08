@@ -292,13 +292,24 @@ struct SourceCarriedCase {
 /// The ordered continuation stack, top first. `SourceContinuation` has no
 /// `Debug`, and the ruling asks for *ordered kinds* rather than a rendering of
 /// the payloads, so this walks the `next` chain and names each frame.
-#[cfg(test)]
+#[cfg(any(test, feature = "checked-ih-realization-observation"))]
 fn rt_continuation_kinds(continuation: &SourceContinuation<'_>) -> Vec<&'static str> {
     let mut kinds = Vec::new();
     let mut cursor = continuation;
     loop {
         let (kind, next): (&'static str, Option<&SourceContinuation<'_>>) = match cursor {
-            SourceContinuation::Terminal(_) => ("Terminal", None),
+            SourceContinuation::Terminal(SourceContinuationTerminal::ReturnValue) => {
+                ("TerminalReturnValue", None)
+            }
+            SourceContinuation::Terminal(
+                SourceContinuationTerminal::ReturnToProducerHole { .. },
+            ) => ("TerminalReturnToProducerHole", None),
+            SourceContinuation::Terminal(SourceContinuationTerminal::ResumeOuter { .. }) => {
+                ("TerminalResumeOuter", None)
+            }
+            SourceContinuation::Terminal(SourceContinuationTerminal::JumpToJoin(_)) => {
+                ("TerminalJumpToJoin", None)
+            }
             SourceContinuation::CheckedRecursiveInvocationReturn { next, .. } => {
                 ("CheckedRecursiveInvocationReturn", Some(next))
             }
@@ -1743,7 +1754,67 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             env,
                             static_origin,
                             next,
-                        } => {
+                        } => 'match_scrutinee: {
+                            // A realized recursive edge has already emitted its CFG jump. It is
+                            // a protocol marker, not a scrutinee value, so this enclosing Match
+                            // forwards it without entering the Match occurrence or selecting a
+                            // case. Preserve the exact predecessor route and role: resetting
+                            // either would silently turn propagation into a new value.
+                            if matches!(
+                                &value,
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
+                            ) {
+                                let forwarded = RoutedAnswer::forward(
+                                    value,
+                                    incoming_route,
+                                    incoming_role,
+                                );
+                                control.continuation = *next;
+                                #[cfg(any(
+                                    test,
+                                    feature = "checked-ih-realization-observation"
+                                ))]
+                                record_checked_ih_realization_observation(
+                                    CheckedIhRealizationObservation::SourceMatchBackedgeForward {
+                                        route_kind: match forwarded.route {
+                                            SourceComputationalAnswerRoute::DirectScrutinee => {
+                                                "DirectScrutinee"
+                                            }
+                                            SourceComputationalAnswerRoute::
+                                                CheckedSelectedRecursor => {
+                                                    "CheckedSelectedRecursor"
+                                                }
+                                        },
+                                        role_kind: match forwarded.role {
+                                            EliminatorRole::Scrutinee => "Scrutinee",
+                                            EliminatorRole::AnswerAfterComputationalFrame { .. } =>
+                                                "AnswerAfterComputationalFrame",
+                                        },
+                                        continuation_kinds: rt_continuation_kinds(
+                                            &control.continuation,
+                                        ),
+                                    },
+                                );
+                                break 'match_scrutinee SourceMachineState::Value {
+                                    value: forwarded,
+                                    control,
+                                };
+                            }
+                            #[cfg(any(
+                                test,
+                                feature = "checked-ih-realization-observation"
+                            ))]
+                            record_checked_ih_realization_observation(
+                                CheckedIhRealizationObservation::
+                                    SourceMatchOccurrencePlanEntryAttempt {
+                                        operand_kind: match &value {
+                                            LoweringOperand::Specialized(value) => {
+                                                lowered_value_kind(value)
+                                            }
+                                            LoweringOperand::Carried(_) => "Carried",
+                                        },
+                                    },
+                            );
                             self.enter_source_occurrence_plan(static_origin)?;
                             control.continuation = *next;
                             #[cfg(any(
@@ -5945,6 +6016,46 @@ mod tests {
     use crate::cranelift_backend::lowering::core::tests::source_frame_bridge::{
         d8f_compile, d8n_compile,
     };
+
+    #[test]
+    fn ordinary_match_backedge_forward_preserves_both_routing_axes() {
+        // Promise class: durable invariant. MEASURED: `RoutedAnswer::forward` is exercised
+        // over both route variants and both eliminator roles with the same
+        // RecursiveBackedge operand. CLAIMED: the ordinary Match forward cannot
+        // reset either axis while propagating the marker. THE GAP: the integration
+        // control separately proves the source-machine seat calls this operation.
+        let origin = inert_test_static_origin();
+        let cases = [
+            (
+                SourceComputationalAnswerRoute::DirectScrutinee,
+                EliminatorRole::Scrutinee,
+            ),
+            (
+                SourceComputationalAnswerRoute::CheckedSelectedRecursor,
+                EliminatorRole::Scrutinee,
+            ),
+            (
+                SourceComputationalAnswerRoute::CheckedSelectedRecursor,
+                EliminatorRole::AnswerAfterComputationalFrame {
+                    continuation_origin: origin,
+                },
+            ),
+        ];
+
+        for (expected_route, expected_role) in cases {
+            let forwarded = RoutedAnswer::forward(
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge),
+                expected_route,
+                expected_role,
+            );
+            assert!(matches!(
+                forwarded.value,
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
+            ));
+            assert_eq!(forwarded.route, expected_route);
+            assert_eq!(forwarded.role, expected_role);
+        }
+    }
 
     #[test]
     fn generated_entry_capsule_guard_rejects_every_specialized_sibling() {

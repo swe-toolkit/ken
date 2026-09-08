@@ -259,19 +259,18 @@ fn assert_nested_checked_pipeline_nat(
 }
 
 #[test]
-fn nested_recursive_match_realizes_checked_ih_then_refuses_recursive_backedge() {
-    // Promise classes: the plan and positional ABI assertions are normative
-    // compatibility vectors over compiler-owned checked identities. The final
-    // exact refusal is a transition sentinel: the successor that gives the
-    // realized RecursiveBackedge its source-control route retires it.
+fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_frontier() {
+    // Promise classes: the plan assertions are normative compatibility vectors
+    // over compiler-owned checked identities. The exact function-ownership
+    // refusal is a transition sentinel for the measured parent frontier.
     //
     // MEASURED: the real checked target carries one oriented frame, two slots,
     // two call templates, and Runtime markers bound to each. Native lowering
-    // enters both pending markers and realizes each exact slot/parent authority.
-    // CLAIMED: the unrealized ComputationalRecursorClosure no longer reaches
-    // the source-machine selector; both checked capsules are realized first,
-    // and the refused operand advances to `RecursiveBackedge`.
-    // THE GAP: this node does not authorize routing that protocol marker.
+    // enters both pending markers, realizes their exact authority, and leaves
+    // the ordinary source Match without a refusal observation.
+    // CLAIMED: that Match forwards the realized RecursiveBackedge protocol
+    // marker before occurrence-plan entry rather than selecting on it.
+    // THE GAP: the new function-ownership refusal is reported, not bypassed.
     let package_name = "nested_inductive_native_stop_pkg";
     let target_name = "liftSizeResult";
     let expected = 3;
@@ -353,20 +352,24 @@ fn nested_recursive_match_realizes_checked_ih_then_refuses_recursive_backedge() 
         }),
     };
     program.examples = vec![example.clone()];
-    let runtime = runtime_ir_report_for_example(&program, &example, "checked-IH authority stop");
+    let runtime = runtime_ir_report_for_example(
+        &program,
+        &example,
+        "realized-backedge source-continuation frontier",
+    );
     let scalar_merge_scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
     let realization_scope = ken_runtime::checked_ih_realization_observation_scope();
     let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &runtime,
         &ken_runtime::NativeSeedEnvironment::empty(),
-        "ken_nested_ih_authority_stop",
+        "ken_nested_ih_backedge_forward_frontier",
     );
     let observations = realization_scope.finish();
     let scalar_merge_arrivals = scalar_merge_scope.finish();
     assert!(
         scalar_merge_arrivals.is_empty(),
-        "the advancing refusal remains before the existing scalar-merge in-edge: \
+        "the parent-frontier refusal remains before the existing scalar-merge in-edge: \
          {scalar_merge_arrivals:#?}"
     );
     let pending = observations
@@ -424,6 +427,47 @@ fn nested_recursive_match_realizes_checked_ih_then_refuses_recursive_backedge() 
         "the pending marker must resolve the exact call, slot, parent, and complete plan: \
          {observations:#?}"
     );
+    // MEASURED: the exact forwarded RoutedAnswer keeps its incoming route,
+    // role, and next continuation, while no occurrence-entry attempt sees the
+    // RecursiveBackedge operand.
+    // CLAIMED: this is propagation rather than a new value or an occurrence-plan
+    // consumption. THE GAP: the later function-ownership refusal remains outside
+    // this forwarding relation.
+    let forwards = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::SourceMatchBackedgeForward {
+                route_kind,
+                role_kind,
+                continuation_kinds,
+            } => Some((*route_kind, *role_kind, continuation_kinds.clone())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        forwards,
+        vec![(
+            "DirectScrutinee",
+            "Scrutinee",
+            vec!["TerminalResumeOuter"],
+        )],
+        "the ordinary Match must preserve the exact route, role, and next continuation it \
+         received: {observations:#?}"
+    );
+    let entered_backedges = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::SourceMatchOccurrencePlanEntryAttempt {
+                operand_kind,
+            } if *operand_kind == "RecursiveBackedge" => Some(*operand_kind),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        entered_backedges.is_empty(),
+        "the RecursiveBackedge forward must happen before ordinary-Match occurrence entry: \
+         {observations:#?}"
+    );
     let match_refusals = observations
         .iter()
         .filter_map(|event| match event {
@@ -435,27 +479,24 @@ fn nested_recursive_match_realizes_checked_ih_then_refuses_recursive_backedge() 
         .collect::<Vec<_>>();
     assert_eq!(
         match_refusals,
-        vec![(
-            ken_runtime::CheckedIhMatchRefusalSite::SourceMachineSelector,
-            "RecursiveBackedge",
-        )],
-        "after both capsules are realized, the next stop must name its exact seat and the \
-         advanced protocol operand: {observations:#?}"
+        Vec::<(ken_runtime::CheckedIhMatchRefusalSite, &'static str)>::new(),
+        "the realized RecursiveBackedge must leave the source Match seat without a refusal: \
+         {observations:#?}"
     );
     match native {
-        Err(ken_runtime::CraneliftBackendError::Unsupported(refusal)) => {
-            assert_eq!(
-                (refusal.construct, refusal.reason.as_str()),
-                ("Match", "scrutinee is not a constructor value"),
-                "D3 retains the fail-closed text while the site observation proves the \
-                 refused operand advanced from a capsule to RecursiveBackedge"
-            );
-        }
+        Err(ken_runtime::CraneliftBackendError::Backend(
+            ken_runtime::BackendFailure::Module(reason),
+        )) => assert_eq!(
+            reason,
+            "source join StaticOriginId(50) was classified outside its owning function",
+            "the forwarded marker must stop at the exact measured parent frontier"
+        ),
         Ok(artifact) => panic!(
-            "checked-IH authority unexpectedly advanced past the join hard stop in `{}`",
+            "the nested checked target unexpectedly completed in `{}`; replace the transition \
+             sentinel with native/interpreter parity before accepting that advancement",
             artifact.entry_symbol
         ),
-        Err(other) => panic!("checked-IH authority reached a different boundary: {other}"),
+        Err(other) => panic!("the forwarded marker reached a different boundary: {other}"),
     }
 }
 
@@ -466,8 +507,8 @@ fn checked_ih_abi_and_match_refusal_site_are_discriminated_before_authority() {
     // are the declared unit-call ABI, not an incidental vector length.
     //
     // The unplanned twin is deliberate: D4's vector is constructed before the
-    // authority stop, and D5 must retain a source-machine refusal witness after
-    // the planned twin advances to a RecursiveBackedge at that same seat.
+    // authority stop, and the same-seat negative keeps the source-machine
+    // refusal live after the planned twin forwards its RecursiveBackedge.
     let package_name = "nested_inductive_native_unplanned_control_pkg";
     let target_name = "liftSizeResult";
     let expected = 3;
