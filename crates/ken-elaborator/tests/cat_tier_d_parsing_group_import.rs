@@ -215,18 +215,13 @@ fn parsing_numeric_loader_visible_inventory_is_exact() {
         "DecimalDigit",
         "NumericErrorKind",
         "char_to_digit",
-        "format_digits",
-        "format_digits_roundtrip",
         "numeric_argument_origin",
-        "numeric_diagnostic",
-        "numeric_error_code",
         "parse_digits_at",
         "parse_formatted_digits",
         "parse_int",
         "parse_int_chars",
         "parse_nat",
         "parse_nat_chars",
-        "show_digits",
     ]);
     assert_eq!(
         catalog_publication::published_module_surfaces(NUMERIC_SOURCE, NUMERIC, "parsing_numeric"),
@@ -243,11 +238,15 @@ fn parsing_numeric_loader_visible_inventory_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: Numeric's checked references intersect its normalized provider
-/// closure at twelve Diagnostics.Core and two Transport identities, while remaining disjoint
-/// from Cursor, Decoder, and both group siblings; loading adds no trust, class,
-/// or instance. CLAIMED: Numeric's complete catalog-value closure is explicit,
-/// already published, and independent of the other group members. THE GAP:
-/// per-item necessity is supplied by the production-side removal campaign.
+/// closure at twelve Diagnostics.Core and two Transport identities, while
+/// remaining disjoint from Cursor, Decoder, and both group siblings; loading
+/// adds no trust, class, or instance. The ten direct Diagnostics.Core imports
+/// induce two additional checked identities, `byte_range_start` and
+/// `byte_range_end`, through the transparent `origin_range_start` and
+/// `origin_range_end` bodies. CLAIMED: Numeric's complete catalog-value closure
+/// is explicit, already published, and independent of the other group members.
+/// THE GAP: per-item necessity is supplied by the production-side removal
+/// campaign.
 #[test]
 fn parsing_numeric_provider_closure_is_exact_and_sibling_disjoint() {
     let direct = direct_numeric();
@@ -309,8 +308,13 @@ fn parsing_numeric_implementation_siblings_remain_private() {
         "InvalidDigit",
         "MkDecimalDigit",
         "numeric_argument_origin_index_faithful",
+        "numeric_error_code",
+        "numeric_diagnostic",
         "decimal_digit_value",
+        "format_digits",
+        "format_digits_roundtrip",
         "parse_digit_result",
+        "show_digits",
     ] {
         assert_private(name);
     }

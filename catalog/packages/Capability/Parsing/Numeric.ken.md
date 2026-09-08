@@ -47,13 +47,13 @@ export NumericErrorKind
 
 data NumericErrorKind = EmptyInput | InvalidDigit
 
-pub fn numeric_error_code (kind : NumericErrorKind) : DiagnosticCode =
+fn numeric_error_code (kind : NumericErrorKind) : DiagnosticCode =
   match kind {
     EmptyInput ↦ MkDiagnosticCode "text.numeric.empty-input";
     InvalidDigit ↦ MkDiagnosticCode "text.numeric.invalid-digit"
   }
 
-pub fn numeric_diagnostic
+fn numeric_diagnostic
       (locate : Nat → Origin) (kind : NumericErrorKind) (position : Nat)
     : Diagnostic =
   MkDiagnostic (locate position) (numeric_error_code kind)
@@ -197,7 +197,7 @@ fn decimal_digit_values (digits : List DecimalDigit) : List Int =
     Cons digit rest ↦ Cons Int (decimal_digit_value digit) (decimal_digit_values rest)
   }
 
-pub fn format_digits (digits : List DecimalDigit) : List Char =
+fn format_digits (digits : List DecimalDigit) : List Char =
   match digits {
     Nil ↦ Nil Char;
     Cons digit rest ↦ Cons Char (decimal_digit_to_char digit) (format_digits rest)
@@ -223,10 +223,10 @@ pub fn parse_formatted_digits (chars : List Char) : Option (List Int) =
     Cons c rest ↦ parse_digit_result (parse_formatted_digits rest) (char_to_digit c)
   }
 
-pub fn show_digits (digits : List DecimalDigit) : String =
+fn show_digits (digits : List DecimalDigit) : String =
   list_char_to_string (format_digits digits)
 
-pub theorem format_digits_roundtrip
+theorem format_digits_roundtrip
       (digits : List DecimalDigit)
     : Equal
         (Option (List Int))
@@ -286,11 +286,9 @@ const parsed_negative_result : Result Diagnostic Int = parse_int example_numeric
 
 ## 6. Trust and derivation
 
-**Public API:** `NumericErrorKind`, `numeric_error_code`,
-`numeric_diagnostic`, `numeric_argument_origin`, `char_to_digit`,
+**Public API:** `NumericErrorKind`, `numeric_argument_origin`, `char_to_digit`,
 `parse_digits_at`, `parse_nat_chars`, `parse_int_chars`, `parse_nat`, `parse_int`,
-`DecimalDigit`, `format_digits`, `parse_formatted_digits`,
-`format_digits_roundtrip`, and `show_digits`.
+`DecimalDigit`, and `parse_formatted_digits`.
 
 **Derivation.** Parsing uses structural recursion on `List Char`, positions use
 structural `Nat`, and values use the landed `charToInt`, `leq_int`, `eq_int`,
