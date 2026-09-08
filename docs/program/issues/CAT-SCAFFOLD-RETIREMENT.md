@@ -89,10 +89,12 @@ provider.
   (gated on BK's DecEq relocation, Tier B). System.IO carries a one-module
   theorem-rename erratum (rename the `write_all_all_success` theorem so it does
   not shadow its subject fn; keep the subject fn), folded into its Tier D step.
-  First internal slice FRAMED + RELEASED 2026-09-08 as
-  [[CAT-MIGRATE-TIER-D-CURSOR]] (DC + Doc -> Cursor; delegated D0 measures the
-  intra-slice DAG). Decoder, then Numeric / Parsing / Process.Arguments, then the
-  singletons + the System.IO erratum are framed one release ahead as this lands.
+  Slice 1 [[CAT-MIGRATE-TIER-D-CURSOR]] (DC + Doc -> Cursor) MERGED 2026-09-08
+  (ee8a35351; D0 measured DC -> Cursor, Doc independent). Slice 2
+  [[CAT-MIGRATE-TIER-D-DECODER]] (Parsing.Decoder; grounded Cursor -> Decoder edge)
+  FRAMED + RELEASED 2026-09-08 as slice 1 landed. Then Numeric / Parsing /
+  Process.Arguments, then the singletons (Diagnostics.Render, Filesystem.Path.Posix)
+  + the System.IO erratum, each framed one release ahead as its predecessor lands.
 - **Tier E — Serialization + Application + Algorithms.** Json (imports Cursor —
   now available; THIS is where Json belongs) -> Application.Input.Schema ->
   Application.CommandLine.ArgParse + Application.Configuration.Decoder;
