@@ -1,42 +1,48 @@
-# WP frame — RT-NESTED-IH-NATIVE-REALIZATION D3-D5 (thread PER-SPECIALIZATION keying into EVERY source-origin-keyed static plane; GATE-0 measured C LIVE -> dual emission; §1b deeper predicate closed at entry 4 = join-ownership)
+# WP frame — RT-NESTED-IH-NATIVE-REALIZATION D3-D5 (thread PER-EMISSION identity into EVERY plane keyed by source-origin / one global emission model; GATE-0 measured C LIVE -> dual emission; §1b deeper predicate, entries 1-5; HS#5 = join-representation, per-emission CarrierWord vs NativeScalarPair)
 
 > The completing D3-D5 slice of RT-NESTED-IH-NATIVE-REALIZATION (node
 > `docs/program/issues/RT-NESTED-IH-NATIVE-REALIZATION.md`). Runtime lane,
 > operator kernel-chain priority (`evt_7nkzsy27p7npw`). Owner: runtime. Size: M.
 > Tier: T1. Gate: none. Architect (`evt_1nkx3f30hqp9y` z4027, `evt_2a1gzw40mprz0`
 > z4029, `evt_53snpb8396g8a` HS#3 + amendment `evt_2cbtpf894nfzt`,
-> `evt_557xhr47qtzrg` HS#4) is the REQUIRED reviewer on the candidate. Builds on
+> `evt_557xhr47qtzrg` HS#4, `evt_4a4tj2h1eatsa` HS#5) is the REQUIRED reviewer on
+> the candidate. Builds on
 > RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION (merged `897f1ea6a`) and
 > RT-CHECKED-IH-REALIZATION-AUTHORITY (merged `e68ecd79`). On land, D3-D5 complete
 > and `KERNEL-NESTED-IND` unblocks.
 
-> ## §1b STRUCTURAL CLOSURE — DEEPER PREDICATE, RESOLVED AT ENTRY 4 (Architect `evt_557xhr47qtzrg`, correcting the entry-3 closure `evt_53snpb8396g8a` / `evt_2cbtpf894nfzt`)
+> ## §1b STRUCTURAL CLOSURE — DEEPER PREDICATE, ENTRIES 1-5 (Architect `evt_4a4tj2h1eatsa` HS#5 adds entry 5 = representation and owns the census miss; `evt_557xhr47qtzrg` entry 4; `evt_53snpb8396g8a` / `evt_2cbtpf894nfzt` entry 3)
 >
-> FOUR hard stops, ONE predicate — deeper than the entry-3 "consumer class"
+> FIVE hard stops, ONE predicate — deeper than the entry-3 "consumer class"
 > framing, which the Architect corrected at HS#4: **a static plane keyed by
-> SOURCE ORIGIN ALONE, while in-place realization + dual emission make one source
-> origin (body 61) correspond to MULTIPLE per-specialization realizations.** The
-> backend ALREADY keys contexts by `(enclosing_specialization, worker_body_origin)`
-> pervasively (`continuations.rs:6408`, `responses.rs:70`: "one context per
-> (enclosing_specialization, worker_body_origin)"); the join-ownership plane and
-> its siblings are the planes that never became specialization-aware. Enumerating
-> them one at a time is the RT-NATIVE-FNSPLIT signal — STOP enumerating. The
-> complete closure threads the specialization identity the backend already
-> computes and carries into EVERY source-origin-keyed plane, so each emission of
-> body 61 owns and disposes its own per-specialization realization. GATE-0
-> measured C LIVE (below), so the retained consumer gets a worker (dual emission),
-> not dissolution. Fold into the SAME candidate (the prototype at `b17a1b6ea` /
-> WIP `ea9cfde3` are prototype-only). Node stays draft until seeded.
+> SOURCE ORIGIN ALONE (or by a SINGLE GLOBAL emission model), while in-place
+> realization + dual emission make one source origin (body 61) correspond to
+> MULTIPLE per-emission realizations that can need DIFFERENT ownership AND
+> DIFFERENT representation.** The backend ALREADY keys contexts by
+> `(enclosing_specialization, worker_body_origin)` pervasively
+> (`continuations.rs:6408`, `responses.rs:70`); the join-ownership and
+> join-representation planes and their siblings are the planes that never became
+> emission-aware. Enumerating them one at a time is the RT-NATIVE-FNSPLIT signal —
+> the closure is to thread the compiler-owned emission identity the backend already
+> carries into EVERY such plane, so each emission of body 61 owns, disposes, AND
+> represents its own per-emission realization. HS#5 arrived at BUILD (not at the
+> census) because the z4033/z4034 AC-DUAL-CENSUS enumerated planes 1-4 but MISSED
+> the representation plane — the closure still covers it; the CENSUS was
+> under-enumerated (Architect owns the miss), which is why AC-DUAL-CENSUS is now
+> "prove per-emission or name the Cond-2 escape, re-derived from origin/main."
+> GATE-0 measured C LIVE (below), so the retained consumer gets a worker (dual
+> emission), not dissolution. Node stays draft until seeded.
 
-## The four source-origin-keyed planes (the corrected §1b inventory)
+## The five planes — keyed by source-origin or one global emission model (the corrected §1b inventory)
 
 Body 61 is realized IN-PLACE as a tail-recursive backedge inside enclosing
 function F (z4027 owner partition + z4029 edge reconciliation), AND — because
 GATE-0 measured it LIVE — is ALSO emitted as a standalone out-of-line worker for
 the separately-retained first-class callable C = `StaticOriginId(71)`. Two
 emissions of one source body, distinct identities, distinct edge kinds. Each of
-the four stops is a static plane that keyed on source origin 61 ALONE and so
-could not tell the two per-specialization realizations apart:
+the five stops is a static plane that keyed on source origin 61 ALONE (or on a
+single global emission model) and so could not tell the two per-emission
+realizations apart:
 
 1. **HS#1 — partition wall (RULED z4027, `evt_1nkx3f30hqp9y`).** Join 50 walled to
    inner unit G though inlined into F. Source `StaticBody` boundary trusted.
@@ -64,6 +70,23 @@ could not tell the two per-specialization realizations apart:
    planned source join StaticOriginId(44) neither emitted nor statically
    unselected`. (`joins.rs:2140` is the OVER-coverage face — HS#1's "classified
    outside its owning function".)
+
+5. **HS#5 — join-representation (RULED `evt_4a4tj2h1eatsa`; the plane the
+   z4033/z4034 census MISSED — Architect owns the miss).** After option (A) clears
+   HS#4, a carried `Match` refuses at `joins.rs:2499` (`:2497` on origin/main):
+   `UnsupportedLowering { construct: "a carried Match arm", reason: "dynamic arms
+   must produce scalar Int or Bool values" }` — the SAME carried Match admits its
+   `StructuralNat` arm and refuses its `Closure` arm. `build_join_result_plan`
+   (`joins_traps.rs:544`) computes ONE joins vector indexed by SOURCE ORIGIN with a
+   SINGLE GLOBAL `functionized_units`, unioning across owner-descriptors
+   (`:477-483`, either -> `CarrierWord`). SOUNDNESS: a `CarrierWord` join CANNOT
+   mint the recursor backedge (`merge_scalar_operand`
+   `ScalarMergeKind::RecursiveBackedge => Err`), so F's recursor emission REQUIRES
+   `NativeScalarPair` while the worker's closure emission REQUIRES `CarrierWord`;
+   for a source join in BOTH, the union-to-`CarrierWord` would BREAK F's backedge.
+   The representation type is PLANNER-OWNED and CLOSED by design
+   (`joins_traps.rs:44-46`: two-way; lowering may not add a third or select from a
+   predecessor). WIP `ec6d401dc`.
 
 ## Mechanism (the closure, grounded @ `496d8637b`)
 
@@ -121,6 +144,30 @@ shape-read). Complete the dual emission across BOTH layers:
    performs, and re-electing the realization to inline body 50 into F IS the
    Condition-2 construct — do not mint it). Additive; the only dual-charged join is
    50 (both emitters).
+
+3. **Join-representation per-emission (HS#5, this recut).** MEASURE FIRST (mirror
+   of the HS#4 population run): is the closure-carrying source join
+   WORKER-EMISSION-ONLY (like 44) or SHARED with F's recursor-backedge emission
+   (like 50)?
+   - FORK 1 (worker-only): make that join's representation `CarrierWord` for the
+     worker emission via EXISTING machinery — summarize the worker emission with
+     its actual functionized-ness so its closure arm -> `CarrierRequired` ->
+     `CarrierWord` (the union at `joins_traps.rs:477-483` already promotes it). No
+     conflict with F. Within-lane.
+   - FORK 2 (shared with F): genuine per-`(owning-emission, source-origin)`
+     representation — F's copy stays `NativeScalarPair` (its `RecursiveBackedge`),
+     the worker's copy is `CarrierWord` (its closure). The per-source-origin joins
+     vector + union CANNOT express this; key the representation per-`(emission,
+     origin)`, minting the `JoinPlanToken` per owning emission
+     (`joins_traps.rs:79-85`; it already carries origin + representation),
+     threading the SAME compiler-owned emission identity (z4033/z4034). NO union
+     hack, NO third representation, NO lowering-side selection.
+   CONDITION-2 GATE (Architect flags this the LIKELIEST plane to trip it — the
+   representation type is CLOSED `:44-46`): Fork 1 is plainly within-lane. Fork 2 is
+   MEASURED — if per-`(emission,origin)` representation forces lowering to SELECT
+   from an emitted predecessor (violating `:44-46`), or needs a NEW plan-map
+   construct beyond re-keying the existing per-origin vector, that IS the
+   Condition-2 hard-stop -> STOP and route to Steward/operator; do NOT mint it.
 
 The ordinary-`Match` selector and the `source.rs` catch-all stay untouched.
 
@@ -196,31 +243,46 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
   == interpreter == `Nat 3`.
 - **AC-ABI-PIN:** retain the RT-CHECKED-IH D4 positional-ABI `#[cfg(test)]` pin —
   recursor oriented frame / slots / parents / calls == the landed D4 vector.
-- **AC-DUAL-CENSUS (the closure's falsifiable guardrail):** census EVERY static
-  plane keyed by source origin ALONE — `EdgeKind::StaticBody` consumers (z4029),
-  emittable-unit / worker consumers (`resolve_worker_targets` by-origin +
-  `worker_templates`, `declare_retained_body_targets_in_func`, the D7 gate), AND
-  the join-ownership plane (`function_owner`, `required_join_origins`,
-  `finalize_join_disposition`, `validate_function_units`) — and confirm each is
-  per-specialization-correct for the dual emission. Charge EVERY source join to
-  the emission(s) that ACTUALLY emit it (measured owner run): a join charged by
-  source-origin-alone to a function that does not emit it (44 -> F) is the defect
-  being fixed; the genuinely dual-emitted join (50) is charged to BOTH emitters.
-  FALSIFIABLE GUARDRAIL: after the change, for every function required == emitted;
-  any residual required-not-emitted or emitted-not-covered join is either a further
-  plane to thread or a real drop — surface it, do not paper it. IF a plane the
-  census finds CANNOT be made per-specialization by threading the existing
-  `(specialization, origin)` identity, THAT plane is the Condition-2 escape — STOP
-  and route it. A reason a consumer must still see the old form must be SHOWN.
+- **AC-DUAL-CENSUS (the closure's falsifiable guardrail — PROVE per-emission, do
+  NOT grep):** RE-DERIVE from origin/main (do NOT trust this enumeration — the
+  z4033/z4034 census MISSED the representation plane and HS#5 arrived at build) the
+  set of EVERY static plane whose value can depend on the emission model, and for
+  EACH prove it is either (i) made per-emission by threading the compiler-owned
+  emission identity, or (ii) named as the Condition-2 escape. The known planes:
+  `EdgeKind::StaticBody` consumers (z4029); emittable-unit / worker consumers
+  (`resolve_worker_targets` by-origin + `worker_templates`,
+  `declare_retained_body_targets_in_func`, the D7 gate); the join-OWNERSHIP plane
+  (`function_owner`, `required_join_origins`, `finalize_join_disposition`,
+  `validate_function_units`); AND the join-REPRESENTATION plane
+  (`build_join_result_plan`, `summarize_result_phase`,
+  `result_phase_environment_for_owner`, the per-origin joins vector, the
+  `functionized_units` flag, the union at `joins_traps.rs:477-483`). Charge EVERY
+  source join to the emission(s) that ACTUALLY emit it (measured owner run):
+  source-origin-alone charging (44 -> F) is the defect being fixed; the
+  dual-emitted join (50) is charged to BOTH emitters WITH its per-emission
+  representation (F `NativeScalarPair` for the backedge; worker `CarrierWord` for
+  the closure). FALSIFIABLE GUARDRAIL: after the change, for every function
+  required == emitted AND every join's representation matches its emission's need;
+  a plane that UNIONS incompatibly (representation vs the `RecursiveBackedge`
+  constraint) is a DEFECT, not a pass. IF a plane CANNOT be made per-emission by
+  threading the existing identity — or forces a lowering-side selection / a new
+  plan construct — THAT plane is the Condition-2 escape: STOP and route it.
 
 ## §1b closure verdict
 
-The four planes are all instances of the ONE deeper predicate (source-origin-alone
-keying vs per-specialization dual emission). Applied UNIFORMLY — thread the
-existing specialization identity into every source-origin-keyed plane the census
-finds — this is the complete structural closure, not a plane-by-plane chain. So no
-HS#5 on this family is expected. A genuinely-new mechanism returns to the
-Architect; §1a next fires at HS#6.
+The FIVE planes are all instances of the ONE deeper predicate (a static plane
+keyed by source origin, or by a single global emission model, vs per-emission dual
+emission). Inventory (Architect `evt_4a4tj2h1eatsa`): 1 partition wall (z4027) / 2
+ABI boundary_signature (z4029) / 3 worker-template emittable-unit (z4032) / 4
+join-ownership (z4033/z4034) / 5 join-REPRESENTATION `build_join_result_plan`
+(HS#5). Applied UNIFORMLY — thread the compiler-owned emission identity into every
+such plane the census finds — this is the complete structural closure, not a
+plane-by-plane chain. HS#5 arrived at BUILD, not at the census, because z4033/z4034
+enumerated planes 1-4 but MISSED the representation plane; the closure still covers
+it, the CENSUS was under-enumerated (Architect owns the miss). A genuinely-new
+mechanism returns to the Architect; §1a next fires at HS#6 — and if Fork 2 trips
+Condition-2 (the representation type is closed by design), that operator hard-stop
+may land WITH the HS#6 trigger.
 
 ## Forbidden boundary (all carries closed; unchanged from z4022/z4027/z4029/z4032)
 
@@ -232,8 +294,13 @@ Architect; §1a next fires at HS#6.
   `KERNEL-NESTED-IND` provenance (templates/ownership carry only 71's own
   oriented-plan / checked-IH provenance).
 - No new `Lowered` / `LoweringOperand` variant or plan construct — if the join
-  plane or the issuance genuinely needs one, that is the Condition-2 hard-stop to
-  Steward/operator.
+  plane, the issuance, or the representation genuinely needs one, that is the
+  Condition-2 hard-stop to Steward/operator.
+- Representation plane: NO union hack, NO third `JoinResultRepresentation`, NO
+  lowering-side selection of representation from an emitted predecessor
+  (`joins_traps.rs:44-46` — the type is closed). Per-`(emission,origin)`
+  representation is minted in the PLANNER (`build_join_result_plan`) via the
+  existing `JoinPlanToken`, never in lowering.
 - Static/dynamic: template from the SCHEMA, capture VALUES through the environment.
 
 ## Out of scope (Architect flag — do NOT fold in)
@@ -249,12 +316,15 @@ surfaces; do not fold it into this WP.
 
 Touches the planner static graph (the realized-recursor `EdgeKind` from z4029),
 the plan-level worker-template issuance (`resolve_worker_targets` /
-`declare_retained_body_targets_in_func`), AND the join-ownership plane
+`declare_retained_body_targets_in_func`), the join-ownership plane
 (`function_owner` / `required_join_origins` / `finalize_join_disposition` /
-`validate_function_units`) — soundness-bearing producers of the kernel-checkable
-required-join set, the ABI boundary signatures, and the worker-template
-population. Runtime is the sole lane on this surface. Architect REQUIRED reviewer
-(`evt_557xhr47qtzrg` + the z4027/z4029/z4032 chain) + Runtime QA. TCB
+`validate_function_units`), AND the join-representation plane
+(`build_join_result_plan` / the per-origin joins vector / `JoinPlanToken`) —
+soundness-bearing producers of the kernel-checkable required-join set, the ABI
+boundary signatures, the worker-template population, and the join result
+representation. Runtime is the sole lane on this surface. Architect REQUIRED
+reviewer (`evt_4a4tj2h1eatsa` HS#5 + `evt_557xhr47qtzrg` + the z4027/z4029/z4032
+chain) + Runtime QA. TCB
 classification assessed at M4; the Architect review is required regardless.
 
 ## Sequencing
