@@ -55,10 +55,15 @@ fn derived_fixture_retains_lawfulclasses_for_cat5_dependency_closure() {
     let _ = dependency_env();
 }
 
+fn load_parsing_module(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Capability.Parsing.Parsing must roots-load");
+    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
+}
+
 fn mk_env() -> ElabEnv {
     let mut env = dependency_env();
-    env.elaborate_ken_md_file(PARSING_KEN_MD)
-        .expect("catalog/packages/Capability/Parsing/Parsing.ken.md must elaborate");
+    load_parsing_module(&mut env);
     env
 }
 
@@ -285,8 +290,7 @@ fn transparent_parsing_bodies_with_saturated_provider_head_occurrence(
 fn cat5_d1_source_span_package_elaborates_zero_delta() {
     let mut env = dependency_env();
     let base_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(PARSING_KEN_MD)
-        .expect("catalog/packages/Capability/Parsing/Parsing.ken.md must elaborate");
+    load_parsing_module(&mut env);
     let after_trusted: HashSet<GlobalId> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         base_trusted, after_trusted,

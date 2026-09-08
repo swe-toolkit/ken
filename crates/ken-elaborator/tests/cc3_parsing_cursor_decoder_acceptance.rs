@@ -56,6 +56,12 @@ fn load_decoder_module(env: &mut ElabEnv) {
     catalog_or::expose_module(env, "Capability.Parsing.Decoder");
 }
 
+fn load_parsing_module(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Capability.Parsing.Parsing must roots-load");
+    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
+}
+
 #[test]
 fn derived_fixture_retains_lawfulclasses_for_cc3_dependency_closure() {
     let _ = dependency_env();
@@ -383,8 +389,7 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
         ],
     );
 
-    env.elaborate_ken_md_file(PARSING_KEN_MD)
-        .expect("Capability.Parsing must elaborate after Capability.Parsing.Decoder");
+    load_parsing_module(&mut env);
     assert_transparent_globals(
         &env,
         &[
@@ -452,8 +457,7 @@ fn cc3_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     load_cursor_module(&mut env);
     load_decoder_module(&mut env);
-    env.elaborate_ken_md_file(PARSING_KEN_MD)
-        .expect("Capability.Parsing must elaborate");
+    load_parsing_module(&mut env);
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "CC3 must add zero trusted-base entries");
 }
@@ -645,7 +649,6 @@ fn full_env() -> ElabEnv {
     let mut env = dependency_env();
     load_cursor_module(&mut env);
     load_decoder_module(&mut env);
-    env.elaborate_ken_md_file(PARSING_KEN_MD)
-        .expect("Capability.Parsing must elaborate after Decoder");
+    load_parsing_module(&mut env);
     env
 }
