@@ -4138,6 +4138,14 @@ pub enum CheckedIhRealizationObservation {
         site: CheckedIhMatchRefusalSite,
         operand_kind: &'static str,
     },
+    SourceMatchBackedgeForward {
+        route_kind: &'static str,
+        role_kind: &'static str,
+        continuation_kinds: Vec<&'static str>,
+    },
+    SourceMatchOccurrencePlanEntryAttempt {
+        operand_kind: &'static str,
+    },
 }
 
 #[cfg(any(test, feature = "checked-ih-realization-observation"))]
@@ -10659,6 +10667,15 @@ impl RoutedAnswer {
             route: SourceComputationalAnswerRoute::CheckedSelectedRecursor,
             role: EliminatorRole::AnswerAfterComputationalFrame { continuation_origin },
         }
+    }
+
+    /// Forward one answer without minting or erasing either routing axis.
+    fn forward(
+        value: LoweringOperand,
+        route: SourceComputationalAnswerRoute,
+        role: EliminatorRole,
+    ) -> Self {
+        Self { value, route, role }
     }
 
     /// Raise a frame's starting route with this predecessor's, never lower it.
