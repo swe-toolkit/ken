@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-D-PARSING-GROUP
 title: "Scaffold-retirement Tier D (Capability), slice 3 (final internal slice): migrate the three Decoder-successor modules — Parsing.Numeric, Parsing.Parsing, Process.Arguments — off fixture-scaffolding / ambient resolution onto real selective imports from the already-published providers (Parsing.Decoder + Parsing.Cursor, published by slices 1-2, plus the Tier A/B/C lower tiers), so each elaborates standalone. Publish each module's own export surface for its downstream consumers (ArgParse, Application.Configuration, Tier E Json/Config.Decoder), replace ambient resolution with real selective imports for the exact D0-measured sets, extend the loader-visible inventories, standalone-green. MEASURED at 613a7f5c9: no intra-group DAG (three independent single-module migrations) and every provider already published — so the three land in any order, or as per-module partials. The proven Tier-A/B/C/Cursor/Decoder publish-and-import shape; NO class-instance relocation, NO proof authoring beyond an attached-owner migration the Architect names. Delegated D0 measures each module's standalone missing-symbol set and full provider closure from loader evidence, and MUST hard-stop if it finds an intra-group edge or a provider owned by an unpublished module."
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none
