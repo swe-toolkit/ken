@@ -43,6 +43,7 @@ struct FsWriteAtRequestV1 {
 };
 struct FsSeekRequestV1 { uint64_t resource; uint64_t origin; uint64_t offset; };
 struct FsSetLengthRequestV1 { uint64_t resource; uint64_t length; };
+struct FsSyncRequestV1 { uint64_t resource; uint64_t mode; };
 struct ClockDeadlineRequestV1 { uint64_t deadline; };
 struct EntropyRequestV1 { uint64_t count; };
 struct BufferAllocateRequestV1 { uint64_t capacity; };
@@ -93,6 +94,7 @@ int main(void) {
     FACT_SIZE(FsWriteAtRequestV1); FACT_ALIGN(FsWriteAtRequestV1); FACT_OFFSET(FsWriteAtRequestV1, file); FACT_OFFSET(FsWriteAtRequestV1, buffer); FACT_OFFSET(FsWriteAtRequestV1, file_offset); FACT_OFFSET(FsWriteAtRequestV1, buffer_start); FACT_OFFSET(FsWriteAtRequestV1, length); FACT_OFFSET(FsWriteAtRequestV1, span_origin);
     FACT_SIZE(FsSeekRequestV1); FACT_ALIGN(FsSeekRequestV1); FACT_OFFSET(FsSeekRequestV1, resource); FACT_OFFSET(FsSeekRequestV1, origin); FACT_OFFSET(FsSeekRequestV1, offset);
     FACT_SIZE(FsSetLengthRequestV1); FACT_ALIGN(FsSetLengthRequestV1); FACT_OFFSET(FsSetLengthRequestV1, resource); FACT_OFFSET(FsSetLengthRequestV1, length);
+    FACT_SIZE(FsSyncRequestV1); FACT_ALIGN(FsSyncRequestV1); FACT_OFFSET(FsSyncRequestV1, resource); FACT_OFFSET(FsSyncRequestV1, mode);
     FACT_SIZE(ClockDeadlineRequestV1); FACT_ALIGN(ClockDeadlineRequestV1); FACT_OFFSET(ClockDeadlineRequestV1, deadline);
     FACT_SIZE(EntropyRequestV1); FACT_ALIGN(EntropyRequestV1); FACT_OFFSET(EntropyRequestV1, count);
     FACT_SIZE(BufferAllocateRequestV1); FACT_ALIGN(BufferAllocateRequestV1); FACT_OFFSET(BufferAllocateRequestV1, capacity);

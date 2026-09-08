@@ -36,6 +36,8 @@ tag|create_policy.create_or_keep|2
 tag|seek_origin.start|0
 tag|seek_origin.current|1
 tag|seek_origin.end|2
+tag|sync_mode.full|0
+tag|sync_mode.data|1
 tag|borrowed.bytes|1
 tag|borrowed.constructor|2
 error|io.NotFound|0
@@ -75,6 +77,7 @@ operation|FsReadAt|030D|native|FsPositionedRequestV1|5|HostReplyV1|1
 operation|FsWriteAt|030E|native|FsWriteAtRequestV1|6|HostReplyV1|1
 operation|FsSeek|030F|unavailable|FsSeekRequestV1|3|HostReplyV1|1
 operation|FsSetLength|0310|unavailable|FsSetLengthRequestV1|2|HostReplyV1|1
+operation|FsSync|0311|unavailable|FsSyncRequestV1|2|HostReplyV1|1
 operation|ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1
 operation|BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1
 operation|BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1

@@ -635,6 +635,7 @@ fn native_process_symbols_from_record(
         dir_entry: spine.dir_entry.clone(),
         file_operation_seek: spine.file_operation_seek.clone(),
         file_operation_set_length: spine.file_operation_set_length.clone(),
+        file_operation_sync: spine.file_operation_sync.clone(),
     }
 }
 
