@@ -369,6 +369,9 @@ fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
     );
     let observations = realization_scope.finish();
     let scalar_merge_arrivals = scalar_merge_scope.finish();
+    let artifact = native.expect(
+        "nested checked IH emits after per-emission join and closure ownership",
+    );
     // This is the runnable real-checked-source replacement for the carried
     // RT-BODY-OCCURRENCE-PROVENANCE control. The old disposable projection's
     // owner 2 / four-join coordinates predated the realized recursor partition;
@@ -610,7 +613,6 @@ fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
         "the realized RecursiveBackedge must leave the source Match seat without a refusal: \
          {observations:#?}"
     );
-    let artifact = native.expect("nested checked IH emits after realized-backedge forwarding");
     assert!(artifact.verifier_passed);
     assert_eq!(
         artifact.entry_symbol,
