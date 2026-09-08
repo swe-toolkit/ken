@@ -384,6 +384,18 @@ mod linux {
         File::from(handle.0.try_clone()?).write_at(bytes, offset)
     }
 
+    pub(super) fn resource_seek(handle: &ResourceHandle, from: FsSeekFromV1) -> io::Result<u64> {
+        File::from(handle.0.try_clone()?).seek(match from {
+            FsSeekFromV1::Start(offset) => SeekFrom::Start(offset),
+            FsSeekFromV1::Current(offset) => SeekFrom::Current(offset),
+            FsSeekFromV1::End(offset) => SeekFrom::End(offset),
+        })
+    }
+
+    pub(super) fn resource_set_length(handle: &ResourceHandle, length: u64) -> io::Result<()> {
+        File::from(handle.0.try_clone()?).set_len(length)
+    }
+
     pub(super) fn read(handle: &Handle) -> io::Result<Vec<u8>> {
         let mut file = file(handle)?;
         file.seek(SeekFrom::Start(0))?;
@@ -886,6 +898,32 @@ pub fn resource_write_at_v1(
     #[cfg(not(target_os = "linux"))]
     {
         let _ = (handle, offset, bytes);
+        unsupported()
+    }
+}
+
+pub fn resource_seek_v1(handle: &ResourceHandleV1, from: FsSeekFromV1) -> HostResult<u64> {
+    assert_current_target_abi()?;
+    #[cfg(target_os = "linux")]
+    {
+        linux::resource_seek(&handle.inner, from).map_err(Into::into)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (handle, from);
+        unsupported()
+    }
+}
+
+pub fn resource_set_length_v1(handle: &ResourceHandleV1, length: u64) -> HostResult<()> {
+    assert_current_target_abi()?;
+    #[cfg(target_os = "linux")]
+    {
+        linux::resource_set_length(&handle.inner, length).map_err(Into::into)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (handle, length);
         unsupported()
     }
 }

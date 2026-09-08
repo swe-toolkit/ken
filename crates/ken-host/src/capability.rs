@@ -269,6 +269,8 @@ pub enum FsCapabilityOperation {
     RenameSource,
     RenameDestination,
     ChangeMode,
+    Seek,
+    SetLength,
 }
 
 impl FsCapabilityOperation {
@@ -282,6 +284,8 @@ impl FsCapabilityOperation {
             Self::RemoveFile | Self::RemoveDirectory => RightSet::DELETE,
             Self::RenameSource | Self::RenameDestination => RightSet::WRITE.union(RightSet::DELETE),
             Self::ChangeMode => RightSet::CHANGE_MODE,
+            Self::Seek => RightSet::READ,
+            Self::SetLength => RightSet::WRITE,
         }
     }
     pub const fn resolves_parent(self) -> bool {

@@ -110,7 +110,7 @@ data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | In
 data ShadowProgress = ReadSome | ReadEof | Wrote
 data ShadowFileOps =
   MkFileError | OpReadFile | OpWriteFile | OpChangeMode | OpAppendFile | OpMetadata | OpRename |
-  OpReadDirectory | OpCreateDirectory | OpRemoveFile | OpRemoveDirectory
+  OpReadDirectory | OpCreateDirectory | OpRemoveFile | OpRemoveDirectory | OpSeek | OpSetLength
 data ShadowMetadata = MkFileMetadata | MkDirEntry | KFile | KDirectory | KSymlink | KOther
 data ShadowOps = Read | Write | Flush | IsTerminal | WallNow | MonotonicNow | SleepUntil | RandomBytes | ReadFile | WriteFile | AppendFile | Metadata | ReadDirectory | CreateDirectory | RemoveFile | RemoveDirectory | Rename | ChangeMode
 
@@ -169,6 +169,8 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowFileOps", "OpCreateDirectory"),
     ("ShadowFileOps", "OpRemoveFile"),
     ("ShadowFileOps", "OpRemoveDirectory"),
+    ("ShadowFileOps", "OpSeek"),
+    ("ShadowFileOps", "OpSetLength"),
     ("ShadowMetadata", "MkFileMetadata"),
     ("ShadowMetadata", "MkDirEntry"),
     ("ShadowMetadata", "KFile"),

@@ -2778,6 +2778,8 @@ fn complete_native_program_preparation(
                     .file_operation_remove_directory
                     .to_string(),
                 dir_entry: host_spine.dir_entry.to_string(),
+                file_operation_seek: host_spine.file_operation_seek.to_string(),
+                file_operation_set_length: host_spine.file_operation_set_length.to_string(),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3691,6 +3693,8 @@ fn checked_host_spine_v1(
         file_operation_remove_file: resolve_id(roles.file_operation_remove_file)?,
         file_operation_remove_directory: resolve_id(roles.file_operation_remove_directory)?,
         dir_entry: resolve_id(roles.dir_entry)?,
+        file_operation_seek: resolve_id(roles.file_operation_seek)?,
+        file_operation_set_length: resolve_id(roles.file_operation_set_length)?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -3937,6 +3941,9 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_operation_remove_file,
         &spine.file_operation_remove_directory,
         &spine.dir_entry,
+        // ABI-S1 appends without changing established positional identities.
+        &spine.file_operation_seek,
+        &spine.file_operation_set_length,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -7020,6 +7027,14 @@ mod d1b_role_c1_roster_identity {
                 record.spine.file_operation_remove_directory.clone(),
             ),
             ("dir_entry", record.spine.dir_entry.clone()),
+            (
+                "file_operation_seek",
+                record.spine.file_operation_seek.clone(),
+            ),
+            (
+                "file_operation_set_length",
+                record.spine.file_operation_set_length.clone(),
+            ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             ("io_error_permission_denied", record.spine.io_errors[1].clone()),
             ("io_error_capability_denied", record.spine.io_errors[2].clone()),

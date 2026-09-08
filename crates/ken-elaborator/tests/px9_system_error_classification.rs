@@ -80,6 +80,23 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
         ["Idempotent", "NonIdempotent"]
     );
     assert_eq!(
+        constructor_names(&env, "FileOperation"),
+        [
+            "OpReadFile",
+            "OpWriteFile",
+            "OpAppendFile",
+            "OpMetadata",
+            "OpReadDirectory",
+            "OpCreateDirectory",
+            "OpRemoveFile",
+            "OpRemoveDirectory",
+            "OpRename",
+            "OpChangeMode",
+            "OpSeek",
+            "OpSetLength",
+        ]
+    );
+    assert_eq!(
         constructor_names(&env, "RetryGuidance"),
         [
             "RetryAdvised",
@@ -191,6 +208,8 @@ theorem px9_remove_file : Equal Idempotence (operation_idempotence (FilesystemOp
 theorem px9_remove_directory : Equal Idempotence (operation_idempotence (FilesystemOp OpRemoveDirectory)) NonIdempotent = Proved
 theorem px9_rename : Equal Idempotence (operation_idempotence (FilesystemOp OpRename)) NonIdempotent = Proved
 theorem px9_change_mode : Equal Idempotence (operation_idempotence (FilesystemOp OpChangeMode)) Idempotent = Proved
+theorem px9_seek : Equal Idempotence (operation_idempotence (FilesystemOp OpSeek)) NonIdempotent = Proved
+theorem px9_set_length : Equal Idempotence (operation_idempotence (FilesystemOp OpSetLength)) Idempotent = Proved
 
 theorem px9_transient_idempotent : Equal RetryGuidance (retry_guidance Transient Idempotent) RetryAdvised = Proved
 theorem px9_transient_nonidempotent : Equal RetryGuidance (retry_guidance Transient NonIdempotent) RetryUnsafeNonIdempotent = Proved
@@ -198,7 +217,7 @@ theorem px9_permanent_idempotent : Equal RetryGuidance (retry_guidance Permanent
 theorem px9_permanent_nonidempotent : Equal RetryGuidance (retry_guidance Permanent NonIdempotent) DoNotRetryPermanent = Proved
 "#,
     )
-    .expect("all 13 identity, 10 operation, and four retry matrix cells must compute");
+    .expect("all 13 identity, 12 operation, and four retry matrix cells must compute");
 
     for law in [
         "retry_guidance_transient_idempotent",

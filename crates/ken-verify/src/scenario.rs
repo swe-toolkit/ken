@@ -2086,6 +2086,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
+    // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_READ_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
@@ -2128,7 +2129,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpCreateDirectory |-> host_exit AFull (Failure 199) ;
                     OpRemoveFile |-> host_exit AFull (Failure 199) ;
                     OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199)
+                    OpRename |-> host_exit AFull (Failure 199) ;
+                    OpSeek |-> host_exit AFull (Failure 199) ;
+                    OpSetLength |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok entries |-> match entries {
@@ -2151,6 +2154,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
+    // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_CREATE_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
@@ -2193,7 +2197,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpReadDirectory |-> host_exit AFull (Failure 199) ;
                     OpRemoveFile |-> host_exit AFull (Failure 199) ;
                     OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199)
+                    OpRename |-> host_exit AFull (Failure 199) ;
+                    OpSeek |-> host_exit AFull (Failure 199) ;
+                    OpSetLength |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull Success
@@ -2204,6 +2210,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
+    // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_REMOVE_FILE_SOURCE: &str = r#"program capabilities FS AFull "./data"
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
@@ -2245,7 +2252,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpReadDirectory |-> host_exit AFull (Failure 199) ;
                     OpCreateDirectory |-> host_exit AFull (Failure 199) ;
                     OpRemoveDirectory |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199)
+                    OpRename |-> host_exit AFull (Failure 199) ;
+                    OpSeek |-> host_exit AFull (Failure 199) ;
+                    OpSetLength |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull Success
@@ -2256,6 +2265,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
+    // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
     const FS_REMOVE_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
 proc main (input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
@@ -2298,7 +2308,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpReadDirectory |-> host_exit AFull (Failure 199) ;
                     OpCreateDirectory |-> host_exit AFull (Failure 199) ;
                     OpRemoveFile |-> host_exit AFull (Failure 199) ;
-                    OpRename |-> host_exit AFull (Failure 199)
+                    OpRename |-> host_exit AFull (Failure 199) ;
+                    OpSeek |-> host_exit AFull (Failure 199) ;
+                    OpSetLength |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull Success

@@ -250,6 +250,21 @@ struct FsWriteAtRequestV1 {
 
 #[repr(C)]
 #[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
+struct FsSeekRequestV1 {
+    resource: u64,
+    origin: u64,
+    offset: u64,
+}
+
+#[repr(C)]
+#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
+struct FsSetLengthRequestV1 {
+    resource: u64,
+    length: u64,
+}
+
+#[repr(C)]
+#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct ClockDeadlineRequestV1 {
     deadline: u64,
 }
@@ -2083,6 +2098,8 @@ mod tests {
         size_align!("ResourceRequestV1", ResourceRequestV1);
         size_align!("FsPositionedRequestV1", FsPositionedRequestV1);
         size_align!("FsWriteAtRequestV1", FsWriteAtRequestV1);
+        size_align!("FsSeekRequestV1", FsSeekRequestV1);
+        size_align!("FsSetLengthRequestV1", FsSetLengthRequestV1);
         size_align!("ClockDeadlineRequestV1", ClockDeadlineRequestV1);
         size_align!("EntropyRequestV1", EntropyRequestV1);
         size_align!("BufferAllocateRequestV1", BufferAllocateRequestV1);
@@ -2142,6 +2159,11 @@ mod tests {
         offset!("FsOpenRequestV1", FsOpenRequestV1, path);
         offset!("FsOpenRequestV1", FsOpenRequestV1, mode);
         offset!("ResourceRequestV1", ResourceRequestV1, resource);
+        offset!("FsSeekRequestV1", FsSeekRequestV1, resource);
+        offset!("FsSeekRequestV1", FsSeekRequestV1, origin);
+        offset!("FsSeekRequestV1", FsSeekRequestV1, offset);
+        offset!("FsSetLengthRequestV1", FsSetLengthRequestV1, resource);
+        offset!("FsSetLengthRequestV1", FsSetLengthRequestV1, length);
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, schema_version);
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, resource_kind);
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, identity);
