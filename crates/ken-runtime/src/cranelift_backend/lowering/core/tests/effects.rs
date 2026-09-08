@@ -1461,28 +1461,29 @@ fn native_resource_error_projection_follows_the_generated_wire_tail() {
 }
 
 /// Promise class: normative compatibility vector. MEASURED: a real native
-/// host-call reply carrying generated resource error code 10 selects the exact
-/// nullary `ResourceRevoked` checked constructor, while a nonzero payload is
-/// rejected. CLAIMED: native projection preserves D2's distinct resource-side
-/// withdrawal identity. THE GAP: provenance admission is host-side and pinned
-/// independently; this test owns the wire-to-checked-value projection only.
+/// host-call reply carrying generic I/O error code 11 selects exactly
+/// `ResourceHostIO Revoked`, while neighboring code 10 is rejected by the same
+/// checked match. CLAIMED: native projection shares the canonical revoked
+/// identity without collapsing it to another I/O arm. THE GAP: provenance
+/// admission is host-side and pinned independently; this test owns the
+/// wire-to-checked-value projection only.
 #[test]
-fn native_resource_revoked_projection_is_exact_and_nullary() {
+fn native_resource_origin_projects_resource_host_io_revoked() {
     let (actual, fixture) = run_px8n_arm_fixture(
         ABI_REVOKE_D2_ERRPROJ_REVOKED,
-        abi_revoke_d2_resource_revoked_projection_fixture,
+        px9_resource_origin_revoked_projection_fixture,
     );
     assert_eq!(fixture.malformed_request, 0);
-    assert_eq!(fixture.call_index, 1);
+    assert_eq!(fixture.call_index, 2);
     assert_eq!(actual, 80);
 
-    let (with_payload, fixture) = run_px8n_arm_fixture(
+    let (neighbor, fixture) = run_px8n_arm_fixture(
         ABI_REVOKE_D2_ERRPROJ_REVOKED | PX8_ERRPROJ_NONZERO_PAYLOAD,
-        abi_revoke_d2_resource_revoked_projection_fixture,
+        px9_resource_origin_revoked_projection_fixture,
     );
     assert_eq!(fixture.malformed_request, 0);
-    assert_eq!(fixture.call_index, 1);
-    assert_eq!(with_payload, -1, "the new resource constructor is nullary");
+    assert_eq!(fixture.call_index, 2);
+    assert_eq!(neighbor, -4, "Unsupported must not alias canonical Revoked");
 }
 
 #[test]
@@ -2055,10 +2056,60 @@ fn px8_allocation_failed_projection_fixture(symbols: &crate::NativeProcessSymbol
     px8_resource_error_projection_fixture(symbols, &symbols.resource_allocation_failed, 79)
 }
 
-fn abi_revoke_d2_resource_revoked_projection_fixture(
+fn px9_resource_origin_revoked_projection_fixture(
     symbols: &crate::NativeProcessSymbols,
 ) -> RuntimeExpr {
-    px8_resource_error_projection_fixture(symbols, &symbols.resource_revoked, 80)
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "PX9-INC2B ResourceHostIO Revoked projection default".to_string(),
+    };
+    let metadata = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::FsHandleMetadata,
+            capability: None,
+            args: vec![RuntimeExpr::Var(0)],
+        }),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: symbols.result_err.clone(),
+            binders: 1,
+            body: RuntimeExpr::Match {
+                scrutinee: Box::new(RuntimeExpr::Var(0)),
+                cases: vec![crate::RuntimeMatchCase {
+                    constructor: symbols.resource_host_io.clone(),
+                    binders: 1,
+                    body: RuntimeExpr::Match {
+                        scrutinee: Box::new(RuntimeExpr::Var(0)),
+                        cases: vec![crate::RuntimeMatchCase {
+                            constructor: symbols.io_errors[11].clone(),
+                            binders: 0,
+                            body: px8n_failure(
+                                symbols,
+                                RuntimeExpr::Value(RuntimeValue::Int((80).into())),
+                            ),
+                        }],
+                        default: trap(),
+                    },
+                }],
+                default: trap(),
+            },
+        }],
+        default: trap(),
+    };
+    RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::BufferAllocate,
+            capability: None,
+            args: vec![RuntimeExpr::Value(RuntimeValue::Int((8).into()))],
+        }),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: symbols.result_ok.clone(),
+            binders: 1,
+            body: metadata,
+        }],
+        default: trap(),
+    }
 }
 
 fn px8i_metadata_big_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
@@ -2420,10 +2471,15 @@ extern "C" fn px8n_scripted_host_dispatch(
             .cast::<Px8nHostReplyFixture>())
     };
     let expected = if fixture.call_index == 0
-        || (fixture.call_index == 1 && fixture.scenario != PX8I_METADATA_BIG)
+        || (fixture.call_index == 1
+            && fixture.scenario != PX8I_METADATA_BIG
+            && fixture.scenario & PX8_ERRPROJ_SCENARIO_MASK
+                != ABI_REVOKE_D2_ERRPROJ_REVOKED)
     {
         ken_host::HostOpV1::BufferAllocate
-    } else if fixture.scenario == PX8I_METADATA_BIG {
+    } else if fixture.scenario == PX8I_METADATA_BIG
+        || fixture.scenario & PX8_ERRPROJ_SCENARIO_MASK == ABI_REVOKE_D2_ERRPROJ_REVOKED
+    {
         ken_host::HostOpV1::FsHandleMetadata
     } else if fixture.scenario == PX8I_WRAPPING_WRITE_START {
         ken_host::HostOpV1::FsWriteAt
@@ -2503,7 +2559,6 @@ extern "C" fn px8n_scripted_host_dispatch(
             PX8_ERRPROJ_INVALID_BOUNDS => Some(wire.resource_error_invalid_bounds),
             PX8_ERRPROJ_NO_PROGRESS => Some(wire.resource_error_no_progress),
             PX8_ERRPROJ_ALLOCATION_FAILED => Some(wire.resource_error_allocation_failed),
-            ABI_REVOKE_D2_ERRPROJ_REVOKED => Some(wire.resource_error_revoked),
             PX8_ERRPROJ_UNKNOWN_IDENTITY => Some(u64::MAX),
             _ => None,
         };
@@ -2521,8 +2576,20 @@ extern "C" fn px8n_scripted_host_dispatch(
             );
         }
     } else if expected == ken_host::HostOpV1::FsHandleMetadata {
-        store(wire.reply_tag_offset, wire.reply_metadata_tag);
-        store(wire.reply_detail_offset, PX8I_BIG_U64);
+        if fixture.scenario & PX8_ERRPROJ_SCENARIO_MASK == ABI_REVOKE_D2_ERRPROJ_REVOKED {
+            store(wire.reply_tag_offset, wire.reply_error_tag);
+            store(
+                wire.reply_detail_offset,
+                if fixture.scenario & PX8_ERRPROJ_NONZERO_PAYLOAD == 0 {
+                    11
+                } else {
+                    10
+                },
+            );
+        } else {
+            store(wire.reply_tag_offset, wire.reply_metadata_tag);
+            store(wire.reply_detail_offset, PX8I_BIG_U64);
+        }
     } else {
         // BUDGET-EFF: every scripted FsReadAt/FsWriteAt scenario here uses
         // the uniform, unclamped request length 4 (validated above at

@@ -1541,6 +1541,7 @@ fn validate_fs_mutation_observation(
         Some(ken_host::IoErrorIdentityV1::NotDirectory) => 52,
         Some(ken_host::IoErrorIdentityV1::NotEmpty) => 53,
         Some(ken_host::IoErrorIdentityV1::Unsupported) => 54,
+        Some(ken_host::IoErrorIdentityV1::Revoked) => 55,
         Some(ken_host::IoErrorIdentityV1::Other(_)) => 56,
     };
     if event.sequence != 0

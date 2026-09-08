@@ -317,7 +317,6 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_error_invalid_offset: u64,
     pub resource_error_invalid_bounds: u64,
     pub resource_error_no_progress: u64,
-    pub resource_error_revoked: u64,
     pub resource_kind_fs_handle: u64,
     pub resource_kind_buffer: u64,
     pub resource_error_reply_schema: u64,
@@ -560,7 +559,6 @@ pub fn host_effect_wire_layout_v1(
         resource_error_invalid_offset: generated_binding("error", "resource.InvalidOffset")?,
         resource_error_invalid_bounds: generated_binding("error", "resource.InvalidBounds")?,
         resource_error_no_progress: generated_binding("error", "resource.NoProgress")?,
-        resource_error_revoked: generated_binding("error", "resource.ResourceRevoked")?,
         resource_kind_fs_handle: generated_binding("tag", "resource_kind.FsHandle")?,
         resource_kind_buffer: generated_binding("tag", "resource_kind.Buffer")?,
         resource_error_reply_schema: generated_binding("lifetime", "resource_error_reply_schema")?,
@@ -814,7 +812,6 @@ pub enum ResourceErrorV1 {
     InvalidOffset,
     InvalidBounds,
     NoProgress,
-    Revoked,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1232,11 +1229,13 @@ impl ResourceTableV1 {
         &mut self,
         revocation: &crate::RevocationDomain,
         tokens: &[ResourceTokenV1],
-    ) -> Result<ResourceAdmissionLeaseV1, ResourceErrorV1> {
+    ) -> Result<ResourceAdmissionLeaseV1, SemanticErrorV1> {
         let mut entries = Vec::with_capacity(tokens.len());
         let mut revocation_leases = Vec::new();
         for token in tokens {
-            let slot = self.lookup(*token)?;
+            let slot = self
+                .lookup(*token)
+                .map_err(SemanticErrorV1::Resource)?;
             let (identity, provenance) = match &slot.state {
                 ResourceSlotStateV1::Live {
                     identity,
@@ -1245,15 +1244,17 @@ impl ResourceTableV1 {
                 } => (*identity, *provenance),
                 ResourceSlotStateV1::Closing { .. }
                 | ResourceSlotStateV1::Retired { .. } => {
-                    return Err(ResourceErrorV1::Closed)
+                    return Err(SemanticErrorV1::Resource(ResourceErrorV1::Closed))
                 }
                 ResourceSlotStateV1::Vacant { .. } => {
-                    return Err(ResourceErrorV1::MalformedResource)
+                    return Err(SemanticErrorV1::Resource(
+                        ResourceErrorV1::MalformedResource,
+                    ))
                 }
             };
             if let Some(provenance) = provenance {
                 let Some(lease) = revocation.admit(provenance) else {
-                    return Err(ResourceErrorV1::Revoked);
+                    return Err(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked));
                 };
                 revocation_leases.push(lease);
             }
@@ -2151,7 +2152,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     } else {
         match resources.admit_resources(revocation, &admission_tokens) {
             Ok(lease) => Some(lease),
-            Err(error) => return Ok(resource_denied(operation, request, error)),
+            Err(error) => return Ok(error_denied(error)),
         }
     };
     let mut minted_resource = None;
@@ -2588,7 +2589,20 @@ fn denied(
 }
 
 fn revoked(operation: HostOpV1, request: &CanonicalRequestV1) -> HostDispatchReplyV1 {
-    path_denied(operation, request, FileErrorCauseV1::Revoked)
+    path_denied(
+        operation,
+        request,
+        FileErrorCauseV1::Io(IoErrorIdentityV1::Revoked),
+    )
+}
+
+fn error_denied(error: SemanticErrorV1) -> HostDispatchReplyV1 {
+    HostDispatchReplyV1 {
+        capability_identity: None,
+        resource_token: None,
+        resource_bindings: Vec::new(),
+        outcome: CanonicalOutcomeV1::Error(error),
+    }
 }
 
 fn resource_denied(
@@ -2596,12 +2610,7 @@ fn resource_denied(
     _request: &CanonicalRequestV1,
     error: ResourceErrorV1,
 ) -> HostDispatchReplyV1 {
-    HostDispatchReplyV1 {
-        capability_identity: None,
-        resource_token: None,
-        resource_bindings: Vec::new(),
-        outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(error)),
-    }
+    error_denied(SemanticErrorV1::Resource(error))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -2740,6 +2749,7 @@ pub enum IoErrorIdentityV1 {
     NotDirectory,
     NotEmpty,
     Unsupported,
+    Revoked,
     Other(i32),
 }
 
@@ -2784,7 +2794,6 @@ pub struct FileErrorIdentityV1 {
 pub enum FileErrorCauseV1 {
     Io(IoErrorIdentityV1),
     Capability(CapabilityDeniedV1),
-    Revoked,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -3537,7 +3546,7 @@ mod tests {
             CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
                 operation: HostOpV1::FsReadFile,
                 relative_path: b"shared".to_vec(),
-                cause: FileErrorCauseV1::Revoked,
+                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Revoked),
             }))
         );
         assert!(
@@ -4670,7 +4679,7 @@ mod tests {
     }
 
     /// Promise class: durable discriminator. MEASURED: a metadata resource
-    /// acquired under a grandchild is denied with exact nullary `Revoked` and
+    /// acquired under a grandchild is denied with exact canonical `Revoked` and
     /// zero backend visits after its parent is revoked, while a sibling-backed
     /// resource remains live. Clearing only the denied slot's provenance makes
     /// the same token reach a known backend I/O error; released, never-minted,
@@ -4830,7 +4839,7 @@ mod tests {
         let denied = metadata_operation(&mut backend, &mut resources, copied_resource_token);
         assert_eq!(
             denied.outcome,
-            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Revoked))
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
         );
         assert!(denied.resource_bindings.is_empty());
         assert_eq!(backend.metadata_calls, 1, "revocation precedes the backend");
@@ -5263,7 +5272,7 @@ mod tests {
 
     /// Promise class: durable discriminator. MEASURED: two otherwise-identical
     /// positioned writes flip at resource admission. Revoke-before-admission
-    /// returns exact nullary `Revoked` with zero backend calls; admit-before-
+    /// returns exact canonical `Revoked` with zero backend calls; admit-before-
     /// revoke commits `AB`, preserves the backend result, denies a later write,
     /// and defers close until the owned lease drains. Both close success and a
     /// configured `ReleaseFailed` settle exactly once and leave the token closed.
@@ -5381,7 +5390,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 revoke_wins.outcome,
-                CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Revoked))
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
             );
             assert_eq!(backend.write_calls, 0);
 
@@ -5425,7 +5434,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 later.outcome,
-                CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Revoked))
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
             );
             assert_eq!(backend.write_calls, 1);
 

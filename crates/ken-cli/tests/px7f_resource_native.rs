@@ -126,8 +126,7 @@ fn right_masks (error : ResourceError) : Bool =
     AllocationFailed |-> False;
     InvalidOffset |-> False;
     InvalidBounds |-> False;
-    NoProgress |-> False;
-    ResourceRevoked |-> False
+    NoProgress |-> False
   }
 
 fn bracket_has_right_denial (bracket : ResourceBracketResult ResourceError Unit) : Bool =
@@ -199,8 +198,7 @@ fn double_release_second_error (error : ResourceError)
     AllocationFailed |-> double_release_unexpected AllocationFailed;
     InvalidOffset |-> double_release_unexpected InvalidOffset;
     InvalidBounds |-> double_release_unexpected InvalidBounds;
-    NoProgress |-> double_release_unexpected NoProgress;
-    ResourceRevoked |-> double_release_unexpected ResourceRevoked
+    NoProgress |-> double_release_unexpected NoProgress
   }
 
 fn double_release_after_second (outcome : Result ResourceError Unit)
