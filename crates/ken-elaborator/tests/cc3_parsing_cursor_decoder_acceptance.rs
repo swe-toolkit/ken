@@ -40,8 +40,12 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
-    env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
-        .expect("Capability.Diagnostics.Core must elaborate fourth");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Diagnostics.Core",
+    )
+    .expect("Capability.Diagnostics.Core must roots-load fourth");
+    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env
 }
 

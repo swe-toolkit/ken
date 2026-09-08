@@ -15,8 +15,6 @@ use std::collections::{BTreeSet, HashSet};
 
 const PARSING_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
-const DIAGNOSTIC_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 const DECODER_KEN_MD: &str =
@@ -44,8 +42,12 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
-    env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
-        .expect("Capability.Diagnostics.Core must elaborate fourth");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Diagnostics.Core",
+    )
+    .expect("Capability.Diagnostics.Core must roots-load fourth");
+    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env.elaborate_ken_md_file(CURSOR_KEN_MD)
         .expect("Capability.Parsing.Cursor must elaborate fifth");
     env.elaborate_ken_md_file(DECODER_KEN_MD)

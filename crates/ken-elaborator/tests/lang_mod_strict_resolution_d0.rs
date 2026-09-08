@@ -471,6 +471,57 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Formatting.Doc now declares its exact Transport and Derived
+            // value dependencies. Its ordinary package boundary loads while
+            // strict mode retains only compiler conveniences.
+            "Capability.Formatting.Doc".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
+            // Parsing.Cursor now declares its exact lower-tier value closure,
+            // including the sole intra-slice Diagnostics.Core edge. Its
+            // ordinary package boundary loads while strict mode retains only
+            // compiler conveniences.
+            "Capability.Parsing.Cursor".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Capability.Process.Environment".to_string(),
             ["Equal", "MkProcessInput", "ProcessInput", "Prod"]
                 .into_iter()
@@ -877,8 +928,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.Input.Schema",
         "Capability.Diagnostics.Render",
         "Capability.Filesystem.Path.Posix",
-        "Capability.Formatting.Doc",
-        "Capability.Parsing.Cursor",
         "Capability.Parsing.Decoder",
         "Capability.Parsing.Numeric",
         "Capability.Parsing.Parsing",

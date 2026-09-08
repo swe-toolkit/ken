@@ -15,8 +15,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const DIAGNOSTIC_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 const DECODER_KEN_MD: &str =
@@ -48,8 +46,13 @@ fn dependency_env() -> ElabEnv {
     // Preserve the provider records while preventing a dependency's selective
     // import from laundering Json's own import at the next raw-source boundary.
     let json_import_boundary = env.module_state.clone();
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Diagnostics.Core",
+    )
+    .expect("Capability.Diagnostics.Core dependency must roots-load");
+    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     for (name, source) in [
-        ("Capability.Diagnostics.Core", DIAGNOSTIC_KEN_MD),
         ("Capability.Parsing.Cursor", CURSOR_KEN_MD),
         ("Capability.Parsing.Decoder", DECODER_KEN_MD),
     ] {
