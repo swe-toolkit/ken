@@ -1168,6 +1168,16 @@ impl<'a> Lowering<'a> {
             origin: StaticOriginId,
             value: &Lowered,
         ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            // The test-only retired flat-order control is a rejection witness,
+            // not a represented result edge. Keep its environment-bearing value
+            // on the ordinary admissibility walk so the existing raw-closure
+            // refusal remains the single fail-closed answer. With the flag off,
+            // short-circuiting leaves the represented path unchanged.
+            if px8ds_retired_flat_order_enabled()
+                && value.contains_boundary_closure_environment()?
+            {
+                value.boundary_transfer_admissibility()?;
+            }
             self.represented_boundary_admissibility(value)?;
             self.source_aggregate_preflight(value)?;
             self.emit_carrier_transfer(builder, origin, value)
