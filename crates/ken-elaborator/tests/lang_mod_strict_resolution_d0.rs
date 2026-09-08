@@ -547,6 +547,27 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Parsing.Numeric now declares its exact Diagnostics.Core and
+            // Transport dependencies. Its ordinary package boundary loads
+            // while strict mode retains compiler conveniences.
+            "Capability.Parsing.Numeric".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "charToInt",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Capability.Process.Environment".to_string(),
             ["Equal", "MkProcessInput", "ProcessInput", "Prod"]
                 .into_iter()
@@ -953,7 +974,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.Input.Schema",
         "Capability.Diagnostics.Render",
         "Capability.Filesystem.Path.Posix",
-        "Capability.Parsing.Numeric",
         "Capability.Parsing.Parsing",
         "Capability.Process.Arguments",
         "Capability.System.IO",

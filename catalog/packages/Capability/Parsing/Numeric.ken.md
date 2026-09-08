@@ -29,6 +29,20 @@ character index without inventing a source or argument identity. The two
 numeric kinds map to stable diagnostic codes owned by this client package.
 
 ```ken
+import Capability.Diagnostics.Core
+  (ArgumentOrigin,
+    Diagnostic,
+    DiagnosticCode,
+    MkByteRange,
+    MkDiagnostic,
+    MkDiagnosticCode,
+    Origin,
+    origin_argument_index,
+    origin_range_end,
+    origin_range_start)
+
+import Core.Logic.Transport (cong, trans)
+
 data NumericErrorKind = EmptyInput | InvalidDigit
 
 fn numeric_error_code (kind : NumericErrorKind) : DiagnosticCode =
@@ -42,7 +56,7 @@ fn numeric_diagnostic
     : Diagnostic =
   MkDiagnostic (locate position) (numeric_error_code kind)
 
-fn numeric_argument_origin (argument : Nat) (position : Nat) : Origin =
+pub fn numeric_argument_origin (argument : Nat) (position : Nat) : Origin =
   ArgumentOrigin argument (MkByteRange position position)
 
 theorem numeric_argument_origin_index_faithful
@@ -77,13 +91,13 @@ integer order. The recursive worker carries both the character index and the
 base-ten accumulator.
 
 ```ken
-fn char_to_digit (c : Char) : Option Int =
+pub fn char_to_digit (c : Char) : Option Int =
   match and_bool (leq_int (48 : Int) (charToInt c)) (leq_int (charToInt c) (57 : Int)) {
     True ↦ Some Int (sub_int (charToInt c) (48 : Int));
     False ↦ None Int
   }
 
-fn parse_digits_at
+pub fn parse_digits_at
       (locate : Nat → Origin) (chars : List Char) (position : Nat) (accumulator : Int)
     : Result Diagnostic Int =
   match chars {
@@ -100,7 +114,7 @@ fn parse_digits_at
       }
   }
 
-fn parse_nat_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
+pub fn parse_nat_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
   match chars {
     Nil ↦ Err Diagnostic Int (numeric_diagnostic locate EmptyInput Zero);
     Cons c rest ↦ parse_digits_at locate (Cons Char c rest) Zero (0 : Int)
@@ -112,7 +126,7 @@ fn negate_parsed (x : Result Diagnostic Int) : Result Diagnostic Int =
     Ok value ↦ Ok Diagnostic Int (sub_int (0 : Int) value)
   }
 
-fn parse_int_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
+pub fn parse_int_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
   match chars {
     Nil ↦ Err Diagnostic Int (numeric_diagnostic locate EmptyInput Zero);
     Cons c rest ↦
@@ -127,10 +141,10 @@ fn parse_int_chars (locate : Nat → Origin) (chars : List Char) : Result Diagno
       }
   }
 
-fn parse_nat (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
+pub fn parse_nat (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
   parse_nat_chars locate (string_to_list_char text)
 
-fn parse_int (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
+pub fn parse_int (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
   parse_int_chars locate (string_to_list_char text)
 ```
 
@@ -199,7 +213,7 @@ fn parse_digit_result
     Some digit ↦ parsed_int_prepend digit parsed_rest
   }
 
-fn parse_formatted_digits (chars : List Char) : Option (List Int) =
+pub fn parse_formatted_digits (chars : List Char) : Option (List Int) =
   match chars {
     Nil ↦ Some (List Int) (Nil Int);
     Cons c rest ↦ parse_digit_result (parse_formatted_digits rest) (char_to_digit c)
@@ -268,11 +282,9 @@ const parsed_negative_result : Result Diagnostic Int = parse_int example_numeric
 
 ## 6. Trust and derivation
 
-**Public API:** `NumericErrorKind`, `numeric_error_code`,
-`numeric_diagnostic`, `numeric_argument_origin`, `char_to_digit`,
-`parse_digits_at`, `parse_nat_chars`, `parse_int_chars`, `parse_nat`, `parse_int`,
-`DecimalDigit`, `format_digits`, `parse_formatted_digits`,
-`format_digits_roundtrip`, and `show_digits`.
+**Public API:** `numeric_argument_origin`, `char_to_digit`, `parse_digits_at`,
+`parse_nat_chars`, `parse_int_chars`, `parse_nat`, `parse_int`, and
+`parse_formatted_digits`.
 
 **Derivation.** Parsing uses structural recursion on `List Char`, positions use
 structural `Nat`, and values use the landed `charToInt`, `leq_int`, `eq_int`,
