@@ -2780,6 +2780,7 @@ fn complete_native_program_preparation(
                 dir_entry: host_spine.dir_entry.to_string(),
                 file_operation_seek: host_spine.file_operation_seek.to_string(),
                 file_operation_set_length: host_spine.file_operation_set_length.to_string(),
+                file_operation_sync: host_spine.file_operation_sync.to_string(),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3695,6 +3696,7 @@ fn checked_host_spine_v1(
         dir_entry: resolve_id(roles.dir_entry)?,
         file_operation_seek: resolve_id(roles.file_operation_seek)?,
         file_operation_set_length: resolve_id(roles.file_operation_set_length)?,
+        file_operation_sync: resolve_id(roles.file_operation_sync)?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -3944,6 +3946,7 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // ABI-S1 appends without changing established positional identities.
         &spine.file_operation_seek,
         &spine.file_operation_set_length,
+        &spine.file_operation_sync,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -7034,6 +7037,10 @@ mod d1b_role_c1_roster_identity {
             (
                 "file_operation_set_length",
                 record.spine.file_operation_set_length.clone(),
+            ),
+            (
+                "file_operation_sync",
+                record.spine.file_operation_sync.clone(),
             ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             ("io_error_permission_denied", record.spine.io_errors[1].clone()),

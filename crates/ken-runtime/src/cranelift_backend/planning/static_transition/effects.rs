@@ -422,6 +422,7 @@ fn host_effect_seat_contract(
                 | Op::FsWriteAt
                 | Op::FsSeek
                 | Op::FsSetLength
+                | Op::FsSync
                 | Op::ResourceRelease
                 | Op::BufferAllocate
                 | Op::BufferFreeze
@@ -586,6 +587,7 @@ fn host_effect_seat_contract(
             | Op::ClockSleepUntil
             | Op::FsSeek
             | Op::FsSetLength
+            | Op::FsSync
             | Op::EntropyRandomBytes,
             _,
         ) => None,

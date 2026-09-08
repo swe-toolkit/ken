@@ -271,6 +271,7 @@ pub enum FsCapabilityOperation {
     ChangeMode,
     Seek,
     SetLength,
+    Sync,
 }
 
 impl FsCapabilityOperation {
@@ -285,7 +286,7 @@ impl FsCapabilityOperation {
             Self::RenameSource | Self::RenameDestination => RightSet::WRITE.union(RightSet::DELETE),
             Self::ChangeMode => RightSet::CHANGE_MODE,
             Self::Seek => RightSet::READ,
-            Self::SetLength => RightSet::WRITE,
+            Self::SetLength | Self::Sync => RightSet::WRITE,
         }
     }
     pub const fn resolves_parent(self) -> bool {

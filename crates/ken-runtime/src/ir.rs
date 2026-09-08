@@ -278,6 +278,7 @@ runtime_host_spine_v1! {
     // ABI-S1 appends descriptor-operation identities.
     file_operation_seek,
     file_operation_set_length,
+    file_operation_sync,
 }
 
 /// The decoded, validated checked-runtime role record.

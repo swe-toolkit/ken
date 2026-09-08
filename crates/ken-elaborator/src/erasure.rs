@@ -597,6 +597,7 @@ pub(crate) struct CheckedHostSpineV1 {
     /// ABI-S1 appends descriptor-operation identities without moving prior roles.
     pub file_operation_seek: StableSymbol,
     pub file_operation_set_length: StableSymbol,
+    pub file_operation_sync: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -8116,6 +8117,7 @@ mod px7l_tests {
                 &family("FileOperation"),
                 "OpSetLength",
             ),
+            file_operation_sync: StableSymbol::constructor(&family("FileOperation"), "OpSync"),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8527,6 +8529,7 @@ mod d1b_role_b_decoder_alignment {
             dir_entry: sentinel("dir_entry"),
             file_operation_seek: sentinel("file_operation_seek"),
             file_operation_set_length: sentinel("file_operation_set_length"),
+            file_operation_sync: sentinel("file_operation_sync"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8611,6 +8614,7 @@ mod d1b_role_b_decoder_alignment {
             spine.file_operation_set_length.as_str(),
             "file_operation_set_length",
         ),
+        (spine.file_operation_sync.as_str(), "file_operation_sync"),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(

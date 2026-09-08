@@ -396,6 +396,14 @@ mod linux {
         File::from(handle.0.try_clone()?).set_len(length)
     }
 
+    pub(super) fn resource_sync(handle: &ResourceHandle, mode: FsSyncModeV1) -> io::Result<()> {
+        let file = File::from(handle.0.try_clone()?);
+        match mode {
+            FsSyncModeV1::SyncFull => file.sync_all(),
+            FsSyncModeV1::SyncData => file.sync_data(),
+        }
+    }
+
     pub(super) fn read(handle: &Handle) -> io::Result<Vec<u8>> {
         let mut file = file(handle)?;
         file.seek(SeekFrom::Start(0))?;
@@ -924,6 +932,19 @@ pub fn resource_set_length_v1(handle: &ResourceHandleV1, length: u64) -> HostRes
     #[cfg(not(target_os = "linux"))]
     {
         let _ = (handle, length);
+        unsupported()
+    }
+}
+
+pub fn resource_sync_v1(handle: &ResourceHandleV1, mode: FsSyncModeV1) -> HostResult<()> {
+    assert_current_target_abi()?;
+    #[cfg(target_os = "linux")]
+    {
+        linux::resource_sync(&handle.inner, mode).map_err(Into::into)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (handle, mode);
         unsupported()
     }
 }
