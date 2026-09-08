@@ -1,7 +1,7 @@
 ---
 id: RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION
 title: "Route the realized RecursiveBackedge protocol marker where it reaches the source-machine ordinary-Match continuation -- the honest hard-stop residual left after the checked-IH realization authority landed"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -11,6 +11,41 @@ blocks: [RT-NESTED-IH-NATIVE-REALIZATION]
 github: null
 origin: "Steward-filed 2026-09-07 (COORDINATION §2) on runtime-leader's request evt_4ee23xjg9q79a, from the accepted-partial hard-stop residual measured and reviewed on RT-CHECKED-IH-REALIZATION-AUTHORITY (merged e68ecd79 / code d29cc8ad0; implementer report evt_4f55thkpb21eg, Runtime QA evt_5cwezyz9w6ype, Architect approval evt_7zmy8t68brxg2). The withdrawn NativeJoinPlanV1 join-marker finding (evt_kvryke1ay21n) was prototype-induced and is NOT this residual -- see the correction evt_35gx7szdwj6s5 / evt_4y65zhtwrfpe6."
 ---
+
+## MERGED 2026-09-08 as squash `897f1ea6a` (PR #3419) -- accepted partial, its one authorized forward delivered.
+
+**Candidate `f53b081376257de563d7adea207892970e38e6f3`** (branch
+`wp/RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION`), landed as squash `897f1ea6a`
+(lieutenant M9 `evt_1a3k3e9jvf7rp`). Base `5a875142b` was three commits behind
+after PX9-INC2A landed; clean rebase, empty §14(5) intersection; all 3 paths
+blob-verified byte-identical pre/post-rebase and against landed `origin/main`.
+CI fully green. Decision `dec_59ab5qb2yztcs` resolved; Runtime QA + Architect
+(required mechanism reviewer) `evt_7w6jmp2r8x128` on exact SHA. Adversary M8b
+`evt_4hd1scyggb9q2` NO OBJECTION (provenance airtight, oracle discriminating and
+non-vacuous, honest accepted-partial). Steward M0-M4 `evt_36hat6zc5zter`.
+
+**What landed:** the realized `RecursiveBackedge` protocol marker now FORWARDS at
+the source-machine ordinary-Match continuation (`source.rs`) -- guard
+`matches!(value, Specialized(Lowered::RecursiveBackedge))` hoisted to the top of
+the seat, forwarded via `RoutedAnswer::forward(value, incoming_route,
+incoming_role)` before `enter_source_occurrence_plan`, both routing axes
+preserved. Strictly narrow: only `RecursiveBackedge` is carved out; every other
+`Specialized(_)` still refuses verbatim. Near-verbatim port of the D2a
+`ComputationalMatchScrutinee` arm. Mints no authority, consumes no occurrence
+plan, selects no case.
+
+**Accepted-partial closeout -- this node is DONE, not superseded.** The frame's
+only authorized deliverable (the forward) landed. Native execution then ADVANCES
+to a new named refusal at the source-join ownership frontier
+`crates/ken-runtime/src/cranelift_backend/lowering/joins.rs:2140`
+(`source join StaticOriginId(50) was classified outside its owning function`),
+fenced by a panicking `Ok(artifact)` arm that forbids spurious completion. Per
+the Architect ruling (`evt_7w6jmp2r8x128`) and its AC-PARENT-FRONTIER, that
+frontier is **`RT-NESTED-IH-NATIVE-REALIZATION`'s D3-D5 territory, not a reason
+to keep this successor active** -- it is the parent's next measured ownership
+frontier, a fresh mechanism question routed to the Architect on
+[[RT-NESTED-IH-NATIVE-REALIZATION]]. The historical residual + successor
+question below stand as the record of what this node delivered.
 
 > # Tracker node, NOT a shovel-ready WP frame.
 >

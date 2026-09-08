@@ -11,8 +11,37 @@ github: null
 origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statement of c2's AC-K12 relationship, evt_77pege8j5cv14, requested at evt_6pmftb5fpxrkm. Discharges the second Steward condition on the c1/c2 cut (evt_6z7wf6dw94cym), which required c2 to state that relationship before assignment.
 ---
 
-> ## STATUS `active` -> `draft` 2026-09-07. `draft` = BLOCKED-ON-PREDECESSOR,
-> ## not unstarted (the schema has no `blocked` value; `draft` carries it).
+> ## PREDECESSOR MET 2026-09-08 -- all three `depends_on` now merged; `draft` = NEEDS-FRAMING (mechanism routed to the Architect), no longer blocked-on-predecessor.
+>
+> [[RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION]] LANDED as squash `897f1ea6a`
+> (PR #3419, 2026-09-08) -- the accepted-partial forward that routes the realized
+> `RecursiveBackedge` past the source-machine ordinary-Match continuation. With
+> it, native execution ADVANCES to the source-join ownership frontier
+> `crates/ken-runtime/src/cranelift_backend/lowering/joins.rs:2140`:
+> `source join StaticOriginId(50) was classified outside its owning function`.
+> Per the Architect (RT-REALIZED-BACKEDGE approval `evt_7w6jmp2r8x128`,
+> AC-PARENT-FRONTIER), **that frontier is THIS node's D3-D5 territory** -- the
+> parent's next measured ownership wall, not a further increment on the
+> successor. It is a genuinely-new native-join-ownership mechanism, so per the
+> Architect's standing rule ("if the parent frontier advances to a genuinely NEW
+> mechanism, that is a fresh mechanism question for me") the Steward has ROUTED
+> the mechanism question to the Architect (source-join owning-function
+> classification at `joins.rs:2140`). The shovel-ready `docs/program/wp/` frame
+> is authored ON that ruling; on release the Steward flips this node
+> `draft`->`active` + kicks the runtime ring. The node stays `draft`
+> (needs-framing) until then -- NOT `active`, which would read as the ring
+> working an unframed node.
+>
+> **FRAME OBLIGATION (carry into the wp/ frame -- do not lose it):** the deferred
+> ABI-order defect below ("THE ABI ORDER IS UNPINNED ...") becomes load-bearing
+> the moment native execution completes and this arm emits an executed program
+> for the first time. The frame MUST carry the writable-now positional
+> `#[cfg(test)]` structural pin (first `args.len()` entries of `inputs` are the
+> matched fields in source order) as a control, independent of the runtime
+> outcome. It is the "wrong answer in the first release that removes the stop"
+> hazard.
+>
+> ## STATUS `active` -> `draft` 2026-09-07 (predecessor-block, now lifted -- see above). `draft` carries BLOCKED / NEEDS-FRAMING (the schema has no `blocked` value).
 >
 > `D2` is merged; `D3`-`D5` (native execution, interpreter agreement at Nat 3,
 > the carried control no longer ignored) needed the checked-IH realization
