@@ -808,26 +808,43 @@ pub(super) fn build_abi_plane(
             return Err(planner_error("abi descriptor is not positional for its function unit"));
         }
         let definition = definitions[ordinal];
-        let (parameters, captures) = declared_arity(plane, sources, definition)?;
-
-        let slot_start = abi.slots.len();
-        push_slots(&mut abi.slots, definition, parameters, captures)?;
-        let slots = DenseRange {
-            start: u32::try_from(slot_start)
-                .map_err(|_| planner_capacity_error("abi slot identity exhausted"))?,
-            len: u32::try_from(abi.slots.len() - slot_start)
-                .map_err(|_| planner_capacity_error("abi slot range exhausted"))?,
-        };
-        let header = frame_header(&abi.slots[slot_start..], parameters, captures)?;
-
-        abi.descriptors.push(AbiDescriptor {
-            function: id,
-            planned_node: function.planned_node,
-            body_occurrence: function.body_occurrence,
+        append_descriptor(
+            &mut abi,
+            id,
+            function.planned_node,
+            function.body_occurrence,
             definition,
-            header,
-            slots,
-        });
+            declared_arity(plane, sources, definition)?,
+        )?;
+    }
+
+    // A realized checked-IH recursor has two identities when its retained
+    // callable is live: the semantic body remains in its enclosing function,
+    // while the first-class path needs an out-of-line worker with the same
+    // source-body origin. The checked marker/call spine is compiler-owned and
+    // identifies that retained path before lowering; no runtime capture value
+    // enters this projection.
+    for worker in realized_recursor_workers(plane, sources, edges)? {
+        let id = PredeclaredFunctionId(
+            u32::try_from(abi.descriptors.len())
+                .map_err(|_| planner_capacity_error("worker descriptor identity exhausted"))?,
+        );
+        let definition = AbiUnitDefinition::ClosureBody {
+            defining_origin: worker.closure_origin,
+            provenance: worker.provenance,
+        };
+        require_representable_producers(plane, sources, worker.body_occurrence)?;
+        for capture in lexical_capture_origins(plane, worker.closure_origin)? {
+            require_representable_producers(plane, sources, capture)?;
+        }
+        append_descriptor(
+            &mut abi,
+            id,
+            worker.planned_node,
+            worker.body_occurrence,
+            definition,
+            (worker.parameters, worker.captures),
+        )?;
     }
 
     abi.validate(
@@ -841,6 +858,142 @@ pub(super) fn build_abi_plane(
         root_ingress,
     )?;
     Ok(abi)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RealizedRecursorWorker {
+    closure_origin: StaticOriginId,
+    body_occurrence: StaticOriginId,
+    planned_node: StaticNodeId,
+    provenance: AbiCaptureProvenance,
+    parameters: u32,
+    captures: u32,
+}
+
+/// Derive the retained-worker half of checked-IH dual realization.
+///
+/// The innermost callee of the checked application spine is the callable that
+/// escapes through the compiler-owned checked recursor envelope. Its ordinary
+/// `StaticBody` edge has already been reconciled to
+/// `RealizedRecursorTransfer`, so this projection cannot re-wall the semantic
+/// graph. It instead issues a second ABI identity for the standalone worker.
+fn realized_recursor_workers(
+    plane: &SemanticPlane,
+    sources: &[SemanticSourceSeed],
+    edges: &[StaticEdge],
+) -> Result<Vec<RealizedRecursorWorker>, CraneliftBackendError> {
+    let mut workers = Vec::new();
+    let mut identities = BTreeSet::new();
+    for slots in sources {
+        if slots.source
+            != SemanticSourceKind::Expression(RuntimeExprShape::CheckedComputationalIHSlots)
+        {
+            continue;
+        }
+        let [callee] = plane.child_origins(slots.origin)? else {
+            return Err(planner_error(
+                "checked-IH slots marker does not have exactly one body child",
+            ));
+        };
+        let mut callee = *callee;
+        let mut checked_applications = 0usize;
+        loop {
+            let source = source_for(sources, callee)?;
+            if source.source != SemanticSourceKind::Expression(RuntimeExprShape::Call) {
+                break;
+            }
+            let children = plane.child_origins(callee)?;
+            let Some((next_callee, arguments)) = children.split_first() else {
+                return Err(planner_error("checked-IH call has no callee child"));
+            };
+            checked_applications = checked_applications
+                .checked_add(
+                    arguments
+                        .iter()
+                        .filter(|argument| {
+                            source_for(sources, **argument).is_ok_and(|source| {
+                                source.source
+                                    == SemanticSourceKind::Expression(
+                                        RuntimeExprShape::CheckedComputationalIHInvocation,
+                                    )
+                            })
+                        })
+                        .count(),
+                )
+                .ok_or_else(|| planner_capacity_error("checked-IH call count exhausted"))?;
+            callee = *next_callee;
+        }
+        for _ in 0..checked_applications {
+            let source = source_for(sources, callee)?;
+            let provenance = closure_provenance(source.source)?;
+            if provenance != AbiCaptureProvenance::Lexical {
+                return Err(planner_error(
+                    "realized checked-IH retained worker is not a lexical closure",
+                ));
+            }
+            let body_occurrence = plane.child_origin(callee, 0)?;
+            let matching = edges
+                .iter()
+                .filter(|edge| {
+                    edge.from == StaticNodeId(callee.0)
+                        && edge.kind == EdgeKind::RealizedRecursorTransfer
+                })
+                .collect::<Vec<_>>();
+            let [edge] = matching.as_slice() else {
+                return Err(planner_error(
+                    "checked-IH retained worker does not have exactly one realized transfer edge",
+                ));
+            };
+            if !identities.insert((callee, body_occurrence)) {
+                return Err(planner_error(
+                    "checked-IH retained worker obligation was issued twice",
+                ));
+            }
+            let definition = AbiUnitDefinition::ClosureBody {
+                defining_origin: callee,
+                provenance,
+            };
+            let (parameters, captures) = declared_arity(plane, sources, definition)?;
+            workers.push(RealizedRecursorWorker {
+                closure_origin: callee,
+                body_occurrence,
+                planned_node: edge.to,
+                provenance,
+                parameters,
+                captures,
+            });
+            callee = body_occurrence;
+        }
+    }
+    Ok(workers)
+}
+
+fn append_descriptor(
+    abi: &mut AbiPlane,
+    function: PredeclaredFunctionId,
+    planned_node: StaticNodeId,
+    body_occurrence: StaticOriginId,
+    definition: AbiUnitDefinition,
+    (parameters, captures): (u32, u32),
+) -> Result<(), CraneliftBackendError> {
+    let slot_start = abi.slots.len();
+    push_slots(&mut abi.slots, definition, parameters, captures)?;
+    let slots = DenseRange {
+        start: u32::try_from(slot_start)
+            .map_err(|_| planner_capacity_error("abi slot identity exhausted"))?,
+        len: u32::try_from(abi.slots.len() - slot_start)
+            .map_err(|_| planner_capacity_error("abi slot range exhausted"))?,
+    };
+    let header = frame_header(&abi.slots[slot_start..], parameters, captures)?;
+    abi.descriptors.push(AbiDescriptor {
+        function,
+        planned_node,
+        body_occurrence,
+        definition,
+        header,
+        slots,
+    });
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2579,10 +2732,17 @@ impl AbiPlane {
         let sources = positioned_sources(nodes, sources)?;
         let sources = sources.as_slice();
 
-        // `AC-1`, direction 1 — every function unit has exactly one descriptor.
-        if self.descriptors.len() != plane.functions.len() {
+        let realized_workers = realized_recursor_workers(plane, sources, edges)?;
+        let expected_descriptors = plane
+            .functions
+            .len()
+            .checked_add(realized_workers.len())
+            .ok_or_else(|| planner_capacity_error("abi descriptor population exhausted"))?;
+        // `AC-1`, direction 1 — every function unit has exactly one descriptor,
+        // followed by every checked-IH dual-realization worker obligation.
+        if self.descriptors.len() != expected_descriptors {
             return Err(planner_error(
-                "abi descriptor population is not exact for the function unit partition",
+                "abi descriptor population is not exact for the function units and retained workers",
             ));
         }
 
@@ -2596,7 +2756,12 @@ impl AbiPlane {
             root_ingress,
         )?;
 
-        for (ordinal, descriptor) in self.descriptors.iter().enumerate() {
+        for (ordinal, descriptor) in self
+            .descriptors
+            .iter()
+            .take(plane.functions.len())
+            .enumerate()
+        {
             // `AC-1`, positional identity. The population equality above makes
             // `ordinal` an in-range function index; it already supplies both
             // population directions. What remains live here is a different law:
@@ -2671,6 +2836,57 @@ impl AbiPlane {
                 return Err(planner_error(
                     "abi frame header is not derived from its own slot run",
                 ));
+            }
+        }
+
+        for (offset, (descriptor, worker)) in self
+            .descriptors
+            .iter()
+            .skip(plane.functions.len())
+            .zip(&realized_workers)
+            .enumerate()
+        {
+            let ordinal = plane
+                .functions
+                .len()
+                .checked_add(offset)
+                .ok_or_else(|| planner_capacity_error("worker descriptor identity exhausted"))?;
+            let expected_id = PredeclaredFunctionId(
+                u32::try_from(ordinal)
+                    .map_err(|_| planner_capacity_error("worker descriptor identity exhausted"))?,
+            );
+            let expected_definition = AbiUnitDefinition::ClosureBody {
+                defining_origin: worker.closure_origin,
+                provenance: worker.provenance,
+            };
+            if descriptor.function != expected_id
+                || descriptor.planned_node != worker.planned_node
+                || descriptor.body_occurrence != worker.body_occurrence
+                || descriptor.definition != expected_definition
+                || descriptor.header.parameters != worker.parameters
+                || descriptor.header.captures != worker.captures
+            {
+                return Err(planner_error(
+                    "retained checked-IH worker descriptor disagrees with its compiler-owned obligation",
+                ));
+            }
+            let slots = slot_slice(&self.slots, descriptor.slots)?;
+            validate_slot_run(
+                slots,
+                worker.parameters,
+                worker.captures,
+                expected_definition,
+            )?;
+            if descriptor.header
+                != frame_header(slots, worker.parameters, worker.captures)?
+            {
+                return Err(planner_error(
+                    "retained checked-IH worker header is not derived from its slot run",
+                ));
+            }
+            require_representable_producers(plane, sources, worker.body_occurrence)?;
+            for capture in lexical_capture_origins(plane, worker.closure_origin)? {
+                require_representable_producers(plane, sources, capture)?;
             }
         }
 

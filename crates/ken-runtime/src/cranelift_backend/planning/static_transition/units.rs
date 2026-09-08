@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use super::abi::{self, AbiFrameHeader, AbiSlot, AbiUnitDefinition};
 use super::occurrences::{origin_of, StaticOriginId};
 use super::{
-    planner_error, CraneliftBackendError, StaticNodeId, StaticTransitionPlan,
+    planner_error, CraneliftBackendError, EdgeKind, StaticNodeId, StaticTransitionPlan,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -250,6 +250,44 @@ impl StaticTransitionPlan<'_> {
                 kind: EmittableCallKind::StaticBody,
             })
             .collect::<Vec<_>>();
+        // Checked-IH dual realization leaves the recursor edge non-boundary in
+        // the semantic graph, while the plan-issued retained worker descriptor
+        // carries a distinct callable identity. Project that second identity as
+        // an ordinary static-body call edge; no raw graph consumer is widened.
+        for descriptor in self
+            .abi
+            .descriptors
+            .iter()
+            .skip(self.semantic.functions.len())
+        {
+            let AbiUnitDefinition::ClosureBody {
+                defining_origin, ..
+            } = descriptor.definition
+            else {
+                continue;
+            };
+            let matching = self
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.kind == EdgeKind::RealizedRecursorTransfer
+                        && edge.from == StaticNodeId(defining_origin.0)
+                        && edge.to == descriptor.planned_node
+                })
+                .collect::<Vec<_>>();
+            let [edge] = matching.as_slice() else {
+                return Err(planner_error(
+                    "retained checked-IH worker descriptor does not have exactly one realized recursor edge",
+                ));
+            };
+            calls.push(EmittableCallEdge {
+                caller: self.semantic.function_for_node(edge.from)?,
+                callee: descriptor.function,
+                callee_origin: origin_of(descriptor.planned_node),
+                call_site_origin: descriptor.body_occurrence,
+                kind: EmittableCallKind::StaticBody,
+            });
+        }
         calls.extend(
             self.semantic
                 .declaration_call_edges(&self.edges)?

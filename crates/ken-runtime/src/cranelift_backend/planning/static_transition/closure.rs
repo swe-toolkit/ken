@@ -1536,16 +1536,56 @@ impl<'src> StaticTransitionPlan<'src> {
             }
         }
 
-        // One-for-one drain against the authoritative classification.
+        // The retained-worker half of checked-IH dual realization has no raw
+        // `StaticBody` graph edge: that edge is the in-function recursor
+        // transfer. Its plan-issued descriptor nevertheless carries a distinct
+        // emittable StaticBody call identity, so add its compiler-owned endpoint
+        // record without changing the graph classification.
+        for descriptor in self
+            .abi
+            .descriptors
+            .iter()
+            .skip(self.semantic.functions.len())
+        {
+            let AbiUnitDefinition::ClosureBody {
+                defining_origin, ..
+            } = descriptor.definition
+            else {
+                continue;
+            };
+            let has_transfer = self.edges.iter().any(|edge| {
+                edge.kind == EdgeKind::RealizedRecursorTransfer
+                    && edge.from == StaticNodeId(defining_origin.0)
+                    && edge.to == descriptor.planned_node
+            });
+            if !has_transfer {
+                return Err(planner_error(
+                    "retained worker descriptor has no realized recursor transfer authority",
+                ));
+            }
+            let source_body = self.semantic.child_origin(defining_origin, 0)?;
+            let scheduling_entry = origin_of(descriptor.planned_node)?;
+            if endpoints.insert(scheduling_entry, source_body).is_some() {
+                return Err(planner_error(
+                    "two static body identities declare the same scheduling entry",
+                ));
+            }
+        }
+
+        // One-for-one drain against the authoritative emitted-call projection.
         let mut bindings = Vec::new();
-        for (caller, _callee, callee_origin) in self.semantic.static_body_call_edges(&self.edges)? {
+        for edge in self
+            .emittable_call_edges()?
+            .into_iter()
+            .filter(|edge| edge.kind() == EmittableCallKind::StaticBody)
+        {
+            let callee_origin = edge.callee_origin();
             let source_body = endpoints.remove(&callee_origin).ok_or_else(|| {
                 planner_error(
-                    "an authoritative static body call has no raw endpoint record for its \
-                     scheduling entry",
+                    "an authoritative static body call has no endpoint record for its scheduling entry",
                 )
             })?;
-            bindings.push((caller, source_body, callee_origin));
+            bindings.push((edge.caller(), source_body, callee_origin));
         }
         if !endpoints.is_empty() {
             return Err(planner_error(
