@@ -37,31 +37,59 @@ the total `List UInt8` view. `String` is deliberately not the offset basis;
 they must.
 
 ```ken
+import Capability.Diagnostics.Core
+  (ByteRange,
+    MkByteRange,
+    Origin,
+    SourceId,
+    SourceOrigin,
+    byte_range_end,
+    byte_range_start,
+    origin_source_id)
+
+import Capability.Parsing.Cursor (CursorOps, MkCursorOps)
+
+import Capability.Parsing.Decoder
+  (Decoded,
+    Decoder,
+    DecoderError,
+    DecoderFailed,
+    DecoderRejected,
+    DecoderResult,
+    decoder_alt,
+    decoder_error_location,
+    decoder_fail,
+    decoder_many,
+    decoder_pure,
+    decoder_recursive,
+    decoder_satisfy,
+    decoder_seq)
+
 import Core.Classes.LawfulClasses (leq_nat)
 
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (bytes_nat_length, list_append, nth)
 
 import Data.Numeric.Nat.Order (sub)
 
-fn IsUtf8 (bs : Bytes) : Prop =
+pub fn IsUtf8 (bs : Bytes) : Prop =
   match bytes_decode bs {
     Err _ ↦ Bottom;
     Ok text ↦ Equal Bytes (bytes_encode text) bs
   }
 
-class Source {
+pub class Source {
   source_id_field : SourceId;
   source_bytes_field : Bytes;
   source_utf8_field : IsUtf8 source_bytes_field
 }
 
-fn source_id (s : Source) : SourceId = s.source_id_field
+pub fn source_id (s : Source) : SourceId = s.source_id_field
 
-fn source_bytes (s : Source) : Bytes = s.source_bytes_field
+pub fn source_bytes (s : Source) : Bytes = s.source_bytes_field
 
-fn source_length (s : Source) : Nat = bytes_nat_length s.source_bytes_field
+pub fn source_length (s : Source) : Nat = bytes_nat_length s.source_bytes_field
 
-proof utf8 for source_bytes (s : Source) : IsUtf8 (source_bytes s) = s.source_utf8_field
+pub proof utf8 for source_bytes (s : Source) : IsUtf8 (source_bytes s) = s.source_utf8_field
 ```
 
 ## 3. Using it
@@ -94,21 +122,23 @@ a zero-width span at that offset is valid, by pairing `LessEqNat::refl`
 (`end <= source_length s`) via `and_intro`.
 
 ```ken
+export Span, MkSpan
+
 data Span = MkSpan Nat Nat
 
-fn span_start (sp : Span) : Nat =
+pub fn span_start (sp : Span) : Nat =
   match sp {
     MkSpan start end ↦ start
   }
 
-fn span_end (sp : Span) : Nat =
+pub fn span_end (sp : Span) : Nat =
   match sp {
     MkSpan start end ↦ end
   }
 
-fn span_to_byte_range (sp : Span) : ByteRange = MkByteRange (span_start sp) (span_end sp)
+pub fn span_to_byte_range (sp : Span) : ByteRange = MkByteRange (span_start sp) (span_end sp)
 
-fn span_origin (source : SourceId) (sp : Span) : Origin =
+pub fn span_origin (source : SourceId) (sp : Span) : Origin =
   SourceOrigin source (span_to_byte_range sp)
 
 theorem span_to_byte_range_faithful
@@ -129,6 +159,8 @@ theorem span_origin_source_faithful
   match sp {
     MkSpan start end ↦ Refl
   }
+
+export ByteCursor
 
 data ByteCursor = MkByteCursor Source Nat
 
@@ -154,7 +186,7 @@ fn byte_cursor_advance (cur : ByteCursor) : ByteCursor =
 fn byte_cursor_locate (cur : ByteCursor) : Span =
   MkSpan (byte_cursor_position cur) (byte_cursor_position cur)
 
-const byte_cursor_ops : CursorOps ByteCursor UInt8 Span =
+pub const byte_cursor_ops : CursorOps ByteCursor UInt8 Span =
   MkCursorOps
     ByteCursor
     UInt8
@@ -164,20 +196,20 @@ const byte_cursor_ops : CursorOps ByteCursor UInt8 Span =
     byte_cursor_advance
     byte_cursor_locate
 
-fn LessEqNat (m : Nat) (n : Nat) : Prop = Equal Bool (leq_nat m n) True
+pub fn LessEqNat (m : Nat) (n : Nat) : Prop = Equal Bool (leq_nat m n) True
 
-proof refl for LessEqNat (n : Nat) : LessEqNat n n =
+pub proof refl for LessEqNat (n : Nat) : LessEqNat n n =
   match n {
     Zero ↦ Proved;
     Suc n2 ↦ proof refl for LessEqNat n2
   }
 
-proof zero_left for LessEqNat (n : Nat) : LessEqNat Zero n = Proved
+pub proof zero_left for LessEqNat (n : Nat) : LessEqNat Zero n = Proved
 
-fn ValidSpan (s : Source) (sp : Span) : Prop =
+pub fn ValidSpan (s : Source) (sp : Span) : Prop =
   And (LessEqNat (span_start sp) (span_end sp)) (LessEqNat (span_end sp) (source_length s))
 
-theorem valid_zero_width_span
+pub theorem valid_zero_width_span
       (s : Source) (offset : Nat)
     : LessEqNat offset (source_length s) → ValidSpan s (MkSpan offset offset) =
   λh.
@@ -205,47 +237,53 @@ the former always succeeds on a zero-width span at `start`, the latter
 always fails at `start` with a zero-width error span.
 
 ```ken
+export Located, MkLocated
+
 data Located a = MkLocated SourceId Span a
 
-fn located_source (a : Type) (x : Located a) : SourceId =
+pub fn located_source (a : Type) (x : Located a) : SourceId =
   match x {
     MkLocated sid sp value ↦ sid
   }
 
-fn located_span (a : Type) (x : Located a) : Span =
+pub fn located_span (a : Type) (x : Located a) : Span =
   match x {
     MkLocated sid sp value ↦ sp
   }
 
-fn located_value (a : Type) (x : Located a) : a =
+pub fn located_value (a : Type) (x : Located a) : a =
   match x {
     MkLocated sid sp value ↦ value
   }
 
-fn ValidLocated (a : Type) (s : Source) (x : Located a) : Prop =
+pub fn ValidLocated (a : Type) (s : Source) (x : Located a) : Prop =
   And (Equal SourceId (located_source a x) (source_id s)) (ValidSpan s (located_span a x))
+
+export ParseError, MkParseError
 
 data ParseError = MkParseError SourceId Span
 
-fn error_source (err : ParseError) : SourceId =
+pub fn error_source (err : ParseError) : SourceId =
   match err {
     MkParseError sid sp ↦ sid
   }
 
-fn error_span (err : ParseError) : Span =
+pub fn error_span (err : ParseError) : Span =
   match err {
     MkParseError sid sp ↦ sp
   }
 
+export ParseResult, Parsed, Failed
+
 data ParseResult a = Parsed a Span Nat | Failed ParseError
 
-const Parser (a : Type) : Type =
+pub const Parser (a : Type) : Type =
   (s : Source) → (start : Nat) → LessEqNat start (source_length s) → ParseResult a
 
 fn decoder_parse_error (s : Source) (err : DecoderError Span) : ParseError =
   MkParseError (source_id s) (decoder_error_location Span err)
 
-fn parser_from_decoder (a : Type) (decoder : Decoder ByteCursor Span a) : Parser a =
+pub fn parser_from_decoder (a : Type) (decoder : Decoder ByteCursor Span a) : Parser a =
   λs.
     λstart.
       λh.
@@ -259,21 +297,21 @@ fn parser_from_decoder (a : Type) (decoder : Decoder ByteCursor Span a) : Parser
           DecoderFailed err ↦ Failed a (decoder_parse_error s err)
         }
 
-fn ParsedValid (s : Source) (start : Nat) (consumed : Span) (next : Nat) : Prop =
+pub fn ParsedValid (s : Source) (start : Nat) (consumed : Span) (next : Nat) : Prop =
   And
     (ValidSpan s consumed)
     (And (Equal Nat (span_start consumed) start) (Equal Nat (span_end consumed) next))
 
-fn FailedValid (s : Source) (err : ParseError) : Prop =
+pub fn FailedValid (s : Source) (err : ParseError) : Prop =
   And (Equal SourceId (error_source err) (source_id s)) (ValidSpan s (error_span err))
 
-fn ParseResultValid (a : Type) (s : Source) (start : Nat) (r : ParseResult a) : Prop =
+pub fn ParseResultValid (a : Type) (s : Source) (start : Nat) (r : ParseResult a) : Prop =
   match r {
     Parsed value consumed next ↦ ParsedValid s start consumed next;
     Failed err ↦ FailedValid s err
   }
 
-fn ParserValid (a : Type) (p : Parser a) : Prop =
+pub fn ParserValid (a : Type) (p : Parser a) : Prop =
   (s : Source)
     → (start : Nat)
     → (h : LessEqNat start (source_length s))
@@ -286,7 +324,7 @@ fn ParseResultTotal (a : Type) (r : ParseResult a) : Prop =
     Failed err ↦ Top
   }
 
-fn ParserTotal (a : Type) (p : Parser a) : Prop =
+pub fn ParserTotal (a : Type) (p : Parser a) : Prop =
   (s : Source)
     → (start : Nat)
     → (h : LessEqNat start (source_length s))
@@ -299,20 +337,20 @@ fn ParseResultSourceLocal (a : Type) (s : Source) (r : ParseResult a) : Prop =
     Failed err ↦ Equal SourceId (error_source err) (source_id s)
   }
 
-fn ParserSourceLocal (a : Type) (p : Parser a) : Prop =
+pub fn ParserSourceLocal (a : Type) (p : Parser a) : Prop =
   (s : Source)
     → (start : Nat)
     → (h : LessEqNat start (source_length s))
     → ParseResultSourceLocal a s
     (p s start h)
 
-fn ParserLaws (a : Type) (p : Parser a) : Prop =
+pub fn ParserLaws (a : Type) (p : Parser a) : Prop =
   And (ParserValid a p) (And (ParserTotal a p) (ParserSourceLocal a p))
 
-fn parser_pure (a : Type) (value : a) : Parser a =
+pub fn parser_pure (a : Type) (value : a) : Parser a =
   parser_from_decoder a (decoder_pure ByteCursor Span a value)
 
-const parser_fail (a : Type) : Parser a =
+pub const parser_fail (a : Type) : Parser a =
   parser_from_decoder a (decoder_fail ByteCursor UInt8 Span a byte_cursor_ops)
 ```
 
@@ -339,30 +377,34 @@ The grammar selectively imports `list_append` from
 package-local copy.
 
 ```ken
+export BoolExpr, BTrue, BFalse, BNot, BAnd
+
 data BoolExpr = BTrue | BFalse | BNot BoolExpr | BAnd BoolExpr BoolExpr
+
+export Syntax, MkSyntax
 
 data Syntax a = MkSyntax (Located a) (List (Located a))
 
-fn syntax_root (a : Type) (x : Syntax a) : Located a =
+pub fn syntax_root (a : Type) (x : Syntax a) : Located a =
   match x {
     MkSyntax root children ↦ root
   }
 
-fn syntax_children (a : Type) (x : Syntax a) : List (Located a) =
+pub fn syntax_children (a : Type) (x : Syntax a) : List (Located a) =
   match x {
     MkSyntax root children ↦ children
   }
 
-fn erase_spans (x : Syntax BoolExpr) : BoolExpr =
+pub fn erase_spans (x : Syntax BoolExpr) : BoolExpr =
   located_value BoolExpr (syntax_root BoolExpr x)
 
-fn ValidLocatedList (a : Type) (s : Source) (xs : List (Located a)) : Prop =
+pub fn ValidLocatedList (a : Type) (s : Source) (xs : List (Located a)) : Prop =
   match xs {
     Nil ↦ Top;
     Cons x rest ↦ And (ValidLocated a s x) (ValidLocatedList a s rest)
   }
 
-fn ValidSyntax (a : Type) (s : Source) (x : Syntax a) : Prop =
+pub fn ValidSyntax (a : Type) (s : Source) (x : Syntax a) : Prop =
   And (ValidLocated a s (syntax_root a x)) (ValidLocatedList a s (syntax_children a x))
 
 fn bool_expr_eq (x : BoolExpr) (y : BoolExpr) : Bool =
@@ -705,10 +747,10 @@ fn complete_bool_decoder (cur : ByteCursor) : DecoderResult ByteCursor Span (Syn
       }
   }
 
-const parse_bool_expr : Parser (Syntax BoolExpr) =
+pub const parse_bool_expr : Parser (Syntax BoolExpr) =
   parser_from_decoder (Syntax BoolExpr) complete_bool_decoder
 
-fn print_bool_expr (e : BoolExpr) : Bytes =
+pub fn print_bool_expr (e : BoolExpr) : Bytes =
   match e {
     BTrue ↦ bytes_encode "true";
     BFalse ↦ bytes_encode "false";
@@ -724,7 +766,7 @@ fn print_bool_expr (e : BoolExpr) : Bytes =
         (bytes_concat (print_bool_expr right) (bytes_encode ")"))
   }
 
-fn format_bool_expr (s : Source) : Result ParseError Bytes =
+pub fn format_bool_expr (s : Source) : Result ParseError Bytes =
   match parse_bool_expr s Zero ((proof zero_left for LessEqNat) (source_length s)) {
     Parsed syntax consumed next ↦ Ok ParseError Bytes (print_bool_expr (erase_spans syntax));
     Failed err ↦ Err ParseError Bytes err
@@ -769,18 +811,19 @@ reference implementation.
 ## 7. Trust  derivation
 
 1. **Public API.** `Source`, `IsUtf8`, `source_id`, `source_bytes`,
-   `source_bytes::utf8`, `source_length`, `Span`, `span_start`,
+   `source_bytes::utf8`, `source_length`, `Span`, `MkSpan`, `span_start`,
    `span_end`, `span_to_byte_range`, `span_origin`, `ByteCursor`,
-   `byte_cursor_ops`, `LessEqNat`, `ValidSpan`,
-   `Located`, `located_source`,
-   `located_span`, `located_value`, `ValidLocated`,
-   `valid_zero_width_span`, `ParseError`, `error_source`, `error_span`,
-   `ParseResult`, `Parser`, `ParsedValid`, `FailedValid`,
+   `byte_cursor_ops`, `LessEqNat`, `LessEqNat::refl`,
+   `LessEqNat::zero_left`, `ValidSpan`, `valid_zero_width_span`, `Located`,
+   `MkLocated`, `located_source`, `located_span`, `located_value`,
+   `ValidLocated`, `ParseError`, `MkParseError`, `error_source`, `error_span`,
+   `ParseResult`, `Parsed`, `Failed`, `Parser`, `ParsedValid`, `FailedValid`,
    `ParseResultValid`, `ParserValid`, `ParserTotal`, `ParserSourceLocal`,
    `ParserLaws`, `parser_from_decoder`, `parser_pure`, `parser_fail`,
-   `BoolExpr`, `Syntax`,
+   `BoolExpr`, `BTrue`, `BFalse`, `BNot`, `BAnd`, `Syntax`, `MkSyntax`,
    `syntax_root`, `syntax_children`, `erase_spans`, `ValidLocatedList`,
-   `ValidSyntax`, `parse_bool_expr`, `print_bool_expr`, `format_bool_expr`.
+   `ValidSyntax`, `parse_bool_expr`, `print_bool_expr`, and
+   `format_bool_expr`.
 2. **Source map.**
 
    | Task | Section |

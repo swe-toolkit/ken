@@ -60,6 +60,12 @@ fn load_decoder_module(env: &mut ElabEnv) {
     catalog_or::expose_module(env, "Capability.Parsing.Decoder");
 }
 
+fn load_parsing_module(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Capability.Parsing.Parsing must roots-load");
+    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
+}
+
 #[test]
 fn derived_fixture_retains_lawfulclasses_for_cc4_dependency_closure() {
     let _ = dependency_env();
@@ -69,8 +75,7 @@ fn full_env() -> ElabEnv {
     let mut env = dependency_env();
     load_cursor_module(&mut env);
     load_decoder_module(&mut env);
-    env.elaborate_ken_md_file(PARSING_KEN_MD)
-        .expect("Capability.Parsing must elaborate seventh");
+    load_parsing_module(&mut env);
     env.elaborate_ken_md_file(NUMERIC_KEN_MD)
         .expect("Capability.Parsing.Numeric must elaborate eighth");
     env
@@ -280,8 +285,7 @@ fn checked_cc4_chain_has_zero_axiom_and_zero_trusted_base_delta() {
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     load_cursor_module(&mut env);
     load_decoder_module(&mut env);
-    env.elaborate_ken_md_file(PARSING_KEN_MD)
-        .expect("Capability.Parsing must elaborate");
+    load_parsing_module(&mut env);
     env.elaborate_ken_md_file(NUMERIC_KEN_MD)
         .expect("Capability.Parsing.Numeric must elaborate");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
