@@ -1,7 +1,7 @@
 ---
 id: RT-PX8DS-REPRESENTED-CROSSING-GATE
 title: "Restore the retired-flat rejection-witness gate on the represented result-edge crossing (transfer_represented_boundary_value entry), which commit 5ec0ab42f bypassed when it rerouted the specialized-join consumer off transfer_into_carrier. Single-locus, entry-not-site, additive fail-closed, keyed on the test-only px8ds_retired_flat_order flag (strict no-op in production). Restores the exact boundary.rs:1047 raw-closure refusal the px8ds negative control asserts, without touching the legitimate D3 represented result-edge crossing."
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none

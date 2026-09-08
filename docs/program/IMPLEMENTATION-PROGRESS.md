@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-08 15:18:36Z — from 570 issue file(s) in `docs/program/issues/`.
+2026-09-08 15:37:26Z — from 570 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -495,7 +495,7 @@ the committed file matches the generator's output.
 | `RT-PLANNER-UNITS-ABI-SPLIT` | Move the units and ABI domain out of planning/static_transition.rs into its own child module -- abi.rs, predeclared ids, descriptors, slots, call-edge views, pre-emission validation and the read-only EmittableUnit boundary form the phase's strongest closed seam, and it is the first planner domain | merged | runtime | L | none | — |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
-| `RT-PX8DS-REPRESENTED-CROSSING-GATE` | Restore the retired-flat rejection-witness gate on the represented result-edge crossing (transfer_represented_boundary_value entry), which commit 5ec0ab42f bypassed when it rerouted the specialized-join consumer off transfer_into_carrier. Single-locus, entry-not-site, additive fail-closed, keyed on the test-only px8ds_retired_flat_order flag (strict no-op in production). Restores the exact boundary.rs:1047 raw-closure refusal the px8ds negative control asserts, without touching the legitimate D3 represented result-edge crossing. | active | runtime | S | none | — |
+| `RT-PX8DS-REPRESENTED-CROSSING-GATE` | Restore the retired-flat rejection-witness gate on the represented result-edge crossing (transfer_represented_boundary_value entry), which commit 5ec0ab42f bypassed when it rerouted the specialized-join consumer off transfer_into_carrier. Single-locus, entry-not-site, additive fail-closed, keyed on the test-only px8ds_retired_flat_order flag (strict no-op in production). Restores the exact boundary.rs:1047 raw-closure refusal the px8ds negative control asserts, without touching the legitimate D3 represented result-edge crossing. | merged | runtime | S | none | — |
 | `RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION` | Route the realized RecursiveBackedge protocol marker where it reaches the source-machine ordinary-Match continuation -- the honest hard-stop residual left after the checked-IH realization authority landed | merged | runtime | S | none | — |
 | `RT-RECURSIVE-POSITION-ARM-ARITY` | One recursive position index is pushed unchanged into every plain-Match arm body -- resolve_recursive_unit_body recurses per arm with the eliminator's single position, and args.get(position) refuses on any arm whose constructor does not carry that position, so the branched-scrutinee port descends correctly and then fails inside the arm | merged | runtime | S | none | — |
 | `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2443 |
