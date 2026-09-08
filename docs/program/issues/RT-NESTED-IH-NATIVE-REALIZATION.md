@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-IH-NATIVE-REALIZATION
 title: "Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3"
-status: draft
+status: active
 owner: runtime
 size: L
 gate: none
@@ -11,7 +11,24 @@ github: null
 origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statement of c2's AC-K12 relationship, evt_77pege8j5cv14, requested at evt_6pmftb5fpxrkm. Discharges the second Steward condition on the c1/c2 cut (evt_6z7wf6dw94cym), which required c2 to state that relationship before assignment.
 ---
 
-> ## PREDECESSOR MET 2026-09-08 -- all three `depends_on` now merged; `draft` = NEEDS-FRAMING (mechanism routed to the Architect), no longer blocked-on-predecessor.
+> ## RE-RELEASED `active` 2026-09-08 -- mechanism ruled, D3-D5 frame authored + released to the runtime ring.
+>
+> Architect D3-D5 mechanism ruling `evt_1nkx3f30hqp9y` (grounded @ `4c8f44066`):
+> the `joins.rs:2140` `StaticOriginId(50) classified outside its owning function`
+> frontier is a PRODUCER fix -- correct the STALE owner partition so 50's owning
+> function is the enclosing specialization F (classify the realized checked-IH
+> recursor entry as a TRANSFER edge, not a `StaticBody`/`DeclarationCall` wall;
+> no dead competing G unit), keyed on the compiler-owned oriented plan. NOT a
+> consumption patch, NOT any widening. Shovel-ready frame:
+> `docs/program/wp/RT-NESTED-IH-NATIVE-REALIZATION.md` (4 pinned ACs incl.
+> AC-COMPLETE-PARITY at `Nat 3` and AC-ABI-PIN, the deferred positional
+> `#[cfg(test)]` control). Architect REQUIRED reviewer + Runtime QA on the
+> candidate. Out-of-scope (Architect flag, separate node if a witness surfaces):
+> `define_continuation_context_bodies` `units.rs:4183` missing
+> `validate_join_plan_consumption` -- the OTHER (separately-emitted context fn)
+> realization shape, NOT this witness.
+>
+> ## PREDECESSOR MET 2026-09-08 -- all three `depends_on` now merged; mechanism routed to the Architect (now ruled, see above).
 >
 > [[RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION]] LANDED as squash `897f1ea6a`
 > (PR #3419, 2026-09-08) -- the accepted-partial forward that routes the realized
