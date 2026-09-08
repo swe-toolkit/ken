@@ -261,16 +261,18 @@ fn assert_nested_checked_pipeline_nat(
 #[test]
 fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_frontier() {
     // Promise classes: the plan assertions are normative compatibility vectors
-    // over compiler-owned checked identities. The exact function-ownership
-    // refusal is a transition sentinel for the measured parent frontier.
+    // over compiler-owned checked identities. Native emission and the forwarding
+    // observations are durable invariants; linked result parity is independently
+    // exercised by `rt_nested_ih_native_realization`.
     //
     // MEASURED: the real checked target carries one oriented frame, two slots,
     // two call templates, and Runtime markers bound to each. Native lowering
-    // enters both pending markers, realizes their exact authority, and leaves
-    // the ordinary source Match without a refusal observation.
-    // CLAIMED: that Match forwards the realized RecursiveBackedge protocol
-    // marker before occurrence-plan entry rather than selecting on it.
-    // THE GAP: the new function-ownership refusal is reported, not bypassed.
+    // enters both pending markers, realizes their exact authority, forwards the
+    // recursive backedge before occurrence entry, and emits a verified object.
+    // CLAIMED: checked nested-IH authority and the recursor protocol survive the
+    // dual-emission realization without a selector refusal.
+    // THE GAP: this test proves emission and exact protocol observations, while
+    // the linked-artifact test proves the resulting Nat value.
     let package_name = "nested_inductive_native_stop_pkg";
     let target_name = "liftSizeResult";
     let expected = 3;
@@ -431,8 +433,8 @@ fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_front
     // role, and next continuation, while no occurrence-entry attempt sees the
     // RecursiveBackedge operand.
     // CLAIMED: this is propagation rather than a new value or an occurrence-plan
-    // consumption. THE GAP: the later function-ownership refusal remains outside
-    // this forwarding relation.
+    // consumption. THE GAP: linked execution is checked by the independent
+    // native/interpreter parity test.
     let forwards = observations
         .iter()
         .filter_map(|event| match event {
@@ -483,21 +485,12 @@ fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_front
         "the realized RecursiveBackedge must leave the source Match seat without a refusal: \
          {observations:#?}"
     );
-    match native {
-        Err(ken_runtime::CraneliftBackendError::Backend(
-            ken_runtime::BackendFailure::Module(reason),
-        )) => assert_eq!(
-            reason,
-            "source join StaticOriginId(50) was classified outside its owning function",
-            "the forwarded marker must stop at the exact measured parent frontier"
-        ),
-        Ok(artifact) => panic!(
-            "the nested checked target unexpectedly completed in `{}`; replace the transition \
-             sentinel with native/interpreter parity before accepting that advancement",
-            artifact.entry_symbol
-        ),
-        Err(other) => panic!("the forwarded marker reached a different boundary: {other}"),
-    }
+    let artifact = native.expect("nested checked IH emits after realized-backedge forwarding");
+    assert!(artifact.verifier_passed);
+    assert_eq!(
+        artifact.entry_symbol,
+        "ken_nested_ih_backedge_forward_frontier"
+    );
 }
 
 #[test]
