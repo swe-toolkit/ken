@@ -20,8 +20,6 @@ const NUMERIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const PRETTY_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
-const ARGUMENTS_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
 const EXIT_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
 const DIAGNOSTIC_RENDER_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
@@ -73,10 +71,15 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
         .expect("Capability.Parsing.Decoder must roots-load in dependency order");
     catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Process.Arguments",
+    )
+    .expect("Capability.Process.Arguments must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Capability.Process.Arguments");
     for (source, label) in [
         (NUMERIC_KEN_MD, "Capability.Parsing.Numeric"),
         (PRETTY_KEN_MD, "Capability.Formatting.Doc"),
-        (ARGUMENTS_KEN_MD, "Capability.Process.Arguments"),
         (EXIT_KEN_MD, "Capability.Process.Exit"),
     ] {
         env.elaborate_ken_md_file(source)
