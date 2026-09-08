@@ -9,8 +9,6 @@ use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const DIAGNOSTIC_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 const DECODER_KEN_MD: &str =
@@ -40,13 +38,22 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Capability.Diagnostics.Core",
-    )
-    .expect("Capability.Diagnostics.Core must roots-load fourth");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Capability.Diagnostics.Core must roots-load fourth");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env
+}
+
+fn load_cursor_module(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Capability.Parsing.Cursor must roots-load");
+    catalog_or::expose_module(env, "Capability.Parsing.Cursor");
+}
+
+fn load_decoder_module(env: &mut ElabEnv) {
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+        .expect("Capability.Parsing.Decoder must roots-load");
+    catalog_or::expose_module(env, "Capability.Parsing.Decoder");
 }
 
 #[test]
@@ -153,7 +160,12 @@ fn transparent_cursor_bodies_routing_length_to_normalizer_remaining(
             (arguments.len() == normalizer_arity
                 && matches!(head, Term::Const { id, .. } if *id == normalizer)
                 && is_saturated_provider_application(arguments[0], provider, provider_arity))
-            .then(|| local.to_owned())
+            .then(|| {
+                local
+                    .strip_prefix("Capability.Parsing.Cursor.")
+                    .unwrap_or(local)
+                    .to_owned()
+            })
         })
         .collect()
 }
@@ -254,8 +266,7 @@ fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
     let mut env = dependency_env();
     let before_globals: BTreeSet<_> = env.globals.values().copied().collect();
     let before_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Cursor must elaborate through its selective import");
+    load_cursor_module(&mut env);
     let after_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let new_trust_names: BTreeSet<_> = after_trust
         .difference(&before_trust)
@@ -326,8 +337,7 @@ fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
 #[test]
 fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
     let mut env = dependency_env();
-    env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Capability.Parsing.Cursor must elaborate after the core closure");
+    load_cursor_module(&mut env);
     assert_transparent_globals(
         &env,
         &[
@@ -349,8 +359,7 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
         ],
     );
 
-    env.elaborate_ken_md_file(DECODER_KEN_MD)
-        .expect("Capability.Parsing.Decoder must elaborate after Capability.Parsing.Cursor");
+    load_decoder_module(&mut env);
     assert_transparent_globals(
         &env,
         &[
@@ -441,10 +450,8 @@ fn cc3_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
 
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Capability.Parsing.Cursor must elaborate");
-    env.elaborate_ken_md_file(DECODER_KEN_MD)
-        .expect("Capability.Parsing.Decoder must elaborate");
+    load_cursor_module(&mut env);
+    load_decoder_module(&mut env);
     env.elaborate_ken_md_file(PARSING_KEN_MD)
         .expect("Capability.Parsing must elaborate");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
@@ -457,8 +464,7 @@ fn cc3_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
 fn cursor_reuses_canonical_nat_operations_with_zero_trust_delta() {
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Capability.Parsing.Cursor must elaborate");
+    load_cursor_module(&mut env);
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "Cursor reuse must add zero trust");
 
@@ -637,10 +643,8 @@ fn repetition_progress_and_arg_locations_impl() {
 #[allow(dead_code)]
 fn full_env() -> ElabEnv {
     let mut env = dependency_env();
-    env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Capability.Parsing.Cursor must elaborate");
-    env.elaborate_ken_md_file(DECODER_KEN_MD)
-        .expect("Capability.Parsing.Decoder must elaborate");
+    load_cursor_module(&mut env);
+    load_decoder_module(&mut env);
     env.elaborate_ken_md_file(PARSING_KEN_MD)
         .expect("Capability.Parsing must elaborate after Decoder");
     env
