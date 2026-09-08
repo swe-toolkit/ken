@@ -275,6 +275,9 @@ runtime_host_spine_v1! {
     file_operation_remove_file,
     file_operation_remove_directory,
     dir_entry,
+    // ABI-S1 appends descriptor-operation identities.
+    file_operation_seek,
+    file_operation_set_length,
 }
 
 /// The decoded, validated checked-runtime role record.

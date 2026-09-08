@@ -4276,6 +4276,8 @@ pub struct FSIds {
     pub op_remove_directory_id: GlobalId,
     pub op_rename_id: GlobalId,
     pub op_change_mode_id: GlobalId,
+    pub op_seek_id: GlobalId,
+    pub op_set_length_id: GlobalId,
     pub mk_file_metadata_id: GlobalId,
     pub mk_dir_entry_id: GlobalId,
     pub k_file_id: GlobalId,
@@ -4347,6 +4349,8 @@ impl FSIds {
             op_remove_directory_id: get("OpRemoveDirectory")?,
             op_rename_id: get("OpRename")?,
             op_change_mode_id: get("OpChangeMode")?,
+            op_seek_id: get("OpSeek")?,
+            op_set_length_id: get("OpSetLength")?,
             mk_file_metadata_id: get("MkFileMetadata")?,
             mk_dir_entry_id: get("MkDirEntry")?,
             k_file_id: get("KFile")?,
@@ -4641,6 +4645,8 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                         ken_host::FsCapabilityOperationV1::RenameDestination
                     }
                     FsOpKind::ChangeMode => ken_host::FsCapabilityOperationV1::ChangeMode,
+                    FsOpKind::Seek => ken_host::FsCapabilityOperationV1::Seek,
+                    FsOpKind::SetLength => ken_host::FsCapabilityOperationV1::SetLength,
                 },
                 held_rights,
             }
@@ -4672,6 +4678,8 @@ fn from_denial_v1(error: &ken_host::CapabilityDeniedV1) -> CapabilityDenied {
                 ken_host::FsCapabilityOperationV1::RenameSource => FsOpKind::RenameSource,
                 ken_host::FsCapabilityOperationV1::RenameDestination => FsOpKind::RenameDestination,
                 ken_host::FsCapabilityOperationV1::ChangeMode => FsOpKind::ChangeMode,
+                ken_host::FsCapabilityOperationV1::Seek => FsOpKind::Seek,
+                ken_host::FsCapabilityOperationV1::SetLength => FsOpKind::SetLength,
             },
             held_rights: *held_rights,
         },
@@ -5610,6 +5618,9 @@ fn reify_host_reply_v1(
                 make_ctor(fs.read_some_id, vec![span, count], store)
             }
         },
+        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::FilePosition(
+            position,
+        )) => EvalVal::BigInt(BigInt::from(position)),
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::WriteProgress(
             ken_host::WriteProgressV1::Wrote(transferred),
         )) => {
@@ -6708,6 +6719,8 @@ mod px5b_effect_observation_tests {
             op_remove_directory_id: id(),
             op_rename_id: id(),
             op_change_mode_id: id(),
+            op_seek_id: id(),
+            op_set_length_id: id(),
             nil_id: id(),
             cons_id: id(),
             mk_file_metadata_id: id(),

@@ -260,6 +260,8 @@ fn runtime_producible_constructors(
         file_operation_remove_file,
         file_operation_remove_directory,
         dir_entry,
+        file_operation_seek,
+        file_operation_set_length,
     } = symbols;
     // Every field is a constructor the native runtime can put in front of a
     // match: host-effect responses, process-entry inputs, and the primitive
@@ -318,6 +320,8 @@ fn runtime_producible_constructors(
         file_operation_remove_file,
         file_operation_remove_directory,
         dir_entry,
+        file_operation_seek,
+        file_operation_set_length,
     ]
     .into_iter()
     .cloned()

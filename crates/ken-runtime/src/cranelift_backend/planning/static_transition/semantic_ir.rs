@@ -137,10 +137,13 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     DirEntry,
     ListNil,
     ListCons,
+    /// ABI-S1 descriptor-operation error identities append without moving prior roles.
+    FileOperationSeek,
+    FileOperationSetLength,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 43] = [
+    pub(super) const ALL: [Self; 45] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -184,6 +187,8 @@ impl SynthesizedFixedConstructorRole {
         Self::DirEntry,
         Self::ListNil,
         Self::ListCons,
+        Self::FileOperationSeek,
+        Self::FileOperationSetLength,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -231,6 +236,8 @@ impl SynthesizedFixedConstructorRole {
             Self::DirEntry => &symbols.dir_entry,
             Self::ListNil => &symbols.list_nil,
             Self::ListCons => &symbols.list_cons,
+            Self::FileOperationSeek => &symbols.file_operation_seek,
+            Self::FileOperationSetLength => &symbols.file_operation_set_length,
         }
     }
 }
