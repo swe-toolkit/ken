@@ -621,6 +621,18 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude SystemError failed: {e}")))?;
     elab.elaborate_decl(
+        "fn file_error_to_system (error : FileError) : SystemError = \
+         match error { \
+           MkFileError operation resource identity |-> \
+             MkSystemError \
+               (FilesystemOp operation) \
+               (FilesystemResource resource) \
+               identity \
+               NoSafeContext \
+         }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude file_error_to_system failed: {e}")))?;
+    elab.elaborate_decl(
         "fn error_transience (identity : IOError) : Transience = \
          match identity { \
            NotFound |-> Permanent; \

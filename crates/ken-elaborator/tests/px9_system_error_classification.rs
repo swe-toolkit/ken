@@ -1,6 +1,6 @@
 //! PX9-INC1 domain-general system errors and two-axis retry classification.
 //!
-//! Sources: PX9-C (`spec/40-effects/41-system-effects.md` §1.8) and the
+//! Sources: PX9-C (`spec/30-surface/38-ffi-io.md` §1.8) and the
 //! Architect's PX9-INC1 D0 reconciliation ruling. These controls are durable
 //! invariants except for the exact constructor inventories, which are normative
 //! compatibility vectors: adding a domain is deliberately additive and must
