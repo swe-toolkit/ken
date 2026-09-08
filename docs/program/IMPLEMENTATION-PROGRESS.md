@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-08 11:23:39Z — from 565 issue file(s) in `docs/program/issues/`.
+2026-09-08 11:37:20Z — from 566 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -476,6 +476,7 @@ the committed file matches the generator's output.
 | `RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY` | CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition | closed | runtime | M | none | — |
 | `RT-NESTED-IH-NATIVE-REALIZATION` | Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3 | merged | runtime | L | none | — |
 | `RT-OVERCONSTRUCTED-OUTER-RECOGNITION` | Establish that no emitted call can name an outer static-worker transport, and classify which repair shapes that permits -- the repair itself is OUT OF SCOPE and moved to RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT | closed | runtime | M | none | — |
+| `RT-PARITY-NATIVE-GOLDEN-REBASELINE` | Re-baseline the two base-red rt_parity_native checked_ih sentinels (drop-capture absolute StaticOriginId + admission-population-is-total set) so the native-slow CI job goes green, preferring relationship/cardinality assertions over brittle absolute ids | draft | runtime | S | none | — |
 | `RT-PARITY` | interpreter/native parity erratum (adversary F5 + F6) | closed | runtime | M | none | — |
 | `RT-PLANNED-CLOSURE-PREEXISTENCE` | Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction? | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2317 |
 | `RT-PLANNER-AGGREGATES-SPLIT` | Move the aggregates domain out of planning/static_transition.rs -- aggregate allocation events, relation closures and their planner-side lifecycle | merged | runtime | M | none | — |

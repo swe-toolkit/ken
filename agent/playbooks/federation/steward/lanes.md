@@ -71,6 +71,26 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 > Operator active. Roster STRUCTURE unchanged (three lanes, runtime / language /
 > foundation). New this session:
 >
+> - **[LATER 2026-09-08 — read first] RT-NESTED-IH CHAIN CLOSED; L3 RETURNS TO
+>   CATALOG.** Lane 1: RT-NESTED-IH-NATIVE-REALIZATION D3-D5 merged (admin-merge
+>   6172f95a7, PR #3422; the HS#1-HS#7 chain is closed). KERNEL-NESTED-IND is the
+>   next lane-1 objective (all 7 deps merged/closed) but the kernel ring is
+>   UNSEATED (no tmux session) — its release is pending an operator RESEAT
+>   decision (reseat kernel into lane 1 vs parallel-with-runtime-ABI vs hold),
+>   surfaced to Pat. Lane 3: PX9 COMPLETE (merged e4e66d120), and operator (Pat)
+>   ruled "L3 should return to catalog work" — so lane 3 reverts from PX9 to the
+>   CAT-SCAFFOLD-RETIREMENT scaffold-retirement campaign (active umbrella,
+>   Architect 5-tier DAG). The PX9-INC2 directive below is DISCHARGED; the
+>   pre-detour CAT hold (CAT-NAT-REUSE D6 on the Arm A/Arm B decision) is STALE
+>   (D6 landed, Arm A ruled, CAT-NAT-REUSE-CONSUMERS merged). Next scaffold tier
+>   = TIER D (Capability), UNFRAMED (foundation-leader evt_25e4ces4x6mgd: first
+>   internal slice DC + Doc -> Cursor, then Decoder, then
+>   Numeric/Parsing/Process.Arguments; CAT-C2 is Spec/Ergo-owned, NOT a scaffold
+>   tier). Steward owns the Tier-D frame (in progress). Released to
+>   foundation-leader evt_6ke5jayq4av32. Also filed
+>   RT-PARITY-NATIVE-GOLDEN-REBASELINE (draft, queued, operator-concurred) for the
+>   base-red native-slow rt_parity_native sentinels.
+>
 > - **Lane 3 (foundation): operator ruled DO PX9 INCREMENT 2 NOW.** Operator, Pat,
 >   2026-09-08, verbatim intent: "Do INC2 now, or else it is just tech debt. How
 >   your bookkeeping works in terms of what this is part of is up to you." This
