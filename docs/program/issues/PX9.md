@@ -1,7 +1,7 @@
 ---
 id: PX9
 title: "cross-domain System.Error — semantic identity, raw errno, operation, resource, safe context, and honest retry classification"
-status: active
+status: merged
 owner: foundation
 size: L
 gate: none

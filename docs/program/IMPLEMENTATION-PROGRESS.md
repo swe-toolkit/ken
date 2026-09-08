@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-08 03:58:05Z — from 565 issue file(s) in `docs/program/issues/`.
+2026-09-08 07:41:33Z — from 565 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -287,7 +287,7 @@ the committed file matches the generator's output.
 | `PX8-SPAN-PROV` | PX8 clause-(b) gap — BufferSpan carries no originating-buffer identity; freeze accepts a same-shape span from a different buffer | merged | spec-enclave | M | none | 914 |
 | `PX8-WROTE-ABS` | PX8 clause-(a) evidence gap — interpreter capped-short Wrote lacks an absolute oracle; PR-C error identities unreached | merged | verify | S | none | — |
 | `PX8` | partial/positioned IO — the completion program's root; closure condition | closed | runtime | L | none | — |
-| `PX9` | cross-domain System.Error — semantic identity, raw errno, operation, resource, safe context, and honest retry classification | active | foundation | L | none | — |
+| `PX9` | cross-domain System.Error — semantic identity, raw errno, operation, resource, safe context, and honest retry classification | merged | foundation | L | none | — |
 | `Q-CLAIM-CLOSURE` | Q-RESIDUE adversary findings — claim-loss in multi-claim test blocks, plus R1/R2/R3 | merged | runtime | S | none | — |
 | `Q-CLAIM-COMPARE-ORD` | claim-loss in list_instance_routes... (compare_ord) — both routing claims dropped, replacement only instantiates Bool | merged | runtime | XS | none | — |
 | `Q-RESIDUE` | the Track Q rework residue — 10 tests, folded from Q3-Q7 | closed | runtime | S | none | 818 |
@@ -632,17 +632,13 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
-- `ABI-S1` blocked by `PX9` (status: active)
-- `ABI-S5` blocked by `PX9` (status: active)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
-- `PX10` blocked by `PX9` (status: active)
 - `PX10` blocked by `ABI-S5` (status: draft)
-- `PX11` blocked by `PX9` (status: active)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
