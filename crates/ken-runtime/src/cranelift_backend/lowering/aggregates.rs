@@ -956,6 +956,52 @@ impl<'a> Lowering<'a> {
                             "a represented boundary closure disagrees with its exact owner, code identity, or captured-environment schema",
                         ));
                     }
+                    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                    {
+                        let planned = self
+                            .static_transition_plan
+                            .aggregate_record_view(*record)?;
+                        let allocation = match planned.allocation() {
+                            PlannedAggregateAllocation::PersistentGround => {
+                                "PersistentGround"
+                            }
+                            PlannedAggregateAllocation::InvocationAggregate => {
+                                "InvocationAggregate"
+                            }
+                        };
+                        let lifetime = match planned.meet() {
+                            PlannedReferentLifetime::Persistent => "Persistent",
+                            PlannedReferentLifetime::ActivationOwned => {
+                                "ActivationOwned"
+                            }
+                        };
+                        record_checked_ih_realization_observation(
+                            CheckedIhRealizationObservation::BoundaryClosureTransfer {
+                                owner: format!("{:?}", environment.owner()),
+                                seat: environment.seat().observation_ordinal(),
+                                body_origin: environment
+                                    .body_origin()
+                                    .observation_ordinal(),
+                                capture_origins: environment
+                                    .capture_origins()
+                                    .iter()
+                                    .map(|origin| origin.observation_ordinal())
+                                    .collect(),
+                                capture_phases: captures
+                                    .iter()
+                                    .map(|capture| match capture {
+                                        LoweringOperand::Carried(_) => "Carried",
+                                        LoweringOperand::Specialized(_) => {
+                                            "Specialized"
+                                        }
+                                    })
+                                    .collect(),
+                                record: record.observation_ordinal(),
+                                allocation,
+                                lifetime,
+                            },
+                        );
+                    }
                     for capture in captures {
                         if let LoweringOperand::Specialized(value) = capture {
                             self.represented_boundary_admissibility(value)?;

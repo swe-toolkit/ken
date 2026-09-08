@@ -4146,6 +4146,23 @@ pub enum CheckedIhRealizationObservation {
     SourceMatchOccurrencePlanEntryAttempt {
         operand_kind: &'static str,
     },
+    EmissionJoinCloseout {
+        function: u32,
+        body_origin: u32,
+        required: Vec<u32>,
+        consumed: Vec<u32>,
+        dispositioned: Vec<u32>,
+    },
+    BoundaryClosureTransfer {
+        owner: String,
+        seat: u32,
+        body_origin: u32,
+        capture_origins: Vec<u32>,
+        capture_phases: Vec<&'static str>,
+        record: u32,
+        allocation: &'static str,
+        lifetime: &'static str,
+    },
 }
 
 #[cfg(any(test, feature = "checked-ih-realization-observation"))]

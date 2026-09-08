@@ -5,6 +5,13 @@ fn output_dir() -> tempfile::TempDir {
         .unwrap()
 }
 
+fn observations_agree(
+    native: &ken_runtime::EffectObservation,
+    interpreted: &ken_runtime::EffectObservation,
+) -> bool {
+    native == interpreted
+}
+
 const NESTED_NAT_THREE: &str = r#"program capabilities FS APartial
 
 data Bag (a : Type) : Type where {
@@ -95,7 +102,24 @@ fn nested_checked_ih_native_result_is_exactly_interpreter_nat_three() {
     )
     .expect("nested checked IH linked artifact runs");
 
-    assert_eq!(native, interpreted);
+    assert!(
+        observations_agree(&native, &interpreted),
+        "native and interpreter observations diverged: native={native:?}, \
+         interpreted={interpreted:?}"
+    );
+
+    // Negative differential control. MEASURED: perturbing only the observed
+    // native exit makes the same comparator disagree. CLAIMED: the positive
+    // parity result depends on comparing both executor outputs. THE GAP: this
+    // mutation validates the comparator, while the production test above is the
+    // reaching witness for the native execution path.
+    let mut perturbed_native = native.clone();
+    perturbed_native.exit_status = 32;
+    assert!(
+        !observations_agree(&perturbed_native, &interpreted),
+        "the differential accepted a deliberately wrong native Nat observation"
+    );
+
     assert_eq!(native.exit_status, 0, "the result was not exactly Nat 3");
     assert_eq!(native.terminal_error, None);
     assert_eq!(

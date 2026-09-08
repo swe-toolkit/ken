@@ -44,6 +44,11 @@ impl StaticOriginId {
     pub(in crate::cranelift_backend) const fn for_test(id: u32) -> Self {
         Self(id)
     }
+
+    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+    pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
+        self.0
+    }
 }
 
 /// One planned source occurrence: the borrowed term, paired with the origin the

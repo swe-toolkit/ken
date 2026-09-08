@@ -29,6 +29,11 @@ impl PredeclaredFunctionId {
     pub(in crate::cranelift_backend) const fn for_test(id: u32) -> Self {
         Self(id)
     }
+
+    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+    pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
+        self.0
+    }
 }
 
 /// **`RT-FNSPLIT-B2F` `D1` — the emitter's read-only view of ONE validated

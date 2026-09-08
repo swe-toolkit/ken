@@ -2145,7 +2145,33 @@ impl<'a> Lowering<'a> {
             let required = self
                 .static_transition_plan
                 .required_join_origins(function, body_occurrence)?;
-            self.finalize_join_disposition(&required)
+            let outcome = self.finalize_join_disposition(&required);
+            #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+            if outcome.is_ok() {
+                record_checked_ih_realization_observation(
+                    CheckedIhRealizationObservation::EmissionJoinCloseout {
+                        function: function.observation_ordinal(),
+                        body_origin: body_occurrence.observation_ordinal(),
+                        required: required
+                            .iter()
+                            .map(|origin| origin.observation_ordinal())
+                            .collect(),
+                        consumed: self
+                            .function_local
+                            .consumed_join_origins
+                            .iter()
+                            .map(|origin| origin.observation_ordinal())
+                            .collect(),
+                        dispositioned: self
+                            .function_local
+                            .dispositioned_join_origins
+                            .iter()
+                            .map(|origin| origin.observation_ordinal())
+                            .collect(),
+                    },
+                );
+            }
+            outcome
         }
 }
 
