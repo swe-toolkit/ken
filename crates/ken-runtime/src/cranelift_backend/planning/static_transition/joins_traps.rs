@@ -21,7 +21,8 @@ use std::collections::BTreeSet;
 
 use super::{
     planner_capacity_error, planner_error, AbiSchedulingIngress, AbiSlotKind, AbiUnitDefinition,
-    CraneliftBackendError, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    CraneliftBackendError, EdgeKind, PredeclaredFunctionId, StaticOriginId,
+    StaticTransitionPlan,
 };
 use super::construction::Planner;
 use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode};
@@ -112,7 +113,7 @@ enum ResultPhase {
 #[cfg(test)]
 thread_local! {
     static D8_FORCE_VARIABLE_SPECIALIZED: Cell<bool> = const { Cell::new(false) };
-    static D8_REMOVE_VARIABLE_CALLABLE_SEED: Cell<bool> = const { Cell::new(false) };
+    static D8_REMOVE_VARIABLE_CALLABLE_SUMMARY: Cell<bool> = const { Cell::new(false) };
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -174,6 +175,33 @@ impl ResultPhaseSummary {
             callable_result: other.callable_result,
         }
     }
+}
+
+/// Whether this callable body belongs to the source unit containing a
+/// reconciled checked-IH recursor transfer.
+///
+/// The query is per body owner and reads the reconciled edge kind; it does not
+/// classify a source spelling, a runtime predecessor, or the plan-wide presence
+/// of some unrelated checked computation. The negative c2 fixture and positive
+/// LiftRose fixture make both directions observable.
+fn body_owner_contains_realized_recursor(
+    plan: &StaticTransitionPlan<'_>,
+    body_origin: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    let Some(owner) = plan.semantic.function_owner(body_origin)? else {
+        return Ok(false);
+    };
+    for edge in &plan.edges {
+        if edge.kind == EdgeKind::RealizedRecursorTransfer
+            && plan
+                .semantic
+                .function_owner(StaticOriginId(edge.from.0))?
+                == Some(owner)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn is_source_join(expr: &RuntimeExpr) -> bool {
@@ -302,7 +330,24 @@ fn summarize_result_phase(
                     ..scrutinee
                 }));
                 case_environment.extend_from_slice(environment);
-                result = result.join(summarize_child(1 + index, &case_environment, joins)?);
+                let mut case_result =
+                    summarize_child(1 + index, &case_environment, joins)?;
+                if scrutinee.phase == ResultPhase::SpecializedOnly
+                    && matches!(
+                        &case.body,
+                        RuntimeExpr::LexicalClosure { params, .. }
+                            if params.len() == case.binders
+                    )
+                {
+                    // The specialized Match emitter applies this exact closure
+                    // to the matched fields instead of returning the closure as
+                    // the arm value. A carried scrutinee cannot take that static
+                    // path, so its closure result remains CarrierRequired. This
+                    // is an emission-phase distinction, not a source-wide union.
+                    case_result.phase = ResultPhase::SpecializedOnly;
+                    case_result.callable_result = None;
+                }
+                result = result.join(case_result);
             }
             result
         }
@@ -433,11 +478,10 @@ fn summarize_result_phase(
             if D8_FORCE_VARIABLE_SPECIALIZED.with(Cell::get) {
                 ResultPhaseSummary::SPECIALIZED
             } else {
-                if D8_REMOVE_VARIABLE_CALLABLE_SEED.with(Cell::get) {
-                    ResultPhaseSummary {
-                        callable_result: None,
-                        ..phase
-                    }
+                if D8_REMOVE_VARIABLE_CALLABLE_SUMMARY.with(Cell::get)
+                    && phase.callable_result.is_some()
+                {
+                    ResultPhaseSummary::SPECIALIZED
                 } else {
                     phase
                 }
@@ -447,15 +491,23 @@ fn summarize_result_phase(
         }
         RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {
             let body_origin = child(0)?;
-            ResultPhaseSummary::callable(
-                if functionized_units
-                    && plan.semantic.crosses_function_owner(origin, body_origin)?
-                {
-                    ResultPhase::CarrierRequired
-                } else {
-                    ResultPhase::SpecializedOnly
-                },
-            )
+            let crosses_owner = plan.semantic.crosses_function_owner(origin, body_origin)?;
+            let callable_result = if functionized_units && crosses_owner {
+                ResultPhase::CarrierRequired
+            } else {
+                ResultPhase::SpecializedOnly
+            };
+            let mut summary = ResultPhaseSummary::callable(callable_result);
+            // A closure whose body is emitted as another function is itself a
+            // boundary value when a source join returns it. This is independent
+            // of the representation produced when the closure is invoked.
+            if functionized_units
+                && crosses_owner
+                && body_owner_contains_realized_recursor(plan, body_origin)?
+            {
+                summary.phase = ResultPhase::CarrierRequired;
+            }
+            summary
         }
         RuntimeExpr::Value(_)
         | RuntimeExpr::DeclarationRef { .. }
@@ -666,36 +718,156 @@ impl<'src> StaticTransitionPlan<'src> {
         }))
     }
 
-    /// Every source-join contract owned by one generated function.
+    /// Every source-join contract owned by one generated emission.
     ///
-    /// This is a projection of the already-validated occurrence population and
-    /// semantic owner partition. Lowering uses it only as the closed expected
-    /// set for its end-of-function consumption check; it cannot add or omit a
-    /// join by maintaining a second caller inventory.
+    /// `(function, body_occurrence)` is the existing planner-issued emission
+    /// identity. A realized checked-IH body can occur both in its source unit
+    /// and in one or more retained workers, so source ownership alone is not an
+    /// emission partition. This projection keeps the source owner as the
+    /// traversal boundary, but assigns nested retained bodies to their own ABI
+    /// descriptors. A realized transfer target itself remains in the source
+    /// emission; only its retained body interior moves behind the worker's real
+    /// call boundary.
     pub(in crate::cranelift_backend) fn required_join_origins(
         &self,
         function: PredeclaredFunctionId,
+        body_occurrence: StaticOriginId,
     ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
-        let mut required = BTreeSet::new();
-        for (index, (occurrence, join)) in self
-            .source_occurrences
+        self.emission_source_origins(function, body_occurrence)?
+            .into_iter()
+            .filter_map(|origin| {
+                self.join_results
+                    .get(origin.0 as usize)
+                    .copied()
+                    .flatten()
+                    .map(|_| Ok(origin))
+            })
+            .collect()
+    }
+
+    /// The exact source occurrences lowered by one predeclared emission.
+    ///
+    /// Retained-worker descriptors are already sealed by the ABI plane. This
+    /// method projects their nesting; it neither mints an emission identity nor
+    /// reads a runtime selector. Base source units keep each realized transfer
+    /// target, while a retained worker stops at a nested worker boundary.
+    pub(in crate::cranelift_backend) fn emission_source_origins(
+        &self,
+        function: PredeclaredFunctionId,
+        body_occurrence: StaticOriginId,
+    ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+        let units = self.emittable_units()?;
+        let matching = units
             .iter()
-            .zip(&self.join_results)
-            .enumerate()
-        {
-            let (Some(occurrence), Some(_)) = (occurrence, join) else {
-                continue;
-            };
-            if occurrence.static_origin.0 as usize != index {
-                return Err(planner_error(
-                    "join consumption population is not keyed by source origin",
-                ));
+            .filter(|unit| unit.function() == function)
+            .collect::<Vec<_>>();
+        let [unit] = matching.as_slice() else {
+            return Err(planner_error(
+                "source-emission identity does not name exactly one emittable unit",
+            ));
+        };
+        if unit.body_occurrence() != body_occurrence {
+            return Err(planner_error(
+                "source-emission body disagrees with its planner-issued unit identity",
+            ));
+        }
+
+        let base = self
+            .semantic
+            .functions
+            .iter()
+            .any(|candidate| candidate.id == function);
+        let workers = units
+            .iter()
+            .filter(|candidate| {
+                !self
+                    .semantic
+                    .functions
+                    .iter()
+                    .any(|base| base.id == candidate.function())
+            })
+            .copied()
+            .collect::<Vec<_>>();
+
+        let mut owned = if base {
+            let mut owned = BTreeSet::new();
+            for occurrence in self.source_occurrences.iter().flatten() {
+                if self.semantic.function_owner(occurrence.static_origin)? == Some(function) {
+                    owned.insert(occurrence.static_origin);
+                }
             }
-            if self.semantic.function_owner(occurrence.static_origin)? == Some(function) {
-                required.insert(occurrence.static_origin);
+            owned
+        } else {
+            self.source_origins_in_owner_subtree(body_occurrence)?
+        };
+
+        if base {
+            for worker in workers {
+                let AbiUnitDefinition::ClosureBody {
+                    defining_origin, ..
+                } = worker.definition()
+                else {
+                    return Err(planner_error(
+                        "a non-source emission is not a retained closure body",
+                    ));
+                };
+                if self.semantic.function_owner(defining_origin)? != Some(function) {
+                    continue;
+                }
+                for nested in self.source_origins_in_owner_subtree(worker.body_occurrence())? {
+                    owned.remove(&nested);
+                }
+                // The realized transfer endpoint remains part of the in-place
+                // source emission even though its retained interior has a
+                // distinct worker realization.
+                owned.insert(worker.body_occurrence());
+            }
+        } else {
+            let snapshot = owned.clone();
+            for worker in workers {
+                if worker.function() == function {
+                    continue;
+                }
+                let AbiUnitDefinition::ClosureBody {
+                    defining_origin, ..
+                } = worker.definition()
+                else {
+                    return Err(planner_error(
+                        "a non-source emission is not a retained closure body",
+                    ));
+                };
+                if !snapshot.contains(&defining_origin) {
+                    continue;
+                }
+                for nested in self.source_origins_in_owner_subtree(worker.body_occurrence())? {
+                    owned.remove(&nested);
+                }
             }
         }
-        Ok(required)
+        Ok(owned)
+    }
+
+    fn source_origins_in_owner_subtree(
+        &self,
+        root: StaticOriginId,
+    ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+        let owner = self
+            .semantic
+            .function_owner(root)?
+            .ok_or_else(|| planner_error("source subtree root has no function owner"))?;
+        let mut pending = vec![root];
+        let mut visited = BTreeSet::new();
+        while let Some(origin) = pending.pop() {
+            if !visited.insert(origin) {
+                continue;
+            }
+            if self.semantic.function_owner(origin)? != Some(owner) {
+                visited.remove(&origin);
+                continue;
+            }
+            pending.extend(self.semantic.child_origins(origin)?.iter().copied());
+        }
+        Ok(visited)
     }
 
     /// Planned joins in one source subtree that remain in its function owner.
@@ -1149,18 +1321,21 @@ mod tests {
         );
     }
 
-    /// Reversible population-side mutation: removing only the callable-result
-    /// seed from `Var` must red at the exact plan assertion before lowering.
+    /// Reversible population-side mutation: removing the complete callable
+    /// summary from `Var` must red at the exact plan assertion before lowering.
+    /// This preserves non-callable carrier seeds while deleting both facts a
+    /// functionized closure contributes: its value crosses a boundary and its
+    /// invocation returns a carried result.
     #[test]
-    fn d8_callable_seed_removal_reds_at_the_plan_boundary() {
-        D8_REMOVE_VARIABLE_CALLABLE_SEED.with(|forced| forced.set(true));
+    fn d8_callable_summary_removal_reds_at_the_plan_boundary() {
+        D8_REMOVE_VARIABLE_CALLABLE_SUMMARY.with(|forced| forced.set(true));
         let result = std::panic::catch_unwind(|| {
             assert_d8_bound_callable_join_is_carrier(false);
         });
-        D8_REMOVE_VARIABLE_CALLABLE_SEED.with(|forced| forced.set(false));
+        D8_REMOVE_VARIABLE_CALLABLE_SUMMARY.with(|forced| forced.set(false));
         assert!(
             result.is_err(),
-            "removing the bound callable seed did not red the plan assertion"
+            "removing the bound callable summary did not red the plan assertion"
         );
     }
 

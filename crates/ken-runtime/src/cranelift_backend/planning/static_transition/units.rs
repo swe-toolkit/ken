@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use super::abi::{self, AbiFrameHeader, AbiSlot, AbiUnitDefinition};
 use super::occurrences::{origin_of, StaticOriginId};
 use super::{
-    planner_error, CraneliftBackendError, StaticNodeId, StaticTransitionPlan,
+    planner_error, CraneliftBackendError, EdgeKind, StaticNodeId, StaticTransitionPlan,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -28,6 +28,11 @@ impl PredeclaredFunctionId {
     #[cfg(test)]
     pub(in crate::cranelift_backend) const fn for_test(id: u32) -> Self {
         Self(id)
+    }
+
+    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+    pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
+        self.0
     }
 }
 
@@ -238,7 +243,7 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn emittable_call_edges(
         &self,
     ) -> Result<Vec<EmittableCallEdge>, CraneliftBackendError> {
-        let mut calls = self
+        let mut source_calls = self
             .semantic
             .static_body_call_edges(&self.edges)?
             .into_iter()
@@ -250,7 +255,7 @@ impl StaticTransitionPlan<'_> {
                 kind: EmittableCallKind::StaticBody,
             })
             .collect::<Vec<_>>();
-        calls.extend(
+        source_calls.extend(
             self.semantic
                 .declaration_call_edges(&self.edges)?
                 .into_iter()
@@ -264,6 +269,111 @@ impl StaticTransitionPlan<'_> {
                     },
                 ),
         );
+
+        let units = self.emittable_units()?;
+        let workers = units
+            .iter()
+            .filter(|unit| {
+                !self
+                    .semantic
+                    .functions
+                    .iter()
+                    .any(|function| function.id == unit.function())
+            })
+            .copied()
+            .collect::<Vec<_>>();
+        let mut calls = source_calls.clone();
+
+        // A retained worker emits the source calls in its own projected source
+        // population. Duplicate those call identities under the worker's
+        // planner-issued function id; the original source-owner calls remain
+        // available to the in-place realization.
+        for worker in &workers {
+            let owned = self
+                .emission_source_origins(worker.function(), worker.body_occurrence())?;
+            for call in &source_calls {
+                let source_site = match call.kind {
+                    EmittableCallKind::StaticBody => units
+                        .iter()
+                        .find(|unit| unit.function() == call.callee)
+                        .and_then(|unit| match unit.definition() {
+                            AbiUnitDefinition::ClosureBody {
+                                defining_origin, ..
+                            } => Some(defining_origin),
+                            AbiUnitDefinition::SchedulingEntry { .. }
+                            | AbiUnitDefinition::CallableDeclaration { .. }
+                            | AbiUnitDefinition::ContinuationSpecialization { .. }
+                            | AbiUnitDefinition::StaticContinuationFusion { .. } => None,
+                        })
+                        .ok_or_else(|| {
+                            planner_error(
+                                "a static-body call callee has no closure definition origin",
+                            )
+                        })?,
+                    EmittableCallKind::Declaration => call.call_site_origin,
+                };
+                if owned.contains(&source_site) {
+                    calls.push(EmittableCallEdge {
+                        caller: worker.function(),
+                        ..*call
+                    });
+                }
+            }
+        }
+
+        // Checked-IH dual realization leaves the recursor edge non-boundary in
+        // the semantic graph, while the plan-issued retained worker descriptor
+        // carries a distinct callable identity. Project that second identity as
+        // a StaticBody call under every emission containing the defining
+        // closure. No raw graph consumer is widened.
+        for worker in &workers {
+            let AbiUnitDefinition::ClosureBody {
+                defining_origin, ..
+            } = worker.definition()
+            else {
+                return Err(planner_error(
+                    "a non-source emission is not a retained closure body",
+                ));
+            };
+            let matching = self
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.kind == EdgeKind::RealizedRecursorTransfer
+                        && edge.from == StaticNodeId(defining_origin.0)
+                        && edge.to == StaticNodeId(worker.entry_origin().0)
+                })
+                .collect::<Vec<_>>();
+            let [edge] = matching.as_slice() else {
+                return Err(planner_error(
+                    "retained checked-IH worker descriptor does not have exactly one realized recursor edge",
+                ));
+            };
+            let mut callers = vec![self.semantic.function_for_node(edge.from)?];
+            for enclosing in &workers {
+                if enclosing.function() == worker.function() {
+                    continue;
+                }
+                let owned = self.emission_source_origins(
+                    enclosing.function(),
+                    enclosing.body_occurrence(),
+                )?;
+                if owned.contains(&defining_origin) {
+                    callers.push(enclosing.function());
+                }
+            }
+            callers.sort_unstable();
+            callers.dedup();
+            for caller in callers {
+                calls.push(EmittableCallEdge {
+                    caller,
+                    callee: worker.function(),
+                    callee_origin: worker.entry_origin(),
+                    call_site_origin: worker.body_occurrence(),
+                    kind: EmittableCallKind::StaticBody,
+                });
+            }
+        }
         Ok(calls)
     }
 
@@ -500,7 +610,9 @@ mod tests {
         // some unrelated law started firing first.
         assert_eq!(
             err,
-            planner_error("abi descriptor population is not exact for the function unit partition"),
+            planner_error(
+                "abi descriptor population is not exact for the function units and retained workers",
+            ),
             "AC-1: the missing descriptor reached the wrong detector"
         );
 
@@ -1159,8 +1271,8 @@ mod tests {
                 // -- SUBSUMED: descriptors are dense over the partition before
                 //    any edge resolves, which IS forward-declaration --
                 "callee not forward-declared => Backend(PlannerInvariant(\"abi \
-                 descriptor population is not exact for the function unit \
-                 partition\"))"
+                 descriptor population is not exact for the function units and \
+                 retained workers\"))"
                     .to_string(),
                 // -- reaches its own arm, with the EXISTING unsupported result --
                 "imported capture edge => Unsupported(UnsupportedLowering { \

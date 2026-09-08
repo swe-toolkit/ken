@@ -67,6 +67,13 @@ use crate::RuntimeExpr;
 pub(in crate::cranelift_backend) struct AggregateOccurrenceId(
     pub(in crate::cranelift_backend::planning::static_transition) u32,
 );
+
+impl AggregateOccurrenceId {
+    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+    pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
+        self.0
+    }
+}
 /// Which producer an aggregate occurrence record is about.
 ///
 /// The two arms are the two ways an aggregate comes to exist, and they are

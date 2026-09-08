@@ -113,8 +113,8 @@ use super::occurrences::{
 };
 use super::semantic_ir::{
     build_bool_constructor_inventory, build_semantic_plane,
-    build_synthesized_constructor_inventory, SemanticMaterialArena, SemanticPlane,
-    SemanticSourceSeed,
+    build_synthesized_constructor_inventory, positioned_sources, RuntimeExprShape,
+    SemanticMaterialArena, SemanticPlane, SemanticSourceKind, SemanticSourceSeed,
 };
 use super::{
     planner_capacity_error, planner_error, CraneliftBackendError, DeclarationCallTargetClass,
@@ -1105,12 +1105,195 @@ impl<'src> Planner<'src> {
         }
     }
 
+    /// Reconcile the compiler-owned checked-IH recursor bodies that were
+    /// realized in place. Planning first records every lexical closure through
+    /// the ordinary `StaticBody` constructor because the oriented authority is
+    /// represented by the enclosing checked markers, not by a new source form.
+    /// Once the complete source graph exists, those markers identify the exact
+    /// lexical-callee spine whose body edges are tail transfers inside the
+    /// caller rather than callable unit boundaries.
+    ///
+    /// This is the single edge-locus reconciliation. Every downstream consumer
+    /// continues to ask only whether an edge is `StaticBody`; none receives a
+    /// checked-IH exception. The edge, its evidence key, and the companion
+    /// entry-body boundary row change as one transaction before any semantic or
+    /// ABI plane is built.
+    fn reconcile_realized_checked_ih_recursors(&mut self) -> Result<(), CraneliftBackendError> {
+        let sources = positioned_sources(&self.plan.nodes, &self.plan.semantic_sources)?;
+        let mut transfers = BTreeSet::new();
+
+        for slots in &sources {
+            if slots.source
+                != SemanticSourceKind::Expression(RuntimeExprShape::CheckedComputationalIHSlots)
+            {
+                continue;
+            }
+            let [callee] = self.plan.semantic_material.source_children(*slots)? else {
+                return Err(planner_error(
+                    "checked-IH slots marker does not have exactly one body child",
+                ));
+            };
+            let mut callee = *callee;
+            let mut checked_applications = 0usize;
+            loop {
+                let source = sources.get(callee.0 as usize).ok_or_else(|| {
+                    planner_error("checked-IH call spine names an unknown source origin")
+                })?;
+                if source.source != SemanticSourceKind::Expression(RuntimeExprShape::Call) {
+                    break;
+                }
+                let children = self.plan.semantic_material.source_children(*source)?;
+                let Some((next_callee, arguments)) = children.split_first() else {
+                    return Err(planner_error("checked-IH call has no callee child"));
+                };
+                checked_applications = checked_applications
+                    .checked_add(
+                        arguments
+                            .iter()
+                            .filter(|argument| {
+                                sources
+                                    .get(argument.0 as usize)
+                                    .is_some_and(|source| {
+                                        source.source
+                                            == SemanticSourceKind::Expression(
+                                                RuntimeExprShape::CheckedComputationalIHInvocation,
+                                            )
+                                    })
+                            })
+                            .count(),
+                    )
+                    .ok_or_else(|| planner_capacity_error("checked-IH call count exhausted"))?;
+                callee = *next_callee;
+            }
+
+            let mut realized = Vec::with_capacity(checked_applications);
+            for _ in 0..checked_applications {
+                let recursor = sources.get(callee.0 as usize).ok_or_else(|| {
+                    planner_error("checked-IH recursor spine names an unknown source origin")
+                })?;
+                if recursor.source
+                    != SemanticSourceKind::Expression(RuntimeExprShape::LexicalClosure)
+                {
+                    // Checked markers whose call spine does not bottom in the
+                    // lexical recursor chain are not this reconciliation's
+                    // population. Leave all their ordinary StaticBody edges
+                    // unchanged so their existing occurrence/marker validation
+                    // remains authoritative; never partially reconcile a chain.
+                    realized.clear();
+                    break;
+                }
+                let body = self
+                    .plan
+                    .semantic_material
+                    .source_children(*recursor)?
+                    .first()
+                    .copied()
+                    .ok_or_else(|| planner_error("checked-IH lexical recursor has no body child"))?;
+                realized.push((callee, body));
+                callee = body;
+            }
+            for transfer in realized {
+                if !transfers.insert(transfer) {
+                    return Err(planner_error(
+                        "checked-IH recursor edge was elected more than once",
+                    ));
+                }
+            }
+        }
+
+        for (from, to) in transfers {
+            let from_node = StaticNodeId(from.0);
+            let to_node = StaticNodeId(to.0);
+            if self.plan.entries.contains(&to_node)
+                || self.plan.edges.iter().any(|edge| {
+                    edge.kind == EdgeKind::DeclarationCall && edge.to == to_node
+                })
+            {
+                return Err(planner_error(
+                    "checked-IH recursor transfer aliases a callable unit boundary",
+                ));
+            }
+            let matching = self
+                .plan
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.from == from_node
+                        && edge.to == to_node
+                        && edge.kind == EdgeKind::StaticBody
+                })
+                .map(|edge| edge.id)
+                .collect::<Vec<_>>();
+            let [edge_id] = matching.as_slice() else {
+                return Err(planner_error(
+                    "checked-IH recursor does not have exactly one static body edge",
+                ));
+            };
+
+            self.plan.edges[edge_id.0 as usize].kind = EdgeKind::RealizedRecursorTransfer;
+
+            let matching_evidence = self
+                .plan
+                .evidence
+                .iter()
+                .enumerate()
+                .filter(|(_, evidence)| evidence.edge == edge_id.0)
+                .map(|(index, _)| index)
+                .collect::<Vec<_>>();
+            let [evidence_index] = matching_evidence.as_slice() else {
+                return Err(planner_error(
+                    "checked-IH recursor edge does not have exactly one evidence record",
+                ));
+            };
+            let evidence = &mut self.plan.evidence[*evidence_index];
+            if evidence.from != from_node
+                || evidence.to != to_node
+                || evidence.kind != EdgeKind::StaticBody
+            {
+                return Err(planner_error(
+                    "checked-IH recursor edge evidence disagrees before reconciliation",
+                ));
+            }
+            evidence.kind = EdgeKind::RealizedRecursorTransfer;
+
+            let old_helper = PlannedHelperKey::edge(EdgeKind::StaticBody, *edge_id);
+            let new_helper =
+                PlannedHelperKey::edge(EdgeKind::RealizedRecursorTransfer, *edge_id);
+            let helpers = self
+                .plan
+                .planned_helpers
+                .iter()
+                .enumerate()
+                .filter(|(_, helper)| **helper == old_helper)
+                .map(|(index, _)| index)
+                .collect::<Vec<_>>();
+            let [helper_index] = helpers.as_slice() else {
+                return Err(planner_error(
+                    "checked-IH recursor edge does not have exactly one helper key",
+                ));
+            };
+            self.plan.planned_helpers[*helper_index] = new_helper;
+
+            let rows_before = self.plan.planned_entry_bodies.len();
+            self.plan
+                .planned_entry_bodies
+                .retain(|pair| pair.entry != to_node);
+            if self.plan.planned_entry_bodies.len().checked_add(1) != Some(rows_before) {
+                return Err(planner_error(
+                    "checked-IH recursor transfer does not retire exactly one boundary row",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn finish(
         mut self,
         symbols: &crate::NativeProcessSymbols,
         root_ingress: AbiRootIngress,
         functionized_units: bool,
     ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
+        self.reconcile_realized_checked_ih_recursors()?;
         let (synthesized_identities, synthesized_io_roles) =
             build_synthesized_constructor_inventory(&mut self.plan.semantic_material, symbols)?;
         let bool_identities =
@@ -1757,6 +1940,9 @@ mod tests {
     /// therefore says nothing about this one. The informative side is the arm
     /// that would still green if this class were left on the fallback, which is
     /// why the mutation has to be class-selective rather than plan-wide.
+    /// Retained-worker projection now observes the corrupted body pair before
+    /// join closeout, so the exact live detector is the missing graph-derived
+    /// call target rather than the later uncovered-join detector.
     #[test]
     fn collapsing_only_the_static_body_target_class_is_refused() {
         use super::super::semantic_ir::{with_body_occurrence_mutation, BodyOccurrenceMutation};
@@ -1783,13 +1969,15 @@ mod tests {
             BodyOccurrenceMutation::CollapseStaticBodyTargetBody,
             || ac3_emit(&expr, &empty),
         );
-        assert!(
-            collapsed
-                .as_ref()
-                .err()
-                .is_some_and(|message| message.contains("planned source join")),
+        assert_eq!(
+            collapsed,
+            Err(
+                "Backend(Module(\"retained body StaticOriginId(7) has no graph-derived call \
+                 target in this unit\"))"
+                    .to_string()
+            ),
             "AC-3: restoring the retired fallback for this class alone must \
-             recreate the traversal/closeout failure. got {collapsed:?}"
+             corrupt the retained body's exact entry/body call projection"
         );
     }
 

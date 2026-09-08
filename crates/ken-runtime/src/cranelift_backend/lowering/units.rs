@@ -8066,7 +8066,7 @@ fn define_unit_body<M: Module>(
         let body = compiler.retained_body_occurrence(body_origin)?;
         compiler.select_terminal_result_origins(body_origin, body.expr)?;
         let lowered = compiler.lower_expr(&mut builder, body, &env)?;
-        compiler.validate_join_plan_consumption(unit.function)?;
+        compiler.validate_join_plan_consumption(unit.function, unit.body_occurrence)?;
         let (result, outcome) = if is_root {
             match lowered {
                 LoweringOperand::Carried(word) if !compiler.process_object => (
@@ -8184,7 +8184,7 @@ fn define_unit_body<M: Module>(
         "UNIT-BODY done function={:?} origin={:?} root={:?}",
         unit.function, unit.body_occurrence, root_outcome.as_ref().map(|_| "root")
     ));
-    compiler.validate_materialized_dead_join_cfg(unit.function, &func)?;
+    compiler.validate_materialized_dead_join_cfg(unit.function, unit.body_occurrence, &func)?;
     // `4b` -- the emission-seam equality gate, on the FINISHED function and
     // before it is defined into the module. The callee of every recorded causal
     // emission is decoded out of this CLIF and compared with the planner-issued

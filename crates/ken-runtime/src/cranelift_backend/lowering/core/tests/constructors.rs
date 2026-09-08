@@ -2996,17 +2996,17 @@ fn d1_nat_match_expr() -> RuntimeExpr {
     ])
 }
 
-/// Durable invariant: the carried entry adapter decodes the exact validated
-/// BoundedNat representation and selects the existing Zero/Suc eliminator.
+/// Durable invariant: the carried entry adapter decodes both admitted immediate
+/// Nat representations and selects the existing Zero/Suc eliminator.
 ///
-/// MEASURED: immediate payloads 0 and 1 select distinct source arms, while the
-/// sibling StructuralNat representation still refuses.
-/// CLAIMED: carried ReadSome span lengths are consumed as bounded Nat values,
-/// without admitting Int-class words to the constructor-node dispatcher.
+/// MEASURED: BoundedNat and StructuralNat payloads 0 and 1 each select the two
+/// distinct source arms.
+/// CLAIMED: the exact Nat family consumes both planner-issued immediate Nat
+/// representations without admitting general Int words to the node dispatcher.
 /// THE GAP: persistent Int-class spills remain outside this immediate adapter;
 /// the spill control below keeps that refusal explicit.
 #[test]
-fn carried_bounded_nat_match_selects_zero_and_suc_immediates() {
+fn carried_nat_match_selects_zero_and_suc_immediates() {
     let source = d1_nat_match_expr();
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let (_module, consumer, selected) =
@@ -3033,10 +3033,17 @@ fn carried_bounded_nat_match_selects_zero_and_suc_immediates() {
         d1_run_carried_word(
             consumer,
             base,
+            d1_raw_immediate(BoundaryTag::ImmediateStructuralNat, 0),
+        ),
+        selected[0],
+    );
+    assert_eq!(
+        d1_run_carried_word(
+            consumer,
+            base,
             d1_raw_immediate(BoundaryTag::ImmediateStructuralNat, 1),
         ),
-        -1,
-        "the sibling immediate Nat representation is not widened into this adapter",
+        selected[1],
     );
 }
 
@@ -3071,6 +3078,55 @@ fn carried_bounded_nat_adapter_is_load_bearing() {
             d1_run_carried_word(without_adapter, base, word),
             -1,
             "dropping the adapter must restore the old refusal for payload {payload}",
+        );
+    }
+}
+
+/// Durable invariant and mutation proof: StructuralNat has its own exact tag
+/// arm rather than inheriting the BoundedNat arm or widening all Int words.
+///
+/// MEASURED: removing only the StructuralNat tag comparison leaves both
+/// BoundedNat arms green while both StructuralNat payloads restore the prior
+/// class-gate refusal.
+/// CLAIMED: the StructuralNat tag comparison is necessary and independent of
+/// the already-admitted BoundedNat representation.
+/// THE GAP: the linked nested-IH differential proves the StructuralNat word is
+/// produced by a real retained worker; this rig isolates the consumer branch.
+#[test]
+fn carried_structural_nat_adapter_is_load_bearing() {
+    let source = d1_nat_match_expr();
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let (_exact_module, exact, selected) = d1_compile_carried_match_consumer(&source, &symbols)
+        .expect("Nat family lowers");
+    let (mutated, hits) = with_carried_match_dispatch_mutation(
+        CarriedMatchDispatchMutation::DropStructuralNatAdapter,
+        || d1_compile_carried_match_consumer(&source, &symbols),
+    );
+    let (_mutated_module, without_structural, _) =
+        mutated.expect("the StructuralNat adapter-removal mutation compiles");
+    assert_eq!(
+        hits, 1,
+        "the mutation must reach the StructuralNat tag comparison once"
+    );
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    for (payload, expected) in [(0, selected[0]), (1, selected[1])] {
+        let bounded = d1_raw_immediate(BoundaryTag::ImmediateBoundedNat, payload);
+        assert_eq!(d1_run_carried_word(exact, base, bounded), expected);
+        assert_eq!(
+            d1_run_carried_word(without_structural, base, bounded),
+            expected,
+            "the structural mutation must preserve BoundedNat payload {payload}",
+        );
+
+        let structural =
+            d1_raw_immediate(BoundaryTag::ImmediateStructuralNat, payload);
+        assert_eq!(d1_run_carried_word(exact, base, structural), expected);
+        assert_eq!(
+            d1_run_carried_word(without_structural, base, structural),
+            -1,
+            "dropping only the structural arm must restore its prior refusal for payload \
+             {payload}",
         );
     }
 }

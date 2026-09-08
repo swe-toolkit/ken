@@ -259,18 +259,20 @@ fn assert_nested_checked_pipeline_nat(
 }
 
 #[test]
-fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_frontier() {
+fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
     // Promise classes: the plan assertions are normative compatibility vectors
-    // over compiler-owned checked identities. The exact function-ownership
-    // refusal is a transition sentinel for the measured parent frontier.
+    // over compiler-owned checked identities. Native emission and the forwarding
+    // observations are durable invariants; linked result parity is independently
+    // exercised by `rt_nested_ih_native_realization`.
     //
     // MEASURED: the real checked target carries one oriented frame, two slots,
     // two call templates, and Runtime markers bound to each. Native lowering
-    // enters both pending markers, realizes their exact authority, and leaves
-    // the ordinary source Match without a refusal observation.
-    // CLAIMED: that Match forwards the realized RecursiveBackedge protocol
-    // marker before occurrence-plan entry rather than selecting on it.
-    // THE GAP: the new function-ownership refusal is reported, not bypassed.
+    // enters both pending markers, realizes their exact authority, forwards the
+    // recursive backedge before occurrence entry, and emits a verified object.
+    // CLAIMED: checked nested-IH authority and the recursor protocol survive the
+    // dual-emission realization without a selector refusal.
+    // THE GAP: this test proves emission and exact protocol observations, while
+    // the linked-artifact test proves the resulting Nat value.
     let package_name = "nested_inductive_native_stop_pkg";
     let target_name = "liftSizeResult";
     let expected = 3;
@@ -367,6 +369,134 @@ fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_front
     );
     let observations = realization_scope.finish();
     let scalar_merge_arrivals = scalar_merge_scope.finish();
+    let artifact = native.expect(
+        "nested checked IH emits after per-emission join and closure ownership",
+    );
+    // This is the runnable real-checked-source replacement for the carried
+    // RT-BODY-OCCURRENCE-PROVENANCE control. The old disposable projection's
+    // owner 2 / four-join coordinates predated the realized recursor partition;
+    // the current plan's exact per-emission population is the authority.
+    //
+    // MEASURED: all seven generated emissions close with required == consumed,
+    // worker 6 alone owns join 44, join 50 is shared with F, and worker 5 owns
+    // no join. Every sibling emission closes in the same attempt.
+    // CLAIMED: join obligations and their exact disposition are keyed by the
+    // generated emission rather than charged globally to a source owner.
+    // THE GAP: this records successful closeout sets; the native/interpreter
+    // test independently proves that the closed artifact executes to Nat 3.
+    let join_closeouts = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::EmissionJoinCloseout {
+                function,
+                body_origin,
+                required,
+                consumed,
+                dispositioned,
+            } => Some((
+                *function,
+                *body_origin,
+                required.clone(),
+                consumed.clone(),
+                dispositioned.clone(),
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        join_closeouts,
+        vec![
+            (0, 10, vec![10], vec![10], vec![]),
+            (1, 101, vec![101], vec![101], vec![]),
+            (2, 22, vec![16, 22], vec![16, 22], vec![]),
+            (
+                3,
+                82,
+                vec![30, 33, 36, 50, 72, 73],
+                vec![30, 33, 36, 50, 72, 73],
+                vec![],
+            ),
+            (4, 91, vec![91], vec![91], vec![]),
+            (5, 61, vec![], vec![], vec![]),
+            (6, 50, vec![44, 50], vec![44, 50], vec![]),
+        ],
+        "each generated emission must close exactly its own join population: \
+         {observations:#?}"
+    );
+
+    // Promise class: normative compatibility vector over compiler-issued source
+    // identities, plus a durable lifetime/ownership invariant.
+    // MEASURED: the two escaping result closures each transfer through a
+    // distinct InvocationAggregate. PFI5's body-50 environment contains the ten
+    // exact source captures, all as carried words copied by value.
+    // CLAIMED: the retained body-61 emission owns its own frame-independent
+    // activation-arena environment and does not borrow PFI4's environment.
+    // THE GAP: ActivationOwned is durable across generated PFI returns, not
+    // beyond the surrounding native invocation; no stronger lifetime is claimed.
+    let boundary_environments = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::BoundaryClosureTransfer {
+                owner,
+                seat,
+                body_origin,
+                capture_origins,
+                capture_phases,
+                record: _,
+                allocation,
+                lifetime,
+            } => Some((
+                owner.clone(),
+                *seat,
+                *body_origin,
+                capture_origins.clone(),
+                capture_phases.clone(),
+                *allocation,
+                *lifetime,
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        boundary_environments,
+        vec![
+            (
+                "Predeclared(PredeclaredFunctionId(4))".to_string(),
+                85,
+                82,
+                vec![84, 83],
+                vec!["Carried", "Carried"],
+                "InvocationAggregate",
+                "ActivationOwned",
+            ),
+            (
+                "Predeclared(PredeclaredFunctionId(5))".to_string(),
+                61,
+                50,
+                vec![60, 59, 58, 57, 56, 55, 54, 53, 52, 51],
+                vec!["Carried"; 10],
+                "InvocationAggregate",
+                "ActivationOwned",
+            ),
+        ],
+        "each escaping closure must use its own emission-owned by-value \
+         environment: {observations:#?}"
+    );
+    let environment_records = observations
+        .iter()
+        .filter_map(|event| match event {
+            ken_runtime::CheckedIhRealizationObservation::BoundaryClosureTransfer {
+                record,
+                ..
+            } => Some(*record),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        environment_records.len(),
+        2,
+        "the two emissions must not alias one environment record"
+    );
     assert!(
         scalar_merge_arrivals.is_empty(),
         "the parent-frontier refusal remains before the existing scalar-merge in-edge: \
@@ -431,8 +561,8 @@ fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_front
     // role, and next continuation, while no occurrence-entry attempt sees the
     // RecursiveBackedge operand.
     // CLAIMED: this is propagation rather than a new value or an occurrence-plan
-    // consumption. THE GAP: the later function-ownership refusal remains outside
-    // this forwarding relation.
+    // consumption. THE GAP: linked execution is checked by the independent
+    // native/interpreter parity test.
     let forwards = observations
         .iter()
         .filter_map(|event| match event {
@@ -483,21 +613,11 @@ fn nested_recursive_match_forwards_realized_backedge_to_function_ownership_front
         "the realized RecursiveBackedge must leave the source Match seat without a refusal: \
          {observations:#?}"
     );
-    match native {
-        Err(ken_runtime::CraneliftBackendError::Backend(
-            ken_runtime::BackendFailure::Module(reason),
-        )) => assert_eq!(
-            reason,
-            "source join StaticOriginId(50) was classified outside its owning function",
-            "the forwarded marker must stop at the exact measured parent frontier"
-        ),
-        Ok(artifact) => panic!(
-            "the nested checked target unexpectedly completed in `{}`; replace the transition \
-             sentinel with native/interpreter parity before accepting that advancement",
-            artifact.entry_symbol
-        ),
-        Err(other) => panic!("the forwarded marker reached a different boundary: {other}"),
-    }
+    assert!(artifact.verifier_passed);
+    assert_eq!(
+        artifact.entry_symbol,
+        "ken_nested_ih_backedge_forward_frontier"
+    );
 }
 
 #[test]

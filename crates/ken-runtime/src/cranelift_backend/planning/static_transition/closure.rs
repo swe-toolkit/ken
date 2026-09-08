@@ -1485,74 +1485,37 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
     ) -> Result<Vec<(PredeclaredFunctionId, StaticOriginId, StaticOriginId)>, CraneliftBackendError>
     {
-        let origin_of = |node: StaticNodeId| -> Result<StaticOriginId, CraneliftBackendError> {
-            self.semantic
-                .descriptors
-                .get(node.0 as usize)
-                .map(|descriptor| descriptor.origin)
-                .ok_or_else(|| planner_error("a static body edge endpoint has no descriptor"))
-        };
-        let shape_of = |node: StaticNodeId| -> Option<semantic_ir::RuntimeExprShape> {
-            self.semantic_sources
-                .iter()
-                .find(|seed| seed.planned_node == node)
-                .and_then(|seed| match seed.source {
-                    SemanticSourceKind::Expression(shape) => Some(shape),
-                    _ => None,
-                })
-        };
-
-        // Endpoints only, from the raw edges.
-        let mut endpoints: BTreeMap<StaticOriginId, StaticOriginId> = BTreeMap::new();
-        for edge in &self.edges {
-            if edge.kind != EdgeKind::StaticBody {
-                continue;
-            }
-            // `D2a`: a declaration-owned pair's relation is a definition, not a
-            // call, so it mints no endpoint record here either. ⛔ Asked of the
-            // semantic plane rather than decided here — the owner
-            // classification has one home, and this file is pinned not to name
-            // it.
-            if self.semantic.is_declaration_owned_static_body(edge)? {
-                continue;
-            }
-            match shape_of(edge.from) {
-                Some(semantic_ir::RuntimeExprShape::Closure)
-                | Some(semantic_ir::RuntimeExprShape::LexicalClosure) => {}
-                _ => {
+        let units = self.emittable_units()?;
+        self.emittable_call_edges()?
+            .into_iter()
+            .filter(|edge| edge.kind() == EmittableCallKind::StaticBody)
+            .map(|edge| {
+                let matching = units
+                    .iter()
+                    .filter(|unit| unit.function() == edge.callee())
+                    .collect::<Vec<_>>();
+                let [callee] = matching.as_slice() else {
                     return Err(planner_error(
-                        "a static body edge's source is not exactly a Closure or LexicalClosure \
-                         occurrence",
+                        "a static-body call does not name exactly one emittable callee",
+                    ));
+                };
+                let AbiUnitDefinition::ClosureBody { .. } = callee.definition() else {
+                    return Err(planner_error(
+                        "a static-body call callee is not a retained closure body",
+                    ));
+                };
+                if callee.entry_origin() != edge.callee_origin() {
+                    return Err(planner_error(
+                        "a static-body call scheduling entry disagrees with its callee descriptor",
                     ));
                 }
-            }
-            let closure_occurrence = origin_of(edge.from)?;
-            let source_body = self.semantic.child_origin(closure_occurrence, 0)?;
-            let scheduling_entry = origin_of(edge.to)?;
-            if endpoints.insert(scheduling_entry, source_body).is_some() {
-                return Err(planner_error(
-                    "two static body edges declare the same scheduling entry",
-                ));
-            }
-        }
-
-        // One-for-one drain against the authoritative classification.
-        let mut bindings = Vec::new();
-        for (caller, _callee, callee_origin) in self.semantic.static_body_call_edges(&self.edges)? {
-            let source_body = endpoints.remove(&callee_origin).ok_or_else(|| {
-                planner_error(
-                    "an authoritative static body call has no raw endpoint record for its \
-                     scheduling entry",
-                )
-            })?;
-            bindings.push((caller, source_body, callee_origin));
-        }
-        if !endpoints.is_empty() {
-            return Err(planner_error(
-                "a raw static body endpoint record was never claimed by an authoritative call",
-            ));
-        }
-        Ok(bindings)
+                Ok((
+                    edge.caller(),
+                    callee.body_occurrence(),
+                    edge.callee_origin(),
+                ))
+            })
+            .collect()
     }
 
     /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 1 — the raw worker bodies that
@@ -5068,76 +5031,6 @@ mod tests {
                 .id
         }
     }
-
-    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-5` — the deferred synthetic
-    /// exact-witness control, CARRIED here, RUNNABLE later.**
-    ///
-    /// **This control has never executed and this candidate does not claim it
-    /// has.** It is carried in the tree, per `AC-5`, so the obligation is an
-    /// artifact rather than a sentence in a handoff that evaporates when the
-    /// terminal closes. The **committed runnable form is owned by the first
-    /// candidate to run once nested-inductive admission is on `main`** — keyed
-    /// to that capability, not to the closure of any node.
-    ///
-    /// **Release condition: nested-inductive admission is on `main`.**
-    ///
-    /// Stated as the capability rather than as `KERNEL-NESTED-IND` merged,
-    /// because those two came apart once already: a merge event is not the
-    /// capability it was expected to deliver, and gating on one invites the next
-    /// reader to un-ignore this control and take a red they cannot fix.
-    ///
-    /// **The release condition is tracked at `KERNEL-NESTED-IND` `AC-K12`.**
-    /// Consult it there.
-    ///
-    /// ⛔ **This comment deliberately gives you NO way to decide the condition
-    /// locally.** An earlier wording did, and that is the defect this replaces:
-    /// a decision procedure written into a comment is correct at the instant it
-    /// is written and silently wrong afterwards, at which point it tells the
-    /// reader the capability has arrived. Any snapshot, path list or commit put
-    /// here would decay the same way — so if you find yourself adding one,
-    /// that is the bug, not the omission.
-    ///
-    /// Until that capability lands the
-    /// `LiftRose` witness exists only on the attribution node's disposable
-    /// synthetic venue — an unreferenced composition of this Runtime tree with
-    /// Kernel's held `dd3cd050` and its projection snapshot — which is a
-    /// pre-merge integration gate, not a suite fixture.
-    ///
-    /// **What the runnable form must assert**, so the next seat inherits the
-    /// obligation rather than re-deriving it:
-    ///
-    /// 1. `SOI(26)` is a reachable `ComputationalMatch` owned by
-    ///    `PredeclaredFunctionId(2)`;
-    /// 2. that owner's required join set is exactly `{26, 33, 39, 53}`;
-    /// 3. every member is **entered and closed through the real traversal** —
-    ///    `consumed ∪ dispositioned` equals the required set, rather than the
-    ///    empty sets the attribution measured;
-    /// 4. sibling owners still close normally, so the fixture discriminates this
-    ///    owner rather than reporting a whole-plan change.
-    ///
-    /// **Fail-closed by construction.** The body panics rather than returning,
-    /// so removing `#[ignore]` without supplying the witness is a RED. An
-    /// ignored test whose body would pass vacuously is the shape that lets a
-    /// deferred obligation read as a discharged one.
-    #[test]
-    #[ignore = "carried, not runnable: needs nested-inductive admission on main \
-                for the LiftRose witness -- the capability, not the \
-                KERNEL-NESTED-IND merge event, which fired at afb38934 without \
-                delivering it. The first candidate to run once that capability \
-                is on main owns the runnable form."]
-    pub(in crate::cranelift_backend::planning::static_transition) fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
-        panic!(
-            "RT-BODY-OCCURRENCE-PROVENANCE AC-5 is CARRIED, not discharged. \
-             Supply the LiftRose witness (requires nested-inductive admission \
-             on main -- the capability, not merely KERNEL-NESTED-IND merged) \
-             and assert: SOI(26) is a reachable ComputationalMatch owned by \
-             PredeclaredFunctionId(2); its required join set is exactly \
-             {{26, 33, 39, 53}}; consumed union dispositioned equals that set \
-             through the real traversal; and sibling owners still close \
-             normally. Do not delete this control to make a suite green."
-        );
-    }
-
 
     /// Hard-stop #18 row 2 — declaration-call validation consumes the canonical
     /// node-indexed source view, never the planner's walk order.

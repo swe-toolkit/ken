@@ -335,6 +335,7 @@ enum EdgeKind {
     InvokeProducerTail,
     CompleteProducerTail,
     StaticBody,
+    RealizedRecursorTransfer,
     DeclarationCall,
     Trap,
 }
@@ -722,8 +723,17 @@ fn inline_synthesized_seat_emission_owners(
     seat: StaticOriginId,
 ) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
     let mut owners = Vec::new();
-    if let Some(predeclared) = plan.semantic.function_owner(seat)? {
-        owners.push(ContinuationEmissionOwner::Predeclared(predeclared));
+    // Source ownership is only a traversal boundary. A retained checked-IH
+    // body can be emitted both in place and as a separate predeclared worker,
+    // so synthesized records are issued to every generated emission that
+    // actually contains this seat.
+    for unit in plan.emittable_units()? {
+        if plan
+            .emission_source_origins(unit.function(), unit.body_occurrence())?
+            .contains(&seat)
+        {
+            owners.push(ContinuationEmissionOwner::Predeclared(unit.function()));
+        }
     }
     for unit in plan.continuation_units()? {
         let frame = plan.planned_occurrence_expr(unit.continuation_origin())?;
