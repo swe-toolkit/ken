@@ -9,7 +9,7 @@ Canonical source: [checked package](../../../../../catalog/packages/Capability/P
 | Fact class | Disposition | Result and grounding |
 |---|---|---|
 | Subject | `generated` | `catalog/packages/Capability/Parsing/Numeric.ken.md` — “`Capability.Parsing.Numeric` — located decimal parsing,” from the [subject index](../../subjects.md). |
-| Declaration/type | `authored` | Declares located numeric diagnostics, decimal parsers over structural character lists, a proof-carrying decimal-digit carrier, structural digit formatting, and the thin `show_digits` String wrapper. |
+| Declaration/type | `authored` | The public surface is `numeric_argument_origin`, `char_to_digit`, `parse_digits_at`, `parse_nat_chars`, `parse_int_chars`, `parse_nat`, `parse_int`, and `parse_formatted_digits`. Located diagnostics, the decimal-digit carrier, formatting, and `show_digits` remain private implementation. |
 | Law | `authored` | Checked origin-fidelity theorems preserve argument index and endpoints, the digit carrier attaches a validity proof, and `format_digits_roundtrip` proves structural parse/format recovery. |
 | Effect/capability | `none-declared` | The canonical checked fences declare no effect row, `proc`, `visits`, or capability value for this package. |
 | Assurance | `authored` | Parsing and formatting are structural checked definitions; the format law avoids the opaque Int/String gap, and the package declares no primitive, postulate, opaque constant, `Axiom`, or trusted-base delta. |
