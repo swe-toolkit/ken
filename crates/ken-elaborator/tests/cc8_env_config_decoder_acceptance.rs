@@ -19,8 +19,6 @@ const STRING_KEYS: &str = include_str!("../../../catalog/packages/Data/Text/Stri
 const CODEC: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.md");
 const NUMERIC: &str = include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const PRETTY: &str = include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
-const ARGUMENTS: &str =
-    include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
 const ENVIRONMENT: &str =
     include_str!("../../../catalog/packages/Capability/Process/Environment.ken.md");
 const EXIT: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
@@ -76,10 +74,15 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
         .expect("Capability.Parsing.Decoder must roots-load in dependency order");
     catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Process.Arguments",
+    )
+    .expect("Capability.Process.Arguments must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Capability.Process.Arguments");
     for (source, label) in [
         (NUMERIC, "Capability.Parsing.Numeric"),
         (PRETTY, "Capability.Formatting.Doc"),
-        (ARGUMENTS, "Capability.Process.Arguments"),
         (ENVIRONMENT, "Capability.Process.Environment"),
         (EXIT, "Capability.Process.Exit"),
         (DIAGNOSTIC_RENDER, "Capability.Diagnostics.Render"),

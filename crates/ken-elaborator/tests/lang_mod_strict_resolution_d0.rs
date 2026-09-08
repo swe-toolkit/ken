@@ -594,6 +594,34 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Process.Arguments now declares its exact LawfulClasses, Derived,
+            // and Cursor dependencies. Its ordinary package boundary loads
+            // while strict mode retains provider compiler conveniences plus
+            // the ProcessInput ABI carrier and constructor.
+            "Capability.Process.Arguments".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "MkProcessInput",
+                "ProcessInput",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Capability.Process.Environment".to_string(),
             ["Equal", "MkProcessInput", "ProcessInput", "Prod"]
                 .into_iter()
@@ -1000,7 +1028,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.Input.Schema",
         "Capability.Diagnostics.Render",
         "Capability.Filesystem.Path.Posix",
-        "Capability.Process.Arguments",
         "Capability.System.IO",
         "Data.Collections.Map",
         "Data.Serialization.Json",

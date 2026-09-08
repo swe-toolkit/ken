@@ -10,8 +10,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const CURSOR_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 const ARGUMENTS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
 const EXIT_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
@@ -31,8 +29,9 @@ fn dependency_env() -> ElabEnv {
     env.elaborate_module_from_roots(&[catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load third");
     expose_module_aliases(&mut env, "Capability.Diagnostics.Core");
-    env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Capability.Parsing.Cursor must elaborate fourth");
+    env.elaborate_module_from_roots(&[catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Capability.Parsing.Cursor must roots-load fourth");
+    expose_module_aliases(&mut env, "Capability.Parsing.Cursor");
     env
 }
 

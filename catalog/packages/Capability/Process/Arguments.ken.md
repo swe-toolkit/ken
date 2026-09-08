@@ -1,8 +1,8 @@
 # Capability.Process.Arguments
 
-`Capability.Process.Arguments` is the pure, byte-preserving view of the argv field in the
-landed `ProcessInput` ABI. Raw arguments remain `Bytes`; decoding is always an
-explicit choice made by a caller.
+`Capability.Process.Arguments` is the pure, byte-preserving view of the argv
+field in the landed `ProcessInput` ABI. Raw arguments remain `Bytes`; decoding
+is always an explicit choice made by a caller.
 
 ## 1. Raw process input
 
@@ -11,20 +11,26 @@ package names only the argv projection and replacement operation, while the
 match keeps the environment and working-directory bytes unchanged.
 
 ```ken
+import Capability.Parsing.Cursor (ArgLocation, MkArgLocation)
+
 import Core.Classes.LawfulClasses (leq_nat)
 
-fn process_arguments (input : ProcessInput) : List Bytes =
+import Data.Collections.Derived (bytes_nat_length, nth)
+
+pub fn process_arguments (input : ProcessInput) : List Bytes =
   match input {
     MkProcessInput arguments environment working_directory ↦ arguments
   }
 
-fn replace_process_arguments (arguments : List Bytes) (input : ProcessInput) : ProcessInput =
+pub fn replace_process_arguments
+      (arguments : List Bytes) (input : ProcessInput)
+    : ProcessInput =
   match input {
     MkProcessInput previous environment working_directory ↦
       MkProcessInput arguments environment working_directory
   }
 
-proof round_trip for process_arguments
+pub proof round_trip for process_arguments
       (arguments : List Bytes) (input : ProcessInput)
     : Equal
         (List Bytes)
@@ -34,7 +40,7 @@ proof round_trip for process_arguments
     MkProcessInput previous environment working_directory ↦ Refl
   }
 
-fn process_argument_at (index : Nat) (input : ProcessInput) : Option Bytes =
+pub fn process_argument_at (index : Nat) (input : ProcessInput) : Option Bytes =
   nth Bytes index (process_arguments input)
 ```
 
@@ -46,10 +52,11 @@ the canonical `leq_nat` relation.
 
 `argument_slice_location` accepts only a range whose argument exists, whose
 start does not exceed its end, and whose end does not exceed the computed byte
-length. The resulting location is CC3's existing `ArgLocation`.
+length. The resulting location uses the shared `ArgLocation` carrier.
 
 ```ken
-fn argument_at (index : Nat) (arguments : List Bytes) : Option Bytes = nth Bytes index arguments
+pub fn argument_at (index : Nat) (arguments : List Bytes) : Option Bytes =
+  nth Bytes index arguments
 
 fn argument_bytes_at (index : Nat) (arguments : List Bytes) : Option Bytes =
   match argument_at index arguments {
@@ -57,7 +64,7 @@ fn argument_bytes_at (index : Nat) (arguments : List Bytes) : Option Bytes =
     Some argument ↦ Some Bytes argument
   }
 
-fn argument_slice_location
+pub fn argument_slice_location
       (index : Nat) (start : Nat) (end : Nat) (arguments : List Bytes)
     : Option ArgLocation =
   match argument_at index arguments {
@@ -82,7 +89,11 @@ computed from the total structural byte view.
 
 ## 4. Trust & derivation
 
+**Public API:** `process_arguments`, `replace_process_arguments`,
+`process_arguments::round_trip`, `process_argument_at`, `argument_at`, and
+`argument_slice_location`. The identity-shaped `argument_bytes_at` helper stays
+private.
+
 All declarations are transparent checked terms over landed `ProcessInput`,
-`List`, `Bytes`, and `ArgLocation`. The package declares no
-primitive, postulate, opaque constant, or `Axiom`; its `trusted_base()` delta is
-zero.
+`List`, `Bytes`, and `ArgLocation`. The package declares no primitive,
+postulate, opaque constant, or `Axiom`; its `trusted_base()` delta is zero.

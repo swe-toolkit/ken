@@ -21,6 +21,8 @@ const NUMERIC_SOURCE: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const PARSING_SOURCE: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
+const ARGUMENTS_SOURCE: &str =
+    include_str!("../../../catalog/packages/Capability/Process/Arguments.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()
@@ -246,6 +248,47 @@ fn direct_parsing() -> DirectParsing {
         numeric_sibling,
         arguments_sibling,
         parsing,
+    }
+}
+
+struct DirectArguments {
+    env: ElabEnv,
+    lawful: BTreeSet<GlobalId>,
+    derived: BTreeSet<GlobalId>,
+    cursor: BTreeSet<GlobalId>,
+    numeric_sibling: BTreeSet<GlobalId>,
+    parsing_sibling: BTreeSet<GlobalId>,
+    arguments: BTreeSet<GlobalId>,
+}
+
+fn direct_arguments() -> DirectArguments {
+    let mut env = ElabEnv::new().expect("base environment");
+    load(&mut env, "Core.Classes.LawfulClasses");
+    let lawful = module_ids(&env, "Core.Classes.LawfulClasses");
+    load(&mut env, "Data.Collections.Derived");
+    let derived = module_ids(&env, "Data.Collections.Derived");
+    load(&mut env, DC);
+    load(&mut env, CURSOR);
+    let cursor = module_ids(&env, CURSOR);
+    load(&mut env, NUMERIC);
+    let numeric_sibling = module_ids(&env, NUMERIC);
+    load(&mut env, PARSING);
+    let parsing_sibling = module_ids(&env, PARSING);
+    let before_trust = env.env.trusted_base();
+    let before_classes = env.class_env.class_entries().count();
+    let before_instances = env.class_env.instances.len();
+    let arguments = load(&mut env, ARGUMENTS);
+    assert_eq!(env.env.trusted_base(), before_trust);
+    assert_eq!(env.class_env.class_entries().count(), before_classes);
+    assert_eq!(env.class_env.instances.len(), before_instances);
+    DirectArguments {
+        env,
+        lawful,
+        derived,
+        cursor,
+        numeric_sibling,
+        parsing_sibling,
+        arguments,
     }
 }
 
@@ -618,5 +661,120 @@ fn parsing_module_implementation_siblings_remain_private() {
         "complete_bool_decoder",
     ] {
         assert_parsing_private(name);
+    }
+}
+
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: every Process.Arguments declaration and attached proof is queried
+/// through the roots loader, and the successful set equals the exact coherent
+/// public API. A strict client imports the operations together and constructs
+/// their built-in input carriers. CLAIMED: the final Parsing-group partial
+/// publishes only usable argv projection, replacement, lookup, and location
+/// operations. THE GAP: later additive API changes must deliberately update
+/// this compatibility vector.
+#[test]
+fn process_arguments_loader_visible_inventory_is_exact_and_coherent() {
+    let expected = names(&[
+        "argument_at",
+        "argument_slice_location",
+        "process_argument_at",
+        "process_arguments",
+        "process_arguments::round_trip",
+        "replace_process_arguments",
+    ]);
+    assert_eq!(
+        catalog_publication::published_module_surfaces(
+            ARGUMENTS_SOURCE,
+            ARGUMENTS,
+            "process_arguments",
+        ),
+        expected
+    );
+    let mut loaded = direct_arguments();
+    let imports = expected
+        .iter()
+        .filter(|surface| !surface.contains("::"))
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    loaded
+        .env
+        .elaborate_file(&format!(
+            "import {ARGUMENTS} ({imports})\n\
+             import {CURSOR} (ArgLocation)\n\
+             const strict_empty_bytes : Bytes = bytes_encode \"\"\n\
+             const strict_empty_arguments : List Bytes = Nil Bytes\n\
+             const strict_input : ProcessInput = \
+               MkProcessInput strict_empty_arguments (Nil (Prod Bytes Bytes)) strict_empty_bytes\n\
+             const strict_replaced : ProcessInput = \
+               replace_process_arguments strict_empty_arguments strict_input\n\
+             const strict_projected : List Bytes = process_arguments strict_replaced\n\
+             const strict_input_at : Option Bytes = \
+               process_argument_at Zero strict_replaced\n\
+             const strict_list_at : Option Bytes = \
+               argument_at Zero strict_empty_arguments\n\
+             const strict_location : Option ArgLocation = \
+               argument_slice_location Zero Zero Zero strict_empty_arguments"
+        ))
+        .expect("the Process.Arguments surface must be usable by a strict client");
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: Process.Arguments checked declarations intersect their canonical
+/// LawfulClasses, Derived, and Cursor providers at exactly the five GlobalIds
+/// below, while both landed group-sibling intersections are empty. Loading adds
+/// no trust, class, or instance. CLAIMED: the complete catalog-value closure is
+/// explicit, published, and sibling-disjoint. THE GAP: per-import necessity is
+/// supplied by the production-side removal campaign.
+#[test]
+fn process_arguments_provider_closure_is_exact_and_sibling_disjoint() {
+    let loaded = direct_arguments();
+    let refs = owned_refs(&loaded.env, &loaded.arguments);
+    let intersection_names = |module: &str, owned: &BTreeSet<GlobalId>| {
+        let ids = refs.intersection(owned).copied().collect::<BTreeSet<_>>();
+        module_surface_names(&loaded.env, module, &ids)
+    };
+    assert_eq!(
+        intersection_names("Core.Classes.LawfulClasses", &loaded.lawful),
+        names(&["leq_nat"])
+    );
+    assert_eq!(
+        intersection_names("Data.Collections.Derived", &loaded.derived),
+        names(&["bytes_nat_length", "nth"])
+    );
+    assert_eq!(
+        intersection_names(CURSOR, &loaded.cursor),
+        names(&["ArgLocation", "MkArgLocation"])
+    );
+    assert!(
+        refs.is_disjoint(&loaded.numeric_sibling),
+        "Process.Arguments must remain disjoint from Numeric"
+    );
+    assert!(
+        refs.is_disjoint(&loaded.parsing_sibling),
+        "Process.Arguments must remain disjoint from Parsing"
+    );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: a real selective-import client cannot name the redundant private
+/// byte-lookup helper, while the exact inventory test sees every other
+/// declaration. CLAIMED: publication does not expose implementation-only API.
+/// THE GAP: the visibility-only source differential separately establishes
+/// that the helper body itself did not move.
+#[test]
+fn process_arguments_implementation_helper_remains_private() {
+    let mut loaded = direct_arguments();
+    match loaded
+        .env
+        .elaborate_file(&format!("import {ARGUMENTS} (argument_bytes_at)"))
+    {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, format!("{ARGUMENTS}.argument_bytes_at"))
+        }
+        other => panic!("{ARGUMENTS}.argument_bytes_at must stay private, got {other:?}"),
     }
 }
