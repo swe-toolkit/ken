@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-08 07:41:33Z — from 565 issue file(s) in `docs/program/issues/`.
+2026-09-08 11:23:39Z — from 565 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -474,7 +474,7 @@ the committed file matches the generator's output.
 | `RT-NATIVE-VOCAB-STRUCTURAL-COMPLETENESS` | Conjunct-(2) completeness in dead-arm effect lowering rests on NativeProcessSymbols mirroring the runtime's minting sites BY CONVENTION, not by structure -- make it structural so a newly-minted runtime constructor cannot silently create a wrongly-trapped live arm | draft | runtime | S | none | — |
 | `RT-NATIVE-WRITEALL-SUCCESS-FOLD` | Green the WRITE_ALL success native full-program row (linked_checked_write_all_observes_short_progress_and_matches_interpreter, px8f_buffer_native.rs:345) — one recursive read-then-write program that reifies BOTH remaining native carried-value quarters (Wrote + ReadSome, short-progress). A fresh zero-TCB / option-(a) CONSUMER of the already-landed execute-then-resume capability that carries the success retained body (WriteProgress / ReadSome span+count) through the composed return to exit. Landing it meets RT-NATIVE-CARRIED-VALUE's four-value closure condition and re-verifies + closes PX8. | merged | runtime | M | none | — |
 | `RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY` | CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition | closed | runtime | M | none | — |
-| `RT-NESTED-IH-NATIVE-REALIZATION` | Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3 | active | runtime | L | none | — |
+| `RT-NESTED-IH-NATIVE-REALIZATION` | Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3 | merged | runtime | L | none | — |
 | `RT-OVERCONSTRUCTED-OUTER-RECOGNITION` | Establish that no emitted call can name an outer static-worker transport, and classify which repair shapes that permits -- the repair itself is OUT OF SCOPE and moved to RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT | closed | runtime | M | none | — |
 | `RT-PARITY` | interpreter/native parity erratum (adversary F5 + F6) | closed | runtime | M | none | — |
 | `RT-PLANNED-CLOSURE-PREEXISTENCE` | Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction? | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2317 |
@@ -635,7 +635,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
-- `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `PX10` blocked by `ABI-S5` (status: draft)

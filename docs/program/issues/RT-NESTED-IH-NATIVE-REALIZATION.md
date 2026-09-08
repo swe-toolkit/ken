@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-IH-NATIVE-REALIZATION
 title: "Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
