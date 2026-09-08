@@ -666,36 +666,156 @@ impl<'src> StaticTransitionPlan<'src> {
         }))
     }
 
-    /// Every source-join contract owned by one generated function.
+    /// Every source-join contract owned by one generated emission.
     ///
-    /// This is a projection of the already-validated occurrence population and
-    /// semantic owner partition. Lowering uses it only as the closed expected
-    /// set for its end-of-function consumption check; it cannot add or omit a
-    /// join by maintaining a second caller inventory.
+    /// `(function, body_occurrence)` is the existing planner-issued emission
+    /// identity. A realized checked-IH body can occur both in its source unit
+    /// and in one or more retained workers, so source ownership alone is not an
+    /// emission partition. This projection keeps the source owner as the
+    /// traversal boundary, but assigns nested retained bodies to their own ABI
+    /// descriptors. A realized transfer target itself remains in the source
+    /// emission; only its retained body interior moves behind the worker's real
+    /// call boundary.
     pub(in crate::cranelift_backend) fn required_join_origins(
         &self,
         function: PredeclaredFunctionId,
+        body_occurrence: StaticOriginId,
     ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
-        let mut required = BTreeSet::new();
-        for (index, (occurrence, join)) in self
-            .source_occurrences
+        self.emission_source_origins(function, body_occurrence)?
+            .into_iter()
+            .filter_map(|origin| {
+                self.join_results
+                    .get(origin.0 as usize)
+                    .copied()
+                    .flatten()
+                    .map(|_| Ok(origin))
+            })
+            .collect()
+    }
+
+    /// The exact source occurrences lowered by one predeclared emission.
+    ///
+    /// Retained-worker descriptors are already sealed by the ABI plane. This
+    /// method projects their nesting; it neither mints an emission identity nor
+    /// reads a runtime selector. Base source units keep each realized transfer
+    /// target, while a retained worker stops at a nested worker boundary.
+    pub(in crate::cranelift_backend) fn emission_source_origins(
+        &self,
+        function: PredeclaredFunctionId,
+        body_occurrence: StaticOriginId,
+    ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+        let units = self.emittable_units()?;
+        let matching = units
             .iter()
-            .zip(&self.join_results)
-            .enumerate()
-        {
-            let (Some(occurrence), Some(_)) = (occurrence, join) else {
-                continue;
-            };
-            if occurrence.static_origin.0 as usize != index {
-                return Err(planner_error(
-                    "join consumption population is not keyed by source origin",
-                ));
+            .filter(|unit| unit.function() == function)
+            .collect::<Vec<_>>();
+        let [unit] = matching.as_slice() else {
+            return Err(planner_error(
+                "source-emission identity does not name exactly one emittable unit",
+            ));
+        };
+        if unit.body_occurrence() != body_occurrence {
+            return Err(planner_error(
+                "source-emission body disagrees with its planner-issued unit identity",
+            ));
+        }
+
+        let base = self
+            .semantic
+            .functions
+            .iter()
+            .any(|candidate| candidate.id == function);
+        let workers = units
+            .iter()
+            .filter(|candidate| {
+                !self
+                    .semantic
+                    .functions
+                    .iter()
+                    .any(|base| base.id == candidate.function())
+            })
+            .copied()
+            .collect::<Vec<_>>();
+
+        let mut owned = if base {
+            let mut owned = BTreeSet::new();
+            for occurrence in self.source_occurrences.iter().flatten() {
+                if self.semantic.function_owner(occurrence.static_origin)? == Some(function) {
+                    owned.insert(occurrence.static_origin);
+                }
             }
-            if self.semantic.function_owner(occurrence.static_origin)? == Some(function) {
-                required.insert(occurrence.static_origin);
+            owned
+        } else {
+            self.source_origins_in_owner_subtree(body_occurrence)?
+        };
+
+        if base {
+            for worker in workers {
+                let AbiUnitDefinition::ClosureBody {
+                    defining_origin, ..
+                } = worker.definition()
+                else {
+                    return Err(planner_error(
+                        "a non-source emission is not a retained closure body",
+                    ));
+                };
+                if self.semantic.function_owner(defining_origin)? != Some(function) {
+                    continue;
+                }
+                for nested in self.source_origins_in_owner_subtree(worker.body_occurrence())? {
+                    owned.remove(&nested);
+                }
+                // The realized transfer endpoint remains part of the in-place
+                // source emission even though its retained interior has a
+                // distinct worker realization.
+                owned.insert(worker.body_occurrence());
+            }
+        } else {
+            let snapshot = owned.clone();
+            for worker in workers {
+                if worker.function() == function {
+                    continue;
+                }
+                let AbiUnitDefinition::ClosureBody {
+                    defining_origin, ..
+                } = worker.definition()
+                else {
+                    return Err(planner_error(
+                        "a non-source emission is not a retained closure body",
+                    ));
+                };
+                if !snapshot.contains(&defining_origin) {
+                    continue;
+                }
+                for nested in self.source_origins_in_owner_subtree(worker.body_occurrence())? {
+                    owned.remove(&nested);
+                }
             }
         }
-        Ok(required)
+        Ok(owned)
+    }
+
+    fn source_origins_in_owner_subtree(
+        &self,
+        root: StaticOriginId,
+    ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+        let owner = self
+            .semantic
+            .function_owner(root)?
+            .ok_or_else(|| planner_error("source subtree root has no function owner"))?;
+        let mut pending = vec![root];
+        let mut visited = BTreeSet::new();
+        while let Some(origin) = pending.pop() {
+            if !visited.insert(origin) {
+                continue;
+            }
+            if self.semantic.function_owner(origin)? != Some(owner) {
+                visited.remove(&origin);
+                continue;
+            }
+            pending.extend(self.semantic.child_origins(origin)?.iter().copied());
+        }
+        Ok(visited)
     }
 
     /// Planned joins in one source subtree that remain in its function owner.

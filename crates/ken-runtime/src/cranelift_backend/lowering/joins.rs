@@ -2077,11 +2077,12 @@ impl<'a> Lowering<'a> {
         pub(super) fn validate_join_plan_consumption(
             &mut self,
             function: PredeclaredFunctionId,
+            body_occurrence: StaticOriginId,
         ) -> Result<(), CraneliftBackendError> {
             self.close_statically_unselected_match_cases()?;
             let required = self
                 .static_transition_plan
-                .required_join_origins(function)?;
+                .required_join_origins(function, body_occurrence)?;
             self.finalize_join_disposition(&required)
         }
 }
@@ -2173,11 +2174,12 @@ impl<'a> Lowering<'a> {
         pub(super) fn validate_materialized_dead_join_cfg(
             &self,
             function: PredeclaredFunctionId,
+            body_occurrence: StaticOriginId,
             func: &Function,
         ) -> Result<(), CraneliftBackendError> {
             let required = self
                 .static_transition_plan
-                .required_join_origins(function)?;
+                .required_join_origins(function, body_occurrence)?;
             self.validate_materialized_dead_join_cfg_for(&required, func)
         }
 }

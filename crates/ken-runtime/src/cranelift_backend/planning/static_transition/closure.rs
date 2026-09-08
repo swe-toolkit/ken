@@ -1485,114 +1485,37 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
     ) -> Result<Vec<(PredeclaredFunctionId, StaticOriginId, StaticOriginId)>, CraneliftBackendError>
     {
-        let origin_of = |node: StaticNodeId| -> Result<StaticOriginId, CraneliftBackendError> {
-            self.semantic
-                .descriptors
-                .get(node.0 as usize)
-                .map(|descriptor| descriptor.origin)
-                .ok_or_else(|| planner_error("a static body edge endpoint has no descriptor"))
-        };
-        let shape_of = |node: StaticNodeId| -> Option<semantic_ir::RuntimeExprShape> {
-            self.semantic_sources
-                .iter()
-                .find(|seed| seed.planned_node == node)
-                .and_then(|seed| match seed.source {
-                    SemanticSourceKind::Expression(shape) => Some(shape),
-                    _ => None,
-                })
-        };
-
-        // Endpoints only, from the raw edges.
-        let mut endpoints: BTreeMap<StaticOriginId, StaticOriginId> = BTreeMap::new();
-        for edge in &self.edges {
-            if edge.kind != EdgeKind::StaticBody {
-                continue;
-            }
-            // `D2a`: a declaration-owned pair's relation is a definition, not a
-            // call, so it mints no endpoint record here either. ⛔ Asked of the
-            // semantic plane rather than decided here — the owner
-            // classification has one home, and this file is pinned not to name
-            // it.
-            if self.semantic.is_declaration_owned_static_body(edge)? {
-                continue;
-            }
-            match shape_of(edge.from) {
-                Some(semantic_ir::RuntimeExprShape::Closure)
-                | Some(semantic_ir::RuntimeExprShape::LexicalClosure) => {}
-                _ => {
-                    return Err(planner_error(
-                        "a static body edge's source is not exactly a Closure or LexicalClosure \
-                         occurrence",
-                    ));
-                }
-            }
-            let closure_occurrence = origin_of(edge.from)?;
-            let source_body = self.semantic.child_origin(closure_occurrence, 0)?;
-            let scheduling_entry = origin_of(edge.to)?;
-            if endpoints.insert(scheduling_entry, source_body).is_some() {
-                return Err(planner_error(
-                    "two static body edges declare the same scheduling entry",
-                ));
-            }
-        }
-
-        // The retained-worker half of checked-IH dual realization has no raw
-        // `StaticBody` graph edge: that edge is the in-function recursor
-        // transfer. Its plan-issued descriptor nevertheless carries a distinct
-        // emittable StaticBody call identity, so add its compiler-owned endpoint
-        // record without changing the graph classification.
-        for descriptor in self
-            .abi
-            .descriptors
-            .iter()
-            .skip(self.semantic.functions.len())
-        {
-            let AbiUnitDefinition::ClosureBody {
-                defining_origin, ..
-            } = descriptor.definition
-            else {
-                continue;
-            };
-            let has_transfer = self.edges.iter().any(|edge| {
-                edge.kind == EdgeKind::RealizedRecursorTransfer
-                    && edge.from == StaticNodeId(defining_origin.0)
-                    && edge.to == descriptor.planned_node
-            });
-            if !has_transfer {
-                return Err(planner_error(
-                    "retained worker descriptor has no realized recursor transfer authority",
-                ));
-            }
-            let source_body = self.semantic.child_origin(defining_origin, 0)?;
-            let scheduling_entry = origin_of(descriptor.planned_node)?;
-            if endpoints.insert(scheduling_entry, source_body).is_some() {
-                return Err(planner_error(
-                    "two static body identities declare the same scheduling entry",
-                ));
-            }
-        }
-
-        // One-for-one drain against the authoritative emitted-call projection.
-        let mut bindings = Vec::new();
-        for edge in self
-            .emittable_call_edges()?
+        let units = self.emittable_units()?;
+        self.emittable_call_edges()?
             .into_iter()
             .filter(|edge| edge.kind() == EmittableCallKind::StaticBody)
-        {
-            let callee_origin = edge.callee_origin();
-            let source_body = endpoints.remove(&callee_origin).ok_or_else(|| {
-                planner_error(
-                    "an authoritative static body call has no endpoint record for its scheduling entry",
-                )
-            })?;
-            bindings.push((edge.caller(), source_body, callee_origin));
-        }
-        if !endpoints.is_empty() {
-            return Err(planner_error(
-                "a raw static body endpoint record was never claimed by an authoritative call",
-            ));
-        }
-        Ok(bindings)
+            .map(|edge| {
+                let matching = units
+                    .iter()
+                    .filter(|unit| unit.function() == edge.callee())
+                    .collect::<Vec<_>>();
+                let [callee] = matching.as_slice() else {
+                    return Err(planner_error(
+                        "a static-body call does not name exactly one emittable callee",
+                    ));
+                };
+                let AbiUnitDefinition::ClosureBody { .. } = callee.definition() else {
+                    return Err(planner_error(
+                        "a static-body call callee is not a retained closure body",
+                    ));
+                };
+                if callee.entry_origin() != edge.callee_origin() {
+                    return Err(planner_error(
+                        "a static-body call scheduling entry disagrees with its callee descriptor",
+                    ));
+                }
+                Ok((
+                    edge.caller(),
+                    callee.body_occurrence(),
+                    edge.callee_origin(),
+                ))
+            })
+            .collect()
     }
 
     /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 1 — the raw worker bodies that

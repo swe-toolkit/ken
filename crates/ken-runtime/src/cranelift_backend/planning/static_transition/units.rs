@@ -238,7 +238,7 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn emittable_call_edges(
         &self,
     ) -> Result<Vec<EmittableCallEdge>, CraneliftBackendError> {
-        let mut calls = self
+        let mut source_calls = self
             .semantic
             .static_body_call_edges(&self.edges)?
             .into_iter()
@@ -250,45 +250,7 @@ impl StaticTransitionPlan<'_> {
                 kind: EmittableCallKind::StaticBody,
             })
             .collect::<Vec<_>>();
-        // Checked-IH dual realization leaves the recursor edge non-boundary in
-        // the semantic graph, while the plan-issued retained worker descriptor
-        // carries a distinct callable identity. Project that second identity as
-        // an ordinary static-body call edge; no raw graph consumer is widened.
-        for descriptor in self
-            .abi
-            .descriptors
-            .iter()
-            .skip(self.semantic.functions.len())
-        {
-            let AbiUnitDefinition::ClosureBody {
-                defining_origin, ..
-            } = descriptor.definition
-            else {
-                continue;
-            };
-            let matching = self
-                .edges
-                .iter()
-                .filter(|edge| {
-                    edge.kind == EdgeKind::RealizedRecursorTransfer
-                        && edge.from == StaticNodeId(defining_origin.0)
-                        && edge.to == descriptor.planned_node
-                })
-                .collect::<Vec<_>>();
-            let [edge] = matching.as_slice() else {
-                return Err(planner_error(
-                    "retained checked-IH worker descriptor does not have exactly one realized recursor edge",
-                ));
-            };
-            calls.push(EmittableCallEdge {
-                caller: self.semantic.function_for_node(edge.from)?,
-                callee: descriptor.function,
-                callee_origin: origin_of(descriptor.planned_node),
-                call_site_origin: descriptor.body_occurrence,
-                kind: EmittableCallKind::StaticBody,
-            });
-        }
-        calls.extend(
+        source_calls.extend(
             self.semantic
                 .declaration_call_edges(&self.edges)?
                 .into_iter()
@@ -302,6 +264,111 @@ impl StaticTransitionPlan<'_> {
                     },
                 ),
         );
+
+        let units = self.emittable_units()?;
+        let workers = units
+            .iter()
+            .filter(|unit| {
+                !self
+                    .semantic
+                    .functions
+                    .iter()
+                    .any(|function| function.id == unit.function())
+            })
+            .copied()
+            .collect::<Vec<_>>();
+        let mut calls = source_calls.clone();
+
+        // A retained worker emits the source calls in its own projected source
+        // population. Duplicate those call identities under the worker's
+        // planner-issued function id; the original source-owner calls remain
+        // available to the in-place realization.
+        for worker in &workers {
+            let owned = self
+                .emission_source_origins(worker.function(), worker.body_occurrence())?;
+            for call in &source_calls {
+                let source_site = match call.kind {
+                    EmittableCallKind::StaticBody => units
+                        .iter()
+                        .find(|unit| unit.function() == call.callee)
+                        .and_then(|unit| match unit.definition() {
+                            AbiUnitDefinition::ClosureBody {
+                                defining_origin, ..
+                            } => Some(defining_origin),
+                            AbiUnitDefinition::SchedulingEntry { .. }
+                            | AbiUnitDefinition::CallableDeclaration { .. }
+                            | AbiUnitDefinition::ContinuationSpecialization { .. }
+                            | AbiUnitDefinition::StaticContinuationFusion { .. } => None,
+                        })
+                        .ok_or_else(|| {
+                            planner_error(
+                                "a static-body call callee has no closure definition origin",
+                            )
+                        })?,
+                    EmittableCallKind::Declaration => call.call_site_origin,
+                };
+                if owned.contains(&source_site) {
+                    calls.push(EmittableCallEdge {
+                        caller: worker.function(),
+                        ..*call
+                    });
+                }
+            }
+        }
+
+        // Checked-IH dual realization leaves the recursor edge non-boundary in
+        // the semantic graph, while the plan-issued retained worker descriptor
+        // carries a distinct callable identity. Project that second identity as
+        // a StaticBody call under every emission containing the defining
+        // closure. No raw graph consumer is widened.
+        for worker in &workers {
+            let AbiUnitDefinition::ClosureBody {
+                defining_origin, ..
+            } = worker.definition()
+            else {
+                return Err(planner_error(
+                    "a non-source emission is not a retained closure body",
+                ));
+            };
+            let matching = self
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.kind == EdgeKind::RealizedRecursorTransfer
+                        && edge.from == StaticNodeId(defining_origin.0)
+                        && edge.to == StaticNodeId(worker.entry_origin().0)
+                })
+                .collect::<Vec<_>>();
+            let [edge] = matching.as_slice() else {
+                return Err(planner_error(
+                    "retained checked-IH worker descriptor does not have exactly one realized recursor edge",
+                ));
+            };
+            let mut callers = vec![self.semantic.function_for_node(edge.from)?];
+            for enclosing in &workers {
+                if enclosing.function() == worker.function() {
+                    continue;
+                }
+                let owned = self.emission_source_origins(
+                    enclosing.function(),
+                    enclosing.body_occurrence(),
+                )?;
+                if owned.contains(&defining_origin) {
+                    callers.push(enclosing.function());
+                }
+            }
+            callers.sort_unstable();
+            callers.dedup();
+            for caller in callers {
+                calls.push(EmittableCallEdge {
+                    caller,
+                    callee: worker.function(),
+                    callee_origin: worker.entry_origin(),
+                    call_site_origin: worker.body_occurrence(),
+                    kind: EmittableCallKind::StaticBody,
+                });
+            }
+        }
         Ok(calls)
     }
 
