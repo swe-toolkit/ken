@@ -1,200 +1,219 @@
-# WP frame — RT-NESTED-IH-NATIVE-REALIZATION D3-D5 (realized-recursor EdgeKind reconciliation, §1b structural closure)
+# WP frame — RT-NESTED-IH-NATIVE-REALIZATION D3-D5 (reconcile body 61 PER CONSUMER CLASS; GATE-0 C-liveness decides worker-obligation vs scope-dissolution; §1b closure resolved at entry 3)
 
 > The completing D3-D5 slice of RT-NESTED-IH-NATIVE-REALIZATION (node
 > `docs/program/issues/RT-NESTED-IH-NATIVE-REALIZATION.md`). Runtime lane,
-> operator kernel-chain priority (`evt_7nkzsy27p7npw`: "Go with A, unblock the
-> kernel chain"). Owner: runtime. Size: M. Tier: T1. Gate: none. Architect
-> (`evt_1nkx3f30hqp9y` z4027, `evt_2a1gzw40mprz0` HS#2 closure) is the REQUIRED
-> reviewer on the candidate (a soundness-bearing planner static-graph fix).
-> Builds on RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION (merged `897f1ea6a`) and
-> RT-CHECKED-IH-REALIZATION-AUTHORITY (merged `e68ecd79`). On land, this node's
-> D3-D5 complete and `KERNEL-NESTED-IND` unblocks.
+> operator kernel-chain priority (`evt_7nkzsy27p7npw`). Owner: runtime. Size: M.
+> Tier: T1. Gate: none. Architect (`evt_1nkx3f30hqp9y` z4027, `evt_2a1gzw40mprz0`
+> z4029, `evt_53snpb8396g8a` HS#3 + amendment `evt_2cbtpf894nfzt`) is the REQUIRED
+> reviewer on the candidate. Builds on RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION
+> (merged `897f1ea6a`) and RT-CHECKED-IH-REALIZATION-AUTHORITY (merged `e68ecd79`).
+> On land, D3-D5 complete and `KERNEL-NESTED-IND` unblocks.
 
-> ## RECUT 2026-09-08 — HS#2 §1b STRUCTURAL CLOSURE (Architect `evt_2a1gzw40mprz0`)
+> ## §1b STRUCTURAL CLOSURE — RESOLVED AT ENTRY 3 (Architect `evt_53snpb8396g8a` + amendment `evt_2cbtpf894nfzt`)
 >
-> The z4027 owner-partition mechanism (correct the stale partition with two
-> special-cases) is SUPERSEDED by a single edge reconciliation. HS#2 fired one
-> edge further on, at the ABI boundary-signature validator, and it shares HS#1's
-> ROOT: the realized recursor's edge stays typed `EdgeKind::StaticBody` across
-> the entire static graph (~20 consumers, five files) while the elected in-place
-> checked-IH realization made it an intra-F CFG backedge. Point-fixing each
-> consumer is the RT-NATIVE-FNSPLIT 33-stop chain re-forming. The Architect
-> named the predicate at the 2nd entry (§1b sanctions this — the 3rd entry is
-> the LATEST you may generalize, not the earliest, and the shared root here is
-> grounded, not inferred). z4027 is NOT landed (the node is one still-compiling
-> candidate), so folding the closure in throws away no landed code — it SIMPLIFIES
-> the partition rather than adding to it. The superseded per-plane WIP is
-> checkpointed at `6596d0051` on `wp/RT-NESTED-IH-NATIVE-REALIZATION` (not a
-> candidate). Rebuild ONE candidate on the edge reconciliation.
+> Three hard stops, ONE family: **in-place checked-IH realization has a
+> NON-UNIFORM effect on the static-graph consumers of body 61.** The consumer
+> classes are OPPOSITE and EXHAUSTIVE — a consumer either keys on 61 as a CALL
+> BOUNDARY (partition wall, ABI boundary-signature — must STOP seeing a call after
+> realization) or needs 61 as an EMITTABLE WORKER (worker_templates for the
+> retained call — must STILL get a template). A single edge-kind reconciliation
+> (z4029) satisfies the first class and, by construction, breaks the second —
+> which is why HS#3 surfaced. The complete closure reconciles body 61's identity
+> PER CONSUMER CLASS. The z4029 edge reconciliation is RETAINED (correct for the
+> boundary class); this recut ADDS the retained-class resolution — which is one of
+> TWO outcomes decided by a MEASUREMENT (below), not asserted. Fold into the SAME
+> candidate (the prototype at `b17a1b6ea` is prototype-only). Node stays draft
+> until seeded.
 
-## Mechanism (Architect HS#2 closure `evt_2a1gzw40mprz0`, grounded @ `496d8637b`)
+## Mechanism (Architect HS#3 ruling `evt_53snpb8396g8a`, amended `evt_2cbtpf894nfzt`, grounded @ `496d8637b`)
 
-The root is ONE thing: the realized checked-IH recursor edge remains typed
-`EdgeKind::StaticBody` across the whole planner static graph, while the
-compiler-elected in-place checked-IH realization made it an intra-F CFG backedge
-(`Lowered::RecursiveBackedge`, already emitted in F per RT-REALIZED-BACKEDGE).
-A `StaticBody` edge asserts a source-level call boundary — a separate
-closure-body unit with its own defining occurrence. Post-realization that
-assertion is a FICTION: there is no separate unit, no separate frame, no call;
-the body is F's own code, lowered INLINE via the `iterative_composition` descent
-(`core.rs:3382`), and the tail edge is already in F.
+Body B = `StaticOriginId(61)` is realized IN-PLACE as a tail-recursive backedge
+inside its enclosing function F (z4027 owner partition + z4029 edge
+reconciliation — its recursor `StaticBody` edge became a non-boundary backedge,
+`RecursiveBackedge` already emitted in F). But the SAME body B is ALSO the target
+of a separately-RETAINED first-class callable C = `StaticOriginId(71)` — an
+invocation-local compiler control capsule (`mod.rs:3539`) whose captures mix
+JIT-seed (`ArtifactStatic`, minted before execution) and activation-carried
+(invocation-time SSA) phases.
 
-The edge is minted at `construction.rs:771` (`register_static_body`: source ->
-`body.entry` as `EdgeKind::StaticBody`) and nothing retires it. z4027 corrected
-the partition's TREATMENT of that edge (seed `edge.to` as its own unit at
-`semantic_ir.rs:1296`; wall `StaticBody|DeclarationCall` out of the flood at
-`semantic_ir.rs:1350`) but left the edge KIND stale — so every other consumer
-of `EdgeKind::StaticBody` still reads it as a boundary.
+The collision, grounded: `resolve_worker_targets` (`units.rs:995`) populates
+`worker_templates` from `plan.emittable_units()`, keyed by
+`unit.body_occurrence()`. z4029 removed body 61 from the emittable-unit
+population (its recursor `StaticBody` edge became a backedge), so its worker
+template VANISHED. When C is lowered it hits the D7 pre-emission
+capture-contract gate (`calls.rs:577-680`), which requires a planner-issued
+worker template keyed by B's origin — now absent. Refusal (verbatim, at
+`calls.rs:623-630`): `Unsupported { construct: "RetainedCallableCaptureContract",
+reason: "a mixed-phase retained callable at StaticOriginId(71) has no
+planner-issued worker template for body origin StaticOriginId(61) in this
+function" }`.
 
-Two hard stops, one predicate ("the static plane trusts a source-level
-`StaticBody` boundary"):
+THE DISPOSITION IS DECIDED BY A MEASUREMENT, not read off the shape (the
+amendment's correction — the capsule existing and the machinery existing do NOT
+establish liveness; that was a shape-read). GATE-0 measures whether body 61 is
+actually INVOKED through C's (origin 71) first-class retained value at a
+REACHABLE site:
 
-1. HS#1 (RULED z4027): `partition_function_units` walls join 50 to the inner
-   unit G though it inlined into F — because the recursor entry is a `StaticBody`
-   wall.
-2. HS#2 (this frontier): `abi.rs:2735` `validate_boundary_layouts` iterates
-   `boundary_signatures()` (`abi.rs:2854`), one signature per
-   `EdgeKind::StaticBody` edge, with `defining_origin = edge.from` and
-   `callee = owner(edge.to)`. For the realized recursor, `edge.to` (the body
-   seed) is now owned by F after z4027, so `descriptor(F).closure_shaped_captures()`
-   yields F's defining_origin while `signature.defining_origin` is the recursor
-   occurrence — they disagree -> `PlannerInvariant` at `abi.rs:2771`
-   "boundary signature and callee descriptor disagree on the defining occurrence."
+- **C LIVE (a genuine escape) -> (a) DUAL EMISSION.** The missing worker template
+  IS a NEW COMPILER-DERIVED PRODUCER OBLIGATION: the planner issues body 61's
+  worker template for the retained callable 71 as a PLAN-LEVEL obligation, keyed
+  on 71's compiler-owned oriented-plan + the static body 61 + the static capture
+  schema. Body 61's SOURCE compiles TWICE — the specialized inline backedge in F
+  (recursor path, z4029) AND a standalone worker (the escaped retained use, 71) —
+  two emissions, DISTINCT identities and DISTINCT edge kinds, one source body.
+  This is the standard inlined-AND-escaping pattern (LLVM/GCC emit the out-of-line
+  copy of an address-taken function even when it is inlined at every direct call
+  site).
+- **C DEAD / vestigial -> (c) SPURIOUS RETENTION.** The worker-template omission
+  is a CORRECT REFUSAL. The fix is UPSTREAM: extend the realization's
+  reconciliation SCOPE to COMPLETELY DISSOLVE C and every capture-contract
+  obligation it carries — NOT manufacture a worker for a callable nobody calls.
+  Incomplete dissolution recurs as HS#4 at the next C consumer. NOT a producer
+  obligation.
 
-RULING — reconcile the EDGE, once. At the point the plan elects in-place
-checked-IH realization for the recursor (the SAME compiler-owned oriented-plan /
-checked-IH marking z4027 keys on — kernel-checkable, identity-bound, never
-caller-authored), the realized recursor's edge must NOT be an
-`EdgeKind::StaticBody` call boundary. Reconcile it once, at the edge, to a
-non-boundary control/transfer (backedge) edge that reflects the realized
-backedge. The edge is still a real control edge (a tail jump) — it is
-RECLASSIFIED, not deleted.
+Why measure first: issuing a worker for a DEAD C is wasted emission AND papers
+over an incomplete realization scope — it would HIDE a real (c) defect behind a
+green build. The measurement is the single fact that decides producer-obligation
+vs correct-refusal. (b) forbid-realization stays REFUTED as pessimizing (it would
+sacrifice the in-place recursor realization z4027/z4029 correctly achieved to
+serve a cold first-class reference); prior art does BOTH, not forbid.
 
-Then, with ZERO per-consumer special-casing:
-- `semantic_ir.rs` partition: the edge is no longer `StaticBody`, so `:1296`
-  does not seed a `StaticBodyTarget` unit (no dead G) AND `:1350` does not wall
-  it (F's flood crosses naturally -> 50 owned by F). z4027's TWO partition
-  special-cases fall out for free and become UNNECESSARY (the partition
-  simplifies, it does not grow).
-- `abi.rs:2861` `boundary_signatures`: filters `EdgeKind::StaticBody` -> skips
-  the reconciled edge -> no phantom boundary. HS#2 closed.
-- `closure.rs` / `continuations.rs` / `construction.rs` `StaticBody` consumers:
-  all skip it. Entries 3..N preempted before they fire.
-
-SOUNDNESS: retiring the boundary makes the graph tell the truth about what was
-realized — it does not hide a boundary that exists. Body lowering is unaffected
-(it never went through the `StaticBody` call path). Because reconciliation is at
-the planner static graph (an `EdgeKind`), it is the SAME lane as z4027 (which
-edited the planner partition), NOT a `Lowered`/`LoweringOperand` variant.
-
-## Fixed inputs (Architect-measured @ `496d8637b`; re-measure at your D0 cut)
-
-Line numbers drift — re-measure at D0. The Architect grounded these from
-`origin/main 496d8637b` himself.
-
-- THE EDGE-MINT / RECONCILIATION LOCUS: `construction.rs:771`
-  (`register_static_body`, source -> `body.entry` as `EdgeKind::StaticBody`);
-  reconcile at the realization-election point keyed on the oriented-plan /
-  checked-IH marking.
-- HS#2 frontier: `abi.rs:2735` (`validate_boundary_layouts`), `abi.rs:2854`
-  (`boundary_signatures`), `abi.rs:2771` (the `PlannerInvariant`), `abi.rs:2861`
-  (the `EdgeKind::StaticBody` filter).
-- z4027 partition sites now SIMPLIFIED (special-cases removed):
-  `semantic_ir.rs:1296` (seed), `semantic_ir.rs:1350` (wall).
-- THE `EdgeKind::StaticBody` CONSUMER CENSUS (starting set, ~20 sites across five
-  files — the ring RE-DERIVES the complete set from `origin/main` at D0):
-  - `semantic_ir.rs`: `:1162`, `:1296`, `:1350`, `:2169`
-  - `abi.rs`: `:1746`, `:2861`
-  - `closure.rs` (~16): `:1270`, `:1508`, `:3282`, `:5405`, `:5769`, `:5858`,
-    `:5959`, `:5991`, `:6016`, `:6115`, `:6173`, `:6201`, `:6210`, `:6365`,
-    `:6437`, `:6485`
-  - `construction.rs`: `:536`, `:563`, `:1725`
-  - `continuations.rs`: `:3290`
-- `validate_function_units` (`semantic_ir.rs:2395`, recompute-and-compare) — the
-  AC-SINGLE-OWNER control.
-- `iterative_composition` descent (`core.rs:3382`) — where the body lowers
-  inline; unaffected.
-- The landed RT-CHECKED-IH D4 positional-ABI vector (the recursor's oriented
-  frame / slots / parents / calls) — the AC-ABI-PIN reference, plus the node's
-  own deferred positional `#[cfg(test)]` pin.
+SOUNDNESS is a SEPARATE gate from liveness (AC-DISCRIMINATOR-GATE, below):
+derivability (is 61's body / 71's schema compiler-owned?) vs liveness (is C
+invoked?). Both must pass for (a). 61 is a `StaticOriginId` (compiler-owned static
+body); 71's capture SCHEMA is the static `AbiCaptureProvenance` classification the
+D7 gate itself uses (`Carried` = activation-frame SSA vs `ArtifactStatic` =
+pre-exec seed — a STATIC per-capture classification; only the VALUES are runtime).
+So the template derives PURELY from 71's compiler-owned marking, never
+caller-authored; template from the SCHEMA, capture VALUES through the environment.
 
 ## Deliverable
 
-Reconcile the realized checked-IH recursor edge at ONE locus — the
-realization-election point, keyed on the compiler-owned oriented-plan /
-checked-IH marking — from `EdgeKind::StaticBody` to a non-boundary
-control/transfer (backedge) `EdgeKind`. Remove z4027's two partition
-special-cases as superseded (the partition flood, the no-seed/no-dead-G, and the
-ABI boundary filter all follow naturally from the reconciled edge). NO
-per-consumer special-casing at any of the ~20 `StaticBody` sites. The
-ordinary-`Match` selector, the `source.rs` catch-all, and all values/carriers
-stay untouched.
+GATE-0 FIRST, then the branch it selects:
 
-## Acceptance criteria
+0. **GATE-0 (AC-C-LIVENESS) — the mandatory first measurement.** Measure whether
+   body 61 is invoked through origin 71's first-class retained value at a
+   reachable site (a reachability/invocation measurement of C, NOT a shape-read of
+   the capsule or the machinery). Report the measurement WITH the candidate; it
+   decides the disposition and the Architect reviews against it.
 
-RETAIN (z4027's proven results, now CONSEQUENCES of the edge reconciliation):
+Then exactly one branch:
 
-- **AC-COMPLETE-PARITY (the goal):** native execution COMPLETES and native
-  result == interpreter == `Nat 3`. Removing the stop is necessary but NOT
-  sufficient — parity is the real gate.
-- **AC-SINGLE-OWNER:** `validate_function_units` (`semantic_ir.rs:2395`) passes;
-  the realized subtree (incl. 50) is owned by EXACTLY F — no double-owner, no
-  dead G unit emitted.
-- **AC-DISPOSITION-CONSISTENT:** statically-unselected branches still disposition
-  correctly; `source_join_origins_in_owner_subtree(F root) ∋ 50`.
-- **AC-ABI-PIN (the "wrong answer in the first release that removes the stop"
-  hazard the node records):** retain the RT-CHECKED-IH D4 positional-ABI
-  `#[cfg(test)]` pin — the recursor's oriented frame / slots / parents / calls
-  == the landed D4 vector. Parity at `Nat 3` PLUS an unchanged positional-ABI
-  vector proves the completion is the RIGHT one, not an accidental one.
+- **(a) C LIVE:** issue body 61's worker template for the retained callable 71 as
+  a PLAN-LEVEL producer obligation — keep body 61 in the worker-template
+  population BECAUSE it is a retained-callable target of 71 (even though its
+  recursor edge was reconciled), extending the existing `resolve_worker_targets` /
+  `declare_retained_body_targets_in_func` issuance. Reify-and-seal on origin 71's
+  plan (kernel-checkable) so every use-context has the template BY CONSTRUCTION —
+  NOT per-function on demand (recurs as HS#4/#5). Identity is BY origin 61 across
+  BOTH realizations; do NOT dedup them (different ABIs, different call patterns).
+  The standalone worker gets its OWN real `StaticBody` call boundary — it must NOT
+  inherit the recursor backedge's non-boundary edge kind (z4029's kind is for the
+  in-place path ONLY).
+- **(c) C DEAD:** extend the realization's reconciliation scope to COMPLETELY
+  dissolve C and every capture-contract obligation it carries.
 
-NEW (the closure's guardrail — a proven closure, not a better grep):
+The ordinary-`Match` selector and the `source.rs` catch-all stay untouched.
 
-- **AC-STATICBODY-CENSUS:** enumerate EVERY `EdgeKind::StaticBody` consumer (the
-  ~20 sites above are the STARTING census; re-derive the complete set from
-  `origin/main` at D0) and for each confirm it EITHER correctly treats the
-  reconciled realized-recursor edge as a non-boundary (skips it) OR carries a
-  GROUNDED, STATED reason it must still see the edge — in which case the
-  reconciliation is an OVERLAY/attribute checked through a shared helper, not an
-  `EdgeKind` change. A reason may NOT be assumed; it must be shown. This is what
-  turns "reclassify fixes everything" from a bet into an obligation.
+HARD-STOP ESCAPES (report + STOP, do not route around):
+- **Condition-2 / inc3 axis-B:** if branch (a) genuinely requires a NEW
+  `Lowered`/`LoweringOperand` variant or a new plan construct, that crosses a
+  forbidden carry — route to Steward/operator (funding line); do NOT mint the
+  variant. A larger BUILD through existing machinery is within-lane; a new
+  construct is not.
+- **AC-DISCRIMINATOR-GATE:** if any part of 61's body / 71's capture SCHEMA is
+  runtime-DETERMINED (not merely runtime-valued), the durable first-class-callable
+  carrier (the B2F analogue) is the OPERATOR FORK — route it.
 
-## §1b symptom inventory (seed — extend on each further stop)
+## Fixed inputs (Architect-measured @ `496d8637b`; re-measure at your D0 cut)
 
-Predicate shared by every entry: "the static plane trusts a source-level
-`EdgeKind::StaticBody` boundary that in-place checked-IH realization dissolved."
+- THE REFUSAL: `calls.rs:623-630`, the D7 capture-contract gate
+  (`calls.rs:577-680`).
+- THE ISSUANCE MACHINERY (Condition 2 exists here): `resolve_worker_targets`
+  (`units.rs:995`) templating `worker_templates` from `plan.emittable_units()`
+  keyed by `unit.body_occurrence()`; `declare_retained_body_targets_in_func`
+  (`units.rs:2900`).
+- THE RETAINED CALLABLE: `mod.rs:3539` (invocation-local control capsule, origin
+  71); its `AbiCaptureProvenance` classification (`Carried` vs `ArtifactStatic`).
+- GATE-0 MEASUREMENT TARGET: the reachable invocation sites of origin 71's
+  first-class retained value (does control reach an invocation of body 61 through
+  C).
+- THE z4029 EDGE RECONCILIATION (retained, must still hold): realized-recursor
+  edge minted at `construction.rs:771` (`register_static_body`), reconciled to a
+  non-boundary backedge; partition sites `semantic_ir.rs:1296` / `:1350`; ABI
+  boundary-signature validator `abi.rs:2735` / `:2854` / `:2771` / `:2861`.
+- `validate_function_units` (`semantic_ir.rs:2395`) — AC-RECURSOR-UNTOUCHED
+  control. The landed RT-CHECKED-IH D4 positional-ABI vector — AC-ABI-PIN.
 
-1. **HS#1 — partition (RULED z4027, `evt_1nkx3f30hqp9y`).**
-   `partition_function_units` trusts the source unit wall; join 50 walled to
-   inner unit G though inlined into F. Point-fix was two partition special-cases.
-2. **HS#2 — ABI boundary signatures (RULED, this closure, `evt_2a1gzw40mprz0`).**
-   `abi.rs` `boundary_signatures` trusts the `StaticBody` edge as a callee
-   definition; the realized subtree inlined into F disagrees ->
-   `PlannerInvariant` at `abi.rs:2771`.
+## Acceptance criteria (Architect-pinned)
 
-CLOSURE VERDICT: these are not two defects but one — the stale `EdgeKind`. The
-structural fix is the single edge reconciliation above; entries 3..N (the
-`closure.rs` / `continuations.rs` / `construction.rs` consumers) are preempted,
-not point-fixed. A genuinely-new mechanism behind the closure returns to the
-Architect; the §1a research trigger is at HS#3 and this closure is meant to end
-the chain before it reaches it.
+- **AC-C-LIVENESS (GATE-0, ahead of building anything):** a reachability/invocation
+  MEASUREMENT of whether body 61 is invoked through origin 71's first-class value
+  decides (a) vs (c). Capsule/machinery existence is NOT liveness. The candidate
+  reports the measurement; it is the discriminator.
+- **AC-WORKER-ISSUED (branch a):** body 61's worker template EXISTS for the
+  retained callable 71, derived from 71's compiler-owned marking; the D7 gate is
+  satisfied, not bypassed. Identity BY origin 61 across both realizations, NOT
+  deduped (distinct ABIs); the worker carries its OWN `StaticBody` call boundary.
+- **AC-DISCRIMINATOR-GATE (SEPARATE from liveness — derivability):** measure that
+  61's body identity and 71's capture SCHEMA are compiler-owned/static; if any
+  part is runtime-DETERMINED (body identity chosen at runtime, a capture SHAPE a
+  caller authors, or provenance only from a forbidden carry), the disposition
+  FLIPS to must-refuse and the B2F durable-carrier is the OPERATOR FORK.
+- **AC-PLAN-LEVEL (branch a):** issued at the PLAN level (reify-and-seal on origin
+  71's plan), not per-function — assert the refusal does not recur at a second use
+  of 71.
+- **AC-RECURSOR-UNTOUCHED (critical, sharpened):** the two realizations carry
+  DISTINCT edge kinds. z4027/z4029 still hold: `validate_function_units` passes,
+  join 50 owned by F, the recursor edge stays a non-boundary backedge, partition +
+  ABI stops stay closed. The retained-worker reference carries its own `StaticBody`
+  boundary; neither realization's edge kind leaks into the other. (Branch (c):
+  dissolving C must not re-wall the recursor path either.)
+- **AC-COMPLETE-PARITY (the goal):** native execution COMPLETES and native result
+  == interpreter == `Nat 3`.
+- **AC-ABI-PIN:** retain the RT-CHECKED-IH D4 positional-ABI `#[cfg(test)]` pin —
+  recursor oriented frame / slots / parents / calls == the landed D4 vector.
+- **AC-DUAL-CENSUS (AC-STATICBODY-CENSUS extended to BOTH directions):** census
+  every `EdgeKind::StaticBody` consumer (z4029, boundary class) AND every
+  emittable-unit / worker consumer (`resolve_worker_targets` by-origin + the
+  `worker_templates` map, `declare_retained_body_targets_in_func`, the D7 gate —
+  worker class), confirming body 61's DUAL role is correctly resolved and neither
+  edge kind leaks into the other. A reason a consumer must still see the old form
+  must be SHOWN, not assumed.
 
-## Forbidden boundary (each closed route, inherited from z4022/z4027)
+## §1b symptom inventory (RESOLVED at entry 3 — per-consumer-class closure)
 
-- No selector or catch-all widening: the ordinary-`Match` selector (`core.rs`)
-  and the `source.rs` catch-all are UNTOUCHED — the edit is the planner
-  `EdgeKind`.
-- No second join inventory / no `NativeJoinPlanV1` collection (it stays
-  withdrawn).
-- No `.residual` inspection; no unchecked / caller-authored plan (reconciliation
-  keys on the compiler-owned oriented plan).
-- No terminal-`All` / `KERNEL-NESTED-IND` provenance import.
-- No new `Lowered` / `LoweringOperand` variant or carrier conversion — an
-  `EdgeKind` reconciliation is planner-static-graph (the SAME lane as z4027),
-  NOT a `Lowered`/operand variant; `RecursiveBackedge` and all values are
-  unchanged.
-- No per-consumer special-casing of any `StaticBody` site (that is the 33-stop
-  chain this closure exists to prevent).
+Family predicate: "in-place checked-IH realization has a NON-UNIFORM effect on the
+static-graph consumers of body 61." Two consumer classes, OPPOSITE and EXHAUSTIVE.
+
+1. **HS#1 — partition (BOUNDARY class; RULED z4027, `evt_1nkx3f30hqp9y`).** Join 50
+   walled to inner unit G though inlined into F.
+2. **HS#2 — ABI boundary signatures (BOUNDARY class; RULED z4029,
+   `evt_2a1gzw40mprz0`).** `boundary_signatures` reads the `StaticBody` edge as a
+   callee definition. Both closed by the single edge reconciliation.
+3. **HS#3 — retained-callable worker template (WORKER class; RULED
+   `evt_53snpb8396g8a`, amended `evt_2cbtpf894nfzt`).** `resolve_worker_targets`
+   lost body 61 from the emittable population when z4029 reconciled its edge; the
+   D7 gate refuses retained callable 71. Closed PER MEASUREMENT: C live -> plan-level
+   worker obligation; C dead -> complete dissolution.
+
+CLOSURE VERDICT: the boundary class (HS#1/#2) and the worker class (HS#3) are
+exhaustive over how a static-graph consumer keys on a body, so reconciling body
+61's identity PER CONSUMER CLASS (worker if the retained consumer is live, else
+dissolution) is the complete closure — no HS#4 on this family is expected. A
+genuinely-new mechanism returns to the Architect; §1a next fires at HS#6.
+
+## Forbidden boundary (all carries closed; unchanged from z4022/z4027/z4029)
+
+- Plan-level producer obligation INSIDE the existing worker-template issuance,
+  keyed on 71's compiler-owned oriented-plan. No selector or catch-all widening.
+- No second join inventory / no `NativeJoinPlanV1` (stays withdrawn); no
+  `.residual`; no unchecked / caller-authored plan; no terminal-`All` /
+  `KERNEL-NESTED-IND` provenance (template carries only 71's own oriented-plan /
+  checked-IH provenance).
+- No new `Lowered` / `LoweringOperand` variant or carrier — if the obligation
+  genuinely needs one, that is the Condition-2 hard-stop to Steward/operator.
+- Static/dynamic: template from the SCHEMA, capture VALUES through the environment.
 
 ## Out of scope (Architect flag — do NOT fold in)
 
@@ -207,22 +226,23 @@ surfaces; do not fold it into this WP.
 
 ## Contention check
 
-Touches the planner static graph (the realized-recursor `EdgeKind` at its mint
-locus, plus removal of z4027's partition special-cases) — a soundness-bearing
-producer of the kernel-checkable required-join set and the ABI boundary
-signatures. Runtime is the sole lane on this surface (foundation is on PX9;
-language on its own track). Architect REQUIRED reviewer (`evt_2a1gzw40mprz0`) +
-Runtime QA. The candidate's TCB classification is assessed at M4 (the edge
-classification feeds `required_join_origins` and the ABI boundary validator, so
-likely TCB-adjacent); the Architect review is required regardless.
+Touches the planner static graph (the realized-recursor `EdgeKind` from z4029)
+and the plan-level worker-template issuance (`resolve_worker_targets` /
+`declare_retained_body_targets_in_func`) — soundness-bearing producers of the
+kernel-checkable required-join set, the ABI boundary signatures, and the
+worker-template population. Runtime is the sole lane on this surface. Architect
+REQUIRED reviewer (`evt_53snpb8396g8a` / `evt_2cbtpf894nfzt`) + Runtime QA. TCB
+classification assessed at M4; the Architect review is required regardless.
 
 ## Sequencing
 
-Releasable now (both predecessors merged, closure ruled, ring holding for this
-amended frame). On the candidate: my M1-M4 (Architect REQUIRED reviewer + Runtime
-QA). Accepted-partial discipline holds: if native completes but parity fails, or
-advances to a NEW named refusal, report it verbatim + site and STOP — a
-genuinely-new mechanism is a fresh Architect question, not something to route
-around. On land, RT-NESTED-IH-NATIVE-REALIZATION D3-D5 complete and
-`KERNEL-NESTED-IND` unblocks; the operator-prioritized runtime kernel chain
-advances toward `DS-9`.
+Releasable now (predecessors merged, closure ruled at entry 3, ring holding for
+this amended frame). GATE-0 (C-liveness) is the first deliverable and is reported
+with the candidate. On the candidate: my M1-M4 (Architect REQUIRED reviewer +
+Runtime QA). Accepted-partial discipline holds: if native completes but parity
+fails, or advances to a NEW named refusal, report it verbatim + site and STOP (§1a
+next fires at HS#6). If AC-DISCRIMINATOR-GATE measures any part of 61's body / 71's
+schema runtime-determined, STOP and route the operator B2F fork. If branch (a)
+needs a new `Lowered`/operand variant, STOP and route the Condition-2 funding line.
+On land, D3-D5 complete and `KERNEL-NESTED-IND` unblocks; the operator-prioritized
+runtime kernel chain advances toward `DS-9`.
