@@ -64,6 +64,7 @@ pub(in crate::cranelift_backend::lowering) enum CarriedMatchDispatchMutation {
     BypassBoolTagGuard,
     AdmitIntClass,
     DropBoundedNatAdapter,
+    DropStructuralNatAdapter,
 }
 
 #[cfg(test)]
@@ -463,7 +464,7 @@ impl<'a> Lowering<'a> {
             env: &[LoweringEnvironmentBinding],
         composed_suffix: Option<&[EliminatorFrame<'_>]>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
-            let exact_bounded_nat_family = cases.len() == 2
+            let exact_nat_family = cases.len() == 2
                 && cases.iter().any(|case| {
                     case.constructor == self.process_symbols.nat_zero && case.binders == 0
                 })
@@ -472,7 +473,7 @@ impl<'a> Lowering<'a> {
                 })
                 && composed_suffix.is_none_or(<[_]>::is_empty);
             #[cfg(test)]
-            let exact_bounded_nat_family = exact_bounded_nat_family
+            let exact_nat_family = exact_nat_family
                 && !carried_match_dispatch_mutation_applies(
                     CarriedMatchDispatchMutation::DropBoundedNatAdapter,
                 );
@@ -483,17 +484,20 @@ impl<'a> Lowering<'a> {
             if cases.is_empty() {
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())));
             }
-            if exact_bounded_nat_family {
-                // A Nat family can arrive in either representation: ReadSome's
-                // validated length is an immediate BoundedNat, while a source
-                // `Suc` rebuilt around a carried predecessor is still a
-                // constructor. Split on the existing word tag and keep the
-                // constructor route unchanged for the sibling representation.
+            if exact_nat_family {
+                // A Nat family can arrive as a validated BoundedNat, as a
+                // deforested StructuralNat, or as a represented constructor.
+                // Split on the two existing immediate tags and keep the node
+                // route unchanged for the represented form. The exact Nat case
+                // family is the static authority for this adapter; runtime tags
+                // select only among representations already admitted here.
                 let tag = builder.ins().band_imm(
                     scrutinee.word,
                     crate::boundary_value::BOUNDARY_TAG_MASK as i64,
                 );
                 let bounded = builder.create_block();
+                let structural_probe = builder.create_block();
+                let structural = builder.create_block();
                 let represented = builder.create_block();
                 let merge = join_plan
                     .has_continuing_predecessor
@@ -508,7 +512,7 @@ impl<'a> Lowering<'a> {
                 );
                 builder
                     .ins()
-                    .brif(is_bounded, bounded, &[], represented, &[]);
+                    .brif(is_bounded, bounded, &[], structural_probe, &[]);
                 let mut merge_kind = None;
 
                 builder.switch_to_block(bounded);
@@ -541,6 +545,60 @@ impl<'a> Lowering<'a> {
                         bounded_result,
                         &mut merge_kind,
                         "a carried BoundedNat representation",
+                    )?;
+                }
+
+                builder.switch_to_block(structural_probe);
+                #[cfg(test)]
+                let structural_tag = if carried_match_dispatch_mutation_applies(
+                    CarriedMatchDispatchMutation::DropStructuralNatAdapter,
+                ) {
+                    BoundaryTag::ImmediateBoundedNat
+                } else {
+                    BoundaryTag::ImmediateStructuralNat
+                };
+                #[cfg(not(test))]
+                let structural_tag = BoundaryTag::ImmediateStructuralNat;
+                let is_structural = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    tag,
+                    structural_tag as i64,
+                );
+                builder
+                    .ins()
+                    .brif(is_structural, structural, &[], represented, &[]);
+
+                builder.switch_to_block(structural);
+                let value = builder.ins().ushr_imm(
+                    scrutinee.word,
+                    i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
+                );
+                let structural_result = self.lower_bounded_nat_match_with_plan(
+                    builder,
+                    BoundedNatV1::derived_from_validated(value),
+                    true,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                    &join_plan,
+                )?;
+                if !self.seal_source_trap_branch(builder, &structural_result)? {
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(
+                            "join plan omitted a merge despite a continuing carried \
+                             StructuralNat predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        static_origin,
+                        structural_result,
+                        &mut merge_kind,
+                        "a carried StructuralNat representation",
                     )?;
                 }
 
