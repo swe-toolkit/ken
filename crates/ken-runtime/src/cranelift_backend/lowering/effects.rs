@@ -231,7 +231,6 @@ fn runtime_producible_constructors(
         resource_invalid_offset,
         resource_invalid_bounds,
         resource_no_progress,
-        resource_revoked,
         resource_kind_fs_handle,
         resource_kind_buffer,
         resource_trace_identity,
@@ -290,7 +289,6 @@ fn runtime_producible_constructors(
         resource_invalid_offset,
         resource_invalid_bounds,
         resource_no_progress,
-        resource_revoked,
         resource_kind_fs_handle,
         resource_kind_buffer,
         resource_trace_identity,
@@ -1980,7 +1978,7 @@ impl<'a> Lowering<'a> {
         let is_other = builder.ins().icmp_imm(
             cranelift_codegen::ir::condcodes::IntCC::Equal,
             discriminator,
-            11,
+            12,
         );
         builder.ins().brif(is_other, other, &[], ordinary, &[]);
         builder.switch_to_block(other);
@@ -1992,7 +1990,11 @@ impl<'a> Lowering<'a> {
         builder.switch_to_block(ordinary);
         let upper = builder.ins().ushr_imm(encoded, 8);
         Self::require_i64(builder, upper, 0);
-        Self::require_one_of_i64(builder, discriminator, &[0, 1, 3, 4, 5, 6, 7, 8, 9, 10]);
+        Self::require_one_of_i64(
+            builder,
+            discriminator,
+            &[0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        );
         builder.ins().jump(valid, &[]);
         builder.switch_to_block(valid);
     }
@@ -2010,7 +2012,7 @@ impl<'a> Lowering<'a> {
         held: cranelift_codegen::ir::Value,
         actual_expected_kind: cranelift_codegen::ir::Value,
         actual_actual_kind: cranelift_codegen::ir::Value,
-        resource_error_tags_in_payload_shape_order: [u64; 11],
+        resource_error_tags_in_payload_shape_order: [u64; 10],
         expected_schema: u64,
         expected_kind: u64,
         buffer_kind: u64,
@@ -2040,7 +2042,6 @@ impl<'a> Lowering<'a> {
         let invalid_bounds_tag = next_resource_error_tag();
         let no_progress_tag = next_resource_error_tag();
         let allocation_failed_tag = next_resource_error_tag();
-        let revoked_tag = next_resource_error_tag();
         let arms = [
             closed_tag,
             malformed_reply_tag,
@@ -2138,7 +2139,6 @@ impl<'a> Lowering<'a> {
                 invalid_bounds_tag,
                 no_progress_tag,
                 allocation_failed_tag,
-                revoked_tag,
             ]
             .map(|tag| i64::try_from(tag).expect("resource error tag fits i64")),
         );
@@ -3714,10 +3714,12 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::ResourceRelease => {
                     vec![success_tag, wire.reply_resource_error_tag as i64]
                 }
-                ken_host::HostOpV1::BufferAllocate | ken_host::HostOpV1::BufferFreeze => {
+                ken_host::HostOpV1::BufferAllocate => {
                     vec![success_tag, wire.reply_resource_error_tag as i64]
                 }
-                ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::FsWriteAt => vec![
+                ken_host::HostOpV1::BufferFreeze
+                | ken_host::HostOpV1::FsReadAt
+                | ken_host::HostOpV1::FsWriteAt => vec![
                     success_tag,
                     wire.reply_error_tag as i64,
                     wire.reply_resource_error_tag as i64,
@@ -3797,7 +3799,6 @@ impl<'a> Lowering<'a> {
                     wire.resource_error_invalid_bounds,
                     wire.resource_error_no_progress,
                     wire.resource_error_allocation_failed,
-                    wire.resource_error_revoked,
                 ],
                 wire.resource_error_reply_schema,
                 wire.resource_kind_fs_handle,
@@ -4225,16 +4226,6 @@ impl<'a> Lowering<'a> {
                             Vec::new(),
                             &seats,
                         )?,
-                        self.synthesized_dynamic_alternative(
-                            static_origin,
-                            &error_root,
-                            11,
-                            checked_resource_tag(wire.resource_error_revoked),
-                            SynthesizedFixedConstructorRole::ResourceRevoked,
-                            self.process_symbols.resource_revoked.clone(),
-                            Vec::new(),
-                            &seats,
-                        )?,
                     ],
                 })
             } else {
@@ -4650,6 +4641,10 @@ impl<'a> Lowering<'a> {
             // so the population equality is asked for here explicitly.
             self.reconcile_host_result_root(static_origin, &error_root, &error)?;
             self.reconcile_host_result_root(static_origin, &ok_root, &ok)?;
+            // Static response ownership splits after the current block's last
+            // instruction. Keep that endpoint explicit even when both final
+            // synthesized roots are metadata-only nullary constructors.
+            let _response_owner_endpoint = builder.ins().iconst(types::I64, 0);
             Ok(LoweringOperand::Specialized(Lowered::HostResult {
                 success,
                 error: Box::new(error),

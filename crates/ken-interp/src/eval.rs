@@ -4253,7 +4253,6 @@ pub struct FSIds {
     pub invalid_offset_id: GlobalId,
     pub invalid_bounds_id: GlobalId,
     pub no_progress_id: GlobalId,
-    pub resource_revoked_id: GlobalId,
     pub private_buffer_span_id: GlobalId,
     pub private_transfer_count_id: GlobalId,
     pub read_some_id: GlobalId,
@@ -4324,7 +4323,6 @@ impl FSIds {
             invalid_offset_id: get("InvalidOffset")?,
             invalid_bounds_id: get("InvalidBounds")?,
             no_progress_id: get("NoProgress")?,
-            resource_revoked_id: get("ResourceRevoked")?,
             private_buffer_span_id: elab.env.inductive(get("BufferSpan")?)?.constructors[0].id,
             private_transfer_count_id: elab.env.inductive(get("TransferCount")?)?.constructors[0]
                 .id,
@@ -4442,6 +4440,7 @@ fn io_error_identity_value(
         ken_host::IoErrorIdentityV1::NotDirectory => ids.notdirectory_id,
         ken_host::IoErrorIdentityV1::NotEmpty => ids.notempty_id,
         ken_host::IoErrorIdentityV1::Unsupported => ids.unsupported_id,
+        ken_host::IoErrorIdentityV1::Revoked => ids.revoked_id,
         ken_host::IoErrorIdentityV1::Other(_) => ids.other_id,
     };
     let args = if ctor == ids.other_id {
@@ -5079,7 +5078,6 @@ fn resource_error_value_v1(
         ken_host::ResourceErrorV1::InvalidOffset => make_ctor(fs.invalid_offset_id, vec![], store),
         ken_host::ResourceErrorV1::InvalidBounds => make_ctor(fs.invalid_bounds_id, vec![], store),
         ken_host::ResourceErrorV1::NoProgress => make_ctor(fs.no_progress_id, vec![], store),
-        ken_host::ResourceErrorV1::Revoked => make_ctor(fs.resource_revoked_id, vec![], store),
     }
 }
 
@@ -5649,7 +5647,6 @@ fn reify_host_reply_v1(
                 ken_host::FileErrorCauseV1::Capability(_) => {
                     make_ctor(ids.capabilitydenied_id, vec![], store)
                 }
-                ken_host::FileErrorCauseV1::Revoked => make_ctor(ids.revoked_id, vec![], store),
             };
             let file_error = file_error_value(operation_id, &error.relative_path, cause, fs, store);
             return Ok(make_result(false, file_error, ids, store));
@@ -6688,7 +6685,6 @@ mod px5b_effect_observation_tests {
             invalid_offset_id: id(),
             invalid_bounds_id: id(),
             no_progress_id: id(),
-            resource_revoked_id: id(),
             private_buffer_span_id: id(),
             private_transfer_count_id: id(),
             read_some_id: id(),
@@ -7244,23 +7240,21 @@ mod px5b_effect_observation_tests {
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the production
-    /// interpreter reifier maps the distinct host resource-withdrawal variant
-    /// to the checked nullary `ResourceRevoked` constructor. CLAIMED: the
-    /// interpreter does not collapse this identity into ResourceHostIO or a
-    /// lifetime/right error. THE GAP: host-side provenance admission is pinned
-    /// independently in ken-host.
+    /// interpreter reifier maps the canonical host Revoked identity reached by
+    /// a resource operation to checked `ResourceHostIO Revoked`. CLAIMED: the
+    /// resource origin shares the filesystem identity without collapsing into
+    /// a lifetime/right error or neighboring I/O arm. THE GAP: host-side
+    /// provenance admission is pinned independently in ken-host.
     #[test]
-    fn resource_revoked_reifies_as_exact_nullary_resource_constructor() {
+    fn resource_origin_revoked_reifies_as_resource_host_io_revoked() {
         with_positioned_write_fixture(
-            "abi-revoke-d2-interpreter",
+            "px9-inc2b-interpreter",
             |ids, fs, store, _, _, _, _| {
                 let request = ken_host::CanonicalRequestV1::FsHandleMetadata;
                 let result = reify_host_reply_v1(
-                    ken_host::CanonicalOutcomeV1::Error(
-                        ken_host::SemanticErrorV1::Resource(
-                            ken_host::ResourceErrorV1::Revoked,
-                        ),
-                    ),
+                    ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(
+                        ken_host::IoErrorIdentityV1::Revoked,
+                    )),
                     None,
                     None,
                     &request,
@@ -7269,8 +7263,8 @@ mod px5b_effect_observation_tests {
                     ids,
                     store,
                 )
-                .expect("interpreter reifies resource revocation");
-                expect_resource_error(&result, fs.resource_revoked_id, ids);
+                .expect("interpreter reifies canonical resource revocation");
+                expect_resource_host_io(&result, ids.revoked_id, ids, fs);
             },
         );
     }
