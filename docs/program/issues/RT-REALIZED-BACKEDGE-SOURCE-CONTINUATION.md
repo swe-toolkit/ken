@@ -1,9 +1,9 @@
 ---
 id: RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION
 title: "Route the realized RecursiveBackedge protocol marker where it reaches the source-machine ordinary-Match continuation -- the honest hard-stop residual left after the checked-IH realization authority landed"
-status: draft
+status: active
 owner: runtime
-size: M
+size: S
 gate: none
 tier: T1
 depends_on: [RT-CHECKED-IH-REALIZATION-AUTHORITY]
