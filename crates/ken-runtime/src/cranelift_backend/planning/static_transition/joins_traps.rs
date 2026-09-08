@@ -21,7 +21,8 @@ use std::collections::BTreeSet;
 
 use super::{
     planner_capacity_error, planner_error, AbiSchedulingIngress, AbiSlotKind, AbiUnitDefinition,
-    CraneliftBackendError, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    CraneliftBackendError, EdgeKind, PredeclaredFunctionId, StaticOriginId,
+    StaticTransitionPlan,
 };
 use super::construction::Planner;
 use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode};
@@ -176,6 +177,33 @@ impl ResultPhaseSummary {
     }
 }
 
+/// Whether this callable body belongs to the source unit containing a
+/// reconciled checked-IH recursor transfer.
+///
+/// The query is per body owner and reads the reconciled edge kind; it does not
+/// classify a source spelling, a runtime predecessor, or the plan-wide presence
+/// of some unrelated checked computation. The negative c2 fixture and positive
+/// LiftRose fixture make both directions observable.
+fn body_owner_contains_realized_recursor(
+    plan: &StaticTransitionPlan<'_>,
+    body_origin: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    let Some(owner) = plan.semantic.function_owner(body_origin)? else {
+        return Ok(false);
+    };
+    for edge in &plan.edges {
+        if edge.kind == EdgeKind::RealizedRecursorTransfer
+            && plan
+                .semantic
+                .function_owner(StaticOriginId(edge.from.0))?
+                == Some(owner)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 fn is_source_join(expr: &RuntimeExpr) -> bool {
     matches!(
         expr,
@@ -302,7 +330,24 @@ fn summarize_result_phase(
                     ..scrutinee
                 }));
                 case_environment.extend_from_slice(environment);
-                result = result.join(summarize_child(1 + index, &case_environment, joins)?);
+                let mut case_result =
+                    summarize_child(1 + index, &case_environment, joins)?;
+                if scrutinee.phase == ResultPhase::SpecializedOnly
+                    && matches!(
+                        &case.body,
+                        RuntimeExpr::LexicalClosure { params, .. }
+                            if params.len() == case.binders
+                    )
+                {
+                    // The specialized Match emitter applies this exact closure
+                    // to the matched fields instead of returning the closure as
+                    // the arm value. A carried scrutinee cannot take that static
+                    // path, so its closure result remains CarrierRequired. This
+                    // is an emission-phase distinction, not a source-wide union.
+                    case_result.phase = ResultPhase::SpecializedOnly;
+                    case_result.callable_result = None;
+                }
+                result = result.join(case_result);
             }
             result
         }
@@ -456,7 +501,10 @@ fn summarize_result_phase(
             // A closure whose body is emitted as another function is itself a
             // boundary value when a source join returns it. This is independent
             // of the representation produced when the closure is invoked.
-            if functionized_units && crosses_owner {
+            if functionized_units
+                && crosses_owner
+                && body_owner_contains_realized_recursor(plan, body_origin)?
+            {
                 summary.phase = ResultPhase::CarrierRequired;
             }
             summary
