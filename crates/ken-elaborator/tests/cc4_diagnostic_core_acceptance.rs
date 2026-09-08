@@ -42,6 +42,12 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Diagnostics.Core",
+    )
+    .expect("Capability.Diagnostics.Core must roots-load fourth");
+    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env
 }
 
@@ -52,8 +58,6 @@ fn derived_fixture_retains_lawfulclasses_for_cc4_dependency_closure() {
 
 fn full_env() -> ElabEnv {
     let mut env = dependency_env();
-    env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
-        .expect("Capability.Diagnostics.Core must elaborate fourth");
     env.elaborate_ken_md_file(CURSOR_KEN_MD)
         .expect("Capability.Parsing.Cursor must elaborate fifth");
     env.elaborate_ken_md_file(DECODER_KEN_MD)
@@ -267,8 +271,6 @@ fn checked_cc4_chain_has_zero_axiom_and_zero_trusted_base_delta() {
 
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
-        .expect("Capability.Diagnostics.Core must elaborate");
     env.elaborate_ken_md_file(CURSOR_KEN_MD)
         .expect("Capability.Parsing.Cursor must elaborate");
     env.elaborate_ken_md_file(DECODER_KEN_MD)

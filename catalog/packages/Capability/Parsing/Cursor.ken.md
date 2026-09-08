@@ -13,12 +13,20 @@ plain `Bytes`; lengths and elements come from the total `List UInt8` view.
 location type and coordinate system. `CursorOps` and `CursorLaws` impose no
 cross-instance orientation, monotonicity, or relation between `cursor_locate`
 and `cursor_remaining`. Location values are comparable only under the semantics
-of the same cursor instance. A consumer that needs a shared diagnostic
-coordinate must use an explicit instance-specific conversion, such as
-`arg_location_origin` or `span_origin`, rather than infer one from `CursorOps`.
+of the same cursor instance. Package-local conversions such as
+`arg_location_origin` and `span_origin` make a diagnostic bridge explicit
+without imposing a coordinate system on generic `CursorOps`.
 
 ```ken
-import Data.Collections.Derived (length)
+import Capability.Diagnostics.Core
+  (ArgumentOrigin,
+    MkByteRange,
+    Origin,
+    origin_argument_index,
+    origin_range_end,
+    origin_range_start)
+
+import Data.Collections.Derived (bytes_nat_length, length, nth)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
@@ -26,35 +34,41 @@ import Data.Numeric.Nat.Order (sub)
 
 data CursorOps c el loc = MkCursorOps (c → Nat) (c → Option el) (c → c) (c → loc)
 
-fn cursor_remaining
+export CursorOps, MkCursorOps
+
+pub fn cursor_remaining
       (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (cur : c)
     : Nat =
   match ops {
     MkCursorOps remaining peek advance locate ↦ remaining cur
   }
 
-fn cursor_peek
+pub fn cursor_peek
       (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (cur : c)
     : Option el =
   match ops {
     MkCursorOps remaining peek advance locate ↦ peek cur
   }
 
-fn cursor_advance (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (cur : c) : c =
+pub fn cursor_advance
+      (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (cur : c)
+    : c =
   match ops {
     MkCursorOps remaining peek advance locate ↦ advance cur
   }
 
-fn cursor_locate
+pub fn cursor_locate
       (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (cur : c)
     : loc =
   match ops {
     MkCursorOps remaining peek advance locate ↦ locate cur
   }
 
-fn arg_length (arg : Bytes) : Nat = bytes_nat_length arg
+pub fn arg_length (arg : Bytes) : Nat = bytes_nat_length arg
 
 data ArgLocation = MkArgLocation Nat Nat Nat
+
+export ArgLocation, MkArgLocation
 
 fn arg_location_index (loc : ArgLocation) : Nat =
   match loc {
@@ -102,6 +116,8 @@ theorem arg_location_origin_end_faithful
 
 data ArgCursor = MkArgCursor (List Bytes) Nat Nat
 
+export ArgCursor
+
 fn arg_cursor_args (cur : ArgCursor) : List Bytes =
   match cur {
     MkArgCursor args index offset ↦ args
@@ -117,7 +133,7 @@ fn arg_cursor_offset (cur : ArgCursor) : Nat =
     MkArgCursor args index offset ↦ offset
   }
 
-fn cursor_nat_lt (a : Nat) (b : Nat) : Bool =
+pub fn cursor_nat_lt (a : Nat) (b : Nat) : Bool =
   match b {
     Zero ↦ False;
     Suc b2 ↦
@@ -172,7 +188,7 @@ fn arg_cursor_normalize
       }
   }
 
-fn arg_cursor_start (args : List Bytes) : ArgCursor =
+pub fn arg_cursor_start (args : List Bytes) : ArgCursor =
   arg_cursor_normalize (length Bytes args) args Zero Zero
 
 fn arg_cursor_advance (cur : ArgCursor) : ArgCursor =
@@ -185,7 +201,7 @@ fn arg_cursor_advance (cur : ArgCursor) : ArgCursor =
 fn arg_cursor_locate (cur : ArgCursor) : ArgLocation =
   MkArgLocation (arg_cursor_index cur) (arg_cursor_offset cur) (arg_cursor_offset cur)
 
-const arg_cursor_ops : CursorOps ArgCursor UInt8 ArgLocation =
+pub const arg_cursor_ops : CursorOps ArgCursor UInt8 ArgLocation =
   MkCursorOps
     ArgCursor
     UInt8
@@ -203,7 +219,7 @@ have positive remaining input, advancing such a cursor must strictly reduce
 that computed bound, and a zero remaining count must be an end position.
 
 ```ken
-fn CursorPeekHasRemaining
+pub fn CursorPeekHasRemaining
       (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc)
     : Prop =
   (cur : c)
@@ -216,7 +232,9 @@ fn CursorPeekHasRemaining
     (cursor_nat_lt Zero (cursor_remaining c el loc ops cur))
     True
 
-fn CursorAdvanceProgress (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) : Prop =
+pub fn CursorAdvanceProgress
+      (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc)
+    : Prop =
   (cur : c)
     → (value : el)
     → Equal
@@ -229,7 +247,7 @@ fn CursorAdvanceProgress (c : Type) (el : Type) (loc : Type) (ops : CursorOps c 
       (cursor_remaining c el loc ops cur))
     True
 
-fn CursorEndValid (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) : Prop =
+pub fn CursorEndValid (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) : Prop =
   (cur : c)
     → Equal Nat
     (cursor_remaining c el loc ops cur)
@@ -238,7 +256,7 @@ fn CursorEndValid (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc)
     (cursor_peek c el loc ops cur)
     (None el)
 
-fn CursorLaws (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) : Prop =
+pub fn CursorLaws (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) : Prop =
   And
     (CursorPeekHasRemaining c el loc ops)
     (And (CursorAdvanceProgress c el loc ops) (CursorEndValid c el loc ops))
@@ -268,5 +286,4 @@ All declarations are transparent checked terms over landed `Bytes`, `List`,
 ## 7. Package  summary
 
 Public surface: `CursorOps`, its four selectors and laws, `arg_length`,
-`ArgLocation`, its faithful `arg_location_origin` injection, `ArgCursor`,
-`arg_cursor_start`, and `arg_cursor_ops`.
+`ArgLocation`, `ArgCursor`, `arg_cursor_start`, and `arg_cursor_ops`.

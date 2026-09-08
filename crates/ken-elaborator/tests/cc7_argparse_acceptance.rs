@@ -11,8 +11,6 @@ use ken_kernel::{Decl, GlobalId, Term};
 
 const VALIDATION_VALID: &str = "Data.Sums.Validation.Valid";
 const VALIDATION_INVALID: &str = "Data.Sums.Validation.Invalid";
-const DIAGNOSTIC_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
 const DECODER_KEN_MD: &str =
@@ -66,13 +64,14 @@ fn dependency_env() -> ElabEnv {
         .expect("Data.Collections.NonEmpty must roots-load before its clients");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Validation")
         .expect("Data.Sums.Validation must roots-load through its declared dependencies");
-    for (source, label) in [
-        (DIAGNOSTIC_KEN_MD, "Capability.Diagnostics.Core"),
-        (CODEC_KEN_MD, "Data.Text.Codec"),
-    ] {
-        env.elaborate_ken_md_file(source)
-            .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
-    }
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Diagnostics.Core",
+    )
+    .expect("Capability.Diagnostics.Core must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
+    env.elaborate_ken_md_file(CODEC_KEN_MD)
+        .expect("Data.Text.Codec must elaborate in dependency order");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("Data.Numeric.Nat.Order must load before its Cursor consumer");
     for (source, label) in [
