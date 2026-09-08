@@ -212,8 +212,6 @@ fn assert_private(surface: &str) {
 #[test]
 fn parsing_numeric_loader_visible_inventory_is_exact() {
     let expected = names(&[
-        "DecimalDigit",
-        "NumericErrorKind",
         "char_to_digit",
         "numeric_argument_origin",
         "parse_digits_at",
@@ -304,8 +302,10 @@ fn parsing_numeric_provider_closure_is_exact_and_sibling_disjoint() {
 #[test]
 fn parsing_numeric_implementation_siblings_remain_private() {
     for name in [
+        "NumericErrorKind",
         "EmptyInput",
         "InvalidDigit",
+        "DecimalDigit",
         "MkDecimalDigit",
         "numeric_argument_origin_index_faithful",
         "numeric_error_code",

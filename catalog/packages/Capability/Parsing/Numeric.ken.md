@@ -43,8 +43,6 @@ import Capability.Diagnostics.Core
 
 import Core.Logic.Transport (cong, trans)
 
-export NumericErrorKind
-
 data NumericErrorKind = EmptyInput | InvalidDigit
 
 fn numeric_error_code (kind : NumericErrorKind) : DiagnosticCode =
@@ -161,8 +159,6 @@ CC2 does not fake that missing operation with a bounded table or a
 non-structural loop.
 
 ```ken
-export DecimalDigit
-
 data DecimalDigit : Type where {
   MkDecimalDigit :
     (value : Int)
@@ -286,9 +282,9 @@ const parsed_negative_result : Result Diagnostic Int = parse_int example_numeric
 
 ## 6. Trust and derivation
 
-**Public API:** `NumericErrorKind`, `numeric_argument_origin`, `char_to_digit`,
-`parse_digits_at`, `parse_nat_chars`, `parse_int_chars`, `parse_nat`, `parse_int`,
-`DecimalDigit`, and `parse_formatted_digits`.
+**Public API:** `numeric_argument_origin`, `char_to_digit`, `parse_digits_at`,
+`parse_nat_chars`, `parse_int_chars`, `parse_nat`, `parse_int`, and
+`parse_formatted_digits`.
 
 **Derivation.** Parsing uses structural recursion on `List Char`, positions use
 structural `Nat`, and values use the landed `charToInt`, `leq_int`, `eq_int`,
