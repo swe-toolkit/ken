@@ -335,6 +335,7 @@ enum EdgeKind {
     InvokeProducerTail,
     CompleteProducerTail,
     StaticBody,
+    RealizedRecursorTransfer,
     DeclarationCall,
     Trap,
 }

@@ -752,6 +752,17 @@ impl SemanticMaterialArena {
     fn children_since(&self, start: usize) -> Result<DenseRange, CraneliftBackendError> {
         range_since(start, self.child_origins.len(), "semantic child origin")
     }
+
+    pub(super) fn source_children(
+        &self,
+        source: SemanticSourceSeed,
+    ) -> Result<&[StaticOriginId], CraneliftBackendError> {
+        arena_slice(
+            &self.child_origins,
+            source.children,
+            "semantic child origin",
+        )
+    }
 }
 
 pub(super) fn build_bool_constructor_inventory(
