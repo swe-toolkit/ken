@@ -15,10 +15,6 @@ use std::collections::{BTreeSet, HashSet};
 
 const PARSING_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
-const CURSOR_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const DECODER_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
@@ -42,16 +38,15 @@ fn dependency_env() -> ElabEnv {
         })
         .collect();
     env.globals.extend(lawful_aliases);
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Capability.Diagnostics.Core",
-    )
-    .expect("Capability.Diagnostics.Core must roots-load fourth");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Capability.Diagnostics.Core must roots-load fourth");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
-    env.elaborate_ken_md_file(CURSOR_KEN_MD)
-        .expect("Capability.Parsing.Cursor must elaborate fifth");
-    env.elaborate_ken_md_file(DECODER_KEN_MD)
-        .expect("Capability.Parsing.Decoder must elaborate sixth");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Capability.Parsing.Cursor must roots-load fifth");
+    catalog_or::expose_module(&mut env, "Capability.Parsing.Cursor");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+        .expect("Capability.Parsing.Decoder must roots-load sixth");
+    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
     env
 }
 

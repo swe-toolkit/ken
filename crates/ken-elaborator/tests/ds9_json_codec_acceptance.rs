@@ -15,10 +15,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const CURSOR_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const DECODER_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 const JSON_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Serialization/Json.ken.md");
 
 fn dependency_env() -> ElabEnv {
@@ -46,19 +42,15 @@ fn dependency_env() -> ElabEnv {
     // Preserve the provider records while preventing a dependency's selective
     // import from laundering Json's own import at the next raw-source boundary.
     let json_import_boundary = env.module_state.clone();
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Capability.Diagnostics.Core",
-    )
-    .expect("Capability.Diagnostics.Core dependency must roots-load");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Capability.Diagnostics.Core dependency must roots-load");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
-    for (name, source) in [
-        ("Capability.Parsing.Cursor", CURSOR_KEN_MD),
-        ("Capability.Parsing.Decoder", DECODER_KEN_MD),
-    ] {
-        env.elaborate_ken_md_file(source)
-            .unwrap_or_else(|error| panic!("{name} dependency must elaborate: {error:?}"));
-    }
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Capability.Parsing.Cursor dependency must roots-load");
+    catalog_or::expose_module(&mut env, "Capability.Parsing.Cursor");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+        .expect("Capability.Parsing.Decoder dependency must roots-load");
+    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
     env.module_state = json_import_boundary;
     assert!(
         !env.globals.contains_key("length"),

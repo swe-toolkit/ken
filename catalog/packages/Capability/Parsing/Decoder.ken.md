@@ -16,23 +16,30 @@ from different `CursorOps` instances are not position-comparable without an
 explicit conversion chosen by the caller.
 
 ```ken
+import Capability.Parsing.Cursor
+  (CursorOps, cursor_advance, cursor_locate, cursor_nat_lt, cursor_peek, cursor_remaining)
+
+export DecoderError, DecoderRejected
+
 data DecoderError loc = DecoderRejected loc | DecoderZeroProgress loc | DecoderFuelExhausted loc
+
+export DecoderResult, Decoded, DecoderFailed
 
 data DecoderResult c loc a = Decoded a c | DecoderFailed (DecoderError loc)
 
-const Decoder (c : Type) (loc : Type) (a : Type) : Type = c → DecoderResult c loc a
+pub const Decoder (c : Type) (loc : Type) (a : Type) : Type = c → DecoderResult c loc a
 
-fn decoder_error_location (loc : Type) (err : DecoderError loc) : loc =
+pub fn decoder_error_location (loc : Type) (err : DecoderError loc) : loc =
   match err {
     DecoderRejected at ↦ at;
     DecoderZeroProgress at ↦ at;
     DecoderFuelExhausted at ↦ at
   }
 
-fn decoder_pure (c : Type) (loc : Type) (a : Type) (value : a) : Decoder c loc a =
+pub fn decoder_pure (c : Type) (loc : Type) (a : Type) (value : a) : Decoder c loc a =
   λcur. Decoded c loc a value cur
 
-fn decoder_fail
+pub fn decoder_fail
       (c : Type) (el : Type) (loc : Type) (a : Type) (ops : CursorOps c el loc)
     : Decoder c loc a =
   λcur. DecoderFailed c loc a (DecoderRejected loc (cursor_locate c el loc ops cur))
@@ -46,7 +53,7 @@ fn decoder_map
       DecoderFailed err ↦ DecoderFailed c loc b err
     }
 
-fn decoder_bind
+pub fn decoder_bind
       (c : Type)
       (loc : Type)
       (a : Type)
@@ -60,7 +67,7 @@ fn decoder_bind
       DecoderFailed err ↦ DecoderFailed c loc b err
     }
 
-fn decoder_seq
+pub fn decoder_seq
       (c : Type)
       (loc : Type)
       (a : Type)
@@ -70,7 +77,7 @@ fn decoder_seq
     : Decoder c loc b =
   decoder_bind c loc a b first (λignored. second)
 
-fn decoder_alt
+pub fn decoder_alt
       (c : Type) (loc : Type) (a : Type) (first : Decoder c loc a) (second : Decoder c loc a)
     : Decoder c loc a =
   λcur.
@@ -84,7 +91,7 @@ fn decoder_alt
         }
     }
 
-fn decoder_satisfy
+pub fn decoder_satisfy
       (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (accept : el → Bool)
     : Decoder c loc el =
   λcur.
@@ -155,7 +162,7 @@ fn decoder_many_fuel
       }
   }
 
-fn decoder_many
+pub fn decoder_many
       (c : Type)
       (el : Type)
       (loc : Type)
@@ -209,7 +216,7 @@ fn decoder_recursive_fuel
     Suc fuel2 ↦ layer (decoder_recursive_fuel c el loc a ops layer fuel2) cur
   }
 
-fn decoder_recursive
+pub fn decoder_recursive
       (c : Type)
       (el : Type)
       (loc : Type)
@@ -297,10 +304,12 @@ fn DecoderManyConsumesAllLaw
 
 ## 3. Using it
 
-Build token decoders with `decoder_satisfy` or `decoder_token`, combine them
-with `map`, `bind`, `seq`, and `alt`, and use `decoder_recursive` for a
-structurally fuel-bounded recursive layer. Callers never supply repetition or
-recursion fuel; both bounds come from `CursorOps.remaining`.
+Build token decoders with `decoder_satisfy`, use `decoder_pure` and
+`decoder_fail` as the base cases, and combine them with `decoder_bind`,
+`decoder_seq`, and `decoder_alt`. `decoder_many` repeats a step, while
+`decoder_recursive` supplies a structurally fuel-bounded recursive layer.
+Callers never supply repetition or recursion fuel; both bounds come from
+`CursorOps.remaining`.
 
 ## 4. Design notes
 
@@ -319,5 +328,7 @@ uses only checked cursor operations. This package adds no axiom or primitive.
 
 ## 7. Package  summary
 
-Public surface: location-generic `DecoderError`, `DecoderResult`, `Decoder`,
-the core sequencing/token/repetition/recursive combinators, and progress laws.
+Public surface: `DecoderError` with ordinary `DecoderRejected`, `DecoderResult`
+with `Decoded` and `DecoderFailed`, `Decoder`, location projection, and the
+pure, failure, bind, sequence, alternative, predicate-token, repetition, and
+recursive combinators consumed by downstream packages.

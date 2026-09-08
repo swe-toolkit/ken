@@ -13,8 +13,6 @@ use ken_kernel::{Decl, GlobalId};
 const BYTES_KEYS: &str = include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
 const VALIDATION_VALID: &str = "Data.Sums.Validation.Valid";
 const VALIDATION_INVALID: &str = "Data.Sums.Validation.Invalid";
-const CURSOR: &str = include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const DECODER: &str = include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 const STRING_BIJECTION: &str =
     include_str!("../../../catalog/packages/Data/Text/StringBijection.ken.md");
 const STRING_KEYS: &str = include_str!("../../../catalog/packages/Data/Text/StringKeys.ken.md");
@@ -65,19 +63,20 @@ fn dependency_env() -> ElabEnv {
         .expect("Data.Collections.NonEmpty must roots-load before its clients");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Validation")
         .expect("Data.Sums.Validation must roots-load through its declared dependencies");
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Capability.Diagnostics.Core",
-    )
-    .expect("Capability.Diagnostics.Core must roots-load in dependency order");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Capability.Diagnostics.Core must roots-load in dependency order");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env.elaborate_ken_md_file(CODEC)
         .expect("Data.Text.Codec must elaborate in dependency order");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("Data.Numeric.Nat.Order must load before its Cursor consumer");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Capability.Parsing.Cursor must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Capability.Parsing.Cursor");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+        .expect("Capability.Parsing.Decoder must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
     for (source, label) in [
-        (CURSOR, "Capability.Parsing.Cursor"),
-        (DECODER, "Capability.Parsing.Decoder"),
         (NUMERIC, "Capability.Parsing.Numeric"),
         (PRETTY, "Capability.Formatting.Doc"),
         (ARGUMENTS, "Capability.Process.Arguments"),

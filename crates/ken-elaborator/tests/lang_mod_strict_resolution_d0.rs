@@ -522,6 +522,31 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Parsing.Decoder now declares its exact six-name Cursor value
+            // dependency. Its ordinary package boundary loads while strict
+            // mode retains the compiler conveniences of that provider closure.
+            "Capability.Parsing.Decoder".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Capability.Process.Environment".to_string(),
             ["Equal", "MkProcessInput", "ProcessInput", "Prod"]
                 .into_iter()
@@ -928,7 +953,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.Input.Schema",
         "Capability.Diagnostics.Render",
         "Capability.Filesystem.Path.Posix",
-        "Capability.Parsing.Decoder",
         "Capability.Parsing.Numeric",
         "Capability.Parsing.Parsing",
         "Capability.Process.Arguments",
