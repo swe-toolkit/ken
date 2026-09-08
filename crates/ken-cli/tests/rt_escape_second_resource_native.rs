@@ -361,7 +361,6 @@ fn body_from_freeze (r : Result ResourceError Bytes) : ResourceBodyResult Unit U
       BufferLimit |-> ResourceBodyErr Unit Unit MkUnit;
       AllocationFailed |-> ResourceBodyErr Unit Unit MkUnit;
       NoProgress |-> ResourceBodyErr Unit Unit MkUnit;
-      ResourceRevoked |-> ResourceBodyErr Unit Unit MkUnit;
       MalformedResource |-> ResourceBodyErr Unit Unit MkUnit;
       RightNotHeld required held |-> ResourceBodyErr Unit Unit MkUnit;
       ResourceHostIO io |-> ResourceBodyErr Unit Unit MkUnit;

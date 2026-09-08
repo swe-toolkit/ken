@@ -1039,8 +1039,7 @@ fn is_invalid_bounds (e : ResourceError) : Bool =
     RightNotHeld required held |-> False; ReleaseFailed kind identity io |-> False;
     ResourceKindMismatch expected actual |-> False; BufferLimit |-> False;
     AllocationFailed |-> False;
-    InvalidOffset |-> False; InvalidBounds |-> True; NoProgress |-> False;
-    ResourceRevoked |-> False
+    InvalidOffset |-> False; InvalidBounds |-> True; NoProgress |-> False
   }
 
 fn is_invalid_offset (e : ResourceError) : Bool =
@@ -1049,8 +1048,7 @@ fn is_invalid_offset (e : ResourceError) : Bool =
     RightNotHeld required held |-> False; ReleaseFailed kind identity io |-> False;
     ResourceKindMismatch expected actual |-> False; BufferLimit |-> False;
     AllocationFailed |-> False;
-    InvalidOffset |-> True; InvalidBounds |-> False; NoProgress |-> False;
-    ResourceRevoked |-> False
+    InvalidOffset |-> True; InvalidBounds |-> False; NoProgress |-> False
   }
 
 fn ok_code (code : ExitCode) : ResourceBodyResult Unit ExitCode =

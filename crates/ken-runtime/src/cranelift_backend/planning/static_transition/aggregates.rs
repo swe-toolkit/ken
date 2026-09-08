@@ -3256,7 +3256,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         ]));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 
-    /// The twelve-alternative resource surface, in the emitter's own order.
+    /// The eleven-alternative resource surface, in the emitter's own order.
     const RESOURCE_SURFACE: SynthesizedAggregateNode =
         N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
             N::Fixed {
@@ -3282,7 +3282,6 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             N::nullary(R::ResourceInvalidOffset),
             N::nullary(R::ResourceInvalidBounds),
             N::nullary(R::ResourceNoProgress),
-            N::nullary(R::ResourceRevoked),
         ]));
 
     /// `Option::Some(<the site's path operand>)`.
@@ -10343,7 +10342,7 @@ mod tests {
         let field = SynthesizedAggregateStep::Field;
         let alt = SynthesizedAggregateStep::Alternative;
 
-        // The twelve resource-surface alternatives, in the emitter's order.
+        // The eleven resource-surface alternatives, in the emitter's order.
         let surface: Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)> = [
             R::ResourceHostIo,
             R::ResourceClosed,
@@ -10356,7 +10355,6 @@ mod tests {
             R::ResourceInvalidOffset,
             R::ResourceInvalidBounds,
             R::ResourceNoProgress,
-            R::ResourceRevoked,
         ]
         .into_iter()
         .enumerate()
@@ -10979,7 +10977,6 @@ mod tests {
                 Fixed(R::ResourceInvalidOffset),
                 Fixed(R::ResourceInvalidBounds),
                 Fixed(R::ResourceNoProgress),
-                Fixed(R::ResourceRevoked),
             ],
             "the surface population is ordered and closed, and its COUNT is the \
              planner's rather than whatever the emitter built"
@@ -11057,7 +11054,7 @@ mod tests {
                 .expect("the error root resolves")
                 .expect("the error root is the resource surface")
                 .len(),
-            12
+            11
         );
 
         // ⭐ LAWFULLY non-dynamic: `Wrote` is a constructor, so the answer is a

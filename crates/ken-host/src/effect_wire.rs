@@ -352,6 +352,7 @@ fn put_io_error(out: &mut Vec<u8>, error: IoErrorIdentityV1) {
         IoErrorIdentityV1::NotEmpty => (8, None),
         IoErrorIdentityV1::Unsupported => (9, None),
         IoErrorIdentityV1::Other(raw) => (10, Some(raw)),
+        IoErrorIdentityV1::Revoked => (11, None),
     };
     put_u8(out, tag);
     if let Some(raw) = raw {
@@ -402,7 +403,6 @@ fn put_cause(out: &mut Vec<u8>, cause: &FileErrorCauseV1) {
             put_u8(out, 1);
             put_denial(out, error);
         }
-        FileErrorCauseV1::Revoked => put_u8(out, 2),
     }
 }
 
@@ -454,7 +454,6 @@ fn put_error(out: &mut Vec<u8>, error: &SemanticErrorV1) -> Result<(), EffectTra
                 ResourceErrorV1::InvalidBounds => put_u8(out, 7),
                 ResourceErrorV1::NoProgress => put_u8(out, 8),
                 ResourceErrorV1::AllocationFailed => put_u8(out, 9),
-                ResourceErrorV1::Revoked => put_u8(out, 10),
             }
         }
     }
@@ -859,6 +858,7 @@ fn get_io_error(cursor: &mut Cursor<'_>) -> Result<IoErrorIdentityV1, EffectTrac
         8 => IoErrorIdentityV1::NotEmpty,
         9 => IoErrorIdentityV1::Unsupported,
         10 => IoErrorIdentityV1::Other(cursor.i32()?),
+        11 => IoErrorIdentityV1::Revoked,
         _ => return Err(EffectTraceWireError),
     })
 }
@@ -897,7 +897,6 @@ fn get_cause(cursor: &mut Cursor<'_>) -> Result<FileErrorCauseV1, EffectTraceWir
     match cursor.u8()? {
         0 => Ok(FileErrorCauseV1::Io(get_io_error(cursor)?)),
         1 => Ok(FileErrorCauseV1::Capability(get_denial(cursor)?)),
-        2 => Ok(FileErrorCauseV1::Revoked),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -932,7 +931,6 @@ fn get_error(cursor: &mut Cursor<'_>) -> Result<SemanticErrorV1, EffectTraceWire
             7 => ResourceErrorV1::InvalidBounds,
             8 => ResourceErrorV1::NoProgress,
             9 => ResourceErrorV1::AllocationFailed,
-            10 => ResourceErrorV1::Revoked,
             _ => return Err(EffectTraceWireError),
         }),
         _ => return Err(EffectTraceWireError),
@@ -1331,12 +1329,12 @@ mod tests {
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the sole
-    /// effect-trace codec round-trips the exact Revoked file-error cause.
-    /// CLAIMED: observation transport cannot collapse revocation into a
-    /// capability or host-I/O neighbour. THE GAP: this is codec evidence; the
-    /// dispatcher and both reifiers have independent D1 controls.
+    /// effect-trace codec round-trips the canonical Revoked I/O identity inside
+    /// a file error. CLAIMED: observation transport cannot collapse revocation
+    /// into a capability or neighboring I/O identity. THE GAP: this is codec
+    /// evidence; the dispatcher and both reifiers have independent controls.
     #[test]
-    fn linked_trace_codec_preserves_revoked_file_error_identity() {
+    fn linked_trace_codec_preserves_file_origin_canonical_revoked_identity() {
         let mut expected = representative_trace();
         expected.effect_trace.push(EffectEvent {
             sequence: 9,
@@ -1349,7 +1347,7 @@ mod tests {
             outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
                 operation: HostOpV1::FsReadFile,
                 relative_path: b"shared".to_vec(),
-                cause: FileErrorCauseV1::Revoked,
+                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Revoked),
             })),
         });
 
@@ -1358,12 +1356,12 @@ mod tests {
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the sole
-    /// effect-trace codec round-trips exact nullary resource revocation.
-    /// CLAIMED: observation transport does not collapse resource withdrawal
-    /// into a lifetime, rights, host-I/O, or file-error identity. THE GAP: the
-    /// dispatcher and checked reifiers independently pin production.
+    /// effect-trace codec round-trips the same canonical Revoked I/O identity
+    /// from a resource operation. CLAIMED: observation transport unifies both
+    /// origins without collapsing to a lifetime or neighboring I/O identity.
+    /// THE GAP: the dispatcher and checked reifiers independently pin production.
     #[test]
-    fn linked_trace_codec_preserves_revoked_resource_error_identity() {
+    fn linked_trace_codec_preserves_resource_origin_canonical_revoked_identity() {
         let mut expected = representative_trace();
         expected.effect_trace.push(EffectEvent {
             sequence: 9,
@@ -1371,8 +1369,8 @@ mod tests {
             capability: None,
             resource_bindings: Vec::new(),
             request: CanonicalRequestV1::FsHandleMetadata,
-            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
-                ResourceErrorV1::Revoked,
+            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Io(
+                IoErrorIdentityV1::Revoked,
             )),
         });
 

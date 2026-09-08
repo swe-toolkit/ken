@@ -1273,7 +1273,6 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 crate::ResourceErrorV1::InvalidBounds => reply.detail = 7,
                 crate::ResourceErrorV1::NoProgress => reply.detail = 8,
                 crate::ResourceErrorV1::AllocationFailed => reply.detail = 9,
-                crate::ResourceErrorV1::Revoked => reply.detail = 10,
             }
         }
         CanonicalOutcomeV1::Error(error) => {
@@ -1283,7 +1282,6 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 crate::SemanticErrorV1::File(error) => match error.cause {
                     FileErrorCauseV1::Io(error) => io_error_tag(error),
                     FileErrorCauseV1::Capability(_) => 2,
-                    FileErrorCauseV1::Revoked => 11,
                 },
                 crate::SemanticErrorV1::Capability(_) => 2,
                 crate::SemanticErrorV1::Resource(_) => {
@@ -1307,6 +1305,7 @@ fn io_error_tag(error: IoErrorIdentityV1) -> u64 {
         IoErrorIdentityV1::NotDirectory => 8,
         IoErrorIdentityV1::NotEmpty => 9,
         IoErrorIdentityV1::Unsupported => 10,
+        IoErrorIdentityV1::Revoked => 11,
         IoErrorIdentityV1::Other(raw) => (u64::from(raw as u32) << 32) | 12,
     }
 }
@@ -1334,6 +1333,7 @@ fn io_error_from_tag(encoded: u64) -> Option<IoErrorIdentityV1> {
         8 => IoErrorIdentityV1::NotDirectory,
         9 => IoErrorIdentityV1::NotEmpty,
         10 => IoErrorIdentityV1::Unsupported,
+        11 => IoErrorIdentityV1::Revoked,
         _ => return None,
     })
 }
@@ -1397,7 +1397,6 @@ fn decode_resource_error_reply(
         7 if all_zero => Some(crate::ResourceErrorV1::InvalidBounds),
         8 if all_zero => Some(crate::ResourceErrorV1::NoProgress),
         9 if all_zero => Some(crate::ResourceErrorV1::AllocationFailed),
-        10 if all_zero => Some(crate::ResourceErrorV1::Revoked),
         _ => None,
     }
 }
@@ -2214,7 +2213,24 @@ mod tests {
         assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
         assert_eq!(effect_binding("error", "io.Revoked"), 11);
         assert_eq!(effect_binding("error", "io.Other"), 12);
-        assert_eq!(effect_binding("error", "resource.ResourceRevoked"), 10);
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the generated
+    /// manifest stays on schema V1 and contains one revoked binding, the
+    /// existing `io.Revoked = 11` row. CLAIMED: PX9 performs an in-place V1
+    /// identity fold rather than retaining a resource-local wire identity or
+    /// silently changing the schema version. THE GAP: the manifest hash, not
+    /// this inventory assertion, rejects a mixed producer and consumer.
+    #[test]
+    fn px9_revoked_fold_is_in_place_v1_with_one_manifest_identity() {
+        assert_eq!(crate::HOST_EFFECT_ABI_V1_SCHEMA_VERSION, 1);
+        assert_eq!(crate::HOST_EFFECT_ABI_V1.schema_version, 1);
+        let revoked = crate::HOST_EFFECT_ABI_V1_BINDINGS
+            .iter()
+            .filter(|(_, name, _)| name.ends_with("Revoked"))
+            .copied()
+            .collect::<Vec<_>>();
+        assert_eq!(revoked, vec![("error", "io.Revoked", 11)]);
     }
 
     #[test]
@@ -2533,6 +2549,10 @@ mod tests {
 
     #[test]
     fn resource_error_reply_decoder_is_canonical_and_fail_closed() {
+        assert_eq!(
+            io_error_from_tag(11),
+            Some(crate::IoErrorIdentityV1::Revoked)
+        );
         let zero = ResourceErrorReplyV1::default();
         assert_eq!(
             decode_resource_error_reply(0, zero),
@@ -2592,7 +2612,6 @@ mod tests {
             (7, crate::ResourceErrorV1::InvalidBounds),
             (8, crate::ResourceErrorV1::NoProgress),
             (9, crate::ResourceErrorV1::AllocationFailed),
-            (10, crate::ResourceErrorV1::Revoked),
         ] {
             assert_eq!(decode_resource_error_reply(tag, zero), Some(expected));
         }
@@ -2782,7 +2801,6 @@ mod tests {
             (crate::ResourceErrorV1::InvalidBounds, 7),
             (crate::ResourceErrorV1::NoProgress, 8),
             (crate::ResourceErrorV1::AllocationFailed, 9),
-            (crate::ResourceErrorV1::Revoked, 10),
         ] {
             assert_eq!(
                 project(error),
@@ -2803,15 +2821,26 @@ mod tests {
 
         set_reply(
             &mut reply,
+            CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Io(
+                crate::IoErrorIdentityV1::Revoked,
+            )),
+            context,
+        );
+        assert_eq!(reply.tag, REPLY_ERROR);
+        assert_eq!(reply.detail, 11);
+        assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
+
+        set_reply(
+            &mut reply,
             CanonicalOutcomeV1::Error(crate::SemanticErrorV1::File(crate::FileErrorIdentityV1 {
                 operation: HostOpV1::FsReadFile,
                 relative_path: b"shared".to_vec(),
-                cause: FileErrorCauseV1::Revoked,
+                cause: FileErrorCauseV1::Io(crate::IoErrorIdentityV1::Revoked),
             })),
             context,
         );
         assert_eq!(reply.tag, REPLY_ERROR);
-        assert_eq!(reply.detail, 11, "Revoked keeps its distinct IOError tag");
+        assert_eq!(reply.detail, 11);
         assert_eq!(reply.resource_error, ResourceErrorReplyV1::default());
 
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
