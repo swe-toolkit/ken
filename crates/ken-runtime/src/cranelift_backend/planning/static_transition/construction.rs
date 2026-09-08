@@ -1166,6 +1166,7 @@ impl<'src> Planner<'src> {
                 callee = *next_callee;
             }
 
+            let mut realized = Vec::with_capacity(checked_applications);
             for _ in 0..checked_applications {
                 let recursor = sources.get(callee.0 as usize).ok_or_else(|| {
                     planner_error("checked-IH recursor spine names an unknown source origin")
@@ -1173,9 +1174,13 @@ impl<'src> Planner<'src> {
                 if recursor.source
                     != SemanticSourceKind::Expression(RuntimeExprShape::LexicalClosure)
                 {
-                    return Err(planner_error(
-                        "checked-IH application is not backed by a lexical recursor closure",
-                    ));
+                    // Checked markers whose call spine does not bottom in the
+                    // lexical recursor chain are not this reconciliation's
+                    // population. Leave all their ordinary StaticBody edges
+                    // unchanged so their existing occurrence/marker validation
+                    // remains authoritative; never partially reconcile a chain.
+                    realized.clear();
+                    break;
                 }
                 let body = self
                     .plan
@@ -1184,12 +1189,15 @@ impl<'src> Planner<'src> {
                     .first()
                     .copied()
                     .ok_or_else(|| planner_error("checked-IH lexical recursor has no body child"))?;
-                if !transfers.insert((callee, body)) {
+                realized.push((callee, body));
+                callee = body;
+            }
+            for transfer in realized {
+                if !transfers.insert(transfer) {
                     return Err(planner_error(
                         "checked-IH recursor edge was elected more than once",
                     ));
                 }
-                callee = body;
             }
         }
 
@@ -1932,6 +1940,9 @@ mod tests {
     /// therefore says nothing about this one. The informative side is the arm
     /// that would still green if this class were left on the fallback, which is
     /// why the mutation has to be class-selective rather than plan-wide.
+    /// Retained-worker projection now observes the corrupted body pair before
+    /// join closeout, so the exact live detector is the missing graph-derived
+    /// call target rather than the later uncovered-join detector.
     #[test]
     fn collapsing_only_the_static_body_target_class_is_refused() {
         use super::super::semantic_ir::{with_body_occurrence_mutation, BodyOccurrenceMutation};
@@ -1958,13 +1969,15 @@ mod tests {
             BodyOccurrenceMutation::CollapseStaticBodyTargetBody,
             || ac3_emit(&expr, &empty),
         );
-        assert!(
-            collapsed
-                .as_ref()
-                .err()
-                .is_some_and(|message| message.contains("planned source join")),
+        assert_eq!(
+            collapsed,
+            Err(
+                "Backend(Module(\"retained body StaticOriginId(7) has no graph-derived call \
+                 target in this unit\"))"
+                    .to_string()
+            ),
             "AC-3: restoring the retired fallback for this class alone must \
-             recreate the traversal/closeout failure. got {collapsed:?}"
+             corrupt the retained body's exact entry/body call projection"
         );
     }
 

@@ -923,14 +923,19 @@ fn realized_recursor_workers(
                 .ok_or_else(|| planner_capacity_error("checked-IH call count exhausted"))?;
             callee = *next_callee;
         }
+        let mut realized = Vec::with_capacity(checked_applications);
         for _ in 0..checked_applications {
             let source = source_for(sources, callee)?;
-            let provenance = closure_provenance(source.source)?;
-            if provenance != AbiCaptureProvenance::Lexical {
-                return Err(planner_error(
-                    "realized checked-IH retained worker is not a lexical closure",
-                ));
+            if source.source
+                != SemanticSourceKind::Expression(RuntimeExprShape::LexicalClosure)
+            {
+                // The edge reconciler leaves non-recursor checked-marker
+                // populations unchanged. Worker issuance follows exactly that
+                // decision and never partially issues a lexical chain.
+                realized.clear();
+                break;
             }
+            let provenance = closure_provenance(source.source)?;
             let body_occurrence = plane.child_origin(callee, 0)?;
             let matching = edges
                 .iter()
@@ -944,17 +949,12 @@ fn realized_recursor_workers(
                     "checked-IH retained worker does not have exactly one realized transfer edge",
                 ));
             };
-            if !identities.insert((callee, body_occurrence)) {
-                return Err(planner_error(
-                    "checked-IH retained worker obligation was issued twice",
-                ));
-            }
             let definition = AbiUnitDefinition::ClosureBody {
                 defining_origin: callee,
                 provenance,
             };
             let (parameters, captures) = declared_arity(plane, sources, definition)?;
-            workers.push(RealizedRecursorWorker {
+            realized.push(RealizedRecursorWorker {
                 closure_origin: callee,
                 body_occurrence,
                 planned_node: edge.to,
@@ -963,6 +963,14 @@ fn realized_recursor_workers(
                 captures,
             });
             callee = body_occurrence;
+        }
+        for worker in realized {
+            if !identities.insert((worker.closure_origin, worker.body_occurrence)) {
+                return Err(planner_error(
+                    "checked-IH retained worker obligation was issued twice",
+                ));
+            }
+            workers.push(worker);
         }
     }
     Ok(workers)

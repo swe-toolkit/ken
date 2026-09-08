@@ -112,7 +112,7 @@ enum ResultPhase {
 #[cfg(test)]
 thread_local! {
     static D8_FORCE_VARIABLE_SPECIALIZED: Cell<bool> = const { Cell::new(false) };
-    static D8_REMOVE_VARIABLE_CALLABLE_SEED: Cell<bool> = const { Cell::new(false) };
+    static D8_REMOVE_VARIABLE_CALLABLE_SUMMARY: Cell<bool> = const { Cell::new(false) };
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -433,11 +433,10 @@ fn summarize_result_phase(
             if D8_FORCE_VARIABLE_SPECIALIZED.with(Cell::get) {
                 ResultPhaseSummary::SPECIALIZED
             } else {
-                if D8_REMOVE_VARIABLE_CALLABLE_SEED.with(Cell::get) {
-                    ResultPhaseSummary {
-                        callable_result: None,
-                        ..phase
-                    }
+                if D8_REMOVE_VARIABLE_CALLABLE_SUMMARY.with(Cell::get)
+                    && phase.callable_result.is_some()
+                {
+                    ResultPhaseSummary::SPECIALIZED
                 } else {
                     phase
                 }
@@ -1274,18 +1273,21 @@ mod tests {
         );
     }
 
-    /// Reversible population-side mutation: removing only the callable-result
-    /// seed from `Var` must red at the exact plan assertion before lowering.
+    /// Reversible population-side mutation: removing the complete callable
+    /// summary from `Var` must red at the exact plan assertion before lowering.
+    /// This preserves non-callable carrier seeds while deleting both facts a
+    /// functionized closure contributes: its value crosses a boundary and its
+    /// invocation returns a carried result.
     #[test]
-    fn d8_callable_seed_removal_reds_at_the_plan_boundary() {
-        D8_REMOVE_VARIABLE_CALLABLE_SEED.with(|forced| forced.set(true));
+    fn d8_callable_summary_removal_reds_at_the_plan_boundary() {
+        D8_REMOVE_VARIABLE_CALLABLE_SUMMARY.with(|forced| forced.set(true));
         let result = std::panic::catch_unwind(|| {
             assert_d8_bound_callable_join_is_carrier(false);
         });
-        D8_REMOVE_VARIABLE_CALLABLE_SEED.with(|forced| forced.set(false));
+        D8_REMOVE_VARIABLE_CALLABLE_SUMMARY.with(|forced| forced.set(false));
         assert!(
             result.is_err(),
-            "removing the bound callable seed did not red the plan assertion"
+            "removing the bound callable summary did not red the plan assertion"
         );
     }
 

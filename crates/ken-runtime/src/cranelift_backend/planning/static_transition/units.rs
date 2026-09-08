@@ -610,7 +610,9 @@ mod tests {
         // some unrelated law started firing first.
         assert_eq!(
             err,
-            planner_error("abi descriptor population is not exact for the function unit partition"),
+            planner_error(
+                "abi descriptor population is not exact for the function units and retained workers",
+            ),
             "AC-1: the missing descriptor reached the wrong detector"
         );
 
@@ -1269,8 +1271,8 @@ mod tests {
                 // -- SUBSUMED: descriptors are dense over the partition before
                 //    any edge resolves, which IS forward-declaration --
                 "callee not forward-declared => Backend(PlannerInvariant(\"abi \
-                 descriptor population is not exact for the function unit \
-                 partition\"))"
+                 descriptor population is not exact for the function units and \
+                 retained workers\"))"
                     .to_string(),
                 // -- reaches its own arm, with the EXISTING unsupported result --
                 "imported capture edge => Unsupported(UnsupportedLowering { \
