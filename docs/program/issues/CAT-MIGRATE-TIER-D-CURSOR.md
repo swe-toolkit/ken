@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-D-CURSOR
 title: "Scaffold-retirement Tier D (Capability), first internal slice: migrate Diagnostics.Core (DC), Formatting.Doc (Doc), and Parsing.Cursor (Cursor) off fixture-scaffolding / ambient resolution onto real selective imports from the already-published Tier A/B/C providers, so each elaborates standalone. Per-module: publish the module's own export surface, replace ambient resolution with a real selective import from the published lower tiers, extend the loader-visible inventory, standalone-green. The proven Tier-A / B / C publish-and-import shape; NO class-instance relocation, NO proof authoring beyond attached-owner migrations the Architect names. D0 measures the intra-slice DAG (whether Cursor consumes DC/Doc or they are independent consumers of lower tiers) and confirms the exact import set per module."
-status: ready
+status: active
 owner: foundation
 size: M
 gate: none
