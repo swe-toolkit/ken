@@ -14,13 +14,13 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
-const DIAGNOSTIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const STRING_BIJECTION_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Text/StringBijection.ken.md");
 const STRING_KEYS_KEN_MD: &str =
     include_str!("../../../catalog/packages/Data/Text/StringKeys.ken.md");
 const CODEC_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.md");
-const NUMERIC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
+const NUMERIC_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const NUMERIC_SEED: &str = include_str!("../../../conformance/stdlib/text/seed-text-numeric.md");
 
 fn dependency_env() -> ElabEnv {
@@ -44,8 +44,9 @@ fn dependency_env() -> ElabEnv {
 
 fn load_derived_dependencies(env: &mut ElabEnv) {
     catalog_or::load_derived_fixture(env);
-    env.elaborate_ken_md_file(DIAGNOSTIC_KEN_MD)
-        .expect("Capability/Diagnostics/Core.ken.md must elaborate after Derived");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Capability.Diagnostics.Core must roots-load after Derived");
+    catalog_or::expose_module(env, "Capability.Diagnostics.Core");
 }
 
 fn full_env() -> ElabEnv {

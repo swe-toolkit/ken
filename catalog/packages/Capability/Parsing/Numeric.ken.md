@@ -29,20 +29,36 @@ character index without inventing a source or argument identity. The two
 numeric kinds map to stable diagnostic codes owned by this client package.
 
 ```ken
+import Capability.Diagnostics.Core
+  (ArgumentOrigin,
+    Diagnostic,
+    DiagnosticCode,
+    MkByteRange,
+    MkDiagnostic,
+    MkDiagnosticCode,
+    Origin,
+    origin_argument_index,
+    origin_range_end,
+    origin_range_start)
+
+import Core.Logic.Transport (cong, trans)
+
+export NumericErrorKind
+
 data NumericErrorKind = EmptyInput | InvalidDigit
 
-fn numeric_error_code (kind : NumericErrorKind) : DiagnosticCode =
+pub fn numeric_error_code (kind : NumericErrorKind) : DiagnosticCode =
   match kind {
     EmptyInput ↦ MkDiagnosticCode "text.numeric.empty-input";
     InvalidDigit ↦ MkDiagnosticCode "text.numeric.invalid-digit"
   }
 
-fn numeric_diagnostic
+pub fn numeric_diagnostic
       (locate : Nat → Origin) (kind : NumericErrorKind) (position : Nat)
     : Diagnostic =
   MkDiagnostic (locate position) (numeric_error_code kind)
 
-fn numeric_argument_origin (argument : Nat) (position : Nat) : Origin =
+pub fn numeric_argument_origin (argument : Nat) (position : Nat) : Origin =
   ArgumentOrigin argument (MkByteRange position position)
 
 theorem numeric_argument_origin_index_faithful
@@ -77,13 +93,13 @@ integer order. The recursive worker carries both the character index and the
 base-ten accumulator.
 
 ```ken
-fn char_to_digit (c : Char) : Option Int =
+pub fn char_to_digit (c : Char) : Option Int =
   match and_bool (leq_int (48 : Int) (charToInt c)) (leq_int (charToInt c) (57 : Int)) {
     True ↦ Some Int (sub_int (charToInt c) (48 : Int));
     False ↦ None Int
   }
 
-fn parse_digits_at
+pub fn parse_digits_at
       (locate : Nat → Origin) (chars : List Char) (position : Nat) (accumulator : Int)
     : Result Diagnostic Int =
   match chars {
@@ -100,7 +116,7 @@ fn parse_digits_at
       }
   }
 
-fn parse_nat_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
+pub fn parse_nat_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
   match chars {
     Nil ↦ Err Diagnostic Int (numeric_diagnostic locate EmptyInput Zero);
     Cons c rest ↦ parse_digits_at locate (Cons Char c rest) Zero (0 : Int)
@@ -112,7 +128,7 @@ fn negate_parsed (x : Result Diagnostic Int) : Result Diagnostic Int =
     Ok value ↦ Ok Diagnostic Int (sub_int (0 : Int) value)
   }
 
-fn parse_int_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
+pub fn parse_int_chars (locate : Nat → Origin) (chars : List Char) : Result Diagnostic Int =
   match chars {
     Nil ↦ Err Diagnostic Int (numeric_diagnostic locate EmptyInput Zero);
     Cons c rest ↦
@@ -127,10 +143,10 @@ fn parse_int_chars (locate : Nat → Origin) (chars : List Char) : Result Diagno
       }
   }
 
-fn parse_nat (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
+pub fn parse_nat (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
   parse_nat_chars locate (string_to_list_char text)
 
-fn parse_int (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
+pub fn parse_int (locate : Nat → Origin) (text : String) : Result Diagnostic Int =
   parse_int_chars locate (string_to_list_char text)
 ```
 
@@ -145,6 +161,8 @@ CC2 does not fake that missing operation with a bounded table or a
 non-structural loop.
 
 ```ken
+export DecimalDigit
+
 data DecimalDigit : Type where {
   MkDecimalDigit :
     (value : Int)
@@ -179,7 +197,7 @@ fn decimal_digit_values (digits : List DecimalDigit) : List Int =
     Cons digit rest ↦ Cons Int (decimal_digit_value digit) (decimal_digit_values rest)
   }
 
-fn format_digits (digits : List DecimalDigit) : List Char =
+pub fn format_digits (digits : List DecimalDigit) : List Char =
   match digits {
     Nil ↦ Nil Char;
     Cons digit rest ↦ Cons Char (decimal_digit_to_char digit) (format_digits rest)
@@ -199,16 +217,16 @@ fn parse_digit_result
     Some digit ↦ parsed_int_prepend digit parsed_rest
   }
 
-fn parse_formatted_digits (chars : List Char) : Option (List Int) =
+pub fn parse_formatted_digits (chars : List Char) : Option (List Int) =
   match chars {
     Nil ↦ Some (List Int) (Nil Int);
     Cons c rest ↦ parse_digit_result (parse_formatted_digits rest) (char_to_digit c)
   }
 
-fn show_digits (digits : List DecimalDigit) : String =
+pub fn show_digits (digits : List DecimalDigit) : String =
   list_char_to_string (format_digits digits)
 
-theorem format_digits_roundtrip
+pub theorem format_digits_roundtrip
       (digits : List DecimalDigit)
     : Equal
         (Option (List Int))
