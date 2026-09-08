@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-D-DECODER
 title: "Scaffold-retirement Tier D (Capability), slice 2: migrate Parsing.Decoder off fixture-scaffolding / ambient resolution onto real selective imports from the already-published providers (Parsing.Cursor, now published by slice 1, plus the Tier A/B/C lower tiers), so it elaborates standalone. Publish Decoder's own export surface, replace ambient resolution with a real selective import for the exact D0-measured set, extend the loader-visible inventory, standalone-green. The proven Tier-A / B / C / Cursor-slice publish-and-import shape; NO class-instance relocation, NO proof authoring beyond an attached-owner migration the Architect names. Delegated D0 measures Decoder's standalone missing-symbol set and full provider closure from loader evidence."
-status: ready
+status: active
 owner: foundation
 size: S
 gate: none
