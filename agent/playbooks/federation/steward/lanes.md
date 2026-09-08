@@ -71,6 +71,34 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 > Operator active. Roster STRUCTURE unchanged (three lanes, runtime / language /
 > foundation). New this session:
 >
+> - **[LATEST 2026-09-08 — read first] KERNEL RESEAT RULED: L2 takes
+>   KERNEL-NESTED-IND at its next seam; L1 stays on ABI.** Operator (Pat),
+>   verbatim: "reseat L2 for this at the next seam on that lane, and then return
+>   L2 to its workstream. Keep L1 moving on ABI/compiler work." Resolves the
+>   reseat fork surfaced in the bullet below (which is now SUPERSEDED on that
+>   point). Execution:
+>   - **L1 (runtime) STAYS runtime and resumes the ABI/compiler completion
+>     program NOW** — RT-PX8DS was its last within-lane fix. ABI-A drained
+>     (A1/A2/A3 merged); PX9 / ABI-A3 / ABI-M1 merged, so ABI-S1 (descriptor
+>     completion) / S2 (dir streaming) / S4 / S5 are all dep-ready (draft).
+>     runtime-leader names the ABI-B entry (evt_124181jspzv2e), Steward
+>     flips ready->active + releases. The kernel-nested chain does NOT go to L1.
+>   - **L2 (language) reseats to the KERNEL ring at its NEXT CLEAN SEAM** — when
+>     its current WP (LANG-MOD-CATALOG-COMPLETENESS) lands/hard-stops. NOT now
+>     (language lane is mid-WP; LANG-FLOOR-ROSTER-FIFTEEN-code is queued and must
+>     NOT be pulled past that seam). At the seam the Steward EXECUTES the reseat
+>     (moot exec the kernel ring from /workspaces/ken, stand down the language
+>     ring) and releases KERNEL-NESTED-IND (active, all 7 deps merged, owner
+>     kernel, size L, TCB; final open deliverables D7 + AC-K12 native/interp
+>     Nat-3; feeds DS-9). language-leader armed evt_50q2excw7rpmx, owes me a
+>     "at seam, ring free" signal.
+>   - **Then RETURN L2 to its language/FO workstream** (LANG-FLOOR-ROSTER-FIFTEEN-code
+>     + catalog-completeness successors + the z3 campaign — PAUSED, not
+>     cancelled) once the kernel chain clears.
+>   - **3-LANE CAP PRESERVED** — kernel occupies the L2 slot temporarily; language
+>     stands down while kernel is up; NO 4th ring. L3 (foundation) unchanged
+>     (CAT Tier-D slice 3 working).
+>
 > - **[LATER 2026-09-08 — read first] RT-NESTED-IH CHAIN CLOSED; L3 RETURNS TO
 >   CATALOG.** Lane 1: RT-NESTED-IH-NATIVE-REALIZATION D3-D5 merged (admin-merge
 >   6172f95a7, PR #3422; the HS#1-HS#7 chain is closed). KERNEL-NESTED-IND is the
