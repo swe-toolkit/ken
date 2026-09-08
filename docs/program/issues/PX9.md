@@ -72,12 +72,33 @@ Spec contract are framed as:
   and the revoked-unification, so PX9-INC1's law ACs cite a normative clause.
   Coupled to PX9-INC1 at merge-order only (build in parallel). **Routed to
   spec-leader 2026-09-07.**
-- **Increment 2** (fs migration + host-wire unification, TCB-adjacent): re-thread
-  the ~16 FS/resource operations onto `SystemError` (`FileError` becomes the
-  fs-domain projection; `ResourceError`'s revoked folds in) and unify the host wire
-  revoked enums. **Not yet framed** — whether it lives inside PX9 or a sequenced
-  successor node is an **operator scope call** (TCB-adjacent), forwarded
-  2026-09-07. Not a dependency of PX9-INC1.
+- **Increment 2** (fs migration + host-wire revoked unification). Operator ruling
+  2026-09-08 (Pat): do INC2 now — deferring it is tech debt. Bookkeeping (Steward):
+  INC2 stays under PX9 as WPs (no new nodes, matching INC1); PX9 stays `active`
+  until WP-B lands; the four downstream (ABI-S1/S5, PX10/PX11) correctly wait for
+  the unified type+wire. **Architect decomposition `evt_6r9scjqs2qjbg` corrects
+  the "~16 ops" framing:** the ask conflated two migrations. FS ops migrate cleanly
+  (field-for-field onto `SystemError`); resource ops do NOT — `ResourceError` is a
+  richer lifecycle type whose arms have no representation in `SystemError`'s flat
+  identity slot, so folding it wholesale would require enriching the identity
+  vocabulary (the forbidden semantic change). So it is **11 fs ops -> `SystemError`
+  + 6 resource ops KEEP `ResourceError`** (only its `ResourceRevoked` identity
+  unifies). Cut into two WPs, A then B:
+  - **PX9-INC2A** (`docs/program/wp/PX9-INC2A-fs-surface-unification.md`, owner
+    Foundation, size M, tier T1): surface unification — the 11 fs ops return
+    `Result SystemError _` (retire `FileError` default / derived fs-view fallback
+    measured at D0), `ResourceError.ResourceRevoked` -> canonical `IOError.Revoked`
+    via `ResourceHostIO` (lifecycle otherwise unchanged), the Ken-side reifier
+    collapses the two wire revoked tags (detail 10 + 11) at decode with the wire
+    SCHEMA untouched, `trusted_base()` delta empty. Folds INC1 rider (1), the
+    docstring cite fix. TCB-neutral, **releasable first**. **Released 2026-09-08.**
+  - **PX9-INC2B** (host-wire revoked schema unification, `crates/ken-host/src/
+    abi_v1.rs`, size S-M, TCB-ADJACENT): add `Revoked` to `IoErrorIdentityV1`,
+    route both former origins through it, retire the two domain wire `Revoked`
+    variants + detail tags (10, 11); wire round-trip discriminating control;
+    `trusted_base()` delta empty; D0 confirms ABI version-bump vs in-place V1 edit.
+    Architect REQUIRED reviewer. **Releasable second**, gated on WP-A's surface;
+    framed while A builds. PX9 stays `active` until it lands.
 - **PX10/PX11-owned (NOT PX9):** each later domain adds `Operation`/`ResourceRef`
   arms + new identities as **pure additions** — never a reshape. This is what
   landing the domain-general shape now (fs first) buys.

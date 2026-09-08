@@ -66,7 +66,47 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-07 (NEWEST — read before the 2026-09-06 block below)
+> ### LIVE POSITION 2026-09-08 (NEWEST — read before the 2026-09-07 block below)
+>
+> Operator active. Roster STRUCTURE unchanged (three lanes, runtime / language /
+> foundation). New this session:
+>
+> - **Lane 3 (foundation): operator ruled DO PX9 INCREMENT 2 NOW.** Operator, Pat,
+>   2026-09-08, verbatim intent: "Do INC2 now, or else it is just tech debt. How
+>   your bookkeeping works in terms of what this is part of is up to you." This
+>   RESOLVES the forwarded PX9-INC2 scope call (evt_76bbnt3f677pt). Bookkeeping
+>   (Steward's, per the operator's delegation): INC2 stays under PX9 as WPs (no new
+>   nodes, matching INC1); PX9 stays `active` until WP-B lands; the four downstream
+>   (ABI-S1/S5, PX10/PX11) correctly wait for the unified type+wire. Architect
+>   decomposition evt_6r9scjqs2qjbg split INC2 into two WPs: **`PX9-INC2A`**
+>   (fs surface unification — 11 fs ops → SystemError, retire FileError default,
+>   ResourceError.ResourceRevoked → canonical IOError.Revoked, reifier collapses
+>   the two wire revoked tags at decode with wire schema untouched; size M, tier
+>   T1, TCB-neutral; RELEASED 2026-09-08) and **`PX9-INC2B`** (host-wire revoked
+>   schema — abi_v1.rs, TCB-ADJACENT, Architect required reviewer; framed while A
+>   builds, releasable second, gated on A's surface). The resource ops KEEP
+>   ResourceError (only its revoked identity unifies — flattening its lifecycle is
+>   the forbidden semantic change). This SUPERSEDES the stale lane-3 table cell
+>   (the 2026-08-30 KERNEL reassignment and the CAT-reuse campaign).
+>
+> - **Lane 1 (runtime): A LANDED, successor released.**
+>   `RT-CHECKED-IH-REALIZATION-AUTHORITY` merged (origin/main e68ecd79 / code
+>   d29cc8ad0) as an accepted partial that mints the checked-IH authority and
+>   hard-stops on one edge (the realized RecursiveBackedge). The Steward filed +
+>   released the successor **`RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION`** (active,
+>   size S, tier T1; Architect mechanism ruling evt_47mfww0ecbf5y = forward the
+>   marker at the ordinary source-machine MatchScrutinee seat, a port of the D2a
+>   arm; Architect required reviewer). `RT-NESTED-IH-NATIVE-REALIZATION` now gates
+>   on this successor (depends_on wired), not merely on A. Runtime returns to ABI
+>   when the chain clears.
+>
+> - **Lane 2 (verify): the LANGUAGE → VERIFY seam FIRED.** LANG-FIXITY-DECL-SURFACE
+>   landed; per the 2026-09-07 ruling below, `CI-NATIVE-PARITY-DURATION` was
+>   released to the verify ring (long pole re-measured: rt_parity_native 3/6 @
+>   ~1437s is the wall ceiling; D5's real target is rebalancing that partition, not
+>   the stale 574s px8f claim).
+>
+> ### LIVE POSITION 2026-09-07 (read before the 2026-09-06 block below)
 >
 > Operator active this session. Roster STRUCTURE unchanged (three lanes,
 > runtime / language / foundation). Operator rulings this session:
