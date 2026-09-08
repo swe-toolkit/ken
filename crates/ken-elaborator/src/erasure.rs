@@ -594,6 +594,9 @@ pub(crate) struct CheckedHostSpineV1 {
     pub file_operation_remove_file: StableSymbol,
     pub file_operation_remove_directory: StableSymbol,
     pub dir_entry: StableSymbol,
+    /// ABI-S1 appends descriptor-operation identities without moving prior roles.
+    pub file_operation_seek: StableSymbol,
+    pub file_operation_set_length: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -8108,6 +8111,11 @@ mod px7l_tests {
                 "RemoveDirectory",
             ),
             dir_entry: StableSymbol::constructor(&family("DirEntry"), "MkDirEntry"),
+            file_operation_seek: StableSymbol::constructor(&family("FileOperation"), "OpSeek"),
+            file_operation_set_length: StableSymbol::constructor(
+                &family("FileOperation"),
+                "OpSetLength",
+            ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8517,6 +8525,8 @@ mod d1b_role_b_decoder_alignment {
             file_operation_remove_file: sentinel("file_operation_remove_file"),
             file_operation_remove_directory: sentinel("file_operation_remove_directory"),
             dir_entry: sentinel("dir_entry"),
+            file_operation_seek: sentinel("file_operation_seek"),
+            file_operation_set_length: sentinel("file_operation_set_length"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8596,6 +8606,11 @@ mod d1b_role_b_decoder_alignment {
         (spine.file_operation_remove_file.as_str(), "file_operation_remove_file"),
         (spine.file_operation_remove_directory.as_str(), "file_operation_remove_directory"),
         (spine.dir_entry.as_str(), "dir_entry"),
+        (spine.file_operation_seek.as_str(), "file_operation_seek"),
+        (
+            spine.file_operation_set_length.as_str(),
+            "file_operation_set_length",
+        ),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(
