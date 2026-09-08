@@ -447,15 +447,20 @@ fn summarize_result_phase(
         }
         RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {
             let body_origin = child(0)?;
-            ResultPhaseSummary::callable(
-                if functionized_units
-                    && plan.semantic.crosses_function_owner(origin, body_origin)?
-                {
-                    ResultPhase::CarrierRequired
-                } else {
-                    ResultPhase::SpecializedOnly
-                },
-            )
+            let crosses_owner = plan.semantic.crosses_function_owner(origin, body_origin)?;
+            let callable_result = if functionized_units && crosses_owner {
+                ResultPhase::CarrierRequired
+            } else {
+                ResultPhase::SpecializedOnly
+            };
+            let mut summary = ResultPhaseSummary::callable(callable_result);
+            // A closure whose body is emitted as another function is itself a
+            // boundary value when a source join returns it. This is independent
+            // of the representation produced when the closure is invoked.
+            if functionized_units && crosses_owner {
+                summary.phase = ResultPhase::CarrierRequired;
+            }
+            summary
         }
         RuntimeExpr::Value(_)
         | RuntimeExpr::DeclarationRef { .. }

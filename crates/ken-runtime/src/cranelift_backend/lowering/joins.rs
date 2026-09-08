@@ -312,7 +312,11 @@ impl<'a> Lowering<'a> {
                         let status = self.emit_process_exit_status(builder, lowered);
                         self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)
                     } else {
-                        self.transfer_into_carrier(builder, origin, &lowered)
+                        // `CarrierWord` is planner-selected before emission. A
+                        // planner-issued closure environment is the existing
+                        // represented result-edge lane; this does not choose a
+                        // representation from the lowered predecessor.
+                        self.transfer_represented_boundary_value(builder, origin, &lowered)
                     }
                 }
             }
