@@ -1,19 +1,19 @@
-# WP frame — RT-NESTED-IH-NATIVE-REALIZATION D3-D5 (thread PER-EMISSION identity into EVERY plane keyed by source-origin / one global emission model; GATE-0 measured C LIVE -> dual emission; §1b deeper predicate, entries 1-5; HS#5 = join-representation, per-emission CarrierWord vs NativeScalarPair)
+# WP frame — RT-NESTED-IH-NATIVE-REALIZATION D3-D5 (thread PER-EMISSION identity into EVERY plane keyed by source-origin / one global emission model; GATE-0 measured C LIVE -> dual emission; §1b deeper predicate, entries 1-6; HS#6 = BoundaryClosureEnvironment issuance, durability-gated A/A'/B trichotomy — re-key / durably materialize / B2F operator fork)
 
 > The completing D3-D5 slice of RT-NESTED-IH-NATIVE-REALIZATION (node
 > `docs/program/issues/RT-NESTED-IH-NATIVE-REALIZATION.md`). Runtime lane,
 > operator kernel-chain priority (`evt_7nkzsy27p7npw`). Owner: runtime. Size: M.
 > Tier: T1. Gate: none. Architect (`evt_1nkx3f30hqp9y` z4027, `evt_2a1gzw40mprz0`
 > z4029, `evt_53snpb8396g8a` HS#3 + amendment `evt_2cbtpf894nfzt`,
-> `evt_557xhr47qtzrg` HS#4, `evt_4a4tj2h1eatsa` HS#5) is the REQUIRED reviewer on
-> the candidate. Builds on
+> `evt_557xhr47qtzrg` HS#4, `evt_4a4tj2h1eatsa` HS#5, `evt_312vam8jegfbf` +
+> `evt_7f76p7y4k3jma` HS#6) is the REQUIRED reviewer on the candidate. Builds on
 > RT-REALIZED-BACKEDGE-SOURCE-CONTINUATION (merged `897f1ea6a`) and
 > RT-CHECKED-IH-REALIZATION-AUTHORITY (merged `e68ecd79`). On land, D3-D5 complete
 > and `KERNEL-NESTED-IND` unblocks.
 
-> ## §1b STRUCTURAL CLOSURE — DEEPER PREDICATE, ENTRIES 1-5 (Architect `evt_4a4tj2h1eatsa` HS#5 adds entry 5 = representation and owns the census miss; `evt_557xhr47qtzrg` entry 4; `evt_53snpb8396g8a` / `evt_2cbtpf894nfzt` entry 3)
+> ## §1b STRUCTURAL CLOSURE — DEEPER PREDICATE, ENTRIES 1-6 (Architect `evt_312vam8jegfbf` + AMENDMENT `evt_7f76p7y4k3jma` HS#6 adds entry 6 = BoundaryClosureEnvironment issuance, durability-gated A/A'/B; `evt_4a4tj2h1eatsa` entry 5; `evt_557xhr47qtzrg` entry 4)
 >
-> FIVE hard stops, ONE predicate — deeper than the entry-3 "consumer class"
+> SIX hard stops, ONE predicate — deeper than the entry-3 "consumer class"
 > framing, which the Architect corrected at HS#4: **a static plane keyed by
 > SOURCE ORIGIN ALONE (or by a SINGLE GLOBAL emission model), while in-place
 > realization + dual emission make one source origin (body 61) correspond to
@@ -31,18 +31,26 @@
 > under-enumerated (Architect owns the miss), which is why AC-DUAL-CENSUS is now
 > "prove per-emission or name the Cond-2 escape, re-derived from origin/main."
 > GATE-0 measured C LIVE (below), so the retained consumer gets a worker (dual
-> emission), not dissolution. Node stays draft until seeded.
+> emission), not dissolution. Entry 6 (HS#6) FORKS on TWO ORDERED measurements —
+> FIRST is the `BoundaryClosureEnvironment` record DURABLE/frame-independent or
+> LIVE-DOMAIN; THEN are body 50's escaping captures static-by-value or
+> dynamic/by-reference-to-frame: (A) durable + static-by-value -> re-key
+> per-emission; (A') live-domain-or-by-ref but static -> durably MATERIALIZE
+> (within-lane iff existing machinery, else Cond-2); (B) any dynamic-escaping
+> capture -> the reserved B2F operator fork. HS#5's `Some` is NOT durability
+> evidence; the durability must be measured. Node stays draft until seeded.
 
-## The five planes — keyed by source-origin or one global emission model (the corrected §1b inventory)
+## The six planes — keyed by source-origin or one global emission model (the corrected §1b inventory)
 
 Body 61 is realized IN-PLACE as a tail-recursive backedge inside enclosing
 function F (z4027 owner partition + z4029 edge reconciliation), AND — because
 GATE-0 measured it LIVE — is ALSO emitted as a standalone out-of-line worker for
 the separately-retained first-class callable C = `StaticOriginId(71)`. Two
 emissions of one source body, distinct identities, distinct edge kinds. Each of
-the five stops is a static plane that keyed on source origin 61 ALONE (or on a
+the six stops is a static plane that keyed on source origin 61 ALONE (or on a
 single global emission model) and so could not tell the two per-emission
-realizations apart:
+realizations apart (entry 6 forks A/A'/B on an ordered durability-then-capture
+measurement — see the deliverable):
 
 1. **HS#1 — partition wall (RULED z4027, `evt_1nkx3f30hqp9y`).** Join 50 walled to
    inner unit G though inlined into F. Source `StaticBody` boundary trusted.
@@ -87,6 +95,28 @@ realizations apart:
    The representation type is PLANNER-OWNED and CLOSED by design
    (`joins_traps.rs:44-46`: two-way; lowering may not add a third or select from a
    predecessor). WIP `ec6d401dc`.
+
+6. **HS#6 — BoundaryClosureEnvironment issuance (RULED `evt_312vam8jegfbf`,
+   AMENDED `evt_7f76p7y4k3jma`; §1a research-discharged this cycle, next trigger
+   HS#9).** After HS#5's Fork 1 clears, worker 5 (`PFI(5)`, unit result origin 61)
+   RETURNS the already-issued worker 6 / body 50 closure across its return boundary
+   (upward-funarg ESCAPE); the raw `Lowered::Closure` reaches
+   `boundary_transfer_admissibility` (`boundary.rs:1032`) and is refused at
+   `boundary.rs:1047`: `a closure cannot cross the boundary: it is runtime-local
+   and live-domain only, and it has no durable lane` (`boundary_environment=None`).
+   It is the GENERIC closure refusal, NOT the `ComputationalRecursorClosure`
+   in-flight-activation arm — body 50 is a representable closure whose DURABLE
+   issuance did not fire. The per-emission machinery EXISTS:
+   `BoundaryClosureEnvironment` (`aggregates.rs:149`, keyed by `owner:
+   ContinuationEmissionOwner`, holding `capture_origins: Vec<StaticOriginId>` + a
+   structural `AggregateOccurrenceId`) and its per-emission
+   `CheckedIhEnvironmentTransport` (`aggregates.rs:~190`, lifetime-tracked
+   `PlannedReferentLifetime`; "the continuation call result SUBSTITUTES for the raw
+   closure"). BUT the amendment corrects a shape-read: HS#5's
+   `boundary_environment=Some` proves only a WITHIN-FRAME (live-domain) environment
+   existed, NOT that it is durable; an ESCAPE needs a DURABLE (frame-independent)
+   environment. Neither `Some` nor `None` is the durability tell — it must be
+   MEASURED. WIP `aca946d3b` (parent `ec6d401dc`).
 
 ## Mechanism (the closure, grounded @ `496d8637b`)
 
@@ -169,6 +199,42 @@ shape-read). Complete the dual emission across BOTH layers:
    construct beyond re-keying the existing per-origin vector, that IS the
    Condition-2 hard-stop -> STOP and route to Steward/operator; do NOT mint it.
 
+4. **BoundaryClosureEnvironment issuance per-emission (HS#6, this recut) — GATED
+   by TWO ORDERED MEASUREMENTS, forking A / A' / B (amendment
+   `evt_7f76p7y4k3jma`).** Rule and re-key NOTHING until measured; do NOT read the
+   fork off "returned across a boundary", and do NOT read durability off HS#5's
+   `Some`.
+   - MEASUREMENT 1 (FIRST, gates everything): is `AggregateOccurrenceId(22)`'s
+     represented environment DURABLE / frame-independent (a compiler-owned
+     aggregate/const record that survives `PFI(5)`'s frame) or LIVE-DOMAIN
+     (frame-based, valid only while `PFI(5)`'s frame is alive)?
+   - MEASUREMENT 2 (THEN): are body 50's escaping captures STATIC/compiler-owned
+     BY-VALUE snapshots, or DYNAMIC runtime SSA / BY-REFERENCE into `PFI(5)`'s
+     activation frame? (A by-reference-to-frame capture cannot cross; it must be
+     captured by-value into a durable record or it is (B).)
+   Select the branch and keep the turn active only through the selected permitted
+   branch:
+   - (A) RE-KEY per-emission — ONLY IF durable AND all escaping captures static
+     BY-VALUE. `None` is a missing per-emission issuance of an EXISTING durable
+     capability; fire `BoundaryClosureEnvironment` / `CheckedIhEnvironmentTransport`
+     keyed per-emission from the `ContinuationEmissionOwner` identity in hand
+     (z4033/z4034), so the raw closure is SUBSTITUTED before boundary admissibility.
+     No borrow of F / the source-owner. §1b entry 6, within-lane.
+   - (A') MATERIALIZE durably — IF live-domain (or any by-reference-to-frame
+     capture) BUT all captures static/by-value-snapshottable: the escape needs a
+     DURABLE MATERIALIZATION (frame-independent record), NOT mere re-keying of a
+     live-domain environment. WITHIN-LANE ONLY IF the materialization uses EXISTING
+     machinery with NO new `Lowered`/`LoweringOperand` variant or plan construct;
+     ELSE it trips Condition-2 -> HARD-STOP to Steward/operator.
+   - (B) B2F OPERATOR FORK — IF ANY escaping capture is DYNAMIC runtime SSA needing
+     runtime-managed heap lifetime past the frame. Condition-2 HARD-STOP to
+     Steward/operator; `None` is a correct refusal no re-keying or materialization
+     satisfies. Do NOT mint the lane; do NOT fake durability by issuing a
+     frame-local environment per-emission (that returns a closure pointing at
+     `PFI(5)`'s torn-down frame = USE-AFTER-FREE). MIXED: a SINGLE
+     dynamic-runtime-escaping capture forces (B) for the whole environment.
+   Report BOTH measurements with the disposition.
+
 The ordinary-`Match` selector and the `source.rs` catch-all stay untouched.
 
 HARD-STOP ESCAPES (report + STOP, do not route around):
@@ -210,6 +276,14 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
   edge minted at `construction.rs:771` (`register_static_body`), reconciled to a
   non-boundary backedge; partition `semantic_ir.rs:1296`/`:1350`; ABI validator
   `abi.rs:2735`/`:2854`/`:2771`/`:2861`.
+- THE HS#6 BOUNDARY-CLOSURE MACHINERY: `boundary_transfer_admissibility`
+  (`boundary.rs:1032`, refusal `:1047`); `BoundaryClosureEnvironment`
+  (`aggregates.rs:149`; `owner: ContinuationEmissionOwner`; `capture_origins:
+  Vec<StaticOriginId>`; `AggregateOccurrenceId`); `CheckedIhEnvironmentTransport`
+  (`aggregates.rs:~190`; `PlannedReferentLifetime`). Returned closure body 50 under
+  `PFI(5)`, `boundary_environment=None`; measure `AggregateOccurrenceId(22)`
+  durability (frame-independent vs live-domain) + body 50 capture schema
+  (static-by-value vs dynamic / by-reference-to-frame).
 - The landed RT-CHECKED-IH D4 positional-ABI vector — AC-ABI-PIN.
 
 ## Acceptance criteria (Architect-pinned)
@@ -229,6 +303,16 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
 - **AC-DISCRIMINATOR-GATE (SEPARATE — derivability):** 61's body identity and 71's
   capture SCHEMA are compiler-owned/static; if any part is runtime-DETERMINED, the
   disposition FLIPS to must-refuse and the B2F durable-carrier is the OPERATOR FORK.
+  HS#6 is the concrete instance for the RETURNED closure: its capture-set lifetime
+  (durable/static-by-value vs live-domain/by-ref vs dynamic-escaping) selects
+  A / A' / B.
+- **AC-NO-DANGLING-ESCAPE (HS#6 named failure mode):** the returned closure (body
+  50) crossing `PFI(5)`'s boundary must NEVER be issued a re-keyed LIVE-DOMAIN
+  environment — that returns a closure pointing at `PFI(5)`'s torn-down frame
+  (upward-funarg use-after-free). Re-key (A) is permitted ONLY on a
+  measured-DURABLE environment; a live-domain environment routes to (A') durable
+  materialization (existing machinery, else Cond-2) or (B) the operator fork, never
+  a re-key.
 - **AC-PLAN-LEVEL:** worker + join obligations issued at the PLAN level
   (reify-and-seal on origin 71's plan), not per-function — assert neither refusal
   recurs at a second use of 71.
@@ -256,7 +340,12 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
   `validate_function_units`); AND the join-REPRESENTATION plane
   (`build_join_result_plan`, `summarize_result_phase`,
   `result_phase_environment_for_owner`, the per-origin joins vector, the
-  `functionized_units` flag, the union at `joins_traps.rs:477-483`). Charge EVERY
+  `functionized_units` flag, the union at `joins_traps.rs:477-483`); AND the
+  BoundaryClosureEnvironment / CheckedIhEnvironmentTransport ISSUANCE /
+  MATERIALIZATION plane (`aggregates.rs:149` + `~:190`;
+  `unit_boundary_environment_record` / `_occurrence` / `_fields`; the
+  `boundary_environment: Option<AggregateOccurrenceId>` issuance sites — measured
+  per-emission AND for durability, HS#6). Charge EVERY
   source join to the emission(s) that ACTUALLY emit it (measured owner run):
   source-origin-alone charging (44 -> F) is the defect being fixed; the
   dual-emitted join (50) is charged to BOTH emitters WITH its per-emission
@@ -270,19 +359,21 @@ HARD-STOP ESCAPES (report + STOP, do not route around):
 
 ## §1b closure verdict
 
-The FIVE planes are all instances of the ONE deeper predicate (a static plane
-keyed by source origin, or by a single global emission model, vs per-emission dual
-emission). Inventory (Architect `evt_4a4tj2h1eatsa`): 1 partition wall (z4027) / 2
-ABI boundary_signature (z4029) / 3 worker-template emittable-unit (z4032) / 4
-join-ownership (z4033/z4034) / 5 join-REPRESENTATION `build_join_result_plan`
-(HS#5). Applied UNIFORMLY — thread the compiler-owned emission identity into every
-such plane the census finds — this is the complete structural closure, not a
-plane-by-plane chain. HS#5 arrived at BUILD, not at the census, because z4033/z4034
-enumerated planes 1-4 but MISSED the representation plane; the closure still covers
-it, the CENSUS was under-enumerated (Architect owns the miss). A genuinely-new
-mechanism returns to the Architect; §1a next fires at HS#6 — and if Fork 2 trips
-Condition-2 (the representation type is closed by design), that operator hard-stop
-may land WITH the HS#6 trigger.
+The SIX planes are all instances of the ONE deeper predicate (a static plane keyed
+by source origin, or by a single global emission model, vs per-emission dual
+emission). Inventory: 1 partition wall (z4027) / 2 ABI boundary_signature (z4029) /
+3 worker-template emittable-unit (z4032) / 4 join-ownership (z4033/z4034) / 5
+join-REPRESENTATION `build_join_result_plan` (HS#5) / 6 BoundaryClosureEnvironment
++ CheckedIhEnvironmentTransport issuance (HS#6 `evt_7f76p7y4k3jma`). Applied
+UNIFORMLY — thread the compiler-owned emission identity into every such plane the
+census finds. §1a and §1b CONVERGE at entry 6: IF the returned closure's
+environment is durable + its captures static-by-value (A), or live-domain/by-ref
+but materializable with EXISTING machinery (A'), entry 6 SHARES the entry-4
+predicate at the issuance/materialization plane and the in-lane chain continues; IF
+A' needs a new construct, or ANY capture is dynamic-runtime-escaping (B), the
+in-lane chain ENDS here at Condition-2 / the B2F operator fork. §1a DISCHARGED for
+HS#6 (amendment on the same advisory, not a new trigger); next research trigger
+HS#9.
 
 ## Forbidden boundary (all carries closed; unchanged from z4022/z4027/z4029/z4032)
 
@@ -294,13 +385,20 @@ may land WITH the HS#6 trigger.
   `KERNEL-NESTED-IND` provenance (templates/ownership carry only 71's own
   oriented-plan / checked-IH provenance).
 - No new `Lowered` / `LoweringOperand` variant or plan construct — if the join
-  plane, the issuance, or the representation genuinely needs one, that is the
-  Condition-2 hard-stop to Steward/operator.
+  plane, the issuance, the representation, or the BoundaryClosureEnvironment
+  materialization genuinely needs one, that is the Condition-2 hard-stop to
+  Steward/operator.
 - Representation plane: NO union hack, NO third `JoinResultRepresentation`, NO
   lowering-side selection of representation from an emitted predecessor
   (`joins_traps.rs:44-46` — the type is closed). Per-`(emission,origin)`
   representation is minted in the PLANNER (`build_join_result_plan`) via the
   existing `JoinPlanToken`, never in lowering.
+- HS#6 escape: NEVER re-key a LIVE-DOMAIN environment for the returned closure
+  (dangling upward-funarg use-after-free); (A) re-key is permitted only on a
+  measured-durable environment. A live-domain-but-static environment routes to
+  (A') durable materialization (existing machinery, else Cond-2); any
+  dynamic-runtime-escaping capture routes to (B) the operator fork. Do NOT fake
+  durability with a frame-local per-emission environment.
 - Static/dynamic: template from the SCHEMA, capture VALUES through the environment.
 
 ## Out of scope (Architect flag — do NOT fold in)
@@ -319,12 +417,14 @@ the plan-level worker-template issuance (`resolve_worker_targets` /
 `declare_retained_body_targets_in_func`), the join-ownership plane
 (`function_owner` / `required_join_origins` / `finalize_join_disposition` /
 `validate_function_units`), AND the join-representation plane
-(`build_join_result_plan` / the per-origin joins vector / `JoinPlanToken`) —
-soundness-bearing producers of the kernel-checkable required-join set, the ABI
-boundary signatures, the worker-template population, and the join result
-representation. Runtime is the sole lane on this surface. Architect REQUIRED
-reviewer (`evt_4a4tj2h1eatsa` HS#5 + `evt_557xhr47qtzrg` + the z4027/z4029/z4032
-chain) + Runtime QA. TCB
+(`build_join_result_plan` / the per-origin joins vector / `JoinPlanToken`), AND the
+BoundaryClosureEnvironment / CheckedIhEnvironmentTransport issuance plane
+(`aggregates.rs:149` / `~:190`) — soundness-bearing producers of the
+kernel-checkable required-join set, the ABI boundary signatures, the
+worker-template population, the join result representation, and the durable
+boundary-closure environment. Runtime is the sole lane on this surface. Architect
+REQUIRED reviewer (`evt_7f76p7y4k3jma` HS#6 + `evt_4a4tj2h1eatsa` HS#5 +
+`evt_557xhr47qtzrg` + the z4027/z4029/z4032 chain) + Runtime QA. TCB
 classification assessed at M4; the Architect review is required regardless.
 
 ## Sequencing
