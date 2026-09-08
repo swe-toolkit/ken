@@ -15,14 +15,18 @@ import Core.Classes.LawfulClasses (leq_nat)
 
 data SourceId = MkSourceId Nat
 
+export SourceId
+
 data ByteRange = MkByteRange Nat Nat
 
-fn byte_range_start (range : ByteRange) : Nat =
+export ByteRange, MkByteRange
+
+pub fn byte_range_start (range : ByteRange) : Nat =
   match range {
     MkByteRange start end ↦ start
   }
 
-fn byte_range_end (range : ByteRange) : Nat =
+pub fn byte_range_end (range : ByteRange) : Nat =
   match range {
     MkByteRange start end ↦ end
   }
@@ -33,11 +37,13 @@ data Origin =
   | EnvironmentOrigin String
   | ConfigKeyOrigin (List String)
 
+export Origin, SourceOrigin, ArgumentOrigin, EnvironmentOrigin, ConfigKeyOrigin
+
 fn environment_origin (variable : String) : Origin = EnvironmentOrigin variable
 
 fn config_key_origin (path : List String) : Origin = ConfigKeyOrigin path
 
-fn origin_source_id (origin : Origin) : Option SourceId =
+pub fn origin_source_id (origin : Origin) : Option SourceId =
   match origin {
     SourceOrigin source range ↦ Some SourceId source;
     ArgumentOrigin index range ↦ None SourceId;
@@ -45,7 +51,7 @@ fn origin_source_id (origin : Origin) : Option SourceId =
     ConfigKeyOrigin path ↦ None SourceId
   }
 
-fn origin_argument_index (origin : Origin) : Option Nat =
+pub fn origin_argument_index (origin : Origin) : Option Nat =
   match origin {
     SourceOrigin source range ↦ None Nat;
     ArgumentOrigin index range ↦ Some Nat index;
@@ -61,7 +67,7 @@ fn origin_byte_range (origin : Origin) : Option ByteRange =
     ConfigKeyOrigin path ↦ None ByteRange
   }
 
-fn origin_range_start (origin : Origin) : Option Nat =
+pub fn origin_range_start (origin : Origin) : Option Nat =
   match origin {
     SourceOrigin source range ↦ Some Nat (byte_range_start range);
     ArgumentOrigin index range ↦ Some Nat (byte_range_start range);
@@ -69,7 +75,7 @@ fn origin_range_start (origin : Origin) : Option Nat =
     ConfigKeyOrigin path ↦ None Nat
   }
 
-fn origin_range_end (origin : Origin) : Option Nat =
+pub fn origin_range_end (origin : Origin) : Option Nat =
   match origin {
     SourceOrigin source range ↦ Some Nat (byte_range_end range);
     ArgumentOrigin index range ↦ Some Nat (byte_range_end range);
@@ -86,14 +92,18 @@ codes they introduce and inject them into this neutral carrier.
 ```ken
 data DiagnosticCode = MkDiagnosticCode String
 
+export DiagnosticCode, MkDiagnosticCode
+
 data Diagnostic = MkDiagnostic Origin DiagnosticCode
 
-fn diagnostic_origin (diagnostic : Diagnostic) : Origin =
+export Diagnostic, MkDiagnostic
+
+pub fn diagnostic_origin (diagnostic : Diagnostic) : Origin =
   match diagnostic {
     MkDiagnostic origin code ↦ origin
   }
 
-fn diagnostic_code (diagnostic : Diagnostic) : DiagnosticCode =
+pub fn diagnostic_code (diagnostic : Diagnostic) : DiagnosticCode =
   match diagnostic {
     MkDiagnostic origin code ↦ code
   }
