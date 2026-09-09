@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-E-SCHEMA
 title: "Scaffold-retirement Tier E, serialization/application spine (successor to Json): migrate the shared schema module Application.Input.Schema off ambient/scaffold resolution onto its D0-measured selective imports from already-published lower tiers (Capability.Formatting.Doc for Doc/Text, Data.Collections.Derived for list_append, the D0-pinned owner of string_to_list_char; NonEmpty and Validation are already imported), and publish only its usable consumer surface. D0 measures Schema's actual provider closure and its client-consumed public surface, adopts exactly that import set, and publishes exactly that surface. NO new proof authoring, NO carrier change; the proven Tier A/B/C/D/E-Json publish-and-import shape."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
