@@ -905,6 +905,36 @@ impl Default for BufferLimitsV1 {
     }
 }
 
+fn checked_bounded_range(
+    capacity: usize,
+    live_start: usize,
+    live_len: usize,
+    start: usize,
+    len: usize,
+) -> Result<std::ops::Range<usize>, ResourceErrorV1> {
+    let end = start
+        .checked_add(len)
+        .ok_or(ResourceErrorV1::InvalidBounds)?;
+    let live_end = live_start
+        .checked_add(live_len)
+        .ok_or(ResourceErrorV1::InvalidBounds)?;
+    if live_end > capacity || start < live_start || end > live_end {
+        return Err(ResourceErrorV1::InvalidBounds);
+    }
+    Ok(start..end)
+}
+
+fn checked_span_origin(
+    target: ResourceTokenV1,
+    span_origin: ResourceTokenV1,
+) -> Result<(), ResourceErrorV1> {
+    if span_origin == target {
+        Ok(())
+    } else {
+        Err(ResourceErrorV1::InvalidBounds)
+    }
+}
+
 #[derive(Debug)]
 pub struct BufferRegionV1 {
     bytes: Vec<u8>,
@@ -941,17 +971,14 @@ impl BufferRegionV1 {
     }
 
     fn initialized_slice(&self, start: usize, len: usize) -> Result<&[u8], ResourceErrorV1> {
-        let end = start
-            .checked_add(len)
-            .ok_or(ResourceErrorV1::InvalidBounds)?;
-        let live_end = self
-            .initialized_start
-            .checked_add(self.initialized_len)
-            .ok_or(ResourceErrorV1::InvalidBounds)?;
-        if start < self.initialized_start || end > live_end {
-            return Err(ResourceErrorV1::InvalidBounds);
-        }
-        Ok(&self.bytes[start..end])
+        let range = checked_bounded_range(
+            self.bytes.len(),
+            self.initialized_start,
+            self.initialized_len,
+            start,
+            len,
+        )?;
+        Ok(&self.bytes[range])
     }
 }
 
@@ -1029,6 +1056,18 @@ impl MappingRegionV1 {
 
     pub fn protection(&self) -> MappingProtectionV1 {
         self.protection
+    }
+
+    fn bounded_slice(&self, start: usize, len: usize) -> Result<&[u8], ResourceErrorV1> {
+        let range = checked_bounded_range(self.bytes.len(), 0, self.bytes.len(), start, len)?;
+        Ok(&self.bytes[range])
+    }
+
+    fn write_bounded_slice(&mut self, start: usize, bytes: &[u8]) -> Result<(), ResourceErrorV1> {
+        let range =
+            checked_bounded_range(self.bytes.len(), 0, self.bytes.len(), start, bytes.len())?;
+        self.bytes[range].copy_from_slice(bytes);
+        Ok(())
     }
 }
 
@@ -1394,6 +1433,108 @@ impl ResourceTableV1 {
             return Err(ResourceErrorV1::MalformedResource);
         };
         Ok((region, *identity))
+    }
+
+    fn resolve_mapping_mut(
+        &mut self,
+        token: ResourceTokenV1,
+        required: crate::RightSet,
+    ) -> Result<(&mut MappingRegionV1, ResourceTraceIdentityV1), ResourceErrorV1> {
+        self.lookup(token)?;
+        let slot = &mut self.slots[token.slot as usize];
+        let (owner, kind, rights, identity) = match &mut slot.state {
+            ResourceSlotStateV1::Live {
+                owner,
+                kind,
+                rights,
+                identity,
+                ..
+            } => (owner, kind, rights, identity),
+            ResourceSlotStateV1::Closing { .. } => return Err(ResourceErrorV1::Closed),
+            ResourceSlotStateV1::Vacant { .. } => return Err(ResourceErrorV1::MalformedResource),
+            ResourceSlotStateV1::Retired { .. } => return Err(ResourceErrorV1::Closed),
+        };
+        if *kind != ResourceKindV1::Mapping {
+            return Err(ResourceErrorV1::ResourceKindMismatch {
+                expected: ResourceKindV1::Mapping,
+                actual: *kind,
+            });
+        }
+        if !rights.contains(required) {
+            return Err(ResourceErrorV1::RightNotHeld {
+                required: required.bits(),
+                held: rights.bits(),
+            });
+        }
+        let ResourceOwnerV1::Mapping(region) = owner else {
+            return Err(ResourceErrorV1::MalformedResource);
+        };
+        Ok((region, *identity))
+    }
+
+    fn with_mapping_view<R>(
+        &mut self,
+        revocation: &crate::RevocationDomain,
+        target: ResourceTokenV1,
+        span_origin: ResourceTokenV1,
+        required: crate::RightSet,
+        operation: impl FnOnce(&mut MappingRegionV1) -> Result<R, ResourceErrorV1>,
+    ) -> Result<R, SemanticErrorV1> {
+        let admission = self.admit_resources(revocation, &[target])?;
+        let result = checked_span_origin(target, span_origin)
+            .and_then(|()| {
+                self.resolve_mapping_mut(target, required)
+                    .map(|(region, _)| region)
+            })
+            .and_then(operation)
+            .map_err(SemanticErrorV1::Resource);
+        assert!(
+            self.finish_admission(admission).is_empty(),
+            "synchronous mapping view cannot overlap a release request"
+        );
+        result
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn read_mapping_view(
+        &mut self,
+        revocation: &crate::RevocationDomain,
+        target: ResourceTokenV1,
+        span_origin: ResourceTokenV1,
+        start: u64,
+        length: u64,
+    ) -> Result<Vec<u8>, SemanticErrorV1> {
+        let start = usize::try_from(start)
+            .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))?;
+        let length = usize::try_from(length)
+            .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))?;
+        self.with_mapping_view(
+            revocation,
+            target,
+            span_origin,
+            crate::RightSet::READ,
+            |region| region.bounded_slice(start, length).map(<[u8]>::to_vec),
+        )
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn write_mapping_view(
+        &mut self,
+        revocation: &crate::RevocationDomain,
+        target: ResourceTokenV1,
+        span_origin: ResourceTokenV1,
+        start: u64,
+        bytes: &[u8],
+    ) -> Result<(), SemanticErrorV1> {
+        let start = usize::try_from(start)
+            .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))?;
+        self.with_mapping_view(
+            revocation,
+            target,
+            span_origin,
+            crate::RightSet::WRITE,
+            |region| region.write_bounded_slice(start, bytes),
+        )
     }
 
     pub fn identity(
@@ -2758,14 +2899,14 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             match resources.resolve_buffer(target) {
                 Ok((buffer, identity)) => {
                     resource_bindings.push((ResourceBindingRole::Target, identity));
-                    if span_origin != target {
+                    if let Err(error) = checked_span_origin(target, span_origin) {
                         // PX8-SPAN-PROV: the span was minted by a different
                         // buffer acquisition. Reject before exposing any bytes.
                         // Acquisition mismatch shares `InvalidBounds` with
                         // numeric live-window invalidity (`38 §1.7.1`); their
                         // relative order is not publicly observable, so the
                         // check may precede the numeric coordinate check.
-                        Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
+                        Err(SemanticErrorV1::Resource(error))
                     } else {
                         let start =
                             usize::try_from(*start).map_err(|_| ResourceErrorV1::InvalidBounds);
@@ -2873,12 +3014,12 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                         .checked_add(effective as u64)
                         .ok_or(ResourceErrorV1::InvalidOffset)
                         .map_err(SemanticErrorV1::Resource)?;
-                    if span_origin != target_buffer {
+                    if let Err(error) = checked_span_origin(target_buffer, span_origin) {
                         // PX8-SPAN-PROV: foreign-acquisition span. Reject after
                         // existing host-width admission (`InvalidOffset`) and
                         // before exposing bytes or issuing any backend write, so
                         // a mismatch records zero backend calls (`38 §1.7.1`).
-                        return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds));
+                        return Err(SemanticErrorV1::Resource(error));
                     }
                     let bytes = region
                         .initialized_slice(start, effective)
@@ -5216,6 +5357,140 @@ mod tests {
             Err(ResourceErrorV1::Closed)
         ));
         assert_eq!(backend.unmap_calls, 1, "terminal release is never retried");
+    }
+
+    /// Promise class: durable invariant. MEASURED: Buffer and Mapping route
+    /// through one overflow-checked range helper while supplying distinct live
+    /// windows; Mapping read/write additionally enforce exact origin, rights,
+    /// lineage admission, kind, and terminal lifetime before exposing bytes.
+    /// CLAIMED: ABI-S6 D2 reuses the PX8 bounded-view discipline without
+    /// inventing a Mapping window, right, or refusal. THE GAP: D2 deliberately
+    /// has no Mapping producer or native lowering; test-inserted mappings drive
+    /// this resource-model boundary until D3 makes it reachable.
+    #[test]
+    fn abi_s6_d2_mapping_views_share_bounds_and_enforce_origin_rights_and_lifetime() {
+        let mut buffer = BufferRegionV1::try_new(8).expect("buffer backing");
+        buffer.bytes[2..5].copy_from_slice(b"buf");
+        buffer.install_window(2, 3);
+        assert_eq!(buffer.initialized_slice(2, 3), Ok(&b"buf"[..]));
+        assert_eq!(
+            buffer.initialized_slice(1, 1),
+            Err(ResourceErrorV1::InvalidBounds)
+        );
+        assert_eq!(
+            buffer.initialized_slice(4, 2),
+            Err(ResourceErrorV1::InvalidBounds)
+        );
+
+        let mut revocation = RevocationDomain::default();
+        let writable_lineage = revocation.mint_root();
+        let other_lineage = revocation.mint_root();
+        let read_only_lineage = revocation.mint_root();
+        let mut table = ResourceTableV1::default();
+        let (writable, _) = table.insert_mapping(
+            MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::Writable)
+                .expect("writable mapping"),
+            writable_lineage,
+        );
+        let (other, _) = table.insert_mapping(
+            MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::Writable)
+                .expect("second mapping"),
+            other_lineage,
+        );
+        let (read_only, _) = table.insert_mapping(
+            MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::ReadOnly)
+                .expect("read-only mapping"),
+            read_only_lineage,
+        );
+        let (buffer_token, _) = table.insert_buffer(8).expect("wrong-kind buffer");
+
+        table
+            .write_mapping_view(&revocation, writable, writable, 2, b"map")
+            .expect("own-origin writable view");
+        assert_eq!(
+            table.read_mapping_view(&revocation, writable, writable, 0, 8),
+            Ok(vec![0, 0, b'm', b'a', b'p', 0, 0, 0])
+        );
+        assert_eq!(
+            table.read_mapping_view(&revocation, writable, writable, 7, 2),
+            Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
+        );
+        assert_eq!(
+            table.read_mapping_view(&revocation, writable, writable, u64::MAX, 2),
+            Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
+        );
+
+        assert_eq!(
+            table.read_mapping_view(&revocation, writable, other, 2, 3),
+            Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
+        );
+        assert_eq!(
+            table.write_mapping_view(&revocation, writable, other, 2, b"bad"),
+            Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
+        );
+        assert_eq!(
+            table.write_mapping_view(&revocation, writable, writable, 7, b"xx"),
+            Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
+        );
+        assert_eq!(
+            table.read_mapping_view(&revocation, writable, writable, 2, 3),
+            Ok(b"map".to_vec()),
+            "rejected foreign-origin and out-of-bounds writes mutate no bytes"
+        );
+        assert_eq!(
+            table.read_mapping_view(&revocation, read_only, read_only, 0, 1),
+            Ok(vec![0]),
+            "a read-only mapping still carries READ"
+        );
+        assert_eq!(
+            table.write_mapping_view(&revocation, read_only, read_only, 0, b"x"),
+            Err(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: crate::RightSet::WRITE.bits(),
+                held: crate::RightSet::READ.bits(),
+            }))
+        );
+        assert_eq!(
+            table.read_mapping_view(&revocation, buffer_token, buffer_token, 0, 1),
+            Err(SemanticErrorV1::Resource(
+                ResourceErrorV1::ResourceKindMismatch {
+                    expected: ResourceKindV1::Mapping,
+                    actual: ResourceKindV1::Buffer,
+                }
+            ))
+        );
+
+        assert!(revocation.revoke(writable_lineage));
+        assert_eq!(
+            table.read_mapping_view(&revocation, writable, writable, 0, 1),
+            Err(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
+        );
+        let pending = table
+            .begin_release(other)
+            .expect("live mapping can be released");
+        let mut backend = MappingReleaseBackend::default();
+        ResourceTableV1::finish_release_with(pending, &mut backend).expect("test mapping unmaps");
+        assert_eq!(
+            table.read_mapping_view(&revocation, other, other, 0, 1),
+            Err(SemanticErrorV1::Resource(ResourceErrorV1::Closed))
+        );
+    }
+
+    /// Promise class: transition sentinel. MEASURED: the first Mapping
+    /// operation identity remains unassigned and the closed inventory still
+    /// proceeds directly from BufferFreeze to Entropy. CLAIMED: D2 assigns no
+    /// Mapping producer or view-operation HostOp identity. THE GAP: native tag
+    /// reachability also depends on no existing operation being repurposed;
+    /// exhaustive dispatcher review closes that residual. D3 deliberately
+    /// retires this sentinel when it registers the producer and completes
+    /// native Mapping reification in the same increment.
+    #[test]
+    fn abi_s6_d2_leaves_mapping_operation_identity_unassigned() {
+        assert_eq!(HostOpV1::try_from(0x0404), Err(UnknownHostOpV1(0x0404)));
+        assert_eq!(
+            HostOpV1::BufferFreeze.next_in_inventory(),
+            Some(HostOpV1::EntropyRandomBytes),
+            "D2 leaves no Mapping-bearing host operation between the existing region and entropy bands"
+        );
     }
 
     /// Promise class: durable invariant. MEASURED: a backend that has not
