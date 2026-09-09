@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-D-POSIX
 title: "Scaffold-retirement Tier D (Capability), independent singleton: migrate Filesystem.Path.Posix off ambient resolution onto real selective imports from the already-published Core.Logic.Compare, Core.Classes.LawfulClasses, and Data.Collections.Derived providers, so it elaborates standalone. Publish the module's client-consumed export surface, replace whole-catalog ambient resolution with a real selective import block, extend the loader-visible inventory, standalone-green. The proven Tier-A/B/C/D publish-and-import shape; NO class-instance relocation, NO proof authoring. D0 DETERMINES the surface (there is no external importer) via the loader: the exact free-symbol closure per provider and which declarations the sole de-facto client (the cc6b acceptance fixture) consumes vs which are internal plumbing/lemmas."
-status: ready
+status: active
 owner: foundation
 size: M
 gate: none
