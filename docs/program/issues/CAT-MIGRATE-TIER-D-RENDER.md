@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-D-RENDER
 title: "Scaffold-retirement Tier D (Capability), independent singleton: migrate Diagnostics.Render off ambient resolution onto real selective imports from the already-published Diagnostics.Core and Formatting.Doc providers, so it elaborates standalone. Publish the module's own client-consumed export surface, replace whole-catalog ambient resolution with a real selective import block, extend the loader-visible inventory, standalone-green. The proven Tier-A/B/C/D publish-and-import shape; NO class-instance relocation, NO proof authoring. D0 confirms (via the loader, not a read) the exact free-symbol closure per provider and which of the three module functions are client-consumed vs private helpers."
-status: ready
+status: merged
 owner: foundation
 size: S
 gate: none
