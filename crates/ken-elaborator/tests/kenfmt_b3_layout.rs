@@ -3,10 +3,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ken_elaborator::layout::{display_width, format_ken, CANONICAL_WIDTH};
+use ken_elaborator::layout::{display_width, format_ken, render, Doc, CANONICAL_WIDTH, INDENT_WIDTH};
 use ken_elaborator::lossless::parse_lossless;
 use ken_elaborator::resolve::resolve_decls;
-use ken_elaborator::{Decl, ElabEnv, ElabError, ImportKind};
+use ken_elaborator::{Decl, ElabEnv, ElabError, ExportForm, ImportKind};
 
 fn ast_shape(source: &str) -> String {
     let parsed = parse_lossless(source).expect("source must parse");
@@ -434,4 +434,131 @@ fn indented_ken_blocks(section: &str) -> Vec<(usize, String)> {
         offset += line.len();
     }
     blocks
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: a >96-column bare in-scope `export a, b, c` name list formats to a
+/// wrapped result whose every line is within CANONICAL_WIDTH, keeps its exact
+/// ordered item inventory, preserves the parsed AST, and is a byte fixed point.
+/// CLAIMED: an over-width in-scope export wraps at its comma boundaries rather
+/// than rendering as a flat, unbreakable run. THE GAP: parenthesized selective
+/// imports and facade exports already break through the shared parenthesized
+/// list algebra (see `selective_import_items_wrap_without_inventory_or_fixed_
+/// point_drift`); this pins the previously-unbreakable bare in-scope list, the
+/// form the recombined canonical `OrdResult` export requires.
+#[test]
+fn ac1_wide_inscope_export_wraps_under_canonical_width() {
+    let source = "export OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt, ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2\n";
+    assert!(
+        display_width(source.trim_end()) > CANONICAL_WIDTH,
+        "fixture must overflow the canonical width"
+    );
+
+    let inventory = |text: &str| {
+        parse_lossless(text)
+            .expect("in-scope export fixture must parse")
+            .typed_decls()
+            .iter()
+            .filter_map(|decl| match decl {
+                Decl::ExportDecl {
+                    form: ExportForm::InScope { items },
+                    ..
+                } => Some(
+                    items
+                        .iter()
+                        .map(|item| (item.name.clone(), item.rename.clone()))
+                        .collect::<Vec<_>>(),
+                ),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let formatted = format_ken(source).expect("wide in-scope export must format");
+
+    assert!(
+        formatted.lines().count() > 1,
+        "an over-width in-scope export must wrap onto continuation lines: {formatted}"
+    );
+    assert!(
+        formatted
+            .lines()
+            .all(|line| display_width(line) <= CANONICAL_WIDTH),
+        "every wrapped line must be within the canonical width: {formatted}"
+    );
+    assert_eq!(
+        inventory(&formatted),
+        inventory(source),
+        "the wrapped export must retain its exact ordered item inventory"
+    );
+    assert_eq!(
+        inventory(&formatted)
+            .iter()
+            .map(|items| items.len())
+            .sum::<usize>(),
+        11
+    );
+    assert_eq!(
+        ast_shape(&formatted),
+        ast_shape(source),
+        "the wrapped export must parse to the same AST as the flat form"
+    );
+    assert_eq!(
+        format_ken(&formatted).unwrap(),
+        formatted,
+        "the wrapped export must be a formatter fixed point"
+    );
+}
+
+/// Promise class: durable invariant (committed mutation control).
+///
+/// MEASURED: a module-surface comma list renders under CANONICAL_WIDTH only
+/// because each comma boundary is a `Doc::line()` break point; replacing that
+/// break with a flat space — the exact mutation AC-6 names — leaves a single
+/// line above the width. CLAIMED: the wrap is carried by the comma-boundary
+/// break point, not by incidental width. THE GAP: the formatter's own use of
+/// this break point is pinned by `ac1_wide_inscope_export_wraps_under_canonical_
+/// width` and the selective-import test; this isolates the break point's
+/// necessity in the layout algebra so its removal cannot silently pass.
+#[test]
+fn ac6_comma_boundary_break_carries_the_module_surface_wrap() {
+    let names = [
+        "OrdResult",
+        "Lt",
+        "Eq",
+        "Gt",
+        "ord_eq",
+        "ord_lt",
+        "ord_gt",
+        "ord_result_leq",
+        "ord_result_dispatch2",
+        "ord_result_elim",
+        "ord_result_elim2",
+    ];
+    let build = |boundary: &Doc| {
+        let mut items = vec![Doc::text("export "), Doc::text(names[0])];
+        for name in &names[1..] {
+            items.push(Doc::text(","));
+            items.push(boundary.clone());
+            items.push(Doc::text(*name));
+        }
+        Doc::concat(items).nest(INDENT_WIDTH).group()
+    };
+
+    let wrapped = render(&build(&Doc::line()), CANONICAL_WIDTH);
+    let mutated = render(&build(&Doc::text(" ")), CANONICAL_WIDTH);
+
+    assert!(
+        wrapped.lines().count() > 1
+            && wrapped
+                .lines()
+                .all(|line| display_width(line) <= CANONICAL_WIDTH),
+        "the comma-boundary break must wrap the list under the canonical width: {wrapped}"
+    );
+    assert!(
+        mutated.lines().count() == 1
+            && mutated.lines().any(|line| display_width(line) > CANONICAL_WIDTH),
+        "dropping the comma-boundary break must revert to a single over-width run: {mutated}"
+    );
 }
