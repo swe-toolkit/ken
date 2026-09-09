@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-KENFMT-DECL-LAYOUT
 title: "kenfmt breakable layout for the module/import declaration surface: Doc-builders for ExportDecl and ImportDecl (and selective-import / re-export name lists) so an overflowing name list wraps under CANONICAL_WIDTH and round-trips as a formatter fixed point. The Component B formatter-gate gap."
-status: draft
+status: active
 owner: language
 size: M
 gate: none
@@ -22,7 +22,14 @@ origin: "Component B (LANG-MOD-CATALOG-COMPLETENESS) f5be017f7 CI red on two ken
 > `depends_on: [LANG-MOD-CATALOG-COMPLETENESS]` now encodes that schedule
 > (technically buildable earlier, but sequenced here so D2 recombines B's
 > already-landed stopgap decls). Stays `draft` until Steward releases it as the
-> campaign tail. Not released yet.
+> campaign tail.
+>
+> RELEASED 2026-09-09 (Steward). Its dependency LANG-MOD-CATALOG-COMPLETENESS
+> closed (merged as a landed-state verification, c18cc081b), so the operator's
+> 2026-08-21 schedule — this node runs at the END of the module/import work,
+> after Component B — is satisfied. The "before the verify/z3 FO-checker lane
+> resumes" clause is moot: that lane already completed
+> ([[V3-FO-EMBEDDING-ADEQUACY]] merged). Status `draft` -> `active` on release.
 
 > # DRAFT — buildable; the RECOMBINATION TRIGGER for Component B's split stopgap
 >
