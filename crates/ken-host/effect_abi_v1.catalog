@@ -27,6 +27,7 @@ error|resource.NoProgress|8
 error|resource.AllocationFailed|9
 tag|resource_kind.FsHandle|0
 tag|resource_kind.Buffer|1
+tag|resource_kind.Mapping|2
 tag|stream.stdin|0
 tag|stream.stdout|1
 tag|stream.stderr|2

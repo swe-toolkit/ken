@@ -1128,6 +1128,7 @@ fn validate_resource_lifetime_obligation(
         let acquisition = match resource_kind {
             ken_host::ResourceKindV1::FsHandle => ken_host::HostOpV1::FsOpen,
             ken_host::ResourceKindV1::Buffer => ken_host::HostOpV1::BufferAllocate,
+            ken_host::ResourceKindV1::Mapping => continue,
         };
         if alphabet_contains_host_op(alphabet, acquisition)
             && !value
@@ -1160,6 +1161,7 @@ const fn canonical_resource_kind_v1(value: ken_host::ResourceKindV1) -> &'static
     match value {
         ken_host::ResourceKindV1::FsHandle => "FsHandle",
         ken_host::ResourceKindV1::Buffer => "Buffer",
+        ken_host::ResourceKindV1::Mapping => "Mapping",
     }
 }
 
