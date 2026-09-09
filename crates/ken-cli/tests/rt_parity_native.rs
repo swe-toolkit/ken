@@ -795,6 +795,139 @@ fn in_generated_entry_stack_thread(name: &'static str, body: fn()) {
         .expect("generated-entry fixture thread");
 }
 
+fn parse_static_origin_id(rendered: &str) -> u32 {
+    rendered
+        .strip_prefix("StaticOriginId(")
+        .and_then(|origin| origin.strip_suffix(')'))
+        .unwrap_or_else(|| panic!("invalid StaticOriginId rendering: {rendered}"))
+        .parse()
+        .unwrap_or_else(|_| panic!("invalid StaticOriginId number: {rendered}"))
+}
+
+fn assert_checked_ih_call_origin_adjacency(
+    invocation_origin: u32,
+    call_origin: u32,
+    callee_origin: u32,
+    label: &str,
+) {
+    assert_eq!(
+        (call_origin.checked_add(1), callee_origin.checked_add(1)),
+        (Some(invocation_origin), Some(call_origin)),
+        "{label}: invocation, call, and callee origins must remain consecutive"
+    );
+}
+
+fn assert_checked_ih_direct_application_origin_adjacency(
+    row: &ken_runtime::CheckedIhDirectApplicationObservation,
+) {
+    assert_checked_ih_call_origin_adjacency(
+        parse_static_origin_id(&row.invocation_origin),
+        parse_static_origin_id(&row.application_origin),
+        parse_static_origin_id(&row.callee_origin),
+        "Direct checked-IH application",
+    );
+}
+
+type CheckedIhAdmissionCoordinate = (u32, u32, u32, u32);
+
+fn assert_checked_ih_admission_partition(
+    label: &str,
+    rows: &[ken_runtime::CheckedIhGeneratedEntryAdmissionObservation],
+    expected_partitions: &[Vec<bool>],
+) -> Vec<std::collections::BTreeMap<CheckedIhAdmissionCoordinate, bool>> {
+    assert_eq!(
+        rows.len(),
+        expected_partitions.iter().map(Vec::len).sum::<usize>(),
+        "{label}: the fixed fixture's admission cardinality changed"
+    );
+
+    let mut groups = std::collections::BTreeMap::new();
+    for row in rows {
+        assert_eq!(
+            row.binding_recursive_position, 1,
+            "{label}: every admission must retain the recursive binding seat"
+        );
+        assert_eq!(
+            row.binding_frame_origin.checked_add(4),
+            Some(row.invocation_origin),
+            "{label}: the fixed call must remain four local origins after its binding frame"
+        );
+        assert_checked_ih_call_origin_adjacency(
+            row.invocation_origin,
+            row.call_origin,
+            row.callee_origin,
+            label,
+        );
+        assert!(
+            row.worker_body_origin > row.invocation_origin,
+            "{label}: each worker body must remain downstream of its admitted calls"
+        );
+        groups
+            .entry((row.enclosing_specialization, row.worker_body_origin))
+            .or_insert_with(Vec::new)
+            .push(row);
+    }
+    assert_eq!(
+        groups.len(),
+        expected_partitions.len(),
+        "{label}: the specialization/worker partition changed"
+    );
+    assert_eq!(
+        groups
+            .keys()
+            .map(|(specialization, _)| *specialization)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        groups.len(),
+        "{label}: one specialization must select one worker group"
+    );
+    assert_eq!(
+        groups
+            .keys()
+            .map(|(_, worker)| *worker)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        groups.len(),
+        "{label}: one worker body must belong to one specialization group"
+    );
+
+    let mut actual = groups
+        .into_values()
+        .map(|mut group| {
+            group.sort_by_key(|row| row.binding_frame_origin);
+            let partition = group.iter().map(|row| row.governed).collect::<Vec<_>>();
+            let mut coordinates = std::collections::BTreeMap::new();
+            for row in group {
+                let coordinate = (
+                    row.binding_frame_origin,
+                    row.invocation_origin,
+                    row.call_origin,
+                    row.callee_origin,
+                );
+                assert!(
+                    coordinates.insert(coordinate, row.governed).is_none(),
+                    "{label}: an admission coordinate was duplicated: {coordinate:?}"
+                );
+            }
+            (partition, coordinates)
+        })
+        .collect::<Vec<_>>();
+    actual.sort_by_key(|(partition, _)| partition.len());
+    assert_eq!(
+        actual
+            .iter()
+            .map(|(partition, _)| partition.clone())
+            .collect::<Vec<_>>()
+            .as_slice(),
+        expected_partitions,
+        "{label}: the relative governed/non-governed partition changed"
+    );
+    actual
+        .into_iter()
+        .map(|(_, coordinates)| coordinates)
+        .collect()
+}
+
 #[test]
 fn uint64_checked_wrapper_admits_max_and_rejects_both_neighbors() {
     in_large_stack_thread("uint64-checked-bounds", || {
@@ -969,6 +1102,9 @@ fn fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness() {
 // now observes exact InvalidOffset with exit 0, so the trap the sentinel pinned
 // no longer occurs and the sentinel is removed rather than left to red.
 
+/// **Promise class: durable invariant.** Dense semantic-plane numbering may
+/// move, but each fixed fixture's first two-frame inheritance must retain its
+/// local origin relationships, exact K locator, and independent call identity.
 #[test]
 fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
     in_large_stack_thread("rt-parity-continuation-inheritance", || {
@@ -991,87 +1127,93 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             );
         assert!(ken_runtime::checked_ih_continuation_inheritance_mutation_is_exact());
 
-        let select = |rows: &[ken_runtime::CheckedIhContinuationInheritanceObservation],
-                      source_specialization,
-                      destination_specialization,
-                      active_frame_origin| {
-            let found = rows
-                .iter()
-                .filter(|row| {
-                    row.source_specialization == source_specialization
-                        && row.destination_specialization == destination_specialization
-                        && row.active_frame_origin == active_frame_origin
-                        && row.recursive_position == 1
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(
-                found.len(),
-                1,
-                "one exact transport/call identity must inherit to one descendant coordinate: {found:?}"
-            );
-            found[0].clone()
-        };
-        let read_target = select(&read, 1, 2, 301);
-        assert_eq!(read_target.active_frame_lineage, vec![479, 301]);
-        assert_eq!(read_target.destination_construct_origin, 485);
-        assert_eq!(read_target.recursive_child_origin, 483);
-        assert_eq!(read_target.selected_case_body_origin, 308);
-        assert_eq!(read_target.invocation_origin, 305);
-        assert_eq!(read_target.call_origin, 304);
-        assert_eq!(read_target.callee_origin, 303);
-        assert_eq!(read_target.immediate_k_locator_count, 1);
-        assert_eq!(read_target.immediate_k_locator_invocation_origin, 305);
-        assert_eq!(read_target.immediate_k_locator_callee_origin, 303);
-        assert_eq!(
-            read_target.immediate_k_locator_domain,
-            "ImmediateInvocationEnvironment"
-        );
-        assert_eq!(read_target.immediate_k_environment_index, 0);
-        assert_eq!(read_target.immediate_k_preceding_environment_provenance, None);
-        assert_eq!(read_target.immediate_k_lineage_environment_indices, vec![0, 0]);
-        assert_eq!(read_target.ret_case_body_origin, 474);
-        assert_eq!(read_target.closure_origin, 469);
-        assert_eq!(read_target.capture_ordinal, 0);
-        assert_eq!(read_target.capture_occurrence, 468);
-        assert_eq!(read_target.closure_body_origin, 461);
-        assert_eq!(read_target.body_capture_reads, vec![459]);
-        assert_eq!(read_target.closure_parameter_count, 1);
-        assert!(!read_target.fresh_destination_mentions_source_result);
-        assert!(read_target.ordinary_non_governed_exclusion_count > 0);
+        let select =
+            |label: &str, rows: &[ken_runtime::CheckedIhContinuationInheritanceObservation]| {
+                let first_two_frame = rows
+                    .iter()
+                    .filter(|row| {
+                        row.recursive_position == 1 && row.active_frame_lineage.len() == 2
+                    })
+                    .map(|row| row.active_frame_origin)
+                    .min()
+                    .unwrap_or_else(|| panic!("{label}: no two-frame checked-IH inheritance"));
+                let found = rows
+                    .iter()
+                    .filter(|row| {
+                        row.active_frame_origin == first_two_frame
+                            && row.recursive_position == 1
+                            && row.active_frame_lineage.len() == 2
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    found.len(),
+                    1,
+                    "{label}: one first two-frame transport/call identity must inherit: {found:?}"
+                );
+                found[0].clone()
+            };
+        let assert_local_shape =
+            |label: &str, row: &ken_runtime::CheckedIhContinuationInheritanceObservation| {
+                assert_eq!(row.active_frame_lineage.len(), 2);
+                let inherited_frame = row.active_frame_lineage[0];
+                assert_eq!(row.active_frame_lineage[1], row.active_frame_origin);
+                assert!(inherited_frame > row.active_frame_origin);
+                assert_eq!(row.destination_construct_origin, inherited_frame + 6);
+                assert_eq!(row.recursive_child_origin, inherited_frame + 4);
+                assert_eq!(row.selected_case_body_origin, row.active_frame_origin + 7);
+                assert_eq!(row.invocation_origin, row.active_frame_origin + 4);
+                assert_checked_ih_call_origin_adjacency(
+                    row.invocation_origin,
+                    row.call_origin,
+                    row.callee_origin,
+                    label,
+                );
+                assert_eq!(row.immediate_k_locator_count, 1);
+                assert_eq!(
+                    row.immediate_k_locator_invocation_origin,
+                    row.invocation_origin
+                );
+                assert_eq!(row.immediate_k_locator_callee_origin, row.callee_origin);
+                assert_eq!(
+                    row.immediate_k_locator_domain,
+                    "ImmediateInvocationEnvironment"
+                );
+                assert_eq!(row.ret_case_body_origin + 5, inherited_frame);
+                assert_eq!(row.closure_origin + 10, inherited_frame);
+                assert_eq!(row.capture_occurrence + 1, row.closure_origin);
+                assert_eq!(row.closure_body_origin + 8, row.closure_origin);
+                assert_eq!(row.body_capture_reads.len(), 1);
+                assert_eq!(row.body_capture_reads[0] + 2, row.closure_body_origin);
+                assert_eq!(row.capture_ordinal, 0);
+                assert_eq!(row.closure_parameter_count, 1);
+                assert_ne!(row.source_specialization, row.destination_specialization);
+                assert!(!row.fresh_destination_mentions_source_result);
+                assert!(row.ordinary_non_governed_exclusion_count > 0);
+            };
 
-        let write_target = select(&write, 3, 5, 314);
-        assert_eq!(write_target.active_frame_lineage, vec![492, 314]);
-        assert_eq!(write_target.destination_construct_origin, 498);
-        assert_eq!(write_target.recursive_child_origin, 496);
-        assert_eq!(write_target.selected_case_body_origin, 321);
-        assert_eq!(write_target.invocation_origin, 318);
-        assert_eq!(write_target.call_origin, 317);
-        assert_eq!(write_target.callee_origin, 316);
-        assert_eq!(write_target.immediate_k_locator_count, 1);
-        assert_eq!(write_target.immediate_k_locator_invocation_origin, 318);
-        assert_eq!(write_target.immediate_k_locator_callee_origin, 316);
-        assert_eq!(
-            write_target.immediate_k_locator_domain,
-            "ImmediateInvocationEnvironment"
+        let read_target = select("read", &read);
+        let write_target = select("write", &write);
+        let shifted_read_target = select("shifted read", &shifted_read);
+        assert_local_shape("read", &read_target);
+        assert_local_shape("write", &write_target);
+        assert_local_shape("shifted read", &shifted_read_target);
+        for target in [&read_target, &write_target] {
+            assert_eq!(target.immediate_k_environment_index, 0);
+            assert_eq!(target.immediate_k_preceding_environment_provenance, None);
+            assert_eq!(target.immediate_k_lineage_environment_indices, vec![0, 0]);
+        }
+        assert_ne!(
+            read_target.active_frame_origin, write_target.active_frame_origin,
+            "read and write must select distinct inherited frames"
         );
-        assert_eq!(write_target.immediate_k_environment_index, 0);
-        assert_eq!(write_target.immediate_k_preceding_environment_provenance, None);
-        assert_eq!(write_target.immediate_k_lineage_environment_indices, vec![0, 0]);
-        assert_eq!(write_target.ret_case_body_origin, 487);
-        assert_eq!(write_target.closure_origin, 482);
-        assert_eq!(write_target.capture_ordinal, 0);
-        assert_eq!(write_target.capture_occurrence, 481);
-        assert_eq!(write_target.closure_body_origin, 474);
-        assert_eq!(write_target.body_capture_reads, vec![472]);
-        assert_eq!(write_target.closure_parameter_count, 1);
-        assert!(!write_target.fresh_destination_mentions_source_result);
-        assert!(write_target.ordinary_non_governed_exclusion_count > 0);
+        assert_ne!(
+            read_target.destination_specialization, write_target.destination_specialization,
+            "read and write must inherit into distinct specializations"
+        );
         assert!(write_target.descriptor_only_exclusion_count > 0);
 
-        let shifted_read_target = select(&shifted_read, 1, 2, 301);
         assert_eq!(
-            shifted_read_target.source_call_identity,
-            read_target.source_call_identity,
+            shifted_read_target.source_call_identity, read_target.source_call_identity,
             "inserting a binder must not change transport or call identity"
         );
         assert_eq!(
@@ -1109,7 +1251,9 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             "the immediate locator must re-derive past the inserted binder"
         );
         assert_eq!(
-            shifted_read_target.immediate_k_preceding_environment_provenance.as_deref(),
+            shifted_read_target
+                .immediate_k_preceding_environment_provenance
+                .as_deref(),
             Some("Ordinary"),
             "the pre-shift slot must be the inserted ordinary binder, not K"
         );
@@ -1119,8 +1263,7 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             .last_mut()
             .expect("the governed inheritance has a final arrival") += 1;
         assert_eq!(
-            shifted_read_target.immediate_k_lineage_environment_indices,
-            expected_shifted_lineage,
+            shifted_read_target.immediate_k_lineage_environment_indices, expected_shifted_lineage,
             "only the arrival below the inserted binder may shift"
         );
 
@@ -1182,19 +1325,19 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
     });
 }
 
-/// **Promise class: transition sentinel.** A reviewed change to the fixed
-/// read/write planner graph may replace its dense coordinates, but must replace
-/// this witness while preserving quotient membership and exact-capsule reach.
+/// **Promise class: durable invariant.** Dense semantic-plane numbering may
+/// move, but the fixed fixtures retain their class/member cardinalities, local
+/// call relationships, context partition, and exact-capsule reach.
 ///
 /// **MEASURED:** the two fixed products' complete governed certificate classes,
 /// installation state, typed direct/tail fresh-result routes, and successful
 /// terminal validation observations.
 /// **CLAIMED:** W0/W1 share one typed projection while context-sharing siblings
 /// remain separate, every governed key is reached, and both route variants
-/// retain their exact typed source, intermediate edge, and sink coordinates.
-/// **THE GAP:** the fixed coordinate table is independent of the certificate
-/// builder and is paired with population-side disagreement mutations below;
-/// numeric origins remain transition witnesses rather than durable authority.
+/// retain their source, intermediate edge, and sink relationships.
+/// **THE GAP:** the fixed cardinalities and relative origin relationships are
+/// independent of the certificate builder and are paired with population-side
+/// disagreement mutations below; numeric origins are deliberately not authority.
 #[test]
 fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     in_generated_entry_stack_thread("rt-parity-generated-entry-confluence", || {
@@ -1209,42 +1352,61 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
         assert_eq!(read.len(), 2, "read has two distinct entry coordinates");
         assert_eq!(write.len(), 3, "write has three distinct entry coordinates");
         assert_eq!(
-            read.iter().map(|row| row.context).collect::<std::collections::BTreeSet<_>>().len(),
+            read.iter()
+                .map(|row| row.context)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
             1,
             "read context sharing must not quotient distinct coordinates"
         );
         assert_eq!(
-            write.iter().map(|row| row.context).collect::<std::collections::BTreeSet<_>>().len(),
+            write
+                .iter()
+                .map(|row| row.context)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
             2,
             "write context count remains unchanged"
         );
         assert_eq!(read.iter().map(|row| row.members.len()).sum::<usize>(), 2);
         assert_eq!(write.iter().map(|row| row.members.len()).sum::<usize>(), 4);
 
-        let collision = write
+        let collisions = write
             .iter()
-            .find(|row| row.binding_frame_origin == 755 && row.invocation_origin == 759)
-            .expect("the real W0/W1 coordinate");
-        assert_eq!(collision.members.len(), 2);
+            .filter(|row| row.members.len() == 2)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            collisions.len(),
+            1,
+            "exactly one write class must quotient W0/W1: {collisions:#?}"
+        );
+        let collision = collisions[0];
         assert_ne!(collision.members[0], collision.members[1]);
-        assert_eq!(collision.call_origin, 758);
-        assert_eq!(collision.callee_origin, 757);
         assert_eq!(collision.locator_index, 0);
         assert_eq!(collision.locator_domain, "ImmediateInvocationEnvironment");
         assert!(
             collision
                 .fresh_result_route
                 .starts_with("DirectInvocationReturn"),
-            "the exact body-refined invocation-return edge is the direct route: {collision:?}"
+            "the body-refined invocation-return edge is the direct route: {collision:?}"
         );
         for coordinate in [
-            "invocation_origin: StaticOriginId(759)",
-            "call_origin: StaticOriginId(758)",
-            "callee_origin: StaticOriginId(757)",
-            "binding: CheckedIhBinding { frame_origin: StaticOriginId(755), recursive_position: 1 }",
+            format!(
+                "invocation_origin: StaticOriginId({})",
+                collision.invocation_origin
+            ),
+            format!("call_origin: StaticOriginId({})", collision.call_origin),
+            format!(
+                "callee_origin: StaticOriginId({})",
+                collision.callee_origin
+            ),
+            format!(
+                "binding: CheckedIhBinding {{ frame_origin: StaticOriginId({}), recursive_position: {} }}",
+                collision.binding_frame_origin, collision.binding_recursive_position
+            ),
         ] {
             assert!(
-                collision.fresh_result_route.contains(coordinate),
+                collision.fresh_result_route.contains(&coordinate),
                 "the direct route must retain {coordinate}: {collision:?}"
             );
         }
@@ -1253,11 +1415,16 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
             "the real collision certificate is reused by at least one arrival"
         );
 
-        let write_singleton = write
+        let context_singletons = write
             .iter()
-            .find(|row| row.context == collision.context && row.invocation_origin == 538)
-            .expect("W2 stays separate despite sharing the context");
-        assert_eq!(write_singleton.members.len(), 1);
+            .filter(|row| row.context == collision.context && row.members.len() == 1)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            context_singletons.len(),
+            1,
+            "W2 must stay a singleton despite sharing W0/W1's context: {write:#?}"
+        );
+        let write_singleton = context_singletons[0];
         assert_ne!(write_singleton.callee_origin, collision.callee_origin);
         assert!(
             write_singleton
@@ -1265,21 +1432,6 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
                 .starts_with("TailProducerToRet"),
             "the Tail case must name the governed producer-to-Ret route: {write_singleton:?}"
         );
-        for coordinate in [
-            "invocation_origin: StaticOriginId(718)",
-            "call_origin: StaticOriginId(717)",
-            "callee_origin: StaticOriginId(716)",
-            "active_frame_origin: StaticOriginId(714)",
-            "direction: Forward",
-            "ret_case_body_origin: StaticOriginId(749)",
-            "ret_input_binder: ConstructorChild { frame_origin: StaticOriginId(714), field_position: 0 }",
-            "ret_input_delivery: ProducerResultDirect",
-        ] {
-            assert!(
-                write_singleton.fresh_result_route.contains(coordinate),
-                "the Tail producer-to-Ret route must retain {coordinate}: {write_singleton:?}"
-            );
-        }
         let all_rows = read.iter().chain(&write).collect::<Vec<_>>();
         let tail_rows = all_rows
             .iter()
@@ -1354,6 +1506,7 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
                     format!("callee_origin: {}", coordinate.callee_origin),
                     format!("active_frame_origin: {}", coordinate.active_frame_origin),
                     "direction: Forward".to_string(),
+                    format!("ret_case_body_origin: {}", coordinate.ret_case_body_origin),
                     format!("ret_input_binder: {}", coordinate.ret_input_binder),
                     "ret_input_delivery: ProducerResultDirect".to_string(),
                 ] {
@@ -1370,9 +1523,24 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
                 row.reached_count > 0,
                 "every installed governed key is validated on at least one arrival: {row:?}"
             );
-            assert!(row.reached_exact_capsule, "the exact recursor arm is required");
+            assert!(
+                row.reached_exact_capsule,
+                "the exact recursor arm is required"
+            );
             assert!(row.reached_carried_residual, "K's residual remains Carried");
             assert_eq!(row.destination_body_origin, row.worker_body_origin);
+            assert_eq!(row.binding_recursive_position, 1);
+            assert_eq!(
+                row.binding_frame_origin.checked_add(4),
+                Some(row.invocation_origin),
+                "the fixed source call remains four local origins after its binding frame"
+            );
+            assert_checked_ih_call_origin_adjacency(
+                row.invocation_origin,
+                row.call_origin,
+                row.callee_origin,
+                "generated-entry certificate",
+            );
             assert_eq!(row.invocation_origin, row.locator_invocation_origin);
             assert_eq!(row.callee_origin, row.locator_callee_origin);
         }
@@ -2309,18 +2477,18 @@ owner_body_control_test!(static_response_owner_body_trap_bypass_reds_and_restore
 owner_body_control_test!(static_response_owner_body_vary_ret_reds_and_restores, "vary-ret", "rt_read_offset_stage", VaryRet, "validated a Ret identity other than its exact K Ret");
 owner_body_control_test!(static_response_owner_body_omit_owner_definition_reds_and_restores, "omit-owner-definition", "rt_read_offset_stage", OmitOwnerDefinition, "the response-owner body population is incomplete");
 
-/// **Promise class: durable invariant.** Intended planner growth may add Direct
-/// arrivals, but every such arrival must retain one source-keyed declared call
-/// and use that call's Trap-checked result rather than its capture environment.
+/// **Promise class: durable invariant.** Dense numbering may move, but the
+/// fixed write fixture must retain one source-keyed Direct declared call and use
+/// that call's Trap-checked result rather than its capture environment.
 ///
 /// **MEASURED:** the write fixture's exact governed Direct application records
 /// its invocation/call/callee provenance, a non-degenerate planner-ordered
 /// capture run, one
 /// emitted call and a call-derived result; the Tail-only read fixture records no
 /// Direct application.
-/// **CLAIMED:** Direct applies its carried environment exactly once while Tail
-/// cannot enter the Direct lookup and app486 remains an environment-only
-/// zero-call materializer.
+/// **CLAIMED:** each Direct emission applies its carried environment exactly
+/// once, while Tail and the environment-only materializer cannot enter the
+/// Direct lookup.
 /// **THE GAP:** the observation is emitted at the actual declared-call seam.
 /// The population mutations below independently vary every joining operand and
 /// compare restored executable bytes.
@@ -2352,15 +2520,14 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             read.is_empty() && read_applications == 0,
             "the Tail-only read fixture must not enter the Direct application lookup: {read:#?}"
         );
-        assert!(
-            !write.is_empty(),
-            "the write fixture must reach its governed Direct application"
+        assert_eq!(
+            write.len(),
+            2,
+            "the fixed write fixture reaches two emissions of one Direct application coordinate"
         );
         assert_eq!(write_applications, write.len());
         for row in &write {
-            assert_eq!(row.invocation_origin, "StaticOriginId(759)");
-            assert_eq!(row.application_origin, "StaticOriginId(758)");
-            assert_eq!(row.callee_origin, "StaticOriginId(757)");
+            assert_checked_ih_direct_application_origin_adjacency(row);
             assert!(
                 row.capture_count > 1,
                 "the capture-order control requires a non-degenerate Direct population: {row:#?}"
@@ -2368,11 +2535,34 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             assert_eq!(row.emitted_call_count, 1);
             assert!(row.emitted_call.is_some());
             assert!(row.application_result_from_call);
-            assert!(
-                !row.application_origin.contains("486"),
-                "app486 remains environment-only and cannot be the Direct call seat"
-            );
         }
+        assert_eq!(
+            write
+                .iter()
+                .map(|row| {
+                    (
+                        row.defining_function,
+                        row.invocation_origin.as_str(),
+                        row.application_origin.as_str(),
+                        row.callee_origin.as_str(),
+                        row.source_call_identity.as_str(),
+                        row.capture_count,
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            1,
+            "both emissions must belong to one source-keyed Direct application coordinate"
+        );
+        assert_eq!(
+            write
+                .iter()
+                .map(|row| row.emitted_call.as_deref().expect("one emitted call"))
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            write.len(),
+            "the two reached emissions must remain distinct calls"
+        );
         assert!(ken_runtime::checked_ih_direct_application_mutation_is_exact());
     });
 }
@@ -2456,9 +2646,7 @@ fn direct_application_control_arm(
     );
     assert_eq!(applications, 1, "{label}: mutation missed Direct");
     assert_eq!(rows.len(), 1, "{label}: missing application provenance");
-    assert_eq!(rows[0].invocation_origin, "StaticOriginId(759)");
-    assert_eq!(rows[0].application_origin, "StaticOriginId(758)");
-    assert_eq!(rows[0].callee_origin, "StaticOriginId(757)");
+    assert_checked_ih_direct_application_origin_adjacency(&rows[0]);
     assert_eq!(rows[0].emitted_call_count, expected_calls);
     assert_eq!(rows[0].emitted_call.is_some(), expected_calls == 1);
     assert!(!rows[0].application_result_from_call);
@@ -2660,15 +2848,17 @@ fn checked_ih_fresh_result_route_observation_is_forward_and_paired() {
     });
 }
 
-/// **Promise class: transition sentinel.** A reviewed change to the fixed
-/// read/write fixture's static occurrence graph must replace this exact P/G/N
-/// witness while preserving totality, disjointness, and the per-arrival laws.
+/// **Promise class: durable invariant.** Dense origins and worker-body numbers
+/// may move, but the fixed fixtures retain their call relationships,
+/// cardinalities, and relative P/G/N partitions.
 ///
-/// **MEASURED:** the complete planner-derived admission-key sets for both fixed
-/// product witnesses, including every explicit `NonGoverned` row.
-/// **CLAIMED:** the sanitized map is total over P rather than a governed sample.
-/// **THE GAP:** expected rows come from the independently fixed witness table,
-/// not from re-projecting the map under test.
+/// **MEASURED:** the complete planner-derived admission rows for both fixed
+/// products, grouped by specialization/worker and ordered by source binding.
+/// **CLAIMED:** the sanitized map is total over P rather than a governed sample,
+/// and shared write coordinates are governed only in their owning worker.
+/// **THE GAP:** the expected cardinalities and governed partitions are fixed
+/// independently of the map under test; production mutations below vary the
+/// actual P/G/N population.
 #[test]
 fn checked_ih_generated_entry_admission_population_is_total() {
     in_generated_entry_stack_thread("rt-parity-generated-entry-admissions", || {
@@ -2680,42 +2870,32 @@ fn checked_ih_generated_entry_admission_population_is_total() {
             ken_runtime::with_checked_ih_generated_entry_admission_observations(|| {
                 differential("fs-write-at-offset-single", "rt_write_writable_stage")
             });
-        let keys = |rows: &[ken_runtime::CheckedIhGeneratedEntryAdmissionObservation]| {
-            rows.iter()
-                .map(|row| {
-                    (
-                        row.enclosing_specialization,
-                        row.worker_body_origin,
-                        row.binding_frame_origin,
-                        row.binding_recursive_position,
-                        row.invocation_origin,
-                        row.call_origin,
-                        row.callee_origin,
-                        row.governed,
-                    )
-                })
-                .collect::<std::collections::BTreeSet<_>>()
-        };
-        let expected_read = std::collections::BTreeSet::from([
-            (2, 963, 301, 1, 305, 304, 303, true),
-            (2, 963, 479, 1, 483, 482, 481, false),
-            (2, 963, 520, 1, 524, 523, 522, true),
-            (2, 963, 699, 1, 703, 702, 701, false),
-        ]);
-        let expected_write = std::collections::BTreeSet::from([
-            (3, 1269, 534, 1, 538, 537, 536, true),
-            (3, 1269, 714, 1, 718, 717, 716, false),
-            (3, 1269, 755, 1, 759, 758, 757, true),
-            (3, 1269, 936, 1, 940, 939, 938, false),
-            (5, 1290, 314, 1, 318, 317, 316, true),
-            (5, 1290, 492, 1, 496, 495, 494, false),
-            (5, 1290, 534, 1, 538, 537, 536, false),
-            (5, 1290, 714, 1, 718, 717, 716, false),
-            (5, 1290, 755, 1, 759, 758, 757, false),
-            (5, 1290, 936, 1, 940, 939, 938, false),
-        ]);
-        assert_eq!(keys(&read), expected_read, "the read admission population P is closed");
-        assert_eq!(keys(&write), expected_write, "the write admission population P is closed");
+        let read_groups =
+            assert_checked_ih_admission_partition("read", &read, &[vec![true, false, true, false]]);
+        let write_groups = assert_checked_ih_admission_partition(
+            "write",
+            &write,
+            &[
+                vec![true, false, true, false],
+                vec![true, false, false, false, false, false],
+            ],
+        );
+        assert!(
+            write_groups[0]
+                .keys()
+                .all(|coordinate| write_groups[1].get(coordinate) == Some(&false)),
+            "the four inner-worker write calls must be a non-governed subset of the outer worker"
+        );
+        let write_coordinates = write_groups
+            .iter()
+            .flat_map(|group| group.keys().copied())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            read_groups[0]
+                .keys()
+                .all(|coordinate| !write_coordinates.contains(coordinate)),
+            "read and write admission coordinates must remain disjoint"
+        );
         for row in read.iter().chain(&write) {
             assert!(row.installed);
             assert_eq!(row.installation_count, 1);
@@ -3565,9 +3745,10 @@ fn checked_ih_generated_entry_confluence_is_interning_and_inheritance_order_inde
     });
 }
 
-/// **Promise class: transition sentinel.** A reviewed change to the fixed
-/// read/write static occurrence graphs may replace these coordinates, but must
-/// preserve a non-degenerate sink population and per-entry uniqueness.
+/// **Promise class: durable invariant.** Dense semantic-plane numbering and
+/// per-function copies may move, but each fixed fixture retains a non-degenerate
+/// semantic sink cardinality, ordered frame-to-Ret relationships, and per-entry
+/// uniqueness.
 ///
 /// **MEASURED:** every strict-`Ret` block created while compiling the two fixed
 /// products installs one compiler-only sink and completes one exact lookup.
@@ -3613,63 +3794,47 @@ fn composed_return_ret_sink_population_is_unique() {
             "rt_write_writable_stage",
             "write",
         );
-        // D3-RECUT (b2 inc1) recalibration, Architect ruling B (evt_63dg2292sqwgv).
-        // The pure-Ret{Match} composed-return forward SSA edge (read AND valid-write,
-        // shape-gated at consumption, not operation-gated) returns
-        // Complete(RecursiveBackedge), short-circuiting the source machine AT the
-        // composed-return collapse. Strict-Ret seams DOWNSTREAM of that collapse --
-        // the ones base reached by continuing past it -- are no longer reached, so
-        // their sinks are not installed => the reached-seam population DROPS
-        // (read 35->17, write 26->17 at D3-RECUT; D2's appended ResourceRevoked
-        // alternative adds one reached read-side sink, so read is now 18 while write
-        // remains 17; the count is 1:1 with reached seams, invariant below unchanged).
-        // This is pure SUBSUMPTION plus one additive error arm, not a structural rewrite: the
-        // new coordinate set is a strict SUBSET of the base set (no new seam appears),
-        // and the removed coordinates are exactly the backedge-subsumed downstream
-        // seams -- read loses (301,465),(511,676); write loses (525,691).
-        for (label, observations, expected_count, expected_semantic_coordinates) in [
-            (
-                "read",
-                read,
-                18,
-                std::collections::BTreeSet::from([
-                    ("StaticOriginId(12)", "StaticOriginId(294)", 0),
-                    ("StaticOriginId(479)", "StaticOriginId(514)", 0),
-                    ("StaticOriginId(699)", "StaticOriginId(766)", 0),
-                ]),
-            ),
-            (
-                "write",
-                write,
-                17,
-                std::collections::BTreeSet::from([
-                    ("StaticOriginId(25)", "StaticOriginId(307)", 0),
-                    ("StaticOriginId(314)", "StaticOriginId(487)", 0),
-                    ("StaticOriginId(492)", "StaticOriginId(527)", 0),
-                    ("StaticOriginId(714)", "StaticOriginId(749)", 0),
-                    ("StaticOriginId(755)", "StaticOriginId(931)", 0),
-                    ("StaticOriginId(936)", "StaticOriginId(1084)", 0),
-                ]),
-            ),
-        ] {
-            assert_eq!(
-                observations.len(),
-                expected_count,
-                "{label}: the fixed emitted sink population changed"
-            );
+        for (label, observations, expected_semantic_count) in
+            [("read", read, 3), ("write", write, 6)]
+        {
             let semantic_coordinates = observations
                 .iter()
                 .map(|row| {
                     (
-                        row.active_frame_origin.as_str(),
-                        row.ret_case_body_origin.as_str(),
+                        parse_static_origin_id(&row.active_frame_origin),
+                        parse_static_origin_id(&row.ret_case_body_origin),
                         row.ret_input_field_position,
                     )
                 })
                 .collect::<std::collections::BTreeSet<_>>();
             assert_eq!(
-                semantic_coordinates, expected_semantic_coordinates,
-                "{label}: the fixed semantic sink population changed"
+                semantic_coordinates.len(),
+                expected_semantic_count,
+                "{label}: the fixed semantic sink cardinality changed"
+            );
+            assert!(
+                semantic_coordinates
+                    .iter()
+                    .all(|(active_frame, ret_body, field)| active_frame < ret_body && *field == 0),
+                "{label}: each sink must flow from its active frame to a later Ret body field zero"
+            );
+            assert_eq!(
+                semantic_coordinates
+                    .iter()
+                    .map(|(active_frame, _, _)| *active_frame)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                expected_semantic_count,
+                "{label}: active frames must remain distinct"
+            );
+            assert_eq!(
+                semantic_coordinates
+                    .iter()
+                    .map(|(_, ret_body, _)| *ret_body)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                expected_semantic_count,
+                "{label}: Ret bodies must remain distinct"
             );
             let function_local_keys = observations
                 .iter()
@@ -4089,7 +4254,7 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
 /// evt_1qf2wn2sfbq7x / runtime-qa evt_6vhnvcxpp1fx1). The guard
 /// (`checked_ih_forward_edge_route_collapsible`) is the load-bearing output of
 /// the HS3/HS4 arc, yet it flips no consumption arm on today's programs: the
-/// effect tail (af=483) is already excluded by `tail_worker_body_is_ret_kmatch`
+/// effect tail is already excluded by `tail_worker_body_is_ret_kmatch`
 /// before the guard is consulted, so read-collapses and no-regression bracket the
 /// seat's behavior but leave the discriminator ITSELF unpinned -- a hard-coded
 /// `false` would pass every other fixture identically. This pin observes the
@@ -4161,10 +4326,10 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
         );
 
         // The read-then-write effect program: the non-degenerate pair. Exactly one
-        // route is non-collapsible -- the outer read-then-write effect tail (af=483)
-        // whose producer resumes into a divergent recursor (the guard's Err/impure
-        // negative arm) -- and at least one is collapsible (the inner writeAt
-        // narrowing, af=696, a pure value-returning tail). Classified oppositely in
+        // route is non-collapsible -- the outer read-then-write effect tail whose
+        // producer resumes into a divergent recursor (the guard's Err/impure negative
+        // arm) -- and at least one is collapsible (the inner writeAt narrowing, a pure
+        // value-returning tail). Classified oppositely in
         // one program is exactly what a preventive guard with no arm-flip needs.
         let write = determine("write", "rt_write_writable_stage");
         assert!(
