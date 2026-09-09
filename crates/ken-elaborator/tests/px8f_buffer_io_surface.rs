@@ -54,10 +54,16 @@ fn public_buffer_span_producers(env: &ElabEnv) -> BTreeSet<String> {
 #[test]
 fn checked_surface_is_public_but_proof_carrying_constructors_stay_private() {
     let mut env = ElabEnv::empty().expect("PX8-F prelude");
+    let base_trusted = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     env.elaborate_ken_md_file(BUFFER_KEN_MD)
         .expect("System.Buffer checked fences");
     env.elaborate_ken_md_file(IO_KEN_MD)
         .expect("System.IO checked fences and five law terms");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        base_trusted,
+        "checked Buffer and IO declarations must not grow the trusted base"
+    );
 
     env.elaborate_file(
         r#"
@@ -83,6 +89,10 @@ proc px8f_exact_write_all
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError Unit) visits [FS] =
   writeAll a file offset buffer span
+
+theorem px8f_write_all_all_success_theorem_uses_subject
+  : Equal Bool (write_all_all_success Zero) True =
+  write_all_all_success_holds Zero
 
 proc px8f_readsome_public_consumers
   (a : Auth) (file : Resource FsHandle) (offset : Int)
@@ -170,13 +180,17 @@ proc px8f_readsome_public_consumers
         "write_all_preserves_exact_prefix",
         "write_all_success_is_complete",
         "write_all_preserves_first_error",
-        "write_all_all_success",
+        "write_all_all_success_holds",
     ] {
         assert!(
             env.env.transparent_body(env.globals[law]).is_some(),
             "law `{law}` must be a real checked body"
         );
     }
+    assert_ne!(
+        env.globals["write_all_all_success_holds"], env.globals["write_all_all_success"],
+        "the theorem and its native-prelude subject must remain distinct globals"
+    );
     assert!(!BUFFER_KEN_MD.contains("Axiom"));
     assert!(!IO_KEN_MD.contains("Axiom"));
 }
