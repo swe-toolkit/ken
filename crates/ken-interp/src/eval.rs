@@ -6886,6 +6886,117 @@ mod px5b_effect_observation_tests {
         ));
     }
 
+    /// Promise class: durable component-boundary invariant. MEASURED: the
+    /// interpreter's existing generic reply boundary preserves the Bytes/Unit
+    /// results and exact InvalidBounds, RightNotHeld, and Revoked identities
+    /// used by ABI-S6 D2 mapping views. CLAIMED: D2 needs no new interpreter
+    /// value or error alternative and cannot collapse its resource refusals.
+    /// THE GAP: no Mapping producer or private FSOp constructor exists until
+    /// D3, so host tests drive the resource operation while this test pins its
+    /// already-shared reification boundary directly.
+    #[test]
+    fn abi_s6_d2_mapping_view_results_use_existing_interp_values_and_refusals() {
+        let ids = console_ids();
+        let fs = fs_ids();
+        let mut store = EvalStore::new();
+        let request = ken_host::CanonicalRequestV1::BufferFreeze {
+            start: 0,
+            length: 3,
+        };
+
+        let bytes = reify_host_reply_v1(
+            ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Bytes(
+                b"map".to_vec(),
+            )),
+            None,
+            None,
+            &request,
+            fs.private_buffer_freeze_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("owned mapping bytes use the existing Bytes value");
+        assert_eq!(
+            result_payload(&bytes, ids.ok_id),
+            &EvalVal::Bytes(b"map".to_vec())
+        );
+
+        let unit = reify_host_reply_v1(
+            ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Unit),
+            None,
+            None,
+            &request,
+            fs.private_buffer_freeze_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("mapping write uses the existing Unit value");
+        assert!(matches!(
+            result_payload(&unit, ids.ok_id),
+            EvalVal::Ctor { id, .. } if *id == ids.unit_id
+        ));
+
+        let invalid_bounds = reify_host_reply_v1(
+            ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Resource(
+                ken_host::ResourceErrorV1::InvalidBounds,
+            )),
+            None,
+            None,
+            &request,
+            fs.private_buffer_freeze_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("mapping bounds refusal reifies");
+        expect_resource_error(&invalid_bounds, fs.invalid_bounds_id, &ids);
+
+        let right_not_held = reify_host_reply_v1(
+            ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Resource(
+                ken_host::ResourceErrorV1::RightNotHeld {
+                    required: ken_host::RightSet::WRITE.bits(),
+                    held: ken_host::RightSet::READ.bits(),
+                },
+            )),
+            None,
+            None,
+            &request,
+            fs.private_buffer_freeze_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("mapping right refusal reifies");
+        let payload = result_payload(&right_not_held, ids.err_id);
+        assert!(matches!(
+            payload,
+            EvalVal::Ctor { id, args, .. }
+                if *id == fs.right_not_held_id
+                    && args.as_slice()
+                        == [
+                            EvalVal::Int(i64::from(ken_host::RightSet::WRITE.bits())),
+                            EvalVal::Int(i64::from(ken_host::RightSet::READ.bits())),
+                        ]
+        ));
+
+        let revoked = reify_host_reply_v1(
+            ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(
+                ken_host::IoErrorIdentityV1::Revoked,
+            )),
+            None,
+            None,
+            &request,
+            fs.private_buffer_freeze_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("mapping lineage refusal reifies");
+        expect_resource_host_io(&revoked, ids.revoked_id, &ids, &fs);
+    }
+
     /// Promise class: normative compatibility vector for
     /// security/capabilities/revoked-path-operation-is-distinct-fileerror
     /// MEASURED: the real dispatcher denies a revoked live grant before the
