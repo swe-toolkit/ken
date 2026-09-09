@@ -54,6 +54,7 @@ struct BufferFreezeRequestV1 { uint64_t resource; uint64_t start; uint64_t lengt
 struct MappingAllocateRequestV1 { uint64_t length; uint8_t protection; };
 struct MappingReadViewRequestV1 { uint64_t resource; uint64_t start; uint64_t length; uint64_t span_origin; };
 struct MappingWriteViewRequestV1 { uint64_t resource; uint64_t start; struct SliceV1 bytes; uint64_t span_origin; };
+struct MappingAcquireFileRequestV1 { uint64_t resource; uint64_t length; uint8_t protection; };
 struct ResourceErrorReplyV1 {
     uint64_t schema_version;
     uint64_t resource_kind;
@@ -111,6 +112,7 @@ int main(void) {
     FACT_SIZE(MappingAllocateRequestV1); FACT_ALIGN(MappingAllocateRequestV1); FACT_OFFSET(MappingAllocateRequestV1, length); FACT_OFFSET(MappingAllocateRequestV1, protection);
     FACT_SIZE(MappingReadViewRequestV1); FACT_ALIGN(MappingReadViewRequestV1); FACT_OFFSET(MappingReadViewRequestV1, resource); FACT_OFFSET(MappingReadViewRequestV1, start); FACT_OFFSET(MappingReadViewRequestV1, length); FACT_OFFSET(MappingReadViewRequestV1, span_origin);
     FACT_SIZE(MappingWriteViewRequestV1); FACT_ALIGN(MappingWriteViewRequestV1); FACT_OFFSET(MappingWriteViewRequestV1, resource); FACT_OFFSET(MappingWriteViewRequestV1, start); FACT_OFFSET(MappingWriteViewRequestV1, bytes); FACT_OFFSET(MappingWriteViewRequestV1, span_origin);
+    FACT_SIZE(MappingAcquireFileRequestV1); FACT_ALIGN(MappingAcquireFileRequestV1); FACT_OFFSET(MappingAcquireFileRequestV1, resource); FACT_OFFSET(MappingAcquireFileRequestV1, length); FACT_OFFSET(MappingAcquireFileRequestV1, protection);
     FACT_SIZE(ResourceErrorReplyV1); FACT_ALIGN(ResourceErrorReplyV1); FACT_OFFSET(ResourceErrorReplyV1, schema_version); FACT_OFFSET(ResourceErrorReplyV1, resource_kind); FACT_OFFSET(ResourceErrorReplyV1, identity); FACT_OFFSET(ResourceErrorReplyV1, io); FACT_OFFSET(ResourceErrorReplyV1, required); FACT_OFFSET(ResourceErrorReplyV1, held); FACT_OFFSET(ResourceErrorReplyV1, expected_kind); FACT_OFFSET(ResourceErrorReplyV1, actual_kind);
     FACT_SIZE(HostReplyV1); FACT_ALIGN(HostReplyV1); FACT_OFFSET(HostReplyV1, tag); FACT_OFFSET(HostReplyV1, detail); FACT_OFFSET(HostReplyV1, bytes); FACT_OFFSET(HostReplyV1, resource_error); FACT_OFFSET(HostReplyV1, effective_request);
     return 0;

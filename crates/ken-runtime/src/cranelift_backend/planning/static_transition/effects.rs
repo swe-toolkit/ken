@@ -432,6 +432,7 @@ fn host_effect_seat_contract(
                 | Op::MappingAllocate
                 | Op::MappingReadView
                 | Op::MappingWriteView
+                | Op::MappingAcquireFile
                 | Op::ConsoleRead
                 | Op::ClockWallNow
                 | Op::ClockMonotonicNow
@@ -600,6 +601,7 @@ fn host_effect_seat_contract(
             | Op::MappingAllocate
             | Op::MappingReadView
             | Op::MappingWriteView
+            | Op::MappingAcquireFile
             | Op::EntropyRandomBytes,
             _,
         ) => None,

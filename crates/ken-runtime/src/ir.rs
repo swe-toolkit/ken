@@ -282,6 +282,8 @@ runtime_host_spine_v1! {
     file_operation_get_inheritance,
     file_operation_set_inheritance,
     file_operation_duplicate,
+    // ABI-S6 D4 appends without moving established positional identities.
+    resource_mapping_limit,
 }
 
 /// The decoded, validated checked-runtime role record.

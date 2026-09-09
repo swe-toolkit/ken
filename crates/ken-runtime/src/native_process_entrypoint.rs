@@ -83,6 +83,7 @@ pub struct NativeProcessSymbols {
     pub file_operation_get_inheritance: RuntimeSymbol,
     pub file_operation_set_inheritance: RuntimeSymbol,
     pub file_operation_duplicate: RuntimeSymbol,
+    pub resource_mapping_limit: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -176,6 +177,7 @@ impl NativeProcessSymbols {
             file_operation_set_inheritance: "ctor:prelude::FileOperation::OpSetInheritance"
                 .to_string(),
             file_operation_duplicate: "ctor:prelude::FileOperation::OpDuplicate".to_string(),
+            resource_mapping_limit: "ctor:prelude::ResourceError::MappingLimit".to_string(),
         }
     }
 }

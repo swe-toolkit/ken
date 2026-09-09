@@ -297,6 +297,11 @@ fn put_request(
             put_u64(out, *start);
             put_bytes(out, bytes)?;
         }
+        CanonicalRequestV1::MappingAcquireFile { length, protection } => {
+            put_u8(out, 34);
+            put_u64(out, *length);
+            put_mapping_protection(out, *protection);
+        }
     }
     Ok(())
 }
@@ -539,6 +544,7 @@ fn put_error(out: &mut Vec<u8>, error: &SemanticErrorV1) -> Result<(), EffectTra
                 ResourceErrorV1::InvalidBounds => put_u8(out, 7),
                 ResourceErrorV1::NoProgress => put_u8(out, 8),
                 ResourceErrorV1::AllocationFailed => put_u8(out, 9),
+                ResourceErrorV1::MappingLimit => put_u8(out, 10),
             }
         }
     }
@@ -858,6 +864,10 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
             start: cursor.u64()?,
             bytes: cursor.bytes()?,
         },
+        34 => CanonicalRequestV1::MappingAcquireFile {
+            length: cursor.u64()?,
+            protection: get_mapping_protection(cursor)?,
+        },
         _ => return Err(EffectTraceWireError),
     })
 }
@@ -1081,6 +1091,7 @@ fn get_error(cursor: &mut Cursor<'_>) -> Result<SemanticErrorV1, EffectTraceWire
             7 => ResourceErrorV1::InvalidBounds,
             8 => ResourceErrorV1::NoProgress,
             9 => ResourceErrorV1::AllocationFailed,
+            10 => ResourceErrorV1::MappingLimit,
             _ => return Err(EffectTraceWireError),
         }),
         _ => return Err(EffectTraceWireError),
@@ -1344,6 +1355,10 @@ mod tests {
                 start: 23,
                 bytes: b"mapping".to_vec(),
             },
+            CanonicalRequestV1::MappingAcquireFile {
+                length: 64,
+                protection: MappingProtectionV1::Writable,
+            },
         ];
         let mut encodings = Vec::new();
         for request in &requests {
@@ -1359,7 +1374,7 @@ mod tests {
         }
         assert_eq!(
             encodings.iter().map(|bytes| bytes[0]).collect::<Vec<_>>(),
-            vec![31, 31, 32, 33]
+            vec![31, 31, 32, 33, 34]
         );
         assert_eq!(encodings[0].last(), Some(&0));
         assert_eq!(encodings[1].last(), Some(&1));
@@ -1988,6 +2003,33 @@ mod tests {
             request: CanonicalRequestV1::BufferAllocate { capacity: u64::MAX },
             outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
                 ResourceErrorV1::AllocationFailed,
+            )),
+        });
+
+        let encoded = encode_linked_effect_trace(&expected).unwrap();
+        assert_eq!(decode_linked_effect_trace(&encoded), Ok(expected));
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the sole trace
+    /// codec round-trips file-backed Mapping acquisition with request tag 34 and
+    /// the append-only MappingLimit error identity. CLAIMED: D4's request and
+    /// governor refusal remain distinct from anonymous allocation and
+    /// AllocationFailed on the wire. THE GAP: raw C layout and dispatch behavior
+    /// are pinned independently.
+    #[test]
+    fn abi_s6_d4_file_acquire_and_mapping_limit_round_trip_typed_wire() {
+        let mut expected = representative_trace();
+        expected.effect_trace.push(EffectEvent {
+            sequence: 9,
+            operation: HostOpV1::MappingAcquireFile,
+            capability: None,
+            resource_bindings: Vec::new(),
+            request: CanonicalRequestV1::MappingAcquireFile {
+                length: 1024 * 1024 + 1,
+                protection: MappingProtectionV1::ReadOnly,
+            },
+            outcome: CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
+                ResourceErrorV1::MappingLimit,
             )),
         });
 
