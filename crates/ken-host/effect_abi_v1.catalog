@@ -6,6 +6,7 @@ lifetime|resource_observation_schema|1
 lifetime|resource_error_reply_schema|1
 limit|buffer.per_buffer_max_capacity|1048576
 limit|buffer.invocation_max_live_capacity|16777216
+limit|mapping.per_mapping_max_capacity|1048576
 tag|reply.unit|0
 tag|reply.bool|1
 tag|reply.bytes|2
@@ -25,6 +26,7 @@ error|resource.InvalidOffset|6
 error|resource.InvalidBounds|7
 error|resource.NoProgress|8
 error|resource.AllocationFailed|9
+error|resource.MappingLimit|10
 tag|resource_kind.FsHandle|0
 tag|resource_kind.Buffer|1
 tag|resource_kind.Mapping|2
@@ -92,3 +94,4 @@ operation|BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1
 operation|MappingAllocate|0404|unavailable|MappingAllocateRequestV1|2|HostReplyV1|1
 operation|MappingReadView|0405|unavailable|MappingReadViewRequestV1|4|HostReplyV1|1
 operation|MappingWriteView|0406|unavailable|MappingWriteViewRequestV1|4|HostReplyV1|1
+operation|MappingAcquireFile|0407|unavailable|MappingAcquireFileRequestV1|3|HostReplyV1|1

@@ -144,10 +144,12 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     FileOperationGetInheritance,
     FileOperationSetInheritance,
     FileOperationDuplicate,
+    /// ABI-S6 D4 appends the Mapping governor refusal role.
+    ResourceMappingLimit,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 49] = [
+    pub(super) const ALL: [Self; 50] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -197,6 +199,7 @@ impl SynthesizedFixedConstructorRole {
         Self::FileOperationGetInheritance,
         Self::FileOperationSetInheritance,
         Self::FileOperationDuplicate,
+        Self::ResourceMappingLimit,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -250,6 +253,7 @@ impl SynthesizedFixedConstructorRole {
             Self::FileOperationGetInheritance => &symbols.file_operation_get_inheritance,
             Self::FileOperationSetInheritance => &symbols.file_operation_set_inheritance,
             Self::FileOperationDuplicate => &symbols.file_operation_duplicate,
+            Self::ResourceMappingLimit => &symbols.resource_mapping_limit,
         }
     }
 }

@@ -623,7 +623,8 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::BufferFreeze
         | ken_host::HostOpV1::MappingAllocate
         | ken_host::HostOpV1::MappingReadView
-        | ken_host::HostOpV1::MappingWriteView => HostOpFamilyV1::Fs,
+        | ken_host::HostOpV1::MappingWriteView
+        | ken_host::HostOpV1::MappingAcquireFile => HostOpFamilyV1::Fs,
     }
 }
 
@@ -706,6 +707,7 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::MappingAllocate => "MappingAllocate",
         ken_host::HostOpV1::MappingReadView => "MappingReadView",
         ken_host::HostOpV1::MappingWriteView => "MappingWriteView",
+        ken_host::HostOpV1::MappingAcquireFile => "MappingAcquireFile",
     }
 }
 
@@ -1820,5 +1822,34 @@ proc second (_value : Unit)
                 Err(ExportError::NonClosedPerformInventory { .. })
             ));
         }
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: D4's new
+    /// operation has its exact append-only spelling and remains in the existing
+    /// FSOp/FS family. CLAIMED: file-backed acquisition adds neither a Mapping
+    /// family nor a checked producer. THE GAP: host availability and runtime
+    /// no-seat classification independently keep the operation non-native.
+    #[test]
+    fn abi_s6_d4_file_acquire_has_exact_fs_family_and_spelling() {
+        let operation = ken_host::HostOpV1::MappingAcquireFile;
+        assert_eq!(host_operation_family(operation), ("FSOp", "FS"));
+        assert_eq!(
+            canonical_host_perform_signature_v1(operation),
+            "MappingAcquireFile"
+        );
+        assert_eq!(
+            canonical_perform_node_signature_v1(&PerformNodeSignatureV1::Host {
+                family_symbol: "FSOp".to_string(),
+                operation,
+            }),
+            Ok("MappingAcquireFile".to_string())
+        );
+        assert!(matches!(
+            canonical_perform_node_signature_v1(&PerformNodeSignatureV1::Host {
+                family_symbol: "MappingOp".to_string(),
+                operation,
+            }),
+            Err(ExportError::NonClosedPerformInventory { .. })
+        ));
     }
 }

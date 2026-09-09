@@ -4254,6 +4254,7 @@ pub struct FSIds {
     pub invalid_offset_id: GlobalId,
     pub invalid_bounds_id: GlobalId,
     pub no_progress_id: GlobalId,
+    pub mapping_limit_id: GlobalId,
     pub private_buffer_span_id: GlobalId,
     pub private_transfer_count_id: GlobalId,
     pub read_some_id: GlobalId,
@@ -4331,6 +4332,7 @@ impl FSIds {
             invalid_offset_id: get("InvalidOffset")?,
             invalid_bounds_id: get("InvalidBounds")?,
             no_progress_id: get("NoProgress")?,
+            mapping_limit_id: get("MappingLimit")?,
             private_buffer_span_id: elab.env.inductive(get("BufferSpan")?)?.constructors[0].id,
             private_transfer_count_id: elab.env.inductive(get("TransferCount")?)?.constructors[0]
                 .id,
@@ -5110,6 +5112,7 @@ fn resource_error_value_v1(
         ken_host::ResourceErrorV1::InvalidOffset => make_ctor(fs.invalid_offset_id, vec![], store),
         ken_host::ResourceErrorV1::InvalidBounds => make_ctor(fs.invalid_bounds_id, vec![], store),
         ken_host::ResourceErrorV1::NoProgress => make_ctor(fs.no_progress_id, vec![], store),
+        ken_host::ResourceErrorV1::MappingLimit => make_ctor(fs.mapping_limit_id, vec![], store),
     }
 }
 
@@ -6719,6 +6722,7 @@ mod px5b_effect_observation_tests {
             invalid_offset_id: id(),
             invalid_bounds_id: id(),
             no_progress_id: id(),
+            mapping_limit_id: id(),
             private_buffer_span_id: id(),
             private_transfer_count_id: id(),
             read_some_id: id(),
@@ -7300,7 +7304,7 @@ mod px5b_effect_observation_tests {
         let mut store = EvalStore::new();
         let mut host = CaptureHost::new(Vec::new());
         let mut resources = ken_host::ResourceTableV1::with_buffer_limits(
-            ken_host::BufferLimitsV1::new(u64::MAX, u64::MAX).unwrap(),
+            ken_host::BufferLimitsV1::new(u64::MAX, u64::MAX, u64::MAX).unwrap(),
         );
         let mut revocation = ken_host::RevocationDomain::default();
 
@@ -7321,7 +7325,7 @@ mod px5b_effect_observation_tests {
         expect_resource_error(&result, fs.allocation_failed_id, &ids);
 
         let mut policy_rejected = ken_host::ResourceTableV1::with_buffer_limits(
-            ken_host::BufferLimitsV1::new(1, 1).unwrap(),
+            ken_host::BufferLimitsV1::new(1, 1, 1).unwrap(),
         );
         let result = run_fs(
             fs.private_buffer_allocate_id,
@@ -7341,6 +7345,29 @@ mod px5b_effect_observation_tests {
             fs.allocation_failed_id, fs.buffer_limit_id,
             "the named semantic ResourceError.AllocationFailed identity exercises neither numeric mapping and neither proves nor infers emitter/planner alternative 7 or ABI code 9"
         );
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the interpreter
+    /// maps MappingLimit to its append-only prelude constructor, distinct from
+    /// BufferLimit and AllocationFailed. CLAIMED: represented D4 refusals keep
+    /// their typed ResourceError identity through the interpreter boundary. THE
+    /// GAP: the file-mapping operation has no checked Ken producer in D4, so the
+    /// host dispatch and trace codec independently pin reachability and encoding.
+    #[test]
+    fn mapping_limit_reifies_the_distinct_checked_resource_error() {
+        let ids = console_ids();
+        let fs = fs_ids();
+        let mut store = EvalStore::new();
+        let value = resource_error_value_v1(
+            ken_host::ResourceErrorV1::MappingLimit,
+            &fs,
+            &ids,
+            &mut store,
+        );
+        assert!(matches!(value, EvalVal::Ctor { id, ref args, .. }
+            if id == fs.mapping_limit_id && args.is_empty()));
+        assert_ne!(fs.mapping_limit_id, fs.buffer_limit_id);
+        assert_ne!(fs.mapping_limit_id, fs.allocation_failed_id);
     }
 
     fn with_positioned_write_fixture(

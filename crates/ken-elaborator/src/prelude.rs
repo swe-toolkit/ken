@@ -207,6 +207,8 @@ canonical_runtime_roles! {
     prod => "MkProd",
     exit_success => "Success",
     exit_failure => "Failure",
+    // ABI-S6 D4 appends the mapping-governor refusal without moving roles.
+    resource_mapping_limit => "MappingLimit",
 }
 
 /// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction. `GlobalId(0)`
@@ -1833,7 +1835,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         ));
     }
     elab.elaborate_decl(
-        "data ResourceError = ResourceHostIO IOError | Closed | MalformedResource | RightNotHeld Int Int | ReleaseFailed ResourceKind ResourceTraceIdentity IOError | ResourceKindMismatch ResourceKind ResourceKind | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress",
+        "data ResourceError = ResourceHostIO IOError | Closed | MalformedResource | RightNotHeld Int Int | ReleaseFailed ResourceKind ResourceTraceIdentity IOError | ResourceKindMismatch ResourceKind ResourceKind | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress | MappingLimit",
     )
     .map_err(|e| ElabError::Internal(format!("prelude ResourceError failed: {e}")))?;
     let resource_host_io_id = elab
@@ -2303,7 +2305,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
            AllocationFailed |-> Ok o (ResourceBracketResult e r) (ResourceBracketReleaseError e r AllocationFailed); \
            InvalidOffset |-> Ok o (ResourceBracketResult e r) (ResourceBracketReleaseError e r InvalidOffset); \
            InvalidBounds |-> Ok o (ResourceBracketResult e r) (ResourceBracketReleaseError e r InvalidBounds); \
-           NoProgress |-> Ok o (ResourceBracketResult e r) (ResourceBracketReleaseError e r NoProgress) \
+           NoProgress |-> Ok o (ResourceBracketResult e r) (ResourceBracketReleaseError e r NoProgress); \
+           MappingLimit |-> Ok o (ResourceBracketResult e r) (ResourceBracketReleaseError e r MappingLimit) \
          }",
     )
     .map_err(|e| {
@@ -2324,7 +2327,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
            AllocationFailed |-> Ok o (ResourceBracketResult e r) (ResourceBracketBodyAndReleaseError e r body_error AllocationFailed); \
            InvalidOffset |-> Ok o (ResourceBracketResult e r) (ResourceBracketBodyAndReleaseError e r body_error InvalidOffset); \
            InvalidBounds |-> Ok o (ResourceBracketResult e r) (ResourceBracketBodyAndReleaseError e r body_error InvalidBounds); \
-           NoProgress |-> Ok o (ResourceBracketResult e r) (ResourceBracketBodyAndReleaseError e r body_error NoProgress) \
+           NoProgress |-> Ok o (ResourceBracketResult e r) (ResourceBracketBodyAndReleaseError e r body_error NoProgress); \
+           MappingLimit |-> Ok o (ResourceBracketResult e r) (ResourceBracketBodyAndReleaseError e r body_error MappingLimit) \
          }",
     )
     .map_err(|e| {
