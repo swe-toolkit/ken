@@ -2134,7 +2134,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpSetLength |-> host_exit AFull (Failure 199) ;
                     OpSync |-> host_exit AFull (Failure 199) ;
                     OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199)
+                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok entries |-> match entries {
@@ -2205,7 +2206,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpSetLength |-> host_exit AFull (Failure 199) ;
                     OpSync |-> host_exit AFull (Failure 199) ;
                     OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199)
+                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull Success
@@ -2263,7 +2265,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpSetLength |-> host_exit AFull (Failure 199) ;
                     OpSync |-> host_exit AFull (Failure 199) ;
                     OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199)
+                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull Success
@@ -2322,7 +2325,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     OpSetLength |-> host_exit AFull (Failure 199) ;
                     OpSync |-> host_exit AFull (Failure 199) ;
                     OpGetInheritance |-> host_exit AFull (Failure 199) ;
-                    OpSetInheritance |-> host_exit AFull (Failure 199)
+                    OpSetInheritance |-> host_exit AFull (Failure 199) ;
+                    OpDuplicate |-> host_exit AFull (Failure 199)
                   }
                 } ;
                 Ok _ |-> host_exit AFull Success

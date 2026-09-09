@@ -4281,6 +4281,7 @@ pub struct FSIds {
     pub op_sync_id: GlobalId,
     pub op_get_inheritance_id: GlobalId,
     pub op_set_inheritance_id: GlobalId,
+    pub op_duplicate_id: GlobalId,
     pub mk_file_metadata_id: GlobalId,
     pub mk_dir_entry_id: GlobalId,
     pub k_file_id: GlobalId,
@@ -4357,6 +4358,7 @@ impl FSIds {
             op_sync_id: get("OpSync")?,
             op_get_inheritance_id: get("OpGetInheritance")?,
             op_set_inheritance_id: get("OpSetInheritance")?,
+            op_duplicate_id: get("OpDuplicate")?,
             mk_file_metadata_id: get("MkFileMetadata")?,
             mk_dir_entry_id: get("MkDirEntry")?,
             k_file_id: get("KFile")?,
@@ -4660,6 +4662,7 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                     FsOpKind::SetInheritance => {
                         ken_host::FsCapabilityOperationV1::SetInheritance
                     }
+                    FsOpKind::Duplicate => ken_host::FsCapabilityOperationV1::Duplicate,
                 },
                 held_rights,
             }
@@ -4696,6 +4699,7 @@ fn from_denial_v1(error: &ken_host::CapabilityDeniedV1) -> CapabilityDenied {
                 ken_host::FsCapabilityOperationV1::Sync => FsOpKind::Sync,
                 ken_host::FsCapabilityOperationV1::GetInheritance => FsOpKind::GetInheritance,
                 ken_host::FsCapabilityOperationV1::SetInheritance => FsOpKind::SetInheritance,
+                ken_host::FsCapabilityOperationV1::Duplicate => FsOpKind::Duplicate,
             },
             held_rights: *held_rights,
         },
@@ -6740,6 +6744,7 @@ mod px5b_effect_observation_tests {
             op_sync_id: id(),
             op_get_inheritance_id: id(),
             op_set_inheritance_id: id(),
+            op_duplicate_id: id(),
             nil_id: id(),
             cons_id: id(),
             mk_file_metadata_id: id(),

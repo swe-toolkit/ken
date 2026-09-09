@@ -617,6 +617,7 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::FsSync
         | ken_host::HostOpV1::FsGetInheritance
         | ken_host::HostOpV1::FsSetInheritance
+        | ken_host::HostOpV1::FsDuplicate
         | ken_host::HostOpV1::ResourceRelease
         | ken_host::HostOpV1::BufferAllocate
         | ken_host::HostOpV1::BufferFreeze => HostOpFamilyV1::Fs,
@@ -695,6 +696,7 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::FsSync => "FsSync",
         ken_host::HostOpV1::FsGetInheritance => "FsGetInheritance",
         ken_host::HostOpV1::FsSetInheritance => "FsSetInheritance",
+        ken_host::HostOpV1::FsDuplicate => "FsDuplicate",
         ken_host::HostOpV1::ResourceRelease => "ResourceRelease",
         ken_host::HostOpV1::BufferAllocate => "BufferAllocate",
         ken_host::HostOpV1::BufferFreeze => "BufferFreeze",

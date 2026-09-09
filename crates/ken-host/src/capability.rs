@@ -274,6 +274,7 @@ pub enum FsCapabilityOperation {
     Sync,
     GetInheritance,
     SetInheritance,
+    Duplicate,
 }
 
 impl FsCapabilityOperation {
@@ -290,7 +291,7 @@ impl FsCapabilityOperation {
             Self::Seek => RightSet::READ,
             Self::SetLength | Self::Sync => RightSet::WRITE,
             Self::GetInheritance => RightSet::READ,
-            Self::SetInheritance => RightSet::CHANGE_MODE,
+            Self::SetInheritance | Self::Duplicate => RightSet::CHANGE_MODE,
         }
     }
     pub const fn resolves_parent(self) -> bool {

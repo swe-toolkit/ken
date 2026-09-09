@@ -262,6 +262,10 @@ fn put_request(
             put_u8(out, 29);
             put_u8(out, inheritance_policy_tag(*policy));
         }
+        CanonicalRequestV1::FsDuplicate { policy } => {
+            put_u8(out, 30);
+            put_u8(out, inheritance_policy_tag(*policy));
+        }
         CanonicalRequestV1::BufferAllocate { capacity } => {
             put_u8(out, 20);
             put_u64(out, *capacity);
@@ -430,6 +434,7 @@ fn fs_operation_tag(operation: FsCapabilityOperationV1) -> u8 {
         FsCapabilityOperationV1::Sync => 13,
         FsCapabilityOperationV1::GetInheritance => 14,
         FsCapabilityOperationV1::SetInheritance => 15,
+        FsCapabilityOperationV1::Duplicate => 16,
     }
 }
 
@@ -799,6 +804,9 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
         29 => CanonicalRequestV1::FsSetInheritance {
             policy: get_inheritance_policy(cursor)?,
         },
+        30 => CanonicalRequestV1::FsDuplicate {
+            policy: get_inheritance_policy(cursor)?,
+        },
         20 => CanonicalRequestV1::BufferAllocate {
             capacity: cursor.u64()?,
         },
@@ -973,6 +981,7 @@ fn get_fs_operation(
         13 => Ok(FsCapabilityOperationV1::Sync),
         14 => Ok(FsCapabilityOperationV1::GetInheritance),
         15 => Ok(FsCapabilityOperationV1::SetInheritance),
+        16 => Ok(FsCapabilityOperationV1::Duplicate),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -1528,6 +1537,85 @@ mod tests {
                 position: 0,
             };
             assert_eq!(get_reply(&mut cursor), Err(EffectTraceWireError));
+        }
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: both frozen
+    /// policies round-trip through the distinct duplicate request tag, the
+    /// operation keeps its independent PX9 and right identities, and unknown
+    /// or truncated policy payloads fail closed. CLAIMED: ABI-S1 D5 reuses the
+    /// D4 policy without defaulting or tag conflation. THE GAP: descriptor and
+    /// resource-table behavior are exercised by the dispatcher discriminator.
+    #[test]
+    fn abi_s1_duplicate_wire_is_typed_distinct_and_fail_closed() {
+        for (policy, bytes) in [
+            (FdInheritancePolicyV1::Inherit, [30, 0]),
+            (FdInheritancePolicyV1::CloseOnExec, [30, 1]),
+        ] {
+            let request = CanonicalRequestV1::FsDuplicate { policy };
+            let mut encoded = Vec::new();
+            put_request(&mut encoded, &request).unwrap();
+            assert_eq!(encoded, bytes);
+            let mut cursor = Cursor {
+                bytes: &encoded,
+                position: 0,
+            };
+            assert_eq!(get_request(&mut cursor).unwrap(), request);
+            assert_eq!(cursor.position, encoded.len());
+        }
+
+        let denial = CapabilityDeniedV1::RightNotHeld {
+            operation: FsCapabilityOperationV1::Duplicate,
+            held_rights: 0x55,
+        };
+        let mut encoded = Vec::new();
+        put_denial(&mut encoded, &denial);
+        assert_eq!(encoded, [0, 16, 0x55]);
+        let mut cursor = Cursor {
+            bytes: &encoded,
+            position: 0,
+        };
+        assert_eq!(get_denial(&mut cursor).unwrap(), denial);
+        assert_eq!(cursor.position, encoded.len());
+
+        let file_error = SemanticErrorV1::File(FileErrorIdentityV1 {
+            operation: HostOpV1::FsDuplicate,
+            relative_path: Vec::new(),
+            cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(79)),
+        });
+        let mut encoded = Vec::new();
+        put_error(&mut encoded, &file_error).unwrap();
+        let mut cursor = Cursor {
+            bytes: &encoded,
+            position: 0,
+        };
+        assert_eq!(get_error(&mut cursor).unwrap(), file_error);
+        assert_eq!(cursor.position, encoded.len());
+
+        let acquired = CanonicalReplyV1::ResourceAcquired {
+            schema_version: 1,
+            resource_kind: ResourceKindV1::FsHandle,
+            identity: ResourceTraceIdentityV1(31),
+        };
+        let mut encoded = Vec::new();
+        put_reply(&mut encoded, &acquired).unwrap();
+        assert_eq!(
+            encoded[0], 8,
+            "duplicate reuses ResourceAcquired reply wire"
+        );
+        let mut cursor = Cursor {
+            bytes: &encoded,
+            position: 0,
+        };
+        assert_eq!(get_reply(&mut cursor).unwrap(), acquired);
+        assert_eq!(cursor.position, encoded.len());
+
+        for malformed in [&[30, 2][..], &[30][..]] {
+            let mut cursor = Cursor {
+                bytes: malformed,
+                position: 0,
+            };
+            assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
         }
     }
 

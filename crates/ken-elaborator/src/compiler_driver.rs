@@ -2787,6 +2787,7 @@ fn complete_native_program_preparation(
                 file_operation_set_inheritance: host_spine
                     .file_operation_set_inheritance
                     .to_string(),
+                file_operation_duplicate: host_spine.file_operation_duplicate.to_string(),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3705,6 +3706,7 @@ fn checked_host_spine_v1(
         file_operation_sync: resolve_id(roles.file_operation_sync)?,
         file_operation_get_inheritance: resolve_id(roles.file_operation_get_inheritance)?,
         file_operation_set_inheritance: resolve_id(roles.file_operation_set_inheritance)?,
+        file_operation_duplicate: resolve_id(roles.file_operation_duplicate)?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -3957,6 +3959,7 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_operation_sync,
         &spine.file_operation_get_inheritance,
         &spine.file_operation_set_inheritance,
+        &spine.file_operation_duplicate,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -7059,6 +7062,10 @@ mod d1b_role_c1_roster_identity {
             (
                 "file_operation_set_inheritance",
                 record.spine.file_operation_set_inheritance.clone(),
+            ),
+            (
+                "file_operation_duplicate",
+                record.spine.file_operation_duplicate.clone(),
             ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             ("io_error_permission_denied", record.spine.io_errors[1].clone()),

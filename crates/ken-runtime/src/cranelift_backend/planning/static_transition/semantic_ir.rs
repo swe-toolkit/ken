@@ -143,10 +143,11 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     FileOperationSync,
     FileOperationGetInheritance,
     FileOperationSetInheritance,
+    FileOperationDuplicate,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 48] = [
+    pub(super) const ALL: [Self; 49] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -195,6 +196,7 @@ impl SynthesizedFixedConstructorRole {
         Self::FileOperationSync,
         Self::FileOperationGetInheritance,
         Self::FileOperationSetInheritance,
+        Self::FileOperationDuplicate,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -247,6 +249,7 @@ impl SynthesizedFixedConstructorRole {
             Self::FileOperationSync => &symbols.file_operation_sync,
             Self::FileOperationGetInheritance => &symbols.file_operation_get_inheritance,
             Self::FileOperationSetInheritance => &symbols.file_operation_set_inheritance,
+            Self::FileOperationDuplicate => &symbols.file_operation_duplicate,
         }
     }
 }

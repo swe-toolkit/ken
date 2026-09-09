@@ -427,6 +427,20 @@ mod linux {
         rustix::io::fcntl_setfd(&handle.0, flags).map_err(io::Error::from)
     }
 
+    pub(super) fn resource_duplicate(
+        handle: &ResourceHandle,
+        policy: FdInheritancePolicyV1,
+    ) -> io::Result<ResourceHandle> {
+        let duplicated = match policy {
+            // rustix 1.1 exposes `dup` as the safe Linux operation with the
+            // same min-zero allocation and no-CLOEXEC semantics.
+            FdInheritancePolicyV1::Inherit => rustix::io::dup(&handle.0),
+            FdInheritancePolicyV1::CloseOnExec => rustix::io::fcntl_dupfd_cloexec(&handle.0, 0),
+        }
+        .map_err(io::Error::from)?;
+        Ok(ResourceHandle(duplicated))
+    }
+
     pub(super) fn read(handle: &Handle) -> io::Result<Vec<u8>> {
         let mut file = file(handle)?;
         file.seek(SeekFrom::Start(0))?;
@@ -993,6 +1007,24 @@ pub fn resource_set_inheritance_v1(
     #[cfg(target_os = "linux")]
     {
         linux::resource_set_inheritance(&handle.inner, policy).map_err(Into::into)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (handle, policy);
+        unsupported()
+    }
+}
+
+pub fn resource_duplicate_v1(
+    handle: &ResourceHandleV1,
+    policy: FdInheritancePolicyV1,
+) -> HostResult<ResourceHandleV1> {
+    assert_current_target_abi()?;
+    #[cfg(target_os = "linux")]
+    {
+        linux::resource_duplicate(&handle.inner, policy)
+            .map(|inner| ResourceHandleV1 { inner })
+            .map_err(Into::into)
     }
     #[cfg(not(target_os = "linux"))]
     {

@@ -281,6 +281,7 @@ runtime_host_spine_v1! {
     file_operation_sync,
     file_operation_get_inheritance,
     file_operation_set_inheritance,
+    file_operation_duplicate,
 }
 
 /// The decoded, validated checked-runtime role record.
