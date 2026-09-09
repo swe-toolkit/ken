@@ -1,7 +1,7 @@
 ---
 id: RT-PARITY-NATIVE-GOLDEN-REBASELINE
 title: "Re-baseline the two base-red rt_parity_native checked_ih sentinels (drop-capture absolute StaticOriginId + admission-population-is-total set) so the native-slow CI job goes green, preferring relationship/cardinality assertions over brittle absolute ids"
-status: draft
+status: active
 owner: runtime
 size: S
 gate: none
@@ -12,11 +12,16 @@ github: null
 origin: "Steward-filed 2026-09-08, operator (Pat) concurred (\"concur with rt_parity_native re-baseline as a small queued node\"). Surfaced during the RT-NESTED-IH-NATIVE-REALIZATION admin-merge (PR #3422, squash 6172f95a7): the native-slow CI job was base-red on two rt_parity_native checked_ih_* tests, ruled OUT-OF-SCOPE candidate-neutral base-red drift by the Architect (evt_3hk4sfm7emxk7) and admin-merged past (Steward evt_6fr6v5rg3k726, PX9-INC2B precedent). This node is the golden refresh that clears the inherited red — NOT a soundness re-open of anything."
 ---
 
-> # QUEUED, not released. Small golden refresh, not a soundness change.
+> # RELEASED 2026-09-09 (operator priority) — restores the CI signal.
 >
-> This is a test-golden re-baseline. It queues behind the active lanes
-> (`steward.md` §1: filings queue behind the lanes). It does NOT gate the
-> RT-NESTED-IH chain (already landed) and touches no production code.
+> Operator (Pat), 2026-09-09, ruled "Release now, priority" after the base-red
+> `rt_parity_native` cluster left CI's aggregate permanently red since ~2026-09-07
+> (every PR merged via per-SHA admin-merge-past). This node is the golden refresh
+> that clears the inherited red and removes the merge-past bypass. Steward flipped
+> `draft` -> `active` and released to the runtime ring; it is the runtime lane's
+> top-priority-next WP (does NOT interrupt the in-flight ABI-S6 D3 T1 build —
+> taken at D3's next seam, or interleaved if the ring can). Still a test-golden
+> re-baseline: no production code, does NOT gate the RT-NESTED-IH chain (landed).
 
 ## The two base-red tests
 
