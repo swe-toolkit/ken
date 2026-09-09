@@ -34,6 +34,8 @@ theorem write_all_preserves_first_error
         (Err ResourceError Unit error) =
   proof first_error for write_all_first_error error
 
-theorem write_all_all_success (fuel : Nat) : Equal Bool (write_all_all_success fuel) True =
+theorem write_all_all_success_holds
+      (fuel : Nat)
+    : Equal Bool (write_all_all_success fuel) True =
   proof all_success for write_all_all_success fuel
 ```

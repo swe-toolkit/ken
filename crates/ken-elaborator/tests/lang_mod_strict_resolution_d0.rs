@@ -718,6 +718,32 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // The standalone theorem no longer shadows its native-prelude
+            // subject, so the ordinary package boundary loads. The remaining
+            // vector is the exact compiler-native proof vocabulary it uses.
+            "Capability.System.IO".to_string(),
+            [
+                "BufferSpan",
+                "Equal",
+                "ResourceError",
+                "TransferCount",
+                "Unit",
+                "write_all_all_success",
+                "write_all_all_success::all_success",
+                "write_all_call_bound",
+                "write_all_call_bound::termination",
+                "write_all_complete",
+                "write_all_complete::success_complete",
+                "write_all_exact_prefix_prop",
+                "write_all_exact_prefix_prop::exact_prefix",
+                "write_all_first_error",
+                "write_all_first_error::first_error",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Capability.System.Resource".to_string(),
             [
                 "ResourceBodyErr",
@@ -1078,7 +1104,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.CommandLine.ArgParse",
         "Application.Configuration.Decoder",
         "Application.Input.Schema",
-        "Capability.System.IO",
         "Data.Collections.Map",
         "Data.Serialization.Json",
     ]
