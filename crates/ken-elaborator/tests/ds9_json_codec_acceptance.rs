@@ -12,60 +12,63 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const JSON_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Serialization/Json.ken.md");
+const JSON_MODULE: &str = "Data.Serialization.Json";
+const JSON_PUBLIC_IMPORT: &str = r#"
+import Data.Serialization.Json
+  (Json,
+    JsonNull,
+    JsonBool,
+    JsonNumber,
+    JsonString,
+    JsonArray,
+    JsonObject,
+    char_cursor_ops,
+    char_cursor_peek_has_remaining,
+    char_cursor_advance_progress,
+    char_cursor_end_valid,
+    char_cursor_laws)
+"#;
+const CURSOR_PUBLIC_IMPORT: &str = r#"
+import Capability.Parsing.Cursor
+  (CursorAdvanceProgress,
+    CursorEndValid,
+    CursorLaws,
+    CursorPeekHasRemaining,
+    cursor_advance,
+    cursor_locate,
+    cursor_peek,
+    cursor_remaining)
+"#;
 
-fn dependency_env() -> ElabEnv {
-    let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_importing_fixture(&mut env, "length");
-    catalog_or::assert_derived_fixture_retains_lawfulclasses(&mut env);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
-        .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
-        .expect("Data.Numeric.Nat.Order must load as a qualified module");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
-        .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let lawful_prefix = "Core.Classes.LawfulClasses.";
-    let lawful_aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(lawful_prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(lawful_aliases);
-    // Preserve the provider records while preventing a dependency's selective
-    // import from laundering Json's own import at the next raw-source boundary.
-    let json_import_boundary = env.module_state.clone();
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
-        .expect("Capability.Diagnostics.Core dependency must roots-load");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
-        .expect("Capability.Parsing.Cursor dependency must roots-load");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Cursor");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
-        .expect("Capability.Parsing.Decoder dependency must roots-load");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
-    env.module_state = json_import_boundary;
+fn json_env() -> (ElabEnv, BTreeSet<GlobalId>) {
+    let mut env = ElabEnv::new().expect("base environment");
+    for provider in ["Data.Collections.Derived", "Capability.Parsing.Cursor"] {
+        env.elaborate_module_from_roots(&[catalog_or::catalog_root()], provider)
+            .unwrap_or_else(|error| panic!("Json provider {provider} must roots-load: {error:?}"));
+    }
+    let trusted_before = env.env.trusted_base().into_iter().collect();
     assert!(
         !env.globals.contains_key("length"),
-        "DS9 must withhold the flat length alias so Json's selective import is load-bearing"
+        "Json's Derived import must supply length rather than an ambient alias"
     );
-    env
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], JSON_MODULE)
+        .expect("Data.Serialization.Json must roots-load through declared imports");
+    (env, trusted_before)
 }
 
-#[test]
-fn derived_fixture_retains_lawfulclasses_for_ds9_dependency_closure() {
-    let _ = dependency_env();
+fn global_id(env: &ElabEnv, name: &str) -> GlobalId {
+    env.globals
+        .get(name)
+        .copied()
+        .or_else(|| env.globals.get(&format!("{JSON_MODULE}.{name}")).copied())
+        .unwrap_or_else(|| panic!("missing `{name}` global"))
 }
 
 fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
-    let expected = env.globals[name];
+    let expected = global_id(env, name);
     match value {
         EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
         other => panic!("expected `{name}`, got {other:?}"),
@@ -73,10 +76,7 @@ fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal]
 }
 
 fn assert_transparent_global(env: &ElabEnv, name: &str) {
-    let id = *env
-        .globals
-        .get(name)
-        .unwrap_or_else(|| panic!("missing `{name}` global"));
+    let id = global_id(env, name);
     assert!(
         matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
         "`{name}` must be a real transparent, kernel-checked global"
@@ -197,10 +197,7 @@ fn json_and_all_six_constructors_are_real_globals() {
     // complete field telescope are public. In particular, checking the field
     // terms prevents a non-recursive `List Bool` from masquerading as the
     // required `List Json` array carrier.
-    let mut env = dependency_env();
-    let trusted_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(JSON_KEN_MD)
-        .expect("Data/Serialization/Json.ken.md must elaborate");
+    let (mut env, trusted_before) = json_env();
     let trusted_after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let new_trust_names: BTreeSet<_> = trusted_after
         .difference(&trusted_before)
@@ -215,7 +212,7 @@ fn json_and_all_six_constructors_are_real_globals() {
          trusted declarations, got {new_trust_names:?}"
     );
 
-    let json_id = *env.globals.get("Json").expect("missing `Json` global");
+    let json_id = global_id(&env, "Json");
     let declaration = env
         .env
         .inductive(json_id)
@@ -260,10 +257,7 @@ fn json_and_all_six_constructors_are_real_globals() {
     .into_iter()
     .enumerate()
     {
-        let constructor_id = *env
-            .globals
-            .get(name)
-            .unwrap_or_else(|| panic!("missing `{name}` constructor global"));
+        let constructor_id = global_id(&env, name);
         let (owner, actual_index) = env
             .env
             .constructor(constructor_id)
@@ -283,12 +277,7 @@ fn json_and_all_six_constructors_are_real_globals() {
     // transparent checked terms. A proof replaced by `Axiom` changes the
     // trusted-base set above; an unresolved hole prevents package elaboration.
     for name in [
-        "char_cursor_remaining",
-        "char_cursor_peek",
-        "char_cursor_advance",
-        "char_cursor_locate",
         "char_cursor_ops",
-        "char_cursor_lt_suc",
         "char_cursor_peek_has_remaining",
         "char_cursor_advance_progress",
         "char_cursor_end_valid",
@@ -296,9 +285,19 @@ fn json_and_all_six_constructors_are_real_globals() {
     ] {
         assert_transparent_global(&env, name);
     }
+    for name in [
+        "char_cursor_remaining",
+        "char_cursor_peek",
+        "char_cursor_advance",
+        "char_cursor_locate",
+        "char_cursor_lt_suc",
+    ] {
+        assert_transparent_global(&env, name);
+    }
 
-    // Durable invariant. MEASURED: after the fixture withholds the flat alias,
-    // the real Json source elaborates `char_cursor_remaining` as a transparent
+    // Durable invariant. MEASURED: the base environment supplies no flat alias,
+    // and the roots-loaded Json source elaborates `char_cursor_remaining` as a
+    // transparent
     // wrapper whose complete application spine is headed by the exact canonical
     // Derived `length` identity at the provider's declaration-derived arity.
     // CLAIMED: the shipped Json cursor uses that selective import rather than
@@ -309,7 +308,7 @@ fn json_and_all_six_constructors_are_real_globals() {
     assert!(
         transparent_body_is_saturated_provider_application(
             &env,
-            env.globals["char_cursor_remaining"],
+            env.globals[&format!("{JSON_MODULE}.char_cursor_remaining")],
             length,
         ),
         "Json char_cursor_remaining must be headed by a saturated application of the \
@@ -332,15 +331,16 @@ fn json_and_all_six_constructors_are_real_globals() {
              : CursorLaws (List Char) Char Nat char_cursor_ops =
            char_cursor_laws"#,
     ] {
-        env.elaborate_decl(declaration)
-            .unwrap_or_else(|error| panic!("cursor acceptance probe must elaborate: {error:?}"));
+        env.elaborate_file(&format!(
+            "{JSON_PUBLIC_IMPORT}\n{CURSOR_PUBLIC_IMPORT}\n{declaration}"
+        ))
+        .unwrap_or_else(|error| panic!("cursor acceptance probe must elaborate: {error:?}"));
     }
 
     // Durable invariant (AC-2): exercise the actual dictionary on non-empty
     // and empty input. These probes call the generic selectors, not the
     // implementation helpers directly.
-    env.elaborate_file(
-        r#"
+    let cursor_behavior_source = r#"
         const ds9_cursor_input : List Char =
           Cons Char (65 : Int) (Cons Char (66 : Int) (Nil Char))
         const ds9_cursor_remaining_result : Nat =
@@ -360,8 +360,10 @@ fn json_and_all_six_constructors_are_real_globals() {
           cursor_peek (List Char) Char Nat char_cursor_ops ds9_cursor_empty
         const ds9_cursor_empty_advance_result : List Char =
           cursor_advance (List Char) Char Nat char_cursor_ops ds9_cursor_empty
-        "#,
-    )
+        "#;
+    env.elaborate_file(&format!(
+        "{JSON_PUBLIC_IMPORT}\n{CURSOR_PUBLIC_IMPORT}\n{cursor_behavior_source}"
+    ))
     .expect("cursor behavior fixtures must elaborate");
 
     let mut store = make_store(&env);
@@ -424,16 +426,16 @@ fn json_and_all_six_constructors_are_real_globals() {
 
 #[test]
 fn decoder_recursive_reaches_array_and_object_many_branches() {
-    let mut env = dependency_env();
-    env.elaborate_ken_md_file(JSON_KEN_MD)
-        .expect("Data/Serialization/Json.ken.md must elaborate");
+    let (mut env, _) = json_env();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+        .expect("Capability.Parsing.Decoder dependency must roots-load");
+    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
 
     // Transition sentinel (D3-probe; retire when the full DS-9 decoder lands):
     // this is a real recursive decoder over explicit List Char input. Its
     // array and object paths each build and execute decoder_many at the nested
     // Json result type; neither path is a source-only or unreachable stub.
-    env.elaborate_file(
-        r#"
+    let recursive_decoder_source = r#"
         fn ds9_probe_token (code : Int) : Decoder (List Char) Nat Char =
           decoder_satisfy
             (List Char)
@@ -588,9 +590,9 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
                     (Cons Char (110 : Int) (Cons Char (125 : Int) (Nil Char)))))))
         const ds9_probe_object_result : DecoderResult (List Char) Nat Json =
           ds9_probe_decoder ds9_probe_object_input
-        "#,
-    )
-    .expect("real recursive array/object decoder probe must elaborate");
+        "#;
+    env.elaborate_file(&format!("{JSON_PUBLIC_IMPORT}\n{recursive_decoder_source}"))
+        .expect("real recursive array/object decoder probe must elaborate");
 
     for name in [
         "ds9_probe_array_decoder",
@@ -606,7 +608,7 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
     let array_result = eval_global(&env, &mut store, "ds9_probe_array_result");
     let array_decoded = ctor_args(&env, &array_result, "Decoded");
     assert!(
-        matches!(&array_decoded[3], EvalVal::Ctor { id, .. } if *id == env.globals["JsonArray"]),
+        matches!(&array_decoded[3], EvalVal::Ctor { id, .. } if *id == global_id(&env, "JsonArray")),
         "array fixture must reach the JsonArray decoder_many branch"
     );
     let array_value = ctor_args(&env, &array_decoded[3], "JsonArray");
@@ -624,7 +626,7 @@ fn decoder_recursive_reaches_array_and_object_many_branches() {
     let object_result = eval_global(&env, &mut store, "ds9_probe_object_result");
     let object_decoded = ctor_args(&env, &object_result, "Decoded");
     assert!(
-        matches!(&object_decoded[3], EvalVal::Ctor { id, .. } if *id == env.globals["JsonObject"]),
+        matches!(&object_decoded[3], EvalVal::Ctor { id, .. } if *id == global_id(&env, "JsonObject")),
         "object fixture must reach the JsonObject decoder_many branch"
     );
     let object_value = ctor_args(&env, &object_decoded[3], "JsonObject");
