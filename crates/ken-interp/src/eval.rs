@@ -4279,6 +4279,8 @@ pub struct FSIds {
     pub op_seek_id: GlobalId,
     pub op_set_length_id: GlobalId,
     pub op_sync_id: GlobalId,
+    pub op_get_inheritance_id: GlobalId,
+    pub op_set_inheritance_id: GlobalId,
     pub mk_file_metadata_id: GlobalId,
     pub mk_dir_entry_id: GlobalId,
     pub k_file_id: GlobalId,
@@ -4353,6 +4355,8 @@ impl FSIds {
             op_seek_id: get("OpSeek")?,
             op_set_length_id: get("OpSetLength")?,
             op_sync_id: get("OpSync")?,
+            op_get_inheritance_id: get("OpGetInheritance")?,
+            op_set_inheritance_id: get("OpSetInheritance")?,
             mk_file_metadata_id: get("MkFileMetadata")?,
             mk_dir_entry_id: get("MkDirEntry")?,
             k_file_id: get("KFile")?,
@@ -4650,6 +4654,12 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                     FsOpKind::Seek => ken_host::FsCapabilityOperationV1::Seek,
                     FsOpKind::SetLength => ken_host::FsCapabilityOperationV1::SetLength,
                     FsOpKind::Sync => ken_host::FsCapabilityOperationV1::Sync,
+                    FsOpKind::GetInheritance => {
+                        ken_host::FsCapabilityOperationV1::GetInheritance
+                    }
+                    FsOpKind::SetInheritance => {
+                        ken_host::FsCapabilityOperationV1::SetInheritance
+                    }
                 },
                 held_rights,
             }
@@ -4684,6 +4694,8 @@ fn from_denial_v1(error: &ken_host::CapabilityDeniedV1) -> CapabilityDenied {
                 ken_host::FsCapabilityOperationV1::Seek => FsOpKind::Seek,
                 ken_host::FsCapabilityOperationV1::SetLength => FsOpKind::SetLength,
                 ken_host::FsCapabilityOperationV1::Sync => FsOpKind::Sync,
+                ken_host::FsCapabilityOperationV1::GetInheritance => FsOpKind::GetInheritance,
+                ken_host::FsCapabilityOperationV1::SetInheritance => FsOpKind::SetInheritance,
             },
             held_rights: *held_rights,
         },
@@ -6726,6 +6738,8 @@ mod px5b_effect_observation_tests {
             op_seek_id: id(),
             op_set_length_id: id(),
             op_sync_id: id(),
+            op_get_inheritance_id: id(),
+            op_set_inheritance_id: id(),
             nil_id: id(),
             cons_id: id(),
             mk_file_metadata_id: id(),

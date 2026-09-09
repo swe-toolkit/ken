@@ -3,10 +3,11 @@
 use crate::{
     CanonicalOutcomeV1, CanonicalReplyV1, CanonicalRequestV1, CapabilityDeniedV1,
     CapabilityTraceIdentity, ConsoleStreamV1, CreatePolicyV1, DirEntryV1, EffectEvent,
-    FileErrorCauseV1, FileErrorIdentityV1, FileMetadataV1, FsCapabilityOperationV1, FsNodeKindV1,
-    FsOpenModeV1, FsSeekFromV1, FsSyncModeV1, HostOpV1, IoErrorIdentityV1, ResourceBindingRole,
-    ResourceErrorV1, ResourceKindV1, ResourceSettlementObservationV1, ResourceSettlementOutcomeV1,
-    ResourceTraceIdentityV1, SemanticErrorV1, TerminalExitClass,
+    FdInheritancePolicyV1, FileErrorCauseV1, FileErrorIdentityV1, FileMetadataV1,
+    FsCapabilityOperationV1, FsNodeKindV1, FsOpenModeV1, FsSeekFromV1, FsSyncModeV1, HostOpV1,
+    IoErrorIdentityV1, ResourceBindingRole, ResourceErrorV1, ResourceKindV1,
+    ResourceSettlementObservationV1, ResourceSettlementOutcomeV1, ResourceTraceIdentityV1,
+    SemanticErrorV1, TerminalExitClass,
 };
 
 const MAGIC: &[u8; 8] = b"KETRACE2";
@@ -85,6 +86,13 @@ fn stream_tag(stream: ConsoleStreamV1) -> u8 {
         ConsoleStreamV1::Stdin => 0,
         ConsoleStreamV1::Stdout => 1,
         ConsoleStreamV1::Stderr => 2,
+    }
+}
+
+fn inheritance_policy_tag(policy: FdInheritancePolicyV1) -> u8 {
+    match policy {
+        FdInheritancePolicyV1::Inherit => 0,
+        FdInheritancePolicyV1::CloseOnExec => 1,
     }
 }
 
@@ -249,6 +257,11 @@ fn put_request(
                 },
             );
         }
+        CanonicalRequestV1::FsGetInheritance => put_u8(out, 28),
+        CanonicalRequestV1::FsSetInheritance { policy } => {
+            put_u8(out, 29);
+            put_u8(out, inheritance_policy_tag(*policy));
+        }
         CanonicalRequestV1::BufferAllocate { capacity } => {
             put_u8(out, 20);
             put_u64(out, *capacity);
@@ -350,6 +363,10 @@ fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTr
             put_u8(out, 13);
             put_u64(out, *position);
         }
+        CanonicalReplyV1::FdInheritancePolicy(policy) => {
+            put_u8(out, 14);
+            put_u8(out, inheritance_policy_tag(*policy));
+        }
     }
     Ok(())
 }
@@ -411,6 +428,8 @@ fn fs_operation_tag(operation: FsCapabilityOperationV1) -> u8 {
         FsCapabilityOperationV1::Seek => 11,
         FsCapabilityOperationV1::SetLength => 12,
         FsCapabilityOperationV1::Sync => 13,
+        FsCapabilityOperationV1::GetInheritance => 14,
+        FsCapabilityOperationV1::SetInheritance => 15,
     }
 }
 
@@ -615,6 +634,16 @@ impl<'a> Cursor<'a> {
     }
 }
 
+fn get_inheritance_policy(
+    cursor: &mut Cursor<'_>,
+) -> Result<FdInheritancePolicyV1, EffectTraceWireError> {
+    match cursor.u8()? {
+        0 => Ok(FdInheritancePolicyV1::Inherit),
+        1 => Ok(FdInheritancePolicyV1::CloseOnExec),
+        _ => Err(EffectTraceWireError),
+    }
+}
+
 fn get_stream(cursor: &mut Cursor<'_>) -> Result<ConsoleStreamV1, EffectTraceWireError> {
     match cursor.u8()? {
         0 => Ok(ConsoleStreamV1::Stdin),
@@ -766,6 +795,10 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
                 _ => return Err(EffectTraceWireError),
             },
         },
+        28 => CanonicalRequestV1::FsGetInheritance,
+        29 => CanonicalRequestV1::FsSetInheritance {
+            policy: get_inheritance_policy(cursor)?,
+        },
         20 => CanonicalRequestV1::BufferAllocate {
             capacity: cursor.u64()?,
         },
@@ -819,6 +852,7 @@ fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWir
         5 => CanonicalReplyV1::Instant(cursor.bytes()?),
         12 => CanonicalReplyV1::MonotonicInstant(cursor.bytes()?),
         13 => CanonicalReplyV1::FilePosition(cursor.u64()?),
+        14 => CanonicalReplyV1::FdInheritancePolicy(get_inheritance_policy(cursor)?),
         6 => CanonicalReplyV1::FileMetadata(FileMetadataV1 {
             size: cursor.u64()?,
             kind: get_node_kind(cursor)?,
@@ -937,6 +971,8 @@ fn get_fs_operation(
         11 => Ok(FsCapabilityOperationV1::Seek),
         12 => Ok(FsCapabilityOperationV1::SetLength),
         13 => Ok(FsCapabilityOperationV1::Sync),
+        14 => Ok(FsCapabilityOperationV1::GetInheritance),
+        15 => Ok(FsCapabilityOperationV1::SetInheritance),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -1389,6 +1425,109 @@ mod tests {
                 position: 0,
             };
             assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
+        }
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: get and set
+    /// have distinct request identities; both inheritance policies preserve
+    /// their frozen tags through set requests and get replies; rights and PX9
+    /// operation identities remain profile-specific; and unknown or truncated
+    /// policy values are refused. CLAIMED: ABI-S1 D4 never conflates direction
+    /// or defaults an unrecognized policy to inheritance. THE GAP: OS behavior
+    /// and resource-right enforcement are exercised by the dispatcher test.
+    #[test]
+    fn abi_s1_inheritance_policy_wire_is_typed_distinct_and_fail_closed() {
+        assert_eq!(FdInheritancePolicyV1::Inherit as u64, 0);
+        assert_eq!(FdInheritancePolicyV1::CloseOnExec as u64, 1);
+
+        let mut get = Vec::new();
+        put_request(&mut get, &CanonicalRequestV1::FsGetInheritance).unwrap();
+        assert_eq!(get, [28]);
+        let mut cursor = Cursor {
+            bytes: &get,
+            position: 0,
+        };
+        assert_eq!(
+            get_request(&mut cursor).unwrap(),
+            CanonicalRequestV1::FsGetInheritance
+        );
+        assert_eq!(cursor.position, get.len());
+
+        for (policy, request_bytes, reply_bytes) in [
+            (FdInheritancePolicyV1::Inherit, [29, 0], [14, 0]),
+            (FdInheritancePolicyV1::CloseOnExec, [29, 1], [14, 1]),
+        ] {
+            let request = CanonicalRequestV1::FsSetInheritance { policy };
+            let mut encoded = Vec::new();
+            put_request(&mut encoded, &request).unwrap();
+            assert_eq!(encoded, request_bytes);
+            let mut cursor = Cursor {
+                bytes: &encoded,
+                position: 0,
+            };
+            assert_eq!(get_request(&mut cursor).unwrap(), request);
+            assert_eq!(cursor.position, encoded.len());
+
+            let reply = CanonicalReplyV1::FdInheritancePolicy(policy);
+            let mut encoded = Vec::new();
+            put_reply(&mut encoded, &reply).unwrap();
+            assert_eq!(encoded, reply_bytes);
+            let mut cursor = Cursor {
+                bytes: &encoded,
+                position: 0,
+            };
+            assert_eq!(get_reply(&mut cursor).unwrap(), reply);
+            assert_eq!(cursor.position, encoded.len());
+        }
+
+        for (operation, tag) in [
+            (FsCapabilityOperationV1::GetInheritance, 14),
+            (FsCapabilityOperationV1::SetInheritance, 15),
+        ] {
+            let denial = CapabilityDeniedV1::RightNotHeld {
+                operation,
+                held_rights: 0x55,
+            };
+            let mut encoded = Vec::new();
+            put_denial(&mut encoded, &denial);
+            assert_eq!(encoded, [0, tag, 0x55]);
+            let mut cursor = Cursor {
+                bytes: &encoded,
+                position: 0,
+            };
+            assert_eq!(get_denial(&mut cursor).unwrap(), denial);
+            assert_eq!(cursor.position, encoded.len());
+        }
+
+        for operation in [HostOpV1::FsGetInheritance, HostOpV1::FsSetInheritance] {
+            let file_error = SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation,
+                relative_path: Vec::new(),
+                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(78)),
+            });
+            let mut encoded = Vec::new();
+            put_error(&mut encoded, &file_error).unwrap();
+            let mut cursor = Cursor {
+                bytes: &encoded,
+                position: 0,
+            };
+            assert_eq!(get_error(&mut cursor).unwrap(), file_error);
+            assert_eq!(cursor.position, encoded.len());
+        }
+
+        for malformed in [&[29, 2][..], &[29][..]] {
+            let mut cursor = Cursor {
+                bytes: malformed,
+                position: 0,
+            };
+            assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
+        }
+        for malformed in [&[14, 2][..], &[14][..]] {
+            let mut cursor = Cursor {
+                bytes: malformed,
+                position: 0,
+            };
+            assert_eq!(get_reply(&mut cursor), Err(EffectTraceWireError));
         }
     }
 

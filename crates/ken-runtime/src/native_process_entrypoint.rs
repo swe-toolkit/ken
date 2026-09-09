@@ -80,6 +80,8 @@ pub struct NativeProcessSymbols {
     pub file_operation_seek: RuntimeSymbol,
     pub file_operation_set_length: RuntimeSymbol,
     pub file_operation_sync: RuntimeSymbol,
+    pub file_operation_get_inheritance: RuntimeSymbol,
+    pub file_operation_set_inheritance: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -168,6 +170,10 @@ impl NativeProcessSymbols {
             file_operation_seek: "ctor:prelude::FileOperation::OpSeek".to_string(),
             file_operation_set_length: "ctor:prelude::FileOperation::OpSetLength".to_string(),
             file_operation_sync: "ctor:prelude::FileOperation::OpSync".to_string(),
+            file_operation_get_inheritance: "ctor:prelude::FileOperation::OpGetInheritance"
+                .to_string(),
+            file_operation_set_inheritance: "ctor:prelude::FileOperation::OpSetInheritance"
+                .to_string(),
         }
     }
 }
