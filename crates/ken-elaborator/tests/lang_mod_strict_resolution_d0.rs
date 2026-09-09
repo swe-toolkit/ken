@@ -409,6 +409,32 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Schema now declares its exact Formatting.Doc, Derived,
+            // NonEmpty, and Validation dependencies. Its ordinary package
+            // boundary loads while strict mode retains only provider compiler
+            // conveniences.
+            "Application.Input.Schema".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Capability.Console.Text".to_string(),
             ["IO", "IOError", "Stderr", "Stdout", "Unit", "write"]
                 .into_iter()
@@ -1128,7 +1154,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Algorithm.Sorting.InsertionSort",
         "Application.CommandLine.ArgParse",
         "Application.Configuration.Decoder",
-        "Application.Input.Schema",
         "Data.Collections.Map",
     ]
     .into_iter()
