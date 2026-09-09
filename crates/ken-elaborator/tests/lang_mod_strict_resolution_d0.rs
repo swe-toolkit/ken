@@ -433,6 +433,32 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Diagnostics.Render now declares its exact Diagnostics.Core and
+            // Formatting.Doc dependencies. Its ordinary package boundary
+            // loads while strict mode retains only provider compiler
+            // conveniences.
+            "Capability.Diagnostics.Render".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Capability.Filesystem.Authority".to_string(),
             [
                 "CreatePolicy",
@@ -1026,7 +1052,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.CommandLine.ArgParse",
         "Application.Configuration.Decoder",
         "Application.Input.Schema",
-        "Capability.Diagnostics.Render",
         "Capability.Filesystem.Path.Posix",
         "Capability.System.IO",
         "Data.Collections.Map",

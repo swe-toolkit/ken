@@ -18,12 +18,9 @@ const STRING_BIJECTION: &str =
 const STRING_KEYS: &str = include_str!("../../../catalog/packages/Data/Text/StringKeys.ken.md");
 const CODEC: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.md");
 const NUMERIC: &str = include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
-const PRETTY: &str = include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
 const ENVIRONMENT: &str =
     include_str!("../../../catalog/packages/Capability/Process/Environment.ken.md");
 const EXIT: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
-const DIAGNOSTIC_RENDER: &str =
-    include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
 const SCHEMA: &str = include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
 const ARGPARSE: &str =
     include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
@@ -82,14 +79,21 @@ fn dependency_env() -> ElabEnv {
     catalog_or::expose_module(&mut env, "Capability.Process.Arguments");
     for (source, label) in [
         (NUMERIC, "Capability.Parsing.Numeric"),
-        (PRETTY, "Capability.Formatting.Doc"),
         (ENVIRONMENT, "Capability.Process.Environment"),
         (EXIT, "Capability.Process.Exit"),
-        (DIAGNOSTIC_RENDER, "Capability.Diagnostics.Render"),
     ] {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
     }
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+        .expect("Capability.Formatting.Doc must roots-load in dependency order");
+    catalog_or::expose_module(&mut env, "Capability.Formatting.Doc");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Capability.Diagnostics.Render",
+    )
+    .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
+    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
     env
 }
 
