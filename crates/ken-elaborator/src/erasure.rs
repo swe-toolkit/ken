@@ -598,6 +598,8 @@ pub(crate) struct CheckedHostSpineV1 {
     pub file_operation_seek: StableSymbol,
     pub file_operation_set_length: StableSymbol,
     pub file_operation_sync: StableSymbol,
+    pub file_operation_get_inheritance: StableSymbol,
+    pub file_operation_set_inheritance: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -8118,6 +8120,14 @@ mod px7l_tests {
                 "OpSetLength",
             ),
             file_operation_sync: StableSymbol::constructor(&family("FileOperation"), "OpSync"),
+            file_operation_get_inheritance: StableSymbol::constructor(
+                &family("FileOperation"),
+                "OpGetInheritance",
+            ),
+            file_operation_set_inheritance: StableSymbol::constructor(
+                &family("FileOperation"),
+                "OpSetInheritance",
+            ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8530,6 +8540,8 @@ mod d1b_role_b_decoder_alignment {
             file_operation_seek: sentinel("file_operation_seek"),
             file_operation_set_length: sentinel("file_operation_set_length"),
             file_operation_sync: sentinel("file_operation_sync"),
+            file_operation_get_inheritance: sentinel("file_operation_get_inheritance"),
+            file_operation_set_inheritance: sentinel("file_operation_set_inheritance"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8615,6 +8627,14 @@ mod d1b_role_b_decoder_alignment {
             "file_operation_set_length",
         ),
         (spine.file_operation_sync.as_str(), "file_operation_sync"),
+        (
+            spine.file_operation_get_inheritance.as_str(),
+            "file_operation_get_inheritance",
+        ),
+        (
+            spine.file_operation_set_inheritance.as_str(),
+            "file_operation_set_inheritance",
+        ),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(

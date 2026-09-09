@@ -423,6 +423,8 @@ fn host_effect_seat_contract(
                 | Op::FsSeek
                 | Op::FsSetLength
                 | Op::FsSync
+                | Op::FsGetInheritance
+                | Op::FsSetInheritance
                 | Op::ResourceRelease
                 | Op::BufferAllocate
                 | Op::BufferFreeze
@@ -588,6 +590,8 @@ fn host_effect_seat_contract(
             | Op::FsSeek
             | Op::FsSetLength
             | Op::FsSync
+            | Op::FsGetInheritance
+            | Op::FsSetInheritance
             | Op::EntropyRandomBytes,
             _,
         ) => None,

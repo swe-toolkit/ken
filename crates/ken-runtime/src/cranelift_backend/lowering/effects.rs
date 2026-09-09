@@ -263,6 +263,8 @@ fn runtime_producible_constructors(
         file_operation_seek,
         file_operation_set_length,
         file_operation_sync,
+        file_operation_get_inheritance,
+        file_operation_set_inheritance,
     } = symbols;
     // Every field is a constructor the native runtime can put in front of a
     // match: host-effect responses, process-entry inputs, and the primitive
@@ -324,6 +326,8 @@ fn runtime_producible_constructors(
         file_operation_seek,
         file_operation_set_length,
         file_operation_sync,
+        file_operation_get_inheritance,
+        file_operation_set_inheritance,
     ]
     .into_iter()
     .cloned()

@@ -279,6 +279,8 @@ runtime_host_spine_v1! {
     file_operation_seek,
     file_operation_set_length,
     file_operation_sync,
+    file_operation_get_inheritance,
+    file_operation_set_inheritance,
 }
 
 /// The decoded, validated checked-runtime role record.

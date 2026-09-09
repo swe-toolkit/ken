@@ -95,6 +95,8 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
             "OpSeek",
             "OpSetLength",
             "OpSync",
+            "OpGetInheritance",
+            "OpSetInheritance",
         ]
     );
     assert_eq!(
@@ -212,6 +214,8 @@ theorem px9_change_mode : Equal Idempotence (operation_idempotence (FilesystemOp
 theorem px9_seek : Equal Idempotence (operation_idempotence (FilesystemOp OpSeek)) NonIdempotent = Proved
 theorem px9_set_length : Equal Idempotence (operation_idempotence (FilesystemOp OpSetLength)) Idempotent = Proved
 theorem px9_sync : Equal Idempotence (operation_idempotence (FilesystemOp OpSync)) Idempotent = Proved
+theorem px9_get_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp OpGetInheritance)) Idempotent = Proved
+theorem px9_set_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp OpSetInheritance)) Idempotent = Proved
 
 theorem px9_transient_idempotent : Equal RetryGuidance (retry_guidance Transient Idempotent) RetryAdvised = Proved
 theorem px9_transient_nonidempotent : Equal RetryGuidance (retry_guidance Transient NonIdempotent) RetryUnsafeNonIdempotent = Proved
@@ -219,7 +223,7 @@ theorem px9_permanent_idempotent : Equal RetryGuidance (retry_guidance Permanent
 theorem px9_permanent_nonidempotent : Equal RetryGuidance (retry_guidance Permanent NonIdempotent) DoNotRetryPermanent = Proved
 "#,
     )
-    .expect("all 13 identity, 13 operation, and four retry matrix cells must compute");
+    .expect("all 13 identity, 15 operation, and four retry matrix cells must compute");
 
     for law in [
         "retry_guidance_transient_idempotent",
