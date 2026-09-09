@@ -497,6 +497,32 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Filesystem.Path.Posix now declares its exact Compare,
+            // LawfulClasses, and Derived dependencies. Its ordinary package
+            // boundary loads while strict mode retains only compiler
+            // conveniences.
+            "Capability.Filesystem.Path.Posix".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // Formatting.Doc now declares its exact Transport and Derived
             // value dependencies. Its ordinary package boundary loads while
             // strict mode retains only compiler conveniences.
@@ -1052,7 +1078,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.CommandLine.ArgParse",
         "Application.Configuration.Decoder",
         "Application.Input.Schema",
-        "Capability.Filesystem.Path.Posix",
         "Capability.System.IO",
         "Data.Collections.Map",
         "Data.Serialization.Json",

@@ -652,13 +652,13 @@ pub proof intro for bool_and
     False ↦ λha. λhb. absurd ha
   }
 
-proof left for bool_and (a : Bool) (b : Bool) : IsTrue (bool_and a b) → IsTrue a =
+pub proof left for bool_and (a : Bool) (b : Bool) : IsTrue (bool_and a b) → IsTrue a =
   match a {
     True ↦ λh. Proved;
     False ↦ λh. absurd h
   }
 
-proof right for bool_and (a : Bool) (b : Bool) : IsTrue (bool_and a b) → IsTrue b =
+pub proof right for bool_and (a : Bool) (b : Bool) : IsTrue (bool_and a b) → IsTrue b =
   match a {
     True ↦ λh. h;
     False ↦ λh. absurd h

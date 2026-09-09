@@ -49,6 +49,7 @@ enum IdentityPrerequisite {
 enum LegacyIdentityEvidence {
     ExactLedger {
         resolved_globals: BTreeSet<GlobalId>,
+        interior_evidence: BTreeSet<GlobalId>,
         identity_grounded_prerequisites: BTreeSet<IdentityPrerequisite>,
     },
     Unavailable {
@@ -406,6 +407,62 @@ impl CompilerInternalBaseSupportAuthority {
     }
 }
 
+fn pinned_interior_evidence(
+    module: &str,
+    unit: &DiscoveredUnit,
+    all_units: &BTreeMap<String, DiscoveredUnit>,
+    env: &ElabEnv,
+    resolved: &BTreeSet<GlobalId>,
+) -> BTreeSet<GlobalId> {
+    const POSIX: &str = "Capability.Filesystem.Path.Posix";
+    const LAWFUL: &str = "Core.Classes.LawfulClasses";
+    const CLASS: &str = "DecEq";
+    const HEAD: &str = "UInt8";
+    const INSTANCE: &str = "DecEq_instance_UInt8";
+
+    if module != POSIX {
+        return BTreeSet::new();
+    }
+
+    assert_eq!(
+        unit.selective_import_bindings
+            .get(CLASS)
+            .map(String::as_str),
+        Some(LAWFUL),
+        "the Posix interior instance must arrive through its selective DecEq provider edge"
+    );
+    assert!(
+        all_units[LAWFUL]
+            .public_targets
+            .contains(&format!("{LAWFUL}.{CLASS}")),
+        "the interior instance's class must be public at its defining provider"
+    );
+    let identity = *env
+        .globals
+        .get(INSTANCE)
+        .expect("the LawfulClasses provider must register its UInt8 DecEq dictionary");
+    let info = env
+        .class_env
+        .instances
+        .get(&(CLASS.to_string(), HEAD.to_string()))
+        .expect("the UInt8 DecEq registry entry must exist");
+    assert_eq!(info.instance_id, identity);
+    assert_eq!(info.class_name, CLASS);
+    assert_eq!(info.defining_package, LAWFUL);
+    assert!(
+        resolved.contains(&identity),
+        "the Posix checked core must retain the imported UInt8 DecEq dictionary"
+    );
+    assert!(
+        !unit
+            .public_targets
+            .iter()
+            .any(|target| target.ends_with(INSTANCE)),
+        "interior instance evidence must not become a by-name Posix export"
+    );
+    BTreeSet::from([identity])
+}
+
 fn legacy_evidence(
     root: &Path,
     module: &str,
@@ -467,6 +524,7 @@ fn legacy_evidence(
         }
     }
 
+    let interior_evidence = pinned_interior_evidence(module, unit, all_units, &env, &resolved);
     let mut modules_longest_first: Vec<_> = all_units.keys().cloned().collect();
     modules_longest_first.sort_by_key(|name| std::cmp::Reverse(name.len()));
     let mut prerequisites = BTreeSet::new();
@@ -482,6 +540,7 @@ fn legacy_evidence(
             || entry_start.is_some_and(|start| identity.0 >= start)
             || strict_available.contains(&identity)
             || base_support.contains(identity)
+            || interior_evidence.contains(&identity)
             || matches!(
                 env.env.lookup(identity),
                 Some(Decl::Primitive {
@@ -535,6 +594,7 @@ fn legacy_evidence(
 
     LegacyIdentityEvidence::ExactLedger {
         resolved_globals: resolved,
+        interior_evidence,
         identity_grounded_prerequisites: prerequisites,
     }
 }
@@ -618,6 +678,7 @@ fn validate_evidence_frontier(rows: &[UnitCensusRow]) -> Result<(), String> {
                 LoaderObservation::Succeeded,
                 LegacyIdentityEvidence::ExactLedger {
                     resolved_globals: _,
+                    interior_evidence: _,
                     identity_grounded_prerequisites,
                 },
             ) => {
@@ -632,6 +693,7 @@ fn validate_evidence_frontier(rows: &[UnitCensusRow]) -> Result<(), String> {
                 LoaderObservation::Refused { .. },
                 LegacyIdentityEvidence::ExactLedger {
                     resolved_globals: _,
+                    interior_evidence: _,
                     identity_grounded_prerequisites,
                 },
             ) => {
@@ -652,9 +714,11 @@ fn validate_evidence_frontier(rows: &[UnitCensusRow]) -> Result<(), String> {
 ///
 /// MEASURED: real discovery, parsing, strict roots loading, and legacy roots
 /// loading construct one row per canonical unit, with exact core identities only
-/// after successful legacy elaboration. CLAIMED: this is the current evidence
-/// frontier and nothing more. THE GAP: unavailable rows intentionally name no
-/// provider or migration and prevent every completeness claim.
+/// after successful legacy elaboration. Posix's sole pinned interior identity is
+/// observed in its checked core and in the imported provider's instance registry.
+/// CLAIMED: this is the current evidence frontier and nothing more. THE GAP:
+/// unavailable rows intentionally name no provider or migration and prevent every
+/// completeness claim.
 #[test]
 fn catalog_evidence_frontier_is_closed_and_honest() {
     let root = catalog_root();
@@ -916,6 +980,7 @@ fn successful_empty_facade_has_exact_interface_identity_evidence() {
         evidence,
         LegacyIdentityEvidence::ExactLedger {
             resolved_globals: BTreeSet::from([provider_identity]),
+            interior_evidence: BTreeSet::new(),
             identity_grounded_prerequisites: BTreeSet::new(),
         }
     );
@@ -1080,6 +1145,7 @@ fn evidence_status_is_typed_and_independent_from_strict_observation() {
     let mut forged = vec![unavailable.clone()];
     forged[0].legacy_identity_evidence = LegacyIdentityEvidence::ExactLedger {
         resolved_globals: BTreeSet::new(),
+        interior_evidence: BTreeSet::new(),
         identity_grounded_prerequisites: BTreeSet::from([
             IdentityPrerequisite::ProviderInterfaceAndImport {
                 identity: GlobalId(0),
