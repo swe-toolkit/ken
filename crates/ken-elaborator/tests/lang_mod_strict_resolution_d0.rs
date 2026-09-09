@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ken_elaborator::modules::{
-    catalog_module_from_path, is_prelude_floor_name, PRELUDE_COMPANION_BINDING_NAMES,
-    PRELUDE_FLOOR_NAMES,
+    PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES, catalog_module_from_path,
+    is_prelude_floor_name,
 };
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Level, Term};
@@ -972,6 +972,31 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Json now declares its exact Derived and Cursor dependencies. Its
+            // ordinary package boundary loads while strict mode retains only
+            // the compiler conveniences inherited through that provider closure.
+            "Data.Serialization.Json".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Data.Sums.Combinators".to_string(),
             ["Equal", "Proved"]
                 .into_iter()
@@ -1105,7 +1130,6 @@ fn catalog_ambient_passthrough_migration_census() {
         "Application.Configuration.Decoder",
         "Application.Input.Schema",
         "Data.Collections.Map",
-        "Data.Serialization.Json",
     ]
     .into_iter()
     .map(str::to_string)

@@ -29,6 +29,15 @@ pairs; duplicate-key rejection belongs to decoding rather than to the carrier.
 ```ken
 import Data.Collections.Derived (length)
 
+import Capability.Parsing.Cursor
+  (CursorOps,
+    MkCursorOps,
+    cursor_nat_lt,
+    CursorPeekHasRemaining,
+    CursorAdvanceProgress,
+    CursorEndValid,
+    CursorLaws)
+
 data Json : Type where {
   JsonNull : Json;
   JsonBool : Bool → Json;
@@ -37,6 +46,8 @@ data Json : Type where {
   JsonArray : List Json → Json;
   JsonObject : List (Pair String Json) → Json
 }
+
+export Json, JsonNull, JsonBool, JsonNumber, JsonString, JsonArray, JsonObject
 
 fn char_cursor_remaining (cur : List Char) : Nat = length Char cur
 
@@ -54,7 +65,7 @@ fn char_cursor_advance (cur : List Char) : List Char =
 
 fn char_cursor_locate (cur : List Char) : Nat = char_cursor_remaining cur
 
-const char_cursor_ops : CursorOps (List Char) Char Nat =
+pub const char_cursor_ops : CursorOps (List Char) Char Nat =
   MkCursorOps
     (List Char)
     Char
@@ -88,7 +99,7 @@ theorem char_cursor_lt_suc (n : Nat) : Equal Bool (cursor_nat_lt n (Suc n)) True
     Suc rest ↦ char_cursor_lt_suc rest
   }
 
-theorem char_cursor_peek_has_remaining
+pub theorem char_cursor_peek_has_remaining
     : CursorPeekHasRemaining (List Char) Char Nat char_cursor_ops =
   λcur.
     match cur {
@@ -96,7 +107,7 @@ theorem char_cursor_peek_has_remaining
       Cons head tail ↦ λvalue. λpeeked. Proved
     }
 
-theorem char_cursor_advance_progress
+pub theorem char_cursor_advance_progress
     : CursorAdvanceProgress (List Char) Char Nat char_cursor_ops =
   λcur.
     match cur {
@@ -104,14 +115,14 @@ theorem char_cursor_advance_progress
       Cons head tail ↦ λvalue. λpeeked. char_cursor_lt_suc (char_cursor_remaining tail)
     }
 
-theorem char_cursor_end_valid : CursorEndValid (List Char) Char Nat char_cursor_ops =
+pub theorem char_cursor_end_valid : CursorEndValid (List Char) Char Nat char_cursor_ops =
   λcur.
     match cur {
       Nil ↦ λempty. Proved;
       Cons head tail ↦ λempty. absurd empty
     }
 
-theorem char_cursor_laws : CursorLaws (List Char) Char Nat char_cursor_ops =
+pub theorem char_cursor_laws : CursorLaws (List Char) Char Nat char_cursor_ops =
   and_intro
     (CursorPeekHasRemaining (List Char) Char Nat char_cursor_ops)
     (And
