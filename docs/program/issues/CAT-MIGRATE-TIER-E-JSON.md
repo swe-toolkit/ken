@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-E-JSON
 title: "Scaffold-retirement Tier E, first serialization/application spine node: migrate the entry module Data.Serialization.Json off ambient/fixture-scaffold resolution onto its D0-measured selective imports from the already-published lower tiers (Tier A Derived, Tier D Capability.Parsing.Cursor), and publish only its usable consumer surface. D0 measures Json's actual provider closure and its client-consumed public surface, adopts exactly that import set, and publishes exactly that surface. NO new proof authoring, NO carrier change; the proven Tier A/B/C/D publish-and-import shape."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
