@@ -4247,6 +4247,7 @@ pub struct FSIds {
     pub release_failed_id: GlobalId,
     pub fs_handle_id: GlobalId,
     pub buffer_id: GlobalId,
+    pub mapping_id: GlobalId,
     pub resource_kind_mismatch_id: GlobalId,
     pub buffer_limit_id: GlobalId,
     pub allocation_failed_id: GlobalId,
@@ -4323,6 +4324,7 @@ impl FSIds {
             release_failed_id: elab.prelude_env.release_failed_id,
             fs_handle_id: elab.prelude_env.fs_handle_id,
             buffer_id: get("Buffer")?,
+            mapping_id: get("Mapping")?,
             resource_kind_mismatch_id: get("ResourceKindMismatch")?,
             buffer_limit_id: get("BufferLimit")?,
             allocation_failed_id: get("AllocationFailed")?,
@@ -5078,6 +5080,7 @@ fn resource_error_value_v1(
             let kind = match resource_kind {
                 ken_host::ResourceKindV1::FsHandle => make_ctor(fs.fs_handle_id, vec![], store),
                 ken_host::ResourceKindV1::Buffer => make_ctor(fs.buffer_id, vec![], store),
+                ken_host::ResourceKindV1::Mapping => make_ctor(fs.mapping_id, vec![], store),
             };
             let trace = make_ctor(
                 fs.private_resource_trace_identity_id,
@@ -5094,6 +5097,7 @@ fn resource_error_value_v1(
             let kind = |kind, store: &mut EvalStore| match kind {
                 ken_host::ResourceKindV1::FsHandle => make_ctor(fs.fs_handle_id, vec![], store),
                 ken_host::ResourceKindV1::Buffer => make_ctor(fs.buffer_id, vec![], store),
+                ken_host::ResourceKindV1::Mapping => make_ctor(fs.mapping_id, vec![], store),
             };
             let expected = kind(expected, store);
             let actual = kind(actual, store);
@@ -6164,9 +6168,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
         }
     })();
     let mut backend = InterpreterHostBackend { handler };
-    let settlements = resources.finalize_all_with(|owner| {
-        ken_host::HostEffectBackendV1::resource_close(&mut backend, owner)
-    });
+    let settlements = resources.finalize_all_with(&mut backend);
     if let Some(recorder) = recorder.as_deref_mut() {
         for settlement in settlements {
             let outcome = match settlement.outcome {
@@ -6710,6 +6712,7 @@ mod px5b_effect_observation_tests {
             release_failed_id: id(),
             fs_handle_id: id(),
             buffer_id: id(),
+            mapping_id: id(),
             resource_kind_mismatch_id: id(),
             buffer_limit_id: id(),
             allocation_failed_id: id(),
@@ -6819,6 +6822,68 @@ mod px5b_effect_observation_tests {
             panic!("expected ResourceError constructor, got {payload:?}")
         };
         assert_eq!(*id, expected);
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the existing
+    /// ResourceError reifier projects Mapping as the distinct third
+    /// ResourceKind constructor in both release-failure and kind-mismatch
+    /// payloads. CLAIMED: ABI-S6 D1's typed mapping refusals cannot collapse to
+    /// Buffer at the interpreter boundary. THE GAP: no checked Mapping acquire
+    /// producer exists until D3, so this drives the reifier directly.
+    #[test]
+    fn abi_s6_d1_mapping_resource_errors_reify_with_exact_kind_identity() {
+        let ids = console_ids();
+        let fs = fs_ids();
+        let mut store = EvalStore::new();
+
+        let mismatch = resource_error_value_v1(
+            ken_host::ResourceErrorV1::ResourceKindMismatch {
+                expected: ken_host::ResourceKindV1::Mapping,
+                actual: ken_host::ResourceKindV1::Buffer,
+            },
+            &fs,
+            &ids,
+            &mut store,
+        );
+        let EvalVal::Ctor {
+            id: mismatch_id,
+            args,
+            ..
+        } = mismatch
+        else {
+            panic!("kind mismatch must reify as a constructor")
+        };
+        assert_eq!(mismatch_id, fs.resource_kind_mismatch_id);
+        assert!(matches!(
+            args.as_slice(),
+            [EvalVal::Ctor { id: expected, .. }, EvalVal::Ctor { id: actual, .. }]
+                if *expected == fs.mapping_id && *actual == fs.buffer_id
+        ));
+
+        let failure = resource_error_value_v1(
+            ken_host::ResourceErrorV1::ReleaseFailed {
+                schema_version: ken_host::RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                resource_kind: ken_host::ResourceKindV1::Mapping,
+                identity: ken_host::ResourceTraceIdentityV1(7),
+                io: ken_host::IoErrorIdentityV1::Unsupported,
+            },
+            &fs,
+            &ids,
+            &mut store,
+        );
+        let EvalVal::Ctor {
+            id: failure_id,
+            args,
+            ..
+        } = failure
+        else {
+            panic!("release failure must reify as a constructor")
+        };
+        assert_eq!(failure_id, fs.release_failed_id);
+        assert!(matches!(
+            args.first(),
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.mapping_id
+        ));
     }
 
     /// Promise class: normative compatibility vector for

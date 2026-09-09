@@ -1794,7 +1794,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // generation-checked resource table is its sole interpreter. The trace
     // identity has one private two-u32-limb constructor so the native reply
     // can preserve all 64 bits without narrowing through signed Ken `Int`.
-    elab.elaborate_decl("data ResourceKind = FsHandle | Buffer")
+    elab.elaborate_decl("data ResourceKind = FsHandle | Buffer | Mapping")
         .map_err(|e| ElabError::Internal(format!("prelude ResourceKind failed: {e}")))?;
     let fs_handle_id = elab
         .globals
