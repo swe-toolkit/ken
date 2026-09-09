@@ -379,6 +379,7 @@ fn put_resource_kind(out: &mut Vec<u8>, kind: ResourceKindV1) {
     match kind {
         ResourceKindV1::FsHandle => put_u8(out, 0),
         ResourceKindV1::Buffer => put_u8(out, 1),
+        ResourceKindV1::Mapping => put_u8(out, 2),
     }
 }
 
@@ -922,6 +923,7 @@ fn get_resource_kind(cursor: &mut Cursor<'_>) -> Result<ResourceKindV1, EffectTr
     match cursor.u8()? {
         0 => Ok(ResourceKindV1::FsHandle),
         1 => Ok(ResourceKindV1::Buffer),
+        2 => Ok(ResourceKindV1::Mapping),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -1538,6 +1540,51 @@ mod tests {
             };
             assert_eq!(get_reply(&mut cursor), Err(EffectTraceWireError));
         }
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: Mapping is the
+    /// third resource-kind tag in both settlement failure and kind-mismatch
+    /// wire payloads, and the next tag fails closed. CLAIMED: ABI-S6 D1 extends
+    /// the resource-kind wire identity append-only without conflating Mapping
+    /// with Buffer. THE GAP: this is codec evidence; resource release behavior
+    /// is pinned independently in `effect_v1`.
+    #[test]
+    fn abi_s6_d1_mapping_resource_kind_wire_is_distinct_and_fail_closed() {
+        let failure = SemanticErrorV1::Resource(ResourceErrorV1::ReleaseFailed {
+            schema_version: crate::RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+            resource_kind: ResourceKindV1::Mapping,
+            identity: ResourceTraceIdentityV1(0x0102_0304_0506_0708),
+            io: IoErrorIdentityV1::Unsupported,
+        });
+        let mut encoded = Vec::new();
+        put_error(&mut encoded, &failure).unwrap();
+        assert_eq!(encoded[0..5], [3, 3, 1, 0, 2]);
+        let mut cursor = Cursor {
+            bytes: &encoded,
+            position: 0,
+        };
+        assert_eq!(get_error(&mut cursor).unwrap(), failure);
+        assert_eq!(cursor.position, encoded.len());
+
+        let mismatch = SemanticErrorV1::Resource(ResourceErrorV1::ResourceKindMismatch {
+            expected: ResourceKindV1::Mapping,
+            actual: ResourceKindV1::Buffer,
+        });
+        encoded.clear();
+        put_error(&mut encoded, &mismatch).unwrap();
+        assert_eq!(encoded, [3, 4, 2, 1]);
+        let mut cursor = Cursor {
+            bytes: &encoded,
+            position: 0,
+        };
+        assert_eq!(get_error(&mut cursor).unwrap(), mismatch);
+        assert_eq!(cursor.position, encoded.len());
+
+        let mut cursor = Cursor {
+            bytes: &[3],
+            position: 0,
+        };
+        assert_eq!(get_resource_kind(&mut cursor), Err(EffectTraceWireError));
     }
 
     /// Promise class: normative compatibility vector. MEASURED: both frozen

@@ -789,6 +789,7 @@ impl ResourceTokenV1 {
 pub enum ResourceKindV1 {
     FsHandle,
     Buffer,
+    Mapping,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -954,10 +955,88 @@ impl BufferRegionV1 {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MappingBackingV1 {
+    Anonymous,
+    FileBacked,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MappingProtectionV1 {
+    ReadOnly,
+    Writable,
+}
+
+impl MappingProtectionV1 {
+    pub const fn rights(self) -> crate::RightSet {
+        match self {
+            Self::ReadOnly => crate::RightSet::READ,
+            Self::Writable => crate::RightSet::READ.union(crate::RightSet::WRITE),
+        }
+    }
+}
+
+/// Host-private storage for an opaque mapping resource.
+///
+/// D1 deliberately owns in-process bytes while the mapping operation remains
+/// represented-unavailable. Native promotion replaces the backing acquisition;
+/// neither this type nor its resource token exposes an address to Ken.
+pub struct MappingRegionV1 {
+    bytes: Vec<u8>,
+    backing: MappingBackingV1,
+    protection: MappingProtectionV1,
+}
+
+impl std::fmt::Debug for MappingRegionV1 {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("MappingRegionV1")
+            .field("length", &self.bytes.len())
+            .field("backing", &self.backing)
+            .field("protection", &self.protection)
+            .finish()
+    }
+}
+
+impl MappingRegionV1 {
+    pub fn try_new_anonymous(
+        length: u64,
+        protection: MappingProtectionV1,
+    ) -> Result<Self, ResourceErrorV1> {
+        if length == 0 {
+            return Err(ResourceErrorV1::InvalidBounds);
+        }
+        let length = usize::try_from(length).map_err(|_| ResourceErrorV1::AllocationFailed)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|_| ResourceErrorV1::AllocationFailed)?;
+        bytes.resize(length, 0);
+        Ok(Self {
+            bytes,
+            backing: MappingBackingV1::Anonymous,
+            protection,
+        })
+    }
+
+    pub fn length(&self) -> usize {
+        self.bytes.len()
+    }
+
+    pub fn backing(&self) -> MappingBackingV1 {
+        self.backing
+    }
+
+    pub fn protection(&self) -> MappingProtectionV1 {
+        self.protection
+    }
+}
+
 #[derive(Debug)]
 pub enum ResourceOwnerV1 {
     FsHandle(crate::ResourceHandleV1),
     Buffer(BufferRegionV1),
+    Mapping(MappingRegionV1),
 }
 
 pub const RESOURCE_OBSERVATION_SCHEMA_VERSION_V1: u16 = 1;
@@ -1154,6 +1233,21 @@ impl ResourceTableV1 {
         Ok(inserted)
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn insert_mapping(
+        &mut self,
+        region: MappingRegionV1,
+        provenance: crate::revocation_v1::RevocationNodeId,
+    ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
+        let rights = region.protection().rights();
+        self.insert_owner(
+            ResourceOwnerV1::Mapping(region),
+            ResourceKindV1::Mapping,
+            rights,
+            Some(provenance),
+        )
+    }
+
     pub fn resolve_fs_handle(
         &self,
         token: ResourceTokenV1,
@@ -1264,6 +1358,42 @@ impl ResourceTableV1 {
             return Err(ResourceErrorV1::MalformedResource);
         };
         Ok((buffer, *identity))
+    }
+
+    pub fn resolve_mapping(
+        &self,
+        token: ResourceTokenV1,
+        required: crate::RightSet,
+    ) -> Result<(&MappingRegionV1, ResourceTraceIdentityV1), ResourceErrorV1> {
+        let slot = self.lookup(token)?;
+        let (owner, kind, rights, identity) = match &slot.state {
+            ResourceSlotStateV1::Live {
+                owner,
+                kind,
+                rights,
+                identity,
+                ..
+            } => (owner, kind, rights, identity),
+            ResourceSlotStateV1::Closing { .. } => return Err(ResourceErrorV1::Closed),
+            ResourceSlotStateV1::Vacant { .. } => return Err(ResourceErrorV1::MalformedResource),
+            ResourceSlotStateV1::Retired { .. } => return Err(ResourceErrorV1::Closed),
+        };
+        if *kind != ResourceKindV1::Mapping {
+            return Err(ResourceErrorV1::ResourceKindMismatch {
+                expected: ResourceKindV1::Mapping,
+                actual: *kind,
+            });
+        }
+        if !rights.contains(required) {
+            return Err(ResourceErrorV1::RightNotHeld {
+                required: required.bits(),
+                held: rights.bits(),
+            });
+        }
+        let ResourceOwnerV1::Mapping(region) = owner else {
+            return Err(ResourceErrorV1::MalformedResource);
+        };
+        Ok((region, *identity))
     }
 
     pub fn identity(
@@ -1556,7 +1686,7 @@ impl ResourceTableV1 {
 
     pub fn finish_release_with(
         pending: PendingResourceCloseV1,
-        close: impl FnOnce(crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1>,
+        backend: &mut impl HostEffectBackendV1,
     ) -> Result<ResourceSettlementObservationV1, ResourceErrorV1> {
         let PendingResourceCloseV1 {
             owner,
@@ -1564,8 +1694,9 @@ impl ResourceTableV1 {
             identity,
         } = pending;
         let closed = match owner {
-            ResourceOwnerV1::FsHandle(handle) => close(handle),
+            ResourceOwnerV1::FsHandle(handle) => backend.resource_close(handle),
             ResourceOwnerV1::Buffer(_) => Ok(()),
+            ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
         };
         match closed {
             Ok(()) => Ok(ResourceSettlementObservationV1 {
@@ -1585,7 +1716,7 @@ impl ResourceTableV1 {
 
     pub fn finalize_all_with(
         &mut self,
-        mut close: impl FnMut(crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1>,
+        backend: &mut impl HostEffectBackendV1,
     ) -> Vec<ResourceSettlementObservationV1> {
         let tokens = self
             .slots
@@ -1605,8 +1736,9 @@ impl ResourceTableV1 {
                 let kind = pending.kind;
                 let identity = pending.identity;
                 let closed = match pending.owner {
-                    ResourceOwnerV1::FsHandle(handle) => close(handle),
+                    ResourceOwnerV1::FsHandle(handle) => backend.resource_close(handle),
                     ResourceOwnerV1::Buffer(_) => Ok(()),
+                    ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
                 };
                 Some(match closed {
                     Ok(()) => ResourceSettlementObservationV1 {
@@ -1639,10 +1771,9 @@ impl ResourceTableV1 {
                 return Err(ResourceErrorV1::Closed);
             };
             return Err(ResourceErrorV1::ResourceKindMismatch {
-                expected: if *actual == ResourceKindV1::FsHandle {
-                    ResourceKindV1::Buffer
-                } else {
-                    ResourceKindV1::FsHandle
+                expected: match actual {
+                    ResourceKindV1::FsHandle => ResourceKindV1::Buffer,
+                    ResourceKindV1::Buffer | ResourceKindV1::Mapping => ResourceKindV1::FsHandle,
                 },
                 actual: *actual,
             });
@@ -1955,6 +2086,10 @@ pub trait HostEffectBackendV1 {
     fn resource_close(&mut self, handle: crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1> {
         crate::close_resource_v1(handle)
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+    }
+
+    fn resource_unmap(&mut self, _region: MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
+        Err(IoErrorIdentityV1::Unsupported)
     }
 }
 
@@ -2771,11 +2906,9 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             match resources.begin_release(token) {
                 Ok(pending) => {
                     resource_bindings.push((ResourceBindingRole::Target, pending.identity));
-                    ResourceTableV1::finish_release_with(pending, |owner| {
-                        backend.resource_close(owner)
-                    })
-                    .map(CanonicalReplyV1::ResourceSettlement)
-                    .map_err(SemanticErrorV1::Resource)
+                    ResourceTableV1::finish_release_with(pending, backend)
+                        .map(CanonicalReplyV1::ResourceSettlement)
+                        .map_err(SemanticErrorV1::Resource)
                 }
                 Err(error) => Err(SemanticErrorV1::Resource(error)),
             }
@@ -3460,6 +3593,106 @@ mod tests {
     use super::*;
     use crate::RevocationDomain;
     use sha2::{Digest, Sha256};
+
+    impl<F> HostEffectBackendV1 for F
+    where
+        F: FnMut(crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1>,
+    {
+        fn console_write(&mut self, _: ConsoleStreamV1, _: &[u8]) -> Result<(), IoErrorIdentityV1> {
+            unreachable!()
+        }
+
+        fn console_flush(&mut self, _: ConsoleStreamV1) -> Result<(), IoErrorIdentityV1> {
+            unreachable!()
+        }
+
+        fn console_is_terminal(&mut self, _: ConsoleStreamV1) -> bool {
+            unreachable!()
+        }
+
+        fn fs_read_file(
+            &mut self,
+            _: &CapabilityGrantV1,
+            _: &[u8],
+        ) -> Result<Vec<u8>, FileErrorCauseV1> {
+            unreachable!()
+        }
+
+        fn fs_write_file(
+            &mut self,
+            _: &CapabilityGrantV1,
+            _: &[u8],
+            _: CreatePolicyV1,
+            _: &[u8],
+        ) -> Result<(), FileErrorCauseV1> {
+            unreachable!()
+        }
+
+        fn resource_close(
+            &mut self,
+            handle: crate::ResourceHandleV1,
+        ) -> Result<(), IoErrorIdentityV1> {
+            self(handle)
+        }
+    }
+
+    #[derive(Default)]
+    struct MappingReleaseBackend {
+        unmap_calls: usize,
+        close_calls: usize,
+        unmap_error: Option<IoErrorIdentityV1>,
+        observed: Option<(usize, MappingBackingV1, MappingProtectionV1)>,
+    }
+
+    impl HostEffectBackendV1 for MappingReleaseBackend {
+        fn console_write(&mut self, _: ConsoleStreamV1, _: &[u8]) -> Result<(), IoErrorIdentityV1> {
+            unreachable!()
+        }
+
+        fn console_flush(&mut self, _: ConsoleStreamV1) -> Result<(), IoErrorIdentityV1> {
+            unreachable!()
+        }
+
+        fn console_is_terminal(&mut self, _: ConsoleStreamV1) -> bool {
+            unreachable!()
+        }
+
+        fn fs_read_file(
+            &mut self,
+            _: &CapabilityGrantV1,
+            _: &[u8],
+        ) -> Result<Vec<u8>, FileErrorCauseV1> {
+            unreachable!()
+        }
+
+        fn fs_write_file(
+            &mut self,
+            _: &CapabilityGrantV1,
+            _: &[u8],
+            _: CreatePolicyV1,
+            _: &[u8],
+        ) -> Result<(), FileErrorCauseV1> {
+            unreachable!()
+        }
+
+        fn resource_close(
+            &mut self,
+            handle: crate::ResourceHandleV1,
+        ) -> Result<(), IoErrorIdentityV1> {
+            self.close_calls += 1;
+            drop(handle);
+            Ok(())
+        }
+
+        fn resource_unmap(&mut self, region: MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
+            self.unmap_calls += 1;
+            self.observed = Some((region.length(), region.backing(), region.protection()));
+            match self.unmap_error.take() {
+                Some(error) => Err(error),
+                None => Ok(()),
+            }
+        }
+    }
 
     #[derive(Default)]
     struct AllOpsBackend(Vec<HostOpV1>, EntropySource);
@@ -4877,7 +5110,7 @@ mod tests {
             Err(ResourceErrorV1::Closed)
         ));
         let calls = std::cell::Cell::new(0);
-        let result = ResourceTableV1::finish_release_with(pending, |owner| {
+        let result = ResourceTableV1::finish_release_with(pending, &mut |owner| {
             calls.set(calls.get() + 1);
             drop(owner);
             Err(IoErrorIdentityV1::Other(5))
@@ -4898,6 +5131,193 @@ mod tests {
         ));
         assert_eq!(calls.get(), 1, "closed descriptors are never retried");
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Promise class: durable invariant. MEASURED: an anonymous writable mapping
+    /// owns host-private bytes, carries READ|WRITE under one explicit lineage,
+    /// becomes inadmissible when that lineage is revoked, and releases through
+    /// exactly one by-value backend unmap before its token stays closed. CLAIMED:
+    /// ABI-S6 D1 reuses the resource table's opacity, rights, revocation, and
+    /// terminal release state machine for a distinct Mapping kind. THE GAP: D1
+    /// has no live MappingAllocate operation or byte view; D3 and D2 own those.
+    #[test]
+    fn abi_s6_d1_mapping_is_opaque_lineage_bound_and_terminally_unmapped() {
+        let mut revocation = RevocationDomain::default();
+        let lineage = revocation.mint_root();
+        assert!(matches!(
+            MappingRegionV1::try_new_anonymous(0, MappingProtectionV1::Writable),
+            Err(ResourceErrorV1::InvalidBounds)
+        ));
+        let region = MappingRegionV1::try_new_anonymous(32, MappingProtectionV1::Writable)
+            .expect("represented anonymous mapping");
+        assert_eq!(region.length(), 32);
+        assert_eq!(region.backing(), MappingBackingV1::Anonymous);
+        assert_eq!(region.protection(), MappingProtectionV1::Writable);
+
+        let mut table = ResourceTableV1::default();
+        let (token, identity) = table.insert_mapping(region, lineage);
+        assert_eq!(identity, ResourceTraceIdentityV1(1));
+        assert!(table.resolve_mapping(token, crate::RightSet::READ).is_ok());
+        assert!(table.resolve_mapping(token, crate::RightSet::WRITE).is_ok());
+        assert!(matches!(
+            table.resolve_mapping(token, crate::RightSet::CHANGE_MODE),
+            Err(ResourceErrorV1::RightNotHeld { required, held })
+                if required == crate::RightSet::CHANGE_MODE.bits()
+                    && held == crate::RightSet::READ.union(crate::RightSet::WRITE).bits()
+        ));
+        assert!(matches!(
+            table.resolve_buffer(token),
+            Err(ResourceErrorV1::ResourceKindMismatch {
+                expected: ResourceKindV1::Buffer,
+                actual: ResourceKindV1::Mapping,
+            })
+        ));
+        let admitted = table
+            .admit_resources(&revocation, &[token])
+            .expect("live lineage admits the mapping");
+        assert!(table.finish_admission(admitted).is_empty());
+        assert!(revocation.revoke(lineage));
+        assert!(matches!(
+            table.admit_resources(&revocation, &[token]),
+            Err(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
+        ));
+
+        let pending = table
+            .begin_release(token)
+            .expect("revoked owners remain releasable");
+        let mut backend = MappingReleaseBackend::default();
+        let settlement =
+            ResourceTableV1::finish_release_with(pending, &mut backend).expect("mapping release");
+        assert_eq!(backend.unmap_calls, 1);
+        assert_eq!(backend.close_calls, 0);
+        assert_eq!(
+            backend.observed,
+            Some((
+                32,
+                MappingBackingV1::Anonymous,
+                MappingProtectionV1::Writable,
+            ))
+        );
+        assert_eq!(
+            settlement,
+            ResourceSettlementObservationV1 {
+                schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                resource_kind: ResourceKindV1::Mapping,
+                identity,
+                outcome: ResourceSettlementOutcomeV1::Released,
+            }
+        );
+        assert!(matches!(
+            table.resolve_mapping(token, crate::RightSet::READ),
+            Err(ResourceErrorV1::Closed)
+        ));
+        assert!(matches!(
+            table.begin_release(token),
+            Err(ResourceErrorV1::Closed)
+        ));
+        assert_eq!(backend.unmap_calls, 1, "terminal release is never retried");
+    }
+
+    /// Promise class: durable invariant. MEASURED: a backend that has not
+    /// implemented native unmap returns exact `Unsupported` and does not treat
+    /// dropping the in-process representation as a successful unmap. CLAIMED:
+    /// D1's backend seam fails closed while Mapping remains represented-
+    /// unavailable. THE GAP: later native promotion replaces this default and
+    /// must independently prove the real syscall path.
+    #[test]
+    fn abi_s6_d1_default_backend_unmap_is_unavailable_not_a_silent_drop() {
+        let region = MappingRegionV1::try_new_anonymous(4, MappingProtectionV1::ReadOnly)
+            .expect("represented anonymous mapping");
+        let mut backend = AllOpsBackend::default();
+        assert_eq!(
+            HostEffectBackendV1::resource_unmap(&mut backend, region),
+            Err(IoErrorIdentityV1::Unsupported)
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: a backend unmap error becomes
+    /// exact Mapping `ReleaseFailed`, the generation-checked token is already
+    /// closed, and a second release makes no backend call. CLAIMED: Mapping and
+    /// FsHandle share terminal fallible release rather than a retry transition.
+    /// THE GAP: the error is injected; native munmap promotion is later work.
+    #[test]
+    fn abi_s6_d1_unmap_failure_is_typed_and_terminal() {
+        let mut revocation = RevocationDomain::default();
+        let lineage = revocation.mint_root();
+        let region = MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::ReadOnly)
+            .expect("represented anonymous mapping");
+        let mut table = ResourceTableV1::default();
+        let (token, identity) = table.insert_mapping(region, lineage);
+        assert!(matches!(
+            table.resolve_mapping(token, crate::RightSet::WRITE),
+            Err(ResourceErrorV1::RightNotHeld { required, held })
+                if required == crate::RightSet::WRITE.bits()
+                    && held == crate::RightSet::READ.bits()
+        ));
+        let pending = table.begin_release(token).expect("mapping release begins");
+        let mut backend = MappingReleaseBackend {
+            unmap_error: Some(IoErrorIdentityV1::Other(22)),
+            ..MappingReleaseBackend::default()
+        };
+
+        assert_eq!(
+            ResourceTableV1::finish_release_with(pending, &mut backend),
+            Err(ResourceErrorV1::ReleaseFailed {
+                schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                resource_kind: ResourceKindV1::Mapping,
+                identity,
+                io: IoErrorIdentityV1::Other(22),
+            })
+        );
+        assert_eq!(backend.unmap_calls, 1);
+        assert!(matches!(
+            table.begin_release(token),
+            Err(ResourceErrorV1::Closed)
+        ));
+        assert_eq!(backend.unmap_calls, 1, "failed unmap is terminal");
+    }
+
+    /// Promise class: durable invariant. MEASURED: finalizing one Buffer and
+    /// one Mapping drops the Buffer without any backend call and sends only the
+    /// Mapping through `resource_unmap`. CLAIMED: Mapping cannot be conflated
+    /// with Buffer's total in-process release arm. THE GAP: filesystem close is
+    /// independently covered by the established finalizer tests.
+    #[test]
+    fn abi_s6_d1_finalizer_distinguishes_mapping_unmap_from_buffer_drop() {
+        let mut revocation = RevocationDomain::default();
+        let lineage = revocation.mint_root();
+        let mut table = ResourceTableV1::default();
+        let (_, buffer_identity) = table.insert_buffer(4).expect("buffer");
+        let region = MappingRegionV1::try_new_anonymous(16, MappingProtectionV1::ReadOnly)
+            .expect("represented anonymous mapping");
+        let (_, mapping_identity) = table.insert_mapping(region, lineage);
+        let mut backend = MappingReleaseBackend {
+            unmap_error: Some(IoErrorIdentityV1::Other(29)),
+            ..MappingReleaseBackend::default()
+        };
+
+        assert_eq!(
+            table.finalize_all_with(&mut backend),
+            vec![
+                ResourceSettlementObservationV1 {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: ResourceKindV1::Buffer,
+                    identity: buffer_identity,
+                    outcome: ResourceSettlementOutcomeV1::Released,
+                },
+                ResourceSettlementObservationV1 {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: ResourceKindV1::Mapping,
+                    identity: mapping_identity,
+                    outcome: ResourceSettlementOutcomeV1::ReleaseFailed(IoErrorIdentityV1::Other(
+                        29,
+                    )),
+                },
+            ]
+        );
+        assert_eq!(backend.unmap_calls, 1);
+        assert_eq!(backend.close_calls, 0);
+        assert_eq!(table.live_buffer_capacity, 0);
     }
 
     /// Promise class: durable invariant. MEASURED: two independently admitted
@@ -4938,7 +5358,7 @@ mod tests {
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].identity, identity);
         let calls = std::cell::Cell::new(0);
-        ResourceTableV1::finish_release_with(pending.pop().unwrap(), |owner| {
+        ResourceTableV1::finish_release_with(pending.pop().unwrap(), &mut |owner| {
             calls.set(calls.get() + 1);
             crate::close_resource_v1(owner)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
@@ -4966,7 +5386,7 @@ mod tests {
         let (token_b, identity_b) = table
             .insert_fs_handle_without_provenance_for_test(owner_b, crate::RightSet::METADATA);
         let calls = std::cell::Cell::new(0);
-        let settlements = table.finalize_all_with(|owner| {
+        let settlements = table.finalize_all_with(&mut |owner| {
             let call = calls.get();
             calls.set(call + 1);
             drop(owner);
@@ -5002,7 +5422,7 @@ mod tests {
                 Err(ResourceErrorV1::Closed)
             ));
         }
-        assert!(table.finalize_all_with(|_| unreachable!()).is_empty());
+        assert!(table.finalize_all_with(&mut |_| unreachable!()).is_empty());
         assert_eq!(calls.get(), 2, "explicit finalization never retries");
         for root in [root_a, root_b] {
             std::fs::remove_dir_all(root).unwrap();
@@ -5027,7 +5447,7 @@ mod tests {
         .unwrap();
         assert_eq!(metadata.size, 14);
         let pending = table.begin_release(stale).unwrap();
-        ResourceTableV1::finish_release_with(pending, |owner| {
+        ResourceTableV1::finish_release_with(pending, &mut |owner| {
             crate::close_resource_v1(owner)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         })
@@ -5066,7 +5486,7 @@ mod tests {
 
         let wrapped = table.force_generation_for_test(reused, u32::MAX);
         let pending = table.begin_release(wrapped).unwrap();
-        ResourceTableV1::finish_release_with(pending, |owner| {
+        ResourceTableV1::finish_release_with(pending, &mut |owner| {
             crate::close_resource_v1(owner)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         })
@@ -5093,7 +5513,7 @@ mod tests {
             Err(ResourceErrorV1::MalformedResource)
         );
         let pending = table.begin_release(after_wrap).unwrap();
-        ResourceTableV1::finish_release_with(pending, |owner| {
+        ResourceTableV1::finish_release_with(pending, &mut |owner| {
             crate::close_resource_v1(owner)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         })
@@ -6785,7 +7205,7 @@ mod tests {
             let pending = pending.pop().unwrap();
             assert_eq!(pending.identity, admitted_identity);
             let close_calls = std::cell::Cell::new(0);
-            let settlement = ResourceTableV1::finish_release_with(pending, |owner| {
+            let settlement = ResourceTableV1::finish_release_with(pending, &mut |owner| {
                 close_calls.set(close_calls.get() + 1);
                 if let Some(error) = close_error {
                     drop(owner);
@@ -7377,7 +7797,7 @@ mod tests {
             CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::Closed))
         );
         assert!(closed.resource_bindings.is_empty());
-        resources.finalize_all_with(|owner| {
+        resources.finalize_all_with(&mut |owner| {
             crate::close_resource_v1(owner)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         });
@@ -7585,7 +8005,7 @@ mod tests {
         ));
         assert_eq!(std::fs::read(root.join("target.bin")).unwrap(), b"BBBB0000");
 
-        resources.finalize_all_with(|owner| {
+        resources.finalize_all_with(&mut |owner| {
             crate::close_resource_v1(owner)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         });
@@ -7764,7 +8184,7 @@ mod tests {
             CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(b"BBBB".to_vec()))
         );
 
-        resources.finalize_all_with(|owner| {
+        resources.finalize_all_with(&mut |owner| {
             crate::close_resource_v1(owner)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         });

@@ -1062,18 +1062,14 @@ impl ProcessContext {
     fn finalize_resources(&mut self) {
         let settlements = {
             let host = &mut self.host;
-            self.resources
-                .finalize_all_with(|owner| host.resource_close(owner))
+            self.resources.finalize_all_with(host)
         };
         self.record_resource_settlements(settlements);
     }
 
     #[cfg(test)]
-    fn finalize_resources_with(
-        &mut self,
-        close: impl FnMut(crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1>,
-    ) {
-        let settlements = self.resources.finalize_all_with(close);
+    fn finalize_resources_with(&mut self, backend: &mut impl HostEffectBackendV1) {
+        let settlements = self.resources.finalize_all_with(backend);
         self.record_resource_settlements(settlements);
     }
 
@@ -1295,6 +1291,7 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                     reply.resource_error.resource_kind = match resource_kind {
                         crate::ResourceKindV1::FsHandle => 0,
                         crate::ResourceKindV1::Buffer => 1,
+                        crate::ResourceKindV1::Mapping => 2,
                     };
                     reply.resource_error.identity = identity.0;
                     reply.resource_error.io = io_error_tag(io);
@@ -1304,10 +1301,12 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                     reply.resource_error.expected_kind = match expected {
                         crate::ResourceKindV1::FsHandle => 0,
                         crate::ResourceKindV1::Buffer => 1,
+                        crate::ResourceKindV1::Mapping => 2,
                     };
                     reply.resource_error.actual_kind = match actual {
                         crate::ResourceKindV1::FsHandle => 0,
                         crate::ResourceKindV1::Buffer => 1,
+                        crate::ResourceKindV1::Mapping => 2,
                     };
                 }
                 crate::ResourceErrorV1::BufferLimit => reply.detail = 5,
@@ -1390,6 +1389,7 @@ fn decode_resource_error_reply(
     let kind = |tag| match tag {
         0 => Some(crate::ResourceKindV1::FsHandle),
         1 => Some(crate::ResourceKindV1::Buffer),
+        2 => Some(crate::ResourceKindV1::Mapping),
         _ => None,
     };
     let all_zero = payload == ResourceErrorReplyV1::default();
@@ -1975,7 +1975,7 @@ mod tests {
             .resources
             .insert_fs_handle_without_provenance_for_test(owner, crate::RightSet::METADATA);
         let close_calls = std::cell::Cell::new(0);
-        context.finalize_resources_with(|owner| {
+        context.finalize_resources_with(&mut |owner| {
             close_calls.set(close_calls.get() + 1);
             drop(owner);
             Err(IoErrorIdentityV1::Other(5))
@@ -2273,6 +2273,7 @@ mod tests {
         assert_eq!(effect_binding("error", "resource.AllocationFailed"), 9);
         assert_eq!(effect_binding("tag", "resource_kind.FsHandle"), 0);
         assert_eq!(effect_binding("tag", "resource_kind.Buffer"), 1);
+        assert_eq!(effect_binding("tag", "resource_kind.Mapping"), 2);
         assert_eq!(effect_binding("lifetime", "resource_error_reply_schema"), 1);
         assert_eq!(
             effect_binding("limit", "buffer.per_buffer_max_capacity"),
@@ -2666,6 +2667,19 @@ mod tests {
                 io: crate::IoErrorIdentityV1::Other(-5),
             })
         );
+        let mapping_release = ResourceErrorReplyV1 {
+            resource_kind: 2,
+            ..release
+        };
+        assert_eq!(
+            decode_resource_error_reply(3, mapping_release),
+            Some(crate::ResourceErrorV1::ReleaseFailed {
+                schema_version: 1,
+                resource_kind: crate::ResourceKindV1::Mapping,
+                identity: crate::ResourceTraceIdentityV1(u64::MAX),
+                io: crate::IoErrorIdentityV1::Other(-5),
+            })
+        );
         let mismatch = ResourceErrorReplyV1 {
             expected_kind: 0,
             actual_kind: 1,
@@ -2744,7 +2758,7 @@ mod tests {
             (
                 3,
                 ResourceErrorReplyV1 {
-                    resource_kind: 2,
+                    resource_kind: 3,
                     ..release
                 },
             ),
@@ -2863,6 +2877,40 @@ mod tests {
                 ResourceErrorReplyV1 {
                     expected_kind: 1,
                     actual_kind: 0,
+                    ..ResourceErrorReplyV1::default()
+                },
+            )
+        );
+        assert_eq!(
+            project(crate::ResourceErrorV1::ReleaseFailed {
+                schema_version: 1,
+                resource_kind: crate::ResourceKindV1::Mapping,
+                identity: crate::ResourceTraceIdentityV1(17),
+                io: crate::IoErrorIdentityV1::Unsupported,
+            }),
+            (
+                REPLY_RESOURCE_ERROR,
+                3,
+                ResourceErrorReplyV1 {
+                    schema_version: 1,
+                    resource_kind: 2,
+                    identity: 17,
+                    io: io_error_tag(crate::IoErrorIdentityV1::Unsupported),
+                    ..ResourceErrorReplyV1::default()
+                },
+            )
+        );
+        assert_eq!(
+            project(crate::ResourceErrorV1::ResourceKindMismatch {
+                expected: crate::ResourceKindV1::Mapping,
+                actual: crate::ResourceKindV1::Buffer,
+            }),
+            (
+                REPLY_RESOURCE_ERROR,
+                4,
+                ResourceErrorReplyV1 {
+                    expected_kind: 2,
+                    actual_kind: 1,
                     ..ResourceErrorReplyV1::default()
                 },
             )

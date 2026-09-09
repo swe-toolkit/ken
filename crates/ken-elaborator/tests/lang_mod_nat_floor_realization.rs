@@ -68,8 +68,8 @@ const FLOOR_CASES: [FloorCase; 10] = [
     },
     FloorCase {
         name: "ResourceKind",
-        constructors: &["FsHandle", "Buffer"],
-        source: "fn witness (x : ResourceKind) : ResourceKind = match x { FsHandle |-> Buffer ; Buffer |-> FsHandle }",
+        constructors: &["FsHandle", "Buffer", "Mapping"],
+        source: "fn witness (x : ResourceKind) : ResourceKind = match x { FsHandle |-> Buffer ; Buffer |-> Mapping ; Mapping |-> FsHandle }",
     },
     FloorCase {
         name: "Result",
