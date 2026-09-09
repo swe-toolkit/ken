@@ -140,6 +140,14 @@ region-acquire/hold/view/release surface under that shape. Per-increment partial
 landing is authorized. Each operation is threaded through every registration
 site (see AC-INVENTORY-BUILD-BREAK) and lands `RepresentedUnavailable`.
 
+CURRENT POSITION (2026-09-09, measured at `origin/main` `8726f73d6`): D0-D3 have
+merged — the represented `Mapping` operation surface (acquire / bounded views /
+registration) landed on **anonymous** backing, fail-closed and
+`RepresentedUnavailable` (D3 PR #3444, adversary M8 NO DEFECT). The current
+increment is **D4 — file-backed acquire** (runtime-leader named it,
+evt_2zbjjanyg11zx). The node stays `active` across increments; native promotion
+remains a separate later increment.
+
 - **D0 — representation-shape measurement + Architect ruling (reasoning-dense,
   first).** As above: measure the reuse-vs-parallel fork against the boundary,
   hard-stop to the Architect, land nothing until ruled.
@@ -170,6 +178,21 @@ site (see AC-INVENTORY-BUILD-BREAK) and lands `RepresentedUnavailable`.
   Whichever increment (D2 or D3) first makes the parallel `Mapping`
   `ResourceKind` tag reachable to the native reifier also closes the reification
   totality gap — see AC-NATIVE-REIFICATION-TOTAL.
+- **D4 — file-backed mapping acquire (the FsHandle-backed backing axis).** D1-D3
+  landed the represented `Mapping` surface on anonymous backing; D4 adds the
+  file-backed acquire path — a mapping-acquire that takes a **held `FsHandle`**
+  and shares/derives its revocation lineage from it (AC-LIFETIME-REVOCATION
+  already binds this), exercising the source-`FsHandle` lineage/rights rule and
+  the file-backed backing axis. The `HostEffectBackendV1` seam for the real
+  `mmap`-of-fd / `munmap` is shaped as in D1 but lands `RepresentedUnavailable`;
+  no `SYS_*` fact (native promotion is a separate later increment). Deny by
+  default: acquisition requires the governing right on the source handle, and a
+  file-backed region cannot outlive a revocation of the file's lineage.
+  **The capacity-governance fork (AC-MAPPING-CAPACITY-GOVERNANCE) is a hard stop
+  to the ARCHITECT before implementation** — whether the mapping surface adopts
+  per-mapping and invocation-wide limits or an explicit unbounded-but-graceful
+  contract is a design ruling, not this frame's call; land nothing on that axis
+  until ruled.
 
 ## Acceptance criteria (each with its control)
 
@@ -241,6 +264,29 @@ site (see AC-INVENTORY-BUILD-BREAK) and lands `RepresentedUnavailable`.
   the `ResourceKindMapping` alternative reds a named test. This is NOT a D1
   defect — D1's tag is unreachable and fail-closed — it binds whichever
   increment first makes the tag reachable.
+- **AC-MAPPING-CAPACITY-GOVERNANCE (D4; adversary bounded obs on D3,
+  evt_n041yasg5m26).** `MappingAllocate` currently has NO capacity governor:
+  `try_new_anonymous` (`effect_v1.rs:1044`) rejects `length == 0` and fails
+  gracefully on a huge length (`try_reserve_exact` -> `AllocationFailed`, no
+  OOM-abort), but there is no per-mapping cap and no invocation-wide live-mapping
+  accounting — unlike `BufferAllocate`, which enforces `per_buffer_max_capacity`
+  (1 MiB, sealed catalog `buffer.per_buffer_max_capacity|1048576`) and
+  `invocation_max_live_capacity` at `insert_buffer` (`effect_v1.rs:1266`). This
+  is inert in D1-D3 (`MappingAllocate` is unreachable from Ken source — no
+  producer syntax) but goes LIVE the moment a source program can emit
+  `MappingAllocate` with an attacker-influenced `length: u64` or multiplicity: a
+  represented-side resource-exhaustion vector capped only by the process
+  allocator. D4 must CONSCIOUSLY rule — as an Architect hard stop BEFORE
+  implementation (see Hard stop) — whether a `mapping.per_mapping_max_capacity`
+  and an invocation-wide mapping limit belong in the sealed ABI, or whether
+  unbounded-but-graceful is the intended contract (mappings are semantically
+  meant to be larger than buffers, so unbounded MAY be by design). Whichever is
+  ruled, it is a DELIBERATE ABI ruling, not a silent gap. Control: if a limit is
+  adopted, an allocation past the per-mapping cap and the (N+1)th live mapping
+  past the invocation cap each red a named test, and the control must fail
+  against a governor-neutered tree (non-vacuous); if unbounded-but-graceful is
+  ruled, a huge / many-mapping request still fails closed with the typed refusal
+  (never an OOM-abort) and that graceful-failure path is asserted.
 - **AC-RIGHT-BUDGET (measured constraint, not a deliverable).** `RightSet`
   (`capability.rs:94`) is a `u8` with 7 of 8 bits assigned — one bit remains. If
   the mapping needs a distinct capability right rather than reusing `READ` /
@@ -297,3 +343,10 @@ consumed; or opacity / bounds / lifetime cannot be held without exposing an
 address to Ken. Any of those means the work as framed is not what the tree needs,
 not that scope should bend. The D0 representation fork itself is a hard-stop to
 the ARCHITECT (not the Steward) — it is a design ruling, not a scope question.
+
+The D4 mapping capacity-governance fork (AC-MAPPING-CAPACITY-GOVERNANCE:
+per-mapping / invocation-wide limit versus an explicit unbounded-but-graceful
+contract) is likewise a hard stop to the ARCHITECT, before D4 implementation. It
+is a security-relevant ABI-shape ruling — like the D0 fork, a design decision,
+not a scope question — and D4 lands nothing on that axis until the Architect
+rules it.
