@@ -44,6 +44,9 @@ pub enum HostOpV1 {
     ResourceRelease = 0x0401,
     BufferAllocate = 0x0402,
     BufferFreeze = 0x0403,
+    MappingAllocate = 0x0404,
+    MappingReadView = 0x0405,
+    MappingWriteView = 0x0406,
     EntropyRandomBytes = 0x0501,
 }
 
@@ -136,7 +139,10 @@ impl HostOpV1 {
             Self::FsDuplicate => Some(Self::ResourceRelease),
             Self::ResourceRelease => Some(Self::BufferAllocate),
             Self::BufferAllocate => Some(Self::BufferFreeze),
-            Self::BufferFreeze => Some(Self::EntropyRandomBytes),
+            Self::BufferFreeze => Some(Self::MappingAllocate),
+            Self::MappingAllocate => Some(Self::MappingReadView),
+            Self::MappingReadView => Some(Self::MappingWriteView),
+            Self::MappingWriteView => Some(Self::EntropyRandomBytes),
             Self::EntropyRandomBytes => None,
         }
     }
@@ -179,6 +185,9 @@ impl HostOpV1 {
             Self::ResourceRelease => HostOpAvailabilityV1::NativeTested,
             Self::BufferAllocate => HostOpAvailabilityV1::NativeTested,
             Self::BufferFreeze => HostOpAvailabilityV1::NativeTested,
+            Self::MappingAllocate => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::MappingReadView => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::MappingWriteView => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
         }
     }
@@ -219,6 +228,9 @@ impl HostOpV1 {
             Self::ResourceRelease => false,
             Self::BufferAllocate => false,
             Self::BufferFreeze => false,
+            Self::MappingAllocate => true,
+            Self::MappingReadView => false,
+            Self::MappingWriteView => false,
             Self::EntropyRandomBytes => true,
         }
     }
@@ -528,6 +540,9 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsGetInheritance
         | HostOpV1::FsSetInheritance
         | HostOpV1::FsDuplicate
+        | HostOpV1::MappingAllocate
+        | HostOpV1::MappingReadView
+        | HostOpV1::MappingWriteView
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation))
         }
@@ -1272,18 +1287,17 @@ impl ResourceTableV1 {
         Ok(inserted)
     }
 
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn insert_mapping(
         &mut self,
         region: MappingRegionV1,
-        provenance: crate::revocation_v1::RevocationNodeId,
+        provenance: Option<crate::revocation_v1::RevocationNodeId>,
     ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
         let rights = region.protection().rights();
         self.insert_owner(
             ResourceOwnerV1::Mapping(region),
             ResourceKindV1::Mapping,
             rights,
-            Some(provenance),
+            provenance,
         )
     }
 
@@ -1495,7 +1509,6 @@ impl ResourceTableV1 {
         result
     }
 
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn read_mapping_view(
         &mut self,
         revocation: &crate::RevocationDomain,
@@ -1517,7 +1530,6 @@ impl ResourceTableV1 {
         )
     }
 
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn write_mapping_view(
         &mut self,
         revocation: &crate::RevocationDomain,
@@ -2258,6 +2270,13 @@ pub enum ResourceInputsV1 {
         target: ResourceTokenV1,
         span_origin: ResourceTokenV1,
     },
+    /// Mapping view consumer: the target mapping plus the exact acquisition
+    /// whose span is being viewed. The dispatcher requires exact opaque-token
+    /// equality before exposing or modifying any bytes.
+    MappingSpanTarget {
+        target: ResourceTokenV1,
+        span_origin: ResourceTokenV1,
+    },
     /// `FsWriteAt` consumer: the file, the target buffer, and the span's
     /// originating buffer acquisition (PX8-SPAN-PROV). The dispatcher admits
     /// only when `span_origin == target_buffer`, after host-width admission and
@@ -2350,6 +2369,9 @@ impl HostOpV1 {
             | Self::ResourceRelease
             | Self::BufferAllocate
             | Self::BufferFreeze
+            | Self::MappingAllocate
+            | Self::MappingReadView
+            | Self::MappingWriteView
             | Self::EntropyRandomBytes => CapabilityRequirementV1::None,
         }
     }
@@ -2359,9 +2381,10 @@ impl HostOpV1 {
     /// prevent an owned resource from closing.
     const fn resource_admission_requirement(self) -> ResourceAdmissionRequirementV1 {
         match self {
-            Self::FsHandleMetadata | Self::BufferFreeze => {
-                ResourceAdmissionRequirementV1::Target
-            }
+            Self::FsHandleMetadata
+            | Self::BufferFreeze
+            | Self::MappingReadView
+            | Self::MappingWriteView => ResourceAdmissionRequirementV1::Target,
             Self::FsReadAt => ResourceAdmissionRequirementV1::FileBuffer,
             Self::FsWriteAt => ResourceAdmissionRequirementV1::FileBufferSpan,
             Self::FsSeek
@@ -2390,7 +2413,8 @@ impl HostOpV1 {
             | Self::FsChangeMode
             | Self::FsOpen
             | Self::ResourceRelease
-            | Self::BufferAllocate => ResourceAdmissionRequirementV1::None,
+            | Self::BufferAllocate
+            | Self::MappingAllocate => ResourceAdmissionRequirementV1::None,
         }
     }
 }
@@ -2464,6 +2488,9 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             HostOpV1::BufferFreeze,
             ResourceInputsV1::BufferSpanTarget { .. }
         ) | (
+            HostOpV1::MappingReadView | HostOpV1::MappingWriteView,
+            ResourceInputsV1::MappingSpanTarget { .. }
+        ) | (
             HostOpV1::FsReadAt,
             ResourceInputsV1::FileBuffer { .. }
         ) | (
@@ -2471,6 +2498,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             ResourceInputsV1::FileBufferSpan { .. }
         ) | (
             HostOpV1::BufferAllocate
+                | HostOpV1::MappingAllocate
                 | HostOpV1::ConsoleRead
                 | HostOpV1::ConsoleWrite
                 | HostOpV1::ConsoleFlush
@@ -2587,6 +2615,18 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 CanonicalRequestV1::BufferFreeze { .. }
             )
             | (
+                HostOpV1::MappingAllocate,
+                CanonicalRequestV1::MappingAllocate { .. }
+            )
+            | (
+                HostOpV1::MappingReadView,
+                CanonicalRequestV1::MappingReadView { .. }
+            )
+            | (
+                HostOpV1::MappingWriteView,
+                CanonicalRequestV1::MappingWriteView { .. }
+            )
+            | (
                 HostOpV1::ResourceRelease,
                 CanonicalRequestV1::ResourceRelease
             )
@@ -2600,6 +2640,10 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
         | (
             ResourceAdmissionRequirementV1::Target,
             ResourceInputsV1::BufferSpanTarget { target, .. },
+        )
+        | (
+            ResourceAdmissionRequirementV1::Target,
+            ResourceInputsV1::MappingSpanTarget { target, .. },
         ) => vec![target],
         (
             ResourceAdmissionRequirementV1::FileBuffer,
@@ -2922,6 +2966,59 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                     }
                 }
                 Err(error) => Err(SemanticErrorV1::Resource(error)),
+            }
+        }
+        (HostOpV1::MappingAllocate, CanonicalRequestV1::MappingAllocate { length, protection }) => {
+            match MappingRegionV1::try_new_anonymous(*length, *protection) {
+                Ok(region) => {
+                    let (token, identity) = resources.insert_mapping(region, None);
+                    minted_resource = Some(token);
+                    resource_bindings.push((ResourceBindingRole::Target, identity));
+                    Ok(CanonicalReplyV1::ResourceAcquired {
+                        schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                        resource_kind: ResourceKindV1::Mapping,
+                        identity,
+                    })
+                }
+                Err(error) => Err(SemanticErrorV1::Resource(error)),
+            }
+        }
+        (HostOpV1::MappingReadView, CanonicalRequestV1::MappingReadView { start, length }) => {
+            let ResourceInputsV1::MappingSpanTarget {
+                target,
+                span_origin,
+            } = resource
+            else {
+                unreachable!("resource shape validated")
+            };
+            match resources.read_mapping_view(revocation, target, span_origin, *start, *length) {
+                Ok(bytes) => {
+                    let identity = resources
+                        .identity(target)
+                        .expect("successful mapping view has a live identity");
+                    resource_bindings.push((ResourceBindingRole::Target, identity));
+                    Ok(CanonicalReplyV1::Bytes(bytes))
+                }
+                Err(error) => Err(error),
+            }
+        }
+        (HostOpV1::MappingWriteView, CanonicalRequestV1::MappingWriteView { start, bytes }) => {
+            let ResourceInputsV1::MappingSpanTarget {
+                target,
+                span_origin,
+            } = resource
+            else {
+                unreachable!("resource shape validated")
+            };
+            match resources.write_mapping_view(revocation, target, span_origin, *start, bytes) {
+                Ok(()) => {
+                    let identity = resources
+                        .identity(target)
+                        .expect("successful mapping view has a live identity");
+                    resource_bindings.push((ResourceBindingRole::Target, identity));
+                    Ok(CanonicalReplyV1::Unit)
+                }
+                Err(error) => Err(error),
             }
         }
         (
@@ -3328,6 +3425,18 @@ pub enum CanonicalRequestV1 {
     BufferFreeze {
         start: u64,
         length: u64,
+    },
+    MappingAllocate {
+        length: u64,
+        protection: MappingProtectionV1,
+    },
+    MappingReadView {
+        start: u64,
+        length: u64,
+    },
+    MappingWriteView {
+        start: u64,
+        bytes: Vec<u8>,
     },
     ResourceRelease,
 }
@@ -4109,7 +4218,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(classified, expected);
 
-        const RESOURCE_SIDE_D2: [HostOpV1; 12] = [
+        const RESOURCE_SIDE_D2: [HostOpV1; 15] = [
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
             HostOpV1::FsWriteAt,
@@ -4122,6 +4231,9 @@ mod tests {
             HostOpV1::ResourceRelease,
             HostOpV1::BufferAllocate,
             HostOpV1::BufferFreeze,
+            HostOpV1::MappingAllocate,
+            HostOpV1::MappingReadView,
+            HostOpV1::MappingWriteView,
         ];
         for operation in HostOpV1::ALL {
             let capability_admitted = expected.contains(&operation);
@@ -4151,7 +4263,7 @@ mod tests {
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the sealed
-    /// ABI-R3 operation inventory classifies exactly the ten operations that
+    /// ABI-R3 operation inventory classifies exactly the twelve operations that
     /// borrow existing resources; settlement and allocation are explicitly
     /// outside that set. CLAIMED: every resource borrow crosses provenance
     /// admission before backend access. THE GAP: the behavioral lineage and
@@ -4169,6 +4281,8 @@ mod tests {
             HostOpV1::FsSetInheritance,
             HostOpV1::FsDuplicate,
             HostOpV1::BufferFreeze,
+            HostOpV1::MappingReadView,
+            HostOpV1::MappingWriteView,
         ];
         let classified = HostOpV1::ALL
             .into_iter()
@@ -4197,6 +4311,11 @@ mod tests {
             HostOpV1::BufferAllocate.resource_admission_requirement(),
             ResourceAdmissionRequirementV1::None,
             "a fresh ambient buffer has no acquiring capability"
+        );
+        assert_eq!(
+            HostOpV1::MappingAllocate.resource_admission_requirement(),
+            ResourceAdmissionRequirementV1::None,
+            "a fresh ambient anonymous mapping has no acquiring capability"
         );
     }
 
@@ -4491,7 +4610,7 @@ mod tests {
             )
             .unwrap();
         }
-        const RESOURCE_BEARING: [HostOpV1; 13] = [
+        const RESOURCE_BEARING: [HostOpV1; 16] = [
             HostOpV1::FsOpen,
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
@@ -4505,6 +4624,9 @@ mod tests {
             HostOpV1::ResourceRelease,
             HostOpV1::BufferAllocate,
             HostOpV1::BufferFreeze,
+            HostOpV1::MappingAllocate,
+            HostOpV1::MappingReadView,
+            HostOpV1::MappingWriteView,
         ];
         let pre_resource = HostOpV1::ALL
             .into_iter()
@@ -4931,12 +5053,13 @@ mod tests {
         }
     }
 
-    /// Promise class: transition sentinel. ABI-A3 completes Track A, so the
-    /// exact deferred tail is the two Clock siblings, ABI-S1
-    /// seek/set-length/sync/inheritance get+set/duplication, and Entropy. A later
-    /// availability slice must deliberately retire or update this sentinel.
+    /// Promise class: transition sentinel. ABI-S6 D3 extends the represented-
+    /// unavailable tail with exactly the three Mapping operations while leaving
+    /// the existing Clock, ABI-S1 descriptor, and Entropy members in place. A
+    /// later native-promotion slice must deliberately retire or update this
+    /// sentinel.
     #[test]
-    fn abi_a3_completion_leaves_only_the_non_track_a_deferred_tail() {
+    fn abi_s6_d3_extends_only_the_represented_unavailable_tail() {
         assert_eq!(
             HostOpV1::ALL
                 .into_iter()
@@ -4954,9 +5077,12 @@ mod tests {
                 HostOpV1::FsGetInheritance,
                 HostOpV1::FsSetInheritance,
                 HostOpV1::FsDuplicate,
+                HostOpV1::MappingAllocate,
+                HostOpV1::MappingReadView,
+                HostOpV1::MappingWriteView,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "ABI-S1 D1-D5 add only seek, set-length, sync, inheritance flags, and duplication to the deferred tail"
+            "D3 adds exactly the Mapping producer and views to the represented-unavailable tail"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,
@@ -5074,6 +5200,9 @@ mod tests {
             "ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1",
             "BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1",
             "BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1",
+            "MappingAllocate|0404|unavailable|MappingAllocateRequestV1|2|HostReplyV1|1",
+            "MappingReadView|0405|unavailable|MappingReadViewRequestV1|4|HostReplyV1|1",
+            "MappingWriteView|0406|unavailable|MappingWriteViewRequestV1|4|HostReplyV1|1",
             "lifetime=filesystem_observation_schema|2",
             "lifetime=resource_observation_schema|1",
             "lifetime=resource_error_reply_schema|1",
@@ -5093,6 +5222,9 @@ mod tests {
             "tag=reply.resource_error|6",
             "tag=resource_kind.FsHandle|0",
             "tag=resource_kind.Buffer|1",
+            "tag=resource_kind.Mapping|2",
+            "tag=mapping_protection.read_only|0",
+            "tag=mapping_protection.writable|1",
             "tag=seek_origin.start|0",
             "tag=seek_origin.current|1",
             "tag=seek_origin.end|2",
@@ -5296,7 +5428,7 @@ mod tests {
         assert_eq!(region.protection(), MappingProtectionV1::Writable);
 
         let mut table = ResourceTableV1::default();
-        let (token, identity) = table.insert_mapping(region, lineage);
+        let (token, identity) = table.insert_mapping(region, Some(lineage));
         assert_eq!(identity, ResourceTraceIdentityV1(1));
         assert!(table.resolve_mapping(token, crate::RightSet::READ).is_ok());
         assert!(table.resolve_mapping(token, crate::RightSet::WRITE).is_ok());
@@ -5390,17 +5522,17 @@ mod tests {
         let (writable, _) = table.insert_mapping(
             MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::Writable)
                 .expect("writable mapping"),
-            writable_lineage,
+            Some(writable_lineage),
         );
         let (other, _) = table.insert_mapping(
             MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::Writable)
                 .expect("second mapping"),
-            other_lineage,
+            Some(other_lineage),
         );
         let (read_only, _) = table.insert_mapping(
             MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::ReadOnly)
                 .expect("read-only mapping"),
-            read_only_lineage,
+            Some(read_only_lineage),
         );
         let (buffer_token, _) = table.insert_buffer(8).expect("wrong-kind buffer");
 
@@ -5475,21 +5607,206 @@ mod tests {
         );
     }
 
-    /// Promise class: transition sentinel. MEASURED: the first Mapping
-    /// operation identity remains unassigned and the closed inventory still
-    /// proceeds directly from BufferFreeze to Entropy. CLAIMED: D2 assigns no
-    /// Mapping producer or view-operation HostOp identity. THE GAP: native tag
-    /// reachability also depends on no existing operation being repurposed;
-    /// exhaustive dispatcher review closes that residual. D3 deliberately
-    /// retires this sentinel when it registers the producer and completes
-    /// native Mapping reification in the same increment.
+    /// Promise class: normative compatibility vector. MEASURED: the three D3
+    /// Mapping identities occupy their pinned append-only values and inventory
+    /// order, remain represented-unavailable, and only anonymous allocation is
+    /// ambient. CLAIMED: D3 closes the Mapping ABI alphabet without native
+    /// admission or an explicit capability seat. THE GAP: native reachability
+    /// also depends on the runtime admission set; the runtime no-seat census
+    /// and its compile-forced exhaustive match close that independent axis.
     #[test]
-    fn abi_s6_d2_leaves_mapping_operation_identity_unassigned() {
-        assert_eq!(HostOpV1::try_from(0x0404), Err(UnknownHostOpV1(0x0404)));
+    fn abi_s6_d3_mapping_identity_and_unavailable_posture_are_pinned() {
+        assert_eq!(HostOpV1::try_from(0x0404), Ok(HostOpV1::MappingAllocate));
+        assert_eq!(HostOpV1::try_from(0x0405), Ok(HostOpV1::MappingReadView));
+        assert_eq!(HostOpV1::try_from(0x0406), Ok(HostOpV1::MappingWriteView));
         assert_eq!(
             HostOpV1::BufferFreeze.next_in_inventory(),
-            Some(HostOpV1::EntropyRandomBytes),
-            "D2 leaves no Mapping-bearing host operation between the existing region and entropy bands"
+            Some(HostOpV1::MappingAllocate)
+        );
+        assert_eq!(
+            HostOpV1::MappingAllocate.next_in_inventory(),
+            Some(HostOpV1::MappingReadView)
+        );
+        assert_eq!(
+            HostOpV1::MappingReadView.next_in_inventory(),
+            Some(HostOpV1::MappingWriteView)
+        );
+        assert_eq!(
+            HostOpV1::MappingWriteView.next_in_inventory(),
+            Some(HostOpV1::EntropyRandomBytes)
+        );
+        for operation in [
+            HostOpV1::MappingAllocate,
+            HostOpV1::MappingReadView,
+            HostOpV1::MappingWriteView,
+        ] {
+            assert_eq!(
+                operation.availability(),
+                HostOpAvailabilityV1::RepresentedUnavailable
+            );
+            assert_eq!(
+                operation.capability_requirement(),
+                CapabilityRequirementV1::None
+            );
+            assert!(!NATIVE_TESTED_TARGETS_V1.contains(&operation));
+            assert_eq!(
+                host_effect_wire_layout_v1(operation),
+                Err(TerminalErrorV1::OperationUnavailable(operation))
+            );
+        }
+        assert!(HostOpV1::MappingAllocate.is_ambient());
+        assert!(!HostOpV1::MappingReadView.is_ambient());
+        assert!(!HostOpV1::MappingWriteView.is_ambient());
+    }
+
+    /// Promise class: durable invariant. MEASURED: the three represented D3
+    /// operations allocate anonymous Mapping bytes with no lineage node, route
+    /// reads and writes through the landed exact-origin view discipline, and
+    /// preserve the ReadOnly/Writable rights split. CLAIMED: the raw canonical
+    /// host surface is usable by the interpreter without a checked Ken producer
+    /// or native admission. THE GAP: native reachability is independently
+    /// refused by availability and the runtime no-seat census.
+    #[test]
+    fn abi_s6_d3_mapping_dispatch_is_ambient_non_minting_and_view_bounded() {
+        let mut backend = AllOpsBackend::default();
+        let capabilities = CapabilityTableV1::default();
+        let revocation = RevocationDomain::default();
+        let mut resources = ResourceTableV1::default();
+
+        let allocate = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::MappingAllocate,
+            None,
+            ResourceInputsV1::None,
+            &CanonicalRequestV1::MappingAllocate {
+                length: 8,
+                protection: MappingProtectionV1::Writable,
+            },
+        )
+        .expect("represented MappingAllocate dispatch");
+        let target = allocate.resource_token.expect("mapping token");
+        assert_eq!(allocate.capability_identity, None);
+        assert_eq!(
+            allocate.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired {
+                schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                resource_kind: ResourceKindV1::Mapping,
+                identity: ResourceTraceIdentityV1(1),
+            })
+        );
+
+        let write = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::MappingWriteView,
+            None,
+            ResourceInputsV1::MappingSpanTarget {
+                target,
+                span_origin: target,
+            },
+            &CanonicalRequestV1::MappingWriteView {
+                start: 2,
+                bytes: b"map".to_vec(),
+            },
+        )
+        .expect("represented MappingWriteView dispatch");
+        assert_eq!(
+            write.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        );
+        assert_eq!(
+            write.resource_bindings,
+            vec![(ResourceBindingRole::Target, ResourceTraceIdentityV1(1))]
+        );
+
+        let read = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::MappingReadView,
+            None,
+            ResourceInputsV1::MappingSpanTarget {
+                target,
+                span_origin: target,
+            },
+            &CanonicalRequestV1::MappingReadView {
+                start: 2,
+                length: 3,
+            },
+        )
+        .expect("represented MappingReadView dispatch");
+        assert_eq!(
+            read.outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Bytes(b"map".to_vec()))
+        );
+
+        let read_only = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::MappingAllocate,
+            None,
+            ResourceInputsV1::None,
+            &CanonicalRequestV1::MappingAllocate {
+                length: 4,
+                protection: MappingProtectionV1::ReadOnly,
+            },
+        )
+        .expect("represented read-only mapping allocation")
+        .resource_token
+        .expect("read-only mapping token");
+        let refused = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::MappingWriteView,
+            None,
+            ResourceInputsV1::MappingSpanTarget {
+                target: read_only,
+                span_origin: read_only,
+            },
+            &CanonicalRequestV1::MappingWriteView {
+                start: 0,
+                bytes: vec![1],
+            },
+        )
+        .expect("typed read-only refusal");
+        assert_eq!(
+            refused.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: crate::RightSet::WRITE.bits(),
+                held: crate::RightSet::READ.bits(),
+            }))
+        );
+
+        let foreign_origin = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::MappingReadView,
+            None,
+            ResourceInputsV1::MappingSpanTarget {
+                target,
+                span_origin: read_only,
+            },
+            &CanonicalRequestV1::MappingReadView {
+                start: 0,
+                length: 1,
+            },
+        )
+        .expect("typed foreign-origin refusal");
+        assert_eq!(
+            foreign_origin.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
         );
     }
 
@@ -5522,7 +5839,7 @@ mod tests {
         let region = MappingRegionV1::try_new_anonymous(8, MappingProtectionV1::ReadOnly)
             .expect("represented anonymous mapping");
         let mut table = ResourceTableV1::default();
-        let (token, identity) = table.insert_mapping(region, lineage);
+        let (token, identity) = table.insert_mapping(region, Some(lineage));
         assert!(matches!(
             table.resolve_mapping(token, crate::RightSet::WRITE),
             Err(ResourceErrorV1::RightNotHeld { required, held })
@@ -5565,7 +5882,7 @@ mod tests {
         let (_, buffer_identity) = table.insert_buffer(4).expect("buffer");
         let region = MappingRegionV1::try_new_anonymous(16, MappingProtectionV1::ReadOnly)
             .expect("represented anonymous mapping");
-        let (_, mapping_identity) = table.insert_mapping(region, lineage);
+        let (_, mapping_identity) = table.insert_mapping(region, Some(lineage));
         let mut backend = MappingReleaseBackend {
             unmap_error: Some(IoErrorIdentityV1::Other(29)),
             ..MappingReleaseBackend::default()
