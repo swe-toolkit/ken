@@ -8,9 +8,17 @@ renders back to `Bytes` only at the boundary. It never decodes through
 ## 1. Structured paths
 
 ```ken
+import Core.Logic.Compare (list_eq)
+
+import Core.Classes.LawfulClasses (DecEq, bool_and, uint8_deceq_eq)
+
+import Data.Collections.Derived (list_append)
+
 data Path = MkPath {path_absolute : Bool, path_segments : List (List UInt8)}
 
-fn path_is_absolute (path : Path) : Bool =
+export Path, MkPath
+
+pub fn path_is_absolute (path : Path) : Bool =
   match path {
     MkPath absolute segments ↦ absolute
   }
@@ -57,7 +65,7 @@ fn path_input_is_absolute (input : List UInt8) : Bool =
     Cons first rest ↦ path_byte_is_slash first
   }
 
-fn path_parse (raw : Bytes) : Path =
+pub fn path_parse (raw : Bytes) : Path =
   MkPath
     (path_input_is_absolute (bytes_to_list raw))
     (path_split (bytes_to_list raw) (Nil UInt8) (Nil (List UInt8)))
@@ -77,7 +85,7 @@ fn path_render_segments (segments : List (List UInt8)) : List UInt8 =
       }
   }
 
-fn path_render (path : Path) : Bytes =
+pub fn path_render (path : Path) : Bytes =
   match path {
     MkPath absolute segments ↦
       match absolute {
@@ -86,7 +94,7 @@ fn path_render (path : Path) : Bytes =
       }
   }
 
-fn path_join (left : Path) (right : Path) : Path =
+pub fn path_join (left : Path) (right : Path) : Path =
   match right {
     MkPath True segments ↦ right;
     MkPath False right_segments ↦
@@ -106,7 +114,7 @@ fn path_drop_last (segments : List (List UInt8)) : List (List UInt8) =
       }
   }
 
-fn path_parent (path : Path) : Path =
+pub fn path_parent (path : Path) : Path =
   match path {
     MkPath absolute segments ↦ MkPath absolute (path_drop_last segments)
   }
@@ -136,7 +144,7 @@ fn path_segments_valid (segments : List (List UInt8)) : Bool =
     Cons segment rest ↦ bool_and (path_segment_valid segment) (path_segments_valid rest)
   }
 
-fn path_valid (path : Path) : Bool =
+pub fn path_valid (path : Path) : Bool =
   match path {
     MkPath absolute segments ↦ path_segments_valid segments
   }
@@ -987,7 +995,7 @@ theorem path_parse_render_absolute
           (MkPath True)
           (path_split_render_absolute segments valid)))
 
-theorem path_parse_render_valid
+pub theorem path_parse_render_valid
       (path : Path)
     : Eq Bool (path_valid path) True → Eq Path (path_parse (path_render path)) path =
   match path {
@@ -1193,10 +1201,10 @@ theorem path_split_preserves_valid
           segments)
   }
 
-theorem path_parse_valid (raw : Bytes) : Eq Bool (path_valid (path_parse raw)) True =
+pub theorem path_parse_valid (raw : Bytes) : Eq Bool (path_valid (path_parse raw)) True =
   path_split_preserves_valid (bytes_to_list raw) (Nil UInt8) (Nil (List UInt8)) Proved Proved
 
-theorem path_parse_render_parse
+pub theorem path_parse_render_parse
       (raw : Bytes)
     : Eq Path (path_parse (path_render (path_parse raw))) (path_parse raw) =
   path_parse_render_valid (path_parse raw) (path_parse_valid raw)
@@ -1391,7 +1399,7 @@ fn path_normalize_result (path : Path) (raw : Path) (already_normalized : Bool) 
     False ↦ raw
   }
 
-fn path_normalize (path : Path) : Path =
+pub fn path_normalize (path : Path) : Path =
   path_normalize_result path (path_normalize_raw path) (path_normalized path)
 
 theorem path_no_dot_cons
@@ -1723,7 +1731,7 @@ theorem path_normalize_idempotent_result
     False ↦ λis_normalized. absurd is_normalized
   }
 
-theorem path_normalize_idempotent
+pub theorem path_normalize_idempotent
       (path : Path)
     : Eq Path (path_normalize (path_normalize path)) (path_normalize path) =
   path_normalize_idempotent_result
@@ -1775,12 +1783,12 @@ theorem path_normalized_absolute_has_no_dotdot
       }
   }
 
-theorem path_normalize_has_no_dot
+pub theorem path_normalize_has_no_dot
       (path : Path)
     : Equal Bool (path_has_no_dot (path_normalize path)) True =
   path_normalized_has_no_dot (path_normalize path) (path_normalize_normalized path)
 
-theorem path_normalize_absolute_has_no_dotdot
+pub theorem path_normalize_absolute_has_no_dotdot
       (path : Path)
     : Equal Bool (path_absolute_has_no_dotdot (path_normalize path)) True =
   path_normalized_absolute_has_no_dotdot (path_normalize path) (path_normalize_normalized path)
