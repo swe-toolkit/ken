@@ -12,6 +12,39 @@ positional, and subcommand descriptions; that same value drives parsing and
 help generation.
 
 ```ken
+import Application.Input.Schema
+  (SchemaField,
+    MkSchemaField,
+    SchemaOptional,
+    SchemaFlag,
+    SchemaBytes,
+    SchemaRequired,
+    Schema,
+    MkSchema,
+    SchemaFieldCheck,
+    schema_field_presence,
+    SchemaFieldRejected,
+    MkSchemaIssue,
+    SchemaFieldAccepted,
+    SchemaIssue,
+    schema_issue_origin,
+    schema_issue_code,
+    schema_validate_fields,
+    schema_help)
+
+import Capability.Diagnostics.Core
+  (Diagnostic, MkDiagnostic, ArgumentOrigin, MkByteRange, MkDiagnosticCode)
+
+import Capability.Formatting.Doc (Doc, Text)
+
+import Capability.Parsing.Cursor
+  (ArgCursor, ArgLocation, arg_cursor_ops, arg_cursor_start, arg_length, cursor_remaining)
+
+import Capability.Parsing.Decoder
+  (Decoder, decoder_pure, decoder_bind, decoder_satisfy, DecoderFailed, Decoded)
+
+import Data.Collections.Derived (list_append)
+
 import Data.Collections.NonEmpty
   (NonEmpty, nonempty_cons, nonempty_map, Semigroup_instance_NonEmpty)
 
@@ -502,6 +535,27 @@ fn program_help (spec : ProgramSpec) : Doc =
             Char
             (string_to_list_char "\nSubcommands:\n")
             (argparse_subcommands_chars (program_commands spec))))))
+
+export OptionMode,
+  FlagOption,
+  ValueOption,
+  OptionSpec,
+  MkOptionSpec,
+  PositionalSpec,
+  MkPositionalSpec,
+  CommandSpec,
+  MkCommandSpec,
+  ProgramSpec,
+  MkProgramSpec,
+  ParsedArgument,
+  ParsedFlag,
+  ParsedOption,
+  ParsedPositional,
+  ParsedCommand,
+  MkParsedCommand,
+  argparse_run,
+  command_help,
+  program_help
 ```
 
 ## 5. Trust and derivation
