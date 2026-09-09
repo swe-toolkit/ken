@@ -9,7 +9,7 @@ Canonical source: [checked package](../../../../../catalog/packages/Capability/D
 | Fact class | Disposition | Result and grounding |
 |---|---|---|
 | Subject | `generated` | `catalog/packages/Capability/Diagnostics/Render.ken.md` — “Capability.Diagnostics.Render,” from the [subject index](../../subjects.md). |
-| Declaration/type | `authored` | Declares projections from diagnostic codes and origins plus `diagnostic_to_doc`, which renders an origin-family label and stable code into the document algebra. |
+| Declaration/type | `authored` | The public surface is `diagnostic_to_doc`, which renders an origin-family label and stable code into the document algebra; `diagnostic_code_string` and `diagnostic_origin_label` remain private helpers. |
 | Law | `none-declared` | The canonical checked fence declares no `law`, `proof`, or `theorem` for this package. |
 | Effect/capability | `none-declared` | The canonical checked fence declares no effect row, `proc`, `visits`, or capability value for this package. |
 | Assurance | `authored` | The renderer is a transparent structural projection into `Capability.Formatting.Doc`; it adds no error carrier, primitive, postulate, `Axiom`, or trusted-base entry. |
