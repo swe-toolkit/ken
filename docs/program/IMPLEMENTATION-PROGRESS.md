@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-09 01:29:30Z — from 573 issue file(s) in `docs/program/issues/`.
+2026-09-09 04:41:55Z — from 573 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -51,7 +51,7 @@ the committed file matches the generator's output.
 | `ABI-REVOKE-D1` | authority-side lineage + admission lease + the path-side revoked error identity — wires RevocationDomain into the shared host dispatcher and turns the revoked-path oracle case green | merged | runtime | M | none | — |
 | `ABI-REVOKE-D2` | resource provenance + close-after-drain settlement — a resource-token-only op cannot bypass revocation, and owned fds close only after admitted leases drain; turns the two resource oracle cases green | merged | runtime | M | none | — |
 | `ABI-REVOKE` | runtime revocation membrane — the deferred runtime face of 62 §4 | merged | runtime | M-L | none | — |
-| `ABI-S1` | descriptor completion — seek, truncate, sync/data-sync, flags, duplication under explicit inheritance policy | active | runtime | M | none | — |
+| `ABI-S1` | descriptor completion — seek, truncate, sync/data-sync, flags, duplication under explicit inheritance policy | merged | runtime | M | none | — |
 | `ABI-S2` | directory streaming — supersedes whole-directory read where streaming is the honest shape | draft | runtime | M | none | — |
 | `ABI-S3` | monotonic clocks, sleep/deadlines, and secure kernel entropy | merged | runtime | L | none | — |
 | `ABI-S4` | statx-shaped metadata with field-availability bits | draft | runtime | M | none | — |
@@ -640,7 +640,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
-- `ABI-S6` blocked by `ABI-S1` (status: active)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)

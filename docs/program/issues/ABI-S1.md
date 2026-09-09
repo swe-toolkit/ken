@@ -1,7 +1,7 @@
 ---
 id: ABI-S1
 title: "descriptor completion — seek, truncate, sync/data-sync, flags, duplication under explicit inheritance policy"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
