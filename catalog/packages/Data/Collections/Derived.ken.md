@@ -67,10 +67,18 @@ import Core.Classes.LawfulClasses (bool_and, bool_leq)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
-import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)
-
 import Core.Logic.OrdResult
-  (ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2)
+  (OrdResult,
+    Lt,
+    Eq,
+    Gt,
+    ord_eq,
+    ord_lt,
+    ord_gt,
+    ord_result_leq,
+    ord_result_dispatch2,
+    ord_result_elim,
+    ord_result_elim2)
 
 import Core.Logic.Transport (cong, sym, trans)
 

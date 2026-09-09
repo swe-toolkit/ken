@@ -390,9 +390,45 @@ impl<'a> LayoutPrinter<'a> {
             Decl::DataDecl { span, .. } | Decl::AxiomDecl { span, .. } => {
                 self.print_decl_signature(decl, span)
             }
+            Decl::ImportDecl { span, .. } | Decl::ExportDecl { span, .. } => {
+                self.print_module_surface_decl(span)
+            }
             _ => self.print_span(decl.span()),
         };
         self.with_comments(decl.span(), core)
+    }
+
+    /// Module-surface declaration production (`import` / `export`).
+    ///
+    /// A parenthesized selective-import or facade-export name list already
+    /// carries comma-boundary break points through the shared parenthesized
+    /// list algebra (`grouped_token_slice`), so it is routed there unchanged. A
+    /// bare in-scope `export a, b, c` list has no delimiter to carry the break;
+    /// its top-level comma boundaries are routed through the same comma-list
+    /// builder here so an over-width in-scope export wraps under
+    /// `CANONICAL_WIDTH` instead of rendering as a flat, unbreakable run.
+    fn print_module_surface_decl(&self, span: &Span) -> Doc {
+        let indices = self.token_indices(span);
+        if indices.is_empty() {
+            return Doc::Nil;
+        }
+        let has_paren = indices
+            .iter()
+            .any(|index| matches!(self.source.tokens()[*index].kind, Token::LParen));
+        if has_paren {
+            return self.grouped_token_slice(&indices);
+        }
+        if indices.len() > 1 {
+            if let Some(list) = self.comma_separated_token_slice(&indices[1..]) {
+                let separator = self.token_boundary(indices[0], indices[1], Doc::text(" "));
+                return Doc::concat([
+                    Doc::text(self.token_text(indices[0])),
+                    separator,
+                    list,
+                ]);
+            }
+        }
+        self.grouped_token_slice(&indices)
     }
 
     /// Expression production. It is intentionally separate from token block

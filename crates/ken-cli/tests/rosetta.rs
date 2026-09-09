@@ -173,8 +173,7 @@ fn collections_prelude() -> String {
         "import Core.Classes.LawfulClasses (bool_and, bool_leq)",
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Or (Or, Inl, Inr)",
-        "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
-        "import Core.Logic.OrdResult\n  (ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2)",
+        "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
         "import Core.Logic.Transport (cong, sym, trans)",
         "import Data.Numeric.Nat.Order (min, sub)",
     ] {
