@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-CATALOG-COMPLETENESS
 title: "WP-4 Component B — catalog completeness: give Nat and OrdResult (dedup two private copies) canonical public homes plus the fixpoint homeless-convenience census, deliver Order's provider surface + identity, migrate the consuming units (Gcd imports add/mul + leq_nat/sub + Nat and drops its reimplementations), and satisfy whole-catalog strict-green. The module/import campaign's catalog-reuse success step."
-status: active
+status: merged
 owner: language
 size: L
 gate: none
@@ -10,6 +10,47 @@ blocks: []
 github: null
 origin: "Architect ruling evt_214z6r6qnwme0 (2026-08-24), unbundling the WP-4 strict whole-catalog co-gate off Component A. The co-gate gates a deliverable outside WP-4's authorized surface (a canonical home for the type Nat), so it is re-homed here. Steward-filed under [[LANG-MODULE-IMPORT-SYSTEM]]."
 ---
+
+> # MERGED 2026-09-09 — CLOSED AS A LANDED-STATE VERIFICATION (RECUT #3 delta)
+>
+> No code candidate. The deliverable — the evidence-frontier census
+> `crates/ken-elaborator/tests/lang_mod_catalog_evidence_frontier.rs` — is already
+> on `origin/main` (blob `12862cdc92f290cf70e652017c32750f575cef91`; artifact last
+> modified at `7722f4c26`, CAT-MIGRATE-TIER-B-PROVIDERS). The RECUT #3 DELTA
+> MEASUREMENT was run by the language ring and closes the node; no SHA to merge.
+>
+> As-built frontier, measured at `origin/main` `e24c42dc8` (`scripts/ken-cargo test
+> -p ken-elaborator --test lang_mod_catalog_evidence_frontier`, 8 passed / 0 failed,
+> ~104s), run INDEPENDENTLY by language-implementer (evt_7k34xanjwmmr) and
+> language-qa (evt_53jx6xjgppgbb) with matching known-answer: 50 discovered units;
+> 42 `ExactLedger` / 8 `Unavailable` (all `failing_stage = Resolution`); strict 4
+> Succeeded / 46 Refused. This SUPERSEDES the historical 26/24 reading recorded in
+> AC-C1/C3/C6 below — a count is an observation, never a frozen contract (AC-C1,
+> AC-C6).
+>
+> DELTA vs RECUT #3's 26/24 baseline: a monotone frontier advance exactly as AC-C6
+> describes — the landed Pair / Tier-B / Nat provider+floor migrations turned 16
+> more units' legacy cores successful and cleared BOTH prior TypeMismatch failures
+> (Data.Collections.NonEmpty elab; Data.Numeric.Nat.Order kernel). Consequence:
+> there is now NO kernel-stage `Unavailable` row, so the single- vs multi-index
+> Omega-elimination hazard (Architect evt_7wbrfyvwv5517) does not arise — no hard
+> stop.
+>
+> AC-C1..C6 all satisfied by the landed artifact, each enforced by a green
+> STRUCTURAL pin (Steward-verified non-vacuous by reading the test, not taken on
+> the ring's word): population identity
+> (`population_pin_rejects_omission_replacement_and_duplicate`, AC-C1); two
+> orthogonal typed evidence-status axes (AC-C2); `ExactLedger` identity grounding
+> (`panic!` on a successful unit with no exact public target, AC-C3); hard-stop
+> discipline (`panic!` on an unrecorded typed stage / unclassified identity, AC-C4);
+> byte-stability + zero `trusted_base` delta (`HEAD == origin/main`, 0 paths ahead,
+> AC-C5); scoping the identity-grounded rows and leaving the complement
+> `Unavailable`, closing no downstream node (AC-C6). Steward independently confirmed
+> the artifact blob on `origin/main` and the two green runs.
+>
+> Closed docs-only (no code lands), skip-M8. KERNEL-NESTED-IND precedent. The
+> pre-RECUT frontmatter title is retained as history; the RECUT #3 banner below and
+> this banner establish the operative as-built scope.
 
 > # RECUT #3 2026-08-25 — EVIDENCE-FRONTIER artifact (hard stop #3; Architect ruling)
 >
