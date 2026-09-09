@@ -79,6 +79,7 @@ pub struct NativeProcessSymbols {
     pub dir_entry: RuntimeSymbol,
     pub file_operation_seek: RuntimeSymbol,
     pub file_operation_set_length: RuntimeSymbol,
+    pub file_operation_sync: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -166,6 +167,7 @@ impl NativeProcessSymbols {
             dir_entry: "ctor:prelude::DirEntry::MkDirEntry".to_string(),
             file_operation_seek: "ctor:prelude::FileOperation::OpSeek".to_string(),
             file_operation_set_length: "ctor:prelude::FileOperation::OpSetLength".to_string(),
+            file_operation_sync: "ctor:prelude::FileOperation::OpSync".to_string(),
         }
     }
 }
