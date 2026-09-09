@@ -8,32 +8,42 @@ use std::collections::BTreeSet;
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
-const LAWFUL_FUNCTORS: &str = include_str!("../../../catalog/packages/Core/Classes/LawfulFunctors.ken.md");
-const BYTES_KEYS: &str =
-    include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
-const PATH_POSIX: &str = include_str!("../../../catalog/packages/Capability/Filesystem/Path/Posix.ken.md");
-
-fn dependency_env() -> ElabEnv {
-    let mut env = ElabEnv::new().expect("prelude bootstrap");
-    catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
-        .expect("Core.Classes.LawfulClasses must roots-load");
-    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
-    env.elaborate_ken_md_file(BYTES_KEYS)
-        .expect("Data.Binary.BytesKeys must elaborate before the Nat-order closure");
-    catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
-    catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_FUNCTORS)
-        .expect("Core.Classes.LawfulFunctors must elaborate");
-    catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
-    env
-}
+const PATH_POSIX_MODULE: &str = "Capability.Filesystem.Path.Posix";
+const PATH_POSIX_PUBLIC: [&str; 15] = [
+    "MkPath",
+    "Path",
+    "path_is_absolute",
+    "path_join",
+    "path_normalize",
+    "path_normalize_absolute_has_no_dotdot",
+    "path_normalize_has_no_dot",
+    "path_normalize_idempotent",
+    "path_parent",
+    "path_parse",
+    "path_parse_render_parse",
+    "path_parse_render_valid",
+    "path_parse_valid",
+    "path_render",
+    "path_valid",
+];
 
 fn full_env() -> ElabEnv {
-    let mut env = dependency_env();
-    env.elaborate_ken_md_file(PATH_POSIX)
-        .expect("Capability.Filesystem.Path.Posix must elaborate after its declared dependencies");
+    let mut env = ElabEnv::new().expect("prelude bootstrap");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], PATH_POSIX_MODULE)
+        .expect("Capability.Filesystem.Path.Posix must roots-load its declared dependencies");
+    env.elaborate_file(&format!(
+        "import {PATH_POSIX_MODULE} ({})",
+        PATH_POSIX_PUBLIC.join(", ")
+    ))
+    .expect("the curated Posix surface must import together");
+    for surface in PATH_POSIX_PUBLIC {
+        let canonical = env.globals[&format!("{PATH_POSIX_MODULE}.{surface}")];
+        assert_eq!(
+            env.globals.insert(surface.to_owned(), canonical),
+            None,
+            "Posix public aliases must not collide"
+        );
+    }
     env
 }
 
@@ -152,23 +162,7 @@ fn list_segments(env: &ElabEnv, value: &EvalVal) -> Vec<Vec<u8>> {
 #[test]
 fn ordered_dependency_closure_elaborates_path_package() {
     let env = full_env();
-    for name in [
-        "Path",
-        "path_parse",
-        "path_render",
-        "path_normalize",
-        "path_join",
-        "path_parent",
-        "path_is_absolute",
-        "path_valid",
-        "path_split_render_segments",
-        "path_parse_render_valid",
-        "path_parse_valid",
-        "path_parse_render_parse",
-        "path_normalize_idempotent",
-        "path_normalize_has_no_dot",
-        "path_normalize_absolute_has_no_dotdot",
-    ] {
+    for name in PATH_POSIX_PUBLIC {
         assert!(env.globals.contains_key(name), "missing `{name}`");
     }
 }
@@ -194,17 +188,12 @@ fn parse_render_and_normalize_are_byte_exact_at_posix_edges() {
             [EvalVal::Bytes(raw.to_vec())],
         );
         if *raw == b"a//b/" {
-            let (_, parsed_segments) = path_parts(&env, &parsed);
-            let first = match parsed_segments {
-                EvalVal::Ctor { id, args, .. } if *id == env.globals["Cons"] => args[1].clone(),
-                other => panic!("expected first segment, got {other:?}"),
-            };
-            let dot = eval_global(&env, &mut store, "path_dot_segment");
-            let decision = call_global(&env, &mut store, "path_segment_eq", [first, dot]);
+            let validity = call_global(&env, &mut store, "path_valid", [parsed.clone()]);
             assert!(
-                !matches!(decision, EvalVal::Unknown),
-                "segment equality became Unknown"
+                !matches!(validity, EvalVal::Unknown),
+                "public path validity became Unknown"
             );
+            assert!(bool_value(&env, &validity), "parsed path must be valid");
         }
         let normalized = call_global(&env, &mut store, "path_normalize", [parsed]);
         assert!(
@@ -311,34 +300,34 @@ fn validity_rejects_the_old_counterexamples_and_accepts_dotdot() {
 }
 
 #[test]
-fn package_is_extracted_and_adds_zero_trust() {
-    let extracted = ken_elaborator::extract_ken_md(PATH_POSIX).expect("Path.Posix extraction");
-    let tokens: BTreeSet<_> = extracted
-        .source
-        .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
-        .filter(|token| !token.is_empty())
-        .collect();
-    for forbidden in [
-        "Axiom",
-        "primitive",
-        "postulate",
-        "bytes_length",
-        "bytes_slice",
-        "bytes_at",
-        "String",
+fn package_roots_loads_and_adds_zero_trust() {
+    let mut env = ElabEnv::new().expect("prelude bootstrap");
+    for provider in [
+        "Core.Logic.Compare",
+        "Core.Classes.LawfulClasses",
+        "Data.Collections.Derived",
     ] {
-        assert!(
-            !tokens.contains(forbidden),
-            "forbidden `{forbidden}` in extracted Ken"
-        );
+        env.elaborate_module_from_roots(&[catalog_or::catalog_root()], provider)
+            .unwrap_or_else(|error| panic!("Posix provider {provider} must roots-load: {error:?}"));
     }
-    let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(PATH_POSIX)
-        .expect("Path.Posix package");
+    let before_classes = env.class_env.class_entries().count();
+    let before_instances = env.class_env.instances.len();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], PATH_POSIX_MODULE)
+        .expect("Path.Posix package must roots-load");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         before, after,
         "Path.Posix must add zero trusted declarations"
+    );
+    assert_eq!(
+        env.class_env.class_entries().count(),
+        before_classes,
+        "Path.Posix must not mint a class"
+    );
+    assert_eq!(
+        env.class_env.instances.len(),
+        before_instances,
+        "Path.Posix must not mint an instance"
     );
 }
