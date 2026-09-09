@@ -1,7 +1,7 @@
 ---
 id: LANG-MOD-KENFMT-DECL-LAYOUT
 title: "kenfmt breakable layout for the module/import declaration surface: Doc-builders for ExportDecl and ImportDecl (and selective-import / re-export name lists) so an overflowing name list wraps under CANONICAL_WIDTH and round-trips as a formatter fixed point. The Component B formatter-gate gap."
-status: active
+status: merged
 owner: language
 size: M
 gate: none
