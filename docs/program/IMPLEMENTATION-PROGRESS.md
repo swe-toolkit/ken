@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-09 04:57:08Z — from 573 issue file(s) in `docs/program/issues/`.
+2026-09-09 05:48:06Z — from 573 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -172,7 +172,7 @@ the committed file matches the generator's output.
 | `KERNEL-CONV-RECURSIVE-HEAD-TOTALITY` | Restore kernel conversion totality at the distinct recursive-head boundary — converting two separately declared, source-isomorphic recursive transparent globals under a stuck eliminator currently unfolds their distinct self GlobalIds without bound and stack-overflows, instead of returning false and halting as the landed spec §17 contract now requires. Implement the finite §3.5 cross-identity boundary (no clone-equality, bisimulation, certificate, self-id rewrite, or custom normalizer), preserving ordinary same-head recursion, finite δ, and distinct-nonrecursive common reducts, and wire the executable black-box matrix. | merged | kernel | M | none | https://github.com/swe-toolkit/ken/pull/3160 |
 | `KERNEL-CONV-TRUNC-CONGRUENCE` | Add the truncation-former congruence pair (Trunc + TruncProj) to conv_struct so the ordinary conversion gate (whnf + congruence) recognizes convertible-but-not-syntactically-identical truncation types/eliminations — unblocking V3-FO-EMBEDDING-ADEQUACY's quotation-preservation Or arm | merged | kernel | S | none | — |
 | `KERNEL-ELIM-SHAPE-NORMALIZE-DIVERGES` | Eliminator/recursor shape derivation over a proof-carrying inductive family diverges -- derive_recursive_shape and structured_lift normalize a constructor premise before the occurrence test, the elimination-time twin of LANG-CTOR-PREMISE-ELABORATION-DIVERGES | merged | kernel | M | none | — |
-| `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
+| `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | merged | kernel | L | none | — |
 | `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | merged | spec-enclave | M | none | — |
 | `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` | The recursor's iota-rule forces an induction hypothesis for every recursive argument eagerly, so a non-recursive match on a recursive inductive does not reduce at an abstract recursive field -- repair iota_reduct to skip an IH whose method binder does not occur, the reduction-time enabler V3-FO-CHECKER-SOUNDNESS D3 is blocked on | merged | kernel | M | operator | — |
 | `KERNEL-SCT-TELESCOPE-CANON` | The SCT gate derives each group member's arity by counting leading Lam binders in the elaborated body (count_params, sct.rs:623), so once the c-elab result-refinement transport wraps a mutual-recursion body the leading-Lam count diverges from the declared arity, skip_lams skips the wrong number, the size-change matrices are mis-dimensioned, and a terminating transport-carrying clique wrongly reds NotTerminating -- repair the arity to the DECLARED Pi telescope (route A, telescope-canonicalization) with admit==analyze on the same eta-long body, the SCT-pass enabler LANG-INDEXED full admission and V3-FO-CHECKER-SOUNDNESS D3 are blocked on | merged | kernel | M | operator | — |
@@ -640,7 +640,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
-- `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-MOD-ATTACHED-PROOF-OWNERSHIP` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
 - `LANG-MOD-KENFMT-DECL-LAYOUT` blocked by `LANG-MOD-CATALOG-COMPLETENESS` (status: active)
@@ -648,7 +647,6 @@ is itself not yet `merged`/`closed`:
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress
 

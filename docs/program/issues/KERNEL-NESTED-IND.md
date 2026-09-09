@@ -1,7 +1,7 @@
 ---
 id: KERNEL-NESTED-IND
 title: "admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability"
-status: active
+status: merged
 owner: kernel
 size: L
 gate: none
@@ -10,6 +10,29 @@ blocks: [DS-9]
 github: null
 origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved. Demand-pulled by DS-9, which blocked at its first deliverable on `JsonArray (List Json)`; fork raised by the Steward as evt_1ykvpj7yvtg18. The five-point prerequisite contract below is the Architect's, transcribed verbatim in substance. Steward-filed; Steward owns the frame and AC/control placement.
 ---
+
+> ## MERGED 2026-09-09 — CLOSED AS A LANDED-STATE VERIFICATION (no candidate).
+>
+> All deliverables D1a-D7 are landed; every gating AC is satisfied. Each code
+> deliverable (D1a/D1b/D2/D3a/D3b/D4/D5/D6) landed through its own Architect +
+> kernel-QA merge Decision. The two final conditions are met on `origin/main`:
+> - D7 / AC-K10 (`trusted_base()` set-valued delta) landed at ancestor
+>   `d1c913690`.
+> - AC-K12 (nested-IH native execution + Cranelift verifier + interpreter
+>   agreement at Nat 3) independently APPROVED by kernel-QA at `97204e5013`
+>   (evt_6spahdyakm42b): the per-emission protocol/object witness
+>   `liftrose_synthetic_witness_closes_owner_two_required_joins` (nc14 data-match
+>   lowering, 1 passed) and the linked native/interpreter arm
+>   `nested_checked_ih_native_result_is_exactly_interpreter_nat_three` (rt nested
+>   IH native realization, 1 passed). kernel-QA self-corrected an earlier
+>   mislabeled arm before approving, so the verdict is mapped exactly to AC-K12.
+>
+> No files changed for closure, so there is no fresh TCB SHA to route — the
+> substantive review is the landed D-series. `nested-size-uses-lift` remains
+> gated on [[KERNEL-RECURSIVE-RESULT-SURFACE]] (a separate capability node), which
+> the D6 recut established is the correct outcome, not a blocker for this node.
+> Steward closed on the verified landed state; the lane-2 slot returns to Language
+> per the operator reseat ruling.
 
 > ## UNHELD 2026-08-09 — THE RUNTIME WALL IS DOWN. RESUME FROM `da917653`.
 >
