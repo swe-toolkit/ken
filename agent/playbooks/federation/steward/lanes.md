@@ -66,7 +66,22 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-09 (NEWEST — read first)
+> ### LIVE POSITION 2026-09-09 (LATEST — read first): L2 RETURNED TO LANGUAGE
+>
+> **KERNEL-NESTED-IND CLOSED; L2 slot returned to Language per the operator
+> reseat ruling.** The kernel work is done: KERNEL-NESTED-IND merged as a
+> landed-state verification (D7/AC-K10 landed d1c913690; AC-K12 kernel-QA-approved
+> at 97204e5013; no candidate — no files changed). Per the operator's standing
+> ruling ("reseat L2 for this at the next seam on that lane, and then return L2 to
+> its workstream"), the Steward executed the return:
+> - Stood down the kernel ring (`moot down kernel-{leader,implementer,qa}`).
+> - Brought the language ring back up (`moot exec language-{leader,implementer,qa}`
+>   from /workspaces/ken) on LANG-MOD-CATALOG-COMPLETENESS (RECUT #3 AC-CENSUS).
+> - 3-lane cap preserved: L1 runtime (ABI-S6, D0 resolved -> D1 in flight),
+>   L2 language (LANG-MOD-CATALOG-COMPLETENESS, resumed), L3 foundation (POSIX
+>   Tier-D, in QA). The temporary L2=kernel arrangement is retired.
+>
+> ### LIVE POSITION 2026-09-09: KERNEL RESEAT EXECUTED (now SUPERSEDED by the return above)
 >
 > **KERNEL RESEAT EXECUTED.** Operator (Pat), 2026-09-09, verbatim: "this is
 > clearly a seam. reseat to the kernel ring to handle KERNEL-NESTED-IND, then
