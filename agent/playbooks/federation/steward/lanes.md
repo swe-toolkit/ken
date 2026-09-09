@@ -66,7 +66,27 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-08 (NEWEST — read before the 2026-09-07 block below)
+> ### LIVE POSITION 2026-09-09 (NEWEST — read first)
+>
+> **KERNEL RESEAT EXECUTED.** Operator (Pat), 2026-09-09, verbatim: "this is
+> clearly a seam. reseat to the kernel ring to handle KERNEL-NESTED-IND, then
+> continue with LANG-MOD-CATALOG-COMPLETENESS." This resolves the 2026-09-08
+> "at next clean seam" trigger below — the operator judged the L2 idle-stall
+> (language ring parked ~9-10h; implementer on a stale "awaiting publisher for
+> LANG-INTERVENING Inc2" belief, that work already landed 2f8da96ac / closed
+> 2026-09-07) to BE the seam. Steward executed:
+> - Stood down the language ring (`moot down language-{leader,implementer,qa}`).
+> - Seated the kernel ring (`moot exec kernel-{leader,implementer,qa}` from
+>   /workspaces/ken) — leader terra/medium, implementer sol/high (T1), qa
+>   terra/medium (same config that completed KERNEL-CONV-RECURSIVE-HEAD-TOTALITY).
+> - Released KERNEL-NESTED-IND to kernel-leader (anchor evt_1bxn9f0evzck8; active,
+>   owner kernel, TCB, final deliverables D7 + AC-K12, feeds DS-9).
+> - L2 slot is now the KERNEL ring temporarily; **3-lane cap preserved** (no 4th
+>   ring). LANG-MOD-CATALOG-COMPLETENESS is PAUSED (not cancelled); RETURN the
+>   language ring to it once the kernel chain clears. L1 (runtime) stays on ABI
+>   (ABI-S1 D5 in flight); L3 (foundation) unchanged (POSIX Tier-D in flight).
+>
+> ### LIVE POSITION 2026-09-08 (read before the 2026-09-07 block below)
 >
 > Operator active. Roster STRUCTURE unchanged (three lanes, runtime / language /
 > foundation). New this session:
