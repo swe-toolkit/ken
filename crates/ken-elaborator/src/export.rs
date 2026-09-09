@@ -620,7 +620,10 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::FsDuplicate
         | ken_host::HostOpV1::ResourceRelease
         | ken_host::HostOpV1::BufferAllocate
-        | ken_host::HostOpV1::BufferFreeze => HostOpFamilyV1::Fs,
+        | ken_host::HostOpV1::BufferFreeze
+        | ken_host::HostOpV1::MappingAllocate
+        | ken_host::HostOpV1::MappingReadView
+        | ken_host::HostOpV1::MappingWriteView => HostOpFamilyV1::Fs,
     }
 }
 
@@ -700,6 +703,9 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::ResourceRelease => "ResourceRelease",
         ken_host::HostOpV1::BufferAllocate => "BufferAllocate",
         ken_host::HostOpV1::BufferFreeze => "BufferFreeze",
+        ken_host::HostOpV1::MappingAllocate => "MappingAllocate",
+        ken_host::HostOpV1::MappingReadView => "MappingReadView",
+        ken_host::HostOpV1::MappingWriteView => "MappingWriteView",
     }
 }
 
@@ -970,6 +976,21 @@ const BUFFER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 4] = [
     },
 ];
 
+const MAPPING_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
+    ResourceLifetimeBindingPoint {
+        operation: ken_host::HostOpV1::MappingReadView,
+        role: ken_host::ResourceBindingRole::Target,
+    },
+    ResourceLifetimeBindingPoint {
+        operation: ken_host::HostOpV1::MappingWriteView,
+        role: ken_host::ResourceBindingRole::Target,
+    },
+    ResourceLifetimeBindingPoint {
+        operation: ken_host::HostOpV1::ResourceRelease,
+        role: ken_host::ResourceBindingRole::Target,
+    },
+];
+
 fn alphabet_contains_host_op(alphabet: &BTreeSet<String>, operation: ken_host::HostOpV1) -> bool {
     alphabet.contains(canonical_host_perform_signature_v1(operation))
 }
@@ -1017,6 +1038,21 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
         }
     }
 
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::MappingAllocate) {
+        if let Some(operation) = first_reachable_operation(
+            alphabet,
+            &[
+                ken_host::HostOpV1::MappingReadView,
+                ken_host::HostOpV1::MappingWriteView,
+            ],
+        ) {
+            return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::Mapping,
+                operation,
+            });
+        }
+    }
+
     Ok(())
 }
 
@@ -1027,6 +1063,7 @@ fn project_resource_lifetime_obligation(
 
     if alphabet_contains_host_op(alphabet, ken_host::HostOpV1::FsOpen)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::BufferAllocate)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::MappingAllocate)
     {
         Ok(Some(project_resource_lifetime_obligation_body(alphabet)))
     } else {
@@ -1066,6 +1103,16 @@ fn project_resource_lifetime_obligation_body(
             require_same_at: reachable(&BUFFER_REQUIRE_SAME_AT),
         });
     }
+    if alphabet_contains_host_op(alphabet, ken_host::HostOpV1::MappingAllocate) {
+        plans.push(ResourceLifetimePlan {
+            resource_kind: ken_host::ResourceKindV1::Mapping,
+            bind_at: ResourceLifetimeBindingPoint {
+                operation: ken_host::HostOpV1::MappingAllocate,
+                role: ken_host::ResourceBindingRole::Target,
+            },
+            require_same_at: reachable(&MAPPING_REQUIRE_SAME_AT),
+        });
+    }
 
     ResourceLifetimeObligation {
         obligation_id: "resource-lifetime",
@@ -1098,19 +1145,23 @@ fn validate_resource_lifetime_selection(
     validate_resource_use_acquisitions(alphabet)?;
     let has_buffer = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::BufferAllocate);
     let has_file = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::FsOpen);
+    let has_mapping = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::MappingAllocate);
 
-    match (has_buffer, has_file, value) {
-        (true, _, Some(value)) | (false, true, Some(value)) => {
+    match value {
+        Some(value) if has_buffer || has_file || has_mapping => {
             validate_resource_lifetime_obligation(value, alphabet)
         }
-        (true, _, None) => Err(ExportError::MissingResourceLifetimePlan {
+        None if has_buffer => Err(ExportError::MissingResourceLifetimePlan {
             resource_kind: ken_host::ResourceKindV1::Buffer,
         }),
-        (false, true, None) => Err(ExportError::MissingResourceLifetimePlan {
+        None if has_file => Err(ExportError::MissingResourceLifetimePlan {
             resource_kind: ken_host::ResourceKindV1::FsHandle,
         }),
-        (false, false, Some(_)) => Err(ExportError::InvalidResourceLifetimeObligation),
-        (false, false, None) => Ok(()),
+        None if has_mapping => Err(ExportError::MissingResourceLifetimePlan {
+            resource_kind: ken_host::ResourceKindV1::Mapping,
+        }),
+        Some(_) => Err(ExportError::InvalidResourceLifetimeObligation),
+        None => Ok(()),
     }
 }
 
@@ -1124,11 +1175,12 @@ fn validate_resource_lifetime_obligation(
     for resource_kind in [
         ken_host::ResourceKindV1::FsHandle,
         ken_host::ResourceKindV1::Buffer,
+        ken_host::ResourceKindV1::Mapping,
     ] {
         let acquisition = match resource_kind {
             ken_host::ResourceKindV1::FsHandle => ken_host::HostOpV1::FsOpen,
             ken_host::ResourceKindV1::Buffer => ken_host::HostOpV1::BufferAllocate,
-            ken_host::ResourceKindV1::Mapping => continue,
+            ken_host::ResourceKindV1::Mapping => ken_host::HostOpV1::MappingAllocate,
         };
         if alphabet_contains_host_op(alphabet, acquisition)
             && !value
@@ -1483,6 +1535,62 @@ mod resource_lifetime_hash_tests {
             })
         );
     }
+
+    /// Promise class: durable invariant. MEASURED: a Mapping alphabet projects
+    /// one Mapping lifetime plan from allocation through both views and release,
+    /// while either view without allocation is rejected. CLAIMED: ABI-S6 D3
+    /// joins the closed resource-lifetime alphabet without a checked producer.
+    /// THE GAP: actual operation dispatch and typed refusals are host/interpreter
+    /// concerns and are covered in those crates.
+    #[test]
+    fn abi_s6_d3_mapping_alphabet_projects_exact_lifetime_or_rejects_use_only() {
+        let alphabet = BTreeSet::from([
+            "MappingAllocate".to_string(),
+            "MappingReadView".to_string(),
+            "MappingWriteView".to_string(),
+            "ResourceRelease".to_string(),
+        ]);
+        let projected = project_resource_lifetime_obligation(&alphabet)
+            .expect("valid mapping alphabet")
+            .expect("mapping lifetime plan");
+        assert_eq!(projected.plans.len(), 1);
+        assert_eq!(
+            projected.plans[0],
+            ResourceLifetimePlan {
+                resource_kind: ken_host::ResourceKindV1::Mapping,
+                bind_at: ResourceLifetimeBindingPoint {
+                    operation: ken_host::HostOpV1::MappingAllocate,
+                    role: ken_host::ResourceBindingRole::Target,
+                },
+                require_same_at: vec![
+                    ResourceLifetimeBindingPoint {
+                        operation: ken_host::HostOpV1::MappingReadView,
+                        role: ken_host::ResourceBindingRole::Target,
+                    },
+                    ResourceLifetimeBindingPoint {
+                        operation: ken_host::HostOpV1::MappingWriteView,
+                        role: ken_host::ResourceBindingRole::Target,
+                    },
+                    ResourceLifetimeBindingPoint {
+                        operation: ken_host::HostOpV1::ResourceRelease,
+                        role: ken_host::ResourceBindingRole::Target,
+                    },
+                ],
+            }
+        );
+
+        let use_only = BTreeSet::from([
+            "MappingReadView".to_string(),
+            "MappingWriteView".to_string(),
+        ]);
+        assert_eq!(
+            project_resource_lifetime_obligation(&use_only),
+            Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::Mapping,
+                operation: ken_host::HostOpV1::MappingReadView,
+            })
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1680,6 +1788,37 @@ proc second (_value : Unit)
         for (operation, discriminant, spelling) in legacy {
             assert_eq!(operation as u16, discriminant);
             assert_eq!(canonical_host_perform_signature_v1(operation), spelling);
+        }
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: all three D3
+    /// operation identities have exact injective spellings and classify into
+    /// the existing FSOp/FS family. CLAIMED: D3 extends only the closed host ABI
+    /// alphabet and does not invent a Mapping family or checked syntax. THE GAP:
+    /// resource-lifetime selection is independently checked above.
+    #[test]
+    fn abi_s6_d3_mapping_operations_have_exact_fs_family_and_spellings() {
+        for (operation, spelling) in [
+            (ken_host::HostOpV1::MappingAllocate, "MappingAllocate"),
+            (ken_host::HostOpV1::MappingReadView, "MappingReadView"),
+            (ken_host::HostOpV1::MappingWriteView, "MappingWriteView"),
+        ] {
+            assert_eq!(host_operation_family(operation), ("FSOp", "FS"));
+            assert_eq!(canonical_host_perform_signature_v1(operation), spelling);
+            assert_eq!(
+                canonical_perform_node_signature_v1(&PerformNodeSignatureV1::Host {
+                    family_symbol: "FSOp".to_string(),
+                    operation,
+                }),
+                Ok(spelling.to_string())
+            );
+            assert!(matches!(
+                canonical_perform_node_signature_v1(&PerformNodeSignatureV1::Host {
+                    family_symbol: "MappingOp".to_string(),
+                    operation,
+                }),
+                Err(ExportError::NonClosedPerformInventory { .. })
+            ));
         }
     }
 }

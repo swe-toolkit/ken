@@ -6997,6 +6997,124 @@ mod px5b_effect_observation_tests {
         expect_resource_host_io(&revoked, ids.revoked_id, &ids, &fs);
     }
 
+    /// Promise class: durable component-boundary invariant. MEASURED: the real
+    /// host dispatcher allocates an anonymous Mapping and routes both D3 views,
+    /// while the interpreter's existing generic reifier observes the opaque
+    /// resource token, Unit, and owned Bytes results. CLAIMED: the represented
+    /// Mapping operations are interpreter-observable without a new value form
+    /// or checked Ken producer. THE GAP: native execution is independently
+    /// unavailable and is not exercised by this component boundary.
+    #[test]
+    fn abi_s6_d3_mapping_dispatch_reaches_existing_interpreter_observations() {
+        let ids = console_ids();
+        let fs = fs_ids();
+        let mut store = EvalStore::new();
+        let capabilities = ken_host::CapabilityTableV1::default();
+        let revocation = ken_host::RevocationDomain::default();
+        let mut resources = ken_host::ResourceTableV1::default();
+        let mut backend = ShortWriteBackend::default();
+
+        let allocate_request = ken_host::CanonicalRequestV1::MappingAllocate {
+            length: 8,
+            protection: ken_host::MappingProtectionV1::Writable,
+        };
+        let allocate = ken_host::dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            ken_host::HostOpV1::MappingAllocate,
+            None,
+            ken_host::ResourceInputsV1::None,
+            &allocate_request,
+        )
+        .expect("represented mapping allocation dispatches");
+        let target = allocate.resource_token.expect("mapping token");
+        let value = reify_host_reply_v1(
+            allocate.outcome,
+            allocate.resource_token,
+            None,
+            &allocate_request,
+            fs.private_buffer_allocate_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("mapping allocation reifies through the existing resource value");
+        assert_eq!(
+            result_payload(&value, ids.ok_id),
+            &EvalVal::ResourceToken(target)
+        );
+
+        let write_request = ken_host::CanonicalRequestV1::MappingWriteView {
+            start: 2,
+            bytes: b"map".to_vec(),
+        };
+        let write = ken_host::dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            ken_host::HostOpV1::MappingWriteView,
+            None,
+            ken_host::ResourceInputsV1::MappingSpanTarget {
+                target,
+                span_origin: target,
+            },
+            &write_request,
+        )
+        .expect("represented mapping write dispatches");
+        let value = reify_host_reply_v1(
+            write.outcome,
+            write.resource_token,
+            None,
+            &write_request,
+            fs.private_buffer_freeze_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("mapping write reifies through existing Unit");
+        assert!(matches!(
+            result_payload(&value, ids.ok_id),
+            EvalVal::Ctor { id, .. } if *id == ids.unit_id
+        ));
+
+        let read_request = ken_host::CanonicalRequestV1::MappingReadView {
+            start: 2,
+            length: 3,
+        };
+        let read = ken_host::dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            ken_host::HostOpV1::MappingReadView,
+            None,
+            ken_host::ResourceInputsV1::MappingSpanTarget {
+                target,
+                span_origin: target,
+            },
+            &read_request,
+        )
+        .expect("represented mapping read dispatches");
+        let value = reify_host_reply_v1(
+            read.outcome,
+            read.resource_token,
+            None,
+            &read_request,
+            fs.private_buffer_freeze_id,
+            &fs,
+            &ids,
+            &mut store,
+        )
+        .expect("mapping read reifies through existing Bytes");
+        assert_eq!(
+            result_payload(&value, ids.ok_id),
+            &EvalVal::Bytes(b"map".to_vec())
+        );
+    }
+
     /// Promise class: normative compatibility vector for
     /// security/capabilities/revoked-path-operation-is-distinct-fileerror
     /// MEASURED: the real dispatcher denies a revoked live grant before the

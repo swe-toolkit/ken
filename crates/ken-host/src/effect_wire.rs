@@ -5,7 +5,7 @@ use crate::{
     CapabilityTraceIdentity, ConsoleStreamV1, CreatePolicyV1, DirEntryV1, EffectEvent,
     FdInheritancePolicyV1, FileErrorCauseV1, FileErrorIdentityV1, FileMetadataV1,
     FsCapabilityOperationV1, FsNodeKindV1, FsOpenModeV1, FsSeekFromV1, FsSyncModeV1, HostOpV1,
-    IoErrorIdentityV1, ResourceBindingRole, ResourceErrorV1, ResourceKindV1,
+    IoErrorIdentityV1, MappingProtectionV1, ResourceBindingRole, ResourceErrorV1, ResourceKindV1,
     ResourceSettlementObservationV1, ResourceSettlementOutcomeV1, ResourceTraceIdentityV1,
     SemanticErrorV1, TerminalExitClass,
 };
@@ -93,6 +93,13 @@ fn inheritance_policy_tag(policy: FdInheritancePolicyV1) -> u8 {
     match policy {
         FdInheritancePolicyV1::Inherit => 0,
         FdInheritancePolicyV1::CloseOnExec => 1,
+    }
+}
+
+fn put_mapping_protection(out: &mut Vec<u8>, protection: MappingProtectionV1) {
+    match protection {
+        MappingProtectionV1::ReadOnly => put_u8(out, 0),
+        MappingProtectionV1::Writable => put_u8(out, 1),
     }
 }
 
@@ -274,6 +281,21 @@ fn put_request(
             put_u8(out, 21);
             put_u64(out, *start);
             put_u64(out, *length);
+        }
+        CanonicalRequestV1::MappingAllocate { length, protection } => {
+            put_u8(out, 31);
+            put_u64(out, *length);
+            put_mapping_protection(out, *protection);
+        }
+        CanonicalRequestV1::MappingReadView { start, length } => {
+            put_u8(out, 32);
+            put_u64(out, *start);
+            put_u64(out, *length);
+        }
+        CanonicalRequestV1::MappingWriteView { start, bytes } => {
+            put_u8(out, 33);
+            put_u64(out, *start);
+            put_bytes(out, bytes)?;
         }
     }
     Ok(())
@@ -681,6 +703,15 @@ fn get_bool(cursor: &mut Cursor<'_>) -> Result<bool, EffectTraceWireError> {
         _ => Err(EffectTraceWireError),
     }
 }
+fn get_mapping_protection(
+    cursor: &mut Cursor<'_>,
+) -> Result<MappingProtectionV1, EffectTraceWireError> {
+    match cursor.u8()? {
+        0 => Ok(MappingProtectionV1::ReadOnly),
+        1 => Ok(MappingProtectionV1::Writable),
+        _ => Err(EffectTraceWireError),
+    }
+}
 fn get_node_kind(cursor: &mut Cursor<'_>) -> Result<FsNodeKindV1, EffectTraceWireError> {
     match cursor.u8()? {
         0 => Ok(FsNodeKindV1::File),
@@ -814,6 +845,18 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
         21 => CanonicalRequestV1::BufferFreeze {
             start: cursor.u64()?,
             length: cursor.u64()?,
+        },
+        31 => CanonicalRequestV1::MappingAllocate {
+            length: cursor.u64()?,
+            protection: get_mapping_protection(cursor)?,
+        },
+        32 => CanonicalRequestV1::MappingReadView {
+            start: cursor.u64()?,
+            length: cursor.u64()?,
+        },
+        33 => CanonicalRequestV1::MappingWriteView {
+            start: cursor.u64()?,
+            bytes: cursor.bytes()?,
         },
         _ => return Err(EffectTraceWireError),
     })
@@ -1273,6 +1316,64 @@ mod tests {
         let mut wall = Vec::new();
         put_request(&mut wall, &CanonicalRequestV1::ClockWallNow).expect("encodes");
         assert_ne!(wall, encodings[0]);
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: all three D3
+    /// Mapping requests round-trip with distinct append-only request tags,
+    /// ReadOnly/Writable encode as 0/1, and an unknown protection byte is
+    /// rejected. CLAIMED: the represented Mapping trace wire is typed and
+    /// fail-closed without widening the protection alphabet. THE GAP: opaque
+    /// resource tokens live in EffectEvent resource bindings rather than this
+    /// canonical request payload and are covered by dispatch tests.
+    #[test]
+    fn abi_s6_d3_mapping_requests_round_trip_and_protection_fails_closed() {
+        let requests = [
+            CanonicalRequestV1::MappingAllocate {
+                length: 0x0123_4567_89ab_cdef,
+                protection: MappingProtectionV1::ReadOnly,
+            },
+            CanonicalRequestV1::MappingAllocate {
+                length: 0xfedc_ba98_7654_3210,
+                protection: MappingProtectionV1::Writable,
+            },
+            CanonicalRequestV1::MappingReadView {
+                start: 17,
+                length: 31,
+            },
+            CanonicalRequestV1::MappingWriteView {
+                start: 23,
+                bytes: b"mapping".to_vec(),
+            },
+        ];
+        let mut encodings = Vec::new();
+        for request in &requests {
+            let mut encoded = Vec::new();
+            put_request(&mut encoded, request).expect("mapping request encodes");
+            let mut cursor = Cursor {
+                bytes: &encoded,
+                position: 0,
+            };
+            assert_eq!(get_request(&mut cursor).unwrap(), *request);
+            assert_eq!(cursor.position, encoded.len());
+            encodings.push(encoded);
+        }
+        assert_eq!(
+            encodings.iter().map(|bytes| bytes[0]).collect::<Vec<_>>(),
+            vec![31, 31, 32, 33]
+        );
+        assert_eq!(encodings[0].last(), Some(&0));
+        assert_eq!(encodings[1].last(), Some(&1));
+        assert_ne!(encodings[0], encodings[1]);
+        assert_ne!(encodings[2], encodings[3]);
+
+        let mut unknown = vec![31];
+        put_u64(&mut unknown, 8);
+        put_u8(&mut unknown, 2);
+        let mut cursor = Cursor {
+            bytes: &unknown,
+            position: 0,
+        };
+        assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
     }
 
     /// Promise class: normative compatibility vector. MEASURED: all three

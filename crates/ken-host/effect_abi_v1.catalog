@@ -28,6 +28,8 @@ error|resource.AllocationFailed|9
 tag|resource_kind.FsHandle|0
 tag|resource_kind.Buffer|1
 tag|resource_kind.Mapping|2
+tag|mapping_protection.read_only|0
+tag|mapping_protection.writable|1
 tag|stream.stdin|0
 tag|stream.stdout|1
 tag|stream.stderr|2
@@ -87,3 +89,6 @@ operation|FsDuplicate|0314|unavailable|FsDuplicateRequestV1|2|HostReplyV1|1
 operation|ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1
 operation|BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1
 operation|BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1
+operation|MappingAllocate|0404|unavailable|MappingAllocateRequestV1|2|HostReplyV1|1
+operation|MappingReadView|0405|unavailable|MappingReadViewRequestV1|4|HostReplyV1|1
+operation|MappingWriteView|0406|unavailable|MappingWriteViewRequestV1|4|HostReplyV1|1
