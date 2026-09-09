@@ -167,6 +167,9 @@ site (see AC-INVENTORY-BUILD-BREAK) and lands `RepresentedUnavailable`.
   not a descriptor op — it takes the next free band-04 slot `0x0404` or a new
   band, per D0). Pinned ABI-fact inventory updated only as the represented
   surface requires; NO `SYS_*` fact is added (native promotion is a later node).
+  Whichever increment (D2 or D3) first makes the parallel `Mapping`
+  `ResourceKind` tag reachable to the native reifier also closes the reification
+  totality gap — see AC-NATIVE-REIFICATION-TOTAL.
 
 ## Acceptance criteria (each with its control)
 
@@ -219,6 +222,25 @@ site (see AC-INVENTORY-BUILD-BREAK) and lands `RepresentedUnavailable`.
   represented-tail sentinel and the fact-inventory anchor both reflect the new
   ops with no native-status or SYS_-fact change; a native-status flip reds a named
   test.
+- **AC-NATIVE-REIFICATION-TOTAL (D2/D3 seam; adversary bounded obs on D1,
+  evt_7cnqjqpd9zv1e / lesson bbc87dc2b).** D0 ruled a PARALLEL `Mapping`
+  `ResourceKind` and D1 landed it as an unreachable, fail-closed tag (correctly
+  NOT touching the native reifier — no opcode makes it reachable). The native
+  `ResourceKind` reification path is therefore currently NON-total over the
+  closed sum for the `Mapping` tag: no `SynthesizedFixedConstructorRole::
+  ResourceKindMapping` role, `ALL = [Self; 49]`, and `resource_kind_value` has
+  only two `DynamicConstructor` alternatives — a native `Mapping` resource error
+  would hit `malformed_dynamic_constructor_trap` rather than reify. In the SAME
+  increment (D2 bounded-view / D3 registration) that first makes the `Mapping`
+  tag reachable to the native reifier, extend that path: add
+  `SynthesizedFixedConstructorRole::ResourceKindMapping` plus its process symbol
+  and the third `resource_kind_value` alternative (native lowering,
+  `crates/ken-runtime` `lowering/effects.rs` ~`:4052`), so the reifier is total
+  over the closed `ResourceKind` sum. Control: a native `Mapping` resource error
+  reifies to its typed Ken constructor rather than trapping; a mutation dropping
+  the `ResourceKindMapping` alternative reds a named test. This is NOT a D1
+  defect — D1's tag is unreachable and fail-closed — it binds whichever
+  increment first makes the tag reachable.
 - **AC-RIGHT-BUDGET (measured constraint, not a deliverable).** `RightSet`
   (`capability.rs:94`) is a `u8` with 7 of 8 bits assigned — one bit remains. If
   the mapping needs a distinct capability right rather than reusing `READ` /
