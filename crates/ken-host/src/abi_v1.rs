@@ -316,6 +316,31 @@ struct BufferFreezeRequestV1 {
 }
 
 #[repr(C)]
+#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
+struct MappingAllocateRequestV1 {
+    length: u64,
+    protection: u8,
+}
+
+#[repr(C)]
+#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
+struct MappingReadViewRequestV1 {
+    resource: u64,
+    start: u64,
+    length: u64,
+    span_origin: u64,
+}
+
+#[repr(C)]
+#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
+struct MappingWriteViewRequestV1 {
+    resource: u64,
+    start: u64,
+    bytes: SliceV1,
+    span_origin: u64,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ResourceErrorReplyV1 {
     schema_version: u64,
@@ -2135,6 +2160,9 @@ mod tests {
         size_align!("EntropyRequestV1", EntropyRequestV1);
         size_align!("BufferAllocateRequestV1", BufferAllocateRequestV1);
         size_align!("BufferFreezeRequestV1", BufferFreezeRequestV1);
+        size_align!("MappingAllocateRequestV1", MappingAllocateRequestV1);
+        size_align!("MappingReadViewRequestV1", MappingReadViewRequestV1);
+        size_align!("MappingWriteViewRequestV1", MappingWriteViewRequestV1);
         size_align!("ResourceErrorReplyV1", ResourceErrorReplyV1);
         size_align!("HostReplyV1", HostReplyV1);
         macro_rules! offset {
@@ -2214,6 +2242,44 @@ mod tests {
         );
         offset!("FsDuplicateRequestV1", FsDuplicateRequestV1, resource);
         offset!("FsDuplicateRequestV1", FsDuplicateRequestV1, policy);
+        offset!("MappingAllocateRequestV1", MappingAllocateRequestV1, length);
+        offset!(
+            "MappingAllocateRequestV1",
+            MappingAllocateRequestV1,
+            protection
+        );
+        offset!(
+            "MappingReadViewRequestV1",
+            MappingReadViewRequestV1,
+            resource
+        );
+        offset!("MappingReadViewRequestV1", MappingReadViewRequestV1, start);
+        offset!("MappingReadViewRequestV1", MappingReadViewRequestV1, length);
+        offset!(
+            "MappingReadViewRequestV1",
+            MappingReadViewRequestV1,
+            span_origin
+        );
+        offset!(
+            "MappingWriteViewRequestV1",
+            MappingWriteViewRequestV1,
+            resource
+        );
+        offset!(
+            "MappingWriteViewRequestV1",
+            MappingWriteViewRequestV1,
+            start
+        );
+        offset!(
+            "MappingWriteViewRequestV1",
+            MappingWriteViewRequestV1,
+            bytes
+        );
+        offset!(
+            "MappingWriteViewRequestV1",
+            MappingWriteViewRequestV1,
+            span_origin
+        );
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, schema_version);
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, resource_kind);
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, identity);
@@ -2274,6 +2340,8 @@ mod tests {
         assert_eq!(effect_binding("tag", "resource_kind.FsHandle"), 0);
         assert_eq!(effect_binding("tag", "resource_kind.Buffer"), 1);
         assert_eq!(effect_binding("tag", "resource_kind.Mapping"), 2);
+        assert_eq!(effect_binding("tag", "mapping_protection.read_only"), 0);
+        assert_eq!(effect_binding("tag", "mapping_protection.writable"), 1);
         assert_eq!(effect_binding("lifetime", "resource_error_reply_schema"), 1);
         assert_eq!(
             effect_binding("limit", "buffer.per_buffer_max_capacity"),
@@ -2286,6 +2354,37 @@ mod tests {
         assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
         assert_eq!(effect_binding("error", "io.Revoked"), 11);
         assert_eq!(effect_binding("error", "io.Other"), 12);
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the C-probed
+    /// D3 request records have exact sizes, alignments, and field offsets for
+    /// length/protection, target/start/length/origin, and target/start/bytes/
+    /// origin. CLAIMED: the raw Mapping ABI mirrors the ruled canonical schemas
+    /// without exposing an address or reordering the exact-origin token. THE
+    /// GAP: the independent Rust-vs-C assertions above reject target-header
+    /// disagreement; these literals pin the contract rather than another copy.
+    #[test]
+    fn abi_s6_d3_mapping_raw_request_layout_is_exact() {
+        for (name, value) in [
+            ("SIZE_MappingAllocateRequestV1", 16),
+            ("ALIGN_MappingAllocateRequestV1", 8),
+            ("OFFSET_MappingAllocateRequestV1_length", 0),
+            ("OFFSET_MappingAllocateRequestV1_protection", 8),
+            ("SIZE_MappingReadViewRequestV1", 32),
+            ("ALIGN_MappingReadViewRequestV1", 8),
+            ("OFFSET_MappingReadViewRequestV1_resource", 0),
+            ("OFFSET_MappingReadViewRequestV1_start", 8),
+            ("OFFSET_MappingReadViewRequestV1_length", 16),
+            ("OFFSET_MappingReadViewRequestV1_span_origin", 24),
+            ("SIZE_MappingWriteViewRequestV1", 40),
+            ("ALIGN_MappingWriteViewRequestV1", 8),
+            ("OFFSET_MappingWriteViewRequestV1_resource", 0),
+            ("OFFSET_MappingWriteViewRequestV1_start", 8),
+            ("OFFSET_MappingWriteViewRequestV1_bytes", 16),
+            ("OFFSET_MappingWriteViewRequestV1_span_origin", 32),
+        ] {
+            assert_eq!(effect_fact(name), value, "raw ABI fact {name}");
+        }
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the generated

@@ -429,6 +429,9 @@ fn host_effect_seat_contract(
                 | Op::ResourceRelease
                 | Op::BufferAllocate
                 | Op::BufferFreeze
+                | Op::MappingAllocate
+                | Op::MappingReadView
+                | Op::MappingWriteView
                 | Op::ConsoleRead
                 | Op::ClockWallNow
                 | Op::ClockMonotonicNow
@@ -594,6 +597,9 @@ fn host_effect_seat_contract(
             | Op::FsGetInheritance
             | Op::FsSetInheritance
             | Op::FsDuplicate
+            | Op::MappingAllocate
+            | Op::MappingReadView
+            | Op::MappingWriteView
             | Op::EntropyRandomBytes,
             _,
         ) => None,
