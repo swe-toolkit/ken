@@ -82,6 +82,7 @@ operation|FsSetLength|0310|unavailable|FsSetLengthRequestV1|2|HostReplyV1|1
 operation|FsSync|0311|unavailable|FsSyncRequestV1|2|HostReplyV1|1
 operation|FsGetInheritance|0312|unavailable|FsGetInheritanceRequestV1|1|HostReplyV1|1
 operation|FsSetInheritance|0313|unavailable|FsSetInheritanceRequestV1|2|HostReplyV1|1
+operation|FsDuplicate|0314|unavailable|FsDuplicateRequestV1|2|HostReplyV1|1
 operation|ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1
 operation|BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1
 operation|BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1

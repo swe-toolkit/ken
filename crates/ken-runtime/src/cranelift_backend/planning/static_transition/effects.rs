@@ -425,6 +425,7 @@ fn host_effect_seat_contract(
                 | Op::FsSync
                 | Op::FsGetInheritance
                 | Op::FsSetInheritance
+                | Op::FsDuplicate
                 | Op::ResourceRelease
                 | Op::BufferAllocate
                 | Op::BufferFreeze
@@ -592,6 +593,7 @@ fn host_effect_seat_contract(
             | Op::FsSync
             | Op::FsGetInheritance
             | Op::FsSetInheritance
+            | Op::FsDuplicate
             | Op::EntropyRandomBytes,
             _,
         ) => None,

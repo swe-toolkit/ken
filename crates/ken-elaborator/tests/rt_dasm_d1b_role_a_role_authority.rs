@@ -111,7 +111,7 @@ data ShadowProgress = ReadSome | ReadEof | Wrote
 data ShadowFileOps =
   MkFileError | OpReadFile | OpWriteFile | OpChangeMode | OpAppendFile | OpMetadata | OpRename |
   OpReadDirectory | OpCreateDirectory | OpRemoveFile | OpRemoveDirectory | OpSeek | OpSetLength | OpSync |
-  OpGetInheritance | OpSetInheritance
+  OpGetInheritance | OpSetInheritance | OpDuplicate
 data ShadowMetadata = MkFileMetadata | MkDirEntry | KFile | KDirectory | KSymlink | KOther
 data ShadowOps = Read | Write | Flush | IsTerminal | WallNow | MonotonicNow | SleepUntil | RandomBytes | ReadFile | WriteFile | AppendFile | Metadata | ReadDirectory | CreateDirectory | RemoveFile | RemoveDirectory | Rename | ChangeMode
 
@@ -175,6 +175,7 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowFileOps", "OpSync"),
     ("ShadowFileOps", "OpGetInheritance"),
     ("ShadowFileOps", "OpSetInheritance"),
+    ("ShadowFileOps", "OpDuplicate"),
     ("ShadowMetadata", "MkFileMetadata"),
     ("ShadowMetadata", "MkDirEntry"),
     ("ShadowMetadata", "KFile"),

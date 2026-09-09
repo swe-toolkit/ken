@@ -40,6 +40,7 @@ pub enum HostOpV1 {
     FsSync = 0x0311,
     FsGetInheritance = 0x0312,
     FsSetInheritance = 0x0313,
+    FsDuplicate = 0x0314,
     ResourceRelease = 0x0401,
     BufferAllocate = 0x0402,
     BufferFreeze = 0x0403,
@@ -131,7 +132,8 @@ impl HostOpV1 {
             Self::FsSetLength => Some(Self::FsSync),
             Self::FsSync => Some(Self::FsGetInheritance),
             Self::FsGetInheritance => Some(Self::FsSetInheritance),
-            Self::FsSetInheritance => Some(Self::ResourceRelease),
+            Self::FsSetInheritance => Some(Self::FsDuplicate),
+            Self::FsDuplicate => Some(Self::ResourceRelease),
             Self::ResourceRelease => Some(Self::BufferAllocate),
             Self::BufferAllocate => Some(Self::BufferFreeze),
             Self::BufferFreeze => Some(Self::EntropyRandomBytes),
@@ -173,6 +175,7 @@ impl HostOpV1 {
             Self::FsSync => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsGetInheritance => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsSetInheritance => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsDuplicate => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ResourceRelease => HostOpAvailabilityV1::NativeTested,
             Self::BufferAllocate => HostOpAvailabilityV1::NativeTested,
             Self::BufferFreeze => HostOpAvailabilityV1::NativeTested,
@@ -212,6 +215,7 @@ impl HostOpV1 {
             Self::FsSync => false,
             Self::FsGetInheritance => false,
             Self::FsSetInheritance => false,
+            Self::FsDuplicate => false,
             Self::ResourceRelease => false,
             Self::BufferAllocate => false,
             Self::BufferFreeze => false,
@@ -523,6 +527,7 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsSync
         | HostOpV1::FsGetInheritance
         | HostOpV1::FsSetInheritance
+        | HostOpV1::FsDuplicate
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation))
         }
@@ -1183,6 +1188,54 @@ impl ResourceTableV1 {
             return Err(ResourceErrorV1::MalformedResource);
         };
         Ok((owner, *identity))
+    }
+
+    fn resolve_fs_handle_for_duplication(
+        &self,
+        token: ResourceTokenV1,
+        required: crate::RightSet,
+    ) -> Result<
+        (
+            &crate::ResourceHandleV1,
+            ResourceTraceIdentityV1,
+            crate::RightSet,
+            crate::revocation_v1::RevocationNodeId,
+        ),
+        ResourceErrorV1,
+    > {
+        let slot = self.lookup(token)?;
+        let (owner, kind, rights, identity, provenance) = match &slot.state {
+            ResourceSlotStateV1::Live {
+                owner,
+                kind,
+                rights,
+                identity,
+                provenance,
+                ..
+            } => (owner, kind, rights, identity, provenance),
+            ResourceSlotStateV1::Closing { .. } => return Err(ResourceErrorV1::Closed),
+            ResourceSlotStateV1::Vacant { .. } => return Err(ResourceErrorV1::MalformedResource),
+            ResourceSlotStateV1::Retired { .. } => return Err(ResourceErrorV1::Closed),
+        };
+        if *kind != ResourceKindV1::FsHandle {
+            return Err(ResourceErrorV1::ResourceKindMismatch {
+                expected: ResourceKindV1::FsHandle,
+                actual: *kind,
+            });
+        }
+        if !rights.contains(required) {
+            return Err(ResourceErrorV1::RightNotHeld {
+                required: required.bits(),
+                held: rights.bits(),
+            });
+        }
+        let ResourceOwnerV1::FsHandle(owner) = owner else {
+            return Err(ResourceErrorV1::MalformedResource);
+        };
+        let Some(provenance) = *provenance else {
+            return Err(ResourceErrorV1::MalformedResource);
+        };
+        Ok((owner, *identity, *rights, provenance))
     }
 
     pub fn resolve_buffer(
@@ -1890,6 +1943,15 @@ pub trait HostEffectBackendV1 {
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
     }
 
+    fn fs_resource_duplicate(
+        &mut self,
+        handle: &crate::ResourceHandleV1,
+        policy: FdInheritancePolicyV1,
+    ) -> Result<crate::ResourceHandleV1, IoErrorIdentityV1> {
+        crate::resource_duplicate_v1(handle, policy)
+            .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+    }
+
     fn resource_close(&mut self, handle: crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1> {
         crate::close_resource_v1(handle)
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
@@ -2008,6 +2070,7 @@ impl HostOpV1 {
             | Self::FsSync
             | Self::FsGetInheritance
             | Self::FsSetInheritance
+            | Self::FsDuplicate
             | Self::ResourceRelease
             | Self::BufferAllocate
             | Self::BufferFreeze
@@ -2029,7 +2092,8 @@ impl HostOpV1 {
             | Self::FsSetLength
             | Self::FsSync
             | Self::FsGetInheritance
-            | Self::FsSetInheritance => ResourceAdmissionRequirementV1::Target,
+            | Self::FsSetInheritance
+            | Self::FsDuplicate => ResourceAdmissionRequirementV1::Target,
             Self::ConsoleRead
             | Self::ConsoleWrite
             | Self::ConsoleFlush
@@ -2117,6 +2181,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 | HostOpV1::FsSync
                 | HostOpV1::FsGetInheritance
                 | HostOpV1::FsSetInheritance
+                | HostOpV1::FsDuplicate
                 | HostOpV1::ResourceRelease,
             ResourceInputsV1::Target(_)
         ) | (
@@ -2232,6 +2297,10 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             | (
                 HostOpV1::FsSetInheritance,
                 CanonicalRequestV1::FsSetInheritance { .. }
+            )
+            | (
+                HostOpV1::FsDuplicate,
+                CanonicalRequestV1::FsDuplicate { .. }
             )
             | (
                 HostOpV1::BufferAllocate,
@@ -2501,6 +2570,34 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 Err(error) => Err(SemanticErrorV1::Resource(error)),
             }
         }
+        (HostOpV1::FsDuplicate, CanonicalRequestV1::FsDuplicate { policy }) => {
+            let ResourceInputsV1::Target(token) = resource else {
+                unreachable!("resource shape validated")
+            };
+            match resources.resolve_fs_handle_for_duplication(
+                token,
+                crate::FsCapabilityOperation::Duplicate.required_right(),
+            ) {
+                Ok((handle, source_identity, rights, provenance)) => {
+                    resource_bindings.push((ResourceBindingRole::Target, source_identity));
+                    match backend.fs_resource_duplicate(handle, *policy) {
+                        Ok(owner) => {
+                            let (alias, identity) =
+                                resources.insert_fs_handle(owner, rights, provenance);
+                            minted_resource = Some(alias);
+                            resource_bindings.push((ResourceBindingRole::Target, identity));
+                            Ok(CanonicalReplyV1::ResourceAcquired {
+                                schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                                resource_kind: ResourceKindV1::FsHandle,
+                                identity,
+                            })
+                        }
+                        Err(error) => Err(file_error(operation, &[], FileErrorCauseV1::Io(error))),
+                    }
+                }
+                Err(error) => Err(SemanticErrorV1::Resource(error)),
+            }
+        }
         (HostOpV1::BufferAllocate, CanonicalRequestV1::BufferAllocate { capacity }) => {
             match resources.insert_buffer(*capacity) {
                 Ok((token, identity)) => {
@@ -2752,6 +2849,7 @@ fn map_capability_denial(error: crate::CapabilityDenied) -> CapabilityDeniedV1 {
                     crate::FsCapabilityOperation::SetInheritance => {
                         FsCapabilityOperationV1::SetInheritance
                     }
+                    crate::FsCapabilityOperation::Duplicate => FsCapabilityOperationV1::Duplicate,
                 },
                 held_rights,
             }
@@ -2947,6 +3045,9 @@ pub enum CanonicalRequestV1 {
     FsSetInheritance {
         policy: FdInheritancePolicyV1,
     },
+    FsDuplicate {
+        policy: FdInheritancePolicyV1,
+    },
     BufferAllocate {
         capacity: u64,
     },
@@ -2975,6 +3076,7 @@ pub enum FsCapabilityOperationV1 {
     Sync,
     GetInheritance,
     SetInheritance,
+    Duplicate,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -3633,7 +3735,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(classified, expected);
 
-        const RESOURCE_SIDE_D2: [HostOpV1; 11] = [
+        const RESOURCE_SIDE_D2: [HostOpV1; 12] = [
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
             HostOpV1::FsWriteAt,
@@ -3642,6 +3744,7 @@ mod tests {
             HostOpV1::FsSync,
             HostOpV1::FsGetInheritance,
             HostOpV1::FsSetInheritance,
+            HostOpV1::FsDuplicate,
             HostOpV1::ResourceRelease,
             HostOpV1::BufferAllocate,
             HostOpV1::BufferFreeze,
@@ -3674,7 +3777,7 @@ mod tests {
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the sealed
-    /// ABI-R3 operation inventory classifies exactly the nine operations that
+    /// ABI-R3 operation inventory classifies exactly the ten operations that
     /// borrow existing resources; settlement and allocation are explicitly
     /// outside that set. CLAIMED: every resource borrow crosses provenance
     /// admission before backend access. THE GAP: the behavioral lineage and
@@ -3690,6 +3793,7 @@ mod tests {
             HostOpV1::FsSync,
             HostOpV1::FsGetInheritance,
             HostOpV1::FsSetInheritance,
+            HostOpV1::FsDuplicate,
             HostOpV1::BufferFreeze,
         ];
         let classified = HostOpV1::ALL
@@ -4013,7 +4117,7 @@ mod tests {
             )
             .unwrap();
         }
-        const RESOURCE_BEARING: [HostOpV1; 12] = [
+        const RESOURCE_BEARING: [HostOpV1; 13] = [
             HostOpV1::FsOpen,
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
@@ -4023,6 +4127,7 @@ mod tests {
             HostOpV1::FsSync,
             HostOpV1::FsGetInheritance,
             HostOpV1::FsSetInheritance,
+            HostOpV1::FsDuplicate,
             HostOpV1::ResourceRelease,
             HostOpV1::BufferAllocate,
             HostOpV1::BufferFreeze,
@@ -4312,12 +4417,17 @@ mod tests {
         assert_eq!(HostOpV1::FsSync as u16, 0x0311);
         assert_eq!(HostOpV1::FsGetInheritance as u16, 0x0312);
         assert_eq!(HostOpV1::FsSetInheritance as u16, 0x0313);
+        assert_eq!(HostOpV1::FsDuplicate as u16, 0x0314);
         assert_ne!(HostOpV1::FsSeek as u16, HostOpV1::FsSetLength as u16);
         assert_ne!(HostOpV1::FsSetLength as u16, HostOpV1::FsSync as u16);
         assert_ne!(HostOpV1::FsSync as u16, HostOpV1::FsGetInheritance as u16);
         assert_ne!(
             HostOpV1::FsGetInheritance as u16,
             HostOpV1::FsSetInheritance as u16
+        );
+        assert_ne!(
+            HostOpV1::FsSetInheritance as u16,
+            HostOpV1::FsDuplicate as u16
         );
         assert_eq!(generated_binding("tag", "seek_origin.start"), Ok(0));
         assert_eq!(generated_binding("tag", "seek_origin.current"), Ok(1));
@@ -4360,9 +4470,19 @@ mod tests {
             generated_layout_fact("OFFSET_FsSetInheritanceRequestV1_policy"),
             Ok(8)
         );
+        assert_eq!(generated_layout_fact("SIZE_FsDuplicateRequestV1"), Ok(16));
+        assert_eq!(generated_layout_fact("ALIGN_FsDuplicateRequestV1"), Ok(8));
+        assert_eq!(
+            generated_layout_fact("OFFSET_FsDuplicateRequestV1_resource"),
+            Ok(0)
+        );
+        assert_eq!(
+            generated_layout_fact("OFFSET_FsDuplicateRequestV1_policy"),
+            Ok(8)
+        );
     }
 
-    /// Promise class: transition sentinel. ABI-S1 D1-D4 represent the
+    /// Promise class: transition sentinel. ABI-S1 D1-D5 represent the
     /// descriptor operations but deliberately do not promote their native
     /// wire layouts. A later promotion must retire this sentinel explicitly.
     #[test]
@@ -4373,6 +4493,7 @@ mod tests {
             HostOpV1::FsSync,
             HostOpV1::FsGetInheritance,
             HostOpV1::FsSetInheritance,
+            HostOpV1::FsDuplicate,
         ] {
             assert_eq!(
                 operation.availability(),
@@ -4389,7 +4510,7 @@ mod tests {
 
     /// Promise class: transition sentinel. ABI-A3 completes Track A, so the
     /// exact deferred tail is the two Clock siblings, ABI-S1
-    /// seek/set-length/sync/inheritance get+set, and Entropy. A later
+    /// seek/set-length/sync/inheritance get+set/duplication, and Entropy. A later
     /// availability slice must deliberately retire or update this sentinel.
     #[test]
     fn abi_a3_completion_leaves_only_the_non_track_a_deferred_tail() {
@@ -4409,9 +4530,10 @@ mod tests {
                 HostOpV1::FsSync,
                 HostOpV1::FsGetInheritance,
                 HostOpV1::FsSetInheritance,
+                HostOpV1::FsDuplicate,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "ABI-S1 D1-D4 add only seek, set-length, sync, and inheritance flags to the deferred tail"
+            "ABI-S1 D1-D5 add only seek, set-length, sync, inheritance flags, and duplication to the deferred tail"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,
@@ -4525,6 +4647,7 @@ mod tests {
             "FsSync|0311|unavailable|FsSyncRequestV1|2|HostReplyV1|1",
             "FsGetInheritance|0312|unavailable|FsGetInheritanceRequestV1|1|HostReplyV1|1",
             "FsSetInheritance|0313|unavailable|FsSetInheritanceRequestV1|2|HostReplyV1|1",
+            "FsDuplicate|0314|unavailable|FsDuplicateRequestV1|2|HostReplyV1|1",
             "ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1",
             "BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1",
             "BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1",
@@ -5901,6 +6024,197 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// Promise class: durable discriminator. MEASURED: duplication requires
+    /// CHANGE_MODE before creating a table entry, atomically applies both
+    /// frozen inheritance policies, copies the source rights exactly, and
+    /// preserves the source revocation lineage. CLAIMED: ABI-S1 D5 mints one
+    /// alias without an authority or revocation bypass. THE GAP: wire tags,
+    /// C layout, PX9 identity, and represented-only availability are pinned
+    /// independently.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_s1_duplicate_preserves_policy_rights_and_revocation_lineage() {
+        let root =
+            std::env::temp_dir().join(format!("ken-abi-s1-duplicate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("held.bin"), b"payload").unwrap();
+        let rooted = crate::open_root(&crate::RootPath::new(&root).unwrap()).unwrap();
+        let leaf = crate::PathComponent::new(b"held.bin").unwrap();
+        let open = || crate::open_resource_at_v1(&rooted, &leaf, crate::OpenRequest::Read).unwrap();
+        let mut revocation = RevocationDomain::default();
+        let lineage = revocation.mint_root();
+        let weaker_lineage = revocation.mint_root();
+        let source_rights = crate::RightSet::READ.union(crate::RightSet::CHANGE_MODE);
+        let mut resources = ResourceTableV1::default();
+        let (source, source_identity) = resources.insert_fs_handle(open(), source_rights, lineage);
+        let (weaker, _) = resources.insert_fs_handle(open(), crate::RightSet::READ, weaker_lineage);
+        let capabilities = CapabilityTableV1::default();
+        let mut backend = RealResourceBackend {
+            root: rooted,
+            metadata_calls: 0,
+            metadata_error: None,
+        };
+        let duplicate = |backend: &mut RealResourceBackend,
+                         revocation: &RevocationDomain,
+                         resources: &mut ResourceTableV1,
+                         token: ResourceTokenV1,
+                         policy: FdInheritancePolicyV1| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                revocation,
+                resources,
+                HostOpV1::FsDuplicate,
+                None,
+                ResourceInputsV1::Target(token),
+                &CanonicalRequestV1::FsDuplicate { policy },
+            )
+            .unwrap()
+        };
+        let get = |backend: &mut RealResourceBackend,
+                   revocation: &RevocationDomain,
+                   resources: &mut ResourceTableV1,
+                   token: ResourceTokenV1| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                revocation,
+                resources,
+                HostOpV1::FsGetInheritance,
+                None,
+                ResourceInputsV1::Target(token),
+                &CanonicalRequestV1::FsGetInheritance,
+            )
+            .unwrap()
+            .outcome
+        };
+
+        let slots_before_denial = resources.slots.len();
+        let denied = duplicate(
+            &mut backend,
+            &revocation,
+            &mut resources,
+            weaker,
+            FdInheritancePolicyV1::Inherit,
+        );
+        assert_eq!(
+            denied.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: crate::RightSet::CHANGE_MODE.bits(),
+                held: crate::RightSet::READ.bits(),
+            }))
+        );
+        assert!(denied.resource_token.is_none());
+        assert!(denied.resource_bindings.is_empty());
+        assert_eq!(resources.slots.len(), slots_before_denial);
+
+        let inherited = duplicate(
+            &mut backend,
+            &revocation,
+            &mut resources,
+            source,
+            FdInheritancePolicyV1::Inherit,
+        );
+        let inherited_alias = inherited.resource_token.expect("alias token");
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired {
+            resource_kind: ResourceKindV1::FsHandle,
+            identity: inherited_identity,
+            ..
+        }) = inherited.outcome
+        else {
+            panic!("duplicate must report one acquired filesystem resource")
+        };
+        assert_eq!(
+            inherited.resource_bindings,
+            [
+                (ResourceBindingRole::Target, source_identity),
+                (ResourceBindingRole::Target, inherited_identity),
+            ]
+        );
+        assert_eq!(
+            get(
+                &mut backend,
+                &revocation,
+                &mut resources,
+                inherited_alias,
+            ),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FdInheritancePolicy(
+                FdInheritancePolicyV1::Inherit
+            ))
+        );
+
+        let close_on_exec = duplicate(
+            &mut backend,
+            &revocation,
+            &mut resources,
+            source,
+            FdInheritancePolicyV1::CloseOnExec,
+        );
+        let close_on_exec_alias = close_on_exec.resource_token.expect("alias token");
+        assert_eq!(
+            get(
+                &mut backend,
+                &revocation,
+                &mut resources,
+                close_on_exec_alias,
+            ),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FdInheritancePolicy(
+                FdInheritancePolicyV1::CloseOnExec
+            ))
+        );
+
+        let ResourceSlotStateV1::Live {
+            rights, provenance, ..
+        } = &resources.slots[inherited_alias.slot as usize].state
+        else {
+            panic!("the alias must occupy a live resource slot")
+        };
+        assert_eq!(*rights, source_rights);
+        assert_eq!(*provenance, Some(lineage));
+        let no_write_escalation = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::FsSetLength,
+            None,
+            ResourceInputsV1::Target(inherited_alias),
+            &CanonicalRequestV1::FsSetLength { length: 0 },
+        )
+        .unwrap();
+        assert_eq!(
+            no_write_escalation.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: crate::RightSet::WRITE.bits(),
+                held: source_rights.bits(),
+            }))
+        );
+
+        assert!(revocation.revoke(lineage));
+        assert_eq!(
+            get(
+                &mut backend,
+                &revocation,
+                &mut resources,
+                inherited_alias,
+            ),
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
+        );
+        assert_eq!(
+            get(
+                &mut backend,
+                &revocation,
+                &mut resources,
+                close_on_exec_alias,
+            ),
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
+        );
+
+        drop(resources);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[derive(Default)]
     struct DescriptorErrorBackend {
         seek_calls: usize,
@@ -5908,6 +6222,7 @@ mod tests {
         sync_modes: Vec<FsSyncModeV1>,
         get_inheritance_calls: usize,
         set_inheritance_policies: Vec<FdInheritancePolicyV1>,
+        duplicate_policies: Vec<FdInheritancePolicyV1>,
     }
 
     impl HostEffectBackendV1 for DescriptorErrorBackend {
@@ -5987,9 +6302,18 @@ mod tests {
             self.set_inheritance_policies.push(policy);
             Err(IoErrorIdentityV1::Other(906))
         }
+
+        fn fs_resource_duplicate(
+            &mut self,
+            _: &crate::ResourceHandleV1,
+            policy: FdInheritancePolicyV1,
+        ) -> Result<crate::ResourceHandleV1, IoErrorIdentityV1> {
+            self.duplicate_policies.push(policy);
+            Err(IoErrorIdentityV1::Other(907))
+        }
     }
 
-    /// Promise class: durable discriminator. MEASURED: five admitted descriptor
+    /// Promise class: durable discriminator. MEASURED: six admitted descriptor
     /// operations receive distinct injected host failures and preserve their
     /// operation identity, absent-path context, and exact I/O cause in
     /// `SemanticErrorV1::File`. CLAIMED: PX9 file-error identity is not
@@ -6003,9 +6327,10 @@ mod tests {
         let rights = crate::RightSet::READ
             .union(crate::RightSet::WRITE)
             .union(crate::RightSet::CHANGE_MODE);
-        let (token, _) = resources.insert_fs_handle_without_provenance_for_test(owner, rights);
+        let mut revocation = RevocationDomain::default();
+        let lineage = revocation.mint_root();
+        let (token, _) = resources.insert_fs_handle(owner, rights, lineage);
         let capabilities = CapabilityTableV1::default();
-        let revocation = RevocationDomain::default();
         let mut backend = DescriptorErrorBackend::default();
 
         let seek = dispatch_host_op_v1(
@@ -6116,11 +6441,35 @@ mod tests {
             backend.sync_modes,
             [FsSyncModeV1::SyncFull, FsSyncModeV1::SyncData]
         );
+        let duplicate = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::FsDuplicate,
+            None,
+            ResourceInputsV1::Target(token),
+            &CanonicalRequestV1::FsDuplicate {
+                policy: FdInheritancePolicyV1::Inherit,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            duplicate.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation: HostOpV1::FsDuplicate,
+                relative_path: Vec::new(),
+                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(907)),
+            }))
+        );
+        assert!(duplicate.resource_token.is_none());
+
         assert_eq!(backend.get_inheritance_calls, 1);
         assert_eq!(
             backend.set_inheritance_policies,
             [FdInheritancePolicyV1::CloseOnExec]
         );
+        assert_eq!(backend.duplicate_policies, [FdInheritancePolicyV1::Inherit]);
 
         drop(resources);
         std::fs::remove_dir_all(root).unwrap();

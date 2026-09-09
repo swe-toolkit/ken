@@ -82,6 +82,7 @@ pub struct NativeProcessSymbols {
     pub file_operation_sync: RuntimeSymbol,
     pub file_operation_get_inheritance: RuntimeSymbol,
     pub file_operation_set_inheritance: RuntimeSymbol,
+    pub file_operation_duplicate: RuntimeSymbol,
 }
 
 impl NativeProcessSymbols {
@@ -174,6 +175,7 @@ impl NativeProcessSymbols {
                 .to_string(),
             file_operation_set_inheritance: "ctor:prelude::FileOperation::OpSetInheritance"
                 .to_string(),
+            file_operation_duplicate: "ctor:prelude::FileOperation::OpDuplicate".to_string(),
         }
     }
 }

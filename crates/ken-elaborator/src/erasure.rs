@@ -600,6 +600,7 @@ pub(crate) struct CheckedHostSpineV1 {
     pub file_operation_sync: StableSymbol,
     pub file_operation_get_inheritance: StableSymbol,
     pub file_operation_set_inheritance: StableSymbol,
+    pub file_operation_duplicate: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -8128,6 +8129,10 @@ mod px7l_tests {
                 &family("FileOperation"),
                 "OpSetInheritance",
             ),
+            file_operation_duplicate: StableSymbol::constructor(
+                &family("FileOperation"),
+                "OpDuplicate",
+            ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8542,6 +8547,7 @@ mod d1b_role_b_decoder_alignment {
             file_operation_sync: sentinel("file_operation_sync"),
             file_operation_get_inheritance: sentinel("file_operation_get_inheritance"),
             file_operation_set_inheritance: sentinel("file_operation_set_inheritance"),
+            file_operation_duplicate: sentinel("file_operation_duplicate"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8634,6 +8640,10 @@ mod d1b_role_b_decoder_alignment {
         (
             spine.file_operation_set_inheritance.as_str(),
             "file_operation_set_inheritance",
+        ),
+        (
+            spine.file_operation_duplicate.as_str(),
+            "file_operation_duplicate",
         ),
         ];
         for (decoded_symbol, field) in pairs {
