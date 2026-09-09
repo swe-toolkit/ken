@@ -1,8 +1,9 @@
 # Capability.Diagnostics.Render
 
-`Capability.Diagnostics.Render` is the presentation layer shared by command-line and
-configuration clients. It depends on the origin-neutral diagnostic carrier and
-the document algebra without adding rendering knowledge to either package.
+`Capability.Diagnostics.Render` is the presentation layer shared by
+command-line and configuration clients. It depends on the origin-neutral
+diagnostic carrier and the document algebra without adding rendering knowledge
+to either package.
 
 ## 1. Rendering
 
@@ -11,6 +12,20 @@ short family label; clients can inspect the structured origin itself when they
 need exact machine-readable indexes and ranges.
 
 ```ken
+import Capability.Diagnostics.Core
+  (ArgumentOrigin,
+    ConfigKeyOrigin,
+    Diagnostic,
+    DiagnosticCode,
+    EnvironmentOrigin,
+    MkDiagnosticCode,
+    Origin,
+    SourceOrigin,
+    diagnostic_code,
+    diagnostic_origin)
+
+import Capability.Formatting.Doc (Concat, Doc, Group, Line, text_string)
+
 fn diagnostic_code_string (code : DiagnosticCode) : String =
   match code {
     MkDiagnosticCode value ↦ value
@@ -24,7 +39,7 @@ fn diagnostic_origin_label (origin : Origin) : String =
     ConfigKeyOrigin path ↦ "configuration"
   }
 
-fn diagnostic_to_doc (diagnostic : Diagnostic) : Doc =
+pub fn diagnostic_to_doc (diagnostic : Diagnostic) : Doc =
   Group
     (Concat
       (text_string (diagnostic_origin_label (diagnostic_origin diagnostic)))
@@ -35,5 +50,6 @@ fn diagnostic_to_doc (diagnostic : Diagnostic) : Doc =
 
 ## 2. Trust and derivation
 
-The renderer is a transparent structural projection into `Capability.Formatting.Doc`. It adds
-no error carrier, primitive, postulate, `Axiom`, or trusted-base entry.
+The renderer is a transparent structural projection into
+`Capability.Formatting.Doc`. It adds no error carrier, primitive, postulate,
+`Axiom`, or trusted-base entry.
