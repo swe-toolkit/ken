@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-D-SYSTEM-IO
 title: "Tier-D scaffold-retirement leaf: rename the Capability.System.IO theorem `write_all_all_success` to a non-shadowing canonical identifier so it stops colliding with its own subject function (the native-prelude `write_all_all_success`), retaining the subject function and preserving proof body + trust. The Tier-D singleton tail, after Posix and before Tier E."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
