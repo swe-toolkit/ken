@@ -38,6 +38,8 @@ pub enum HostOpV1 {
     FsSeek = 0x030F,
     FsSetLength = 0x0310,
     FsSync = 0x0311,
+    FsGetInheritance = 0x0312,
+    FsSetInheritance = 0x0313,
     ResourceRelease = 0x0401,
     BufferAllocate = 0x0402,
     BufferFreeze = 0x0403,
@@ -127,7 +129,9 @@ impl HostOpV1 {
             Self::FsWriteAt => Some(Self::FsSeek),
             Self::FsSeek => Some(Self::FsSetLength),
             Self::FsSetLength => Some(Self::FsSync),
-            Self::FsSync => Some(Self::ResourceRelease),
+            Self::FsSync => Some(Self::FsGetInheritance),
+            Self::FsGetInheritance => Some(Self::FsSetInheritance),
+            Self::FsSetInheritance => Some(Self::ResourceRelease),
             Self::ResourceRelease => Some(Self::BufferAllocate),
             Self::BufferAllocate => Some(Self::BufferFreeze),
             Self::BufferFreeze => Some(Self::EntropyRandomBytes),
@@ -167,6 +171,8 @@ impl HostOpV1 {
             Self::FsSeek => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsSetLength => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::FsSync => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsGetInheritance => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::FsSetInheritance => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::ResourceRelease => HostOpAvailabilityV1::NativeTested,
             Self::BufferAllocate => HostOpAvailabilityV1::NativeTested,
             Self::BufferFreeze => HostOpAvailabilityV1::NativeTested,
@@ -204,6 +210,8 @@ impl HostOpV1 {
             Self::FsSeek => false,
             Self::FsSetLength => false,
             Self::FsSync => false,
+            Self::FsGetInheritance => false,
+            Self::FsSetInheritance => false,
             Self::ResourceRelease => false,
             Self::BufferAllocate => false,
             Self::BufferFreeze => false,
@@ -513,6 +521,8 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsSeek
         | HostOpV1::FsSetLength
         | HostOpV1::FsSync
+        | HostOpV1::FsGetInheritance
+        | HostOpV1::FsSetInheritance
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation))
         }
@@ -799,6 +809,15 @@ pub enum FsSeekFromV1 {
 pub enum FsSyncModeV1 {
     SyncFull,
     SyncData,
+}
+
+/// Frozen descriptor inheritance policy shared by flag mutation and later
+/// duplication. The numeric discriminants are public ABI identities.
+#[repr(u64)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum FdInheritancePolicyV1 {
+    Inherit = 0,
+    CloseOnExec = 1,
 }
 
 impl FsOpenModeV1 {
@@ -1854,6 +1873,23 @@ pub trait HostEffectBackendV1 {
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
     }
 
+    fn fs_resource_get_inheritance(
+        &mut self,
+        handle: &crate::ResourceHandleV1,
+    ) -> Result<FdInheritancePolicyV1, IoErrorIdentityV1> {
+        crate::resource_get_inheritance_v1(handle)
+            .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+    }
+
+    fn fs_resource_set_inheritance(
+        &mut self,
+        handle: &crate::ResourceHandleV1,
+        policy: FdInheritancePolicyV1,
+    ) -> Result<(), IoErrorIdentityV1> {
+        crate::resource_set_inheritance_v1(handle, policy)
+            .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+    }
+
     fn resource_close(&mut self, handle: crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1> {
         crate::close_resource_v1(handle)
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
@@ -1970,6 +2006,8 @@ impl HostOpV1 {
             | Self::FsSeek
             | Self::FsSetLength
             | Self::FsSync
+            | Self::FsGetInheritance
+            | Self::FsSetInheritance
             | Self::ResourceRelease
             | Self::BufferAllocate
             | Self::BufferFreeze
@@ -1987,9 +2025,11 @@ impl HostOpV1 {
             }
             Self::FsReadAt => ResourceAdmissionRequirementV1::FileBuffer,
             Self::FsWriteAt => ResourceAdmissionRequirementV1::FileBufferSpan,
-            Self::FsSeek | Self::FsSetLength | Self::FsSync => {
-                ResourceAdmissionRequirementV1::Target
-            }
+            Self::FsSeek
+            | Self::FsSetLength
+            | Self::FsSync
+            | Self::FsGetInheritance
+            | Self::FsSetInheritance => ResourceAdmissionRequirementV1::Target,
             Self::ConsoleRead
             | Self::ConsoleWrite
             | Self::ConsoleFlush
@@ -2075,6 +2115,8 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 | HostOpV1::FsSeek
                 | HostOpV1::FsSetLength
                 | HostOpV1::FsSync
+                | HostOpV1::FsGetInheritance
+                | HostOpV1::FsSetInheritance
                 | HostOpV1::ResourceRelease,
             ResourceInputsV1::Target(_)
         ) | (
@@ -2183,6 +2225,14 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 CanonicalRequestV1::FsSetLength { .. }
             )
             | (HostOpV1::FsSync, CanonicalRequestV1::FsSync { .. })
+            | (
+                HostOpV1::FsGetInheritance,
+                CanonicalRequestV1::FsGetInheritance
+            )
+            | (
+                HostOpV1::FsSetInheritance,
+                CanonicalRequestV1::FsSetInheritance { .. }
+            )
             | (
                 HostOpV1::BufferAllocate,
                 CanonicalRequestV1::BufferAllocate { .. }
@@ -2409,6 +2459,42 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                     resource_bindings.push((ResourceBindingRole::Target, identity));
                     backend
                         .fs_resource_sync(handle, *mode)
+                        .map(|()| CanonicalReplyV1::Unit)
+                        .map_err(|error| file_error(operation, &[], FileErrorCauseV1::Io(error)))
+                }
+                Err(error) => Err(SemanticErrorV1::Resource(error)),
+            }
+        }
+        (HostOpV1::FsGetInheritance, CanonicalRequestV1::FsGetInheritance) => {
+            let ResourceInputsV1::Target(token) = resource else {
+                unreachable!("resource shape validated")
+            };
+            match resources.resolve_fs_handle(
+                token,
+                crate::FsCapabilityOperation::GetInheritance.required_right(),
+            ) {
+                Ok((handle, identity)) => {
+                    resource_bindings.push((ResourceBindingRole::Target, identity));
+                    backend
+                        .fs_resource_get_inheritance(handle)
+                        .map(CanonicalReplyV1::FdInheritancePolicy)
+                        .map_err(|error| file_error(operation, &[], FileErrorCauseV1::Io(error)))
+                }
+                Err(error) => Err(SemanticErrorV1::Resource(error)),
+            }
+        }
+        (HostOpV1::FsSetInheritance, CanonicalRequestV1::FsSetInheritance { policy }) => {
+            let ResourceInputsV1::Target(token) = resource else {
+                unreachable!("resource shape validated")
+            };
+            match resources.resolve_fs_handle(
+                token,
+                crate::FsCapabilityOperation::SetInheritance.required_right(),
+            ) {
+                Ok((handle, identity)) => {
+                    resource_bindings.push((ResourceBindingRole::Target, identity));
+                    backend
+                        .fs_resource_set_inheritance(handle, *policy)
                         .map(|()| CanonicalReplyV1::Unit)
                         .map_err(|error| file_error(operation, &[], FileErrorCauseV1::Io(error)))
                 }
@@ -2660,6 +2746,12 @@ fn map_capability_denial(error: crate::CapabilityDenied) -> CapabilityDeniedV1 {
                     crate::FsCapabilityOperation::Seek => FsCapabilityOperationV1::Seek,
                     crate::FsCapabilityOperation::SetLength => FsCapabilityOperationV1::SetLength,
                     crate::FsCapabilityOperation::Sync => FsCapabilityOperationV1::Sync,
+                    crate::FsCapabilityOperation::GetInheritance => {
+                        FsCapabilityOperationV1::GetInheritance
+                    }
+                    crate::FsCapabilityOperation::SetInheritance => {
+                        FsCapabilityOperationV1::SetInheritance
+                    }
                 },
                 held_rights,
             }
@@ -2851,6 +2943,10 @@ pub enum CanonicalRequestV1 {
     FsSync {
         mode: FsSyncModeV1,
     },
+    FsGetInheritance,
+    FsSetInheritance {
+        policy: FdInheritancePolicyV1,
+    },
     BufferAllocate {
         capacity: u64,
     },
@@ -2877,6 +2973,8 @@ pub enum FsCapabilityOperationV1 {
     Seek,
     SetLength,
     Sync,
+    GetInheritance,
+    SetInheritance,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -2966,6 +3064,7 @@ pub enum CanonicalReplyV1 {
     WriteProgress(WriteProgressV1),
     MonotonicInstant(Vec<u8>),
     FilePosition(u64),
+    FdInheritancePolicy(FdInheritancePolicyV1),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3075,7 +3174,8 @@ impl CanonicalOutcomeV1 {
                 | CanonicalReplyV1::ResourceAcquired { .. }
                 | CanonicalReplyV1::ResourceSettlement(_)
                 | CanonicalReplyV1::MonotonicInstant(_)
-                | CanonicalReplyV1::FilePosition(_) => None,
+                | CanonicalReplyV1::FilePosition(_)
+                | CanonicalReplyV1::FdInheritancePolicy(_) => None,
                 CanonicalReplyV1::ReadProgress(progress) => match progress {
                     ReadProgressV1::ReadEof => None,
                     ReadProgressV1::ReadSome { transferred, .. } => {
@@ -3533,13 +3633,15 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(classified, expected);
 
-        const RESOURCE_SIDE_D2: [HostOpV1; 9] = [
+        const RESOURCE_SIDE_D2: [HostOpV1; 11] = [
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
             HostOpV1::FsWriteAt,
             HostOpV1::FsSeek,
             HostOpV1::FsSetLength,
             HostOpV1::FsSync,
+            HostOpV1::FsGetInheritance,
+            HostOpV1::FsSetInheritance,
             HostOpV1::ResourceRelease,
             HostOpV1::BufferAllocate,
             HostOpV1::BufferFreeze,
@@ -3572,7 +3674,7 @@ mod tests {
     }
 
     /// Promise class: normative compatibility vector. MEASURED: the sealed
-    /// ABI-R3 operation inventory classifies exactly the seven operations that
+    /// ABI-R3 operation inventory classifies exactly the nine operations that
     /// borrow existing resources; settlement and allocation are explicitly
     /// outside that set. CLAIMED: every resource borrow crosses provenance
     /// admission before backend access. THE GAP: the behavioral lineage and
@@ -3586,6 +3688,8 @@ mod tests {
             HostOpV1::FsSeek,
             HostOpV1::FsSetLength,
             HostOpV1::FsSync,
+            HostOpV1::FsGetInheritance,
+            HostOpV1::FsSetInheritance,
             HostOpV1::BufferFreeze,
         ];
         let classified = HostOpV1::ALL
@@ -3909,7 +4013,7 @@ mod tests {
             )
             .unwrap();
         }
-        const RESOURCE_BEARING: [HostOpV1; 10] = [
+        const RESOURCE_BEARING: [HostOpV1; 12] = [
             HostOpV1::FsOpen,
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
@@ -3917,6 +4021,8 @@ mod tests {
             HostOpV1::FsSeek,
             HostOpV1::FsSetLength,
             HostOpV1::FsSync,
+            HostOpV1::FsGetInheritance,
+            HostOpV1::FsSetInheritance,
             HostOpV1::ResourceRelease,
             HostOpV1::BufferAllocate,
             HostOpV1::BufferFreeze,
@@ -4151,6 +4257,8 @@ mod tests {
             HostOpV1::FsSeek,
             HostOpV1::FsSetLength,
             HostOpV1::FsSync,
+            HostOpV1::FsGetInheritance,
+            HostOpV1::FsSetInheritance,
             HostOpV1::FsOpen,
             HostOpV1::ResourceRelease,
             HostOpV1::BufferAllocate,
@@ -4202,16 +4310,59 @@ mod tests {
         assert_eq!(HostOpV1::FsSeek as u16, 0x030f);
         assert_eq!(HostOpV1::FsSetLength as u16, 0x0310);
         assert_eq!(HostOpV1::FsSync as u16, 0x0311);
+        assert_eq!(HostOpV1::FsGetInheritance as u16, 0x0312);
+        assert_eq!(HostOpV1::FsSetInheritance as u16, 0x0313);
         assert_ne!(HostOpV1::FsSeek as u16, HostOpV1::FsSetLength as u16);
         assert_ne!(HostOpV1::FsSetLength as u16, HostOpV1::FsSync as u16);
+        assert_ne!(HostOpV1::FsSync as u16, HostOpV1::FsGetInheritance as u16);
+        assert_ne!(
+            HostOpV1::FsGetInheritance as u16,
+            HostOpV1::FsSetInheritance as u16
+        );
         assert_eq!(generated_binding("tag", "seek_origin.start"), Ok(0));
         assert_eq!(generated_binding("tag", "seek_origin.current"), Ok(1));
         assert_eq!(generated_binding("tag", "seek_origin.end"), Ok(2));
         assert_eq!(generated_binding("tag", "sync_mode.full"), Ok(0));
         assert_eq!(generated_binding("tag", "sync_mode.data"), Ok(1));
+        assert_eq!(
+            generated_binding("tag", "inheritance_policy.inherit"),
+            Ok(0)
+        );
+        assert_eq!(
+            generated_binding("tag", "inheritance_policy.close_on_exec"),
+            Ok(1)
+        );
+        assert_eq!(
+            generated_layout_fact("SIZE_FsGetInheritanceRequestV1"),
+            Ok(8)
+        );
+        assert_eq!(
+            generated_layout_fact("ALIGN_FsGetInheritanceRequestV1"),
+            Ok(8)
+        );
+        assert_eq!(
+            generated_layout_fact("OFFSET_FsGetInheritanceRequestV1_resource"),
+            Ok(0)
+        );
+        assert_eq!(
+            generated_layout_fact("SIZE_FsSetInheritanceRequestV1"),
+            Ok(16)
+        );
+        assert_eq!(
+            generated_layout_fact("ALIGN_FsSetInheritanceRequestV1"),
+            Ok(8)
+        );
+        assert_eq!(
+            generated_layout_fact("OFFSET_FsSetInheritanceRequestV1_resource"),
+            Ok(0)
+        );
+        assert_eq!(
+            generated_layout_fact("OFFSET_FsSetInheritanceRequestV1_policy"),
+            Ok(8)
+        );
     }
 
-    /// Promise class: transition sentinel. ABI-S1 D1-D3 represent the
+    /// Promise class: transition sentinel. ABI-S1 D1-D4 represent the
     /// descriptor operations but deliberately do not promote their native
     /// wire layouts. A later promotion must retire this sentinel explicitly.
     #[test]
@@ -4220,6 +4371,8 @@ mod tests {
             HostOpV1::FsSeek,
             HostOpV1::FsSetLength,
             HostOpV1::FsSync,
+            HostOpV1::FsGetInheritance,
+            HostOpV1::FsSetInheritance,
         ] {
             assert_eq!(
                 operation.availability(),
@@ -4236,7 +4389,7 @@ mod tests {
 
     /// Promise class: transition sentinel. ABI-A3 completes Track A, so the
     /// exact deferred tail is the two Clock siblings, ABI-S1
-    /// seek/set-length/sync, and Entropy. A later
+    /// seek/set-length/sync/inheritance get+set, and Entropy. A later
     /// availability slice must deliberately retire or update this sentinel.
     #[test]
     fn abi_a3_completion_leaves_only_the_non_track_a_deferred_tail() {
@@ -4254,9 +4407,11 @@ mod tests {
                 HostOpV1::FsSeek,
                 HostOpV1::FsSetLength,
                 HostOpV1::FsSync,
+                HostOpV1::FsGetInheritance,
+                HostOpV1::FsSetInheritance,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "ABI-S1 D1-D3 add only seek, set-length, and sync to the deferred tail"
+            "ABI-S1 D1-D4 add only seek, set-length, sync, and inheritance flags to the deferred tail"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,
@@ -4368,6 +4523,8 @@ mod tests {
             "FsSeek|030f|unavailable|FsSeekRequestV1|3|HostReplyV1|1",
             "FsSetLength|0310|unavailable|FsSetLengthRequestV1|2|HostReplyV1|1",
             "FsSync|0311|unavailable|FsSyncRequestV1|2|HostReplyV1|1",
+            "FsGetInheritance|0312|unavailable|FsGetInheritanceRequestV1|1|HostReplyV1|1",
+            "FsSetInheritance|0313|unavailable|FsSetInheritanceRequestV1|2|HostReplyV1|1",
             "ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1",
             "BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1",
             "BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1",
@@ -4393,6 +4550,8 @@ mod tests {
             "tag=seek_origin.start|0",
             "tag=seek_origin.current|1",
             "tag=seek_origin.end|2",
+            "tag=inheritance_policy.inherit|0",
+            "tag=inheritance_policy.close_on_exec|1",
         ] {
             assert!(HOST_EFFECT_ABI_V1_CANONICAL.contains(needle));
             let mutated = HOST_EFFECT_ABI_V1_CANONICAL.replacen(needle, "MUTATED", 1);
@@ -5605,11 +5764,150 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// Promise class: durable discriminator. MEASURED: a descriptor opened by
+    /// the held-handle helper starts CloseOnExec, explicit set transitions it
+    /// through both frozen policies, get observes each transition, and the
+    /// READ versus CHANGE_MODE profiles reject the opposite-only handle before
+    /// mutation. CLAIMED: ABI-S1 D4 implements typed inheritance get/set with
+    /// distinct least-right profiles and no raw integer or Bool policy. THE
+    /// GAP: effect-wire tags and PX9 identities are pinned independently.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_s1_inheritance_get_set_are_typed_and_right_separated() {
+        let root =
+            std::env::temp_dir().join(format!("ken-abi-s1-inheritance-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("held.bin"), b"payload").unwrap();
+        let rooted = crate::open_root(&crate::RootPath::new(&root).unwrap()).unwrap();
+        let leaf = crate::PathComponent::new(b"held.bin").unwrap();
+        let open = || crate::open_resource_at_v1(&rooted, &leaf, crate::OpenRequest::Read).unwrap();
+        let mut resources = ResourceTableV1::default();
+        let (full_token, _) = resources.insert_fs_handle_without_provenance_for_test(
+            open(),
+            crate::RightSet::READ.union(crate::RightSet::CHANGE_MODE),
+        );
+        let (read_token, _) =
+            resources.insert_fs_handle_without_provenance_for_test(open(), crate::RightSet::READ);
+        let (change_token, _) = resources
+            .insert_fs_handle_without_provenance_for_test(open(), crate::RightSet::CHANGE_MODE);
+        let capabilities = CapabilityTableV1::default();
+        let revocation = RevocationDomain::default();
+        let mut backend = RealResourceBackend {
+            root: rooted,
+            metadata_calls: 0,
+            metadata_error: None,
+        };
+
+        let get = |backend: &mut RealResourceBackend,
+                   resources: &mut ResourceTableV1,
+                   token: ResourceTokenV1| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                &revocation,
+                resources,
+                HostOpV1::FsGetInheritance,
+                None,
+                ResourceInputsV1::Target(token),
+                &CanonicalRequestV1::FsGetInheritance,
+            )
+            .unwrap()
+            .outcome
+        };
+        let set = |backend: &mut RealResourceBackend,
+                   resources: &mut ResourceTableV1,
+                   token: ResourceTokenV1,
+                   policy: FdInheritancePolicyV1| {
+            dispatch_host_op_v1(
+                backend,
+                &capabilities,
+                &revocation,
+                resources,
+                HostOpV1::FsSetInheritance,
+                None,
+                ResourceInputsV1::Target(token),
+                &CanonicalRequestV1::FsSetInheritance { policy },
+            )
+            .unwrap()
+            .outcome
+        };
+
+        assert_eq!(
+            get(&mut backend, &mut resources, full_token),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FdInheritancePolicy(
+                FdInheritancePolicyV1::CloseOnExec
+            ))
+        );
+        assert_eq!(
+            set(
+                &mut backend,
+                &mut resources,
+                full_token,
+                FdInheritancePolicyV1::Inherit,
+            ),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        );
+        assert_eq!(
+            get(&mut backend, &mut resources, full_token),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FdInheritancePolicy(
+                FdInheritancePolicyV1::Inherit
+            ))
+        );
+        assert_eq!(
+            set(
+                &mut backend,
+                &mut resources,
+                full_token,
+                FdInheritancePolicyV1::CloseOnExec,
+            ),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        );
+        assert_eq!(
+            get(&mut backend, &mut resources, full_token),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FdInheritancePolicy(
+                FdInheritancePolicyV1::CloseOnExec
+            ))
+        );
+
+        assert_eq!(
+            set(
+                &mut backend,
+                &mut resources,
+                read_token,
+                FdInheritancePolicyV1::Inherit,
+            ),
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: crate::RightSet::CHANGE_MODE.bits(),
+                held: crate::RightSet::READ.bits(),
+            }))
+        );
+        assert_eq!(
+            get(&mut backend, &mut resources, read_token),
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FdInheritancePolicy(
+                FdInheritancePolicyV1::CloseOnExec
+            )),
+            "a denied set must not clear close-on-exec"
+        );
+        assert_eq!(
+            get(&mut backend, &mut resources, change_token),
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: crate::RightSet::READ.bits(),
+                held: crate::RightSet::CHANGE_MODE.bits(),
+            }))
+        );
+
+        drop(resources);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[derive(Default)]
     struct DescriptorErrorBackend {
         seek_calls: usize,
         set_length_calls: usize,
         sync_modes: Vec<FsSyncModeV1>,
+        get_inheritance_calls: usize,
+        set_inheritance_policies: Vec<FdInheritancePolicyV1>,
     }
 
     impl HostEffectBackendV1 for DescriptorErrorBackend {
@@ -5672,9 +5970,26 @@ mod tests {
                 FsSyncModeV1::SyncData => 904,
             }))
         }
+
+        fn fs_resource_get_inheritance(
+            &mut self,
+            _: &crate::ResourceHandleV1,
+        ) -> Result<FdInheritancePolicyV1, IoErrorIdentityV1> {
+            self.get_inheritance_calls += 1;
+            Err(IoErrorIdentityV1::Other(905))
+        }
+
+        fn fs_resource_set_inheritance(
+            &mut self,
+            _: &crate::ResourceHandleV1,
+            policy: FdInheritancePolicyV1,
+        ) -> Result<(), IoErrorIdentityV1> {
+            self.set_inheritance_policies.push(policy);
+            Err(IoErrorIdentityV1::Other(906))
+        }
     }
 
-    /// Promise class: durable discriminator. MEASURED: three admitted descriptor
+    /// Promise class: durable discriminator. MEASURED: five admitted descriptor
     /// operations receive distinct injected host failures and preserve their
     /// operation identity, absent-path context, and exact I/O cause in
     /// `SemanticErrorV1::File`. CLAIMED: PX9 file-error identity is not
@@ -5685,7 +6000,9 @@ mod tests {
     fn abi_s1_descriptor_failures_preserve_px9_file_error_identity() {
         let (root, owner) = resource_fixture("descriptor-error");
         let mut resources = ResourceTableV1::default();
-        let rights = crate::RightSet::READ.union(crate::RightSet::WRITE);
+        let rights = crate::RightSet::READ
+            .union(crate::RightSet::WRITE)
+            .union(crate::RightSet::CHANGE_MODE);
         let (token, _) = resources.insert_fs_handle_without_provenance_for_test(owner, rights);
         let capabilities = CapabilityTableV1::default();
         let revocation = RevocationDomain::default();
@@ -5753,10 +6070,56 @@ mod tests {
                 }))
             );
         }
+        let get = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::FsGetInheritance,
+            None,
+            ResourceInputsV1::Target(token),
+            &CanonicalRequestV1::FsGetInheritance,
+        )
+        .unwrap();
+        assert_eq!(
+            get.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation: HostOpV1::FsGetInheritance,
+                relative_path: Vec::new(),
+                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(905)),
+            }))
+        );
+        let set = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::FsSetInheritance,
+            None,
+            ResourceInputsV1::Target(token),
+            &CanonicalRequestV1::FsSetInheritance {
+                policy: FdInheritancePolicyV1::CloseOnExec,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            set.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation: HostOpV1::FsSetInheritance,
+                relative_path: Vec::new(),
+                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(906)),
+            }))
+        );
+
         assert_eq!((backend.seek_calls, backend.set_length_calls), (1, 1));
         assert_eq!(
             backend.sync_modes,
             [FsSyncModeV1::SyncFull, FsSyncModeV1::SyncData]
+        );
+        assert_eq!(backend.get_inheritance_calls, 1);
+        assert_eq!(
+            backend.set_inheritance_policies,
+            [FdInheritancePolicyV1::CloseOnExec]
         );
 
         drop(resources);

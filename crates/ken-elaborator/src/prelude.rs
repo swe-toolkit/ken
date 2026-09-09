@@ -144,6 +144,8 @@ canonical_runtime_roles! {
     file_operation_seek => "OpSeek",
     file_operation_set_length => "OpSetLength",
     file_operation_sync => "OpSync",
+    file_operation_get_inheritance => "OpGetInheritance",
+    file_operation_set_inheritance => "OpSetInheritance",
     // The thirteen IO errors, in the exact order the spine's vector carries them.
     // That order is the contract; the record's bytes depend on it.
     io_error_not_found => "NotFound",
@@ -585,7 +587,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude IOError failed: {}", e)))?;
     elab.elaborate_decl(
-        "data FileOperation = OpReadFile | OpWriteFile | OpAppendFile | OpMetadata | OpReadDirectory | OpCreateDirectory | OpRemoveFile | OpRemoveDirectory | OpRename | OpChangeMode | OpSeek | OpSetLength | OpSync",
+        "data FileOperation = OpReadFile | OpWriteFile | OpAppendFile | OpMetadata | OpReadDirectory | OpCreateDirectory | OpRemoveFile | OpRemoveDirectory | OpRename | OpChangeMode | OpSeek | OpSetLength | OpSync | OpGetInheritance | OpSetInheritance",
     )
     .map_err(|e| ElabError::Internal(format!("prelude FileOperation failed: {}", e)))?;
     elab.elaborate_decl("data FileError = MkFileError FileOperation (Option Bytes) IOError")
@@ -670,7 +672,9 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
              OpChangeMode |-> Idempotent; \
              OpSeek |-> NonIdempotent; \
              OpSetLength |-> Idempotent; \
-             OpSync |-> Idempotent \
+             OpSync |-> Idempotent; \
+             OpGetInheritance |-> Idempotent; \
+             OpSetInheritance |-> Idempotent \
            } \
          }",
     )
