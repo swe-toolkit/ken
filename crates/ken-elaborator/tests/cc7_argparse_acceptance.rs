@@ -6,7 +6,7 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, apply, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const VALIDATION_VALID: &str = "Data.Sums.Validation.Valid";
@@ -21,8 +21,32 @@ const NUMERIC_KEN_MD: &str =
 const EXIT_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
 const DIAGNOSTIC_RENDER_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
-const SCHEMA_KEN_MD: &str =
+const SCHEMA_MODULE: &str = "Application.Input.Schema";
+const SCHEMA_SOURCE: &str =
     include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
+const ARGPARSE_SCHEMA_IMPORT: &str = r#"
+import Application.Input.Schema
+  (MkSchema,
+    MkSchemaField,
+    MkSchemaIssue,
+    Schema,
+    SchemaBytes,
+    SchemaField,
+    SchemaFieldAccepted,
+    SchemaFieldCheck,
+    SchemaFieldRejected,
+    SchemaFlag,
+    SchemaIssue,
+    SchemaOptional,
+    SchemaPresence,
+    SchemaRequired,
+    SchemaValueShape,
+    schema_field_presence,
+    schema_help,
+    schema_issue_code,
+    schema_issue_origin,
+    schema_validate_fields)
+"#;
 const ARGPARSE_KEN_MD: &str =
     include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
 const EXAMPLE_KEN_MD: &str = include_str!("../../../catalog/examples/CommandLine/Forge.ken.md");
@@ -88,6 +112,10 @@ fn dependency_env() -> ElabEnv {
     env
 }
 
+fn schema_importing_client(source: &str, imports: &str) -> String {
+    source.replacen("```ken\n", &format!("```ken\n{imports}\n"), 1)
+}
+
 fn full_env() -> ElabEnv {
     let mut env = dependency_env();
     env.elaborate_module_from_roots(
@@ -96,12 +124,14 @@ fn full_env() -> ElabEnv {
     )
     .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], SCHEMA_MODULE)
+        .expect("Schema must roots-load through its declared providers");
     let before_validation_clients = env.module_state.clone();
-    env.elaborate_ken_md_file(SCHEMA_KEN_MD)
-        .expect("Schema must import NonEmpty and Validation before either decoder client");
-    env.module_state = before_validation_clients.clone();
-    env.elaborate_ken_md_file(ARGPARSE_KEN_MD)
-        .expect("ArgParse must import NonEmpty and Validation after the complete substrate");
+    env.elaborate_ken_md_file(&schema_importing_client(
+        ARGPARSE_KEN_MD,
+        ARGPARSE_SCHEMA_IMPORT,
+    ))
+    .expect("ArgParse must consume Schema's public surface");
     env.module_state = before_validation_clients.clone();
     env.elaborate_ken_md_file(EXAMPLE_KEN_MD)
         .expect("the separate forge client must import NonEmpty and Validation after ArgParse");
@@ -477,13 +507,20 @@ fn cc7_is_a_zero_trust_specialization_with_no_second_universe() {
     )
     .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
-    for source in [SCHEMA_KEN_MD, ARGPARSE_KEN_MD, EXAMPLE_KEN_MD] {
-        env.elaborate_ken_md_file(source)
-            .expect("each CC7 client must elaborate in the ordered environment");
-    }
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], SCHEMA_MODULE)
+        .expect("Schema must roots-load through its declared providers");
+    let before_clients = env.module_state.clone();
+    env.elaborate_ken_md_file(&schema_importing_client(
+        ARGPARSE_KEN_MD,
+        ARGPARSE_SCHEMA_IMPORT,
+    ))
+    .expect("ArgParse must consume Schema's public surface");
+    env.module_state = before_clients;
+    env.elaborate_ken_md_file(EXAMPLE_KEN_MD)
+        .expect("Forge must elaborate after ArgParse");
     for source in [
         DIAGNOSTIC_RENDER_KEN_MD,
-        SCHEMA_KEN_MD,
+        SCHEMA_SOURCE,
         ARGPARSE_KEN_MD,
         EXAMPLE_KEN_MD,
     ] {

@@ -9,6 +9,10 @@ the clients.
 ## 1. Description vocabulary
 
 ```ken
+import Capability.Formatting.Doc (Doc, Text)
+
+import Data.Collections.Derived (list_append)
+
 import Data.Collections.NonEmpty (NonEmpty, nonempty_append, nonempty_cons)
 
 import Data.Sums.Validation (Invalid, Valid, Validation)
@@ -228,6 +232,33 @@ fn schema_help (schema : Schema) : Doc =
             Char
             (string_to_list_char "\nFields:\n")
             (schema_fields_help_chars (schema_fields schema))))))
+
+export SchemaPresence,
+  SchemaRequired,
+  SchemaOptional,
+  SchemaValueShape,
+  SchemaFlag,
+  SchemaBytes,
+  SchemaField,
+  MkSchemaField,
+  Schema,
+  MkSchema,
+  SchemaIssue,
+  MkSchemaIssue,
+  SchemaFieldCheck,
+  SchemaFieldAccepted,
+  SchemaFieldRejected,
+  SchemaValidation,
+  schema_field_name,
+  schema_field_presence,
+  schema_fields,
+  schema_field_accept,
+  schema_check_presence,
+  schema_issue_origin,
+  schema_issue_code,
+  schema_validate_fields,
+  schema_validate,
+  schema_help
 ```
 
 ## 4. Trust and layering
