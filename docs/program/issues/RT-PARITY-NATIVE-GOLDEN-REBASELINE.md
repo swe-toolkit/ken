@@ -1,7 +1,7 @@
 ---
 id: RT-PARITY-NATIVE-GOLDEN-REBASELINE
 title: "Re-baseline every stale rt_parity_native checked_ih_* golden (census at base — four measured at 60c482cb8: two duplicated direct-origin 741/759, the admission-population set, and the confluence W0/W1 coordinate) so the native-slow CI job goes green, converting brittle absolute ids to relationship/cardinality assertions"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
