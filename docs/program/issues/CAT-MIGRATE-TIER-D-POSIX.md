@@ -31,6 +31,69 @@ origin: "Steward, 2026-09-09, framed on foundation-leader's next-slice proposal 
 > imported today by peer modules) — no consumer-only increment
 > references an unpublished provider (the DAG axis).
 
+## D0 RULING — surface + scope RESOLVED (Architect evt_7kyzjnw0npvm9). AUTHORITATIVE.
+
+D0 ran (foundation-implementer evt_bgbrm3qq7asq, no repo edit) and hard-stopped
+on two facts the a-priori below got wrong; the Architect ruled both. Where this
+section and the a-priori "Fixed inputs" / "Design judgment" below differ, THIS
+SECTION WINS — the a-priori is retained as measured context, not as the spec.
+
+TWO LEGS, one WP (folded per subsume-don't-proliferate; the Architect affirmed
+the Steward's decomposition call). Both legs are reviewed on the candidate
+(Architect + Foundation QA + CV cover BOTH — the fold is a convenience, not a
+review shortcut):
+
+- **Leg A — LawfulClasses provider-surface completion.** Publish
+  `bool_and::left` and `bool_and::right` (add `pub` to the two existing proof
+  declarations; bodies BYTE-UNCHANGED). Reason: `bool_and` is public and its
+  attached-proof family (intro/comm/assoc/idempotent/left_identity/
+  right_identity) is already public; left/right are the elimination projections,
+  the only two left private — a public intro with no public elimination is an
+  incomplete proof API. There is NO supported attached-proof import-item
+  spelling (`bool_and::left` in an import stanza is a ParseError), so this
+  provider edit is the only path. Precedent: CAT-LAWFULFUNCTORS-STANDALONE-IMPORT
+  already published Derived's `list_append::assoc`/`right_unit` (identical
+  pattern). Zero TCB, no proof authoring, no class/instance movement — reviewed
+  as a provider-surface change with its own no-trust / attached-proof-coherence
+  check.
+- **Leg B — the Posix migration** onto the 15-name curated surface below.
+
+**Posix public surface = EXACTLY 15 names (curated; NOT the loader-forced 18):**
+
+- Type + constructor (2): `Path`, `MkPath`. Path stays TRANSPARENT (no
+  representation invariant earns abstraction; `path_valid` is a separate
+  predicate, not a smart-ctor gate) — transparent carrier + public ctor, like
+  the other Tier-D transparent modules.
+- Operations (7): `path_is_absolute`, `path_join`, `path_normalize`,
+  `path_parent`, `path_parse`, `path_render`, `path_valid`.
+- Contract-level theorems (6): `path_normalize_absolute_has_no_dotdot`,
+  `path_normalize_has_no_dot`, `path_normalize_idempotent`,
+  `path_parse_render_parse`, `path_parse_render_valid`, `path_parse_valid`.
+  These state guarantees ABOUT the public operations (normalize eliminates
+  ./.. and is idempotent; parse/render round-trips; parse yields valid).
+
+**Excluded — stay PRIVATE (3):** `path_split_render_segments` (an interior
+recursive lemma, scaffolding for the contract theorems, not a statement about a
+public op); `path_dot_segment` and `path_segment_eq` (internal helpers; neither
+appears in any of the six contract theorems' statements). The loader-forced 18
+was the wrong API precisely because strict-import measurement reports what the
+pre-migration test happened to reach under full ambient visibility, not the
+module's contract.
+
+**cc6b restructures to consume ONLY those 15** (a test-fixture adjustment;
+Posix's terms stay byte-identical modulo the pub markers): any cc6b proof that
+invokes `path_split_render_segments` by name is rewritten to depend on the
+public contract theorem that lemma serves (`path_parse_render_valid` / the
+public validity guarantee), and any scaffolding using `path_dot_segment` /
+`path_segment_eq` uses the public operations instead.
+
+**Hard-stop back to the Architect (not a visibility flip):** if the implementer
+finds cc6b genuinely cannot preserve 5/0 without importing
+`path_split_render_segments` by name, do NOT publish it to clear the red —
+return to the Architect. That means either the lemma is contract-level (fix = a
+public wrapper theorem stating the guarantee, not exposing the raw lemma) or the
+client proof reaches too deep; either way it is a design call.
+
 ## Not a regression fix (read before treating standalone-red as a bug)
 
 Posix elaborates TODAY in the full-catalog build via ambient class-install
@@ -158,13 +221,25 @@ via the loader and corrects these names if the loader disagrees.
   precedent. If D0 surfaces a provider NOT owned by an already-published module
   (a hidden dep on a still-scaffolded module), CITE it and HARD STOP rather than
   dragging an unpublished provider in (the DAG axis every tier respects).
-- **D1 — publish + import + standalone.** Publish exactly the D0-determined
-  export surface with `pub` markers (body BYTE-UNCHANGED); add the selective
-  import block from Compare, LawfulClasses, and Derived for the exact
-  D0-confirmed name sets; retire the ambient reach; extend the module's
-  loader-visible inventory to reflect the new exports and the imports (imported
-  names are not new exports — reflect them the way an existing import is
-  reflected); the module elaborates standalone (exit 0). Native builtins
+- **D0 is RULED (see the D0 RULING section above): 15-name Posix surface + Leg A
+  folded.** The only remaining D0 obligation is to RE-CONFIRM the exact provider
+  and cc6b-resolved sets at the pickup SHA via the loader (they can shift if main
+  advanced) and to hold the path_split_render_segments hard-stop condition.
+- **Leg A — publish LawfulClasses `bool_and::left`/`bool_and::right`.** Add `pub`
+  to the two existing proof declarations in
+  `catalog/packages/Core/Classes/LawfulClasses.ken.md` (bodies BYTE-UNCHANGED).
+  This is the provider-surface completion that makes Posix's three-import
+  roots-load resolve past `UnboundName ...bool_and::left`; reviewed as its own
+  leg (no-trust / attached-proof coherence).
+- **D1 — publish + import + standalone (Leg B).** Publish exactly the 15-name
+  curated surface with `pub` markers (body BYTE-UNCHANGED); add the selective
+  import block from Compare `(list_eq)`, LawfulClasses `(DecEq, uint8_deceq_eq,
+  bool_and)`, and Derived `(list_append)` — the attached proofs resolve through
+  Leg A's provider pub markers, NOT via an import-item spelling (which is
+  unsupported); retire the ambient reach; extend the module's loader-visible
+  inventory to reflect the new exports and the imports (imported names are not
+  new exports — reflect them the way an existing import is reflected); the module
+  elaborates standalone (exit 0). Native builtins
   (`Bytes`/`UInt8`/`List`/`Nat`/`Bool`/`map`/byte-conversions) stay ambient —
   never in the import block.
 - **D2 — consumer + census closure (AC-AFFECTED-CLOSURE).** Update every target
@@ -186,10 +261,17 @@ via the loader and corrects these names if the loader disagrees.
     (:16-38). Once Posix carries a real selective-import block, repoint this to a
     roots-load (the `load_module` / Parsing.Parsing / cc precedent) so the
     module's own imports resolve, and RETIRE the manual pre-seed and the
-    withhold/restore dance that the strict imports make unnecessary. Acceptance
-    bodies (the path_* behavior + theorem checks) unchanged. CONTENTION: two
-    live CV branches touch this fixture (see Contention) — re-measure and
-    coordinate before editing it.
+    withhold/restore dance that the strict imports make unnecessary.
+    **Restructure cc6b to consume ONLY the 15 curated public names** (D0 RULING):
+    any proof that invokes `path_split_render_segments` by name is rewritten to
+    depend on the public contract theorem it serves (`path_parse_render_valid` /
+    the public validity guarantee), and any scaffolding using `path_dot_segment`
+    / `path_segment_eq` uses the public operations instead — a test-fixture
+    adjustment, Posix's terms byte-identical. Acceptance RESULTS (5/0, zero trust
+    delta) preserved. If 5/0 is unreachable without importing
+    `path_split_render_segments` by name, HARD STOP to the Architect (do not
+    publish it). CONTENTION: CV verified both listed CV branches are stale, not
+    live (evt_3mqa1pj2kkvse) — cleared; re-confirm at pickup.
 - **D3 — the singleton D0 test fixture.** Mirror the SINGLETON template
   `crates/ken-elaborator/tests/cat_tier_d_cursor_import.rs` / `..._render_import.rs`
   (two tests per module, each with a MEASURED/CLAIMED/GAP promise-class
@@ -207,14 +289,25 @@ This slice authors NO new proof content and performs NO class-instance relocatio
 
 ## Acceptance criteria, each with its control (proven Tier-A/B/C/D shape)
 
-- **AC-EXPORTED (positive).** Each D0-determined public name (a-priori
-  `path_parse`, `path_render`, `path_join`, `path_parent`, `path_normalize`,
-  `path_valid`, `path_is_absolute`, the `Path` type, and any cc6b-resolved
-  theorem) is LOADER-VISIBLE from Posix — a selective import resolves it to
-  Posix's `GlobalId`, measured by the loader, not a `pub` grep. Control: the
-  probe resolves; a still-private helper name in the same module (e.g.
+- **AC-EXPORTED (positive).** Each of the 15 ruled public names (Path, MkPath;
+  the 7 operations; the 6 contract theorems — see the D0 RULING section) is
+  LOADER-VISIBLE from Posix — a selective import resolves it to Posix's
+  `GlobalId`, measured by the loader, not a `pub` grep. Control: the probe
+  resolves; a still-private helper name in the same module (e.g.
   `path_finish_segment` or the dead `path_list_tail`) still rejects
   `UnboundName`.
+- **AC-LEG-A (LawfulClasses provider-surface completion).**
+  `bool_and::left` and `bool_and::right` are loader-visible from LawfulClasses
+  (a selective client can resolve them, as it already can for the sibling
+  `bool_and::intro`); the two proof bodies are BYTE-UNCHANGED; `trusted_base`
+  delta zero; no class/instance movement. Control: the two proofs resolve where
+  they rejected `UnboundName` before; a differential shows only the two `pub`
+  markers changed.
+- **AC-EXCLUDED-PRIVATE (the curated boundary, load-bearing).** The three
+  ruled-private names stay private: importing `path_split_render_segments`,
+  `path_dot_segment`, or `path_segment_eq` fails `UnboundName`. Control: the
+  exact `UnboundName` on each; a mutation that publishes one (regressing to the
+  loader-forced 18) reds this test.
 - **AC-PRIVATE (negative, load-bearing here).** The internal plumbing stays
   private: importing a private helper name (a segment predicate, a cons-result
   splitter, a forget/normal-form helper, or a lemma NOT in the D0 public set)
@@ -281,16 +374,21 @@ with fixed inputs re-measured at that SHA.
 
 ## Contention and sequencing
 
-`catalog/` (one module) plus the elaborator test fixtures, and additive.
-Re-measured at 6dd88d3fb:
+`catalog/` (TWO modules now — `Posix.ken.md` + `Core/Classes/LawfulClasses.ken.md`
+for Leg A) plus the elaborator test fixtures, and additive. Re-measured at
+6dd88d3fb, CV-contention re-checked at a5c8c2895:
 
-- **Two live CV-owned branches touch the Posix module and cc6b**:
-  `wp/cc6b-path-posix` and `wp/px-posix-campaign-frame` (with their
-  `remotes/conformance-validator/` mirrors), both about the cc6b acceptance / px
-  campaign, NOT this migration. Re-measure at pickup whether either is active
-  and holds uncommitted edits to `Posix.ken.md` or `cc6b_path_posix_acceptance.rs`;
-  coordinate on the cc6b loader edit (D2) before touching it. This is the one
-  real contention risk in the slice.
+- **CV contention CLEARED (was flagged, now resolved).** CV verified
+  (evt_3mqa1pj2kkvse) that `wp/cc6b-path-posix` and `wp/px-posix-campaign-frame`
+  are STALE historical branches (single unmerged commits from 2026-07-14), not
+  checked out in any worktree and holding no uncommitted edits to `Posix.ken.md`
+  or `cc6b_path_posix_acceptance.rs`; their apparent -1793-line deletion is a
+  staleness artifact (main's Posix grew since July). CV deleted the stale local
+  branches; the inert remote refs persist. No CV coordination boundary. Re-confirm
+  at pickup, but this is no longer a live risk.
+- **LawfulClasses (Leg A) contention:** re-measure at pickup that no live lane-2
+  or other branch holds uncommitted edits to `LawfulClasses.ken.md` (it is a
+  widely-imported provider). The edit is two `pub` markers, additive.
 - `lang_mod_strict_resolution_d0.rs` is the shared census fixture edited by every
   Tier-D migration (Render #3432, Arguments #3430, Parsing #3428, Numeric #3426,
   Decoder #3424, Cursor #3423). One Tier-D WP at a time on the lane means it is
@@ -308,16 +406,18 @@ Re-measured at 6dd88d3fb:
 
 ## Hard stop
 
-Route to the Steward if:
+The two original hard-stop conditions (provider gap; surface curation) already
+FIRED in D0 and the Architect RULED them (see the D0 RULING section) — Leg A
+folded, 15-name surface. The surviving conditions:
 
-- Posix CANNOT be brought standalone-green through a selective import from
-  already-published providers — i.e. D0 surfaces a required provider owned by a
-  still-scaffolded, unpublished module (a hidden cross-tier edge; cite it, do
-  not drag the unpublished provider in); or
-- the D0-determined public surface required to keep cc6b green forces publishing
-  a large or API-inappropriate theorem set (design judgment 2) — cite the set
-  and stop rather than freezing it by reflex; or
-- delivering D1..D3 appears to require binding a new class/instance, authoring
-  any proof content, retiring cc6b's manual pre-seed changes an acceptance
-  RESULT (not just its load path), or touching the System.IO erratum. Any of
-  those means the slice cut is wrong, not that the scope should bend.
+- **To the ARCHITECT (design call, not a visibility flip):** if cc6b genuinely
+  cannot preserve 5/0 without importing `path_split_render_segments` by name, do
+  NOT publish it to clear the red — return to the Architect (either the lemma is
+  contract-level and the fix is a public wrapper theorem, or the client proof
+  reaches too deep).
+- **To the Steward:** if delivering the two legs appears to require binding a new
+  class/instance, authoring any proof content (both legs are `pub`-marker-only,
+  bodies byte-unchanged), retiring cc6b's manual pre-seed changes an acceptance
+  RESULT (not just its load path / import surface), a provider beyond
+  Compare/LawfulClasses/Derived is required, or touching the System.IO erratum.
+  Any of those means the slice cut is wrong, not that the scope should bend.
