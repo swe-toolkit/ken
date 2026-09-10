@@ -106,7 +106,7 @@ data ShadowUnit = MkUnit
 data ShadowInstant = MkInstant
 data ShadowReadResult = Chunk | Eof
 data ShadowIoErrors = NotFound | PermissionDenied | CapabilityDenied | BrokenPipe | Interrupted | AlreadyExists | InvalidInput | IsDirectory | NotDirectory | NotEmpty | Unsupported | Revoked | Other
-data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress
+data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress | MappingLimit
 data ShadowProgress = ReadSome | ReadEof | Wrote
 data ShadowFileOps =
   MkFileError | OpReadFile | OpWriteFile | OpChangeMode | OpAppendFile | OpMetadata | OpRename |
@@ -156,6 +156,7 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowResource", "InvalidOffset"),
     ("ShadowResource", "InvalidBounds"),
     ("ShadowResource", "NoProgress"),
+    ("ShadowResource", "MappingLimit"),
     ("ShadowProgress", "ReadSome"),
     ("ShadowProgress", "ReadEof"),
     ("ShadowProgress", "Wrote"),
