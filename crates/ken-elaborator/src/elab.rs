@@ -3854,11 +3854,39 @@ fn check_match_with_lift(
             let result_ordinal = support_shapes
                 .iter()
                 .position(|shape| shape.position == evidence_argument);
+            // A DIRECT recursive field's evidence is a support-family occurrence
+            // whose separate trailing method result carries the recursive value;
+            // that result is surfaced by `result_ordinal`. A field whose recursive
+            // occurrence sits one positive former deeper (`List (Pair String
+            // Self)`) has no such trailing support-family result — its evidence
+            // BINDER is itself the guest induction hypothesis, the kernel's
+            // positivity witness built by build_all_support_decl/carrier_lift_type.
+            // Surface that binder as the selectable recursive result so
+            // `recursive result for <field>` reaches the former-nested occurrence,
+            // consuming the nested All-IH the kernel already builds. A higher-order
+            // (Pi) evidence — the W-style `(Bool -> a)` occurrence — is left out of
+            // scope exactly as today: its hypothesis is a function, not a value,
+            // and applying it is a separate capability. This never manufactures a
+            // decrease: an evidence binder exists only for a POSITIVE recursive
+            // position (derive_carrier_shape is positivity-gated), so a negative
+            // occurrence builds no evidence and remains rejected.
+            let recursive_result_position = match result_ordinal {
+                Some(ordinal) => Some(base + support_ctor.args.len() + ordinal),
+                None => cx.binding_term(base + evidence_argument).and_then(
+                    |(_, evidence_field_ty)| {
+                        (!matches!(
+                            whnf(cx.env, &cx.ctx, &evidence_field_ty),
+                            Term::Pi(_, _)
+                        ))
+                        .then_some(base + evidence_argument)
+                    },
+                ),
+            };
             let installed = install_lift_binding(
                 cx,
                 source_position,
                 base + evidence_argument,
-                result_ordinal.map(|ordinal| base + support_ctor.args.len() + ordinal),
+                recursive_result_position,
             )?;
             expected_bindings.push((source_position, installed));
         }
