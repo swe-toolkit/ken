@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-E-DECODER
 title: "Scaffold-retirement Tier E, serialization/application spine (the LAST Schema client): migrate Application.Configuration.Decoder off ambient/scaffold resolution onto its D0-measured selective imports — Application.Input.Schema (the ~15 consumed names from the published 26-name surface), Capability.Diagnostics.Core (Diagnostic/DiagnosticCode and any MkDiagnostic/Origin reached), Capability.Formatting.Doc (Doc), with Data.Collections.NonEmpty (NonEmpty, nonempty_map) and Data.Sums.Validation (Invalid, Valid, Validation) already selective — and publish its usable consumer surface. D0 measures Decoder's actual provider closure and client-consumed public surface, adopts exactly that import set, and publishes exactly that surface. NO new proof authoring, NO carrier change; the proven Tier A/B/C/D/E-Json/E-Schema/E-ArgParse publish-and-import shape."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
@@ -11,6 +11,20 @@ blocks: []
 github: null
 origin: "Steward-framed 2026-09-10 on the foundation-leader's named spine (evt_2fk3r5y2g3r61: Json -> Application.Input.Schema -> {ArgParse, Decoder}), released as foundation's next deliverable the moment CAT-MIGRATE-TIER-E-ARGPARSE landed (295ba35a3, blob-verified). Fourth and FINAL Tier-E serialization/application-spine node of the [[CAT-SCAFFOLD-RETIREMENT]] DAG and the SECOND (smaller) real client of the published Application.Input.Schema surface — the sibling of ArgParse, INDEPENDENT of it (Decoder consumes Schema, not ArgParse; the true dep is on the merged CAT-MIGRATE-TIER-E-SCHEMA, sequenced second under the one-WP rule as the smaller client: it references ~15 of Schema's 26 published names vs ArgParse's ~20). Module identity GROUNDED at origin/main 295ba35a3: Decoder = catalog/packages/Application/Configuration/Decoder.ken.md (blob 5a6ea273f, 159 lines)."
 ---
+
+> # LANDED 2026-09-10 at 39ebe2c8f (squash of ef4558478) — Tier-E spine COMPLETE.
+>
+> Merged via PR #3452, 26/26 CI green, blob-verified on main (4 paths). The
+> resumed D0 measured no new hard-stop: Decoder adopted the authorized provider
+> set including `Capability.Process.Environment (process_environment)` (the
+> export-only predecessor) and `Core.Classes.LawfulClasses (bytes_deceq_eq)`, with
+> exact Schema coverage, a three-name public driver surface, strict/evidence
+> controls, and unchanged CC8 behavior (Foundation QA evt_5rc6q805by094 + CV
+> evt_390n2x9ek1pmm; no Architect, D0 cleared; no TCB). This is the FOURTH and
+> FINAL Tier-E serialization/application-spine node — with Json, Schema, and
+> ArgParse it COMPLETES that spine. Remaining Tier-E work is the independent
+> algorithm leaves (InsertionSort / OrderedSearch / Gcd / Property) on their own
+> axes; foundation's next deliverable is requested separately.
 
 > # RE-RELEASED 2026-09-10 (Steward) — predecessor landed; D0 resumes.
 >
