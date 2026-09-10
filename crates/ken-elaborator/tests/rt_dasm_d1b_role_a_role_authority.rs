@@ -39,49 +39,42 @@
 //! Every assertion below names a **fully qualified** symbol — the parent chain
 //! is the identity, and the parent is what a substitution changes.
 //!
-//! **MEASURED.** With every non-floor shadowable role spelling and every family
-//! spelling declared by a package, no shadow's framed symbol occurs anywhere in
-//! the emitted record, the canonical prelude parents are still carried, and
-//! every roster spelling is covered by either that fixture or exact floor
-//! constructor parentage.
-//! Seven mutations discriminate it: one per producer path class (record
-//! constructor, spine constructor, family, operation), each restored to
-//! `env.globals.get(name)` and each reddening while naming exactly the redirected
-//! role; and three on the inventory relation (fixture shrinks, roster grows,
-//! fixture goes stale).
+//! **MEASURED (reframed by `LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD`).** A
+//! package can no longer DECLARE a constructor under a prelude/runtime role's
+//! spelling: the flat constructor namespace rejects the collision at declaration
+//! time (`DuplicateConstructorSpelling`, naming both sites). The former
+//! measurement — declare every shadow, then check that none redirected a stored
+//! role — is retired because its fixture is now unrepresentable; the first test
+//! below asserts the rejection directly (on a Runtime-role constructor spelling).
+//! The roster-inventory relation in the second test still holds and is measured.
 //!
-//! **CLAIMED.** No package declaration can capture a Runtime role: the roles
-//! the roster carries resist substitution (measured here), and no role outside
-//! the roster can be selected by spelling at all (closed by the signature, and
-//! not measurable from a test).
+//! **CLAIMED.** No package declaration can capture a Runtime role. For
+//! constructor roles this is now enforced by declaration-time rejection —
+//! strictly stronger than the old "declared but not redirected". For op-defs and
+//! family formers, which the guard does not reject (a constructor shadowing a
+//! def, or a `data` former shadowing a former, are a different collision class),
+//! non-capture stays closed by the producers' `&PreludeEnv` signature, which puts
+//! the package namespace out of scope — never measured from a test, by design.
 //!
-//! **THE GAP.** This file cannot see a role that stops going through the roster,
-//! because the relation compares the fixture against the roster rather than
-//! against the producers. That is now a *bounded* gap rather than a bypass: with
-//! only `&PreludeEnv` and the symbol map in scope, the roster and the
-//! already-canonical `PreludeEnv` ids are the sole ids a producer can reach, so
-//! leaving the roster means widening a signature. What this file still cannot
-//! discriminate is a role that moves from the roster to one of those
-//! already-canonical fields — sound, since both are captured at registration,
-//! but invisible here.
-//! Roles whose ids were already canonical before this repair (`Zero`/`Suc`, the
-//! private operations, the resource ids) are outside the fixture by
-//! construction — they never passed through name lookup, so there is nothing to
-//! substitute. Closed-floor bindings (`Nil`/`Cons`, `Some`, `Ok`/`Err`,
-//! `True`/`False`, `Buffer`) are also outside it: module prebinding now rejects
-//! those spellings before package allocation, so source redirection is
-//! unrepresentable rather than merely ignored by these producers.
+//! **THE GAP.** Unchanged in kind: the inventory relation compares the fixture
+//! against the roster, not against the producers, so a role that leaves the
+//! roster into an already-canonical `PreludeEnv` field is sound (captured at
+//! registration) but invisible here. Roles whose ids were already canonical
+//! (`Zero`/`Suc`, the private operations, the resource ids) never passed through
+//! name lookup. Closed-floor bindings (`Nil`/`Cons`, `Some`, `Ok`/`Err`,
+//! `True`/`False`, `Buffer`) are outside the fixture: module prebinding rejects
+//! those spellings before package allocation.
 
 use std::collections::BTreeSet;
 
-use ken_elaborator::checked_core::{CheckedCorePackage, StableSymbol, SymbolNamespace};
+use ken_elaborator::checked_core::{StableSymbol, SymbolNamespace};
 use ken_elaborator::compiler_driver::{
-    checked_runtime_symbols_v1_key, compile_ken_package_sources, CompilerManifest, CompilerSource,
+    compile_ken_package_sources, CompilerDriverError, CompilerManifest, CompilerSource,
     CompilerTargetKind, TargetSelector,
 };
 use ken_elaborator::modules::PRELUDE_FLOOR_NAMES;
 use ken_elaborator::prelude::CanonicalRuntimeRoles;
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
 
 const PACKAGE: &str = "d1b_role_a_shadow_pkg";
 
@@ -203,7 +196,7 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowOps", "ChangeMode"),
 ];
 
-fn emit_shadowing_package() -> CheckedCorePackage {
+fn compile_shadowing_package() -> Result<(), CompilerDriverError> {
     compile_ken_package_sources(
         &CompilerManifest::new(PACKAGE, Vec::new()),
         vec![CompilerSource::new("src/main.ken", SHADOWING_SOURCE)],
@@ -219,8 +212,7 @@ fn emit_shadowing_package() -> CheckedCorePackage {
             kind: CompilerTargetKind::Executable,
         },
     )
-    .expect("the shadowing package compiles -- colliding declarations are lawful Ken")
-    .package
+    .map(|_| ())
 }
 
 /// The five **family** roles, which are declarations rather than constructors.
@@ -231,140 +223,66 @@ fn emit_shadowing_package() -> CheckedCorePackage {
 /// constructor. Kept in its own table because the symbol namespace differs.
 const SHADOWED_FAMILIES: &[&str] = &["FSOp", "ConsoleOp", "ClockOp", "EntropyOp", "Cap"];
 
-/// The fully qualified symbol a shadow constructor receives.
-fn shadow_symbol(family: &str, constructor: &str) -> String {
-    format!("ctor:{PACKAGE}::{family}::{constructor}")
-}
-
-/// The fully qualified symbol a shadow family declaration receives.
-fn shadow_family_symbol(family: &str) -> String {
-    format!("decl:{PACKAGE}::{family}")
-}
-
-/// Does the record carry this symbol as one of its encoded entries?
-///
-/// ⚠ **This deliberately is not a substring search.** Every symbol in the record
-/// is framed as a little-endian `u64` length followed by its bytes, and matching
-/// the frame is what makes an occurrence exact. A plain `contains` reports role
-/// `X` whenever role `XY` is present, because `X`'s spelling is a prefix of
-/// `XY`'s: the operation-role mutation below redirected only `ReadFile`, and a
-/// substring reader also accused `Read`. That direction is safe — it over-reports
-/// rather than under-reports — but it misattributes the defect, and a control
-/// that names the wrong role sends its reader to the wrong line.
-fn record_carries_symbol(record: &[u8], symbol: &str) -> bool {
-    let mut needle = (symbol.len() as u64).to_le_bytes().to_vec();
-    needle.extend_from_slice(symbol.as_bytes());
-    record.windows(needle.len()).any(|window| window == needle)
-}
-
 #[test]
-fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
-    let package = emit_shadowing_package();
-    let metadata = &package.artifact.semantic.metadata;
-
-    let record = metadata
-        .get(&checked_runtime_symbols_v1_key())
-        .unwrap_or_else(|| {
-            panic!(
-                "no CheckedRuntimeSymbolsV1 in the shadowing package's metadata; keys: {:?}",
-                metadata.keys().collect::<Vec<_>>()
-            )
-        });
-    let text = String::from_utf8_lossy(record);
-
-    // POSITIVE CONTROL ON THE READER. Without it, every absence asserted below
-    // is equally consistent with a reader that can see nothing at all.
-    assert!(
-        text.contains("CheckedRuntimeSymbolsV1"),
-        "the stored bytes carry no version header, so nothing below is reading the record"
-    );
-
-    // POSITIVE CONTROL ON THE FIXTURE. The shadow declarations must really have
-    // elaborated and really have produced these symbols. Without this, "the
-    // shadow symbols are absent from the record" would also hold if the source
-    // had silently failed to declare them, and the control would prove nothing.
-    let declared: Vec<String> = package
-        .artifact
-        .semantic
-        .symbols
-        .iter()
-        .map(|symbol| symbol.to_string())
-        .collect();
-    for (family, constructor) in SHADOWED_ROLES {
-        let symbol = shadow_symbol(family, constructor);
-        assert!(
-            declared.contains(&symbol),
-            "the fixture did not actually declare {symbol}; the shadowing control would then be \
-             vacuous -- it would observe the absence of something that was never created"
-        );
-    }
-    for family in SHADOWED_FAMILIES {
-        let symbol = shadow_family_symbol(family);
-        assert!(
-            declared.contains(&symbol),
-            "the fixture did not actually declare the shadow family {symbol}; see above"
-        );
-    }
-
-    // SUBSTITUTION RESISTANCE. Not one shadow constructor may appear in the
-    // record. Each assertion names the FULLY QUALIFIED symbol: the parent chain
-    // is the role's identity, and a redirected role is spelled under the
-    // package's shadow family rather than under the prelude's.
-    let mut redirected = Vec::new();
-    for (family, constructor) in SHADOWED_ROLES {
-        let symbol = shadow_symbol(family, constructor);
-        if record_carries_symbol(record, &symbol) {
-            redirected.push(symbol);
-        }
-    }
-    for family in SHADOWED_FAMILIES {
-        let symbol = shadow_family_symbol(family);
-        if record_carries_symbol(record, &symbol) {
-            redirected.push(symbol);
-        }
-    }
-    assert!(
-        redirected.is_empty(),
-        "the record carries package constructors in Runtime role positions: {redirected:?}\n\
-         A role selected by source spelling after package elaboration resolves to the package's \
-         declaration, which would hand user constructors Runtime's special meaning."
-    );
-
-    // The canonical prelude parents are still present, so the roles were carried
-    // rather than merely dropped. An empty or truncated record would satisfy the
-    // absence check above for the wrong reason.
+fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
+    // REFRAMED to the new invariant (LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD).
     //
-    // These are deliberately PREFIX probes on the parent chain, not framed exact
-    // matches: the role's own final component is not what is being asked about,
-    // and under shadowing it degrades (the prelude's `Nil` loses its name to the
-    // package's, so its symbol becomes `...::List::ctor_<id>`). The parent is
-    // what survives shadowing, and the parent is the identity.
-    for parent in [
-        "ctor:d1b_role_a_shadow_pkg::List::",
-        "ctor:d1b_role_a_shadow_pkg::Prod::",
-        "ctor:d1b_role_a_shadow_pkg::ITree::",
-        "ctor:d1b_role_a_shadow_pkg::Coproduct::",
-        "ctor:d1b_role_a_shadow_pkg::Result::",
-        "ctor:d1b_role_a_shadow_pkg::Option::",
-        "ctor:d1b_role_a_shadow_pkg::Bool::",
-        "ctor:d1b_role_a_shadow_pkg::Unit::",
-        "ctor:d1b_role_a_shadow_pkg::Instant::",
-        "ctor:d1b_role_a_shadow_pkg::ReadResult::",
-    ] {
-        assert!(
-            text.contains(parent),
-            "the record carries no role under the canonical prelude parent {parent}; the roles \
-             were not merely un-redirected, they are missing"
-        );
+    // This test formerly declared the shadowing package (`emit_shadowing_package`
+    // expecting it to compile — "colliding declarations are lawful Ken") and
+    // MEASURED that no shadow constructor redirected a stored Runtime role. That
+    // measurement was belt-and-suspenders: this file's own thesis is that the
+    // producer property is "closed by the SIGNATURE, not by this file" (both
+    // producers take `&PreludeEnv`, so the package namespace is unnameable in
+    // them). The guard now adds an even earlier gate: a package can no longer
+    // even DECLARE a constructor under a prelude/runtime role's spelling — the
+    // flat constructor namespace rejects it at declaration time. Capture-by-
+    // constructor-spelling is therefore unrepresentable, strictly stronger than
+    // "declared but not redirected". So the fixture no longer compiles, and the
+    // faithful assertion is the rejection itself.
+    //
+    // (Op-role and family-name shadows are NOT rejected by the guard — a
+    // constructor shadowing a def, or a `data` former shadowing a former, are a
+    // different collision class — but their non-capture remains closed by the
+    // `&PreludeEnv` signature exactly as the module doc describes; nothing here
+    // relied on this test to establish it.)
+    match compile_shadowing_package() {
+        Err(CompilerDriverError::Elaboration(ElabError::DuplicateConstructorSpelling {
+            name,
+            first_span,
+            second_span,
+        })) => {
+            // The rejected spelling is one of the Runtime-role constructor
+            // spellings the fixture shadows — proving the rejection is a role
+            // capture the guard prevents, not an incidental collision — and both
+            // declaration sites are named with real spans.
+            assert!(
+                SHADOWED_ROLES
+                    .iter()
+                    .any(|(_, constructor)| *constructor == name),
+                "the rejected constructor spelling {name:?} must be one of the shadowed \
+                 Runtime-role spellings"
+            );
+            assert!(
+                first_span.end > first_span.start && second_span.end > second_span.start,
+                "both declaration sites must be named with real spans: \
+                 first={first_span:?} second={second_span:?}"
+            );
+        }
+        other => panic!(
+            "expected the shadowing package to be REJECTED with a duplicate-constructor-spelling \
+             diagnostic (a runtime-role constructor spelling can no longer be declared by a \
+             package), got {other:?}"
+        ),
     }
 }
 
 /// Roster inventory, stated as a **relation between two artifacts**.
 ///
-/// The test above proves that nothing the fixture shadows can be redirected.
-/// That stays exhaustive over the roster only if the fixture shadows every role
-/// the roster carries — and the fixture's table is hand-written, so on its own
-/// it is a snapshot that a newly added role would silently escape.
+/// The test above proves a package cannot declare a Runtime-role constructor
+/// spelling (the guard rejects it). That inventory stays meaningful over the
+/// roster only if the fixture's table tracks every role the roster carries —
+/// and the table is hand-written, so on its own it is a snapshot that a newly
+/// added role would silently escape.
 ///
 /// This keeps the two in step: the roster's spelling table is compared against
 /// the union of the fixture's shadow inventory and constructors whose recorded
