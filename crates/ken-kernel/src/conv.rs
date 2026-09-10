@@ -714,6 +714,10 @@ fn conv_struct_path(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term, path: &[
 
     match (&a, &b) {
         (Term::Type(l1), Term::Type(l2)) => level_eq(l1, l2),
+        // Proposition-universe congruence (`17 §3.3`, §3.6), deliberately
+        // distinct from proof irrelevance: these are two universe terms, not
+        // two proofs at one proposition. Their levels must be equivalent.
+        (Term::Omega(l1), Term::Omega(l2)) => level_eq(l1, l2),
         (Term::Var(i), Term::Var(j)) => i == j,
         (
             Term::Const {
@@ -789,6 +793,17 @@ fn conv_struct_path(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term, path: &[
         }
         (Term::Proj1(p1), Term::Proj1(p2)) => conv_struct_path(env, ctx, p1, p2, child_path),
         (Term::Proj2(p1), Term::Proj2(p2)) => conv_struct_path(env, ctx, p1, p2, child_path),
+        // Quotient congruence (`16 §5`, `17 §3.3`): quotient types compare
+        // their carriers and relations structurally. Class introductions
+        // compare only their representatives; relation-respect is an
+        // elimination-time obligation, never an extra equality premise here.
+        (Term::Quot(a1, r1), Term::Quot(a2, r2)) => {
+            conv_struct_path(env, ctx, a1, a2, child_path)
+                && conv_struct_path(env, ctx, r1, r2, child_path)
+        }
+        (Term::QuotClass(t1), Term::QuotClass(t2)) => {
+            conv_struct_path(env, ctx, t1, t2, child_path)
+        }
         // Truncation congruence (`16 §6`): the former compares its underlying
         // type, and `|a|` compares its sole introduction operand.
         (Term::Trunc(a1), Term::Trunc(a2)) => conv_struct_path(env, ctx, a1, a2, child_path),
@@ -1014,6 +1029,94 @@ mod tests {
             &ctx,
             &Term::Trunc(Box::new(type_zero)),
             &Term::Trunc(Box::new(type_one)),
+        ));
+    }
+
+    /// Durable invariant (`17 §3.3`, §3.6): Omega congruence uses semantic
+    /// level equality, while non-equivalent levels remain distinct.
+    #[test]
+    fn omega_congruence_accepts_level_equivalence_and_rejects_distinct_levels() {
+        let env = GlobalEnv::new();
+        let ctx = Context::new();
+        let level = Level::Var(LevelVar(0));
+
+        assert!(convert_type(
+            &env,
+            &ctx,
+            &Term::Omega(level.clone().max(Level::zero())),
+            &Term::Omega(level),
+        ));
+        assert!(!convert_type(
+            &env,
+            &ctx,
+            &Term::Omega(Level::zero()),
+            &Term::Omega(Level::suc(Level::zero())),
+        ));
+    }
+
+    /// Durable invariant (`16 §5`, `17 §3.3`): quotient congruence accepts a
+    /// reducible relation and independently rejects a changed carrier or
+    /// relation.
+    #[test]
+    fn quotient_congruence_compares_carrier_and_relation_directionally() {
+        let env = GlobalEnv::new();
+        let carrier = Term::Type(Level::zero());
+        let other_carrier = Term::Type(Level::suc(Level::zero()));
+        let relation_type = Term::pi(
+            carrier.clone(),
+            Term::pi(carrier.clone(), Term::Omega(Level::zero())),
+        );
+        let mut ctx = Context::new();
+        ctx.push(relation_type.clone());
+        ctx.push(relation_type);
+        let reducible_relation =
+            beta_identity(ctx.lookup(0).expect("relation type").clone(), Term::var(0));
+
+        assert!(convert_type(
+            &env,
+            &ctx,
+            &Term::Quot(Box::new(carrier.clone()), Box::new(reducible_relation)),
+            &Term::Quot(Box::new(carrier.clone()), Box::new(Term::var(0))),
+        ));
+        assert!(!convert_type(
+            &env,
+            &ctx,
+            &Term::Quot(Box::new(carrier.clone()), Box::new(Term::var(0))),
+            &Term::Quot(Box::new(other_carrier), Box::new(Term::var(0))),
+        ));
+        assert!(!convert_type(
+            &env,
+            &ctx,
+            &Term::Quot(Box::new(carrier.clone()), Box::new(Term::var(0))),
+            &Term::Quot(Box::new(carrier), Box::new(Term::var(1))),
+        ));
+    }
+
+    /// Durable invariant (`16 §5`): quotient-class congruence compares only
+    /// representatives. A reducible representative accepts; distinct open
+    /// representatives reject rather than acquiring relatedness implicitly.
+    #[test]
+    fn quotient_class_congruence_compares_representatives_only() {
+        let env = GlobalEnv::new();
+        let representative_type = Term::Type(Level::zero());
+        let mut ctx = Context::new();
+        ctx.push(representative_type.clone());
+        ctx.push(representative_type.clone());
+        let reducible_representative = beta_identity(representative_type, Term::var(0));
+
+        assert!(conv_struct_path(
+            &env,
+            &ctx,
+            &Term::QuotClass(Box::new(reducible_representative)),
+            &Term::QuotClass(Box::new(Term::var(0))),
+            &[],
+        ));
+        assert!(!conv_struct_path(
+            &env,
+            &ctx,
+            &Term::QuotClass(Box::new(Term::var(0))),
+            &Term::QuotClass(Box::new(Term::var(1))),
+            &[],
         ));
     }
 

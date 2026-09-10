@@ -1,0 +1,1 @@
+fn quotient_class_congruence_consumer (a : Bool) : ClassExpectedOf a = class_value a
