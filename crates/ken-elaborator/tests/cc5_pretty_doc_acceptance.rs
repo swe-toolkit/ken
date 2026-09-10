@@ -2,14 +2,17 @@
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
+#[path = "support/catalog_publication.rs"]
+mod catalog_publication;
 
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
-const PRETTY_DOC_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
+const PRETTY_DOC_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Formatting/Doc.ken.md");
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
@@ -57,6 +60,53 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
             .into_iter()
             .any(|child| term_mentions(child, target)),
     }
+}
+
+fn declaration_terms(declaration: &Decl) -> Vec<&Term> {
+    match declaration {
+        Decl::Transparent { ty, body, .. } => vec![ty, body],
+        Decl::Opaque { ty, .. } | Decl::Primitive { ty, .. } => vec![ty],
+        Decl::Inductive(inductive) => {
+            let mut terms = Vec::new();
+            terms.extend(inductive.params.iter());
+            terms.extend(inductive.indices.iter());
+            terms.push(&inductive.former_type);
+            for constructor in &inductive.constructors {
+                terms.extend(constructor.args.iter());
+                terms.extend(constructor.target_indices.iter());
+                terms.push(&constructor.type_);
+            }
+            terms
+        }
+    }
+}
+
+fn application_spine(term: &Term) -> (&Term, Vec<&Term>) {
+    let mut head = term;
+    let mut arguments = Vec::new();
+    while let Term::App(function, argument) = head {
+        arguments.push(argument.as_ref());
+        head = function;
+    }
+    arguments.reverse();
+    (head, arguments)
+}
+
+fn is_global(term: &Term, target: GlobalId) -> bool {
+    matches!(term, Term::Const { id, .. } | Term::IndFormer { id, .. } if *id == target)
+}
+
+fn contains_equal_string(term: &Term, equal: GlobalId, string: GlobalId) -> bool {
+    let (head, arguments) = application_spine(term);
+    (is_global(head, equal) && arguments.first().is_some_and(|arg| is_global(arg, string)))
+        || term
+            .children()
+            .into_iter()
+            .any(|child| contains_equal_string(child, equal, string))
+}
+
+fn names(items: &[&str]) -> BTreeSet<String> {
+    items.iter().map(|item| (*item).to_owned()).collect()
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -291,27 +341,109 @@ fn all_three_laws_are_checked_and_consumable_as_proofs() {
     );
 }
 
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: the roots loader reports the exact six-name Doc surface; a real
+/// selective client constructs `Text` from `List Char` and calls `text_string`
+/// from `String`; the private `render_string` declaration remains owned,
+/// transparent, and unimportable. CLAIMED: Doc retains its structural carrier
+/// boundary and its internal opaque-String adapter without widening that API.
+/// THE GAP: loader shape does not prove rendering behavior or laws, which the
+/// three preceding tests exercise independently.
 #[test]
-fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
-    let extracted = ken_elaborator::literate::extract_ken_md(PRETTY_DOC_KEN_MD)
-        .expect("Capability.Formatting.Doc must extract");
-    assert!(!extracted.source.contains("Axiom"));
-    assert!(!extracted.source.contains("string_length"));
-    assert!(!extracted.source.contains("Diagnostic"));
-    assert!(extracted.source.contains("Text : List Char → Doc"));
-    assert!(extracted.source.contains("fn text_string"));
-    assert!(extracted.source.contains("fn render_string"));
-    assert!(
-        !extracted.source.contains("Equal String"),
-        "verified CC5 laws must not cross the opaque String boundary"
+fn pretty_doc_loader_surface_and_string_boundary_are_behavioral() {
+    let expected = names(&["Concat", "Doc", "Group", "Line", "Text", "text_string"]);
+    assert_eq!(
+        catalog_publication::published_module_surfaces(
+            PRETTY_DOC_KEN_MD,
+            "Capability.Formatting.Doc",
+            "cc5_pretty_doc",
+        ),
+        expected,
     );
 
-    // Durable invariant.
-    // MEASURED: the roots-loaded Doc bodies retain the canonical provider ids,
-    // retain neither retired local helper, and add no trust.
-    // CLAIMED: Doc reuses both canonical Nat operations directly.
-    // THE GAP: the existing boundary and proof tests separately establish that
-    // those compiled references preserve Doc's behavior and laws.
+    let mut env = dependency_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+        .expect("Capability.Formatting.Doc must roots-load")
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "CC5 must add zero trusted-base entries");
+
+    env.elaborate_file(
+        r#"
+        import Capability.Formatting.Doc (Doc, Text, text_string)
+
+        fn cc5_text_shape (characters : List Char) : Doc = Text characters
+
+        fn cc5_text_string_shape (value : String) : Doc = text_string value
+        "#,
+    )
+    .expect("selective client must consume Text and text_string at their intended types");
+
+    let render_string = *env
+        .globals
+        .get("Capability.Formatting.Doc.render_string")
+        .expect("Formatting.Doc must retain its owned private render_string declaration");
+    assert!(
+        owned.contains(&render_string) && env.env.transparent_body(render_string).is_some(),
+        "render_string must remain an owned, checked private adapter"
+    );
+    let private_error = env
+        .elaborate_file("import Capability.Formatting.Doc (render_string)")
+        .expect_err("render_string must remain private");
+    assert!(
+        matches!(private_error, ken_elaborator::ElabError::UnboundName { ref name, .. }
+            if name == "Capability.Formatting.Doc.render_string"),
+        "private render_string probe must fail at its own qualified name, got {private_error:?}"
+    );
+
+    let references = catalog_or::owned_references(&env, &owned);
+    let diagnostic_references = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| {
+            (name.starts_with("Capability.Diagnostics.Core.") && references.contains(id))
+                .then(|| name.clone())
+        })
+        .collect::<BTreeSet<_>>();
+    assert!(
+        diagnostic_references.is_empty(),
+        "Doc checked declarations must remain diagnostics-independent: {diagnostic_references:?}"
+    );
+
+    let equal = env.globals["Equal"];
+    let string = env.globals["String"];
+    let equal_string_owners = owned
+        .iter()
+        .filter(|id| {
+            declaration_terms(
+                env.env
+                    .lookup(**id)
+                    .unwrap_or_else(|| panic!("owned global {id:?} must resolve")),
+            )
+            .into_iter()
+            .any(|term| contains_equal_string(term, equal, string))
+        })
+        .copied()
+        .collect::<BTreeSet<_>>();
+    assert!(
+        equal_string_owners.is_empty(),
+        "verified CC5 declarations must not assert equality across opaque String: {equal_string_owners:?}"
+    );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: roots-loaded Doc bodies retain the canonical `length`, `add`, and
+/// `leq_nat` provider identities, retain neither retired local helper, and add
+/// no trust. CLAIMED: structural width and fitting reuse the canonical Nat/List
+/// operations directly. THE GAP: the fitting-boundary and proof-consumption
+/// tests above separately establish the behavior and laws of those references.
+#[test]
+fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
     let mut env = dependency_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
@@ -319,8 +451,10 @@ fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "CC5 must add zero trusted-base entries");
 
+    let length = env.globals["Data.Collections.Derived.length"];
     let add = env.globals["Data.Numeric.Nat.Arithmetic.add"];
     let leq_nat = env.globals["Core.Classes.LawfulClasses.leq_nat"];
+    assert!(env.env.transparent_body(length).is_some());
     assert!(env.env.transparent_body(add).is_some());
     assert!(env.env.transparent_body(leq_nat).is_some());
     for local in ["pretty_nat_add", "pretty_nat_leq"] {
@@ -332,6 +466,7 @@ fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
     }
 
     for (name, provider) in [
+        ("doc_flat_width", length),
         ("doc_flat_width", add),
         ("render_mode", add),
         ("doc_fits", leq_nat),

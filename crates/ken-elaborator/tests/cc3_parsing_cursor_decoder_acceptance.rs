@@ -6,15 +6,8 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
 use ken_kernel::{Decl, GlobalId, Term};
-
-const CURSOR_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const DECODER_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
-const PARSING_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
 
 fn dependency_env() -> ElabEnv {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
@@ -44,22 +37,34 @@ fn dependency_env() -> ElabEnv {
     env
 }
 
-fn load_cursor_module(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
-        .expect("Capability.Parsing.Cursor must roots-load");
+fn load_cursor_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Capability.Parsing.Cursor must roots-load")
+        .into_iter()
+        .collect();
     catalog_or::expose_module(env, "Capability.Parsing.Cursor");
+    owned
 }
 
-fn load_decoder_module(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
-        .expect("Capability.Parsing.Decoder must roots-load");
+fn load_decoder_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+        .expect("Capability.Parsing.Decoder must roots-load")
+        .into_iter()
+        .collect();
     catalog_or::expose_module(env, "Capability.Parsing.Decoder");
+    owned
 }
 
-fn load_parsing_module(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
-        .expect("Capability.Parsing.Parsing must roots-load");
+fn load_parsing_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Capability.Parsing.Parsing must roots-load")
+        .into_iter()
+        .collect();
     catalog_or::expose_module(env, "Capability.Parsing.Parsing");
+    owned
 }
 
 #[test]
@@ -411,55 +416,59 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
     );
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: the roots-loaded Cursor and Parsing declarations retain no checked
+/// reference to the three opaque Bytes primitives, Cursor owns none of the four
+/// retired cache declarations, and the full CC3 load adds no trusted entry.
+/// CLAIMED: the structural parsing path remains independent of opaque byte
+/// indexing/length operations and of its retired cached carrier.
+/// THE GAP: these identity and inventory checks do not prove parsing results;
+/// the progress/location test below independently exercises those behaviors.
 #[test]
-fn cc3_checked_code_has_zero_axiom_and_zero_trusted_base_delta() {
-    for (name, source) in [
-        ("Cursor.ken.md", CURSOR_KEN_MD),
-        ("Decoder.ken.md", DECODER_KEN_MD),
-        ("Capability/Parsing.ken.md", PARSING_KEN_MD),
+fn cc3_checked_identity_closure_and_trust_are_structural() {
+    let mut env = dependency_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let cursor_owned = load_cursor_module(&mut env);
+    let _decoder_owned = load_decoder_module(&mut env);
+    let parsing_owned = load_parsing_module(&mut env);
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "CC3 must add zero trusted-base entries");
+
+    let forbidden_primitives = ["bytes_length", "bytes_slice", "bytes_at"]
+        .into_iter()
+        .map(|name| (name, env.globals[name]))
+        .collect::<BTreeSet<_>>();
+    for (module, owned) in [
+        ("Capability.Parsing.Cursor", &cursor_owned),
+        ("Capability.Parsing.Parsing", &parsing_owned),
     ] {
-        let extracted =
-            ken_elaborator::literate::extract_ken_md(source).expect("CC3 source must extract");
+        let references = catalog_or::owned_references(&env, owned);
+        let retained = forbidden_primitives
+            .iter()
+            .filter(|(_, id)| references.contains(id))
+            .map(|(name, _)| *name)
+            .collect::<BTreeSet<_>>();
         assert!(
-            !extracted.source.contains("Axiom"),
-            "{name}'s checked code must contain no Axiom"
+            retained.is_empty(),
+            "{module}'s checked structural path must not retain opaque Bytes primitives: {retained:?}"
         );
-        if name != "Decoder.ken.md" {
-            let emitted_names: BTreeSet<_> = extracted
-                .source
-                .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
-                .filter(|token| !token.is_empty())
-                .collect();
-            for forbidden in ["bytes_length", "bytes_slice", "bytes_at"] {
-                assert!(
-                    !emitted_names.contains(forbidden),
-                    "{name}'s structural consumer path must not name `{forbidden}`"
-                );
-            }
-        }
     }
 
-    let cursor = ken_elaborator::literate::extract_ken_md(CURSOR_KEN_MD)
-        .expect("Cursor source must extract");
-    for forbidden in [
+    for retired in [
         "ArgByteLength",
         "ArgBytes",
         "arg_length_field",
         "arg_length_valid_field",
     ] {
+        let qualified = format!("Capability.Parsing.Cursor.{retired}");
         assert!(
-            !cursor.source.contains(forbidden),
-            "Cursor emission must retire `{forbidden}`"
+            env.globals
+                .get(&qualified)
+                .is_none_or(|id| !cursor_owned.contains(id)),
+            "Cursor must not own retired declaration `{qualified}`"
         );
     }
-
-    let mut env = dependency_env();
-    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    load_cursor_module(&mut env);
-    load_decoder_module(&mut env);
-    load_parsing_module(&mut env);
-    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(before, after, "CC3 must add zero trusted-base entries");
 }
 
 /// Durable invariant: Cursor's checked operational bodies call the canonical

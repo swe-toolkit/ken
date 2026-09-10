@@ -2,21 +2,17 @@
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
+#[path = "support/catalog_publication.rs"]
+mod catalog_publication;
 
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DIAGNOSTIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
-const CURSOR_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
-const DECODER_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
-const PARSING_KEN_MD: &str =
-    include_str!("../../../catalog/packages/Capability/Parsing/Parsing.ken.md");
 const NUMERIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 
@@ -48,22 +44,34 @@ fn dependency_env() -> ElabEnv {
     env
 }
 
-fn load_cursor_module(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
-        .expect("Capability.Parsing.Cursor must roots-load");
+fn load_cursor_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Capability.Parsing.Cursor must roots-load")
+        .into_iter()
+        .collect();
     catalog_or::expose_module(env, "Capability.Parsing.Cursor");
+    owned
 }
 
-fn load_decoder_module(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
-        .expect("Capability.Parsing.Decoder must roots-load");
+fn load_decoder_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
+        .expect("Capability.Parsing.Decoder must roots-load")
+        .into_iter()
+        .collect();
     catalog_or::expose_module(env, "Capability.Parsing.Decoder");
+    owned
 }
 
-fn load_parsing_module(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
-        .expect("Capability.Parsing.Parsing must roots-load");
+fn load_parsing_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Parsing")
+        .expect("Capability.Parsing.Parsing must roots-load")
+        .into_iter()
+        .collect();
     catalog_or::expose_module(env, "Capability.Parsing.Parsing");
+    owned
 }
 
 #[test]
@@ -107,6 +115,40 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
             .into_iter()
             .any(|child| term_mentions(child, target)),
     }
+}
+
+fn module_ids(env: &ElabEnv, module: &str) -> BTreeSet<GlobalId> {
+    let prefix = format!("{module}.");
+    env.globals
+        .iter()
+        .filter_map(|(name, id)| name.starts_with(&prefix).then_some(*id))
+        .collect()
+}
+
+fn owned_names(env: &ElabEnv, module: &str, owned: &BTreeSet<GlobalId>) -> BTreeSet<String> {
+    let prefix = format!("{module}.");
+    env.globals
+        .iter()
+        .filter_map(|(name, id)| {
+            (owned.contains(id) && name.starts_with(&prefix))
+                .then(|| name[prefix.len()..].to_owned())
+        })
+        .collect()
+}
+
+fn names(items: &[&str]) -> BTreeSet<String> {
+    items.iter().map(|item| (*item).to_owned()).collect()
+}
+
+fn leading_result(mut term: &Term) -> &Term {
+    while let Term::Pi(_, result) = term {
+        term = result;
+    }
+    term
+}
+
+fn is_global(term: &Term, target: GlobalId) -> bool {
+    matches!(term, Term::Const { id, .. } | Term::IndFormer { id, .. } if *id == target)
 }
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -216,14 +258,6 @@ fn ordered_dependency_closure_elaborates_all_cc4_clients() {
         !env.globals.contains_key("NumericError"),
         "Capability.Parsing.Numeric must not retain its pre-CC4 carrier"
     );
-    assert!(
-        !PARSING_KEN_MD.contains("data SourceId ="),
-        "SourceId must move down instead of surviving as a CAT-5 duplicate"
-    );
-    assert!(
-        !DECODER_KEN_MD.contains("Diagnostic") && !DECODER_KEN_MD.contains("Origin"),
-        "the location-generic Decoder must remain independent of Capability.Diagnostics.Core"
-    );
 }
 
 /// Durable invariant: the roots-loaded Diagnostics package references the
@@ -265,31 +299,91 @@ fn diagnostics_reuses_the_canonical_lawful_classes_relation() {
     );
 }
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: Parsing owns no `SourceId` declaration while its checked closure
+/// retains Diagnostics.Core's canonical identity, and Decoder-owned declarations
+/// retain no Diagnostics.Core identity. CLAIMED: SourceId is defined once below
+/// Parsing, while the location-generic Decoder remains diagnostics-independent.
+/// THE GAP: identity closure does not prove injected locations are faithful;
+/// the non-degenerate evaluation test below owns that behavioral obligation.
 #[test]
-fn checked_cc4_chain_has_zero_axiom_and_zero_trusted_base_delta() {
-    for (name, source) in [
-        ("Capability/Diagnostics/Core.ken.md", DIAGNOSTIC_KEN_MD),
-        ("Capability/Parsing/Cursor.ken.md", CURSOR_KEN_MD),
-        ("Capability/Parsing.ken.md", PARSING_KEN_MD),
-        ("Capability/Parsing/Numeric.ken.md", NUMERIC_KEN_MD),
-    ] {
-        let extracted =
-            ken_elaborator::literate::extract_ken_md(source).expect("CC4 source must extract");
-        assert!(
-            !extracted.source.contains("Axiom"),
-            "{name} must contain no checked Axiom"
-        );
-    }
+fn cc4_clients_use_canonical_diagnostics_without_duplicate_carriers() {
+    let root = catalog_or::catalog_root();
+    let mut parsing_env = ElabEnv::new().expect("base environment");
+    let parsing_owned = parsing_env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), "Capability.Parsing.Parsing")
+        .expect("Parsing must roots-load")
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    assert!(
+        !owned_names(&parsing_env, "Capability.Parsing.Parsing", &parsing_owned,)
+            .contains("SourceId"),
+        "Parsing must not own a duplicate SourceId"
+    );
+    let canonical_source_id = parsing_env.globals["Capability.Diagnostics.Core.SourceId"];
+    assert!(
+        catalog_or::owned_references(&parsing_env, &parsing_owned).contains(&canonical_source_id),
+        "Parsing must retain the canonical Diagnostics.Core.SourceId GlobalId"
+    );
 
-    let mut env = dependency_env();
-    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    load_cursor_module(&mut env);
-    load_decoder_module(&mut env);
-    load_parsing_module(&mut env);
-    env.elaborate_ken_md_file(NUMERIC_KEN_MD)
-        .expect("Capability.Parsing.Numeric must elaborate");
-    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(before, after, "CC4 must add zero trusted-base entries");
+    let mut decoder_env = ElabEnv::new().expect("base environment");
+    let decoder_owned = decoder_env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), "Capability.Parsing.Decoder")
+        .expect("Decoder must roots-load")
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let diagnostic_ids = module_ids(&decoder_env, "Capability.Diagnostics.Core");
+    let retained = catalog_or::owned_references(&decoder_env, &decoder_owned)
+        .intersection(&diagnostic_ids)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    assert!(
+        retained.is_empty(),
+        "Decoder-owned checked declarations must remain independent of Diagnostics.Core: {retained:?}"
+    );
+}
+
+/// Promise class: durable invariant.
+///
+/// MEASURED: the real CC4 load leaves the kernel's trusted-base population
+/// unchanged. CLAIMED: every CC4 declaration remains kernel-checked rather than
+/// admitted. THE GAP: trust equality does not establish carrier behavior, which
+/// is exercised independently by the shape and non-degenerate injection tests.
+#[test]
+fn checked_cc4_chain_has_zero_trusted_base_delta() {
+    let mut diagnostics = ElabEnv::empty().expect("prelude bootstrap");
+    diagnostics
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Diagnostics provider must roots-load");
+    let before: BTreeSet<_> = diagnostics.env.trusted_base().into_iter().collect();
+    diagnostics
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Diagnostics.Core must roots-load");
+    let after: BTreeSet<_> = diagnostics.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Diagnostics.Core must add zero trust");
+
+    let mut cursor = dependency_env();
+    let before: BTreeSet<_> = cursor.env.trusted_base().into_iter().collect();
+    load_cursor_module(&mut cursor);
+    let after: BTreeSet<_> = cursor.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing.Cursor must add zero trust");
+
+    let mut parsing = dependency_env();
+    load_cursor_module(&mut parsing);
+    load_decoder_module(&mut parsing);
+    let before: BTreeSet<_> = parsing.env.trusted_base().into_iter().collect();
+    load_parsing_module(&mut parsing);
+    let after: BTreeSet<_> = parsing.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing.Parsing must add zero trust");
+
+    let mut numeric = dependency_env();
+    let before: BTreeSet<_> = numeric.env.trusted_base().into_iter().collect();
+    numeric
+        .elaborate_ken_md_file(NUMERIC_KEN_MD)
+        .expect("Parsing.Numeric must elaborate");
+    let after: BTreeSet<_> = numeric.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing.Numeric must add zero trust");
 }
 
 #[test]
@@ -372,25 +466,103 @@ fn exact_non_degenerate_injections_preserve_every_location_field() {
     );
 }
 
+/// Promise class: normative compatibility vector.
+///
+/// MEASURED: every publishable Diagnostics.Core declaration is queried through
+/// the roots loader, the successful surface equals the curated carrier API, and
+/// a selective client type-checks every carrier constructor at its intended
+/// argument/result types. CLAIMED: Diagnostics.Core exposes the structured
+/// diagnostic carrier and no presentation API. THE GAP: private declarations
+/// are not a public surface; checked dependency closure is covered separately by
+/// the canonical-lawful-provider test.
 #[test]
-fn diagnostic_core_is_structured_and_render_free() {
-    let extracted = ken_elaborator::literate::extract_ken_md(DIAGNOSTIC_KEN_MD)
-        .expect("Capability.Diagnostics.Core must extract");
-    let checked = extracted.source;
-    assert!(checked.contains("data Diagnostic = MkDiagnostic Origin DiagnosticCode"));
-    assert!(checked.contains("data Origin ="));
-    for constructor in [
-        "SourceOrigin SourceId ByteRange",
-        "ArgumentOrigin Nat ByteRange",
-        "EnvironmentOrigin String",
-        "ConfigKeyOrigin (List String)",
-    ] {
-        assert!(checked.contains(constructor), "missing `{constructor}`");
-    }
-    for forbidden in ["fn show", "format", "render", "width", "layout", "message"] {
-        assert!(
-            !checked.contains(forbidden),
-            "Capability.Diagnostics.Core must remain presentation-neutral: found `{forbidden}`"
-        );
-    }
+fn diagnostic_core_loader_surface_and_carrier_shapes_are_exact() {
+    let expected = names(&[
+        "ArgumentOrigin",
+        "ByteRange",
+        "ConfigKeyOrigin",
+        "Diagnostic",
+        "DiagnosticCode",
+        "EnvironmentOrigin",
+        "MkByteRange",
+        "MkDiagnostic",
+        "MkDiagnosticCode",
+        "Origin",
+        "SourceId",
+        "SourceOrigin",
+        "byte_range_end",
+        "byte_range_start",
+        "diagnostic_code",
+        "diagnostic_origin",
+        "origin_argument_index",
+        "origin_range_end",
+        "origin_range_start",
+        "origin_source_id",
+    ]);
+    assert_eq!(
+        catalog_publication::published_module_surfaces(
+            DIAGNOSTIC_KEN_MD,
+            "Capability.Diagnostics.Core",
+            "cc4_diagnostics_core",
+        ),
+        expected,
+    );
+
+    let mut env = ElabEnv::new().expect("base environment");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Diagnostics.Core must roots-load")
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let formatting_ids = module_ids(&env, "Capability.Formatting.Doc");
+    let string = env.globals["String"];
+    let presentation_declarations = owned
+        .iter()
+        .filter(|id| {
+            let declaration = env
+                .env
+                .lookup(**id)
+                .unwrap_or_else(|| panic!("owned global {id:?} must resolve"));
+            !catalog_or::declaration_references(declaration).is_disjoint(&formatting_ids)
+                || matches!(declaration, Decl::Transparent { ty, .. }
+                    if is_global(leading_result(ty), string))
+        })
+        .copied()
+        .collect::<BTreeSet<_>>();
+    assert!(
+        presentation_declarations.is_empty(),
+        "Diagnostics.Core must own no checked presentation dependency or String renderer: {presentation_declarations:?}"
+    );
+
+    env.elaborate_file(
+        r#"
+        import Capability.Diagnostics.Core
+          (ArgumentOrigin,
+            ByteRange,
+            ConfigKeyOrigin,
+            Diagnostic,
+            DiagnosticCode,
+            EnvironmentOrigin,
+            MkDiagnostic,
+            Origin,
+            SourceId,
+            SourceOrigin)
+
+        fn cc4_source_origin_shape (source : SourceId) (range : ByteRange) : Origin =
+          SourceOrigin source range
+
+        fn cc4_argument_origin_shape (index : Nat) (range : ByteRange) : Origin =
+          ArgumentOrigin index range
+
+        fn cc4_environment_origin_shape (variable : String) : Origin =
+          EnvironmentOrigin variable
+
+        fn cc4_config_key_origin_shape (path : List String) : Origin =
+          ConfigKeyOrigin path
+
+        fn cc4_diagnostic_shape (origin : Origin) (code : DiagnosticCode) : Diagnostic =
+          MkDiagnostic origin code
+        "#,
+    )
+    .expect("selective client must consume every structured carrier shape");
 }
