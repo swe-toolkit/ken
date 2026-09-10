@@ -8753,6 +8753,24 @@ fn create_policy_tag(value: &Lowered) -> Option<i64> {
         None
     }
 }
+fn mapping_protection_tag(value: &Lowered) -> Option<i64> {
+    let Lowered::Constructor {
+        constructor, args, ..
+    } = value
+    else {
+        return None;
+    };
+    if !args.is_empty() {
+        return None;
+    }
+    if constructor.ends_with("::ReadOnly") {
+        Some(0)
+    } else if constructor.ends_with("::ReadWrite") {
+        Some(1)
+    } else {
+        None
+    }
+}
 fn resource_open_mode_tag(value: &Lowered) -> Option<i64> {
     let Lowered::Constructor {
         constructor, args, ..

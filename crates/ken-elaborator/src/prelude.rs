@@ -209,6 +209,8 @@ canonical_runtime_roles! {
     exit_failure => "Failure",
     // ABI-S6 D4 appends the mapping-governor refusal without moving roles.
     resource_mapping_limit => "MappingLimit",
+    // ABI-S6 D5a appends the now-native resource-kind reification role.
+    resource_kind_mapping => "Mapping",
 }
 
 /// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction. `GlobalId(0)`

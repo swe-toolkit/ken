@@ -284,6 +284,8 @@ runtime_host_spine_v1! {
     file_operation_duplicate,
     // ABI-S6 D4 appends without moving established positional identities.
     resource_mapping_limit,
+    // ABI-S6 D5a makes the third resource kind native-reifiable.
+    resource_kind_mapping,
 }
 
 /// The decoded, validated checked-runtime role record.

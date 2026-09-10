@@ -267,6 +267,7 @@ fn runtime_producible_constructors(
         file_operation_set_inheritance,
         file_operation_duplicate,
         resource_mapping_limit,
+        resource_kind_mapping,
     } = symbols;
     // Every field is a constructor the native runtime can put in front of a
     // match: host-effect responses, process-entry inputs, and the primitive
@@ -332,6 +333,7 @@ fn runtime_producible_constructors(
         file_operation_set_inheritance,
         file_operation_duplicate,
         resource_mapping_limit,
+        resource_kind_mapping,
     ]
     .into_iter()
     .cloned()
@@ -2030,6 +2032,7 @@ impl<'a> Lowering<'a> {
         expected_schema: u64,
         expected_kind: u64,
         buffer_kind: u64,
+        mapping_kind: u64,
     ) {
         let resource = builder.create_block();
         let done = builder.create_block();
@@ -2110,7 +2113,11 @@ impl<'a> Lowering<'a> {
                     Self::require_one_of_i64(
                         builder,
                         kind,
-                        &[expected_kind as i64, buffer_kind as i64],
+                        &[
+                            expected_kind as i64,
+                            buffer_kind as i64,
+                            mapping_kind as i64,
+                        ],
                     );
                     Self::require_i64(builder, required, 0);
                     Self::require_i64(builder, held, 0);
@@ -2125,12 +2132,20 @@ impl<'a> Lowering<'a> {
                     Self::require_one_of_i64(
                         builder,
                         actual_expected_kind,
-                        &[expected_kind as i64, buffer_kind as i64],
+                        &[
+                            expected_kind as i64,
+                            buffer_kind as i64,
+                            mapping_kind as i64,
+                        ],
                     );
                     Self::require_one_of_i64(
                         builder,
                         actual_actual_kind,
-                        &[expected_kind as i64, buffer_kind as i64],
+                        &[
+                            expected_kind as i64,
+                            buffer_kind as i64,
+                            mapping_kind as i64,
+                        ],
                     );
                     let distinct = builder.ins().icmp(
                         cranelift_codegen::ir::condcodes::IntCC::NotEqual,
@@ -3460,6 +3475,133 @@ impl<'a> Lowering<'a> {
                         .stack_store(value, request, request_offset(index));
                 }
             }
+            ken_host::HostOpV1::MappingAllocate => {
+                if capability.is_some() {
+                    return Err(unsupported(
+                        "Effect",
+                        "MappingAllocate carried a capability",
+                    ));
+                }
+                let (_, length_operand) = seats.operand(SEAT_0)?;
+                let (length, valid) = match length_operand {
+                    LoweringOperand::Specialized(lowered) => {
+                        self.narrow_native_int_u64(builder, lowered)?
+                    }
+                    LoweringOperand::Carried(word) => {
+                        self.narrow_carried_int_u64(builder, *word)?
+                    }
+                };
+                let invalid = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    valid,
+                    0,
+                );
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
+                let protection = self.wire_constructor_tag_seat(
+                    builder,
+                    &seats,
+                    SEAT_1,
+                    mapping_protection_tag,
+                    "MappingAllocate has a malformed MappingProtection",
+                )?;
+                builder
+                    .ins()
+                    .stack_store(length, request, request_offset(0));
+                builder
+                    .ins()
+                    .stack_store(protection, request, request_offset(1));
+            }
+            ken_host::HostOpV1::MappingReadView => {
+                if capability.is_some() {
+                    return Err(unsupported(
+                        "Effect",
+                        "MappingReadView carried a capability",
+                    ));
+                }
+                let target = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(SEAT_0)?.1,
+                    "MappingReadView",
+                    "mapping",
+                )?;
+                let start = seats.specialized(SEAT_1)?;
+                let length = seats.specialized(SEAT_2)?;
+                let (start, start_valid) = self.narrow_native_int_u64(builder, start)?;
+                let (length, length_valid) = self.narrow_native_int_u64(builder, length)?;
+                let valid = builder.ins().band(start_valid, length_valid);
+                let invalid = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    valid,
+                    0,
+                );
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
+                let span_origin = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(SEAT_3)?.1,
+                    "MappingReadView",
+                    "span origin",
+                )?;
+                for (index, value) in [target, start, length, span_origin].into_iter().enumerate() {
+                    builder
+                        .ins()
+                        .stack_store(value, request, request_offset(index));
+                }
+            }
+            ken_host::HostOpV1::MappingWriteView => {
+                if capability.is_some() {
+                    return Err(unsupported(
+                        "Effect",
+                        "MappingWriteView carried a capability",
+                    ));
+                }
+                let target = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(SEAT_0)?.1,
+                    "MappingWriteView",
+                    "mapping",
+                )?;
+                let start = seats.specialized(SEAT_1)?;
+                let (start, valid) = self.narrow_native_int_u64(builder, start)?;
+                let invalid = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    valid,
+                    0,
+                );
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
+                let bytes = self.wire_bytes_seat(builder, &seats, SEAT_2)?;
+                if let Some((invalid, resource_code)) = bytes.refusal {
+                    let detail = io_error_other_detail(builder, resource_code);
+                    record_narrow_failure(builder, invalid, error_reply_tag, detail);
+                }
+                let span_origin = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(SEAT_3)?.1,
+                    "MappingWriteView",
+                    "span origin",
+                )?;
+                builder
+                    .ins()
+                    .stack_store(target, request, request_offset(0));
+                builder.ins().stack_store(start, request, request_offset(1));
+                builder
+                    .ins()
+                    .stack_store(bytes.pointer, request, request_offset(2));
+                builder
+                    .ins()
+                    .stack_store(bytes.len, request, request_offset(3));
+                builder
+                    .ins()
+                    .stack_store(span_origin, request, request_offset(4));
+            }
             ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::FsWriteAt => {
                 if capability.is_some() {
                     return Err(unsupported(
@@ -3708,10 +3850,15 @@ impl<'a> Lowering<'a> {
                     wire.reply_bytes_tag
                 }
                 ken_host::HostOpV1::FsOpen => wire.reply_resource_tag,
-                ken_host::HostOpV1::FsMetadata
-                | ken_host::HostOpV1::FsHandleMetadata => wire.reply_metadata_tag,
-                ken_host::HostOpV1::BufferAllocate => wire.reply_resource_tag,
-                ken_host::HostOpV1::BufferFreeze => wire.reply_bytes_tag,
+                ken_host::HostOpV1::FsMetadata | ken_host::HostOpV1::FsHandleMetadata => {
+                    wire.reply_metadata_tag
+                }
+                ken_host::HostOpV1::BufferAllocate | ken_host::HostOpV1::MappingAllocate => {
+                    wire.reply_resource_tag
+                }
+                ken_host::HostOpV1::BufferFreeze | ken_host::HostOpV1::MappingReadView => {
+                    wire.reply_bytes_tag
+                }
                 ken_host::HostOpV1::FsReadAt => wire.reply_read_progress_tag,
                 ken_host::HostOpV1::FsWriteAt => wire.reply_write_progress_tag,
                 _ => wire.reply_unit_tag,
@@ -3735,7 +3882,10 @@ impl<'a> Lowering<'a> {
                 }
                 ken_host::HostOpV1::BufferFreeze
                 | ken_host::HostOpV1::FsReadAt
-                | ken_host::HostOpV1::FsWriteAt => vec![
+                | ken_host::HostOpV1::FsWriteAt
+                | ken_host::HostOpV1::MappingAllocate
+                | ken_host::HostOpV1::MappingReadView
+                | ken_host::HostOpV1::MappingWriteView => vec![
                     success_tag,
                     wire.reply_error_tag as i64,
                     wire.reply_resource_error_tag as i64,
@@ -3820,6 +3970,7 @@ impl<'a> Lowering<'a> {
                 wire.resource_error_reply_schema,
                 wire.resource_kind_fs_handle,
                 wire.resource_kind_buffer,
+                wire.resource_kind_mapping,
             );
             let payload = builder.ins().sshr_imm(detail, 32);
             let payload_int = self.lower_dynamic_small_int(builder, payload);
@@ -4006,6 +4157,9 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::ResourceRelease
                     | ken_host::HostOpV1::BufferAllocate
                     | ken_host::HostOpV1::BufferFreeze
+                    | ken_host::HostOpV1::MappingAllocate
+                    | ken_host::HostOpV1::MappingReadView
+                    | ken_host::HostOpV1::MappingWriteView
                     | ken_host::HostOpV1::FsReadAt
                     | ken_host::HostOpV1::FsWriteAt
             ) {
@@ -4077,6 +4231,16 @@ impl<'a> Lowering<'a> {
                                         wire.resource_kind_buffer as i64,
                                         SynthesizedFixedConstructorRole::ResourceKindBuffer,
                                         this.process_symbols.resource_kind_buffer.clone(),
+                                        Vec::new(),
+                                        &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin,
+                                        node,
+                                        2,
+                                        wire.resource_kind_mapping as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindMapping,
+                                        this.process_symbols.resource_kind_mapping.clone(),
                                         Vec::new(),
                                         &seats,
                                     )?,
@@ -4463,9 +4627,15 @@ impl<'a> Lowering<'a> {
                     ],
                     &seats,
                 )?
-            } else if operation == ken_host::HostOpV1::BufferAllocate {
+            } else if matches!(
+                operation,
+                ken_host::HostOpV1::BufferAllocate | ken_host::HostOpV1::MappingAllocate
+            ) {
                 Lowered::ResourceToken { value: detail }
-            } else if operation == ken_host::HostOpV1::BufferFreeze {
+            } else if matches!(
+                operation,
+                ken_host::HostOpV1::BufferFreeze | ken_host::HostOpV1::MappingReadView
+            ) {
                 // `D2` — the SECOND site, and it needs the mask for the same
                 // reason. ⛔ Not a copy of the arm above by accident: both
                 // construct a `ResponseBytes` from the reply span, so a mask at

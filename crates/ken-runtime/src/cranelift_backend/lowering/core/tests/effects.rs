@@ -1545,6 +1545,407 @@ fn native_nullary_resource_error_set_rejects_payloads_and_unknown_identities() {
     );
 }
 
+const ABI_S6_D5A_MAPPING_LIMIT: u64 = 0;
+const ABI_S6_D5A_KIND_MISMATCH: u64 = 1;
+
+fn abi_s6_mapping_allocate() -> RuntimeExpr {
+    RuntimeExpr::Effect {
+        family: "FS".to_string(),
+        operation: ken_host::HostOpV1::MappingAllocate,
+        capability: None,
+        args: vec![
+            RuntimeExpr::Value(RuntimeValue::Int(8.into())),
+            RuntimeExpr::Construct {
+                constructor: "ctor:prelude::MappingProt::ReadOnly".to_string(),
+                args: Vec::new(),
+            },
+        ],
+    }
+}
+
+fn abi_s6_mapping_limit_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "ABI-S6 D5a MappingLimit projection default".to_string(),
+    };
+    RuntimeExpr::Match {
+        scrutinee: Box::new(abi_s6_mapping_allocate()),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: RuntimeExpr::Match {
+                    scrutinee: Box::new(RuntimeExpr::Var(0)),
+                    cases: vec![crate::RuntimeMatchCase {
+                        constructor: symbols.resource_mapping_limit.clone(),
+                        binders: 0,
+                        body: px8n_failure(
+                            symbols,
+                            RuntimeExpr::Value(RuntimeValue::Int(90.into())),
+                        ),
+                    }],
+                    default: trap(),
+                },
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(99.into()))),
+            },
+        ],
+        default: trap(),
+    }
+}
+
+fn abi_s6_mapping_kind_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "ABI-S6 D5a Mapping ResourceKind projection default".to_string(),
+    };
+    RuntimeExpr::Match {
+        scrutinee: Box::new(abi_s6_mapping_allocate()),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: symbols.result_err.clone(),
+            binders: 1,
+            body: RuntimeExpr::Match {
+                scrutinee: Box::new(RuntimeExpr::Var(0)),
+                cases: vec![crate::RuntimeMatchCase {
+                    constructor: symbols.resource_kind_mismatch.clone(),
+                    binders: 2,
+                    body: px8n_failure(
+                        symbols,
+                        RuntimeExpr::Value(RuntimeValue::Int(91.into())),
+                    ),
+                }],
+                default: trap(),
+            },
+        }],
+        default: trap(),
+    }
+}
+
+fn run_abi_s6_d5a_reifier_fixture(
+    scenario: u64,
+    expression: fn(&crate::NativeProcessSymbols) -> RuntimeExpr,
+) -> i64 {
+    let isa = native_isa().unwrap();
+    let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
+    builder.symbol(
+        "ken_host_dispatch_v1",
+        abi_s6_d5a_scripted_dispatch as *const u8,
+    );
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let compiled = compile_expr_into_module(
+        JITModule::new(builder),
+        "abi_s6_d5a_reifier",
+        Linkage::Local,
+        &expression(&symbols),
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        Some(&symbols),
+        Some(crate::cranelift_backend::test_support::test_only_distinguished_root_join_plan()),
+        None,
+    )
+    .expect("ABI-S6 Mapping effect lowers");
+    let input = BorrowedFixtureValue {
+        kind: 1,
+        tag: 0,
+        data: std::ptr::null(),
+        len: 0,
+    };
+    let mut scenario = scenario;
+    let invocation = RootIngressFixture {
+        process_input: &input,
+        host_context: (&mut scenario as *mut u64).cast(),
+        capability: 0,
+    };
+    let (_, result) = compiled
+        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .expect("ABI-S6 reifier fixture runs");
+    result.expect("fixture returns a scalar ExitCode payload")
+}
+
+extern "C" fn abi_s6_d5a_scripted_dispatch(
+    host_context: *const std::ffi::c_void,
+    operation: i64,
+    request: *const std::ffi::c_void,
+    request_size: i64,
+    reply: *mut std::ffi::c_void,
+) -> i64 {
+    if operation != ken_host::HostOpV1::MappingAllocate as i64 {
+        return -1;
+    }
+    let wire = ken_host::host_effect_wire_layout_v1(ken_host::HostOpV1::MappingAllocate)
+        .expect("native MappingAllocate layout");
+    if request_size != i64::from(wire.request_size) {
+        return -1;
+    }
+    let load = |offset: u32| unsafe {
+        *(request.cast::<u8>().add(offset as usize).cast::<u64>())
+    };
+    if load(wire.request_offsets[0]) != 8 || load(wire.request_offsets[1]) != 0 {
+        return -1;
+    }
+    unsafe { std::ptr::write_bytes(reply.cast::<u8>(), 0, wire.reply_size as usize) };
+    let store = |offset: u32, value: u64| unsafe {
+        *(reply.cast::<u8>().add(offset as usize).cast::<u64>()) = value;
+    };
+    store(wire.reply_tag_offset, wire.reply_resource_error_tag);
+    let scenario = unsafe { *host_context.cast::<u64>() };
+    match scenario {
+        ABI_S6_D5A_MAPPING_LIMIT => {
+            store(wire.reply_detail_offset, wire.resource_error_mapping_limit);
+        }
+        ABI_S6_D5A_KIND_MISMATCH => {
+            store(wire.reply_detail_offset, wire.resource_error_kind_mismatch);
+            store(
+                wire.reply_resource_error_expected_kind_offset,
+                wire.resource_kind_mapping,
+            );
+            store(
+                wire.reply_resource_error_actual_kind_offset,
+                wire.resource_kind_buffer,
+            );
+        }
+        _ => return -1,
+    }
+    0
+}
+
+#[test]
+fn abi_s6_d5a_mapping_limit_and_mapping_kind_reify_without_trapping() {
+    assert_eq!(
+        run_abi_s6_d5a_reifier_fixture(
+            ABI_S6_D5A_MAPPING_LIMIT,
+            abi_s6_mapping_limit_fixture,
+        ),
+        90
+    );
+    assert_eq!(
+        run_abi_s6_d5a_reifier_fixture(
+            ABI_S6_D5A_KIND_MISMATCH,
+            abi_s6_mapping_kind_fixture,
+        ),
+        91
+    );
+}
+
+fn abi_s6_mapping_view_sequence(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "ABI-S6 D5a mapping-view sequence default".to_string(),
+    };
+    let read = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::MappingReadView,
+            capability: None,
+            args: vec![
+                RuntimeExpr::Var(1),
+                RuntimeExpr::Value(RuntimeValue::Int(2.into())),
+                RuntimeExpr::Value(RuntimeValue::Int(3.into())),
+                RuntimeExpr::Var(1),
+            ],
+        }),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(82.into()))),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(92.into()))),
+            },
+        ],
+        default: trap(),
+    };
+    let write = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::MappingWriteView,
+            capability: None,
+            args: vec![
+                RuntimeExpr::Var(0),
+                RuntimeExpr::Value(RuntimeValue::Int(2.into())),
+                RuntimeExpr::Value(RuntimeValue::Bytes(b"map".to_vec())),
+                RuntimeExpr::Var(0),
+            ],
+        }),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(81.into()))),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: read,
+            },
+        ],
+        default: trap(),
+    };
+    RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            family: "FS".to_string(),
+            operation: ken_host::HostOpV1::MappingAllocate,
+            capability: None,
+            args: vec![
+                RuntimeExpr::Value(RuntimeValue::Int(8.into())),
+                RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::MappingProt::ReadWrite".to_string(),
+                    args: Vec::new(),
+                },
+            ],
+        }),
+        cases: vec![
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_err.clone(),
+                binders: 1,
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(80.into()))),
+            },
+            crate::RuntimeMatchCase {
+                constructor: symbols.result_ok.clone(),
+                binders: 1,
+                body: write,
+            },
+        ],
+        default: trap(),
+    }
+}
+
+#[repr(C)]
+struct AbiS6ViewFixture {
+    call_index: u64,
+    malformed: u64,
+}
+
+extern "C" fn abi_s6_d5a_view_dispatch(
+    host_context: *const std::ffi::c_void,
+    operation: i64,
+    request: *const std::ffi::c_void,
+    request_size: i64,
+    reply: *mut std::ffi::c_void,
+) -> i64 {
+    let fixture = unsafe { &mut *host_context.cast_mut().cast::<AbiS6ViewFixture>() };
+    let expected = match fixture.call_index {
+        0 => ken_host::HostOpV1::MappingAllocate,
+        1 => ken_host::HostOpV1::MappingWriteView,
+        2 => ken_host::HostOpV1::MappingReadView,
+        _ => return -1,
+    };
+    if operation != expected as i64 {
+        fixture.malformed = 1;
+        return -1;
+    }
+    let wire = ken_host::host_effect_wire_layout_v1(expected).expect("native Mapping layout");
+    if request_size != i64::from(wire.request_size) {
+        fixture.malformed = 2;
+        return -1;
+    }
+    let load = |offset: u32| unsafe {
+        *(request.cast::<u8>().add(offset as usize).cast::<u64>())
+    };
+    let valid = match expected {
+        ken_host::HostOpV1::MappingAllocate => {
+            load(wire.request_offsets[0]) == 8 && load(wire.request_offsets[1]) == 1
+        }
+        ken_host::HostOpV1::MappingWriteView => {
+            let pointer = load(wire.request_offsets[2]) as *const u8;
+            let length = load(wire.request_offsets[3]) as usize;
+            load(wire.request_offsets[0]) == 11
+                && load(wire.request_offsets[1]) == 2
+                && load(wire.request_offsets[4]) == 11
+                && length == 3
+                && unsafe { std::slice::from_raw_parts(pointer, length) } == b"map"
+        }
+        ken_host::HostOpV1::MappingReadView => {
+            [
+                load(wire.request_offsets[0]),
+                load(wire.request_offsets[1]),
+                load(wire.request_offsets[2]),
+                load(wire.request_offsets[3]),
+            ] == [11, 2, 3, 11]
+        }
+        _ => unreachable!(),
+    };
+    if !valid {
+        fixture.malformed = 3;
+        return -1;
+    }
+    unsafe { std::ptr::write_bytes(reply.cast::<u8>(), 0, wire.reply_size as usize) };
+    let store = |offset: u32, value: u64| unsafe {
+        *(reply.cast::<u8>().add(offset as usize).cast::<u64>()) = value;
+    };
+    match expected {
+        ken_host::HostOpV1::MappingAllocate => {
+            store(wire.reply_tag_offset, wire.reply_resource_tag);
+            store(wire.reply_detail_offset, 11);
+        }
+        ken_host::HostOpV1::MappingWriteView => {
+            store(wire.reply_tag_offset, wire.reply_unit_tag);
+        }
+        ken_host::HostOpV1::MappingReadView => {
+            store(wire.reply_tag_offset, wire.reply_bytes_tag);
+            store(wire.reply_bytes_data_offset, b"map".as_ptr() as u64);
+            store(wire.reply_bytes_len_offset, 3);
+        }
+        _ => unreachable!(),
+    }
+    fixture.call_index += 1;
+    0
+}
+
+#[test]
+fn abi_s6_d5a_all_anonymous_mapping_operations_lower_as_one_native_set() {
+    let isa = native_isa().unwrap();
+    let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
+    builder.symbol(
+        "ken_host_dispatch_v1",
+        abi_s6_d5a_view_dispatch as *const u8,
+    );
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let compiled = compile_expr_into_module(
+        JITModule::new(builder),
+        "abi_s6_d5a_mapping_views",
+        Linkage::Local,
+        &abi_s6_mapping_view_sequence(&symbols),
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        Some(&symbols),
+        Some(crate::cranelift_backend::test_support::test_only_distinguished_root_join_plan()),
+        None,
+    )
+    .expect("the atomic anonymous Mapping operation set lowers");
+    let input = BorrowedFixtureValue {
+        kind: 1,
+        tag: 0,
+        data: std::ptr::null(),
+        len: 0,
+    };
+    let mut fixture = AbiS6ViewFixture {
+        call_index: 0,
+        malformed: 0,
+    };
+    let invocation = RootIngressFixture {
+        process_input: &input,
+        host_context: (&mut fixture as *mut AbiS6ViewFixture).cast(),
+        capability: 0,
+    };
+    let (_, result) = compiled
+        .run(Some((&invocation as *const RootIngressFixture).cast()))
+        .expect("the mapping operation sequence runs");
+    assert_eq!(result, Some(92));
+    assert_eq!(fixture.call_index, 3);
+    assert_eq!(fixture.malformed, 0);
+}
+
 fn px8_dynamic_read_residual_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
     let trap = || RuntimeTrap {
         code: RuntimeTrapCode::PatternMatchFailure,
@@ -1747,6 +2148,9 @@ fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
         mutations.push(changed);
         let mut changed = layout.clone();
         changed.resource_kind_fs_handle ^= 1;
+        mutations.push(changed);
+        let mut changed = layout.clone();
+        changed.resource_kind_mapping ^= 1;
         mutations.push(changed);
         let mut changed = layout.clone();
         changed.resource_error_reply_schema ^= 1;
@@ -4721,13 +5125,17 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsChangeMode, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsOpen, EffectSeatSlot::Argument(0)),
+            (
+                ken_host::HostOpV1::MappingWriteView,
+                EffectSeatSlot::Argument(2),
+            ),
         ],
         "a SPECIALIZED_ONLY byte-span seat lacks its evidence disposition"
     );
     assert_eq!(
         either_phase.len() + specialized_only.len(),
-        15,
-        "the byte-span seat population is fifteen; a change needs its own disposition"
+        16,
+        "the byte-span seat population is sixteen; a change needs its own disposition"
     );
 }
 

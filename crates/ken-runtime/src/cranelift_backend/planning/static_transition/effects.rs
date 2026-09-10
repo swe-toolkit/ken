@@ -201,6 +201,8 @@ enum EffectSeatConstructorRole {
     ResourceRead,
     ResourceMetadata,
     ResourceWriteCreate,
+    MappingReadOnly,
+    MappingWritable,
 }
 
 impl EffectSeatConstructorRole {
@@ -215,6 +217,8 @@ impl EffectSeatConstructorRole {
             Self::ResourceRead => "::ResourceOpenMode::ResourceRead",
             Self::ResourceMetadata => "::ResourceOpenMode::ResourceMetadata",
             Self::ResourceWriteCreate => "::ResourceOpenMode::ResourceWriteCreate",
+            Self::MappingReadOnly => "::MappingProt::ReadOnly",
+            Self::MappingWritable => "::MappingProt::ReadWrite",
         }
     }
 }
@@ -343,7 +347,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 22] = [
+    [ken_host::HostOpV1; 25] = [
     ken_host::HostOpV1::ConsoleRead,
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
@@ -366,6 +370,9 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::ResourceRelease,
     ken_host::HostOpV1::BufferAllocate,
     ken_host::HostOpV1::BufferFreeze,
+    ken_host::HostOpV1::MappingAllocate,
+    ken_host::HostOpV1::MappingReadView,
+    ken_host::HostOpV1::MappingWriteView,
 ];
 
 /// The seat contract of one admitted operation at one semantic ordinal.
@@ -520,9 +527,20 @@ fn host_effect_seat_contract(
         (Op::FsChangeMode, 1) => Some(exact_int),
         (Op::FsHandleMetadata, 0) | (Op::ResourceRelease, 0) => Some(resource),
         // ⭐ The one seat this release teaches the carrier to observe.
-        (Op::BufferAllocate, 0) => Some(carried_exact_int),
-        (Op::BufferFreeze, 0) | (Op::BufferFreeze, 3) => Some(phase_bearing_resource),
-        (Op::BufferFreeze, 1) | (Op::BufferFreeze, 2) => Some(exact_int),
+        (Op::BufferAllocate, 0) | (Op::MappingAllocate, 0) => Some(carried_exact_int),
+        (Op::MappingAllocate, 1) => Some(tag),
+        (Op::BufferFreeze, 0)
+        | (Op::BufferFreeze, 3)
+        | (Op::MappingReadView, 0)
+        | (Op::MappingReadView, 3)
+        | (Op::MappingWriteView, 0)
+        | (Op::MappingWriteView, 3) => Some(phase_bearing_resource),
+        (Op::BufferFreeze, 1)
+        | (Op::BufferFreeze, 2)
+        | (Op::MappingReadView, 1)
+        | (Op::MappingReadView, 2)
+        | (Op::MappingWriteView, 1) => Some(exact_int),
+        (Op::MappingWriteView, 2) => Some(bytes),
         (Op::FsReadAt, 0) | (Op::FsReadAt, 2) | (Op::FsWriteAt, 0) | (Op::FsWriteAt, 2) => {
             Some(resource)
         }
@@ -581,7 +599,10 @@ fn host_effect_seat_contract(
             | Op::FsWriteAt
             | Op::ResourceRelease
             | Op::BufferAllocate
-            | Op::BufferFreeze,
+            | Op::BufferFreeze
+            | Op::MappingAllocate
+            | Op::MappingReadView
+            | Op::MappingWriteView,
             _,
         ) => None,
         // ⛔ The represented-UNAVAILABLE lanes, named rather than wildcarded.
@@ -598,9 +619,6 @@ fn host_effect_seat_contract(
             | Op::FsGetInheritance
             | Op::FsSetInheritance
             | Op::FsDuplicate
-            | Op::MappingAllocate
-            | Op::MappingReadView
-            | Op::MappingWriteView
             | Op::MappingAcquireFile
             | Op::EntropyRandomBytes,
             _,
@@ -847,6 +865,9 @@ impl<'src> StaticTransitionPlan<'src> {
                     }
                 }
                 paths
+            }
+            (Op::MappingAllocate, EffectSeatSlot::Argument(1)) => {
+                roots(&[(Role::MappingReadOnly, 0), (Role::MappingWritable, 1)])?
             }
             _ => return Ok(None),
         };
