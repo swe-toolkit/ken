@@ -52,15 +52,6 @@ proc map_bytes_window (mapping : MappingHandle) (start : Int) (length : Int)
   : HostIO AFull (Result ResourceError Bytes) visits [FS] =
   mapBytes AFull mapping (MkMappingWindow start length)
 
-proc write_body_at (mapping : MappingHandle) (start : Int)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (MkMappingWindow start (4 : Int))
-      (bytes_encode "ABCD"))
-    (\outcome. expect_unit outcome)
-
 proc read_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
@@ -82,7 +73,11 @@ proc after_write (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok unit |-> read_body mapping
+    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
+      (\bytes. expect_bytes bytes)
   }
 
 proc write_read_body (mapping : MappingHandle)
@@ -107,7 +102,12 @@ proc after_read (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok bytes |-> write_body_at mapping (2 : Int)
+    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
+        (bytes_encode "ABCD"))
+      (\written. expect_unit written)
   }
 
 proc read_write_body (mapping : MappingHandle)
@@ -124,6 +124,123 @@ proc read_write_stage (_cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite read_write_body)
+    (\outcome. finish outcome)
+
+proc after_read_to_read (mapping : MappingHandle)
+  (outcome : Result ResourceError Bytes)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
+      (\read. expect_bytes read)
+  }
+
+proc read_read_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    (map_bytes_window mapping (2 : Int) (4 : Int))
+    (\outcome. after_read_to_read mapping outcome)
+
+proc after_write_to_write (mapping : MappingHandle)
+  (outcome : Result ResourceError Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
+        (bytes_encode "EFGH"))
+      (\written. expect_unit written)
+  }
+
+proc write_write_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
+      (bytes_encode "ABCD"))
+    (\outcome. after_write_to_write mapping outcome)
+
+proc after_second_write_to_read (mapping : MappingHandle)
+  (outcome : Result ResourceError Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
+      (\read. expect_bytes read)
+  }
+
+proc after_read_to_write_read (mapping : MappingHandle)
+  (outcome : Result ResourceError Bytes)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
+        (bytes_encode "ABCD"))
+      (\written. after_second_write_to_read mapping written)
+  }
+
+proc read_write_read_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    (map_bytes_window mapping (2 : Int) (4 : Int))
+    (\outcome. after_read_to_write_read mapping outcome)
+
+proc after_second_read_to_write (mapping : MappingHandle)
+  (outcome : Result ResourceError Bytes)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
+        (bytes_encode "EFGH"))
+      (\written. expect_unit written)
+  }
+
+proc after_write_to_read_write (mapping : MappingHandle)
+  (outcome : Result ResourceError Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
+      (\read. after_second_read_to_write mapping read)
+  }
+
+proc write_read_write_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
+      (bytes_encode "ABCD"))
+    (\outcome. after_write_to_read_write mapping outcome)
+
+proc matrix_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite __MATRIX_BODY__)
     (\outcome. finish outcome)
 
 fn expect_invalid_bounds (outcome : Result ResourceError Bytes)
@@ -204,21 +321,21 @@ struct Differential {
     native: ken_runtime::EffectObservation,
 }
 
-fn differential(case: &str, entry: &str) -> Differential {
+fn try_differential(case: &str, entry: &str, matrix_body: &str) -> Result<Differential, String> {
     let root = tempfile::Builder::new()
         .prefix(&format!("ken-abi-s6-surface-{case}-"))
         .tempdir()
-        .unwrap();
-    let source = SOURCE.replace("__ENTRY__", entry);
+        .map_err(|error| format!("{case}: creates temporary root: {error:?}"))?;
+    let source = SOURCE
+        .replace("__ENTRY__", entry)
+        .replace("__MATRIX_BODY__", matrix_body);
     let output = ken_cli::build_native_program(
         &source,
         ken_cli::SourceFormat::Ken,
         &format!("abi_s6_surface_{}", case.replace('-', "_")),
         root.path(),
     )
-    .unwrap_or_else(|error| {
-        panic!("{case}: window-direct source reaches native lowering: {error:?}")
-    });
+    .map_err(|error| format!("{case}: native lowering: {error:?}"))?;
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -228,7 +345,7 @@ fn differential(case: &str, entry: &str) -> Differential {
             plan_hash: output.plan_transport_hash,
         },
     )
-    .unwrap_or_else(|error| panic!("{case}: linked artifact runs: {error:?}"));
+    .map_err(|error| format!("{case}: native execution: {error:?}"))?;
     let mut host = ken_interp::PosixHost::new_at(root.path());
     let interpreted = ken_cli::run_program_effect_observation(
         &source,
@@ -238,11 +355,37 @@ fn differential(case: &str, entry: &str) -> Differential {
         root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
-    .unwrap_or_else(|error| panic!("{case}: source runs in interpreter: {error:?}"));
-    Differential {
+    .map_err(|error| format!("{case}: interpreter execution: {error:?}"))?;
+    Ok(Differential {
         interpreted,
         native,
-    }
+    })
+}
+
+fn try_differential_in_worker(
+    case: &str,
+    entry: &str,
+    matrix_body: &str,
+) -> Result<Differential, String> {
+    let owned_case = case.to_owned();
+    let entry = entry.to_owned();
+    let matrix_body = matrix_body.to_owned();
+    std::thread::Builder::new()
+        .name(format!("abi-s6-{case}"))
+        .stack_size(32 * 1024 * 1024)
+        .spawn(move || try_differential(&owned_case, &entry, &matrix_body))
+        .map_err(|error| format!("starts {case} matrix worker: {error:?}"))?
+        .join()
+        .map_err(|_| format!("{case}: matrix worker panicked"))?
+}
+
+fn differential(case: &str, entry: &str) -> Differential {
+    try_differential_in_worker(case, entry, "read_body")
+        .unwrap_or_else(|error| panic!("{error}"))
+}
+
+fn differential_matrix_body(case: &str, body: &str) -> Result<Differential, String> {
+    try_differential_in_worker(case, "matrix_stage", body)
 }
 
 fn non_release_events(
@@ -312,6 +455,89 @@ fn assert_parity(case: &str, result: &Differential) {
     assert_eq!(
         result.native.terminal_exit, result.interpreted.terminal_exit,
         "{case}: terminal exit class"
+    );
+}
+
+fn parity_difference(case: &str, result: &Differential) -> Option<String> {
+    if (result.native.exit_status, result.interpreted.exit_status) != (0, 0) {
+        return Some(format!(
+            "{case}: exit statuses native={} interpreter={}",
+            result.native.exit_status, result.interpreted.exit_status
+        ));
+    }
+    if result.native.terminal_error.is_some() || result.interpreted.terminal_error.is_some() {
+        return Some(format!(
+            "{case}: terminal errors native={:?} interpreter={:?}",
+            result.native.terminal_error, result.interpreted.terminal_error
+        ));
+    }
+    if non_release_events(&result.native) != non_release_events(&result.interpreted) {
+        return Some(format!("{case}: ordered non-release traces differ"));
+    }
+    if release_set(&result.native) != release_set(&result.interpreted) {
+        return Some(format!("{case}: release sets differ"));
+    }
+    if result.native.terminal_exit != result.interpreted.terminal_exit {
+        return Some(format!("{case}: terminal exit classes differ"));
+    }
+    None
+}
+
+/// Promise class: durable behavioral invariant. CONTROL: the complete ordered
+/// two-operation Mapping access matrix plus both alternating three-operation
+/// forms must execute through checked source in both engines. Every row requires
+/// exact operation-order, request/outcome/binding parity and one terminal
+/// release. CLAIMED: the D1 carried-transport frontier is closed for every
+/// Mapping access kind that can follow either sibling. THE GAP: file-backed
+/// acquisition and MAP_PRIVATE COW remain D5b.
+#[test]
+fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
+    use ken_runtime::HostOpV1::{MappingAllocate, MappingReadView, MappingWriteView};
+
+    let cases = [
+        ("read-read", "read_read_body", vec![MappingAllocate, MappingReadView, MappingReadView]),
+        ("read-write", "read_write_body", vec![MappingAllocate, MappingReadView, MappingWriteView]),
+        ("write-read", "write_read_body", vec![MappingAllocate, MappingWriteView, MappingReadView]),
+        ("write-write", "write_write_body", vec![MappingAllocate, MappingWriteView, MappingWriteView]),
+        (
+            "read-write-read",
+            "read_write_read_body",
+            vec![MappingAllocate, MappingReadView, MappingWriteView, MappingReadView],
+        ),
+        (
+            "write-read-write",
+            "write_read_write_body",
+            vec![MappingAllocate, MappingWriteView, MappingReadView, MappingWriteView],
+        ),
+    ];
+    let mut failures = Vec::new();
+    for (case, body, expected_operations) in cases {
+        match differential_matrix_body(case, body) {
+            Err(error) => failures.push(error),
+            Ok(result) => {
+                if let Some(error) = parity_difference(case, &result) {
+                    failures.push(error);
+                    continue;
+                }
+                let actual_operations = non_release_events(&result.native)
+                    .iter()
+                    .map(|event| event.operation)
+                    .collect::<Vec<_>>();
+                if actual_operations != expected_operations {
+                    failures.push(format!(
+                        "{case}: operations {actual_operations:?}, expected {expected_operations:?}"
+                    ));
+                }
+                if release_set(&result.native).len() != 1 {
+                    failures.push(format!("{case}: expected exactly one release"));
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "the carried Mapping access frontier must have no refusal or trap:\n{}",
+        failures.join("\n")
     );
 }
 
@@ -428,7 +654,7 @@ fn window_direct_map_read_then_write_executes_in_source_order() {
         events[2].request,
         ken_runtime::CanonicalRequestV1::MappingWriteView {
             start: 2,
-            bytes: vec![0, 0, 0, 0],
+            bytes: b"ABCD".to_vec(),
         }
     );
     assert!(matches!(

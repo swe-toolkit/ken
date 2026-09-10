@@ -505,7 +505,12 @@ fn host_effect_seat_contract(
         (Op::ConsoleWrite, 1)
         | (Op::FsWriteFile, 2)
         | (Op::FsAppendFile, 1)
-        | (Op::FsRename, 1) => Some(carried_bytes),
+        | (Op::FsRename, 1)
+        // ABI-S6 D5a-surface D1: `read -> write` measured this payload at the
+        // carried refusal and the existing guarded observer consumes it. This
+        // is the one newly evidenced byte-span row; no other Mapping seat is
+        // widened speculatively.
+        | (Op::MappingWriteView, 2) => Some(carried_bytes),
         // LEFT SPECIALIZED_ONLY for the direct operation consumer, and NOT
         // because the observer fails them — the observer succeeds at all seven.
         // Each operation's synthesized `FileError` separately declares
@@ -545,7 +550,6 @@ fn host_effect_seat_contract(
         (Op::MappingReadView, 1)
         | (Op::MappingReadView, 2)
         | (Op::MappingWriteView, 1) => Some(carried_exact_int),
-        (Op::MappingWriteView, 2) => Some(bytes),
         (Op::FsReadAt, 0) | (Op::FsReadAt, 2) | (Op::FsWriteAt, 0) | (Op::FsWriteAt, 2) => {
             Some(resource)
         }

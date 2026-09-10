@@ -3599,18 +3599,18 @@ fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() 
 
 /// ABI-S6 D5a-surface D1's Mapping-window family is one phase contract.
 ///
-/// MEASURED: both `MappingReadView` coordinates and the `MappingWriteView`
-/// start coordinate admit their exact-`Int` need in specialized and carried
+/// MEASURED: both `MappingReadView` coordinates, the `MappingWriteView` start,
+/// and its byte-span payload admit their exact needs in specialized and carried
 /// phases, while both `BufferFreeze` coordinates remain specialized-only.
 /// CLAIMED: checked Mapping composition cannot select a different availability
 /// merely by sequencing read and write, and the repair does not widen Buffer.
 /// THE GAP: this pins planning admission; the native/interpreter surface tests
-/// independently exercise the paired lowering observer and exact wire values.
+/// independently exercise the paired lowering observers and exact wire values.
 ///
 /// Promise class: durable invariant. New Mapping operations may add seats, but
 /// these three window coordinates and BufferFreeze's separate contract remain.
 #[test]
-fn mapping_window_int_seats_are_either_phase_without_widening_buffer_freeze() {
+fn mapping_window_seats_are_either_phase_without_widening_buffer_freeze() {
     for (operation, ordinal) in [
         (ken_host::HostOpV1::MappingReadView, 1),
         (ken_host::HostOpV1::MappingReadView, 2),
@@ -3627,6 +3627,19 @@ fn mapping_window_int_seats_are_either_phase_without_widening_buffer_freeze() {
             "{operation:?} argument {ordinal} must admit a carried exact Int"
         );
     }
+
+    let (semantic, need, avail) = host_effect_seat_contract_of(
+        ken_host::HostOpV1::MappingWriteView,
+        EffectSeatSlot::Argument(2),
+    )
+    .expect("MappingWriteView byte-span contract");
+    assert_eq!(semantic, EffectSeatOperation::ProjectBytesSpan);
+    assert_eq!(need, EffectSeatNeed::BytesPointerLength);
+    assert!(avail.admits(EffectSeatPhase::SpecializedTemplate));
+    assert!(
+        avail.admits(EffectSeatPhase::CarriedWord),
+        "MappingWriteView argument 2 must admit its witnessed carried Bytes"
+    );
 
     for ordinal in [1, 2] {
         let (semantic, need, avail) = host_effect_seat_contract_of(
@@ -5105,8 +5118,8 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// **MEASURED:** the exact partition of every `BytesPointerLength` seat in the
 /// contract into those whose `Avail` admits a carried word and those it does
 /// not.
-/// **CLAIMED:** the original `D5` pair plus ABI-A2's real carried append
-/// contents seat are activated, and no others.
+/// **CLAIMED:** the original `D5` pair, ABI-A2's carried append/rename seats,
+/// and ABI-S6's witnessed Mapping write payload are activated, and no others.
 /// **THE GAP this closes:** a forbidden list only reddens on a seat someone
 /// thought to name. This scans the authoritative population and asserts the
 /// whole partition, so a new byte-span seat, or a later flip of one nobody
@@ -5155,6 +5168,10 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(2)),
             (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(1)),
             (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(1)),
+            (
+                ken_host::HostOpV1::MappingWriteView,
+                EffectSeatSlot::Argument(2),
+            ),
         ],
         "the EITHER_PHASE byte-span inventory is not the evidence-backed set"
     );
@@ -5172,10 +5189,6 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsChangeMode, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsOpen, EffectSeatSlot::Argument(0)),
-            (
-                ken_host::HostOpV1::MappingWriteView,
-                EffectSeatSlot::Argument(2),
-            ),
         ],
         "a SPECIALIZED_ONLY byte-span seat lacks its evidence disposition"
     );
