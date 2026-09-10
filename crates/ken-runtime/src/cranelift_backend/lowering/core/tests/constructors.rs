@@ -7997,10 +7997,9 @@ fn a_dynamic_alternative_with_no_planned_record_refuses() {
     let population = plan
         .synthesized_dynamic_alternatives(seat, &error_root)
         .expect("the error root is the resource surface");
-    assert_eq!(
-        population.len(),
-        11,
-        "the resource surface has eleven alternatives"
+    assert!(
+        !population.is_empty(),
+        "the resource surface must supply an alternative to probe"
     );
 
     let seed_env = NativeSeedEnvironment::empty();

@@ -639,6 +639,7 @@ fn native_process_symbols_from_record(
         file_operation_get_inheritance: spine.file_operation_get_inheritance.clone(),
         file_operation_set_inheritance: spine.file_operation_set_inheritance.clone(),
         file_operation_duplicate: spine.file_operation_duplicate.clone(),
+        resource_mapping_limit: spine.resource_mapping_limit.clone(),
     }
 }
 

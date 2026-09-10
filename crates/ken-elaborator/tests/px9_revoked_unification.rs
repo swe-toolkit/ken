@@ -52,6 +52,7 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
             "InvalidOffset",
             "InvalidBounds",
             "NoProgress",
+            "MappingLimit",
         ]
     );
     assert_eq!(
@@ -77,6 +78,7 @@ fn resource_lifecycle_keeps_exact_non_revoked_arms_and_zero_new_trust() {
                 former(env.globals["ResourceKind"]),
                 former(env.globals["ResourceKind"]),
             ],
+            vec![],
             vec![],
             vec![],
             vec![],

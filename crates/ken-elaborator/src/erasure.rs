@@ -601,6 +601,8 @@ pub(crate) struct CheckedHostSpineV1 {
     pub file_operation_get_inheritance: StableSymbol,
     pub file_operation_set_inheritance: StableSymbol,
     pub file_operation_duplicate: StableSymbol,
+    /// ABI-S6 D4 appends without moving established positional roles.
+    pub resource_mapping_limit: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -8133,6 +8135,10 @@ mod px7l_tests {
                 &family("FileOperation"),
                 "OpDuplicate",
             ),
+            resource_mapping_limit: StableSymbol::constructor(
+                &family("ResourceError"),
+                "MappingLimit",
+            ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8548,6 +8554,7 @@ mod d1b_role_b_decoder_alignment {
             file_operation_get_inheritance: sentinel("file_operation_get_inheritance"),
             file_operation_set_inheritance: sentinel("file_operation_set_inheritance"),
             file_operation_duplicate: sentinel("file_operation_duplicate"),
+            resource_mapping_limit: sentinel("resource_mapping_limit"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8644,6 +8651,10 @@ mod d1b_role_b_decoder_alignment {
         (
             spine.file_operation_duplicate.as_str(),
             "file_operation_duplicate",
+        ),
+        (
+            spine.resource_mapping_limit.as_str(),
+            "resource_mapping_limit",
         ),
         ];
         for (decoded_symbol, field) in pairs {

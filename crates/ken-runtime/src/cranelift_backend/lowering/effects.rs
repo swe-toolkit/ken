@@ -266,6 +266,7 @@ fn runtime_producible_constructors(
         file_operation_get_inheritance,
         file_operation_set_inheritance,
         file_operation_duplicate,
+        resource_mapping_limit,
     } = symbols;
     // Every field is a constructor the native runtime can put in front of a
     // match: host-effect responses, process-entry inputs, and the primitive
@@ -330,6 +331,7 @@ fn runtime_producible_constructors(
         file_operation_get_inheritance,
         file_operation_set_inheritance,
         file_operation_duplicate,
+        resource_mapping_limit,
     ]
     .into_iter()
     .cloned()
@@ -2024,7 +2026,7 @@ impl<'a> Lowering<'a> {
         held: cranelift_codegen::ir::Value,
         actual_expected_kind: cranelift_codegen::ir::Value,
         actual_actual_kind: cranelift_codegen::ir::Value,
-        resource_error_tags_in_payload_shape_order: [u64; 10],
+        resource_error_tags_in_payload_shape_order: [u64; 11],
         expected_schema: u64,
         expected_kind: u64,
         buffer_kind: u64,
@@ -2054,6 +2056,7 @@ impl<'a> Lowering<'a> {
         let invalid_bounds_tag = next_resource_error_tag();
         let no_progress_tag = next_resource_error_tag();
         let allocation_failed_tag = next_resource_error_tag();
+        let mapping_limit_tag = next_resource_error_tag();
         let arms = [
             closed_tag,
             malformed_reply_tag,
@@ -2151,6 +2154,7 @@ impl<'a> Lowering<'a> {
                 invalid_bounds_tag,
                 no_progress_tag,
                 allocation_failed_tag,
+                mapping_limit_tag,
             ]
             .map(|tag| i64::try_from(tag).expect("resource error tag fits i64")),
         );
@@ -3811,6 +3815,7 @@ impl<'a> Lowering<'a> {
                     wire.resource_error_invalid_bounds,
                     wire.resource_error_no_progress,
                     wire.resource_error_allocation_failed,
+                    wire.resource_error_mapping_limit,
                 ],
                 wire.resource_error_reply_schema,
                 wire.resource_kind_fs_handle,
@@ -4235,6 +4240,16 @@ impl<'a> Lowering<'a> {
                             checked_resource_tag(wire.resource_error_no_progress),
                             SynthesizedFixedConstructorRole::ResourceNoProgress,
                             self.process_symbols.resource_no_progress.clone(),
+                            Vec::new(),
+                            &seats,
+                        )?,
+                        self.synthesized_dynamic_alternative(
+                            static_origin,
+                            &error_root,
+                            11,
+                            checked_resource_tag(wire.resource_error_mapping_limit),
+                            SynthesizedFixedConstructorRole::ResourceMappingLimit,
+                            self.process_symbols.resource_mapping_limit.clone(),
                             Vec::new(),
                             &seats,
                         )?,

@@ -341,6 +341,14 @@ struct MappingWriteViewRequestV1 {
 }
 
 #[repr(C)]
+#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
+struct MappingAcquireFileRequestV1 {
+    resource: u64,
+    length: u64,
+    protection: u8,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ResourceErrorReplyV1 {
     schema_version: u64,
@@ -1339,6 +1347,7 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 crate::ResourceErrorV1::InvalidBounds => reply.detail = 7,
                 crate::ResourceErrorV1::NoProgress => reply.detail = 8,
                 crate::ResourceErrorV1::AllocationFailed => reply.detail = 9,
+                crate::ResourceErrorV1::MappingLimit => reply.detail = 10,
             }
         }
         CanonicalOutcomeV1::Error(error) => {
@@ -1464,6 +1473,7 @@ fn decode_resource_error_reply(
         7 if all_zero => Some(crate::ResourceErrorV1::InvalidBounds),
         8 if all_zero => Some(crate::ResourceErrorV1::NoProgress),
         9 if all_zero => Some(crate::ResourceErrorV1::AllocationFailed),
+        10 if all_zero => Some(crate::ResourceErrorV1::MappingLimit),
         _ => None,
     }
 }
@@ -2163,6 +2173,7 @@ mod tests {
         size_align!("MappingAllocateRequestV1", MappingAllocateRequestV1);
         size_align!("MappingReadViewRequestV1", MappingReadViewRequestV1);
         size_align!("MappingWriteViewRequestV1", MappingWriteViewRequestV1);
+        size_align!("MappingAcquireFileRequestV1", MappingAcquireFileRequestV1);
         size_align!("ResourceErrorReplyV1", ResourceErrorReplyV1);
         size_align!("HostReplyV1", HostReplyV1);
         macro_rules! offset {
@@ -2280,6 +2291,21 @@ mod tests {
             MappingWriteViewRequestV1,
             span_origin
         );
+        offset!(
+            "MappingAcquireFileRequestV1",
+            MappingAcquireFileRequestV1,
+            resource
+        );
+        offset!(
+            "MappingAcquireFileRequestV1",
+            MappingAcquireFileRequestV1,
+            length
+        );
+        offset!(
+            "MappingAcquireFileRequestV1",
+            MappingAcquireFileRequestV1,
+            protection
+        );
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, schema_version);
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, resource_kind);
         offset!("ResourceErrorReplyV1", ResourceErrorReplyV1, identity);
@@ -2337,6 +2363,7 @@ mod tests {
         assert_eq!(effect_binding("error", "resource.InvalidBounds"), 7);
         assert_eq!(effect_binding("error", "resource.NoProgress"), 8);
         assert_eq!(effect_binding("error", "resource.AllocationFailed"), 9);
+        assert_eq!(effect_binding("error", "resource.MappingLimit"), 10);
         assert_eq!(effect_binding("tag", "resource_kind.FsHandle"), 0);
         assert_eq!(effect_binding("tag", "resource_kind.Buffer"), 1);
         assert_eq!(effect_binding("tag", "resource_kind.Mapping"), 2);
@@ -2350,6 +2377,10 @@ mod tests {
         assert_eq!(
             effect_binding("limit", "buffer.invocation_max_live_capacity"),
             crate::DEFAULT_BUFFER_LIMITS_V1.invocation_max_live_capacity
+        );
+        assert_eq!(
+            effect_binding("limit", "mapping.per_mapping_max_capacity"),
+            crate::DEFAULT_BUFFER_LIMITS_V1.per_mapping_max_capacity
         );
         assert_eq!(effect_binding("error", "io.BrokenPipe"), 3);
         assert_eq!(effect_binding("error", "io.Revoked"), 11);
@@ -2382,6 +2413,25 @@ mod tests {
             ("OFFSET_MappingWriteViewRequestV1_start", 8),
             ("OFFSET_MappingWriteViewRequestV1_bytes", 16),
             ("OFFSET_MappingWriteViewRequestV1_span_origin", 32),
+        ] {
+            assert_eq!(effect_fact(name), value, "raw ABI fact {name}");
+        }
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: the independent
+    /// C observer fixes the D4 source-token/length/protection record at one
+    /// append-only layout. CLAIMED: file-backed acquisition carries only an
+    /// opaque source token and bounded scalar request, never an address. THE GAP:
+    /// canonical traces keep the source token in resource bindings and are
+    /// independently pinned by the semantic dispatcher and trace codec.
+    #[test]
+    fn abi_s6_d4_file_acquire_raw_request_layout_is_exact() {
+        for (name, value) in [
+            ("SIZE_MappingAcquireFileRequestV1", 24),
+            ("ALIGN_MappingAcquireFileRequestV1", 8),
+            ("OFFSET_MappingAcquireFileRequestV1_resource", 0),
+            ("OFFSET_MappingAcquireFileRequestV1_length", 8),
+            ("OFFSET_MappingAcquireFileRequestV1_protection", 16),
         ] {
             assert_eq!(effect_fact(name), value, "raw ABI fact {name}");
         }
@@ -2797,6 +2847,7 @@ mod tests {
             (7, crate::ResourceErrorV1::InvalidBounds),
             (8, crate::ResourceErrorV1::NoProgress),
             (9, crate::ResourceErrorV1::AllocationFailed),
+            (10, crate::ResourceErrorV1::MappingLimit),
         ] {
             assert_eq!(decode_resource_error_reply(tag, zero), Some(expected));
         }
@@ -3020,6 +3071,7 @@ mod tests {
             (crate::ResourceErrorV1::InvalidBounds, 7),
             (crate::ResourceErrorV1::NoProgress, 8),
             (crate::ResourceErrorV1::AllocationFailed, 9),
+            (crate::ResourceErrorV1::MappingLimit, 10),
         ] {
             assert_eq!(
                 project(error),
