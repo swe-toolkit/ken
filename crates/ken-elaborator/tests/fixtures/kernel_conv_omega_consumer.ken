@@ -1,0 +1,1 @@
+fn omega_congruence_consumer (a : Type) (x : a) : OmegaExpectedOf a = omega_value a x

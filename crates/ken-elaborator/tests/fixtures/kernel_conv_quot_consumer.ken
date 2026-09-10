@@ -1,0 +1,1 @@
+fn quotient_congruence_consumer (r : Bool → Bool → Omega) : QuotExpectedOf r = quotient_value r
