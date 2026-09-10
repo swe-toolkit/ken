@@ -140,13 +140,20 @@ region-acquire/hold/view/release surface under that shape. Per-increment partial
 landing is authorized. Each operation is threaded through every registration
 site (see AC-INVENTORY-BUILD-BREAK) and lands `RepresentedUnavailable`.
 
-CURRENT POSITION (2026-09-09, measured at `origin/main` `8726f73d6`): D0-D3 have
+CURRENT POSITION (2026-09-10, measured at `origin/main` `9d614db31`): D0-D4 have
 merged — the represented `Mapping` operation surface (acquire / bounded views /
-registration) landed on **anonymous** backing, fail-closed and
-`RepresentedUnavailable` (D3 PR #3444, adversary M8 NO DEFECT). The current
-increment is **D4 — file-backed acquire** (runtime-leader named it,
-evt_2zbjjanyg11zx). The node stays `active` across increments; native promotion
-remains a separate later increment.
+registration) landed on **anonymous** and **file-backed** backing, fail-closed
+and `RepresentedUnavailable` (D3 PR #3444 adversary M8 NO DEFECT; D4 file-backed
+acquire landed cf894cdb5). The normative **§1.9 mapping-surface contract + seed**
+landed (`cd62283b8`, spec `30-surface/38-ffi-io.md §1.9` +
+`conformance/surface/ffi-io/seed-mapping.md`), so the checked surface and its
+discriminating negatives are now pinned. **The Architect then SPLIT the native
+D5a increment into D5a-core and D5a-surface** (relayed by runtime-leader
+evt_580zc1y1jknn0 / evt_6x2krr2wfvax8): D5a-core owns the native anonymous
+promotion (the frozen three-op wire), currently a candidate `7beecdb4e` on
+`wp/ABI-S6-native-anonymous` under fresh Runtime-QA + Architect review; D5a-surface
+owns the checked §1.9 composition over that frozen wire + the seed discharge (the
+increment framed below). The node stays `active` across increments.
 
 - **D0 — representation-shape measurement + Architect ruling (reasoning-dense,
   first).** As above: measure the reuse-vs-parallel fork against the boundary,
@@ -193,6 +200,47 @@ remains a separate later increment.
   per-mapping and invocation-wide limits or an explicit unbounded-but-graceful
   contract is a design ruling, not this frame's call; land nothing on that axis
   until ruled.
+- **D5a-core — native anonymous promotion (the frozen three-op wire).** Promotes
+  the anonymous `Mapping` acquire/view/release wire from `RepresentedUnavailable`
+  to native (real `mmap`/`munmap`), closing the native-reifier totality gap for
+  the `Mapping` tag (AC-NATIVE-REIFICATION-TOTAL). Owned by the Architect's
+  split; a separate candidate `7beecdb4e` on `wp/ABI-S6-native-anonymous`
+  under fresh Runtime-QA + Architect review against the seven core gates (native
+  reachability, opacity, 4 KiB shared accounting, MAP_PRIVATE/munmap, reifier
+  totality, no new right/TCB, seed still honestly undischarged). Not this frame's
+  deliverable — recorded here for the increment plan; it routes to the Steward on
+  its own QA/Architect approval.
+- **D5a-surface — the checked §1.9 composition over the frozen three-op wire
+  (D0-first; THIS is the framed/released increment).** Compose the public checked
+  Mapping surface — `withMapping` / `mapView` / `mapBytes` / `mapWrite`, exactly
+  the four `spec/30-surface/38-ffi-io.md §1.9` procs — over the frozen three-op
+  native wire D5a-core delivers, and DISCHARGE the three RED-UNTIL-BUILT seed
+  cases (`conformance/surface/ffi-io/seed-mapping.md`). Grounded on the landed
+  §1.9 contract (`cd62283b8`).
+  - **D0 — characterize the continuation prerequisite; HARD-STOP if unmet.**
+    `withMapping`'s bracket body `MappingHandle -> HostIO a (ResourceBodyResult e
+    r)` composes a checked resource bracket exactly as `withBuffer` (`§1.7.1`) /
+    the `FsHandle` acquire/release bracket do. D0 measures whether that checked
+    bracket composition is buildable on the EXISTING resource-bracket /
+    continuation machinery, or whether it requires a continuation capability the
+    runtime does not yet have (the represented-K seam). Report the exact
+    prerequisite and HARD-STOP to the Steward + Architect if it is unmet. Do NOT
+    build new continuation machinery here, do NOT alter the §1.9 contract to route
+    around it, and do NOT add an operation — any of those is out of this increment's
+    scope and is a distinct node the Architect must rule.
+  - **D1 (only if D0 clears) — build the checked composition + discharge the
+    seed.** Implement the four checked procs over the frozen three-op wire and
+    turn the three seed cases green WITH their discriminating controls intact:
+    MAP_PRIVATE copy-on-write (the in-mapping read observes the write; the
+    ordinary-file read observes the ORIGINAL bytes), the fixed 4 KiB
+    host-independent granule (1 B -> 4096, 4097 B -> 8192; native == interpreted),
+    and opacity + bounds (no raw address in any Ken value or token; out-of-range
+    `mapView` is a fail-visible `ResourceError`; a wrong-kind token is
+    `ResourceKindMismatch` naming `Mapping`; `ReadOnly` refuses `mapWrite`).
+  - **Constraints (hard stops, per the Architect split).** No alteration of the
+    §1.9 contract to match D5a-core; no new operation beyond the four §1.9 procs;
+    the three-op native wire is frozen. Route to the Steward + Architect on any of
+    these rather than absorbing it.
 
 ## Acceptance criteria (each with its control)
 
@@ -300,6 +348,22 @@ remains a separate later increment.
   (`export.rs` / `erasure.rs` / `prelude.rs`), the generated catalog data file,
   and the `ken-interp` reify path. Green in CI is the workspace verdict — build
   and test locally targeted only, never `--workspace` (COORDINATION §12).
+- **AC-SEED-DISCHARGE-D5A (D5a-surface — the point of the increment).** The three
+  `conformance/surface/ffi-io/seed-mapping.md` cases flip from RED-UNTIL-BUILT to
+  GREEN, each with its discriminating control still refuting a non-conforming
+  implementation — the pair, not a lone positive: (1) MAP_PRIVATE — the
+  in-mapping read observes the write AND the ordinary-file read observes the
+  original bytes, so a `MAP_SHARED`/write-through surface reds; (2) 4 KiB granule
+  — the charged sizes are exactly 4096/4096/8192 and NATIVE == INTERPRETED, so a
+  `sysconf(_SC_PAGESIZE)`-derived or byte-granular rule reds (host-independent by
+  construction); (3) opacity + bounds — no raw address in any Ken value or token,
+  out-of-range `mapView` is a fail-visible `ResourceError`, wrong-kind token is
+  `ResourceKindMismatch` naming `Mapping`. Control: neutering any discriminator
+  (write-through, host-page accounting, address exposure, unchecked view) reds the
+  matching case; a case that passes green-vs-green against its named
+  non-conforming implementation is vacuous and does NOT discharge. The seed text
+  is not altered to make a case pass — a case that only passes after weakening its
+  control is a HARD STOP, not a discharge.
 
 ## Gate, reviewers, sequencing
 
