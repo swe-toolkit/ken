@@ -2691,16 +2691,15 @@ impl StaticTransitionPlan<'_> {
             }
             RuntimeExpr::CheckedRecursiveInvocation { .. }
             | RuntimeExpr::CheckedComputationalIHInvocation { .. } => Ok(None),
-            RuntimeExpr::Let { .. } => {
-                self.static_response_frontier_sequence(&children, active)
-            }
+            RuntimeExpr::Let { .. } => self.static_response_frontier_sequence(&children, active),
             RuntimeExpr::If { .. } => {
                 let Some((scrutinee_origin, branches)) = children.split_first() else {
                     return Err(planner_error(
                         "a response-frontier If has no scrutinee child",
                     ));
                 };
-                let Some(scrutinee) = self.static_response_frontier(*scrutinee_origin, active)? else {
+                let Some(scrutinee) = self.static_response_frontier(*scrutinee_origin, active)?
+                else {
                     active.remove(&origin);
                     return Ok(None);
                 };
@@ -2709,7 +2708,8 @@ impl StaticTransitionPlan<'_> {
                 } else {
                     let mut frontier = Vec::new();
                     for branch in branches {
-                        let Some(mut branch) = self.static_response_frontier(*branch, active)? else {
+                        let Some(mut branch) = self.static_response_frontier(*branch, active)?
+                        else {
                             active.remove(&origin);
                             return Ok(None);
                         };
@@ -2726,7 +2726,8 @@ impl StaticTransitionPlan<'_> {
                         "a response-frontier Match has no scrutinee child",
                     ));
                 };
-                let Some(scrutinee) = self.static_response_frontier(*scrutinee_origin, active)? else {
+                let Some(scrutinee) = self.static_response_frontier(*scrutinee_origin, active)?
+                else {
                     active.remove(&origin);
                     return Ok(None);
                 };
@@ -2735,7 +2736,8 @@ impl StaticTransitionPlan<'_> {
                 } else {
                     let mut frontier = Vec::new();
                     for branch in branches {
-                        let Some(mut branch) = self.static_response_frontier(*branch, active)? else {
+                        let Some(mut branch) = self.static_response_frontier(*branch, active)?
+                        else {
                             active.remove(&origin);
                             return Ok(None);
                         };
@@ -2812,10 +2814,8 @@ impl StaticTransitionPlan<'_> {
         &self,
         response: &StaticResponseContinuation,
     ) -> Result<Vec<DeferredResponseRow>, CraneliftBackendError> {
-        let frontier = self.static_response_frontier(
-            response.k_body_origin(),
-            &mut BTreeSet::new(),
-        )?;
+        let frontier =
+            self.static_response_frontier(response.k_body_origin(), &mut BTreeSet::new())?;
         let Some(mut pending) = frontier else {
             return Ok(Vec::new());
         };
@@ -2841,10 +2841,8 @@ impl StaticTransitionPlan<'_> {
             let Some(shape) = self.deferred_response_continuation_shape(&row)? else {
                 return Ok(Vec::new());
             };
-            let next_frontier = self.static_response_frontier(
-                shape.k_body_origin,
-                &mut BTreeSet::new(),
-            )?;
+            let next_frontier =
+                self.static_response_frontier(shape.k_body_origin, &mut BTreeSet::new())?;
             let Some(mut next) = next_frontier else {
                 return Ok(Vec::new());
             };

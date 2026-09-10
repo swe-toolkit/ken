@@ -5819,12 +5819,7 @@ impl<'a> Lowering<'a> {
         match producer_eliminators {
             Some(eliminators) => {
                 let eliminators = eliminators.to_vec();
-                self.lower_computational_producer_expr(
-                    builder,
-                    k_body,
-                    &k_env,
-                    &eliminators,
-                )
+                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
             }
             None => self.lower_expr(builder, k_body, &k_env),
         }
