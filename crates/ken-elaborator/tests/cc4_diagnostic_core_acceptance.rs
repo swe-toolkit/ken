@@ -352,15 +352,38 @@ fn cc4_clients_use_canonical_diagnostics_without_duplicate_carriers() {
 /// is exercised independently by the shape and non-degenerate injection tests.
 #[test]
 fn checked_cc4_chain_has_zero_trusted_base_delta() {
-    let mut env = dependency_env();
-    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    load_cursor_module(&mut env);
-    load_decoder_module(&mut env);
-    load_parsing_module(&mut env);
-    env.elaborate_ken_md_file(NUMERIC_KEN_MD)
-        .expect("Capability.Parsing.Numeric must elaborate");
-    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(before, after, "CC4 must add zero trusted-base entries");
+    let mut diagnostics = ElabEnv::empty().expect("prelude bootstrap");
+    diagnostics
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+        .expect("Diagnostics provider must roots-load");
+    let before: BTreeSet<_> = diagnostics.env.trusted_base().into_iter().collect();
+    diagnostics
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
+        .expect("Diagnostics.Core must roots-load");
+    let after: BTreeSet<_> = diagnostics.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Diagnostics.Core must add zero trust");
+
+    let mut cursor = dependency_env();
+    let before: BTreeSet<_> = cursor.env.trusted_base().into_iter().collect();
+    load_cursor_module(&mut cursor);
+    let after: BTreeSet<_> = cursor.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing.Cursor must add zero trust");
+
+    let mut parsing = dependency_env();
+    load_cursor_module(&mut parsing);
+    load_decoder_module(&mut parsing);
+    let before: BTreeSet<_> = parsing.env.trusted_base().into_iter().collect();
+    load_parsing_module(&mut parsing);
+    let after: BTreeSet<_> = parsing.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing.Parsing must add zero trust");
+
+    let mut numeric = dependency_env();
+    let before: BTreeSet<_> = numeric.env.trusted_base().into_iter().collect();
+    numeric
+        .elaborate_ken_md_file(NUMERIC_KEN_MD)
+        .expect("Parsing.Numeric must elaborate");
+    let after: BTreeSet<_> = numeric.env.trusted_base().into_iter().collect();
+    assert_eq!(before, after, "Parsing.Numeric must add zero trust");
 }
 
 #[test]
