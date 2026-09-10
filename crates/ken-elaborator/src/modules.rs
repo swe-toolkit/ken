@@ -1312,20 +1312,23 @@ fn rewrite_rexpr_inner(
             span,
         } => {
             let scrut = Box::new(rewrite_rexpr(scope, exports, *scrut)?);
-            let arms = arms
-                .into_iter()
-                .map(|a| {
-                    Ok(RMatchArm {
-                        pat: rewrite_rpattern(scope, exports, a.pat)?,
-                        guard: a
-                            .guard
-                            .map(|guard| rewrite_rexpr(scope, exports, guard))
-                            .transpose()?,
-                        body: rewrite_rexpr(scope, exports, a.body)?,
-                        span: a.span,
-                    })
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?;
+            // Keep recursive match descent free of per-arm iterator frames. The
+            // iterator/Result collection adds a chain of adapter frames
+            // for every nested source match; a finite checked program must not
+            // become unresolvable merely because the prelude gained declarations.
+            let mut rewritten_arms = Vec::with_capacity(arms.len());
+            for arm in arms {
+                rewritten_arms.push(RMatchArm {
+                    pat: rewrite_rpattern(scope, exports, arm.pat)?,
+                    guard: arm
+                        .guard
+                        .map(|guard| rewrite_rexpr(scope, exports, guard))
+                        .transpose()?,
+                    body: rewrite_rexpr(scope, exports, arm.body)?,
+                    span: arm.span,
+                });
+            }
+            let arms = rewritten_arms;
             RExpr::RMatch {
                 scrut,
                 equation,
