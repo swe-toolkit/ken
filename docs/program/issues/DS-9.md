@@ -1,19 +1,50 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: active
+status: draft
 owner: foundation
 size: L
 gate: none
-depends_on: [KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE]
+depends_on: [LANG-ELAB-NESTED-FORMER-RECURSION]
 blocks: []
 github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## RE-BLOCKED 2026-09-10 (Steward) — HARD STOP #2 (post-kernel-fix). `active`
+> ## -> `draft`. READ THIS FIRST; it supersedes the RE-RELEASED banner below.
+> ##
+> ## The kernel former-lift ADMISSION fix landed and worked (layer-1): the
+> ## six-arm `Json` match now builds and the direct `List Json` array fold
+> ## EXECUTES. DS-9 D3 D0 then hit a DIFFERENT layer. The Architect ruled it
+> ## (evt_71pwctbj3rax8, thr_7scvvcxfn3cq2): a genuine remaining
+> ## Language/elaborator structural-recursion gap, NO already-lawful source form,
+> ## DS-9 blocked with no candidate. For `JsonObject`'s `List (Pair String Json)`
+> ## the recursive `Json` is nested inside a `Pair`; the elaborator's surface
+> ## structural-recursion machinery (`RRecursiveResult` / SCT in `elab.rs`) reaches
+> ## only DIRECT recursive-occurrence children, so it cannot CONSUME the nested IH
+> ## the kernel now builds — every natural surface fold reds
+> ## `StructuralResultOutOfScope` / `NotTerminating`. Array-only is dishonest for
+> ## an array/object increment; restructuring off `List (Pair String Json)` is a
+> ## forbidden carrier change. So there is no honest increment now.
+> ##
+> ## BLOCKER: `LANG-ELAB-NESTED-FORMER-RECURSION` (language, released to the
+> ## language ring 2026-09-10) — extend surface structural recursion + totality to
+> ## consume a recursive occurrence nested one positive-former deeper than direct.
+> ## It is layer-2 of the SAME nested-former-recursion capability whose layer-1
+> ## (kernel former-lift admission) landed. On its landing the Steward RE-RELEASES
+> ## DS-9's D3+. The `show_int` P2 floor (below) remains a separate, independent
+> ## gate on the complete number leaf. The held branch `wp/DS-9-json-codec` is
+> ## intact; the D3a decoder paragraph and all carrier/law prohibitions stand.
+> ##
+> ## The RE-RELEASED banner below is SUPERSEDED for now — its kernel-prerequisite
+> ## reasoning is correct and permanent (that blocker IS cleared), but a second,
+> ## distinct layer-2 blocker is now in front of D3+.
+
 > ## RE-RELEASED 2026-09-10 (Steward) — the KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE
-> ## blocker is CLEARED. `draft` -> `active`. READ THIS FIRST; it supersedes the
-> ## RE-BLOCKED banner below.
+> ## blocker is CLEARED. `draft` -> `active`. [SUPERSEDED by the HARD STOP #2
+> ## RE-BLOCKED banner above — the kernel blocker IS cleared, but a distinct
+> ## elaborator layer-2 blocker now gates D3+.]
 >
 > `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` LANDED on `origin/main` at `486e9f33`
 > (squash of `eb9910302`, blob-verified byte-identical on both kernel paths). That
