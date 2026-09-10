@@ -197,6 +197,185 @@ const HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD: &str =
     "KEN_RT_HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD";
 
 #[cfg(target_os = "linux")]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum RetainedResultClosureOwner {
+    Predeclared(u64),
+    Specialization(u64),
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct RetainedResultClosureRow {
+    owner: RetainedResultClosureOwner,
+    result: u64,
+    construct: u64,
+    field: u64,
+    seat: u64,
+    body: u64,
+    captures: Vec<u64>,
+    target: u64,
+}
+
+#[cfg(target_os = "linux")]
+fn parse_decimal_after(text: &str, prefix: &str) -> u64 {
+    let tail = text
+        .split_once(prefix)
+        .unwrap_or_else(|| panic!("retained-result row has no {prefix}: {text}"))
+        .1;
+    let digits = tail
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>();
+    assert!(
+        !digits.is_empty(),
+        "retained-result row has no decimal after {prefix}: {text}"
+    );
+    digits
+        .parse()
+        .unwrap_or_else(|_| panic!("retained-result row has invalid {prefix}: {text}"))
+}
+
+#[cfg(target_os = "linux")]
+fn parse_retained_result_closure_row(line: &str) -> Option<RetainedResultClosureRow> {
+    if !line.starts_with("retained-result-closure-control mutation=") {
+        return None;
+    }
+    let owner = if line.contains(" owner=Predeclared(PredeclaredFunctionId(") {
+        RetainedResultClosureOwner::Predeclared(parse_decimal_after(
+            line,
+            " owner=Predeclared(PredeclaredFunctionId(",
+        ))
+    } else if line.contains(" owner=Specialization(ContinuationSpecializationId(") {
+        RetainedResultClosureOwner::Specialization(parse_decimal_after(
+            line,
+            " owner=Specialization(ContinuationSpecializationId(",
+        ))
+    } else {
+        panic!("retained-result row has an unknown owner: {line}");
+    };
+    let capture_text = line
+        .split_once(" captures=[")
+        .unwrap_or_else(|| panic!("retained-result row has no captures: {line}"))
+        .1
+        .split_once("] target=")
+        .unwrap_or_else(|| panic!("retained-result row has no target after captures: {line}"))
+        .0;
+    let captures = if capture_text.is_empty() {
+        Vec::new()
+    } else {
+        capture_text
+            .split(", ")
+            .map(|capture| parse_decimal_after(capture, "StaticOriginId("))
+            .collect()
+    };
+    Some(RetainedResultClosureRow {
+        owner,
+        result: parse_decimal_after(line, " result=StaticOriginId("),
+        construct: parse_decimal_after(line, " construct=StaticOriginId("),
+        field: parse_decimal_after(line, " field="),
+        seat: parse_decimal_after(line, " seat=StaticOriginId("),
+        body: parse_decimal_after(line, " body=StaticOriginId("),
+        captures,
+        target: parse_decimal_after(line, " target=ContinuationSpecializationId("),
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn assert_retained_result_closure_population(stderr: &str, mode: &str) {
+    let reported = stderr
+        .lines()
+        .filter_map(parse_retained_result_closure_row)
+        .collect::<Vec<_>>();
+    assert!(
+        !reported.is_empty() && reported.len() % 6 == 0,
+        "{mode}: every proof projection must report the fixed fixture's six retained result-closure rows; stderr:\n{stderr}"
+    );
+    let expected = reported[..6]
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        expected.len(),
+        6,
+        "{mode}: one retained result-closure row is duplicated in a projection; stderr:\n{stderr}"
+    );
+    for projection in reported.chunks_exact(6) {
+        assert_eq!(
+            projection
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            expected,
+            "{mode}: repeated proof projection changed the typed population; stderr:\n{stderr}"
+        );
+    }
+    let rows = expected.into_iter().collect::<Vec<_>>();
+
+    let projections: [fn(&RetainedResultClosureRow) -> u64; 5] = [
+        |row| row.result,
+        |row| row.construct,
+        |row| row.seat,
+        |row| row.body,
+        |row| row.target,
+    ];
+    for project in projections {
+        assert_eq!(
+            rows.iter()
+                .map(project)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            rows.len(),
+            "{mode}: one typed retained-result coordinate is duplicated; stderr:\n{stderr}"
+        );
+    }
+
+    for row in &rows {
+        assert_eq!(
+            row.field, 1,
+            "{mode}: retained result closure is not the recursive Result field: {row:?}"
+        );
+        assert!(
+            row.body < row.seat,
+            "{mode}: retained closure body does not precede its seat: {row:?}"
+        );
+        assert_eq!(
+            row.captures,
+            ((row.body + 1)..row.seat).rev().collect::<Vec<_>>(),
+            "{mode}: retained closure captures are not the exact positional child run: {row:?}"
+        );
+    }
+
+    let predeclared = rows
+        .iter()
+        .filter(|row| matches!(row.owner, RetainedResultClosureOwner::Predeclared(_)))
+        .count();
+    let specialized = rows
+        .iter()
+        .filter_map(|row| match row.owner {
+            RetainedResultClosureOwner::Predeclared(_) => None,
+            RetainedResultClosureOwner::Specialization(owner) => Some((owner, row)),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(predeclared, 4, "{mode}: fixed fixture predeclared rows");
+    assert_eq!(specialized.len(), 2, "{mode}: fixed fixture nested rows");
+    for (source_target, child) in specialized {
+        let parents = rows
+            .iter()
+            .filter(|parent| {
+                matches!(parent.owner, RetainedResultClosureOwner::Predeclared(_))
+                    && parent.target == source_target
+                    && parent.body == child.result
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            parents.len(),
+            1,
+            "{mode}: a specialization-owned retained row lacks its unique parent target/body relation: {child:?}"
+        );
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn assert_retained_unit_call_target_mutation_child() {
     use ken_runtime::RetainedUnitCallTargetMutation as Mutation;
 
@@ -205,11 +384,11 @@ fn assert_retained_unit_call_target_mutation_child() {
     let (mutation, expected) = match mode.as_str() {
         "unrelated-owner-root" => (
             Mutation::SubstituteUnrelatedOwnerRoot,
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "has no graph-derived call target in this unit",
         ),
         "suppress-graph-claims" => (
             Mutation::SuppressGraphClaims,
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "has no graph-derived call target in this unit",
         ),
         "wrong-target" => (
             Mutation::SubstituteWrongTarget,
@@ -460,11 +639,11 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
     let cases = [
         (
             "unrelated-owner-root",
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "has no graph-derived call target in this unit",
         ),
         (
             "suppress-graph-claims",
-            "retained body StaticOriginId(1236) has no graph-derived call target in this unit",
+            "has no graph-derived call target in this unit",
         ),
         ("wrong-target", "a retained-body graph claim for"),
         (
@@ -513,15 +692,16 @@ fn retained_unit_call_target_controls_reject_malformed_derivations() {
 /// dropping, duplicating, substituting real neighboring owner/body/field/target
 /// rows, permuting the real capture run, widening to every other captured
 /// lexical occurrence, or dropping the exact downstream call edge reaches a
-/// distinct production refusal.
+/// distinct production refusal. Each malformed child also reports the fixed
+/// fixture's six unique rows, exact descending capture runs, and both nested
+/// specialization-to-parent target/body joins.
 /// CLAIMED: only the exact result/constructor/field/closure/body/capture/target
 /// tuple and its joined static call edge may acquire the existing M4 environment
 /// representation. Handler-owned Deferred continuations no longer cross this
 /// boundary; their replacement control is
 /// `handler_owned_deferred_response_controls_are_load_bearing`.
-/// THE GAP: numeric coordinates below establish that each population mutation
-/// reached D0's exact fixture row; they select no authority and are never inputs
-/// to production derivation.
+/// THE GAP: the fixed fixture supplies four predeclared and two nested rows; the
+/// assertions identify them by typed relations, never planner allocation ids.
 #[test]
 fn retained_result_closure_proof_controls_are_exact_and_positional() {
     let cases = [
@@ -583,20 +763,7 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
                 stderr.contains(expected),
                 "{mode}: child did not publish intended refusal; stderr:\n{stderr}"
             );
-            for coordinate in [
-                "construct=StaticOriginId(815)",
-                "field=1",
-                "seat=StaticOriginId(810)",
-                "body=StaticOriginId(800)",
-                "StaticOriginId(809)",
-                "StaticOriginId(801)",
-                "target=ContinuationSpecializationId(3)",
-            ] {
-                assert!(
-                    stderr.contains(coordinate),
-                    "{mode}: mutation did not report D0's exact typed row coordinate {coordinate}; stderr:\n{stderr}"
-                );
-            }
+            assert_retained_result_closure_population(&stderr, mode);
         }
     }
 }
@@ -816,13 +983,14 @@ const WRITE_ALL_CLASSIFIER_STACK_BYTES: usize =
 /// promotes exactly its two exclusively-predeclared producer groups while the
 /// unit-less P1 and mixed-owner group retain their existing lowering paths.
 ///
-/// MEASURED: the exact 267/279 rows acquire response owners and compile beside
-/// P1 1229 plus mixed group 287 without an escaping response placeholder.
-/// Suppression restores 267/279 to P2, while deliberately over-promoting 287
-/// reaches the owner-escape refusal. CLAIMED: the Route-B ownership restriction
-/// is both sufficient and necessary for sound partial specialization. THE GAP:
-/// the successful `ReadSome` body still belongs to the held parent carry WP, so
-/// this predecessor does not claim the runtime right-path witness.
+/// MEASURED: the exact FsReadAt and BufferAllocate rows acquire response owners
+/// and compile beside the one FsWriteAt P1 row and three mixed-owner
+/// ResourceRelease rows. Suppression restores those two rows to P2, while
+/// deliberately over-promoting all three ResourceRelease rows reaches the
+/// owner-escape refusal. CLAIMED: the Route-B ownership restriction is both
+/// sufficient and necessary for sound partial specialization. THE GAP: the
+/// successful `ReadSome` body still belongs to the held parent carry WP, so this
+/// predecessor does not claim the runtime right-path witness.
 #[test]
 fn write_all_classifies_mixed_specialized_and_deferred_responses() {
     std::thread::Builder::new()
@@ -854,42 +1022,28 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             let specialized = diagnostic
                 .all_static_response_rows
                 .iter()
-                .map(|row| {
-                    (
-                        row.producer_call_origin,
-                        row.vis_origin,
-                        row.operation.as_str(),
-                    )
-                })
+                .map(|row| row.operation.as_str())
                 .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(diagnostic.all_static_response_rows.len(), 3);
             assert_eq!(
                 specialized,
-                std::collections::BTreeSet::from([
-                    (267, 1406, "FsReadAt"),
-                    (279, 1549, "BufferAllocate"),
-                    (303, 1572, "FsOpen"),
-                ]),
+                std::collections::BTreeSet::from(["FsReadAt", "BufferAllocate", "FsOpen",]),
                 "only the two exclusively-predeclared groups join the preexisting open row"
             );
-            let deferred = diagnostic
-                .static_response_deferred
-                .iter()
-                .map(|row| {
-                    (
-                        row.producer_call_origin,
-                        row.vis_origin,
-                        row.operation.as_str(),
-                        row.sub_case.as_str(),
-                    )
-                })
-                .collect::<std::collections::BTreeSet<_>>();
+            let deferred = diagnostic.static_response_deferred.iter().fold(
+                std::collections::BTreeMap::new(),
+                |mut counts, row| {
+                    *counts
+                        .entry((row.operation.as_str(), row.sub_case.as_str()))
+                        .or_insert(0usize) += 1;
+                    counts
+                },
+            );
             assert_eq!(
                 deferred,
-                std::collections::BTreeSet::from([
-                    (254, 1229, "FsWriteAt", "NoContinuationUnit"),
-                    (287, 606, "ResourceRelease", "UnconsumedTransportCaller"),
-                    (287, 815, "ResourceRelease", "UnconsumedTransportCaller"),
-                    (287, 1024, "ResourceRelease", "UnconsumedTransportCaller"),
+                std::collections::BTreeMap::from([
+                    (("FsWriteAt", "NoContinuationUnit"), 1),
+                    (("ResourceRelease", "UnconsumedTransportCaller"), 3),
                 ]),
                 "P1 stays main-lowered and the mixed-owner group stays P2"
             );
@@ -901,14 +1055,14 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             let buffer_handler = diagnostic
                 .all_static_response_rows
                 .iter()
-                .find(|row| row.vis_origin == 1549)
+                .find(|row| row.operation == "BufferAllocate")
                 .expect("the promoted BufferAllocate response remains present")
                 .base_owner
                 .clone();
             let p1 = diagnostic
                 .static_response_deferred
                 .iter()
-                .find(|row| row.vis_origin == 1229)
+                .find(|row| row.operation == "FsWriteAt" && row.sub_case == "NoContinuationUnit")
                 .expect("the P1 response remains in the Deferred population");
             assert_eq!(p1.handler_owner.as_deref(), Some(buffer_handler.as_str()));
             for row in &diagnostic.static_response_deferred {
@@ -944,7 +1098,7 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 diagnostic
                     .static_response_deferred
                     .iter()
-                    .filter(|row| row.vis_origin != 1229)
+                    .filter(|row| row.operation != "FsWriteAt")
                     .all(|row| row.tail_static_calls == Some(0)),
                 "resource-release continuations must return directly rather than recurse"
             );
@@ -963,27 +1117,27 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             let suppressed_specialized = suppressed
                 .all_static_response_rows
                 .iter()
-                .map(|row| (row.producer_call_origin, row.vis_origin))
-                .collect::<std::collections::BTreeSet<_>>();
+                .map(|row| row.operation.as_str())
+                .collect::<Vec<_>>();
             assert_eq!(
                 suppressed_specialized,
-                std::collections::BTreeSet::from([(303, 1572)]),
+                vec!["FsOpen"],
                 "suppression must remove both execute-then-resume owners"
             );
             let suppressed_p2 = suppressed
                 .static_response_deferred
                 .iter()
                 .filter(|row| row.sub_case == "UnconsumedTransportCaller")
-                .map(|row| (row.producer_call_origin, row.vis_origin))
-                .collect::<std::collections::BTreeSet<_>>();
+                .fold(std::collections::BTreeMap::new(), |mut counts, row| {
+                    *counts.entry(row.operation.as_str()).or_insert(0usize) += 1;
+                    counts
+                });
             assert_eq!(
                 suppressed_p2,
-                std::collections::BTreeSet::from([
-                    (267, 1406),
-                    (279, 1549),
-                    (287, 606),
-                    (287, 815),
-                    (287, 1024),
+                std::collections::BTreeMap::from([
+                    ("FsReadAt", 1),
+                    ("BufferAllocate", 1),
+                    ("ResourceRelease", 3),
                 ]),
                 "restoring the veto must reopen the ordinary groups as P2"
             );
