@@ -358,9 +358,11 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
 }
 
 /// One response `Vis` classified `Deferred` (recut amendment
-/// `evt_4ar3rxzrra5v4`). It acquires no response owner and no
-/// `StaticResponseDeferred` placeholder; its operation root and host effect fall
-/// through to main's pre-WP lowering (R3). The row is POPULATED (never an
+/// `evt_4ar3rxzrra5v4`). It acquires no dedicated response owner and no
+/// `StaticResponseDeferred` placeholder. A statically bounded P2 suffix may be
+/// dispatched by the same enclosing specialized owner; every other row's
+/// operation root and host effect fall through to main's pre-WP lowering (R3).
+/// The row is POPULATED (never an
 /// absence), so `classify` is congruent (AC-1) and every consumer reconciles the
 /// residual by total match rather than reconstructing it from local negative
 /// evidence (R2).
@@ -2647,23 +2649,285 @@ impl StaticTransitionPlan<'_> {
         Ok(Some(shape))
     }
 
-    /// The nearest specialized handler whose K body contains one Deferred
-    /// response.
+    /// Return the possible first response `Vis` nodes evaluated by `origin`.
     ///
-    /// This is the single-owner decomposition for a Deferred response whose K
-    /// uses the current HostResult exactly once on its most demanding path and
-    /// whose exits are
-    /// only `ITree::Ret`, traps, or uniquely resolved static tail calls. Several
-    /// enclosing response bodies may contain the same lexical subtree; the
-    /// nearest one is the unique candidate whose K body is contained by every
-    /// other candidate K body. That handler must also contain a unit-less P1;
-    /// P1-free response planes therefore retain their established behavior.
-    /// Selection is by structural nesting, never by specialization ordinal,
-    /// origin proximity, or runtime state.
+    /// Sequential operands stop at their first nonempty response frontier;
+    /// mutually exclusive branches contribute a union. A computational match
+    /// therefore examines its scrutinee before its cases: a resource body's
+    /// pending access is dispatched before the Ret case can release the
+    /// resource. Closure bodies are dormant. A call or checked recursive
+    /// invocation beyond the visible source tree is not statically bounded and
+    /// returns `None`, which leaves the response unowned and fail-closed.
+    fn static_response_frontier_sequence(
+        &self,
+        origins: &[StaticOriginId],
+        active: &mut BTreeSet<StaticOriginId>,
+    ) -> Result<Option<Vec<StaticOriginId>>, CraneliftBackendError> {
+        for origin in origins {
+            let Some(frontier) = self.static_response_frontier(*origin, active)? else {
+                return Ok(None);
+            };
+            if !frontier.is_empty() {
+                return Ok(Some(frontier));
+            }
+        }
+        Ok(Some(Vec::new()))
+    }
+
+    fn static_response_frontier(
+        &self,
+        origin: StaticOriginId,
+        active: &mut BTreeSet<StaticOriginId>,
+    ) -> Result<Option<Vec<StaticOriginId>>, CraneliftBackendError> {
+        if !active.insert(origin) {
+            return Ok(None);
+        }
+        let children = self.semantic.child_origins(origin)?.to_vec();
+        let result = match self.planned_occurrence_expr(origin)? {
+            RuntimeExpr::CheckedJoinSite { .. }
+            | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedComputationalIHSlots { .. } => {
+                self.static_response_frontier_sequence(&children, active)
+            }
+            RuntimeExpr::CheckedRecursiveInvocation { .. }
+            | RuntimeExpr::CheckedComputationalIHInvocation { .. } => Ok(None),
+            RuntimeExpr::Let { .. } => self.static_response_frontier_sequence(&children, active),
+            RuntimeExpr::If { .. } => {
+                let Some((scrutinee_origin, branches)) = children.split_first() else {
+                    return Err(planner_error(
+                        "a response-frontier If has no scrutinee child",
+                    ));
+                };
+                let Some(scrutinee) = self.static_response_frontier(*scrutinee_origin, active)?
+                else {
+                    active.remove(&origin);
+                    return Ok(None);
+                };
+                if !scrutinee.is_empty() {
+                    Ok(Some(scrutinee))
+                } else {
+                    let mut frontier = Vec::new();
+                    for branch in branches {
+                        let Some(mut branch) = self.static_response_frontier(*branch, active)?
+                        else {
+                            active.remove(&origin);
+                            return Ok(None);
+                        };
+                        frontier.append(&mut branch);
+                    }
+                    frontier.sort();
+                    frontier.dedup();
+                    Ok(Some(frontier))
+                }
+            }
+            RuntimeExpr::Match { .. } | RuntimeExpr::ComputationalMatch { .. } => {
+                let Some((scrutinee_origin, branches)) = children.split_first() else {
+                    return Err(planner_error(
+                        "a response-frontier Match has no scrutinee child",
+                    ));
+                };
+                let Some(scrutinee) = self.static_response_frontier(*scrutinee_origin, active)?
+                else {
+                    active.remove(&origin);
+                    return Ok(None);
+                };
+                if !scrutinee.is_empty() {
+                    Ok(Some(scrutinee))
+                } else {
+                    let mut frontier = Vec::new();
+                    for branch in branches {
+                        let Some(mut branch) = self.static_response_frontier(*branch, active)?
+                        else {
+                            active.remove(&origin);
+                            return Ok(None);
+                        };
+                        frontier.append(&mut branch);
+                    }
+                    frontier.sort();
+                    frontier.dedup();
+                    Ok(Some(frontier))
+                }
+            }
+            RuntimeExpr::Construct { constructor, args }
+                if constructor.as_str().ends_with("::ITree::Vis") && args.len() == 2 =>
+            {
+                let known = self
+                    .static_response_continuations
+                    .iter()
+                    .any(|row| row.vis_origin() == origin)
+                    || self
+                        .static_response_deferred
+                        .iter()
+                        .any(|row| row.vis_origin() == origin);
+                if known {
+                    Ok(Some(vec![origin]))
+                } else {
+                    Ok(None)
+                }
+            }
+            RuntimeExpr::Construct { constructor, args }
+                if constructor.as_str().ends_with("::ITree::Ret") && args.len() == 1 =>
+            {
+                Ok(Some(Vec::new()))
+            }
+            RuntimeExpr::PrimitiveCall { .. }
+            | RuntimeExpr::Construct { .. }
+            | RuntimeExpr::Record { .. }
+            | RuntimeExpr::Project { .. } => {
+                self.static_response_frontier_sequence(&children, active)
+            }
+            RuntimeExpr::LexicalClosure { .. } => {
+                let Some((_body, captures)) = children.split_first() else {
+                    return Err(planner_error(
+                        "a response-frontier lexical closure has no body child",
+                    ));
+                };
+                self.static_response_frontier_sequence(captures, active)
+            }
+            RuntimeExpr::Closure { .. }
+            | RuntimeExpr::Value(_)
+            | RuntimeExpr::Var(_)
+            | RuntimeExpr::DeclarationRef { .. }
+            | RuntimeExpr::ImportedDeclarationRef { .. }
+            | RuntimeExpr::Trap(_) => Ok(Some(Vec::new())),
+            RuntimeExpr::Call { .. } | RuntimeExpr::Effect { .. } => Ok(None),
+        };
+        active.remove(&origin);
+        result
+    }
+
+    /// The statically bounded P2 suffix reached from one specialized owner.
+    ///
+    /// Every Deferred P2 node on the frontier calls its exact lexical K once
+    /// with the current HostResult, then contributes that K's frontier. How many
+    /// times the typed K body reads its ordinary argument is source semantics,
+    /// not owner multiplicity. P1 and already-
+    /// Specialized nodes are existing owner boundaries. The installed finite
+    /// response population is the bound; a cycle or opaque frontier leaves the
+    /// whole new suffix unowned rather than weakening exact-Ret. S7 admits only
+    /// the two evidenced new classes: one repeated producer call, or the frozen
+    /// Mapping read/write access family. A terminal `ResourceRelease` belongs
+    /// to the qualified bracket suffix but does not decide its operation class.
+    /// A heterogeneous sibling outside those classes retains its existing owner
+    /// and forward-edge route byte-for-behavior.
+    fn bounded_deferred_response_suffix(
+        &self,
+        response: &StaticResponseContinuation,
+    ) -> Result<Vec<DeferredResponseRow>, CraneliftBackendError> {
+        let frontier =
+            self.static_response_frontier(response.k_body_origin(), &mut BTreeSet::new())?;
+        let Some(mut pending) = frontier else {
+            return Ok(Vec::new());
+        };
+        let mut suffix = Vec::new();
+        let mut visited = BTreeSet::new();
+        while let Some(vis) = pending.pop() {
+            if self
+                .static_response_continuations
+                .iter()
+                .any(|candidate| candidate.vis_origin() == vis)
+            {
+                continue;
+            }
+            let Some(row) = self.deferred_response_at_vis(vis)? else {
+                return Ok(Vec::new());
+            };
+            if row.sub_case == DeferredResponseSubCase::NoContinuationUnit {
+                continue;
+            }
+            if !visited.insert(row.vis_origin()) {
+                return Ok(Vec::new());
+            }
+            let Some(shape) = self.deferred_response_continuation_shape(&row)? else {
+                return Ok(Vec::new());
+            };
+            let next_frontier =
+                self.static_response_frontier(shape.k_body_origin, &mut BTreeSet::new())?;
+            let Some(mut next) = next_frontier else {
+                return Ok(Vec::new());
+            };
+            suffix.push(row);
+            pending.append(&mut next);
+            if suffix.len() > self.static_response_deferred.len() {
+                return Err(planner_error(
+                    "a static response owner's bounded Deferred suffix exceeded its finite population",
+                ));
+            }
+        }
+        let substantive = suffix
+            .iter()
+            .filter(|candidate| candidate.operation() != HostOpV1::ResourceRelease)
+            .collect::<Vec<_>>();
+        let repeated_producer = !substantive.is_empty()
+            && substantive.iter().all(|candidate| {
+                candidate.producer_call_origin() == response.producer_call_origin()
+            });
+        let mapping_access = |operation| {
+            matches!(
+                operation,
+                HostOpV1::MappingReadView | HostOpV1::MappingWriteView
+            )
+        };
+        let mapping_access_chain = mapping_access(response.operation())
+            && !substantive.is_empty()
+            && substantive
+                .iter()
+                .all(|candidate| mapping_access(candidate.operation()));
+        if repeated_producer || mapping_access_chain {
+            Ok(suffix)
+        } else {
+            // S7: a heterogeneous sequence outside the two newly evidenced
+            // classes keeps its existing owner/forward-edge route unchanged.
+            Ok(Vec::new())
+        }
+    }
+
+    /// The unique specialized owner of a statically bounded P2 suffix.
+    pub(in crate::cranelift_backend) fn bounded_deferred_response_handler_owner(
+        &self,
+        row: &DeferredResponseRow,
+    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if row.sub_case != DeferredResponseSubCase::UnconsumedTransportCaller {
+            return Ok(None);
+        }
+        let mut owners = Vec::new();
+        for response in &self.static_response_continuations {
+            let suffix = self.bounded_deferred_response_suffix(response)?;
+            if suffix
+                .iter()
+                .any(|candidate| candidate.vis_origin() == row.vis_origin())
+                && !owners.contains(&response.base_owner())
+            {
+                owners.push(response.base_owner());
+            }
+        }
+        match owners.as_slice() {
+            [] => Ok(None),
+            [owner] => Ok(Some(*owner)),
+            _ => Err(planner_error(
+                "one bounded Deferred response suffix has more than one static handler owner",
+            )),
+        }
+    }
+
+    /// The specialized handler that consumes one Deferred response.
+    ///
+    /// The first arm is the statically bounded P2 interpreter suffix above. The
+    /// fallback is the established single-owner decomposition for a Deferred
+    /// response whose K uses the current HostResult exactly once on its most
+    /// demanding path and whose exits are only `ITree::Ret`, traps, or uniquely
+    /// resolved static tail calls. Several enclosing response bodies may contain
+    /// the same lexical subtree; the nearest one is the unique candidate whose K
+    /// body is contained by every other candidate K body. That fallback handler
+    /// must also contain a unit-less P1. Selection is by structural ownership,
+    /// never by specialization ordinal, origin proximity, or runtime state.
     pub(in crate::cranelift_backend) fn deferred_response_handler_owner(
         &self,
         row: &DeferredResponseRow,
     ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if let Some(owner) = self.bounded_deferred_response_handler_owner(row)? {
+            return Ok(Some(owner));
+        }
         let Some(shape) = self.deferred_response_continuation_shape(row)? else {
             return Ok(None);
         };

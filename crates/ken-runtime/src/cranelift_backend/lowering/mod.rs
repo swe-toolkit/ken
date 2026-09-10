@@ -955,6 +955,7 @@ impl ArtifactHelpers<'_> {
             worker_templates: BTreeMap::new(),
             context_calls: BTreeMap::new(),
             static_response_owner: None,
+            driven_deferred_response_effect: None,
             defining_abi_operands: Vec::new(),
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
@@ -1183,6 +1184,11 @@ struct FunctionLocalRefs {
     /// `FuncRef` crosses a function.
     context_calls: BTreeMap<ContinuationContextId, units::DeclaredUnitCall>,
     static_response_owner: Option<StaticResponseOwnerId>,
+    /// The exact Deferred host-effect occurrence currently dispatched by the
+    /// statically unrolled response-owner interpreter. This is scoped around
+    /// one host dispatch and restores afterwards; it never makes a sibling
+    /// effect occurrence observable inside the owner.
+    driven_deferred_response_effect: Option<StaticOriginId>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1b** -- this function's
     /// own ABI-slot operands, indexed by ABI position.
     ///

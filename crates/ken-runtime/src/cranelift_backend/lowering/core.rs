@@ -5518,21 +5518,26 @@ impl<'a> Lowering<'a> {
         ))
     }
 
-    /// Consume a Deferred `Vis` constructed inside its nearest static handler.
+    /// Consume a Deferred `Vis` inside its statically selected response handler.
     ///
-    /// This is recut-A's local half. The planner has already proved a one-use,
-    /// tail-resumptive lexical K and selected one nearest handler. Operation
-    /// fields may already be carried or may still be specialized; both routes
-    /// validate the same source identities before the existing synchronous host
-    /// dispatch. The K body is then lowered in this function, so its closure does
-    /// not cross a boundary and the current HostResult cannot be replaced by a
-    /// prior body result.
+    /// The established P1 route proves a one-use, tail-resumptive lexical K. The
+    /// bounded P2 route proves the `Vis` is on the finite response frontier and
+    /// calls the exact lexical K once; the K body retains its ordinary source
+    /// semantics, including zero or multiple reads of that typed parameter.
+    /// Operation fields may already be carried or may still be specialized;
+    /// both routes validate the same source identities before the existing
+    /// synchronous host dispatch. The K body is then lowered in this function,
+    /// so its closure does not cross a boundary and the current HostResult cannot
+    /// be replaced by a prior body result. A producer-path call receives its
+    /// current eliminator stack so the statically unrolled step resumes exactly
+    /// the surrounding ITree handler before returning to the response owner.
     fn drive_handler_owned_deferred_response(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         vis_origin: StaticOriginId,
         lowered_args: &[LoweringOperand],
         row: &crate::cranelift_backend::planning::DeferredResponseRow,
+        producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let handler_owner = self
             .static_transition_plan
@@ -5778,6 +5783,10 @@ impl<'a> Lowering<'a> {
             .into_iter()
             .map(LoweringEnvironmentBinding::Value)
             .collect::<Vec<_>>();
+        let prior_driven_effect = self
+            .function_local
+            .driven_deferred_response_effect
+            .replace(effect.static_origin);
         let response = self.lower_process_host_effect(
             builder,
             family,
@@ -5786,7 +5795,9 @@ impl<'a> Lowering<'a> {
             args,
             effect.static_origin,
             &effect_env,
-        )?;
+        );
+        self.function_local.driven_deferred_response_effect = prior_driven_effect;
+        let response = response?;
         if !matches!(
             response,
             LoweringOperand::Specialized(Lowered::HostResult { .. })
@@ -5805,7 +5816,13 @@ impl<'a> Lowering<'a> {
                 .map(LoweringEnvironmentBinding::Value),
         );
         let k_body = self.retained_body_occurrence(*body)?;
-        self.lower_expr(builder, k_body, &k_env)
+        match producer_eliminators {
+            Some(eliminators) => {
+                let eliminators = eliminators.to_vec();
+                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
+            }
+            None => self.lower_expr(builder, k_body, &k_env),
+        }
     }
 
     fn lower_computational_producer_call(
@@ -6439,6 +6456,37 @@ impl<'a> Lowering<'a> {
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
         let eliminator = eliminators[0];
+        if let Some(row) = self
+            .static_transition_plan
+            .deferred_response_at_vis(static_origin)?
+        {
+            let current_owns_response = self
+                .static_transition_plan
+                .bounded_deferred_response_handler_owner(&row)?
+                .is_some_and(|owner| self.defining_emission_owner == Some(owner));
+            if current_owns_response
+                && !handler_owned_deferred_response_mutation_applies(
+                    HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
+                )
+            {
+                let lowered_args = args
+                    .iter()
+                    .enumerate()
+                    .map(|(position, arg)| {
+                        let arg = self.child_occurrence(static_origin, position, arg)?;
+                        self.lower_expr(builder, arg, producer_env)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let resumed = self.drive_handler_owned_deferred_response(
+                    builder,
+                    static_origin,
+                    &lowered_args,
+                    &row,
+                    Some(eliminators),
+                )?;
+                return Ok(ProducerTrampolineStep::ordinary(resumed));
+            }
+        }
         let terminal_exit = constructor == &self.process_symbols.exit_success
             || constructor == &self.process_symbols.exit_failure;
         let itree_frame = match eliminator {
@@ -15005,6 +15053,7 @@ impl<'a> Lowering<'a> {
                                 static_origin,
                                 &lowered_args,
                                 &row,
+                                None,
                             );
                         }
                     }

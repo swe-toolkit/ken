@@ -195,6 +195,96 @@ proc px8f_readsome_public_consumers
     assert!(!IO_KEN_MD.contains("Axiom"));
 }
 
+/// Promise class: normative compatibility vector (`38 §1.9`). The public
+/// Mapping accessors take immutable windows directly, while the handle
+/// constructor, resource projections, and frozen host operations remain absent
+/// from checked source. `mapView`/`MappingSpan` are intentionally not surface
+/// names: mappings reject rather than cap, so no minted subrange is needed.
+#[test]
+fn abi_s6_mapping_surface_is_window_direct_and_the_handle_stays_opaque() {
+    let mut env = ElabEnv::empty().expect("ABI-S6 prelude");
+    env.elaborate_file(
+        r#"
+proc mapping_surface_write
+  (a : Auth) (mapping : MappingHandle) (window : MappingWindow) (bytes : Bytes)
+  : HostIO a (Result ResourceError Unit) visits [FS] =
+  mapWrite a mapping window bytes
+
+proc mapping_surface_read
+  (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
+  : HostIO a (Result ResourceError Bytes) visits [FS] =
+  mapBytes a mapping window
+"#,
+    )
+    .expect("the checked window-direct Mapping surface elaborates");
+
+    for public in [
+        "MappingSource",
+        "Anonymous",
+        "FileBacked",
+        "MappingProt",
+        "ReadOnly",
+        "ReadWrite",
+        "MappingExtent",
+        "MappingWindow",
+        "MkMappingWindow",
+        "MappingHandle",
+        "withMapping",
+        "mapBytes",
+        "mapWrite",
+    ] {
+        assert!(env.globals.contains_key(public), "missing `{public}`");
+    }
+    for unavailable in [
+        "mapView",
+        "MappingSpan",
+        "PrivateMappingHandle",
+        "mapping_handle_resource",
+        "mapping_handle_length",
+        "PrivateMappingAllocate",
+        "PrivateMappingReadView",
+        "PrivateMappingWriteView",
+        "PrivateMappingAcquireFile",
+    ] {
+        assert!(
+            !env.globals.contains_key(unavailable),
+            "`{unavailable}` escaped into the checked surface"
+        );
+    }
+}
+
+/// Promise class: durable opacity invariant (`38 §1.9`). MEASURED: checked
+/// source cannot resolve the sole MappingHandle constructor or either internal
+/// field projection. CLAIMED: users cannot forge a handle/resource/extent pair
+/// or extract its governed resource. THE GAP: native host code remains trusted
+/// to preserve token integrity after the checked boundary.
+#[test]
+fn checked_source_cannot_forge_or_project_mapping_handles() {
+    for (private, source) in [
+        (
+            "PrivateMappingHandle",
+            "fn escaped (resource : Resource Mapping) (extent : MappingExtent) \
+             : MappingHandle = PrivateMappingHandle resource extent",
+        ),
+        (
+            "mapping_handle_resource",
+            "fn escaped (mapping : MappingHandle) : Resource Mapping = \
+             mapping_handle_resource mapping",
+        ),
+        (
+            "mapping_handle_length",
+            "fn escaped (mapping : MappingHandle) : Int = \
+             mapping_handle_length mapping",
+        ),
+    ] {
+        let mut env = ElabEnv::empty().expect("ABI-S6 prelude");
+        match env.elaborate_file(source) {
+            Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, private),
+            other => panic!("`{private}` must reject as an unresolved private name, got {other:?}"),
+        }
+    }
+}
+
 #[test]
 fn buffer_span_producer_closure_is_derived_from_public_globals() {
     let mut env = ElabEnv::empty().expect("SPAN-SEAL prelude");

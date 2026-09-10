@@ -505,7 +505,12 @@ fn host_effect_seat_contract(
         (Op::ConsoleWrite, 1)
         | (Op::FsWriteFile, 2)
         | (Op::FsAppendFile, 1)
-        | (Op::FsRename, 1) => Some(carried_bytes),
+        | (Op::FsRename, 1)
+        // ABI-S6 D5a-surface D1: `read -> write` measured this payload at the
+        // carried refusal and the existing guarded observer consumes it. This
+        // is the one newly evidenced byte-span row; no other Mapping seat is
+        // widened speculatively.
+        | (Op::MappingWriteView, 2) => Some(carried_bytes),
         // LEFT SPECIALIZED_ONLY for the direct operation consumer, and NOT
         // because the observer fails them — the observer succeeds at all seven.
         // Each operation's synthesized `FileError` separately declares
@@ -535,12 +540,16 @@ fn host_effect_seat_contract(
         | (Op::MappingReadView, 3)
         | (Op::MappingWriteView, 0)
         | (Op::MappingWriteView, 3) => Some(phase_bearing_resource),
-        (Op::BufferFreeze, 1)
-        | (Op::BufferFreeze, 2)
-        | (Op::MappingReadView, 1)
+        (Op::BufferFreeze, 1) | (Op::BufferFreeze, 2) => Some(exact_int),
+        // ABI-S6 D5a-surface D1: the whole Mapping-window exact-`Int`
+        // family can arrive through a declared ABI slot. Move the two read
+        // coordinates and the write start together; leaving any one
+        // specialized-only makes sequential checked composition depend on
+        // which access happens second. The lowering pairs this availability
+        // with the shared fail-closed carried `Int` decoder.
+        (Op::MappingReadView, 1)
         | (Op::MappingReadView, 2)
-        | (Op::MappingWriteView, 1) => Some(exact_int),
-        (Op::MappingWriteView, 2) => Some(bytes),
+        | (Op::MappingWriteView, 1) => Some(carried_exact_int),
         (Op::FsReadAt, 0) | (Op::FsReadAt, 2) | (Op::FsWriteAt, 0) | (Op::FsWriteAt, 2) => {
             Some(resource)
         }

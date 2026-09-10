@@ -26,6 +26,7 @@ use super::continuations::{
 };
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority,
+    occurrence_subtree_contains,
     planner_capacity_error, planner_error, AbiCaptureProvenance, AbiUnitDefinition,
     BoundaryReferentOwner, ContinuationCallIdentity, ContinuationEmissionOwner,
     ContinuationEnvironmentClaim, ContinuationFrameIdentity, ContinuationSourceCoordinate,
@@ -6225,11 +6226,13 @@ fn generated_entry_retarget_caller(
 /// invocation segment.
 ///
 /// This reads the closed typed continuation-unit population. It does not walk a
-/// source body or recover an identity from a numeric origin: the active frame,
-/// its already-selected alternative, and the recursive position are the same
-/// planner facts that created the unit. Multiple producer constructs are legal
-/// only when their declared worker bodies agree, matching lowering's existing
-/// branch-local agreement rule.
+/// source body or recover an identity from a numeric origin: the exact producer
+/// construct, recursive child, active frame, selected alternative, and recursive
+/// position are the same planner facts that created the unit. A specialization
+/// discovered later inside this worker body belongs to its own producer
+/// construct and must not be compared as a second body of this invocation. The
+/// one shared response-interpreter body remains the handler that calls these
+/// exact, per-node typed K bodies; the K bodies themselves are not erased.
 fn checked_ih_invocation_recursive_unit_bodies(
     plan: &StaticTransitionPlan<'_>,
     final_step: &CheckedIhSelfResumptionStep,
@@ -6273,7 +6276,9 @@ fn checked_ih_invocation_recursive_unit_bodies(
 
     let mut declared = Vec::new();
     for unit in plan.continuation_units()? {
-        if unit.continuation_origin() != final_step.active_frame_origin
+        if unit.producer_construct_origin() != final_step.construct_origin
+            || unit.worker_closure_origin() != final_step.recursive_child_origin
+            || unit.continuation_origin() != final_step.active_frame_origin
             || unit.producer_alternative() != final_step.selected_alternative
             || unit.recursive_position() != final_step.callee_binding.recursive_position
         {
@@ -7016,6 +7021,15 @@ fn checked_ih_generated_entry_row(
         .self_resumption_steps
         .last()
         .ok_or_else(|| planner_error("a generated-entry inheritance has no final step"))?;
+    if !occurrence_subtree_contains(plan, worker_body_origin, final_step.invocation_origin)? {
+        // The capability may continue across this transport while its governed
+        // call remains outside the generated context's emitted body. Such an
+        // inheritance has no generated-entry admission seat: publishing one
+        // would create a governed key absent from the context's closed call
+        // population. The capability and transport remain validated by their
+        // own complete derivations; only the nonexistent entry access is absent.
+        return Ok(None);
+    }
     // A' (Architect C, evt_40dme966hce0a): use the passed CANONICAL inheritance
     // directly. The former re-lookup via checked_ih_continuation_inheritance_for_
     // invocation read the stored, MUTABLE field and broke under SuppressForInertness
