@@ -1,6 +1,6 @@
 ---
 id: KERNEL-CONV-CONGRUENCE-CLOSURE
-title: "Complete conv_struct_path's congruence closure for the six reachable arm-less formers — Omega, Cast, J, Quot, QuotClass, QuotElim — each a same-former congruence arm matching its real equality rule with a live source consumer + directional rejects; plus documented unreachability proofs for Let and Refl (no arm). Completeness-only, trust-delta zero"
+title: "Complete conv_struct_path's congruence closure for the five reachable arm-less formers — Omega, Cast, Quot, QuotClass, QuotElim — each a same-former congruence arm matching its real equality rule with a live source consumer + directional rejects; plus documented unreachability proofs for Refl, Let, and J (no arm). Completeness-only, trust-delta zero"
 status: active
 owner: kernel
 size: M
@@ -30,16 +30,22 @@ origin: "Architect kernel-level section 1b in evt_579jhptqfzcgn: conv_struct's c
 > # Omega-shortcut) is discharged by a documented unreachability proof instead of
 > # a synthesized consumer.
 > #
-> # SETTLED SCOPE (Architect per-arm design ruling evt_3d4823xtmab8, grounded on
-> # origin/main 661d988d7). The inventory is corrected: the `_ => false` set is
-> # EIGHT formers, split SIX reachable arms (Omega, Cast, J, Quot, QuotClass,
-> # QuotElim) + TWO documented unreachability proofs (Refl, Let). Departures from
-> # the original frame: J MUST be built (reachable — the frame missed it) and Let
-> # MUST NOT (unreachable — documented, not omitted). The ruling is the exact
-> # implementation mechanism (per-arm rule, consumer shape, directional rejects,
-> # invariants INV-1..5). kernel-leader sliced increment 1 = Omega + Quot +
-> # QuotClass (evt_5mbj1dfj3j23h); Cast, J, QuotElim follow. Branch
-> # `wp/KERNEL-CONV-CONGRUENCE-CLOSURE` off 661d988d7.
+> # SETTLED SCOPE — REVISED (Architect evt_116724dpe5s6e supersedes the
+> # J-reachable call in evt_3d4823xtmab8). The `_ => false` set is EIGHT formers,
+> # split FIVE reachable arms (Omega, Cast, Quot, QuotClass, QuotElim) + THREE
+> # documented unreachability proofs (Refl, Let, J). J was briefly ruled a
+> # reachable arm (evt_3d4823xtmab8) then re-ruled UNREACHABLE on the well-typed
+> # path (evt_116724dpe5s6e): it joins Refl and Let — documented proof, NO arm,
+> # NO consumer. The remaining departure from the ORIGINAL frame is Let (must be
+> # documented, not built). The per-arm ruling (rule, consumer shape, directional
+> # rejects, invariants INV-1..5) remains the exact mechanism for the five
+> # reachable arms.
+> #
+> # INCREMENTS: increment 1 = Omega + Quot + QuotClass (evt_5mbj1dfj3j23h) —
+> # LANDED at origin/main f1e7e516, blob-verified 5/5. Increment 2 = Cast +
+> # QuotElim ONLY, plus the J unreachability proof and the correction of the
+> # stale whnf-J comment (evt_116724dpe5s6e). Branch
+> # `wp/KERNEL-CONV-CONGRUENCE-CLOSURE` re-cut off f1e7e516.
 
 # The settled gap (Architect design ruling evt_3d4823xtmab8, grounded on 661d988d7)
 
@@ -56,40 +62,43 @@ The true set falling to `_ => false` with both sides the same former is EIGHT,
 split by `whnf_progress` reachability (whnf is the oracle: a former needs an arm
 IFF whnf can leave it as the head — a value or a stuck neutral):
 
-- REACHABLE — need a same-former congruence arm + a live source consumer (SIX):
+- REACHABLE — need a same-former congruence arm + a live source consumer (FIVE):
   **Omega** (whnf leaf; `level_eq` on levels, mirrors the Type arm),
   **Cast** (neutral when cast_reduce is None; four fields compared structurally),
-  **J** (neutral when j_reduce is None — the frame MISSED this; a real
-  completeness gap: two neutral J's read inconvertible today),
   **Quot** (whnf leaf; carrier + relation),
   **QuotClass** (whnf leaf; representative ONLY — the TruncProj precedent; does
   NOT decide R-relatedness), and
   **QuotElim** (neutral on a non-canonical scrut; motive/method/respect/scrut,
   mirrors the Elim arm).
-- UNREACHABLE — documented unreachability proof, NO arm, NO consumer (TWO):
+- UNREACHABLE — documented unreachability proof, NO arm, NO consumer (THREE):
   **Refl** (every well-typed Eq-conversion returns at the `is_omega_type` guard
   `conv.rs:566` and the App-arg re-entry `:782-787` BEFORE conv_struct_path —
-  the Omega-shortcut the frame hypothesized, confirmed genuine) and **Let**
-  (whnf reduces it unconditionally, no stuck case — the `_` is dead). The frame
-  had Refl as "confirm reachability" and omitted Let; both are settled here.
+  the Omega-shortcut the frame hypothesized, confirmed genuine), **Let** (whnf
+  reduces it unconditionally, no stuck case — the `_` is dead), and **J**
+  (re-ruled unreachable on the well-typed path per evt_116724dpe5s6e: a
+  well-typed neutral J cannot present two should-convert-yet-inconvertible forms
+  at conv_struct_path — the increment-2 deliverable carries the documented proof
+  and corrects the stale whnf-J comment).
 
-The substantive departures from the original frame: **J must be built**
-(reachable) and **Let must be documented, not built** (unreachable).
+The substantive departures from the original frame: **Let must be documented,
+not built** (unreachable), and **J is documented-unreachable** — the
+evt_3d4823xtmab8 "J is a reachable arm" call was superseded by
+evt_116724dpe5s6e.
 
 # Deliverable
 
-Six new same-former congruence arms in `conv_struct_path` — Omega, Cast, J,
+Five new same-former congruence arms in `conv_struct_path` — Omega, Cast,
 Quot, QuotClass, QuotElim — each matching its REAL equality rule per the
 Architect's per-arm rulings in evt_3d4823xtmab8 (that ruling is the exact
 mechanism; the per-arm rule, consumer shape, and directional rejects are
-enumerated there). Two documented unreachability proofs (Refl, Let) in place of
-arms. The closure-level invariants BIND every arm:
+enumerated there). Three documented unreachability proofs (Refl, Let, J) in
+place of arms. The closure-level invariants BIND every arm:
 
 - INV-1 fail-closed / completeness-only — every arm is congruence (all fields
   equal ⇒ terms equal); it can only recognise MORE true equalities, never admit
   a false one. The trust root cannot weaken; same posture as the landed Eq arm.
-- INV-2 proof components compared STRUCTURALLY, not skipped (Cast's `e`, J's
-  `eq`, QuotElim's `respect`) — deliberately NOT proof-irrelevance (that needs
+- INV-2 proof components compared STRUCTURALLY, not skipped (Cast's `e`,
+  QuotElim's `respect`) — deliberately NOT proof-irrelevance (that needs
   the type, would grow the TCB surface, and is a SEPARATE future increment,
   out of scope here).
 - INV-3 whnf is the reachability oracle — no arm for an unreachable former (dead
@@ -99,19 +108,19 @@ arms. The closure-level invariants BIND every arm:
 - INV-5 Omega levels via `level_eq`, not `==` (mirrors the Type arm).
 
 **SYNTHESIZE a live source consumer per REACHABLE arm (operator ruling).** For
-each of the six, author a ken-source artifact (a `.ken` fixture or catalog
+each of the five, author a ken-source artifact (a `.ken` fixture or catalog
 module) that FORCES `conv_struct_path` to decide convertibility with that former
 as the head and elaborates/type-checks ONLY once the arm exists — failing on the
 pre-arm tree because the catch-all rejects the genuine convertibility, passing
 once the arm lands. The acceptance must be equal-but-not-syntactically-identical
 (a non-`==` field difference that resolves by recursion / level_eq) so the
-`a == b` fast path does not mask the arm and make the test vacuous. The two
-unreachable formers (Refl, Let) are each discharged by their documented proof,
-NOT a consumer.
+`a == b` fast path does not mask the arm and make the test vacuous. The three
+unreachable formers (Refl, Let, J) are each discharged by their documented
+proof, NOT a consumer.
 
 # Acceptance criteria
 
-- AC-ACCEPT / AC-DISCRIMINATE (per REACHABLE arm — the six). Both directions per
+- AC-ACCEPT / AC-DISCRIMINATE (per REACHABLE arm — the five). Both directions per
   COORDINATION section 7: an acceptance case (equal-but-not-syntactically-
   identical instances accepted, reaching the arm) AND a directional
   discrimination case for EACH compared field (a lone difference in that field
@@ -123,9 +132,10 @@ NOT a consumer.
   A consumer that passes on the base (never reaches the arm) does not discharge
   this. If a source-level consumer cannot be made to reach an arm, HARD-STOP and
   report rather than substituting a Rust-only unit probe.
-- AC-UNREACHABLE-PROVED (Refl, Let). Each is discharged by a documented
-  unreachability proof in place of an arm/consumer, per the Architect ruling —
-  no dead TCB arm is added.
+- AC-UNREACHABLE-PROVED (Refl, Let, J). Each is discharged by a documented
+  unreachability proof in place of an arm/consumer, per the Architect ruling
+  (J per evt_116724dpe5s6e) — no dead TCB arm is added. Increment 2 also
+  corrects the stale whnf-J comment.
 - AC-ZERO-TRUST. Zero `trusted_base()` delta (completeness-only; INV-1).
 - AC-NO-REGRESSION. Whole-suite green in CI; local targeted `-p ken-kernel` only.
 
