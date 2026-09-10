@@ -4,13 +4,26 @@ Format: `../../README.md`. These pin the normative Mapping-surface contract of
 `spec/30-surface/38-ffi-io.md §1.9` (opaque runtime-owned regions and bounded
 byte views; authority `docs/program/10-linux-abi-completion.md §4`). The cases
 net the *discriminating* form of each property — each reds a plausible
-non-conforming implementation — not the prose. The Mapping surface (the
+non-conforming implementation — not the prose. The Mapping surface splits
+across two runtime gates. The **anonymous** window-direct surface — the
 `withMapping` bracket, `MappingHandle`/`MappingWindow`, the window-direct
-`mapBytes`/`mapWrite`, the `Mapping` resource kind) is the runtime deliverable
-**ABI-S6 / D5a**, not yet
-landed, so every case is **RED-UNTIL-BUILT / BLOCKED-ON-ABI-S6-D5a**: the
-surface does not yet exist. The seed is staged now as the control that makes
-§1.9's negatives testable, for D5a to build against.
+`mapBytes`/`mapWrite`, the `Mapping` resource kind, and the 4 KiB granule
+accounting — is **ABI-S6 / D5a**, discharged by the **D1** increment: cases 2
+and 3 (4 KiB granule; opacity + bounds) are **RED-UNTIL-BUILT /
+BLOCKED-ON-ABI-S6-D5a** and lift to green on the D1 candidate. **File-backed
+copy-on-write** — a `FileBacked` mapping acquired via `MappingAcquireFile` — is
+the **ABI-S6 / D5b** successor, so case 1 (MAP_PRIVATE file COW) is **(gated:
+D5b)** and stays RED across the D5b interval: what blocks it is file-backed
+*acquisition*, not the window-direct `mapWrite` it uses, which D1 lands.
+
+The staged gate stays honest because a live sibling enforces the posture across
+the whole interval: while case 1's file-backed COW flip is dormant, the D5a
+opacity/bounds case and every case's native==interpreter parity assertion keep
+opacity, bounds-not-clamp, and native/interp agreement enforced from the moment
+D1 lands — a fully-gated axis with no live enforcer would leave the posture
+unguarded until D5b; this one does not. The seed is staged now as the control
+that makes §1.9's negatives testable, for D5a/D1 to build against and D5b to
+extend.
 
 ## Reading disciplines
 
@@ -33,11 +46,13 @@ inspected a raw address would be testing a surface §1.9 forbids.
   `FileBacked` mapping over it via `withMapping … ReadWrite`, `mapWrite`s
   different bytes into an in-range `MappingWindow`, then — after the bracket
   settles — reads the same file through the ordinary `§1.3` file API.
-- expect: **RED-UNTIL-BUILT** — the post-write file read returns the **original**
-  bytes, not the mapped write. The in-mapping read view observes the write
-  (process-local visibility) while the file is unchanged.
-- fixture: **BLOCKED-ON-ABI-S6-D5a** — the `withMapping`/`mapWrite` surface is
-  the runtime deliverable, not yet landed.
+- expect: **RED — (gated: D5b)** — the post-write file read returns the
+  **original** bytes, not the mapped write. The in-mapping read view observes the
+  write (process-local visibility) while the file is unchanged.
+- fixture: **BLOCKED-ON-ABI-S6-D5b** — `FileBacked` acquisition
+  (`MappingAcquireFile`) is the copy-on-write successor capability, deferred to
+  D5b. D1 lands the window-direct `mapWrite` this case uses, but not file-backed
+  acquisition; the gate is the `FileBacked` mapping, not the write.
 - control: a `MAP_SHARED`/write-through implementation reds — it propagates the
   mapped write to the file, so the post-write file read returns the mapped bytes
   instead of the original. A lone "the write is visible in the mapping" positive
