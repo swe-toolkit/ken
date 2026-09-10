@@ -1,7 +1,7 @@
 ---
 id: KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE
 title: "Complete the intrinsic All former-lift guest-path resolution to descend through NESTED positive formers (List (Pair String X)), so the eliminator of a strictly-positive inductive whose recursive occurrence sits one former-nesting deeper than a direct application can be built — preserving strict positivity (positive former nestings only, never a negative-position path)."
-status: draft
+status: active
 owner: kernel
 size: M
 gate: kernel
