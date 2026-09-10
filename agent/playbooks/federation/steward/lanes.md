@@ -66,7 +66,21 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-10 (LATEST — read first): RT-MAPPING LANDED; LANG-CHECKED RELEASED; coverage node filed
+> ### LIVE POSITION 2026-09-10 (LATEST — read first): ABI-S6 D5a-surface D1 RE-RELEASED to runtime (L1)
+>
+> **L1 runtime head: ABI-S6 D5a-surface D1 RE-RELEASED** on current main
+> `d70db3299` (runtime-leader request; the ring was idle awaiting the concrete
+> act). All three prerequisites landed: D5a-core native wire (`29f64ff6f`),
+> window-direct §1.9 surface contract (`b33f8ac9b`), and RT-MAPPING general N>=2
+> dispatch (`1c48b6c5c`, the HS#4 prerequisite). ABI-S6 stays `active` (D5a-surface
+> is the live increment; banner added). Deliverable D1: three checked procs
+> (withMapping/mapBytes/mapWrite) over the frozen three-op wire + the two
+> achievable seed discharges (4 KiB granule, opacity/bounds) + the multi-op
+> acceptance RT-MAPPING unblocked; COW seed stays RED (BLOCKED-ON-D5b); wire
+> frozen, no fourth op, no §1.9 alteration. Reviewers: Runtime QA + Architect +
+> Adversary -> Steward M1-M4 -> lieutenant. Kicked the runtime ring.
+>
+> ### LIVE POSITION 2026-09-10: RT-MAPPING LANDED; LANG-CHECKED RELEASED; coverage node filed
 >
 > **RT-MAPPING-MULTIOP-DISPATCH MERGED** at `1c48b6c5c` (respin candidate
 > `0fd1eead9`, blob-verified 17/17). Node `active -> merged`. Gates on the exact

@@ -12,6 +12,29 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
+> # D5a-surface D1 RE-RELEASED 2026-09-10 (Steward) — all three prerequisites
+> # LANDED; runtime ring resume authorized. The held multi-op acceptance resumes
+> # on current main d70db3299. The prerequisite frame (5bf1915e4, HS#4) named
+> # RT-MAPPING-MULTIOP-DISPATCH as the blocker for D5a-surface's remaining multi-op
+> # acceptance; it MERGED at 1c48b6c5c (blob-verified 17/17). With that, the three
+> # things D5a-surface D1 composes over are all on main:
+> #   - D5a-core native anonymous wire (29f64ff6f) — real mmap/munmap three-op wire;
+> #   - window-direct §1.9 surface contract (b33f8ac9b) — mapView/MappingSpan
+> #     dropped, MappingWindow passed directly to mapBytes/mapWrite (this is what
+> #     dissolved the D0 continuation blocker, Architect evt_56e6jx62s0qpb);
+> #   - RT-MAPPING general N>=2 same-producer dispatch (1c48b6c5c) — the runtime
+> #     machinery that lets a SECOND mapping effect sequence and execute.
+> # So D0 is resolved (via the respin) and D1 is buildable. RESUME D5a-surface D1
+> # on a base carrying d70db3299: build the three checked procs (withMapping /
+> # mapBytes / mapWrite) over the frozen three-op wire, discharge the TWO achievable
+> # seed cases (4 KiB granule + opacity/bounds) with controls intact, and the
+> # multi-op acceptance (a second mapping effect sequenced after the first executes
+> # and matches interp) that RT-MAPPING unblocked. The MAP_PRIVATE COW seed STAYS
+> # RED (BLOCKED-ON-D5b), the three-op wire is FROZEN, no fourth op, no §1.9
+> # alteration — route to Steward+Architect on any of those (hard stops unchanged).
+> # Re-measure the fixed inputs at pickup. Reviewers: Runtime QA + Architect
+> # (required, TCB-adjacent) + Adversary -> Steward M1-M4 -> lieutenant.
+> #
 > # WP frame. Authority: `docs/program/10-linux-abi-completion.md §4` Track S.
 > Fixed inputs measured at `origin/main` `2dbe90af798bdd72aacf95ee45e60c2130ad75cc`
 > (the ABI-S1-closed tip). The `ken-host` / `ken-runtime` / prelude surfaces this
