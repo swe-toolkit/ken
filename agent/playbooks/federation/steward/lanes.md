@@ -98,6 +98,24 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 > stale-draft umbrella LANG-MODULE-IMPORT-SYSTEM (capability landed via the
 > LANG-MOD-* children; reconcile its status, do not release).
 >
+> **RE-MEASURED 2026-09-10 (buildability), correcting the title-based queue: the
+> top THREE are NOT releasable. Pattern-forms slices 1-5 (as/tuple/record/or/
+> guards) MERGED — only LITERALS remains, BLOCKED on deceq-char. Membership was
+> RECUT NOT BUILDABLE + DEFERRED (needs a nonexistent typeclass-dispatch
+> capability, zero corpus demand; do-not-release). Deceq-char is gate:operator
+> (numeric-equality TCB question; also the literals blocker). EFFECTIVE
+> releasable language head = LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN (S, totality/
+> SCT family), then checked-ih-body-view / ctor-shadowing / sigma-sweep
+> (reachability-unconfirmed); trunc-remedies blocked on a deferred Architect
+> design call.**
+>
+> **KERNEL-CONV-CONGRUENCE-CLOSURE inserted at L2 FRONT (operator ruling
+> 2026-09-10): run it via a TEMPORARY KERNEL RESEAT of the L2 slot
+> (KERNEL-NESTED-IND precedent), with a consumer-synthesis deliverable (author
+> ken-source exercising each arm-less former). Language ring resumes on
+> SCT-opaque after KERNEL-CONV lands. 3-lane cap preserved (L2 slot = kernel
+> temporarily).**
+>
 > ### LIVE POSITION 2026-09-09: L2 RETURNED TO LANGUAGE
 >
 > **KERNEL-NESTED-IND CLOSED; L2 slot returned to Language per the operator
