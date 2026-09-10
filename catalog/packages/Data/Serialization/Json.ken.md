@@ -49,6 +49,34 @@ data Json : Type where {
 
 export Json, JsonNull, JsonBool, JsonNumber, JsonString, JsonArray, JsonObject
 
+fn json_nat_add (left : Nat) (right : Nat) : Nat =
+  match left {
+    Zero ↦ right;
+    Suc rest ↦ Suc (json_nat_add rest right)
+  }
+
+fn json_size (value : Json) : Nat =
+  match value {
+    JsonNull ↦ Suc Zero;
+    JsonBool flag ↦ Suc Zero;
+    JsonNumber number ↦ Suc Zero;
+    JsonString string ↦ Suc Zero;
+    JsonArray values ↦
+      Suc
+        (match values {
+          Nil ↦ Zero;
+          Cons child rest ↦
+            json_nat_add (recursive result for child) (recursive result for rest)
+        });
+    JsonObject members ↦
+      Suc
+        (match members {
+          Nil ↦ Zero;
+          Cons member rest ↦
+            json_nat_add (recursive result for member) (recursive result for rest)
+        })
+  }
+
 fn char_cursor_remaining (cur : List Char) : Nat = length Char cur
 
 fn char_cursor_peek (cur : List Char) : Option Char =
@@ -80,7 +108,11 @@ pub const char_cursor_ops : CursorOps (List Char) Char Nat =
 
 `JsonNull` is null. `JsonBool`, `JsonNumber`, and `JsonString` introduce the
 three scalar leaves. `JsonArray` introduces a `List Json`, while `JsonObject`
-introduces a `List (Pair String Json)`.
+introduces a `List (Pair String Json)`. The private `json_size` fold counts each
+JSON constructor in a value; object keys are metadata rather than JSON child
+values. Its object branch consumes the recursive result associated with each
+whole member, preserving the `Pair String Json` carrier without projecting a
+second recursive call from it.
 
 The character cursor treats the unconsumed suffix as its carrier. Its location
 is the remaining character count, so a parser can report the exact suffix
@@ -152,6 +184,11 @@ a silent widening or narrowing of the round-trip claim.
 represent any ordered member list. The decoder's typed boundary will reject
 duplicate keys; the carrier itself does not add a malformed internal state.
 
+**The structural size fold follows the carrier.** Array elements and object
+members are traversed without flattening or projection-based self-calls. The
+member-associated recursive result is the checked evidence for the JSON value
+nested in that member's `Pair`.
+
 ## 6. References
 
 - **RFC 8259, The JavaScript Object Notation Data Interchange Format** — the
@@ -173,6 +210,7 @@ duplicate keys; the carrier itself does not add a malformed internal state.
 |---|---|
 | Inspect the carrier | [§2](#2-definition) |
 | Inspect the character cursor | [§2](#2-definition) |
+| Inspect the structural fold | [§2](#2-definition) |
 | Review its laws | [§4](#4-laws--proofs) |
 | Understand the number domain | [§5](#5-design-notes) |
 | Locate later codec work | [§3](#3-using-it) |
@@ -180,15 +218,17 @@ duplicate keys; the carrier itself does not add a malformed internal state.
 **Derivation path from built-ins.** `Json` is an ordinary strictly positive
 inductive assembled from the built-in `Bool`, `Int`, `String`, `List`, and
 `Pair` types. Its recursive occurrences follow `List`'s checked positive
-parameter and the transparent non-dependent `Pair`/Sigma structure. The cursor
-dictionary and its laws instantiate the carrier-neutral parsing abstraction
-using transparent structural recursion on `List Char`.
+parameter and the transparent non-dependent `Pair`/Sigma structure. The private
+size fold consumes the checked recursive result at each such occurrence. The
+cursor dictionary and its laws instantiate the carrier-neutral parsing
+abstraction using transparent structural recursion on `List Char`.
 
 **`trusted_base()` delta: zero.** This file declares no primitive, opaque
 constant, postulate, or `Axiom`; the carrier is checked by ordinary inductive
 admission.
 
-**Validation evidence.** The ordered package check elaborates the parsing
-dependency before this tangled source. Focused acceptance resolves the family,
-every constructor, the cursor dictionary, and all four proof witnesses as real
-registered kernel globals, and checks concrete cursor behavior.
+**Validation evidence.** A raw package check resolves the complete dependency
+closure from this source's declared imports. Focused acceptance resolves the
+family, every constructor, the cursor dictionary, and all four proof witnesses
+as real registered kernel globals; checks concrete cursor behavior; and executes
+the structural fold over nested arrays and objects.
