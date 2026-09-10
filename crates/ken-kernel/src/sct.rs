@@ -5,6 +5,58 @@
 //!    matrices (`sizeRel` per arg vs param, `17 §4.2`).
 //! 2. Compute the idempotent closure of self-loop matrices via Floyd-Warshall.
 //! 3. Accept iff every idempotent self-loop has ≥1 `↓` on the diagonal.
+//!
+//! # Limitation: descent is intraprocedural — never through a helper's return
+//!
+//! SCT traces a structural decrease only through a **direct pattern match
+//! feeding the recursive call in the same body** — not through the return value
+//! of an intervening non-recursive helper. Factoring a shared guard out into a
+//! helper and recursing on its result reds:
+//!
+//! ```text
+//! NotTerminating("SCT: idempotent self-loop has no strictly-decreasing parameter")
+//! ```
+//!
+//! **Mechanism.** `size_rel` contributes a strict `Down` on the self-loop
+//! diagonal only for a `Term::Var` whose provenance is a field projection of the
+//! parameter matched by the recursing body — that `(param_idx, Down)` provenance
+//! is set at the Elim-method boundary in `dispatch_elim_methods` and threaded
+//! through the body. An **exact reconstruction** of the matched value is `DownEq`
+//! (size-preserving, never strict); constructor-wrapping, application, primitive,
+//! and cast are all `Unknown`. A non-recursive helper's return is a `Const`
+//! application, so `size_rel` yields `Unknown`; the self-loop matrix then carries
+//! no `↓` on its diagonal and [`sct_check`] refuses. This is size-change analysis
+//! over the call *group*: descent evidence comes from the recursing body's own
+//! match-bound field variables, and a helper's return is opaque by construction —
+//! SCT does not inline the helper and holds no size signature for it.
+//!
+//! **This is an intended conservative limitation, not a defect** (ruled at
+//! `LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN` D0). `NotTerminating` is a *refusal* —
+//! the fail-closed direction. SCT's contract is soundness: it never admits a
+//! non-total definition, and refusing a possibly-total one it cannot prove
+//! terminating is the correct conservative behavior, never a soundness hole.
+//! Tracing "`helper : List a → List a` returns a subterm ≤ its input" to the call
+//! site is *interprocedural* size analysis (sized types / per-function size
+//! signatures), a strictly more powerful terminator; its absence is the boundary
+//! of this method, not a gap in this realization. Widening to accept it would be
+//! a TCB capability extension carrying its own soundness review — a separate
+//! kernel node, never a by-product of this gate.
+//!
+//! **Remedy (authoring-side).** Make the recursive call's decreasing argument a
+//! variable bound by matching the recursing function's *own* parameter — a
+//! field-projection subterm, which carries `Down` — present in that function's
+//! own body. Inline the structural match into the recursive body (a direct
+//! `Cons`/`Nil` match at each call site) rather than factoring it into a helper
+//! and recursing on the helper's return. The exact-reconstruction path does not
+//! rescue this: a reconstructed argument is `DownEq`, so it still yields no strict
+//! decrease — the descent must come from a directly-matched field binder.
+//!
+//! Encountered twice in unrelated work, each time recorded only beside the
+//! workaround: `catalog/packages/Tooling/Verification/FoKripke.ken` (the
+//! `fok_check_tree → fok_check_rule → fok_check_forall_right → fok_check_tree`
+//! clique, where a `fok_single_cert : List FokCert → Option FokCert` singleton
+//! guard was inlined as a direct `Cons`/`Nil` match at each call site) and
+//! `crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs`.
 
 use crate::conv::whnf;
 use crate::env::{Context, GlobalEnv};
