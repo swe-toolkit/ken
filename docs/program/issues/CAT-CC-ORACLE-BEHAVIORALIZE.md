@@ -1,7 +1,7 @@
 ---
 id: CAT-CC-ORACLE-BEHAVIORALIZE
 title: "Behavioralize the pre-existing prohibited repository-text oracles in the cc3/cc4/cc5 catalog acceptance tests: replace the Axiom source scans with trusted-base delta checks, and the catalog data-declaration / fn text scans with loader-inventory / selective-resolution / elaboration controls. A test-only cleanup surfaced by CV during the CAT-MIGRATE-TIER-D-CURSOR review; pre-existing, non-blocking, queued behind the active lanes."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
@@ -12,13 +12,18 @@ github: null
 origin: "Steward-filed 2026-09-08 at foundation-leader's request (evt_54b2snsnh72f9, answer (b): unframed, file a small Foundation-owned draft; must NOT be folded into CAT-MIGRATE-TIER-D-CURSOR). Surfaced by CV (evt_7hy0ax01j3s08) during the CAT-MIGRATE-TIER-D-CURSOR review as the same prohibited-subject class the fleet blocked NonEmpty on: repository-text oracles that assert catalog TEXT rather than behavior. Pre-existing (NOT introduced by that candidate — its cc3/cc4/cc5 hunks only swapped the dependency-env to the roots loader, leaving these assertion lines untouched), so it did not block the migration; CV flagged it explicitly so it does not fall through the two-reviewer gap."
 ---
 
-> # RELEASED 2026-09-10 (Steward) — foundation lane, D0-first.
+> # LANDED 2026-09-10 at 9d614db31 (squash of 701afd7bb) — oracles behavioralized.
 > #
-> # Test-only cleanup: behavioralize the prohibited catalog-text oracles in
-> # cc3/cc4/cc5. The active migration lanes are complete (Tier-E spine landed), so
-> # foundation-leader (evt_6hqdgayjbgtjp) named this the next foundation deliverable
-> # and it is unblocked. Grounded at origin/main 06c102a38; D0 re-measures at
-> # pickup. Foundation QA + CV on the exact SHA, then Steward M1-M4 -> lieutenant.
+> # Merged via the publisher, blob-verified byte-identical on all 4 paths
+> # (cc3/cc4/cc5 + support/catalog_or.rs). All 17 in-scope repository-text oracle
+> # groups in cc3/cc4/cc5 replaced by mutation-proven behavioral controls
+> # (trusted-base delta, loader-visible inventory, identity closure, selective-
+> # client elaboration). Scope stayed frozen to the three CV-named suites; the
+> # catalog_or reference-collection helpers are the trust-provider isolation, not
+> # a widening. Test-only, no src/catalog/carrier/proof change, trusted_base()
+> # unaffected (the suites MEASURE it). Foundation QA evt_12wmg3cm1gdma + CV
+> # evt_56fyfdr1kawk7 (closes CV's prohibited-oracle finding across the Tier-D/E
+> # slices); no Architect (standard control designs). Decision dec_6q4vmtqw3v1rc.
 
 ## The prohibited oracles (CV census, evt_7hy0ax01j3s08 — exact sites)
 

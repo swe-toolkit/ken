@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-10 05:07:52Z — from 579 issue file(s) in `docs/program/issues/`.
+2026-09-10 06:58:38Z — from 579 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -64,7 +64,7 @@ the committed file matches the generator's output.
 | `CAT-BSEARCH` | Decidable ordered search — Algorithm/Searching: membership over a sorted List returning a Dec proof, target 3 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-C2` | Localized Map/Set key-interface split: a non-canonical carrier becomes a lawful Map/Set key under a weaker key-order dictionary while staying an unlawful Ord key wherever antisym concludes kernel Equal | draft | spec-enclave | M | none | — |
 | `CAT-CAPEX` | catalog exhibits no checked capability/authority exemplar — write one against the landed Cap/Auth surface | merged | ergo | M | none | — |
-| `CAT-CC-ORACLE-BEHAVIORALIZE` | Behavioralize the pre-existing prohibited repository-text oracles in the cc3/cc4/cc5 catalog acceptance tests: replace the Axiom source scans with trusted-base delta checks, and the catalog data-declaration / fn text scans with loader-inventory / selective-resolution / elaboration controls. A test-only cleanup surfaced by CV during the CAT-MIGRATE-TIER-D-CURSOR review; pre-existing, non-blocking, queued behind the active lanes. | active | foundation | S | none | — |
+| `CAT-CC-ORACLE-BEHAVIORALIZE` | Behavioralize the pre-existing prohibited repository-text oracles in the cc3/cc4/cc5 catalog acceptance tests: replace the Axiom source scans with trusted-base delta checks, and the catalog data-declaration / fn text scans with loader-inventory / selective-resolution / elaboration controls. A test-only cleanup surfaced by CV during the CAT-MIGRATE-TIER-D-CURSOR review; pre-existing, non-blocking, queued behind the active lanes. | merged | foundation | S | none | — |
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-DERIVED-PUB-EXPORT` | Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3079 |
 | `CAT-DERIVED-REUSE-CONSUMERS` | Drain catalog-reuse census group 4 (derived-list computational reuse) — replace six reimplementations of list_append, reverse, concat_map, and length across five packages with selective imports from Data.Collections.Derived. The consumer half of CAT-DERIVED-PUB-EXPORT, shaped on the landed CAT-NAT-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | M | none | — |
