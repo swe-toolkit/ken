@@ -11,8 +11,26 @@ github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## D3+ MERGED 2026-09-10 as an accepted partial — the node stays `active`.
+> ## READ THIS FIRST.
+> ##
+> ## Exact `247503636`, squashed to `main` `105135af3`; both paths blob-verified
+> ## by the Steward (`Json.ken.md` + `ds9_json_codec_acceptance.rs`, +113/-8).
+> ## Decision `dec_1vxxax44anytq` (Foundation QA evt_45b4tfjs6z4sv + Architect
+> ## evt_ccmp1tpk2fgn + CV evt_6ykttftbb1y1e). The first production unbounded
+> ## `json_size` fold: consumes the nested All-IH per array element AND per object
+> ## member via the B selector form `recursive result for member` (the payoff of
+> ## the kernel P1 -> LANG-ELAB -> DS-9 chain). `trusted_base()` delta zero.
+> ##
+> ## REMAINING: encode/decode + the round-trip law are still gated on the
+> ## SEPARATE `show_int` P2 floor (the complete JsonNumber leaf); no codec /
+> ## round-trip is claimed by this increment. Foundation's next DS-9 slice is
+> ## whatever is honest WITHOUT show_int, else the node waits on that floor —
+> ## confirm the next grounded deliverable with foundation-leader (it may move to
+> ## the catalog self-sufficiency campaign, queued behind DS-9).
+>
 > ## RE-RELEASED 2026-09-10 (Steward) — the elaborator prerequisite LANDED.
-> ## READ THIS FIRST; it supersedes the RE-BLOCKED banner immediately below.
+> ## (Superseded by the D3+ MERGED banner above; kept for history.)
 > ##
 > ## LANG-ELAB-NESTED-FORMER-RECURSION merged at 8508c108b (elaborator sub-cap
 > ## B: the surface now CONSUMES the kernel's nested All-IH for a recursive

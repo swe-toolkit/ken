@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-10 13:32:55Z — from 582 issue file(s) in `docs/program/issues/`.
+2026-09-10 14:32:42Z — from 582 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -174,7 +174,7 @@ the committed file matches the generator's output.
 | `F1-37` | F1 [task-list #37] — bignum Int soundness review for K3 trusted-base promotion | draft | runtime | TBD | none | — |
 | `F3-39` | F3 [task-list #39] — reducer: degrade-not-wrap + retire legacy arms | draft | runtime | TBD | none | — |
 | `F4` | content-addressing + value-model design (aka PX8-F-PROOF) | draft | foundation+spec-enclave | M | none | — |
-| `KERNEL-CONV-CONGRUENCE-CLOSURE` | Complete conv_struct's congruence closure for the remaining formers with no arm — Quot, QuotClass, QuotElim, Cast, Omega (level_eq), Refl — each matching that former's real formation/equality rule with its own acceptance + discrimination conformance case; no blanket add | ready | kernel | M | none | — |
+| `KERNEL-CONV-CONGRUENCE-CLOSURE` | Complete conv_struct_path's congruence closure for the six reachable arm-less formers — Omega, Cast, J, Quot, QuotClass, QuotElim — each a same-former congruence arm matching its real equality rule with a live source consumer + directional rejects; plus documented unreachability proofs for Let and Refl (no arm). Completeness-only, trust-delta zero | active | kernel | M | none | — |
 | `KERNEL-CONV-RECURSIVE-HEAD-TOTALITY` | Restore kernel conversion totality at the distinct recursive-head boundary — converting two separately declared, source-isomorphic recursive transparent globals under a stuck eliminator currently unfolds their distinct self GlobalIds without bound and stack-overflows, instead of returning false and halting as the landed spec §17 contract now requires. Implement the finite §3.5 cross-identity boundary (no clone-equality, bisimulation, certificate, self-id rewrite, or custom normalizer), preserving ordinary same-head recursion, finite δ, and distinct-nonrecursive common reducts, and wire the executable black-box matrix. | merged | kernel | M | none | https://github.com/swe-toolkit/ken/pull/3160 |
 | `KERNEL-CONV-TRUNC-CONGRUENCE` | Add the truncation-former congruence pair (Trunc + TruncProj) to conv_struct so the ordinary conversion gate (whnf + congruence) recognizes convertible-but-not-syntactically-identical truncation types/eliminations — unblocking V3-FO-EMBEDDING-ADEQUACY's quotation-preservation Or arm | merged | kernel | S | none | — |
 | `KERNEL-ELIM-SHAPE-NORMALIZE-DIVERGES` | Eliminator/recursor shape derivation over a proof-carrying inductive family diverges -- derive_recursive_shape and structured_lift normalize a constructor premise before the occurrence test, the elimination-time twin of LANG-CTOR-PREMISE-ELABORATION-DIVERGES | merged | kernel | M | none | — |
@@ -627,7 +627,6 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
-- `KERNEL-CONV-CONGRUENCE-CLOSURE` — Complete conv_struct's congruence closure for the remaining formers with no arm — Quot, QuotClass, QuotElim, Cast, Omega (level_eq), Refl — each matching that former's real formation/equality rule with its own acceptance + discrimination conformance case; no blanket add
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed

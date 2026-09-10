@@ -4,6 +4,7 @@ title: "Ken's SCT termination checker traces a structural decrease only through 
 status: draft
 owner: language
 size: S
+tier: T2
 gate: none
 depends_on: []
 blocks: []
@@ -11,12 +12,24 @@ github: null
 origin: "Steward, 2026-08-16, on Architect evt_2ee9qfch79vgg reviewing V3-FO-KEN-LEVEL-CHECKER-AUTHORING D2: 'a real Ken ergonomics data point, not a defect in this WP ... worth a line to the Language/Ergo track as an observed limitation with a concrete reproduction, rather than leaving it as a comment in one catalog file.' Reproduction re-verified by the Steward against candidate 7726c108c and against origin/main c8fa12c9b before filing."
 ---
 
-> # QUEUED. NOT A THIRD LANE, AND NOT A DEFECT REPORT AGAINST A MERGED WP.
->
-> Operator priority, 2026-08-15: lane 1 is `RecursiveDescent` retirement, lane 2
-> is the z3 round-trip and the FO Kripke embedding. **Filed so it is not lost.**
-> [[V3-FO-KEN-LEVEL-CHECKER-AUTHORING]] handled it correctly by inlining; this
-> node is about the limitation, not about that candidate.
+> # L2 LANGUAGE RESUME HEAD (framed 2026-09-10). Was QUEUED; now the effective
+> # releasable language head.
+> #
+> # After KERNEL-CONV-CONGRUENCE-CLOSURE lands and the L2 slot reseats from the
+> # kernel ring back to language, this is the effective releasable language head:
+> # the operator's L2 queue top three (pattern-forms LITERALS, membership,
+> # deceq-char) are all blocked or deferred (membership recut NOT BUILDABLE;
+> # literals + deceq-char gate on the operator's numeric-equality TCB question).
+> # The Steward releases THIS then — flip status draft->ready + kick the language
+> # ring. Tier T2: the RING work is reproduce + document. The D0 FORK (defect /
+> # documented-limitation / intended) is the ARCHITECT's call, routed to it; if
+> # D0 concludes DEFECT it becomes a SEPARATE kernel TCB node with a soundness
+> # review (AC-3), NOT this node. Coordinates below are as-of-filing; D0
+> # re-measures at pickup (sct.rs line numbers drift).
+> #
+> # Original filing context (operator priority 2026-08-15): filed so the twice-hit
+> # limitation is not lost. [[V3-FO-KEN-LEVEL-CHECKER-AUTHORING]] handled it
+> # correctly by inlining; this node is about the limitation, not that candidate.
 
 ## The observed limitation
 
