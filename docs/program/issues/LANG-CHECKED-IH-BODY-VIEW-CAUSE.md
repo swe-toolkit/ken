@@ -1,7 +1,7 @@
 ---
 id: LANG-CHECKED-IH-BODY-VIEW-CAUSE
 title: "An ordinary binary-tree traversal does not compile natively, and the code discards the reason: compiler_driver.rs maps any failure of checked_core_declaration_body_view to MissingClosureMetadata with map_err(|_| ...), so the label is not a diagnosis. Surface the cause before sizing anything"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
@@ -11,6 +11,27 @@ github: null
 origin: "Architect evt_7msgce14888x4, 2026-08-16, ruling on the Steward's Q2 (evt_2cmabgypc18cq). Discovered as a side finding of RT-DESCENT-LANE-COMPLETENESS D5's two-recursive-position probe (runtime-implementer evt_6tveatdhcz72y). Ruled REAL on three grounds, none of them the error text. Steward-filed per COORDINATION section 2; QUEUED behind the operator's one-lane priority, lane 2 is quiet and this is not released."
 ---
 
+> # COMPLETE 2026-09-10 — node MERGED at origin/main 9f91155d0
+> # ("LANG-CHECKED-IH-BODY-VIEW-CAUSE: D0 dissolved, regression guard retained").
+> # D0 OUTCOME A (Architect pre-committed procedure evt_7rw7e54drqq8f): the D5
+> # two-recursive-position inorder-traversal probe COMPILES on current main and
+> # runs (native artifact, terminal_error=None, exit_status=1 as reaching witness)
+> # — no MissingClosureMetadata, no CheckedCoreBodyViewError. The 331db0a73 gap is
+> # CLOSED: the interval work (candidate-closure specialization / the
+> # RT-FNUNIT-MULTI-WORKER-CONTINUATION mirror) made the two-recursive-position
+> # traversal reachable-and-lowerable. D0 dissolves — neither one case nor a class,
+> # nothing to fix; SCT untouched, no census-site change. What landed is a durable
+> # native regression guard ONLY: crates/ken-cli/tests/lang_checked_ih_body_view_cause.rs
+> # (candidate 328b40b3, +153, sole path, mutation-proven) encoding the inorder
+> # compiles+runs+exit-1 witness plus the three direct-recursion compile controls.
+> # No production / TCB / census / SCT change. Gates on exact 328b40b3: Language QA
+> # evt_795t98yvr2b82 + Architect respin evt_50htcap88147n; Decision dec_49dfdy6z63tvh
+> # APPROVED. The surviving lesser compiler_driver.rs runtime-match-census
+> # map_err(|_|) catch-all was correctly OUT of scope and untouched. NOTE for a
+> # future reader: the body-view discard the original finding named was already
+> # repaired independently (f9dd79f52, CheckedCoreBodyViewError is a discriminated
+> # enum), and the gap itself then closed — a finding that dissolved from both ends.
+> #
 > # RELEASED 2026-09-10 (Steward) — the effective releasable language head.
 > # LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN merged (888e6fe4) and
 > # RT-MAPPING-MULTIOP-DISPATCH merged (1c48b6c5c), which clears the brief hold:
