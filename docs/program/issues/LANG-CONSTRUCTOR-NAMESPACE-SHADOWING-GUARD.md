@@ -1,7 +1,7 @@
 ---
 id: LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD
 title: "Elaborator constructor namespace: a later constructor with a spelling already bound silently replaces the earlier binding (flat global map, unqualified pattern resolution). Diagnose it instead of shadowing silently. QUEUED language debt — not on any active lane."
-status: draft
+status: active
 owner: language
 size: S
 gate: none
@@ -12,9 +12,32 @@ github: null
 origin: "Filed by the Steward 2026-09-06. A recurring elaborator limitation hit by TWO lanes in one session: foundation TIER-C (pub data NonEmpty, evt_5h8nbwcweq87m) and runtime ABI-REVOKE-D2 (a second nullary `Revoked` across IOError + ResourceError, evt_1294jtct6rmfa). The runtime-leader named it explicitly as 'separate language debt, not D2 scope' (evt_5qns09rmgar2a). Captured so it is durable; QUEUED behind the three active lanes, NOT released. Flesh the frame at release time."
 ---
 
-> # QUEUED — NOT RELEASED. Behind the three active lanes. This is the sanctioned
-> # capture of a ring finding (received, queued, no lane blocked on it). Do not
-> # release without an operator/Steward lane slot.
+> # RELEASED 2026-09-10 (Steward) — the L2 language head. LANG-CHECKED-IH-BODY-
+> # VIEW-CAUSE closed (D0 dissolved, 9f91155d0) and the language ring went idle,
+> # so this is the next item in the operator L2 queue (item 6). status
+> # draft->active; kicking the language ring. Tier T2 (mechanical diagnostic
+> # emission at declaration time), size S.
+> #
+> # RE-MEASURED at release (9f91155d0): the constructor insert sites are UNCHANGED
+> # at crates/ken-elaborator/src/data.rs:111 and :277 (globals.insert(c.name.clone(),
+> # ctor_ids[i])). The pattern-admission family-membership resolution the frame
+> # cited at elab.rs:12417/:12456 has DRIFTED to elab.rs:7081 (the matches!
+> # RPatKind::Ctor ... cx.globals.get(name) family check) and :15103
+> # (cx.globals.get(name).expect). The ring re-measures precisely at pickup.
+> #
+> # DELIVERABLE (per the sketch below, now the released contract): detect an
+> # insert into `globals` whose spelling is already bound to a constructor of a
+> # DIFFERENT family and emit a duplicate-constructor-spelling diagnostic naming
+> # BOTH declaration sites — at declaration time, so the collision fails loudly at
+> # its source rather than as a downstream TypeMismatch in an unrelated family.
+> # Type-directed / qualified / overloaded coexistence is FORECLOSED (Architect,
+> # settled flat-namespace spec §1) — do NOT build that; this is the narrow
+> # diagnose-don't-shadow hardening only. AC: a two-sum same-spelling fixture reds
+> # with that exact diagnostic; control: distinct spellings compile. No TCB/spec
+> # change. Reviewers: Language QA + Architect (namespace-semantics confirmation)
+> # -> Steward M1-M4 -> lieutenant. Reachability of the diagnostic seam is
+> # unconfirmed — hard-stop to the Steward if the insert site cannot carry the
+> # duplicate check without a broader refactor.
 
 ## The finding (measured, both instances at b13c3af1)
 

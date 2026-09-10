@@ -66,7 +66,26 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-10 (LATEST — read first): ABI-S6 D5a-surface D1 RE-RELEASED to runtime (L1)
+> ### LIVE POSITION 2026-09-10 (LATEST — read first): LANG-CHECKED CLOSED; L2 head = ctor-shadowing-guard
+>
+> **LANG-CHECKED-IH-BODY-VIEW-CAUSE MERGED** at `9f91155d0` (candidate `328b40b3`,
+> blob-verified sole path). D0 Outcome A: the D5 two-recursive-position inorder
+> probe COMPILES on current main (gap closed by interval work); D0 dissolved, no
+> census/SCT change; a durable native regression guard landed
+> (`crates/ken-cli/tests/lang_checked_ih_body_view_cause.rs`, +153). Node
+> `active -> merged`. Gates QA evt_795t98yvr2b82 + Architect respin
+> evt_50htcap88147n; Decision dec_49dfdy6z63tvh.
+>
+> **L2 language head RELEASED: `LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD`**
+> (operator L2 queue item 6; item 5 LANG-CHECKED just closed, items 1-3
+> blocked/deferred, item 4 SCT merged). T2/S. Node `draft -> active`; kicked the
+> language ring. Deliverable: diagnose a duplicate constructor spelling across
+> families at declaration time (data.rs:111/:277 insert sites; the elab.rs
+> family-membership resolution drifted to :7081/:15103) — the narrow
+> diagnose-don't-shadow hardening; type-directed coexistence is FORECLOSED
+> (Architect flat-namespace §1). Reviewers QA + Architect -> Steward M1-M4.
+>
+> ### LIVE POSITION 2026-09-10: ABI-S6 D5a-surface D1 RE-RELEASED to runtime (L1)
 >
 > **L1 runtime head: ABI-S6 D5a-surface D1 RE-RELEASED** on current main
 > `d70db3299` (runtime-leader request; the ring was idle awaiting the concrete
