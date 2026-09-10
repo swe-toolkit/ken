@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT
 title: "Scaffold-retirement provider publish: make Capability.Process.Environment a published consumer surface (pub + export the D0-measured names — process_environment and the surface Decoder consumes) so it can be imported selectively, mirroring the already-landed Capability.Process.Arguments precedent. Pure module over the landed ProcessInput ABI; no carrier/proof change, no TCB. Unblocks CAT-MIGRATE-TIER-E-DECODER."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
@@ -11,6 +11,24 @@ blocks: [CAT-MIGRATE-TIER-E-DECODER]
 github: null
 origin: "Steward-framed 2026-09-10 as the predecessor discovered by CAT-MIGRATE-TIER-E-DECODER's D0 (foundation-implementer evt_18aqwyk476b4w, hard-stop (a)): Decoder consumes `process_environment`, owned by Capability.Process.Environment, which declares no `pub`/`export` at origin/main 710479b5d and so cannot be imported selectively. Steward ruling evt_155n7vtdndkm3: publish that provider FIRST. Grounded at 710479b5d: Capability.Process.Environment = catalog/packages/Capability/Process/Environment.ken.md (43 lines, PURE — process_environment / replace_process_environment + a round_trip proof over the landed ProcessInput ABI; only prelude/List/Prod/Bytes; trusted_base() delta zero). Its sibling Capability.Process.Arguments is already migrated + published with the identical shape (pub fn process_arguments, selective imports, pub proof round_trip)."
 ---
+
+> # LANDED 2026-09-10 at dd7a4360c (squash of 593f86edc) — export-only publish.
+>
+> Merged via PR #3451, 26/26 CI green, blob-verified on main. What actually
+> landed, per the frame-owner ruling evt_3aewjkc8p13ba: the surface is published
+> with `export process_environment` ONLY — NOT `pub` and NOT both. D0
+> (evt_44kzse3fkdqx9) measured the exact one-name consumer surface
+> `{process_environment}` (Decoder is the only client; `replace_process_environment`
+> and the `round_trip` proof have no catalog consumer, so they stay unpublished),
+> a prelude-only provider closure (empty import ledger), and confirmed that
+> `pub`-only and `export`-only each publish the same canonical identity while
+> their CONJUNCTION is unrepresentable (duplicate public target -> UnboundName).
+> The `export`-only spelling matches the explicit-surface Tier-E migration cohort
+> (Schema/ArgParse/JSON) that Decoder belongs to. Bodies byte-unchanged,
+> `trusted_base()` delta zero (CV-verified). This unblocked
+> CAT-MIGRATE-TIER-E-DECODER, re-released the same day. The "add pub + export
+> line" phrasing in the deliverables/ACs below is SUPERSEDED by this banner —
+> read it as export-only.
 
 > # RELEASED 2026-09-10 (Steward) — provider publish unblocking the last spine node.
 >
@@ -50,8 +68,9 @@ via the loader at the pickup SHA:
   {prelude, and any provider the landed Arguments already imports:
   Capability.Parsing.Cursor, Core.Classes.LawfulClasses, Data.Collections.Derived}).
 - **Declared public API: none today** (no `pub`, no `export`). The migration
-  ADDS `pub` to the consumed declarations and an `export` line carrying exactly
-  the D0-measured usable consumer surface. Decoder consumes `process_environment`
+  ADDS an `export` line carrying exactly the D0-measured usable consumer surface
+  (export-only, NOT `pub` — the conjunction is unrepresentable; ruled
+  evt_3aewjkc8p13ba, see the LANDED banner). Decoder consumes `process_environment`
   at minimum; D0 measures the exact set (it may include
   `replace_process_environment` and the `round_trip` proof if a client consumes
   them — publish exactly what is consumed, no internal helper over-published).
@@ -63,9 +82,10 @@ via the loader at the pickup SHA:
   Arguments imports) and the exact names to publish (the surface Decoder and any
   other client consumes). Hard-stop to the Steward on an unpublished provider or
   an unexpected edge outside the predicted set above.
-- **D1 — publish, executing the D0 ledger.** Add `pub` to the consumed
-  declarations; add the `export` line with exactly the D0-measured surface; adopt
-  any D0-measured selective import; extend the loader-visible inventory. The
+- **D1 — publish, executing the D0 ledger.** Add the `export` line with exactly
+  the D0-measured surface (export-only — do NOT also add `pub`; ruled
+  evt_3aewjkc8p13ba); adopt any D0-measured selective import; extend the
+  loader-visible inventory. The
   module elaborates standalone (exit 0). No carrier change, no new proof content —
   every `data`/`fn`/`const`/`proof` body byte-unchanged; `trusted_base()`
   unaffected.

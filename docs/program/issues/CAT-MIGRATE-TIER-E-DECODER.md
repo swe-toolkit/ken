@@ -12,17 +12,20 @@ github: null
 origin: "Steward-framed 2026-09-10 on the foundation-leader's named spine (evt_2fk3r5y2g3r61: Json -> Application.Input.Schema -> {ArgParse, Decoder}), released as foundation's next deliverable the moment CAT-MIGRATE-TIER-E-ARGPARSE landed (295ba35a3, blob-verified). Fourth and FINAL Tier-E serialization/application-spine node of the [[CAT-SCAFFOLD-RETIREMENT]] DAG and the SECOND (smaller) real client of the published Application.Input.Schema surface — the sibling of ArgParse, INDEPENDENT of it (Decoder consumes Schema, not ArgParse; the true dep is on the merged CAT-MIGRATE-TIER-E-SCHEMA, sequenced second under the one-WP rule as the smaller client: it references ~15 of Schema's 26 published names vs ArgParse's ~20). Module identity GROUNDED at origin/main 295ba35a3: Decoder = catalog/packages/Application/Configuration/Decoder.ken.md (blob 5a6ea273f, 159 lines)."
 ---
 
-> # HELD 2026-09-10 — blocked on new predecessor CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT.
+> # RE-RELEASED 2026-09-10 (Steward) — predecessor landed; D0 resumes.
 >
-> Decoder's D0 (foundation-implementer evt_18aqwyk476b4w) surfaced a genuine
-> hard-stop (a): it consumes `process_environment`, owned by the UNPUBLISHED
-> `Capability.Process.Environment` (no `pub`/`export` at 710479b5d). Ruling
-> evt_155n7vtdndkm3: publish that provider FIRST — a near-trivial pure migration
-> mirroring the landed `Capability.Process.Arguments`. Decoder resumes (the
-> Steward re-releases it) the moment CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT
-> lands; its D0 picks up from the same point and the LawfulClasses ruling
-> (evt_73wh7dgneqe6y) stands. depends_on updated; do NOT work Decoder until
-> re-released.
+> The hold is lifted. CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT LANDED on main
+> (dd7a4360c, blob-verified): `Capability.Process.Environment` now publishes
+> `export process_environment`, so the process_environment edge that stopped
+> Decoder's D0 (evt_18aqwyk476b4w) is resolvable by selective import. Re-released
+> to the foundation ring evt_6pjjc2tba8d2v. D0 resumes from the same point; the
+> authorized provider set is {Application.Input.Schema, Capability.Diagnostics.Core,
+> Capability.Formatting.Doc, Data.Collections.Derived, Data.Collections.NonEmpty,
+> Data.Sums.Validation, Core.Classes.LawfulClasses, Capability.Process.Environment,
+> prelude} — adopt `Capability.Process.Environment (process_environment)` and
+> `Core.Classes.LawfulClasses (bytes_deceq_eq)` (ruling evt_73wh7dgneqe6y stands);
+> a NEW free symbol outside that set is a fresh hard-stop. Both `depends_on`
+> predecessors (Schema, Process-Environment) are now merged.
 
 > # RELEASED 2026-09-10 (Steward) — Tier E spine, node 4 (FINAL): last Schema client.
 >
