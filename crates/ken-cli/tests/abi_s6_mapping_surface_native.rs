@@ -1,4 +1,4 @@
-//! ABI-S6 D5a-surface: checked window-direct Mapping programs.
+//! ABI-S6 D5a-surface: checked read-window/write-payload Mapping programs.
 //!
 //! Promise class: normative compatibility vectors from `38 §1.9` and
 //! `conformance/surface/ffi-io/seed-mapping.md`. The programs cross the real
@@ -85,8 +85,7 @@ proc write_read_body (mapping : MappingHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
-      (bytes_encode "ABCD"))
+    (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
     (\outcome. after_write mapping outcome)
 
 proc write_read_stage (_cap : Cap AFull)
@@ -105,8 +104,7 @@ proc after_read (mapping : MappingHandle)
     Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
-        (bytes_encode "ABCD"))
+      (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
       (\written. expect_unit written)
   }
 
@@ -154,8 +152,7 @@ proc after_write_to_write (mapping : MappingHandle)
     Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
-        (bytes_encode "EFGH"))
+      (mapWrite AFull mapping (2 : Int) (bytes_encode "EFGH"))
       (\written. expect_unit written)
   }
 
@@ -164,8 +161,7 @@ proc write_write_body (mapping : MappingHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
-      (bytes_encode "ABCD"))
+    (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
     (\outcome. after_write_to_write mapping outcome)
 
 proc after_second_write_to_read (mapping : MappingHandle)
@@ -188,8 +184,7 @@ proc after_read_to_write_read (mapping : MappingHandle)
     Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
-        (bytes_encode "ABCD"))
+      (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
       (\written. after_second_write_to_read mapping written)
   }
 
@@ -209,8 +204,7 @@ proc after_second_read_to_write (mapping : MappingHandle)
     Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
-        (bytes_encode "EFGH"))
+      (mapWrite AFull mapping (2 : Int) (bytes_encode "EFGH"))
       (\written. expect_unit written)
   }
 
@@ -231,8 +225,7 @@ proc write_read_write_body (mapping : MappingHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (MkMappingWindow (2 : Int) (4 : Int))
-      (bytes_encode "ABCD"))
+    (mapWrite AFull mapping (2 : Int) (bytes_encode "ABCD"))
     (\outcome. after_write_to_read_write mapping outcome)
 
 proc matrix_stage (_cap : Cap AFull)
@@ -280,8 +273,7 @@ proc out_of_range_write_body (mapping : MappingHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (MkMappingWindow (6 : Int) (4 : Int))
-      (bytes_encode "ABCD"))
+    (mapWrite AFull mapping (6 : Int) (bytes_encode "ABCD"))
     (\outcome. expect_invalid_bounds_unit outcome)
 
 proc out_of_range_write_stage (_cap : Cap AFull)
@@ -326,8 +318,7 @@ proc after_read_to_read_only_write (mapping : MappingHandle)
     Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-      (mapWrite AFull mapping (MkMappingWindow (0 : Int) (1 : Int))
-        (bytes_encode "X"))
+      (mapWrite AFull mapping (0 : Int) (bytes_encode "X"))
       (\written. expect_read_only_refusal written)
   }
 
@@ -382,8 +373,7 @@ proc read_only_write_body (mapping : MappingHandle)
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (mapWrite AFull mapping (MkMappingWindow (0 : Int) (1 : Int))
-      (bytes_encode "X"))
+    (mapWrite AFull mapping (0 : Int) (bytes_encode "X"))
     (\outcome. expect_read_only_refusal outcome)
 
 proc read_only_write_stage (_cap : Cap AFull)
@@ -739,14 +729,14 @@ fn window_direct_map_bytes_executes_natively_and_matches_the_interpreter() {
     assert_eq!(release_set(&result.native).len(), 1);
 }
 
-/// Promise class: durable behavioral invariant. CONTROL: one checked write is
-/// followed by one checked read whose two window `Int`s cross declared proc ABI
-/// slots; both engines must observe `ABCD`, agree on the ordered effect trace,
-/// and release once. CLAIMED: write-then-read carried-window access composes
-/// without a Bytes-to-span response transform. THE GAP: MAP_PRIVATE file
-/// isolation remains D5b.
+/// Promise class: durable behavioral invariant. CONTROL: one checked write at
+/// offset 2 is followed by one checked read whose window `Int`s cross declared
+/// proc ABI slots; both engines must observe `ABCD`, agree on the ordered effect
+/// trace, and release once. CLAIMED: payload-derived write extent composes with
+/// window-direct read access without a response transform. THE GAP: MAP_PRIVATE
+/// file isolation remains D5b.
 #[test]
-fn window_direct_map_write_then_read_executes_and_preserves_process_local_bytes() {
+fn offset_direct_map_write_then_window_read_preserves_process_local_bytes() {
     let result = differential("write-read", "write_read_stage");
     assert_parity("write-read", &result);
     assert_eq!(
@@ -785,15 +775,15 @@ fn window_direct_map_write_then_read_executes_and_preserves_process_local_bytes(
 }
 
 /// Promise class: durable behavioral invariant. CONTROL: one checked read of
-/// [2,6) is followed by one checked write to the same window after all three
-/// Mapping-window `Int` seats cross declared proc ABI slots; both engines must
-/// preserve the exact read-before-write trace, copied zero bytes, written
-/// bytes, terminal result, and one release. CLAIMED: read-then-write carried
-/// access composes independently of sequential direction. THE GAP: the later
+/// [2,6) is followed by one checked write at offset 2 after the read-window and
+/// write-offset `Int` seats cross declared proc ABI slots; both engines must
+/// preserve the exact read-before-write trace, copied zero bytes, written bytes,
+/// terminal result, and one release. CLAIMED: read-window then payload-derived
+/// write access composes independently of sequential direction. THE GAP: later
 /// in-mapping readback and MAP_PRIVATE file isolation are covered by the
 /// write-then-read sibling and remain D5b respectively.
 #[test]
-fn window_direct_map_read_then_write_executes_in_source_order() {
+fn window_read_then_offset_direct_map_write_executes_in_source_order() {
     let result = differential("read-write", "read_write_stage");
     assert_parity("read-write", &result);
     let events = non_release_events(&result.native);
@@ -895,11 +885,11 @@ fn out_of_range_window_is_invalid_bounds_not_clamped() {
 }
 
 /// Promise class: normative compatibility vector. MEASURED: a checked write of
-/// four bytes into [6,10) against an eight-byte mapping reaches the real
-/// MappingWriteView operation and returns exact InvalidBounds in both engines.
-/// CLAIMED: mapWrite bounds-checks the declared window and never clamps or
-/// exposes a partial write. THE GAP: window/payload length agreement is pinned
-/// independently below so this row cannot pass by substituting payload extent.
+/// four payload bytes at offset 6 derives [6,10), reaches the real
+/// MappingWriteView operation, and returns exact InvalidBounds in both engines.
+/// CLAIMED: mapWrite bounds-checks the payload-derived range and never clamps or
+/// exposes a partial write. THE GAP: negative read-window scalar narrowing is
+/// pinned independently below; this row exercises a positive write overrun.
 #[test]
 fn out_of_range_map_write_is_invalid_bounds_not_clamped() {
     let result = differential("out-of-range-write", "out_of_range_write_stage");
@@ -1000,10 +990,11 @@ fn second_mapping_effect_rechecks_bounds() {
 /// Promise class: normative compatibility vector. MEASURED: a checked mapWrite
 /// through a ReadOnly handle enters the real write operation and returns the
 /// exact WRITE-vs-READ RightNotHeld masks in both engines. CLAIMED: ReadOnly
-/// mappings refuse writes without mutating bytes. THE GAP: the unchanged byte
-/// content is independently covered by the host resource-table test.
+/// mappings refuse payload-derived writes without mutating bytes. THE GAP: the
+/// unchanged byte content is independently covered by the host resource-table
+/// test.
 #[test]
-fn read_only_mapping_refuses_window_write_with_exact_rights() {
+fn read_only_mapping_refuses_payload_write_with_exact_rights() {
     let result = differential("read-only-write", "read_only_write_stage");
     assert_parity("read-only-write", &result);
     let writes = operation_events(&result.native, ken_runtime::HostOpV1::MappingWriteView);
