@@ -66,7 +66,34 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-09 (LATEST — read first): L2 RETURNED TO LANGUAGE
+> ### LIVE POSITION 2026-09-10 (LATEST — read first): L2 WORK QUEUE SET
+>
+> **Operator (Pat), 2026-09-10, this session: L2's objective SEQUENCE after
+> LANG-ELAB-NESTED-FORMER-RECURSION lands.** The verification workstream (z3,
+> Kripke, FO embedding-adequacy) and module/import are COMPLETE; the remaining
+> language work is completeness + surface syntax. Operator directed this exact
+> order as the language-ring queue — three groups, release ONE ahead
+> (`steward.md` §5), size the unsized head at release, do NOT collapse the
+> three-lane cap:
+>
+> 1. LANG-MATCH-PATTERN-FORMS-ABSENT (unsized; dep SPEC-MATCH-PATTERN-PINS
+>    MERGED — releasable; spec 34 §3 nine pattern forms, PatKind has three)
+> 2. LANG-MEMBERSHIP-OPERATOR-SURFACE (M; `∈`/`in` parser arm, spec 31 §1b)
+> 3. LANG-DECEQ-CHAR-LAWFUL-INSTANCES (unsized; lawful DecEq Char/String, 37 §2.5)
+> 4. LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN (S; SCT decrease via a helper return)
+> 5. LANG-CHECKED-IH-BODY-VIEW-CAUSE (S; native traversal fail cause discarded)
+> 6. LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD (S; silent ctor shadowing)
+> 7. LANG-RESULT-TRANSPORT-SIGMA-SWEEP (S; sibling-consumer Sigma-closure sweep)
+> 8. LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES (S; trunc_intro remedy spelling)
+>
+> Head releases only after LANG-ELAB lands (its DS-9 cascade re-releases
+> FOUNDATION on L3, freeing L2). NOT in the queue (operator did not include):
+> LANG-FOREIGN-NAME-FORMAT-CHARS (security lint), CORE-AUDIT-LABELS-ARE-
+> ARTIFACT-IDENTITY (TCB/identity design fork — Architect first), and the
+> stale-draft umbrella LANG-MODULE-IMPORT-SYSTEM (capability landed via the
+> LANG-MOD-* children; reconcile its status, do not release).
+>
+> ### LIVE POSITION 2026-09-09: L2 RETURNED TO LANGUAGE
 >
 > **KERNEL-NESTED-IND CLOSED; L2 slot returned to Language per the operator
 > reseat ruling.** The kernel work is done: KERNEL-NESTED-IND merged as a
