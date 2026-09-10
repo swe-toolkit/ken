@@ -1,7 +1,7 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: draft
+status: active
 owner: foundation
 size: L
 gate: none
@@ -10,6 +10,30 @@ blocks: []
 github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
+
+> ## RE-RELEASED 2026-09-10 (Steward) — the `KERNEL-NESTED-IND` blocker is CLEARED.
+> ## `draft` -> `active`.
+>
+> `KERNEL-NESTED-IND` is now **merged** on `origin/main` (verified against
+> IMPLEMENTATION-PROGRESS at current main `ed3b57d6`). This frame's own startable
+> condition — *"DS-9 becomes startable when `D5` MERGES, not when the whole node
+> CLOSES"* (the D5-block banner below) — is therefore satisfied: `KERNEL-NESTED-IND`
+> closed with `D5` in, so the surface consumability DS-9's unbounded folds needed
+> (matching / elaboration / structural-recursion accepting the lifted IH) is
+> landed. `D1` / `D2` / `D3a` are accepted-partial landings; the node resumes at
+> the **next increment — the first `D3`+ slice promising an unbounded `Json` fold**
+> over arrays/objects (the slice the D5-block explicitly gated). foundation-leader
+> confirmed it as the next grounded Foundation deliverable (evt_5majqygex8mkz).
+>
+> **All standing prohibitions from the original release banner still bind** — the
+> W-shaped / `Fin n` / flattening / Church / postulate re-encodings the Architect
+> forbade remain forbidden (that was a ruling, not a consequence of the block);
+> the carrier fork stays as `dec_3n1pp559pxrrw` / frame §3; the `D3a` decoder
+> paragraph is NOT to be deleted (the banner below explains why it only looks
+> redundant). D0/pickup re-measures the frame's fixed inputs and re-checks the
+> §7 contention list against the LIVE lanes (that list is stale). Reviewer:
+> Foundation QA + CV on the exact SHA, Architect on any carrier/law judgment, then
+> Steward M1-M4 -> lieutenant. One increment at a time.
 
 > ## STATUS CORRECTED `active` -> `draft` 2026-08-14. `draft` here means
 > ## BLOCKED-WITH-WORK-LANDED, not unstarted.
