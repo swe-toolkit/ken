@@ -1,7 +1,7 @@
 ---
 id: RT-MAPPING-MULTIOP-DISPATCH
 title: "Build GENERAL runtime static-response-owner dispatch for repeated same-producer / following N>=2 effects through the simple linear-continuation plane, so a native program that sequences a second (and third) effect executes and matches the interpreter with exact-Ret preserved. D0 proved this is a GENERAL plane gap — an older FS-metadata-repeat family traps identically at the same P2 wall (units.rs:3430), not a Mapping-specific defect — so it is fixed ONCE at the response owner; ABI-S6 D5a-surface Mapping multi-op and FS-metadata-repeat are two CONSUMERS of the one fix. Two coordinated sub-parts: P1 the interpreter-loop repeated-dispatch, P2 the planner heterogeneous recursive-body agreement. Carries the Mapping carried-Int (HS#2) and carried-byte-span (HS#3) seat repairs forward atomically and gives them their first executing witnesses."
-status: active
+status: merged
 owner: runtime
 size: L
 gate: runtime
@@ -12,6 +12,27 @@ github: null
 origin: "Steward-filed 2026-09-10 on the Architect ruling evt_559xpa0pqghx8 (D5a-surface HS#4, thr_67d5fmztsmdzj), a PREREQUISITE / SCOPE SPLIT (not a further already-lawful seat repair). runtime-implementer's directed diagnosis (evt_2mhd52b54w2y8) FALSIFIED the Architect's HS#3 carried-Int-representation premise and reached the response-owner continuation boundary the Architect's conditional named — the (b) branch verbatim (a genuine missing continuation capability, not a representation mismatch). The Architect ruled HS#2/#3/#4 ONE predicate (single-op-only D5a-core promotion) and split this out as the structural closure. Soundness/TCB-adjacent (response-owner decomposition + planner invariants) -> Architect REQUIRED review. Bounded/grounded; does not need the operator's return. RESCOPED 2026-09-10 on the Architect ruling evt_7r3ejswrwsxaz (D0=NO adopted): D0 proved the gap is GENERAL (an older FS-metadata-repeat family traps identically), so the node is reframed from Mapping-specific to the general repeated-N>=2 same-producer dispatch capability, sized L, with sub-parts P1/P2 and added criterion S7; the id is kept as the stable handle (reframe, not rename). Design UNCHANGED (S1-S6 stand); the DESIGN needs no operator return to authorize (forced critical path)."
 ---
 
+> # COMPLETE 2026-09-10 — node MERGED at origin/main 1c48b6c5c
+> # ("RT-MAPPING-MULTIOP-DISPATCH respin: fix stack-overflow regression"). The
+> # CI-red respin candidate 0fd1eead9 landed; blob-verified 17/17 changed paths
+> # against origin/main. Gates on the exact SHA: Runtime QA, Architect delta +
+> # M4 APPROVE (evt_2m1jv4q0yxv6n / evt_3k6q8qa406f07), Adversary NO-DEFECT
+> # (evt_5qgbdffsq56k0, carrying the prior full-lens APPROVE evt_fsd2bf8e4hrv on
+> # the 16 byte-identical files); no Spec/CV gate applied. Decision dec_2d203c2h22qp8
+> # resolved APPROVE (resolved_by runtime-leader). The general repeated-N>=2
+> # same-producer dispatch capability (P1 interpreter-loop repeated-dispatch + P2
+> # planner heterogeneous recursive-body agreement) is built at the response
+> # owner; the exact-Ret invariant and planner recursive-body agreement (S1-S7)
+> # are preserved, not relaxed. The respin's sole delta vs the S1-S7-approved
+> # 187436161 was crates/ken-elaborator/src/modules.rs (+17/-14, RMatch
+> # iterator/collect -> explicit capacity-preserving loop) = the AUTHORIZED
+> # per-level frame reduction on the structural rewrite descent (RUST_MIN_STACK
+> # unset, no budget bump). ABI-S6 D5a-surface Mapping multi-op and the older
+> # FS-metadata-repeat family are the two consumers now unblocked. OWED (filed as
+> # a separate queued runtime node, NOT blocking this merge — the Adversary's two
+> # non-blocking missing-negative-test notes + the Architect S4 positive control):
+> # [[RT-MAPPING-DISPATCH-CONTROL-COVERAGE]].
+> #
 > # A fail-closed runtime continuation-capability gap, now known GENERAL. The
 > # static response owner cannot execute a SECOND same-producer effect sequenced
 > # after the first: it calls K, requires the returned carrier tag == `ITree::Ret`,
