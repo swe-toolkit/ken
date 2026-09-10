@@ -11,9 +11,9 @@ mod catalog_or;
 
 use std::collections::BTreeSet;
 
-use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
+use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_kernel::{Decl, GlobalId, KernelError, Term};
 
 const JSON_MODULE: &str = "Data.Serialization.Json";
 const JSON_PUBLIC_IMPORT: &str = r#"
@@ -189,6 +189,101 @@ fn list_count(env: &ElabEnv, value: &EvalVal) -> u64 {
         }
         other => panic!("expected List, got {other:?}"),
     }
+}
+
+fn assert_positivity_violation(source: &str, shape: &str) {
+    let mut env = ElabEnv::new().expect("base environment");
+    match env.elaborate_file(source) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::PositivityViolation(message),
+            ..
+        }) => assert!(
+            message.contains("non-strictly-positive occurrence"),
+            "{shape} must fail at positivity admission, got {message:?}"
+        ),
+        other => panic!("{shape} must reject with PositivityViolation, got {other:?}"),
+    }
+}
+
+#[test]
+fn intrinsic_all_lift_admits_public_json_nested_pair_and_direct_list_control() {
+    // Durable invariant (KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE).
+    // MEASURED: the checked elaborator constructs match methods for both the
+    // direct List Self path and public Json's List (Pair String Self) path.
+    // CLAIMED: guest-path recovery follows every already-admitted positive
+    // recursive shape after aligning its field term to WHNF. THE GAP: this
+    // checks method admission, not runtime use of the generated IH.
+    let (mut env, trusted_before) = json_env();
+    env.elaborate_file(
+        r#"
+        data DirectListJson : Type where {
+          DirectListNull : DirectListJson;
+          DirectListValues : List DirectListJson → DirectListJson
+        }
+
+        fn direct_list_match (value : DirectListJson) : Nat =
+          match value {
+            DirectListNull ↦ Zero;
+            DirectListValues values ↦ Zero
+          }
+        "#,
+    )
+    .expect("the established direct List Self match must remain admitted");
+
+    env.elaborate_file(&format!(
+        r#"{JSON_PUBLIC_IMPORT}
+        fn nested_list_pair_match (value : Json) : Nat =
+          match value {{
+            JsonNull ↦ Zero;
+            JsonBool flag ↦ Zero;
+            JsonNumber number ↦ Zero;
+            JsonString string ↦ Zero;
+            JsonArray values ↦ Zero;
+            JsonObject members ↦ Zero
+          }}
+        "#
+    ))
+    .expect("public Json's nested List (Pair String Self) match must elaborate");
+
+    let trusted_after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(
+        trusted_after, trusted_before,
+        "positive guest-path alignment must add zero trusted declarations"
+    );
+}
+
+#[test]
+fn intrinsic_all_lift_direct_pi_domain_remains_rejected() {
+    // Durable invariant. MEASURED: the direct negative occurrence reaches the
+    // named positivity error. CLAIMED: WHNF alignment cannot cross a Pi domain.
+    // THE GAP: the former-nested sibling is exercised independently below.
+    assert_positivity_violation(
+        r#"
+        data DirectNegative : Type where {
+          MkDirectNegative : (DirectNegative → Empty) → DirectNegative
+        }
+        "#,
+        "direct Pi-domain recursive occurrence",
+    );
+}
+
+#[test]
+fn intrinsic_all_lift_former_nested_pi_domain_remains_rejected() {
+    // Durable invariant. MEASURED: the exact outer-List/transparent-Pair path
+    // rejects when Self moves into Pair's inner Pi domain. CLAIMED: only an
+    // existing positive RecursiveShape edge can reach guest recovery. THE GAP:
+    // other unknown/non-positive former positions remain in the established
+    // nested-inductives corpus rather than being restated here.
+    assert_positivity_violation(
+        r#"
+        data FormerNestedNegative : Type where {
+          MkFormerNestedNegative
+            : List (Pair (FormerNestedNegative → Empty) Unit)
+            → FormerNestedNegative
+        }
+        "#,
+        "former-nested Pi-domain recursive occurrence",
+    );
 }
 
 #[test]
