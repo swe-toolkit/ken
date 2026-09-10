@@ -66,7 +66,27 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-10 (LATEST — read first): L2 WORK QUEUE SET
+> ### LIVE POSITION 2026-09-10 (LATEST — read first): DS-9 D3+ LANDED; KERNEL-CONV on L2 via kernel reseat
+>
+> **DS-9 D3+ MERGED at `105135af3`** (blob-verified; accepted partial, node stays
+> `active`; encode/decode/round-trip still gated on the separate `show_int`
+> floor). Foundation ring's NEXT deliverable is TBD with foundation-leader — an
+> honest DS-9 slice without show_int, else the catalog self-sufficiency campaign
+> (queued behind DS-9), else stand down.
+>
+> **L2 slot = KERNEL ring (temporary reseat, operator ruling 2026-09-10)** running
+> `KERNEL-CONV-CONGRUENCE-CLOSURE`. Language ring stood down; kernel up (impl
+> sol/high = T1). Architect per-arm ruling `evt_3d4823xtmab8` SETTLED the scope:
+> SIX reachable congruence arms (Omega, Cast, J, Quot, QuotClass, QuotElim) + TWO
+> documented unreachability proofs (Refl, Let) — J added (reachable, frame missed
+> it), Let moved to documented. Increment 1 = Omega/Quot/QuotClass building
+> (`evt_5mbj1dfj3j23h`, branch `wp/KERNEL-CONV-CONGRUENCE-CLOSURE` off
+> `661d988d7`). On full land: reseat L2 back to language and release
+> `LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN` (framed as the resume head this session,
+> tier T2). L1 runtime building `RT-MAPPING-MULTIOP-DISPATCH`. Disk reclaimed
+> 99->76% (stood-down language `target/`). 3-lane cap preserved throughout.
+>
+> ### LIVE POSITION 2026-09-10 (read first): L2 WORK QUEUE SET
 >
 > **EXECUTED same day: LANG-ELAB-NESTED-FORMER-RECURSION LANDED 8508c108b
 > (blob-verified). DS-9 re-released to foundation (L3 comes back up); L2 head
