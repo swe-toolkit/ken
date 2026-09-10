@@ -8,6 +8,32 @@ caller. Keys and values remain plain `Bytes` throughout.
 ## 1. Local provenance and values
 
 ```ken
+import Application.Input.Schema
+  (MkSchemaIssue,
+    Schema,
+    SchemaField,
+    SchemaFieldCheck,
+    SchemaIssue,
+    SchemaValidation,
+    schema_check_presence,
+    schema_field_accept,
+    schema_field_name,
+    schema_field_presence,
+    schema_fields,
+    schema_help,
+    schema_issue_code,
+    schema_issue_origin,
+    schema_validate)
+
+import Capability.Diagnostics.Core
+  (ConfigKeyOrigin, Diagnostic, EnvironmentOrigin, MkDiagnostic, MkDiagnosticCode, Origin)
+
+import Capability.Formatting.Doc (Doc)
+
+import Capability.Process.Environment (process_environment)
+
+import Core.Classes.LawfulClasses (bytes_deceq_eq)
+
 import Data.Collections.NonEmpty (NonEmpty, nonempty_map)
 
 import Data.Sums.Validation (Invalid, Valid, Validation)
@@ -149,6 +175,8 @@ fn decode_config_entries
     (schema_validate EnvConfigOrigin Bool (config_field_check entries) schema)
 
 fn env_config_help (schema : Schema) : Doc = schema_help schema
+
+export decode_process_environment, decode_config_entries, env_config_help
 ```
 
 ## 4. Trust and boundaries
