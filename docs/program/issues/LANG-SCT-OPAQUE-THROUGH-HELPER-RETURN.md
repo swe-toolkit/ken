@@ -1,7 +1,7 @@
 ---
 id: LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN
 title: "Ken's SCT termination checker traces a structural decrease only through a direct pattern match feeding the recursive call, so factoring a shared guard into a non-recursive helper reds NotTerminating -- forcing duplication at exactly the sites a checker wants one guard"
-status: draft
+status: ready
 owner: language
 size: S
 tier: T2
@@ -12,6 +12,14 @@ github: null
 origin: "Steward, 2026-08-16, on Architect evt_2ee9qfch79vgg reviewing V3-FO-KEN-LEVEL-CHECKER-AUTHORING D2: 'a real Ken ergonomics data point, not a defect in this WP ... worth a line to the Language/Ergo track as an observed limitation with a concrete reproduction, rather than leaving it as a comment in one catalog file.' Reproduction re-verified by the Steward against candidate 7726c108c and against origin/main c8fa12c9b before filing."
 ---
 
+ # RELEASED 2026-09-10 (Steward). KERNEL-CONV-CONGRUENCE-CLOSURE MERGED
+> # (0c68628f5), the temporary L2 kernel reseat retired, and the L2 slot returned
+> # to the language ring — so this, the effective releasable language head, is
+> # released. status draft->ready; kicked the language ring. Tier T2: the RING
+> # work is reproduce + document; the D0 fork (defect / documented-limitation /
+> # intended) is the ARCHITECT's call, routed to it. Coordinates below were
+> # RE-MEASURED at 0c68628f5 (they had drifted from the filing SHA).
+> #
 > # L2 LANGUAGE RESUME HEAD (framed 2026-09-10). Was QUEUED; now the effective
 > # releasable language head.
 > #
@@ -57,17 +65,21 @@ destructure-feeds-recursive-call relationship. That is what landed.
 
 **Verified coordinates:**
 
+Re-measured at `origin/main` `0c68628f5` (the frame's original coordinates had
+drifted; re-measure again at pickup):
+
 | what | where |
 |---|---|
-| the recorded finding | `catalog/packages/Tooling/Verification/FoKripke.ken:306-312` |
-| the two inlined sites | same file, `fok_check_forall_right:550`, `fok_check_rule:572` |
+| the recorded finding | `catalog/packages/Tooling/Verification/FoKripke.ken:484` (the "factoring it out reds `SCT: idempotent self-loop has no…`" note) |
+| the two inlined sites | same file, `fok_check_forall_right:969`, `fok_check_rule:991` |
 | the checker | `crates/ken-kernel/src/sct.rs` |
-| the acceptance criterion | `sct.rs:7` — *"Accept iff every idempotent self-loop has >=1 down-arrow on the diagonal"* |
+| the acceptance criterion | `sct.rs:7` — *"Accept iff every idempotent self-loop has ≥1 `↓` on the diagonal"* (the module doc, lines 1-7, is D1's candidate home; the exact error string is emitted at `sct.rs:753`) |
 
 ## This is the second recorded encounter, which is the reason to file it
 
 The same error string is already documented at
-`crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs:553`.
+`crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs:564`
+(re-measured at `0c68628f5`; was `:553` at filing).
 
 ⇒ **The limitation has now been hit twice, in unrelated work, and both times the
 record was left as a comment beside the workaround.** The next author will
