@@ -21,34 +21,27 @@ const NUMERIC_KEN_MD: &str =
 const EXIT_KEN_MD: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
 const DIAGNOSTIC_RENDER_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Render.ken.md");
-const SCHEMA_MODULE: &str = "Application.Input.Schema";
 const SCHEMA_SOURCE: &str =
     include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
-const ARGPARSE_SCHEMA_IMPORT: &str = r#"
-import Application.Input.Schema
-  (MkSchema,
-    MkSchemaField,
-    MkSchemaIssue,
-    Schema,
-    SchemaBytes,
-    SchemaField,
-    SchemaFieldAccepted,
-    SchemaFieldCheck,
-    SchemaFieldRejected,
-    SchemaFlag,
-    SchemaIssue,
-    SchemaOptional,
-    SchemaPresence,
-    SchemaRequired,
-    SchemaValueShape,
-    schema_field_presence,
-    schema_help,
-    schema_issue_code,
-    schema_issue_origin,
-    schema_validate_fields)
-"#;
-const ARGPARSE_KEN_MD: &str =
+const ARGPARSE_MODULE: &str = "Application.CommandLine.ArgParse";
+const ARGPARSE_SOURCE: &str =
     include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
+const FORGE_ARGPARSE_IMPORT: &str = r#"
+import Application.CommandLine.ArgParse
+  (CommandSpec,
+    FlagOption,
+    MkCommandSpec,
+    MkOptionSpec,
+    MkPositionalSpec,
+    MkProgramSpec,
+    OptionSpec,
+    ParsedCommand,
+    PositionalSpec,
+    ProgramSpec,
+    ValueOption,
+    argparse_run,
+    program_help)
+"#;
 const EXAMPLE_KEN_MD: &str = include_str!("../../../catalog/examples/CommandLine/Forge.ken.md");
 
 fn dependency_env() -> ElabEnv {
@@ -112,7 +105,7 @@ fn dependency_env() -> ElabEnv {
     env
 }
 
-fn schema_importing_client(source: &str, imports: &str) -> String {
+fn importing_client(source: &str, imports: &str) -> String {
     source.replacen("```ken\n", &format!("```ken\n{imports}\n"), 1)
 }
 
@@ -124,18 +117,12 @@ fn full_env() -> ElabEnv {
     )
     .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], SCHEMA_MODULE)
-        .expect("Schema must roots-load through its declared providers");
-    let before_validation_clients = env.module_state.clone();
-    env.elaborate_ken_md_file(&schema_importing_client(
-        ARGPARSE_KEN_MD,
-        ARGPARSE_SCHEMA_IMPORT,
-    ))
-    .expect("ArgParse must consume Schema's public surface");
-    env.module_state = before_validation_clients.clone();
-    env.elaborate_ken_md_file(EXAMPLE_KEN_MD)
-        .expect("the separate forge client must import NonEmpty and Validation after ArgParse");
-    env.module_state = before_validation_clients;
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], ARGPARSE_MODULE)
+        .expect("ArgParse must roots-load through its declared providers");
+    let before_forge = env.module_state.clone();
+    env.elaborate_ken_md_file(&importing_client(EXAMPLE_KEN_MD, FORGE_ARGPARSE_IMPORT))
+        .expect("the separate Forge client must consume ArgParse's public surface");
+    env.module_state = before_forge;
     env
 }
 
@@ -167,8 +154,20 @@ fn make_store(env: &ElabEnv) -> EvalStore {
     store
 }
 
+fn global_id(env: &ElabEnv, name: &str) -> GlobalId {
+    env.globals
+        .get(name)
+        .copied()
+        .or_else(|| {
+            env.globals
+                .get(&format!("{ARGPARSE_MODULE}.{name}"))
+                .copied()
+        })
+        .unwrap_or_else(|| panic!("missing `{name}` global"))
+}
+
 fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
-    let id = env.globals[name];
+    let id = global_id(env, name);
     match env.env.lookup(id) {
         Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
         other => panic!("`{name}` must be transparent, got {other:?}"),
@@ -234,7 +233,7 @@ fn nat_count(env: &ElabEnv, value: &EvalVal) -> usize {
 }
 
 fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
-    let expected = env.globals[name];
+    let expected = global_id(env, name);
     match value {
         EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
         other => panic!("expected `{name}`, got {other:?}"),
@@ -339,11 +338,7 @@ fn ordered_closure_elaborates_the_renderer_specialization_and_multifile_client()
         "forge_parse",
         "forge_help",
     ] {
-        let id = env
-            .globals
-            .get(name)
-            .copied()
-            .unwrap_or_else(|| panic!("missing `{name}`"));
+        let id = global_id(&env, name);
         assert!(
             env.env.transparent_body(id).is_some(),
             "`{name}` must be transparent and kernel checked"
@@ -371,7 +366,7 @@ fn forge_parses_flags_raw_values_and_positionals_and_renders_derived_help() {
     let parsed = call_global(&env, &mut store, "forge_parse", [arguments]);
     let values = parsed_arguments(&env, &parsed);
     assert_eq!(values.len(), 3);
-    assert!(matches!(values[0], EvalVal::Ctor { id, .. } if *id == env.globals["ParsedFlag"]));
+    assert!(matches!(values[0], EvalVal::Ctor { id, .. } if *id == global_id(&env, "ParsedFlag")));
     let option = ctor_args(&env, values[1], "ParsedOption");
     assert_eq!(option.last(), Some(&EvalVal::Bytes(b"out.bin".to_vec())));
     let positional = ctor_args(&env, values[2], "ParsedPositional");
@@ -469,6 +464,15 @@ fn adding_one_option_to_the_spec_changes_help_without_a_second_help_edit() {
     let mut env = full_env();
     env.elaborate_file(
         r#"
+        import Application.CommandLine.ArgParse
+          (CommandSpec,
+            FlagOption,
+            MkCommandSpec,
+            MkOptionSpec,
+            OptionSpec,
+            PositionalSpec,
+            command_help)
+
         const cc7_color_option : OptionSpec =
           MkOptionSpec "color" (None String) FlagOption "color"
 
@@ -507,21 +511,16 @@ fn cc7_is_a_zero_trust_specialization_with_no_second_universe() {
     )
     .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], SCHEMA_MODULE)
-        .expect("Schema must roots-load through its declared providers");
-    let before_clients = env.module_state.clone();
-    env.elaborate_ken_md_file(&schema_importing_client(
-        ARGPARSE_KEN_MD,
-        ARGPARSE_SCHEMA_IMPORT,
-    ))
-    .expect("ArgParse must consume Schema's public surface");
-    env.module_state = before_clients;
-    env.elaborate_ken_md_file(EXAMPLE_KEN_MD)
-        .expect("Forge must elaborate after ArgParse");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], ARGPARSE_MODULE)
+        .expect("ArgParse must roots-load through its declared providers");
+    let before_forge = env.module_state.clone();
+    env.elaborate_ken_md_file(&importing_client(EXAMPLE_KEN_MD, FORGE_ARGPARSE_IMPORT))
+        .expect("Forge must consume ArgParse's public surface");
+    env.module_state = before_forge;
     for source in [
         DIAGNOSTIC_RENDER_KEN_MD,
         SCHEMA_SOURCE,
-        ARGPARSE_KEN_MD,
+        ARGPARSE_SOURCE,
         EXAMPLE_KEN_MD,
     ] {
         let extracted = ken_elaborator::literate::extract_ken_md(source)
@@ -550,7 +549,7 @@ fn cc7_is_a_zero_trust_specialization_with_no_second_universe() {
     assert_eq!(before, after, "CC7 must add zero trusted-base entries");
 
     let argparse =
-        ken_elaborator::literate::extract_ken_md(ARGPARSE_KEN_MD).expect("ArgParse must extract");
+        ken_elaborator::literate::extract_ken_md(ARGPARSE_SOURCE).expect("ArgParse must extract");
     assert!(
         argparse.source.contains(
             "fn argparse_byte_matches_char (actual : UInt8) (expected : Char) : Bool =\n  eq_int (uint8_to_int actual) (charToInt expected)"

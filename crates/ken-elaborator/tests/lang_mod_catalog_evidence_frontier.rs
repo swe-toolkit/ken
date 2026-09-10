@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use ken_elaborator::modules::{
-    catalog_module_from_path, PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES,
+    PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES, catalog_module_from_path,
 };
-use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, Span};
+use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, Span, literate, parser};
 use ken_kernel::{
     ConstructorDecl, Decl, GlobalId, InductiveDecl, KernelError, Level, ParameterPolarity,
     PrimReduction, Term,
@@ -419,6 +419,42 @@ fn pinned_interior_evidence(
     const CLASS: &str = "DecEq";
     const HEAD: &str = "UInt8";
     const INSTANCE: &str = "DecEq_instance_UInt8";
+    const ARGPARSE: &str = "Application.CommandLine.ArgParse";
+    const NONEMPTY: &str = "Data.Collections.NonEmpty";
+    const SEMIGROUP_SURFACE: &str = "Semigroup_instance_NonEmpty";
+    const SEMIGROUP_IDENTITY: &str = "Semigroup_instance_Data.Collections.NonEmpty.NonEmpty";
+
+    if module == ARGPARSE {
+        assert_eq!(
+            unit.selective_import_bindings
+                .get(SEMIGROUP_SURFACE)
+                .map(String::as_str),
+            Some(NONEMPTY),
+            "ArgParse's semigroup dictionary must arrive through its selective NonEmpty edge"
+        );
+        assert!(
+            all_units[NONEMPTY]
+                .public_targets
+                .contains(&format!("{NONEMPTY}.{SEMIGROUP_SURFACE}")),
+            "the imported NonEmpty semigroup dictionary must be provider-public"
+        );
+        let identity = *env
+            .globals
+            .get(SEMIGROUP_IDENTITY)
+            .expect("NonEmpty must register its canonical semigroup dictionary");
+        assert!(
+            resolved.contains(&identity),
+            "ArgParse terms must retain the imported NonEmpty semigroup dictionary"
+        );
+        assert!(
+            !unit
+                .public_targets
+                .iter()
+                .any(|target| target.ends_with(SEMIGROUP_SURFACE)),
+            "imported semigroup evidence must not become an ArgParse re-export"
+        );
+        return BTreeSet::from([identity]);
+    }
 
     if module != POSIX {
         return BTreeSet::new();

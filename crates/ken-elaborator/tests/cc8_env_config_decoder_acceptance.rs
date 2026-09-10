@@ -24,28 +24,22 @@ const EXIT: &str = include_str!("../../../catalog/packages/Capability/Process/Ex
 const SCHEMA_MODULE: &str = "Application.Input.Schema";
 const SCHEMA_SOURCE: &str =
     include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
-const ARGPARSE_SCHEMA_IMPORT: &str = r#"
-import Application.Input.Schema
-  (MkSchema,
-    MkSchemaField,
-    MkSchemaIssue,
-    Schema,
-    SchemaBytes,
-    SchemaField,
-    SchemaFieldAccepted,
-    SchemaFieldCheck,
-    SchemaFieldRejected,
-    SchemaFlag,
-    SchemaIssue,
-    SchemaOptional,
-    SchemaPresence,
-    SchemaRequired,
-    SchemaValueShape,
-    schema_field_presence,
-    schema_help,
-    schema_issue_code,
-    schema_issue_origin,
-    schema_validate_fields)
+const ARGPARSE_MODULE: &str = "Application.CommandLine.ArgParse";
+const FORGE_ARGPARSE_IMPORT: &str = r#"
+import Application.CommandLine.ArgParse
+  (CommandSpec,
+    FlagOption,
+    MkCommandSpec,
+    MkOptionSpec,
+    MkPositionalSpec,
+    MkProgramSpec,
+    OptionSpec,
+    ParsedCommand,
+    PositionalSpec,
+    ProgramSpec,
+    ValueOption,
+    argparse_run,
+    program_help)
 "#;
 const DECODER_SCHEMA_IMPORT: &str = r#"
 import Application.Input.Schema
@@ -65,7 +59,7 @@ import Application.Input.Schema
     schema_issue_origin,
     schema_validate)
 "#;
-const ARGPARSE: &str =
+const ARGPARSE_SOURCE: &str =
     include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
 const CONFIG_DECODER: &str =
     include_str!("../../../catalog/packages/Application/Configuration/Decoder.ken.md");
@@ -140,7 +134,7 @@ fn dependency_env() -> ElabEnv {
     env
 }
 
-fn schema_importing_client(source: &str, imports: &str) -> String {
+fn importing_client(source: &str, imports: &str) -> String {
     source.replacen("```ken\n", &format!("```ken\n{imports}\n"), 1)
 }
 
@@ -148,17 +142,18 @@ fn full_env() -> ElabEnv {
     let mut env = dependency_env();
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], SCHEMA_MODULE)
         .expect("Schema must roots-load through its declared providers");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], ARGPARSE_MODULE)
+        .expect("ArgParse must roots-load through its declared providers");
     let before_validation_clients = env.module_state.clone();
     for (source, label) in [
         (
-            schema_importing_client(ARGPARSE, ARGPARSE_SCHEMA_IMPORT),
-            "ArgParse",
-        ),
-        (
-            schema_importing_client(CONFIG_DECODER, DECODER_SCHEMA_IMPORT),
+            importing_client(CONFIG_DECODER, DECODER_SCHEMA_IMPORT),
             "Application.Configuration.Decoder",
         ),
-        (EXAMPLE.to_owned(), "Application.CommandLine.Forge"),
+        (
+            importing_client(EXAMPLE, FORGE_ARGPARSE_IMPORT),
+            "Application.CommandLine.Forge",
+        ),
     ] {
         env.elaborate_ken_md_file(&source)
             .unwrap_or_else(|err| panic!("{label} must consume its public providers: {err:?}"));
@@ -194,8 +189,20 @@ fn make_store(env: &ElabEnv) -> EvalStore {
     store
 }
 
+fn global_id(env: &ElabEnv, name: &str) -> GlobalId {
+    env.globals
+        .get(name)
+        .copied()
+        .or_else(|| {
+            env.globals
+                .get(&format!("{ARGPARSE_MODULE}.{name}"))
+                .copied()
+        })
+        .unwrap_or_else(|| panic!("missing `{name}` global"))
+}
+
 fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
-    let id = env.globals[name];
+    let id = global_id(env, name);
     match env.env.lookup(id) {
         Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
         other => panic!("`{name}` must be transparent, got {other:?}"),
@@ -276,7 +283,7 @@ fn process_input(
 
 fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
     match value {
-        EvalVal::Ctor { id, args, .. } if *id == env.globals[name] => args.as_slice(),
+        EvalVal::Ctor { id, args, .. } if *id == global_id(env, name) => args.as_slice(),
         other => panic!("expected `{name}`, got {other:?}"),
     }
 }
@@ -317,6 +324,14 @@ fn add_schema_fixtures(env: &mut ElabEnv) {
             SchemaField,
             SchemaOptional,
             SchemaRequired)
+
+        import Application.CommandLine.ArgParse
+          (CommandSpec,
+            MkCommandSpec,
+            MkOptionSpec,
+            OptionSpec,
+            PositionalSpec,
+            ValueOption)
 
         const cc8_host_field : SchemaField =
           MkSchemaField "HOST" SchemaRequired SchemaBytes "service host"
@@ -362,7 +377,7 @@ fn ordered_closure_elaborates_schema_before_both_clients() {
         "decode_config_entries",
         "env_config_help",
     ] {
-        let id = env.globals[name];
+        let id = global_id(&env, name);
         assert!(
             env.env.transparent_body(id).is_some(),
             "`{name}` must be transparent and kernel checked"
@@ -533,17 +548,16 @@ fn cc8_adds_no_trust_and_declares_no_second_universe() {
         .expect("Schema must roots-load through its declared providers");
     assert_new_globals_are_transparent(&env, &before_globals, "Schema");
 
+    let before_globals = env.globals.values().copied().collect::<BTreeSet<_>>();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], ARGPARSE_MODULE)
+        .expect("ArgParse must roots-load through its declared providers");
+    assert_new_globals_are_transparent(&env, &before_globals, "ArgParse");
+
     let before_clients = env.module_state.clone();
-    for (source, label) in [
-        (
-            schema_importing_client(ARGPARSE, ARGPARSE_SCHEMA_IMPORT),
-            "ArgParse",
-        ),
-        (
-            schema_importing_client(CONFIG_DECODER, DECODER_SCHEMA_IMPORT),
-            "Application.Configuration.Decoder",
-        ),
-    ] {
+    for (source, label) in [(
+        importing_client(CONFIG_DECODER, DECODER_SCHEMA_IMPORT),
+        "Application.Configuration.Decoder",
+    )] {
         let before_globals = env.globals.values().copied().collect::<BTreeSet<_>>();
         env.elaborate_ken_md_file(&source)
             .unwrap_or_else(|err| panic!("{label} must elaborate: {err:?}"));
@@ -556,7 +570,7 @@ fn cc8_adds_no_trust_and_declares_no_second_universe() {
         "CC8 must add zero trusted entries"
     );
 
-    let checked = [SCHEMA_SOURCE, ARGPARSE, CONFIG_DECODER]
+    let checked = [SCHEMA_SOURCE, ARGPARSE_SOURCE, CONFIG_DECODER]
         .into_iter()
         .map(|source| {
             ken_elaborator::literate::extract_ken_md(source).expect("extract checked Ken")

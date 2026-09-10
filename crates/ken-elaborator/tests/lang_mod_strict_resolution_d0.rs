@@ -409,6 +409,33 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // ArgParse now declares its exact Schema, diagnostics, formatting,
+            // parsing, and collection dependencies. Its ordinary package
+            // boundary loads while strict mode retains only provider compiler
+            // conveniences.
+            "Application.CommandLine.ArgParse".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "charToInt",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // Schema now declares its exact Formatting.Doc, Derived,
             // NonEmpty, and Validation dependencies. Its ordinary package
             // boundary loads while strict mode retains only provider compiler
@@ -1152,7 +1179,6 @@ fn catalog_ambient_passthrough_migration_census() {
     let expected_residuals = [
         "Algorithm.Searching.OrderedSearch",
         "Algorithm.Sorting.InsertionSort",
-        "Application.CommandLine.ArgParse",
         "Application.Configuration.Decoder",
         "Data.Collections.Map",
     ]
