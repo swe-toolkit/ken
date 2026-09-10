@@ -292,6 +292,65 @@ fn expect_read_only_refusal (outcome : Result ResourceError Unit)
     Ok unit |-> body_error_io
   }
 
+proc after_read_to_read_only_write (mapping : MappingHandle)
+  (outcome : Result ResourceError Bytes)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+      (mapWrite AFull mapping (MkMappingWindow (0 : Int) (1 : Int))
+        (bytes_encode "X"))
+      (\written. expect_read_only_refusal written)
+  }
+
+proc read_then_read_only_write_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    (mapBytes AFull mapping (MkMappingWindow (0 : Int) (1 : Int)))
+    (\outcome. after_read_to_read_only_write mapping outcome)
+
+proc read_then_read_only_write_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly
+      read_then_read_only_write_body)
+    (\outcome. finish outcome)
+
+proc after_read_to_out_of_range (mapping : MappingHandle)
+  (outcome : Result ResourceError Bytes)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok bytes |-> bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+      (mapBytes AFull mapping (MkMappingWindow (6 : Int) (4 : Int)))
+      (\read. expect_invalid_bounds read)
+  }
+
+proc read_then_out_of_range_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    (mapBytes AFull mapping (MkMappingWindow (0 : Int) (1 : Int)))
+    (\outcome. after_read_to_out_of_range mapping outcome)
+
+proc read_then_out_of_range_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly
+      read_then_out_of_range_body)
+    (\outcome. finish outcome)
+
 proc read_only_write_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
@@ -380,12 +439,36 @@ fn try_differential_in_worker(
 }
 
 fn differential(case: &str, entry: &str) -> Differential {
-    try_differential_in_worker(case, entry, "read_body")
-        .unwrap_or_else(|error| panic!("{error}"))
+    try_differential_in_worker(case, entry, "read_body").unwrap_or_else(|error| panic!("{error}"))
 }
 
 fn differential_matrix_body(case: &str, body: &str) -> Result<Differential, String> {
     try_differential_in_worker(case, "matrix_stage", body)
+}
+
+fn differential_matrix_body_with_suppressed_local_drive(
+    case: &str,
+    body: &str,
+) -> (Result<Differential, String>, usize, bool) {
+    let owned_case = case.to_owned();
+    let body = body.to_owned();
+    std::thread::Builder::new()
+        .name(format!("abi-s6-{case}-suppressed-local-drive"))
+        .stack_size(32 * 1024 * 1024)
+        .spawn(move || {
+            let (result, applications) = ken_runtime::with_handler_owned_deferred_response_mutation(
+                ken_runtime::HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
+                || try_differential(&owned_case, "matrix_stage", &body),
+            );
+            (
+                result,
+                applications,
+                ken_runtime::handler_owned_deferred_response_mutation_is_exact(),
+            )
+        })
+        .expect("starts the suppressed local-drive worker")
+        .join()
+        .expect("the suppressed local-drive worker completes")
 }
 
 fn non_release_events(
@@ -495,19 +578,45 @@ fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
     use ken_runtime::HostOpV1::{MappingAllocate, MappingReadView, MappingWriteView};
 
     let cases = [
-        ("read-read", "read_read_body", vec![MappingAllocate, MappingReadView, MappingReadView]),
-        ("read-write", "read_write_body", vec![MappingAllocate, MappingReadView, MappingWriteView]),
-        ("write-read", "write_read_body", vec![MappingAllocate, MappingWriteView, MappingReadView]),
-        ("write-write", "write_write_body", vec![MappingAllocate, MappingWriteView, MappingWriteView]),
+        (
+            "read-read",
+            "read_read_body",
+            vec![MappingAllocate, MappingReadView, MappingReadView],
+        ),
+        (
+            "read-write",
+            "read_write_body",
+            vec![MappingAllocate, MappingReadView, MappingWriteView],
+        ),
+        (
+            "write-read",
+            "write_read_body",
+            vec![MappingAllocate, MappingWriteView, MappingReadView],
+        ),
+        (
+            "write-write",
+            "write_write_body",
+            vec![MappingAllocate, MappingWriteView, MappingWriteView],
+        ),
         (
             "read-write-read",
             "read_write_read_body",
-            vec![MappingAllocate, MappingReadView, MappingWriteView, MappingReadView],
+            vec![
+                MappingAllocate,
+                MappingReadView,
+                MappingWriteView,
+                MappingReadView,
+            ],
         ),
         (
             "write-read-write",
             "write_read_write_body",
-            vec![MappingAllocate, MappingWriteView, MappingReadView, MappingWriteView],
+            vec![
+                MappingAllocate,
+                MappingWriteView,
+                MappingReadView,
+                MappingWriteView,
+            ],
         ),
     ];
     let mut failures = Vec::new();
@@ -539,6 +648,40 @@ fn complete_carried_mapping_access_matrix_matches_the_interpreter() {
         "the carried Mapping access frontier must have no refusal or trap:\n{}",
         failures.join("\n")
     );
+}
+
+/// Promise class: durable behavioral invariant.
+///
+/// MEASURED: the heterogeneous read-write-read program executes with full
+/// native/interpreter parity, while suppressing only the handler-owned local
+/// continuation drive reaches that production seat and restores the exact
+/// pending-`Vis` native trap.
+/// CLAIMED: the statically bounded response-owner interpreter, rather than an
+/// unrelated carried-seat or host change, dispatches effects two and three.
+/// THE GAP: planner shared-body selection and generated-entry closure have their
+/// own compile-time invariants; this control isolates the lowering consumption
+/// seat after those invariants have admitted the same unchanged source.
+#[test]
+fn suppressing_bounded_response_owner_drive_restores_the_pending_vis_trap() {
+    let baseline =
+        differential_matrix_body("read-write-read-drive-baseline", "read_write_read_body")
+            .expect("the exact bounded response-owner path executes");
+    assert_parity("read-write-read-drive-baseline", &baseline);
+
+    let (mutated, applications, restored) = differential_matrix_body_with_suppressed_local_drive(
+        "read-write-read-drive-suppressed",
+        "read_write_read_body",
+    );
+    assert!(applications > 0, "the local-drive mutation did not reach");
+    let error = match mutated {
+        Err(error) => error,
+        Ok(_) => panic!("suppressing local drive did not restore the native trap"),
+    };
+    assert!(
+        error.contains("UnclassifiedRuntimeTrap { terminal_value: -1 }"),
+        "the local-drive suppression failed at a different boundary: {error}"
+    );
+    assert!(restored, "the local-drive mutation leaked past its worker");
 }
 
 /// Promise class: durable behavioral invariant. MEASURED: an honest checked
@@ -697,6 +840,65 @@ fn negative_window_skips_mapping_read_dispatch_in_both_engines() {
     assert!(
         operation_events(&result.interpreted, ken_runtime::HostOpV1::MappingReadView).is_empty()
     );
+    assert_eq!(release_set(&result.native).len(), 1);
+}
+
+/// Promise class: durable behavioral invariant. MEASURED: a valid first read
+/// is followed by a write through the same ReadOnly mapping; effect two reaches
+/// the real host admission and returns the exact WRITE-vs-READ masks in both
+/// engines. CLAIMED: response-owner threading never bypasses per-effect rights
+/// admission on effects two through N. THE GAP: revocation during an anonymous
+/// mapping bracket is not source-constructible; file-source revocation remains
+/// D5b with MappingAcquireFile.
+#[test]
+fn second_mapping_effect_rechecks_read_only_rights() {
+    let result = differential(
+        "read-then-read-only-write",
+        "read_then_read_only_write_stage",
+    );
+    assert_parity("read-then-read-only-write", &result);
+    let events = non_release_events(&result.native);
+    assert_eq!(
+        events
+            .iter()
+            .map(|event| event.operation)
+            .collect::<Vec<_>>(),
+        vec![
+            ken_runtime::HostOpV1::MappingAllocate,
+            ken_runtime::HostOpV1::MappingReadView,
+            ken_runtime::HostOpV1::MappingWriteView,
+        ]
+    );
+    assert!(matches!(
+        events[2].outcome,
+        ken_runtime::CanonicalOutcomeV1::Error(ken_runtime::SemanticErrorV1::Resource(
+            ken_runtime::ResourceErrorV1::RightNotHeld {
+                required: 2,
+                held: 1,
+            }
+        ))
+    ));
+    assert_eq!(release_set(&result.native).len(), 1);
+}
+
+/// Promise class: durable behavioral invariant. MEASURED: a valid first read
+/// is followed by [6,10) against the same eight-byte mapping; effect two reaches
+/// MappingReadView and returns exact InvalidBounds in both engines. CLAIMED:
+/// every statically unrolled access re-runs bounds admission and never clamps.
+/// THE GAP: negative scalar narrowing is independently pinned by the single-op
+/// sibling because its refusal occurs before host dispatch.
+#[test]
+fn second_mapping_effect_rechecks_bounds() {
+    let result = differential("read-then-out-of-range", "read_then_out_of_range_stage");
+    assert_parity("read-then-out-of-range", &result);
+    let reads = operation_events(&result.native, ken_runtime::HostOpV1::MappingReadView);
+    assert_eq!(reads.len(), 2);
+    assert!(matches!(
+        reads[1].outcome,
+        ken_runtime::CanonicalOutcomeV1::Error(ken_runtime::SemanticErrorV1::Resource(
+            ken_runtime::ResourceErrorV1::InvalidBounds
+        ))
+    ));
     assert_eq!(release_set(&result.native).len(), 1);
 }
 

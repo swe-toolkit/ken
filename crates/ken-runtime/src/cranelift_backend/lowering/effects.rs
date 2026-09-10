@@ -2793,7 +2793,9 @@ impl<'a> Lowering<'a> {
             // compiler control: emit the placeholder, consumed when the caller is
             // retargeted to the owner.
             Some(ResponseDisposition::Specialized)
-                if self.function_local.static_response_owner.is_none() =>
+                if self.function_local.static_response_owner.is_none()
+                    && self.function_local.driven_deferred_response_effect
+                        != Some(static_origin) =>
             {
                 return Ok(LoweringOperand::Specialized(
                     Lowered::StaticResponseDeferred,

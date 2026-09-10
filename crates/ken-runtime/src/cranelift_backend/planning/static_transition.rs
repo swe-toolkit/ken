@@ -595,8 +595,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// is not partially specialized. An eligible closed plane with at least two
     /// exclusively-predeclared producer groups turns those emissions into owner calls;
     /// a single-stage plane retains the forward-Ret path. The suppression
-    /// control restores P2. Deferred responses acquire no owner or
-    /// placeholder and fall through to ordinary lowering.
+    /// control restores P2. Deferred responses acquire no dedicated owner or
+    /// placeholder. A statically bounded P2 suffix may be consumed by its
+    /// enclosing specialized owner; every other row falls through to ordinary
+    /// lowering.
     static_response_deferred: Vec<DeferredResponseRow>,
     /// Phase-A carry of the two-phase response context install (RECUT 2, HS5):
     /// the owner-less demand + P1 population minted at install

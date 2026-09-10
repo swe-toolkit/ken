@@ -26,6 +26,7 @@ use super::continuations::{
 };
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority,
+    occurrence_subtree_contains,
     planner_capacity_error, planner_error, AbiCaptureProvenance, AbiUnitDefinition,
     BoundaryReferentOwner, ContinuationCallIdentity, ContinuationEmissionOwner,
     ContinuationEnvironmentClaim, ContinuationFrameIdentity, ContinuationSourceCoordinate,
@@ -6225,11 +6226,12 @@ fn generated_entry_retarget_caller(
 /// invocation segment.
 ///
 /// This reads the closed typed continuation-unit population. It does not walk a
-/// source body or recover an identity from a numeric origin: the active frame,
-/// its already-selected alternative, and the recursive position are the same
-/// planner facts that created the unit. Multiple producer constructs are legal
-/// only when their declared worker bodies agree, matching lowering's existing
-/// branch-local agreement rule.
+/// source body or recover an identity from a numeric origin. The exact producer
+/// construct and recursive child select this step's unit. When that unit is
+/// predeclared and the fixed point has descended from its worker body into a
+/// specialization-owned unit, `producer_result_origin == worker_body_origin`
+/// selects that one generated body as the shared invocation body; the
+/// predeclared worker is then provenance, not a second emitted body.
 fn checked_ih_invocation_recursive_unit_bodies(
     plan: &StaticTransitionPlan<'_>,
     final_step: &CheckedIhSelfResumptionStep,
@@ -6271,7 +6273,9 @@ fn checked_ih_invocation_recursive_unit_bodies(
         ));
     }
 
-    let mut declared = Vec::new();
+    let mut exact_generated = Vec::new();
+    let mut exact_predeclared = Vec::new();
+    let mut generated_descents = Vec::new();
     for unit in plan.continuation_units()? {
         if unit.continuation_origin() != final_step.active_frame_origin
             || unit.producer_alternative() != final_step.selected_alternative
@@ -6279,12 +6283,42 @@ fn checked_ih_invocation_recursive_unit_bodies(
         {
             continue;
         }
-        let body = unit.worker_body_origin();
-        if !declared.contains(&body) {
-            declared.push(body);
+        let exact_source = unit.producer_construct_origin() == final_step.construct_origin
+            && unit.worker_closure_origin() == final_step.recursive_child_origin;
+        match unit.emission_owner() {
+            ContinuationEmissionOwner::Specialization(_) => {
+                let body = unit.worker_body_origin();
+                if exact_source && !exact_generated.contains(&body) {
+                    exact_generated.push(body);
+                }
+                generated_descents.push((unit.producer_result_origin(), body));
+            }
+            ContinuationEmissionOwner::Predeclared(_) if exact_source => {
+                let body = unit.worker_body_origin();
+                if !exact_predeclared.contains(&body) {
+                    exact_predeclared.push(body);
+                }
+            }
+            ContinuationEmissionOwner::Predeclared(_) | ContinuationEmissionOwner::Fusion(_) => {}
         }
     }
-    Ok(declared)
+    if !exact_generated.is_empty() {
+        return Ok(exact_generated);
+    }
+    let [predeclared_body] = exact_predeclared.as_slice() else {
+        return Ok(exact_predeclared);
+    };
+    let mut shared = Vec::new();
+    for (producer_result, body) in generated_descents {
+        if producer_result == *predeclared_body && !shared.contains(&body) {
+            shared.push(body);
+        }
+    }
+    if shared.is_empty() {
+        Ok(exact_predeclared)
+    } else {
+        Ok(shared)
+    }
 }
 
 fn checked_ih_invocation_recursive_unit_body(
@@ -7016,6 +7050,15 @@ fn checked_ih_generated_entry_row(
         .self_resumption_steps
         .last()
         .ok_or_else(|| planner_error("a generated-entry inheritance has no final step"))?;
+    if !occurrence_subtree_contains(plan, worker_body_origin, final_step.invocation_origin)? {
+        // The capability may continue across this transport while its governed
+        // call remains outside the generated context's emitted body. Such an
+        // inheritance has no generated-entry admission seat: publishing one
+        // would create a governed key absent from the context's closed call
+        // population. The capability and transport remain validated by their
+        // own complete derivations; only the nonexistent entry access is absent.
+        return Ok(None);
+    }
     // A' (Architect C, evt_40dme966hce0a): use the passed CANONICAL inheritance
     // directly. The former re-lookup via checked_ih_continuation_inheritance_for_
     // invocation read the stored, MUTABLE field and broke under SuppressForInertness
