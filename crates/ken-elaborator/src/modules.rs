@@ -1772,6 +1772,7 @@ fn elaborate_checked_spine_free(
         &elab.effect_rows,
         &mut elab.fixities,
         &mut elab.fixity_spans,
+        &mut elab.ctor_decl_spans,
         None,
         rdecl,
     )?;
@@ -1795,6 +1796,7 @@ fn elaborate_checked_with_fixity(
         &elab.effect_rows,
         &mut elab.fixities,
         &mut elab.fixity_spans,
+        &mut elab.ctor_decl_spans,
         declared_fixity.map(|pending| (pending.fixity, pending.declaration_span.clone())),
         rdecl,
     )?;

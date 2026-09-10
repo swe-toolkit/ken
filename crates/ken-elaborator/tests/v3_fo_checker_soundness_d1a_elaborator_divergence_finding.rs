@@ -137,27 +137,34 @@ fn minimal_data_ctor_with_recursive_nat_eq_equality_elaborates() {
 fn minimal_fok_derivation_eliminator_builds_without_trust_growth() {
     let mut env = mk_env();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    // `DummyFokDerivation`/`DummyFokDerivInit`, not the catalog's own
+    // `FokDerivation`/`FokDerivInit`: FoKripke is loaded in this env, so reusing
+    // the `FokDerivInit` constructor spelling now collides under the flat
+    // constructor namespace (LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD). The
+    // premise SHAPE is copied verbatim (matching the file's DummyNat/DummyId/
+    // DummyNthForm convention), so the eliminator-shape-derivation property under
+    // test is unchanged.
     env.elaborate_decl(
-        "data FokDerivation : FokSequent -> Type where { \
-           FokDerivInit : \
+        "data DummyFokDerivation : FokSequent -> Type where { \
+           DummyFokDerivInit : \
              (gamma : List FokForm) -> (delta : List FokForm) -> \
              (left : Nat) -> (right : Nat) -> \
              (g : FokForm) -> (d : FokForm) -> \
              Equal (Option FokForm) (fok_nth_form gamma left) (Some FokForm g) -> \
              Equal (Option FokForm) (fok_nth_form delta right) (Some FokForm d) -> \
              Equal Bool (fok_form_eq g d) True -> \
-             FokDerivation (FokMkSequent gamma delta) \
+             DummyFokDerivation (FokMkSequent gamma delta) \
          }",
     )
-    .expect("minimal FokDerivation family must elaborate");
+    .expect("minimal DummyFokDerivation family must elaborate");
     env.elaborate_decl(
         "fn eliminate_fok_derivation \
-           (s : FokSequent) (derivation : FokDerivation s) : Bool = \
+           (s : FokSequent) (derivation : DummyFokDerivation s) : Bool = \
            match derivation { \
-             FokDerivInit gamma delta left right g d left_ok right_ok same |-> True \
+             DummyFokDerivInit gamma delta left right g d left_ok right_ok same |-> True \
            }",
     )
-    .expect("the minimal FokDerivation eliminator must build after demand-driven shape derivation");
+    .expect("the minimal DummyFokDerivation eliminator must build after demand-driven shape derivation");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         before, after,

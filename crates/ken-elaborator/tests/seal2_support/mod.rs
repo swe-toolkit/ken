@@ -115,6 +115,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         num_values,   // literal VALUES keyed by GlobalId — no type of their own
         fixities,     // GlobalId -> surface fixity metadata — carries no Term
         fixity_spans, // GlobalId -> diagnostic spans — carries no Term
+        ctor_decl_spans, // constructor spelling -> first-decl span (dup diagnostic) — no Term
         numeric_env,  // GlobalId op / dispatch tables — types live in global_env
         bytes_env,    // GlobalId type / op ids — types live in global_env
         foreign_env,  // FFI postulate GlobalIds — types live in global_env
@@ -127,6 +128,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         num_values,
         fixities,
         fixity_spans,
+        ctor_decl_spans,
         numeric_env,
         bytes_env,
         foreign_env,

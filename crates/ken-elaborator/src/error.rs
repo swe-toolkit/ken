@@ -191,6 +191,17 @@ pub enum ElabError {
     /// A second top-level definition of a name already defined in the same
     /// compilation unit (`33 §3`, ADR 0014 MRES-5/MRES-7).
     DuplicateDefinition { name: String, span: Span },
+    /// Two sum families declare a constructor with the same spelling
+    /// (`LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD`). The constructor namespace
+    /// is flat, so the later insert would silently shadow the earlier binding
+    /// and surface downstream as an unrelated `TypeMismatch`. Reports both
+    /// declaration sites; coexistence (qualified/type-directed) is deliberately
+    /// not offered.
+    DuplicateConstructorSpelling {
+        name: String,
+        first_span: Span,
+        second_span: Span,
+    },
     /// A fixity declaration does not name a symbolic definition owned by this
     /// module. Imported identities cannot be re-scoped (`33 §6`).
     FixityTargetNotLocal { operator: String, span: Span },
@@ -513,6 +524,17 @@ impl fmt::Display for ElabError {
                 f,
                 "duplicate definition '{}' at {}-{}: name already defined in this compilation unit",
                 name, span.start, span.end,
+            ),
+            ElabError::DuplicateConstructorSpelling {
+                name,
+                first_span,
+                second_span,
+            } => write!(
+                f,
+                "duplicate constructor spelling '{}' at {}-{} and {}-{}: a constructor with this \
+                 name is already declared in another sum family, and the constructor namespace is \
+                 flat; rename one of the constructors",
+                name, first_span.start, first_span.end, second_span.start, second_span.end,
             ),
             ElabError::FixityTargetNotLocal { operator, span } => write!(
                 f,

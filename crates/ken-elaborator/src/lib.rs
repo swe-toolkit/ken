@@ -135,6 +135,13 @@ pub struct ElabEnv {
     /// attribution map is not consulted for association. It is public so
     /// structural tests can exhaustively classify every `ElabEnv` namespace.
     pub fixity_spans: HashMap<GlobalId, Span>,
+    /// First declaration site of each constructor spelling, for the
+    /// duplicate-constructor-spelling diagnostic
+    /// (`LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD`). Populated when a
+    /// constructor is inserted into `globals`; consulted before a colliding
+    /// insert to report the earlier site. Public so structural tests can
+    /// classify every `ElabEnv` namespace.
+    pub ctor_decl_spans: HashMap<String, Span>,
     /// The numeric tower (registered op ids, dispatch tables).
     pub numeric_env: NumericEnv,
     /// The Bytes layer (L6): type ids, I/O effect row registry (`38 §1`, `41`).
@@ -166,6 +173,7 @@ impl ElabEnv {
     pub fn empty() -> Result<Self, ElabError> {
         let mut env = GlobalEnv::new();
         let mut globals = HashMap::new();
+        let mut ctor_decl_spans = HashMap::new();
         // `Bool` is pre-registered here (real `data Bool = True | False`, ES2 —
         // demotes the former opaque `declare_postulate` so `Bool` is
         // matchable data; `reg_ty!("Bool")` in `register_numeric_env` reuses
@@ -188,6 +196,7 @@ impl ElabEnv {
         data::elab_data_decl(
             &mut env,
             &mut globals,
+            &mut ctor_decl_spans,
             "Bool",
             &[],
             &[true_ctor, false_ctor],
@@ -207,6 +216,7 @@ impl ElabEnv {
             num_values: HashMap::new(),
             fixities: HashMap::new(),
             fixity_spans: HashMap::new(),
+            ctor_decl_spans,
             numeric_env,
             bytes_env,
             foreign_env: foreign::ForeignEnv::empty(),
