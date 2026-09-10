@@ -206,6 +206,24 @@ fn assert_positivity_violation(source: &str, shape: &str) {
 }
 
 #[test]
+fn json_roots_loads_from_only_its_declared_imports() {
+    // Durable invariant (AC-SELF-SUFFICIENT).
+    // MEASURED: a fresh base environment roots-loads only the Json module and
+    // resolves its complete dependency closure. CLAIMED: the package declares
+    // every import it needs. THE GAP: the two provider-removal probes are D0
+    // evidence; this committed test guards the positive production path.
+    let mut env = ElabEnv::new().expect("base environment");
+    assert!(!env.globals.contains_key("length"));
+    assert!(!env.globals.contains_key("CursorOps"));
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], JSON_MODULE)
+        .expect("Json must roots-load without an acceptance-fixture preload");
+    assert!(env.globals.contains_key("Data.Serialization.Json.Json"));
+    assert!(env
+        .globals
+        .contains_key("Data.Serialization.Json.char_cursor_laws"));
+}
+
+#[test]
 fn intrinsic_all_lift_admits_public_json_nested_pair_and_direct_list_control() {
     // Durable invariant (KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE).
     // MEASURED: the checked elaborator constructs match methods for both the
@@ -516,6 +534,53 @@ fn json_and_all_six_constructors_are_real_globals() {
             &eval_global(&env, &mut store, "ds9_cursor_empty_advance_result")
         ),
         Vec::<u32>::new()
+    );
+}
+
+#[test]
+fn json_size_consumes_array_and_pair_nested_object_results() {
+    // Durable invariant (D3+ nested-fold floor).
+    // MEASURED: the production Json fold evaluates a mixed object/array value
+    // to the literal five-node result. CLAIMED: both the direct List Json and
+    // nested List (Pair String Json) recursive results are consumed through the
+    // checked carrier. THE GAP: this establishes the unbounded structural fold,
+    // not the separately blocked JsonNumber formatter or the complete codec.
+    let (mut env, _) = json_env();
+    catalog_or::expose_module(&mut env, JSON_MODULE);
+    env.elaborate_file(
+        r#"
+        const ds9_nested_size_value : Json =
+          JsonObject
+            (Cons
+              (Pair String Json)
+              (mk_pair
+                String
+                Json
+                "array"
+                (JsonArray
+                  (Cons
+                    Json
+                    JsonNull
+                    (Cons Json (JsonBool True) (Nil Json)))))
+              (Cons
+                (Pair String Json)
+                (mk_pair String Json "leaf" (JsonString "x"))
+                (Nil (Pair String Json))))
+
+        const ds9_nested_size_result : Nat = json_size ds9_nested_size_value
+        "#,
+    )
+    .expect("production Json array/object fold must elaborate from the package");
+
+    assert_transparent_global(&env, "Data.Serialization.Json.json_size");
+    let mut store = make_store(&env);
+    assert_eq!(
+        nat_count(
+            &env,
+            &eval_global(&env, &mut store, "ds9_nested_size_result")
+        ),
+        5,
+        "Json size must count the object, array, and three scalar child nodes"
     );
 }
 
