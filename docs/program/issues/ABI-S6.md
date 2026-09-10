@@ -12,6 +12,61 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
+> # D5a-surface D1 HS#2 (mapWrite bounds class) — Architect ruling 2026-09-10
+> # (evt_5xsn7eb40xj8j, thr_2b9zky9skt6hc). CONFORMANCE / SURFACE-HONESTY gap, NOT
+> # a soundness hole: the landed mapWrite bounds the write by the PAYLOAD extent
+> # (host-checks start + bytes.len() <= extent), so no OOB/unchecked access — TCB
+> # intact. The unmet promise is §1.9's claim that the DECLARED window (offset,
+> # length) is checked: mapWrite drops the length on the frozen wire
+> # (PrivateMappingWriteView carries no length seat), so mapping_window_length is
+> # silently ignored. Semantic relation ruled EXACT; the declared write-window
+> # length is REDUNDANT (the payload Bytes carries the extent; a write window
+> # larger than its payload is incoherent under MAP_PRIVATE COW). The checked-
+> # surface conditional precheck is REJECTED — it violates §1.9's own
+> # no-in-body-response-transform invariant (764-766) and re-hits the native
+> # BoundaryCarrier wall; do NOT add a wire field / 4th op / continuation
+> # primitive, and do NOT fund a runtime-lowering change to transport a
+> # conditional Ret/Vis at a mapping access.
+> #
+> # THE §1.9 FORK (contract-level, Spec's call — deciding question routed to
+> # spec-author/spec-leader): is an INDEPENDENTLY-declared write-window length
+> # (one that can differ from the payload) a meaningful part of the mapWrite
+> # contract, or is the write window ALWAYS the payload extent?
+> #   - Path B (Architect RECOMMENDED, expected under MAP_PRIVATE/COW scope):
+> #     correct §1.9 to state mapWrite's checked window IS the payload extent
+> #     [offset, offset+len(bytes)), bounds-checked against the extent (the landed
+> #     host already does this); MappingWindow.length is not an independent write
+> #     parameter. Spec-only (spec/ + conformance/ seed-mapping update), NO ABI
+> #     change, NO build-lane rescope. Then Architect required review + CV
+> #     Spec-lane. The landed mapWrite STANDS as correct for the binding property.
+> #   - Path A (only if Spec names a real reason the independent length must be
+> #     honored): add a length seat to the write op (host bounds-checks declared
+> #     (offset,length) vs extent AND enforces length == bytes.len(); single
+> #     unconditional Vis). Frozen-wire ABI change rippling to interp/native/
+> #     planner MappingWriteView consumers — the Steward rescopes a small host-side
+> #     write-wire PREREQUISITE node. Architect required review binds it.
+> # STEWARD rescope/prerequisite call is made AFTER Spec answers (recorded here so
+> # it is not lost). Meanwhile the mismatch seed case is BLOCKED-ON-§1.9-FORK, not
+> # on the runtime ring; the held WIP 64453ef6 (matching-extent mapWrite bounds
+> # control + 1/4097 acquisition parity) is VALID and becomes the candidate once
+> # the fork resolves.
+> #
+> # SYMPTOM INVENTORY — D5a-surface composition (Architect §1a; HS#2 = z-count 2):
+> #   1. (z4091 / HS#1) mapView mints a MappingSpan with no frozen-wire
+> #      counterpart, forcing a body-level response transform native cannot
+> #      transport — an abstract view-token carrying no invariant the request
+> #      window does not. Resolved by the window-direct §1.9 respin (b33f8ac9b).
+> #   2. (this / HS#2) mapWrite's declared-window-length check cannot be enforced
+> #      over the frozen wire without a checked-surface conditional Ret/Vis, which
+> #      native cannot transport (BoundaryCarrier) — the mapping access site cannot
+> #      carry any response shape beyond a single unconditional Vis.
+> # FORMING PREDICATE (NOT yet the §1b structural-closure trigger — that fires at a
+> # 3rd hard-stop keyed on it): "the native mapping surface admits no in-body
+> # control at an access site — every op must be a single unconditional Vis." If a
+> # 3rd bounds/composition hard-stop lands keyed on this same property, that
+> # predicate IS the defect and the fix is a general surface rule (structural
+> # closure), not another point ruling. No research pull yet (fires at HS#3).
+> #
 > # D5a-surface D1 RE-RELEASED 2026-09-10 (Steward) — all three prerequisites
 > # LANDED; runtime ring resume authorized. The held multi-op acceptance resumes
 > # on current main d70db3299. The prerequisite frame (5bf1915e4, HS#4) named
