@@ -1,7 +1,7 @@
 ---
 id: CAT-CC-ORACLE-BEHAVIORALIZE
 title: "Behavioralize the pre-existing prohibited repository-text oracles in the cc3/cc4/cc5 catalog acceptance tests: replace the Axiom source scans with trusted-base delta checks, and the catalog data-declaration / fn text scans with loader-inventory / selective-resolution / elaboration controls. A test-only cleanup surfaced by CV during the CAT-MIGRATE-TIER-D-CURSOR review; pre-existing, non-blocking, queued behind the active lanes."
-status: draft
+status: active
 owner: foundation
 size: S
 gate: none
@@ -12,8 +12,13 @@ github: null
 origin: "Steward-filed 2026-09-08 at foundation-leader's request (evt_54b2snsnh72f9, answer (b): unframed, file a small Foundation-owned draft; must NOT be folded into CAT-MIGRATE-TIER-D-CURSOR). Surfaced by CV (evt_7hy0ax01j3s08) during the CAT-MIGRATE-TIER-D-CURSOR review as the same prohibited-subject class the fleet blocked NonEmpty on: repository-text oracles that assert catalog TEXT rather than behavior. Pre-existing (NOT introduced by that candidate — its cc3/cc4/cc5 hunks only swapped the dependency-env to the roots loader, leaving these assertion lines untouched), so it did not block the migration; CV flagged it explicitly so it does not fall through the two-reviewer gap."
 ---
 
-> # Test-only cleanup. Behavioralize prohibited catalog-text oracles in cc3/cc4/cc5.
-> # Queued behind the active lanes; pre-existing, non-blocking.
+> # RELEASED 2026-09-10 (Steward) — foundation lane, D0-first.
+> #
+> # Test-only cleanup: behavioralize the prohibited catalog-text oracles in
+> # cc3/cc4/cc5. The active migration lanes are complete (Tier-E spine landed), so
+> # foundation-leader (evt_6hqdgayjbgtjp) named this the next foundation deliverable
+> # and it is unblocked. Grounded at origin/main 06c102a38; D0 re-measures at
+> # pickup. Foundation QA + CV on the exact SHA, then Steward M1-M4 -> lieutenant.
 
 ## The prohibited oracles (CV census, evt_7hy0ax01j3s08 — exact sites)
 
@@ -21,7 +26,13 @@ origin: "Steward-filed 2026-09-08 at foundation-leader's request (evt_54b2snsnh7
 (diagnostic core), cc5 (pretty/doc) carry assertions that scan catalog SOURCE TEXT
 rather than checking behavior — the exact class the operator test policy prohibits
 (no CI checker asserting facts about catalog/spec lines) and the shape the fleet
-blocked NonEmpty on. Re-measure exact line numbers at pickup; as CV named them:
+blocked NonEmpty on.
+
+Grounded at `origin/main` `06c102a38` (the three suites exist unchanged from the
+`39ebe2c8f` Decoder landing foundation-leader named; the intervening `06c102a38`
+landing was docs/program-only, so the test files are byte-identical — D0
+re-measures at pickup regardless). Line numbers below are the CV census
+(evt_7hy0ax01j3s08); D0 re-measures the exact sites:
 
 - **Axiom source scans:** cc3:410, cc4:267, cc5:298 — `!extracted.source.contains("Axiom")`.
 - **Catalog declaration text scans:** cc4:208
@@ -32,10 +43,19 @@ blocked NonEmpty on. Re-measure exact line numbers at pickup; as CV named them:
   `"string_length"`, `"Diagnostic"`, `"Text : List Char -> Doc"`,
   `"fn text_string"`, `"fn render_string"`, `"Equal String"`.
 
-## Deliverable
+## Deliverables (D0-first)
 
-Replace each prohibited text-scan with the behavioral control that measures the
-same intended property (CV's mapping):
+**D0 — re-measure the census and fix the mapping.** At the pickup SHA, enumerate
+the exact source-text-scan sites in cc3/cc4/cc5 (the CV list below is the expected
+set; report any drift), and for each one name the behavioral control that measures
+its intended property and the test-support surface it uses (the roots loader,
+`trusted_base()`, the `catalog_publication` helper). Hard-stop to the Steward if
+any site's intended property has no behavioral equivalent — i.e. it asserts a
+property of the source text that is not a loader/trusted-base/elaboration fact
+(none is expected; every listed site maps below).
+
+**D1 — execute the D0 mapping.** Replace each prohibited text-scan with the
+behavioral control that measures the same intended property (CV's mapping):
 
 - **Axiom scans -> trusted-base delta.** The intent ("no axiom snuck into this
   module") is a `trusted_base()` before/after equality across the module's
@@ -72,6 +92,19 @@ Test-only — `crates/ken-elaborator/tests/` (cc3/cc4/cc5 + possibly the shared
 support helper); no `catalog/` source edit, no `crates/**/src`. `gate: none`,
 TCB-neutral. Reviewer: Foundation QA + CV (the finding's origin) on the exact SHA,
 Architect if any control's design is non-obvious, then Steward M1-M4 -> lieutenant.
-Draft and NON-BLOCKING: queued behind the active lanes (foundation-leader's
-instruction) — released when a foundation seat is free and no higher-priority Tier
-D slice is in flight. NOT folded into any CAT-MIGRATE-TIER-D node.
+RELEASED 2026-09-10 (foundation-leader evt_6hqdgayjbgtjp: the active migration
+lanes are complete, so it is ready to frame + release now). NOT folded into any
+CAT-MIGRATE-TIER-D node.
+
+**Scope is exactly the CV-named cc3/cc4/cc5 sites.** The identical prohibited
+text-scan class also exists in other suites (px8f, cc6a, cc7, ds7 all carry
+`source.contains("Axiom")` / `_KEN_MD.contains(...)` scans). Those are OUT of
+scope: this node behavioralizes the three suites the CV census named, no more. If
+D0 finds the class in a cc3/cc4/cc5 site the census missed, fold it in (same
+suite, same finding); a sibling suite is a separate observation to surface to the
+Steward, NOT a scope expansion — do not widen the node into a corpus-wide sweep.
+
+**Contention.** Test-only in `crates/ken-elaborator/tests/`; the three suites are
+not touched by any in-flight WP (foundation-implementer is free post-Decoder; the
+runtime lane's ABI-S6 D5a works native-promotion codegen + `rt_parity_native`, not
+the cc-suites; the language lane is idle). Re-measure contention at pickup.
