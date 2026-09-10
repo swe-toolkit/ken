@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-CONGRUENCE-CLOSURE
 title: "Complete conv_struct_path's congruence closure for the five reachable arm-less formers — Omega, Cast, Quot, QuotClass, QuotElim — each a same-former congruence arm matching its real equality rule with a live source consumer + directional rejects; plus documented unreachability proofs for Refl, Let, and J (no arm). Completeness-only, trust-delta zero"
-status: active
+status: merged
 owner: kernel
 size: M
 gate: none
@@ -41,11 +41,23 @@ origin: "Architect kernel-level section 1b in evt_579jhptqfzcgn: conv_struct's c
 > # rejects, invariants INV-1..5) remains the exact mechanism for the five
 > # reachable arms.
 > #
-> # INCREMENTS: increment 1 = Omega + Quot + QuotClass (evt_5mbj1dfj3j23h) —
+ # INCREMENTS: increment 1 = Omega + Quot + QuotClass (evt_5mbj1dfj3j23h) —
 > # LANDED at origin/main f1e7e516, blob-verified 5/5. Increment 2 = Cast +
 > # QuotElim ONLY, plus the J unreachability proof and the correction of the
 > # stale whnf-J comment (evt_116724dpe5s6e). Branch
 > # `wp/KERNEL-CONV-CONGRUENCE-CLOSURE` re-cut off f1e7e516.
+> #
+> # COMPLETE 2026-09-10 — node MERGED. Increment 2 LANDED at origin/main
+> # 0c68628f5 (candidate 742d1628, blob-verified 5/5: conv.rs, obs.rs,
+> # kernel_conv_congruence_closure.rs, and the cast/quot_elim consumer fixtures).
+> # Gates on exact 742d1628: kernel-QA evt_41e9d6jxpjand, Architect as-implemented
+> # evt_6ep93pnkax0n9 (declares the node CLOSED — five reachable arms built across
+> # inc1+inc2, three documented-unreachable proven, INV-1..5 hold), Adversary
+> # over-accept NO-DEFECT evt_1rrx3g3q6e0zp (relayed evt_5cv5gz71kkdq8). Decision
+> # dec_25f7kqrqt3mxs resolved APPROVE. Trust-delta zero (completeness-only). The
+> # congruence closure of conv_struct_path is complete: whnf is the reachability
+> # oracle, no arm for an unreachable former, no omission for a reachable one. The
+> # temporary L2 kernel reseat retires; the L2 slot returns to the language ring.
 
 # The settled gap (Architect design ruling evt_3d4823xtmab8, grounded on 661d988d7)
 

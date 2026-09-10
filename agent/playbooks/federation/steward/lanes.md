@@ -66,7 +66,38 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-10 (LATEST — read first): DS-9 D3+ LANDED; KERNEL-CONV on L2 via kernel reseat
+> ### LIVE POSITION 2026-09-10 (LATEST — read first): KERNEL-CONV COMPLETE; L2 back to language; SCT-OPAQUE released
+>
+> **KERNEL-CONV-CONGRUENCE-CLOSURE MERGED** — the closing increment 2 (Cast +
+> QuotElim arms + the J documented-unreachability proof + the stale whnf-J comment
+> correction) LANDED at `origin/main` `0c68628f5` (candidate `742d1628`,
+> blob-verified 5/5: conv.rs, obs.rs, the acceptance test, both consumer
+> fixtures). Increment 1 (Omega/Quot/QuotClass) had landed `f1e7e516`. The
+> Architect declared the node CLOSED (`evt_6ep93pnkax0n9`): five reachable
+> congruence arms built across the two increments, three documented-unreachable
+> proven (Refl, Let, J), INV-1..5 hold, trust-delta zero. Node flipped
+> `active -> merged`.
+>
+> **L2 RESEAT REVERSED: the temporary kernel reseat is retired, L2 slot returned
+> to the LANGUAGE ring.** Stood down the kernel ring (`moot down
+> kernel-{leader,implementer,qa}`), brought the language ring back up (`moot exec
+> language-{leader,implementer,qa}` from /workspaces/ken). 3-lane cap preserved
+> throughout (L1 runtime, L2 language, L3 foundation).
+>
+> **L2 language head RELEASED: `LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN`** (S, T2 for
+> the ring work; the D0 defect/limitation/intended fork is the Architect's call,
+> routed to it). status `draft -> ready`; coordinates re-measured at `0c68628f5`
+> (finding `FoKripke.ken:484`; inlined sites `fok_check_forall_right:969` /
+> `fok_check_rule:991`; criterion `sct.rs:7`, error `sct.rs:753`; second encounter
+> `ds5b…:564`). Kicked the language ring.
+>
+> **L1 runtime** is on `RT-MAPPING-MULTIOP-DISPATCH` (CI-red respin owned by
+> runtime-leader; the old candidate `1874361612` is DEAD — a fresh SHA returns to
+> the Steward for M1-M4). **L3 foundation**: `CAT-MAP-DEPENDENCY-CLOSURE-REPAIR`
+> D0 census (foundation-leader owns the re-kick when the build lock clears; census
+> return -> Steward engages the Architect for decomposition).
+>
+> ### LIVE POSITION 2026-09-10 (read first): DS-9 D3+ LANDED; KERNEL-CONV on L2 via kernel reseat
 >
 > **DS-9 D3+ MERGED at `105135af3`** (blob-verified; accepted partial, node stays
 > `active`; encode/decode/round-trip still gated on the separate `show_int`
