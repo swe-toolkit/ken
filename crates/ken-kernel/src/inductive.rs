@@ -1407,43 +1407,44 @@ fn apply_motive(motive: &Term, indices: &[Term], value: Term) -> Term {
 }
 
 fn guest_params_from_shape(
+    env: &GlobalEnv,
     field_type: &Term,
     shape: &RecursiveShape,
     parameter_count: usize,
 ) -> Option<Vec<Term>> {
+    let field_type = whnf(env, &Context::new(), field_type);
     match shape {
         RecursiveShape::Direct { .. } => {
-            let (_, arguments) = peel_app(field_type);
+            let (_, arguments) = peel_app(&field_type);
             (arguments.len() >= parameter_count)
                 .then(|| arguments.into_iter().take(parameter_count).collect())
         }
         RecursiveShape::Pi { body, .. } => {
-            let (_, codomain) = peel_pi(field_type);
-            guest_params_from_shape(&codomain, body, parameter_count)
+            let (_, codomain) = peel_pi(&field_type);
+            guest_params_from_shape(env, &codomain, body, parameter_count)
         }
         RecursiveShape::Sigma { domain, codomain } => {
-            let Term::Sigma(first, second) = field_type else {
+            let Term::Sigma(first, second) = &field_type else {
                 return None;
             };
             domain
                 .as_deref()
-                .and_then(|shape| guest_params_from_shape(first, shape, parameter_count))
+                .and_then(|shape| guest_params_from_shape(env, first, shape, parameter_count))
                 .or_else(|| {
-                    codomain
-                        .as_deref()
-                        .and_then(|shape| guest_params_from_shape(second, shape, parameter_count))
+                    codomain.as_deref().and_then(|shape| {
+                        guest_params_from_shape(env, second, shape, parameter_count)
+                    })
                 })
         }
         RecursiveShape::Former { arguments, .. } => {
-            let (_, actual_arguments) = peel_app(field_type);
+            let (_, actual_arguments) = peel_app(&field_type);
             arguments
                 .iter()
                 .zip(actual_arguments)
                 .find_map(|(argument, actual)| {
-                    argument
-                        .shape
-                        .as_deref()
-                        .and_then(|shape| guest_params_from_shape(&actual, shape, parameter_count))
+                    argument.shape.as_deref().and_then(|shape| {
+                        guest_params_from_shape(env, &actual, shape, parameter_count)
+                    })
                 })
         }
     }
@@ -1475,10 +1476,9 @@ fn intrinsic_former_lift_type(
     let guest_params = arguments
         .iter()
         .find_map(|argument| {
-            argument
-                .shape
-                .as_deref()
-                .and_then(|shape| guest_params_from_shape(&argument.term, shape, parameter_count))
+            argument.shape.as_deref().and_then(|shape| {
+                guest_params_from_shape(env, &argument.term, shape, parameter_count)
+            })
         })
         .ok_or_else(|| unsupported_recursive_shape("intrinsic All lift has no guest path"))?;
     let leaf_sort = infer_motive_level(
@@ -2076,10 +2076,9 @@ fn intrinsic_former_lift_term(
     let guest_params = arguments
         .iter()
         .find_map(|argument| {
-            argument
-                .shape
-                .as_deref()
-                .and_then(|shape| guest_params_from_shape(&argument.term, shape, parameter_count))
+            argument.shape.as_deref().and_then(|shape| {
+                guest_params_from_shape(env, &argument.term, shape, parameter_count)
+            })
         })
         .ok_or_else(|| unsupported_recursive_shape("intrinsic All term has no guest path"))?;
     let leaf_sort = infer_motive_level(
