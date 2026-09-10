@@ -1,7 +1,7 @@
 ---
 id: LANG-CHECKED-IH-BODY-VIEW-CAUSE
 title: "An ordinary binary-tree traversal does not compile natively, and the code discards the reason: compiler_driver.rs maps any failure of checked_core_declaration_body_view to MissingClosureMetadata with map_err(|_| ...), so the label is not a diagnosis. Surface the cause before sizing anything"
-status: draft
+status: active
 owner: language
 size: S
 gate: none
@@ -11,9 +11,44 @@ github: null
 origin: "Architect evt_7msgce14888x4, 2026-08-16, ruling on the Steward's Q2 (evt_2cmabgypc18cq). Discovered as a side finding of RT-DESCENT-LANE-COMPLETENESS D5's two-recursive-position probe (runtime-implementer evt_6tveatdhcz72y). Ruled REAL on three grounds, none of them the error text. Steward-filed per COORDINATION section 2; QUEUED behind the operator's one-lane priority, lane 2 is quiet and this is not released."
 ---
 
-**This node is FILED and QUEUED. No ring is released on it.** Lane 2
-(language + verify) is quiet under the operator's one-lane directive; this is a
-recorded finding, not a dispatch.
+> # RELEASED 2026-09-10 (Steward) — the effective releasable language head.
+> # LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN merged (888e6fe4) and
+> # RT-MAPPING-MULTIOP-DISPATCH merged (1c48b6c5c), which clears the brief hold:
+> # this node's subject file crates/ken-elaborator/src/compiler_driver.rs was in
+> # RT-MAPPING's 17 changed paths, so releasing a language candidate before it
+> # landed would have collided. It has landed. Operator L2 queue items 1-3
+> # (pattern-forms literals / membership / deceq-char) are blocked or deferred; SCT
+> # (item 4) merged; this is item 5, the next releasable head. status draft->active;
+> # kicking the language ring.
+> #
+> # RE-MEASURED AT RELEASE — the D1 body-view site is ALREADY REPAIRED, D1 is
+> # re-pointed to a probe re-run. The frame located the discard at
+> # compiler_driver.rs:2013-2017 as `map_err(|_| MissingClosureMetadata)`. At the
+> # current tree the checked_core_declaration_body_view call (now :2045-2050)
+> # carries the cause: `map_err(|error| CheckedCoreBodyView { section, symbol,
+> # error })` with error: CheckedCoreBodyViewError — landed independently by
+> # f9dd79f52 (NATIVE-HANDLE-CARRIER), present since before RT-MAPPING's base. So
+> # D1's "one line of plumbing to surface the cause" at the LOAD-BEARING site is
+> # already done. What remains and defines the released first increment: RE-RUN the
+> # D5 two-recursive-position inorder traversal probe at the current tree and
+> # report the ACTUAL outcome — it now either compiles, or fails with the
+> # now-carried CheckedCoreBodyViewError named (no longer "cause unknown"). Only
+> # after that measurement returns does anyone size the gap or name a class. A
+> # SECOND, lesser discard survives at the runtime-match-census site (now
+> # :2051-2054, still `map_err(|_| MissingClosureMetadata)`); whether it matters is
+> # exactly what the probe's carried cause tells you — do not fix it speculatively.
+> # The ACTIVATION WARNING below stands unchanged. The D0 fork (is the remaining
+> # gap one view case or a class) remains the ARCHITECT's call, routed to it; the
+> # Architect authored the REAL-on-three-grounds ruling (evt_7msgce14888x4) and
+> # should be told at pickup that the load-bearing discard it named is already
+> # repaired.
+> #
+> # Original filing context below is preserved; the "no ring is released" line is
+> # SUPERSEDED by this banner.
+
+**Historical (SUPERSEDED by the banner above): this node was FILED and QUEUED.**
+Lane 2 was quiet under the earlier one-lane directive; the finding was recorded,
+not dispatched.
 
 ## The finding
 
@@ -45,40 +80,62 @@ Driver(MissingClosureMetadata {
    and `oracle_for` forbids a silent skip, so **no artifact records this as
    expected native behaviour.**
 
-## THE NAME IS NOT A DIAGNOSIS. The site throws the real error away.
+## THE NAME WAS NOT A DIAGNOSIS — and the load-bearing site is now repaired.
 
-At `crates/ken-elaborator/src/compiler_driver.rs:2013-2017`, verified in the
-tree by the Steward:
+As filed, the body-view site discarded the cause at
+`compiler_driver.rs:2013-2017` with `map_err(|_| MissingClosureMetadata)`. That
+site has since been repaired (independently, by `f9dd79f52` NATIVE-HANDLE-CARRIER
+— present since before RT-MAPPING's base). At the current tree (re-measured at
+release) it reads, at `:2045-2050`:
 
 ```rust
 checked_core_declaration_body_view(checked_package, body_view_selection, owner)
-    .map_err(|_| CompilerDriverError::MissingClosureMetadata {
+    .map_err(|error| CompilerDriverError::CheckedCoreBodyView {
         section: "checked computational IH authoritative runtime body",
+        symbol: owner.clone(),
+        error,
+    })?;
+```
+
+**The cause is now CARRIED** (`error: CheckedCoreBodyViewError`), not stamped
+with a catch-all. So D1's one-line-of-plumbing at the load-bearing site is
+already done — see the RELEASED banner. **A SECOND, lesser discard survives**
+immediately below at the runtime-match-census site, `:2051-2054`:
+
+```rust
+let census = crate::checked_core::checked_runtime_match_census(&runtime_body.body)
+    .map_err(|_| CompilerDriverError::MissingClosureMetadata {
+        section: "checked computational IH authoritative runtime match census",
         symbol: owner.clone(),
     })?;
 ```
 
-**`map_err(|_| ...)` discards the cause.** `MissingClosureMetadata` is a
-**catch-all applied regardless of why the view failed** — it is the label the
-site stamps on everything, not a finding. **The same pattern repeats
-immediately below at `:2019`** for the runtime match census.
+⇒ **The measurement located WHERE; the body-view code now surfaces WHY. The
+released increment is to re-run the probe and read the carried cause, not to
+re-plumb a site that already carries it.**
 
-⇒ **The measurement located WHERE and the code discarded WHY.**
+## Deliverable D1 (re-pointed at release): re-run the probe, read the carried cause.
 
-## Deliverable D1: surface the cause. That is the whole first increment.
+The body-view site already surfaces the cause (see the banner). So the first
+increment is no longer plumbing — it is measurement:
 
-**Replace the discarding `map_err` at both sites so the underlying error is
-carried, then re-run the probe and report what it actually says.**
+**Re-run the D5 two-recursive-position inorder traversal probe at the current
+tree and report the ACTUAL outcome.** It now either (a) compiles — in which case
+the gap has closed and this node is closeable — or (b) fails with the carried
+`CheckedCoreBodyViewError` NAMED. Report which, and if (b), report exactly what
+the carried error says.
 
-**Do NOT fix the traversal, size the gap, name a class, or cut a scoped
-successor before this returns.** Architect, explicitly: the first step is one
-line of plumbing, and **it may turn a mysterious metadata failure into an
-ordinary named refusal.** Whether this is one missing view case or a class is
-**exactly what the discarded error would tell you**, and guessing between those
-is what would inflate the node.
+**Do NOT fix the traversal, size the gap, name a class, cut a scoped successor,
+or touch the surviving census-site `map_err(|_|)` before this returns.**
+Architect, explicitly: whether this is one missing view case or a class is
+**exactly what the now-carried error would tell you**, and guessing between
+those is what would inflate the node. The one remaining plumbing question — does
+the second (census) discard also need carrying — is answered by what the probe's
+carried cause shows, not up front.
 
-**The honest headline until then:** *an ordinary binary-tree fold does not
-compile natively, cause unknown.* One measured program, unknown cause.
+**The honest headline until then:** *an ordinary binary-tree fold was measured
+not to compile natively at `331db0a73`; the cause is now carried in the code, so
+the released step is to re-run the probe and read it.*
 
 ## The discriminating experiment, recorded so it is a RE-RUN and not a re-derivation
 

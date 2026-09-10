@@ -66,7 +66,34 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-10 (LATEST — read first): SCT MERGED; RT-MAPPING queued; L2 head held
+> ### LIVE POSITION 2026-09-10 (LATEST — read first): RT-MAPPING LANDED; LANG-CHECKED RELEASED; coverage node filed
+>
+> **RT-MAPPING-MULTIOP-DISPATCH MERGED** at `1c48b6c5c` (respin candidate
+> `0fd1eead9`, blob-verified 17/17). Node `active -> merged`. Gates on the exact
+> SHA: Runtime QA + Architect delta+M4 + Adversary NO-DEFECT; Decision
+> dec_2d203c2h22qp8. ABI-S6 D5a-surface multi-op and the FS-metadata-repeat family
+> (its two consumers) are unblocked — runtime-leader dispatches the ring's next.
+>
+> **OWED runtime coverage FILED (not blocking, queued): `[[RT-MAPPING-DISPATCH-
+> CONTROL-COVERAGE]]`** (S, runtime, draft) — the Adversary's two non-blocking
+> negative-test notes (S7 cross-class control on the `Ok(Vec::new())` census
+> guard; extend the `SuppressLocalContinuationDrive`/owner-identity discriminator
+> to the repeated-producer class) + the Architect S4 unbounded-chain-refused
+> positive control. Queued behind the active lanes.
+>
+> **L2 language head RELEASED: `LANG-CHECKED-IH-BODY-VIEW-CAUSE`** (S, item 5 of
+> the operator L2 queue; items 1-3 blocked/deferred, item 4 SCT merged). The
+> `compiler_driver.rs` contention cleared when RT-MAPPING landed. Node
+> `draft -> active`; kicked the language ring. RE-MEASURED at release: the
+> load-bearing body-view discard the frame named is ALREADY REPAIRED (`f9dd79f52`
+> NATIVE-HANDLE-CARRIER carries `CheckedCoreBodyViewError` now), so D1 is
+> re-pointed from "surface the cause" to "re-run the D5 inorder-traversal probe at
+> the current tree and report the now-carried cause (or that it compiles)." A
+> lesser census-site `map_err(|_|)` discard survives; whether it matters is what
+> the probe shows. D0 (one view case vs a class) stays the Architect's call — and
+> the Architect is told at pickup that the discard it named is already repaired.
+>
+> ### LIVE POSITION 2026-09-10: SCT MERGED; RT-MAPPING queued; L2 head held
 >
 > **LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN MERGED** at `888e6fe4` (candidate
 > `3d0542d9`, blob-verified). D0 ruled INTENDED conservative limitation
