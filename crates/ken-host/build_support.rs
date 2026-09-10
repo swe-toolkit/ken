@@ -6,7 +6,7 @@ struct ProducerInventory {
     o_flags: BTreeSet<String>,
     at_flags: BTreeSet<String>,
     modes: BTreeSet<String>,
-    rustix_fs: BTreeSet<String>,
+    host_syscalls: BTreeSet<String>,
     std_fs: BTreeSet<String>,
     errno_kinds: BTreeSet<String>,
 }
@@ -25,7 +25,11 @@ pub(crate) fn verify_inventory_closure(
     compare_category("OFlags", &producer.o_flags, &registry.o_flags)?;
     compare_category("AtFlags", &producer.at_flags, &registry.at_flags)?;
     compare_category("Mode", &producer.modes, &registry.modes)?;
-    compare_category("rustix fs", &producer.rustix_fs, &registry.rustix_fs)?;
+    compare_category(
+        "host syscall",
+        &producer.host_syscalls,
+        &registry.host_syscalls,
+    )?;
     compare_category("std fs", &producer.std_fs, &registry.std_fs)?;
     compare_category("errno", &producer.errno_kinds, &registry.errno_kinds)?;
 
@@ -58,12 +62,19 @@ fn derive_producer_inventory(
         .map(|(source, _)| source)
         .ok_or_else(|| "cannot isolate the PosixHost consumer".to_owned())?;
 
+    let mut host_syscalls = call_identifiers_after(production, "fs::", Some("std::"));
+    for (call, name) in [("libc::mmap(", "mmap"), ("libc::munmap(", "munmap")] {
+        if production.contains(call) {
+            host_syscalls.insert(name.to_owned());
+        }
+    }
+
     Ok(ProducerInventory {
         abi_layouts: string_arguments(build_source, "layout_fact(")?,
         o_flags: identifiers_after(production, "OFlags::", None),
         at_flags: identifiers_after(production, "AtFlags::", None),
         modes: call_arguments(production, "Mode::from_raw_mode(")?,
-        rustix_fs: call_identifiers_after(production, "fs::", Some("std::")),
+        host_syscalls,
         std_fs: call_identifiers_after(production, "std::fs::", None),
         errno_kinds: compared_error_kinds(posix_consumer),
     })
@@ -75,7 +86,7 @@ fn registry_inventory(facts: &[(&str, u64)]) -> Result<ProducerInventory, String
         o_flags: BTreeSet::new(),
         at_flags: BTreeSet::from(["empty".to_owned()]),
         modes: BTreeSet::new(),
-        rustix_fs: BTreeSet::new(),
+        host_syscalls: BTreeSet::new(),
         std_fs: BTreeSet::from(["read_dir".to_owned(), "remove_dir_all".to_owned()]),
         errno_kinds: BTreeSet::new(),
     };
@@ -94,7 +105,9 @@ fn registry_inventory(facts: &[(&str, u64)]) -> Result<ProducerInventory, String
         } else if *name == "MODE_DIRECTORY_CREATE" {
             inventory.modes.insert("0o777".to_owned());
         } else if let Some(operation) = name.strip_prefix("SYS_") {
-            inventory.rustix_fs.insert(operation.to_ascii_lowercase());
+            inventory
+                .host_syscalls
+                .insert(operation.to_ascii_lowercase());
         } else if *name == "ERRNO_ENOENT" {
             inventory.errno_kinds.insert("NotFound".to_owned());
         } else if *name == "ERRNO_EEXIST" {

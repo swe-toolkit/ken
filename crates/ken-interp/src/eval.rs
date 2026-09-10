@@ -5018,6 +5018,22 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
         ken_host::open_resource_at_v1(&parent, &leaf, request)
             .map_err(|error| host_error_v1(error.into_io_error()))
     }
+
+    fn resource_map_anonymous(
+        &mut self,
+        length: u64,
+        protection: ken_host::MappingProtectionV1,
+    ) -> Result<ken_host::MappingRegionV1, ken_host::SemanticErrorV1> {
+        ken_host::MappingRegionV1::try_new_anonymous(length, protection)
+            .map_err(ken_host::SemanticErrorV1::Resource)
+    }
+
+    fn resource_unmap(
+        &mut self,
+        region: ken_host::MappingRegionV1,
+    ) -> Result<(), ken_host::IoErrorIdentityV1> {
+        region.release_in_process()
+    }
 }
 
 fn from_console_stream_v1(stream: ken_host::ConsoleStreamV1) -> ConsoleStream {
@@ -6512,6 +6528,15 @@ mod px5b_effect_observation_tests {
             assert_eq!(bytes.len(), 4, "dispatcher must apply buffer capacity");
             Ok(WRITTEN)
         }
+
+        fn resource_map_anonymous(
+            &mut self,
+            length: u64,
+            protection: ken_host::MappingProtectionV1,
+        ) -> Result<ken_host::MappingRegionV1, ken_host::SemanticErrorV1> {
+            ken_host::MappingRegionV1::try_new_anonymous(length, protection)
+                .map_err(ken_host::SemanticErrorV1::Resource)
+        }
     }
 
     #[derive(Default)]
@@ -7001,22 +7026,23 @@ mod px5b_effect_observation_tests {
         expect_resource_host_io(&revoked, ids.revoked_id, &ids, &fs);
     }
 
-    /// Promise class: durable component-boundary invariant. MEASURED: the real
-    /// host dispatcher allocates an anonymous Mapping and routes both D3 views,
-    /// while the interpreter's existing generic reifier observes the opaque
-    /// resource token, Unit, and owned Bytes results. CLAIMED: the represented
-    /// Mapping operations are interpreter-observable without a new value form
-    /// or checked Ken producer. THE GAP: native execution is independently
-    /// unavailable and is not exercised by this component boundary.
+    /// Promise class: durable component-boundary invariant. The interpreter's
+    /// production host adapter allocates in-process Mapping bytes, routes both
+    /// bounded views through the shared dispatcher/reifier, and settles the
+    /// mapping without an OS unmap. The native sibling is exercised at the host
+    /// ABI and Cranelift boundaries.
     #[test]
-    fn abi_s6_d3_mapping_dispatch_reaches_existing_interpreter_observations() {
+    fn abi_s6_d5a_mapping_dispatch_uses_the_in_process_interpreter_backend() {
         let ids = console_ids();
         let fs = fs_ids();
         let mut store = EvalStore::new();
         let capabilities = ken_host::CapabilityTableV1::default();
         let revocation = ken_host::RevocationDomain::default();
         let mut resources = ken_host::ResourceTableV1::default();
-        let mut backend = ShortWriteBackend::default();
+        let mut handler = CaptureHost::new(Vec::new());
+        let mut backend = InterpreterHostBackend {
+            handler: &mut handler,
+        };
 
         let allocate_request = ken_host::CanonicalRequestV1::MappingAllocate {
             length: 8,
@@ -7117,6 +7143,30 @@ mod px5b_effect_observation_tests {
             result_payload(&value, ids.ok_id),
             &EvalVal::Bytes(b"map".to_vec())
         );
+
+        let released = ken_host::dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            ken_host::HostOpV1::ResourceRelease,
+            None,
+            ken_host::ResourceInputsV1::Target(target),
+            &ken_host::CanonicalRequestV1::ResourceRelease,
+        )
+        .expect("interpreter mapping release dispatches");
+        assert!(matches!(
+            released.outcome,
+            ken_host::CanonicalOutcomeV1::Success(
+                ken_host::CanonicalReplyV1::ResourceSettlement(
+                    ken_host::ResourceSettlementObservationV1 {
+                        resource_kind: ken_host::ResourceKindV1::Mapping,
+                        outcome: ken_host::ResourceSettlementOutcomeV1::Released,
+                        ..
+                    }
+                )
+            )
+        ));
     }
 
     /// Promise class: normative compatibility vector for

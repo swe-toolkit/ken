@@ -3254,12 +3254,13 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         role: R::ResourceTraceIdentity,
         children: INT2,
     };
-    /// The two-alternative `ResourceKind` set, at wire tags this module does
-    /// not spell — reached by POSITION, per [`SynthesizedAggregateStep`].
+    /// The closed `ResourceKind` set, at wire tags this module does not spell —
+    /// reached by POSITION, per [`SynthesizedAggregateStep`].
     const RESOURCE_KIND: SynthesizedAggregateNode =
         N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
             N::nullary(R::ResourceKindFsHandle),
             N::nullary(R::ResourceKindBuffer),
+            N::nullary(R::ResourceKindMapping),
         ]));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 
@@ -3497,7 +3498,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::FsRemoveDirectory => (REMOVE_DIRECTORY_ERROR, UNIT),
         Op::FsRename => (RENAME_ERROR, UNIT),
         Op::FsChangeMode => (CHANGE_MODE_ERROR, UNIT),
-        Op::BufferAllocate | Op::BufferFreeze => (RESOURCE_SURFACE, N::Absent),
+        Op::BufferAllocate | Op::BufferFreeze | Op::MappingAllocate | Op::MappingReadView => {
+            (RESOURCE_SURFACE, N::Absent)
+        }
+        Op::MappingWriteView => (RESOURCE_SURFACE, UNIT),
         Op::FsHandleMetadata => (RESOURCE_SURFACE, N::Absent),
         Op::ResourceRelease => (RESOURCE_SURFACE, UNIT),
         Op::FsReadAt => (RESOURCE_SURFACE, READ_PROGRESS),
@@ -10370,7 +10374,7 @@ mod tests {
         .map(|(index, role)| (path(ERR, &[alt(index as u32)]), Fixed(role)))
         .chain(
             // `ResourceKind` at its THREE distinct parent paths, each with its
-            // own two alternatives. These are the repeated-role sites.
+            // own three alternatives. These are the repeated-role sites.
             [
                 (4_u32, 0_u32),
                 (5, 0),
@@ -10378,7 +10382,11 @@ mod tests {
             ]
             .into_iter()
             .flat_map(|(alternative, position)| {
-                [R::ResourceKindFsHandle, R::ResourceKindBuffer]
+                [
+                    R::ResourceKindFsHandle,
+                    R::ResourceKindBuffer,
+                    R::ResourceKindMapping,
+                ]
                     .into_iter()
                     .enumerate()
                     .map(move |(index, role)| {
@@ -10995,7 +11003,11 @@ mod tests {
         assert_eq!(
             plan.synthesized_dynamic_alternatives(seat, &err.alternative(4).field(0))
                 .expect("`ResourceReleaseFailed` field 0 is the `ResourceKind` set"),
-            vec![Fixed(R::ResourceKindFsHandle), Fixed(R::ResourceKindBuffer)],
+            vec![
+                Fixed(R::ResourceKindFsHandle),
+                Fixed(R::ResourceKindBuffer),
+                Fixed(R::ResourceKindMapping),
+            ],
         );
 
         let roles = plan.semantic.synthesized_io_error_roles().to_vec();

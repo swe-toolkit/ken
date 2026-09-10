@@ -15,6 +15,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/abi_v1/sigpipe.c");
     println!("cargo:rerun-if-changed=build_support.rs");
     println!("cargo:rerun-if-changed=src/lib.rs");
+    println!("cargo:rerun-if-changed=src/mapping_v1.rs");
     println!("cargo:rerun-if-changed=../ken-interp/src/eval.rs");
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-env-changed=KEN_HOST_ABI_TEST_MISMATCH");
@@ -316,6 +317,13 @@ fn compile_abi_v1_companion(target: &str, host: &str) {
 fn verify_boundary_inventory(facts: &[(&str, u64)]) {
     let build = fs::read_to_string("build.rs").expect("read landed ABI fact producer");
     let source = fs::read_to_string("src/lib.rs").expect("read landed ken-host producer");
+    let mapping =
+        fs::read_to_string("src/mapping_v1.rs").expect("read landed anonymous-mapping producer");
+    let mapping = mapping
+        .split_once("#[cfg(test)]")
+        .map(|(source, _)| source)
+        .unwrap_or(&mapping);
+    let source = format!("{mapping}\n{source}");
     let consumer = fs::read_to_string("../ken-interp/src/eval.rs")
         .expect("read landed interpreter host-boundary consumer");
     let probe = fs::read_to_string("abi_probe.c").expect("read target ABI observer");
@@ -569,6 +577,8 @@ fn linux_raw_facts() -> Vec<(&'static str, u64)> {
         ("SYS_RENAMEAT", general::__NR_renameat.into()),
         ("SYS_READLINKAT", general::__NR_readlinkat.into()),
         ("SYS_FCHMOD", general::__NR_fchmod.into()),
+        ("SYS_MMAP", general::__NR_mmap.into()),
+        ("SYS_MUNMAP", general::__NR_munmap.into()),
         ("ERRNO_ENOENT", errno::ENOENT.into()),
         ("ERRNO_EEXIST", errno::EEXIST.into()),
     ]

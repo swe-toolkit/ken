@@ -187,9 +187,9 @@ impl HostOpV1 {
             Self::ResourceRelease => HostOpAvailabilityV1::NativeTested,
             Self::BufferAllocate => HostOpAvailabilityV1::NativeTested,
             Self::BufferFreeze => HostOpAvailabilityV1::NativeTested,
-            Self::MappingAllocate => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::MappingReadView => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::MappingWriteView => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::MappingAllocate => HostOpAvailabilityV1::NativeTested,
+            Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
+            Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
             Self::MappingAcquireFile => HostOpAvailabilityV1::RepresentedUnavailable,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
         }
@@ -257,7 +257,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 22] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 25] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -280,6 +280,9 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 22] = [
     HostOpV1::ResourceRelease,
     HostOpV1::BufferAllocate,
     HostOpV1::BufferFreeze,
+    HostOpV1::MappingAllocate,
+    HostOpV1::MappingReadView,
+    HostOpV1::MappingWriteView,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -359,6 +362,7 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_error_no_progress: u64,
     pub resource_kind_fs_handle: u64,
     pub resource_kind_buffer: u64,
+    pub resource_kind_mapping: u64,
     pub resource_error_reply_schema: u64,
     pub resource_error_mapping_limit: u64,
 }
@@ -518,12 +522,26 @@ pub fn host_effect_wire_layout_v1(
             checked_u32(field("span_origin")?)?,
         ],
         HostOpV1::BufferAllocate => vec![checked_u32(field("capacity")?)?],
-        HostOpV1::BufferFreeze => vec![
+        HostOpV1::BufferFreeze | HostOpV1::MappingReadView => vec![
             checked_u32(field("resource")?)?,
             checked_u32(field("start")?)?,
             checked_u32(field("length")?)?,
             checked_u32(field("span_origin")?)?,
         ],
+        HostOpV1::MappingAllocate => vec![
+            checked_u32(field("length")?)?,
+            checked_u32(field("protection")?)?,
+        ],
+        HostOpV1::MappingWriteView => {
+            let bytes = slice("bytes")?;
+            vec![
+                checked_u32(field("resource")?)?,
+                checked_u32(field("start")?)?,
+                bytes[0],
+                bytes[1],
+                checked_u32(field("span_origin")?)?,
+            ]
+        }
         // **`ABI-R3` `D4` -- the request/reply schema axis, made a build break.**
         //
         // This was a `_` wildcard. Unlike the three defaults `D2` closed it did
@@ -545,9 +563,6 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsGetInheritance
         | HostOpV1::FsSetInheritance
         | HostOpV1::FsDuplicate
-        | HostOpV1::MappingAllocate
-        | HostOpV1::MappingReadView
-        | HostOpV1::MappingWriteView
         | HostOpV1::MappingAcquireFile
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation))
@@ -612,6 +627,7 @@ pub fn host_effect_wire_layout_v1(
         resource_error_no_progress: generated_binding("error", "resource.NoProgress")?,
         resource_kind_fs_handle: generated_binding("tag", "resource_kind.FsHandle")?,
         resource_kind_buffer: generated_binding("tag", "resource_kind.Buffer")?,
+        resource_kind_mapping: generated_binding("tag", "resource_kind.Mapping")?,
         resource_error_reply_schema: generated_binding("lifetime", "resource_error_reply_schema")?,
         resource_error_mapping_limit: generated_binding("error", "resource.MappingLimit")?,
     })
@@ -903,11 +919,23 @@ pub struct BufferLimitsV1 {
     pub invocation_max_live_capacity: u64,
 }
 
+pub const MAPPING_ACCOUNTING_GRANULE_V1: u64 = 4096;
+
 pub const DEFAULT_BUFFER_LIMITS_V1: BufferLimitsV1 = BufferLimitsV1 {
     per_buffer_max_capacity: 1024 * 1024,
     per_mapping_max_capacity: 1024 * 1024,
     invocation_max_live_capacity: 16 * 1024 * 1024,
 };
+
+fn mapping_accounted_capacity(length: u64) -> Result<u64, ResourceErrorV1> {
+    if length == 0 {
+        return Err(ResourceErrorV1::MappingLimit);
+    }
+    length
+        .checked_add(MAPPING_ACCOUNTING_GRANULE_V1 - 1)
+        .map(|rounded| rounded / MAPPING_ACCOUNTING_GRANULE_V1 * MAPPING_ACCOUNTING_GRANULE_V1)
+        .ok_or(ResourceErrorV1::MappingLimit)
+}
 
 impl BufferLimitsV1 {
     pub const fn new(
@@ -1038,11 +1066,18 @@ impl MappingProtectionV1 {
 
 /// Host-private storage for an opaque mapping resource.
 ///
-/// D1 deliberately owns in-process bytes while the mapping operation remains
-/// represented-unavailable. Native promotion replaces the backing acquisition;
-/// neither this type nor its resource token exposes an address to Ken.
+/// The in-process variant models mappings for the interpreter and represented
+/// file acquisition. The mapped variant owns a Linux mapping whose address is
+/// confined to `mapping_v1`; neither storage form nor the resource token
+/// exposes an address to Ken, and every view still copies bytes across the
+/// checked boundary.
+enum MappingStorageV1 {
+    InProcess(Vec<u8>),
+    Mapped(crate::mapping_v1::MappedRegionV1),
+}
+
 pub struct MappingRegionV1 {
-    bytes: Vec<u8>,
+    storage: MappingStorageV1,
     backing: MappingBackingV1,
     protection: MappingProtectionV1,
 }
@@ -1051,7 +1086,7 @@ impl std::fmt::Debug for MappingRegionV1 {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("MappingRegionV1")
-            .field("length", &self.bytes.len())
+            .field("length", &self.length())
             .field("backing", &self.backing)
             .field("protection", &self.protection)
             .finish()
@@ -1073,7 +1108,7 @@ impl MappingRegionV1 {
             .map_err(|_| ResourceErrorV1::AllocationFailed)?;
         bytes.resize(length, 0);
         Ok(Self {
-            bytes,
+            storage: MappingStorageV1::InProcess(bytes),
             backing: MappingBackingV1::Anonymous,
             protection,
         })
@@ -1087,14 +1122,33 @@ impl MappingRegionV1 {
             return Err(ResourceErrorV1::InvalidBounds);
         }
         Ok(Self {
-            bytes,
+            storage: MappingStorageV1::InProcess(bytes),
             backing: MappingBackingV1::FileBacked,
             protection,
         })
     }
 
+    pub(crate) fn try_new_mapped_anonymous(
+        length: u64,
+        protection: MappingProtectionV1,
+    ) -> Result<Self, IoErrorIdentityV1> {
+        let length = usize::try_from(length).map_err(|_| IoErrorIdentityV1::InvalidInput)?;
+        if length == 0 {
+            return Err(IoErrorIdentityV1::InvalidInput);
+        }
+        let mapped = crate::mapping_v1::map_anonymous_v1(length, protection)?;
+        Ok(Self {
+            storage: MappingStorageV1::Mapped(mapped),
+            backing: MappingBackingV1::Anonymous,
+            protection,
+        })
+    }
+
     pub fn length(&self) -> usize {
-        self.bytes.len()
+        match &self.storage {
+            MappingStorageV1::InProcess(bytes) => bytes.len(),
+            MappingStorageV1::Mapped(mapped) => mapped.length(),
+        }
     }
 
     pub fn backing(&self) -> MappingBackingV1 {
@@ -1105,16 +1159,50 @@ impl MappingRegionV1 {
         self.protection
     }
 
+    #[cfg(test)]
+    pub(crate) fn is_native_mapped(&self) -> bool {
+        matches!(&self.storage, MappingStorageV1::Mapped(_))
+    }
+
+    fn bytes(&self) -> &[u8] {
+        match &self.storage {
+            MappingStorageV1::InProcess(bytes) => bytes,
+            MappingStorageV1::Mapped(mapped) => mapped.as_slice(),
+        }
+    }
+
+    fn bytes_mut(&mut self) -> &mut [u8] {
+        match &mut self.storage {
+            MappingStorageV1::InProcess(bytes) => bytes,
+            MappingStorageV1::Mapped(mapped) => mapped.as_mut_slice(),
+        }
+    }
+
     fn bounded_slice(&self, start: usize, len: usize) -> Result<&[u8], ResourceErrorV1> {
-        let range = checked_bounded_range(self.bytes.len(), 0, self.bytes.len(), start, len)?;
-        Ok(&self.bytes[range])
+        let bytes = self.bytes();
+        let range = checked_bounded_range(bytes.len(), 0, bytes.len(), start, len)?;
+        Ok(&bytes[range])
     }
 
     fn write_bounded_slice(&mut self, start: usize, bytes: &[u8]) -> Result<(), ResourceErrorV1> {
-        let range =
-            checked_bounded_range(self.bytes.len(), 0, self.bytes.len(), start, bytes.len())?;
-        self.bytes[range].copy_from_slice(bytes);
+        let target = self.bytes_mut();
+        let range = checked_bounded_range(target.len(), 0, target.len(), start, bytes.len())?;
+        target[range].copy_from_slice(bytes);
         Ok(())
+    }
+
+    pub fn release_in_process(self) -> Result<(), IoErrorIdentityV1> {
+        match self.storage {
+            MappingStorageV1::InProcess(_) => Ok(()),
+            MappingStorageV1::Mapped(_) => Err(IoErrorIdentityV1::Unsupported),
+        }
+    }
+
+    pub(crate) fn unmap_native(self) -> Result<(), IoErrorIdentityV1> {
+        match self.storage {
+            MappingStorageV1::Mapped(mapped) => crate::mapping_v1::unmap_v1(mapped),
+            MappingStorageV1::InProcess(_) => Err(IoErrorIdentityV1::Unsupported),
+        }
     }
 }
 
@@ -1320,12 +1408,12 @@ impl ResourceTableV1 {
     }
 
     fn mapping_capacity_total(&self, length: u64) -> Result<u64, ResourceErrorV1> {
+        let accounted = mapping_accounted_capacity(length)?;
         let total = self
             .live_owned_capacity
-            .checked_add(length)
+            .checked_add(accounted)
             .ok_or(ResourceErrorV1::MappingLimit)?;
-        if length == 0
-            || length > self.buffer_limits.per_mapping_max_capacity
+        if accounted > self.buffer_limits.per_mapping_max_capacity
             || total > self.buffer_limits.invocation_max_live_capacity
         {
             return Err(ResourceErrorV1::MappingLimit);
@@ -1879,7 +1967,10 @@ impl ResourceTableV1 {
         match owner {
             ResourceOwnerV1::FsHandle(_) => None,
             ResourceOwnerV1::Buffer(buffer) => Some(buffer.capacity() as u64),
-            ResourceOwnerV1::Mapping(region) => Some(region.length() as u64),
+            ResourceOwnerV1::Mapping(region) => Some(
+                mapping_accounted_capacity(region.length() as u64)
+                    .expect("a live mapping has nonzero page-accounted capacity"),
+            ),
         }
     }
 
@@ -2292,6 +2383,14 @@ pub trait HostEffectBackendV1 {
     ) -> Result<crate::ResourceHandleV1, IoErrorIdentityV1> {
         crate::resource_duplicate_v1(handle, policy)
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
+    }
+
+    fn resource_map_anonymous(
+        &mut self,
+        _length: u64,
+        _protection: MappingProtectionV1,
+    ) -> Result<MappingRegionV1, SemanticErrorV1> {
+        Err(SemanticErrorV1::Io(IoErrorIdentityV1::Unsupported))
     }
 
     fn resource_close(&mut self, handle: crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1> {
@@ -3036,11 +3135,16 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             }
         }
         (HostOpV1::MappingAllocate, CanonicalRequestV1::MappingAllocate { length, protection }) => {
-            match resources
-                .mapping_capacity_total(*length)
-                .and_then(|_| MappingRegionV1::try_new_anonymous(*length, *protection))
-                .and_then(|region| resources.insert_mapping(region, None))
-            {
+            let acquired = (|| {
+                resources
+                    .mapping_capacity_total(*length)
+                    .map_err(SemanticErrorV1::Resource)?;
+                let region = backend.resource_map_anonymous(*length, *protection)?;
+                resources
+                    .insert_mapping(region, None)
+                    .map_err(SemanticErrorV1::Resource)
+            })();
+            match acquired {
                 Ok((token, identity)) => {
                     minted_resource = Some(token);
                     resource_bindings.push((ResourceBindingRole::Target, identity));
@@ -3050,7 +3154,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                         identity,
                     })
                 }
-                Err(error) => Err(SemanticErrorV1::Resource(error)),
+                Err(error) => Err(error),
             }
         }
         (
@@ -4071,6 +4175,15 @@ mod tests {
             Ok(count)
         }
 
+        fn resource_map_anonymous(
+            &mut self,
+            length: u64,
+            protection: MappingProtectionV1,
+        ) -> Result<MappingRegionV1, SemanticErrorV1> {
+            MappingRegionV1::try_new_anonymous(length, protection)
+                .map_err(SemanticErrorV1::Resource)
+        }
+
         fn resource_close(
             &mut self,
             handle: crate::ResourceHandleV1,
@@ -4141,6 +4254,17 @@ mod tests {
                 return Err(IoErrorIdentityV1::Unsupported);
             }
             Ok((0..count).map(|index| index as u8).collect())
+        }
+        fn resource_map_anonymous(
+            &mut self,
+            length: u64,
+            protection: MappingProtectionV1,
+        ) -> Result<MappingRegionV1, SemanticErrorV1> {
+            MappingRegionV1::try_new_anonymous(length, protection)
+                .map_err(SemanticErrorV1::Resource)
+        }
+        fn resource_unmap(&mut self, region: MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
+            region.release_in_process()
         }
         fn fs_read_file(
             &mut self,
@@ -5202,13 +5326,11 @@ mod tests {
         }
     }
 
-    /// Promise class: transition sentinel. ABI-S6 D4 extends the represented-
-    /// unavailable tail with file-backed Mapping acquisition while leaving the
-    /// existing Clock, ABI-S1 descriptor, D3 Mapping, and Entropy members in
-    /// place. A later native-promotion slice must deliberately retire or update
-    /// this sentinel.
+    /// Promise class: transition sentinel. ABI-S6 D5a removes exactly the three
+    /// anonymous Mapping operations from the represented-unavailable tail while
+    /// leaving file-backed acquisition for D5b.
     #[test]
-    fn abi_s6_d4_extends_only_the_represented_unavailable_tail() {
+    fn abi_s6_d5a_leaves_file_acquisition_represented_unavailable() {
         assert_eq!(
             HostOpV1::ALL
                 .into_iter()
@@ -5226,13 +5348,10 @@ mod tests {
                 HostOpV1::FsGetInheritance,
                 HostOpV1::FsSetInheritance,
                 HostOpV1::FsDuplicate,
-                HostOpV1::MappingAllocate,
-                HostOpV1::MappingReadView,
-                HostOpV1::MappingWriteView,
                 HostOpV1::MappingAcquireFile,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "D4 adds file-backed acquisition to the represented-unavailable Mapping tail"
+            "D5a must leave only file-backed Mapping acquisition in the unavailable tail"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,
@@ -5350,9 +5469,9 @@ mod tests {
             "ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1",
             "BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1",
             "BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1",
-            "MappingAllocate|0404|unavailable|MappingAllocateRequestV1|2|HostReplyV1|1",
-            "MappingReadView|0405|unavailable|MappingReadViewRequestV1|4|HostReplyV1|1",
-            "MappingWriteView|0406|unavailable|MappingWriteViewRequestV1|4|HostReplyV1|1",
+            "MappingAllocate|0404|native|MappingAllocateRequestV1|2|HostReplyV1|1",
+            "MappingReadView|0405|native|MappingReadViewRequestV1|4|HostReplyV1|1",
+            "MappingWriteView|0406|native|MappingWriteViewRequestV1|4|HostReplyV1|1",
             "MappingAcquireFile|0407|unavailable|MappingAcquireFileRequestV1|3|HostReplyV1|1",
             "lifetime=filesystem_observation_schema|2",
             "lifetime=resource_observation_schema|1",
@@ -5768,15 +5887,12 @@ mod tests {
         );
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: the three D3
-    /// Mapping identities occupy their pinned append-only values and inventory
-    /// order, remain represented-unavailable, and only anonymous allocation is
-    /// ambient. CLAIMED: D3 closes the Mapping ABI alphabet without native
-    /// admission or an explicit capability seat. THE GAP: native reachability
-    /// also depends on the runtime admission set; the runtime no-seat census
-    /// and its compile-forced exhaustive match close that independent axis.
+    /// Promise class: normative compatibility vector. The three anonymous
+    /// Mapping identities retain their pinned append-only values and move as one
+    /// NativeTested set, without adding a capability seat or promoting the
+    /// adjacent file-backed operation.
     #[test]
-    fn abi_s6_d3_mapping_identity_and_unavailable_posture_are_pinned() {
+    fn abi_s6_d5a_promotes_the_atomic_anonymous_mapping_operation_set() {
         assert_eq!(HostOpV1::try_from(0x0404), Ok(HostOpV1::MappingAllocate));
         assert_eq!(HostOpV1::try_from(0x0405), Ok(HostOpV1::MappingReadView));
         assert_eq!(HostOpV1::try_from(0x0406), Ok(HostOpV1::MappingWriteView));
@@ -5801,19 +5917,13 @@ mod tests {
             HostOpV1::MappingReadView,
             HostOpV1::MappingWriteView,
         ] {
-            assert_eq!(
-                operation.availability(),
-                HostOpAvailabilityV1::RepresentedUnavailable
-            );
+            assert_eq!(operation.availability(), HostOpAvailabilityV1::NativeTested);
             assert_eq!(
                 operation.capability_requirement(),
                 CapabilityRequirementV1::None
             );
-            assert!(!NATIVE_TESTED_TARGETS_V1.contains(&operation));
-            assert_eq!(
-                host_effect_wire_layout_v1(operation),
-                Err(TerminalErrorV1::OperationUnavailable(operation))
-            );
+            assert!(NATIVE_TESTED_TARGETS_V1.contains(&operation));
+            assert!(host_effect_wire_layout_v1(operation).is_ok());
         }
         assert!(HostOpV1::MappingAllocate.is_ambient());
         assert!(!HostOpV1::MappingReadView.is_ambient());
@@ -6010,14 +6120,15 @@ mod tests {
     /// Promise class: durable invariant. MEASURED: per-mapping and shared
     /// aggregate excess each return exact MappingLimit before insertion, Buffer
     /// and Mapping draw from one counter, and terminal release restores exactly
-    /// the released length. CLAIMED: mappings cannot bypass the invocation's
-    /// owned-byte governor through a parallel resource channel. THE GAP: process
+    /// the released canonical charge. CLAIMED: mappings cannot bypass the
+    /// invocation's owned-byte governor through a parallel resource channel.
+    /// THE GAP: process
     /// allocator failure remains independently pinned as AllocationFailed.
     #[test]
-    fn abi_s6_d4_mapping_limits_share_owned_bytes_and_release_restores_capacity() {
-        assert!(BufferLimitsV1::new(4, 0, 6).is_none());
-        assert!(BufferLimitsV1::new(4, 7, 6).is_none());
-        let limits = BufferLimitsV1::new(4, 4, 6).expect("valid shared limits");
+    fn abi_s6_d5a_mapping_limits_share_page_charges_and_release_restores_capacity() {
+        assert!(BufferLimitsV1::new(4, 0, 4096).is_none());
+        assert!(BufferLimitsV1::new(4, 4097, 4096).is_none());
+        let limits = BufferLimitsV1::new(4, 4096, 4096).expect("valid shared limits");
         let mut resources = ResourceTableV1::with_buffer_limits(limits);
         let capabilities = CapabilityTableV1::default();
         let revocation = RevocationDomain::default();
@@ -6039,7 +6150,7 @@ mod tests {
             .expect("represented mapping allocation dispatch")
         };
 
-        for length in [0, 5] {
+        for length in [0, 4097] {
             assert_eq!(
                 allocate_mapping(&mut resources, length).outcome,
                 CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::MappingLimit))
@@ -6069,7 +6180,7 @@ mod tests {
         let mapping = allocate_mapping(&mut resources, 4)
             .resource_token
             .expect("mapping fits after buffer release");
-        assert_eq!(resources.live_owned_capacity, 4);
+        assert_eq!(resources.live_owned_capacity, 4096);
         assert_eq!(
             resources.insert_buffer(3),
             Err(ResourceErrorV1::BufferLimit),
@@ -6094,8 +6205,8 @@ mod tests {
             Ok(ResourceReleaseReadinessV1::Waiting)
         ));
         assert_eq!(
-            resources.live_owned_capacity, 2,
-            "admitted Mapping bytes remain live until the lease drains"
+            resources.live_owned_capacity, 4096,
+            "admitted Mapping bytes remain page-charged until the lease drains"
         );
         let mut pending = resources.finish_admission(lease);
         assert_eq!(pending.len(), 1);
@@ -6103,6 +6214,31 @@ mod tests {
         ResourceTableV1::finish_release_with(pending.pop().unwrap(), &mut release_backend)
             .expect("drained mapping unmaps");
         assert_eq!(release_backend.unmap_calls, 2);
+    }
+
+    /// Promise class: normative compatibility vector. The fixed 4 KiB charge is
+    /// shared by every backing and independent of the host's page size, while
+    /// Buffer remains byte-granular in the same invocation aggregate.
+    #[test]
+    fn abi_s6_d5a_mapping_accounting_is_fixed_4kib_and_buffer_is_byte_granular() {
+        assert_eq!(mapping_accounted_capacity(1), Ok(4096));
+        assert_eq!(mapping_accounted_capacity(4096), Ok(4096));
+        assert_eq!(mapping_accounted_capacity(4097), Ok(8192));
+        assert_eq!(
+            mapping_accounted_capacity(0),
+            Err(ResourceErrorV1::MappingLimit)
+        );
+
+        let limits = BufferLimitsV1::new(1, 8192, 16385).expect("mixed byte/page limits");
+        let mut resources = ResourceTableV1::with_buffer_limits(limits);
+        resources.insert_buffer(1).expect("one-byte Buffer");
+        assert_eq!(resources.live_owned_capacity, 1);
+        let region = MappingRegionV1::try_new_anonymous(4097, MappingProtectionV1::ReadOnly)
+            .expect("modeled 4097-byte mapping");
+        resources
+            .insert_mapping(region, None)
+            .expect("8192-byte canonical Mapping charge");
+        assert_eq!(resources.live_owned_capacity, 8193);
     }
 
     /// Promise class: durable discriminator. MEASURED: otherwise-identical
@@ -6122,7 +6258,7 @@ mod tests {
         let read_lineage = revocation.mint_root();
         let full_lineage = revocation.mint_root();
         let mut resources = ResourceTableV1::with_buffer_limits(
-            BufferLimitsV1::new(8, 8, 8).expect("valid mapping limits"),
+            BufferLimitsV1::new(8, 4096, 4096).expect("valid mapping limits"),
         );
         let (read_source, _) =
             resources.insert_fs_handle(read_owner, crate::RightSet::READ, read_lineage);
@@ -6176,7 +6312,7 @@ mod tests {
                 &mut backend,
                 &mut resources,
                 full_source,
-                9,
+                4097,
                 MappingProtectionV1::ReadOnly,
             )
             .outcome,
@@ -6227,7 +6363,7 @@ mod tests {
             backend.read_calls, 3,
             "partial reads fill the exact request"
         );
-        assert_eq!(resources.live_owned_capacity, 8);
+        assert_eq!(resources.live_owned_capacity, 4096);
         let (region, _) = resources
             .resolve_mapping(mapping, crate::RightSet::WRITE)
             .expect("writable file mapping");
@@ -6259,7 +6395,7 @@ mod tests {
         resources
             .insert_mapping(replacement, None)
             .expect("released capacity is reusable");
-        assert_eq!(resources.live_owned_capacity, 8);
+        assert_eq!(resources.live_owned_capacity, 4096);
 
         drop(resources);
         std::fs::remove_dir_all(read_root).unwrap();
@@ -6278,7 +6414,7 @@ mod tests {
         let mut revocation = RevocationDomain::default();
         let lineage = revocation.mint_root();
         let mut resources = ResourceTableV1::with_buffer_limits(
-            BufferLimitsV1::new(16, 16, 16).expect("valid mapping limits"),
+            BufferLimitsV1::new(16, 4096, 4096).expect("valid mapping limits"),
         );
         let (source, _) = resources.insert_fs_handle(owner, crate::RightSet::READ, lineage);
         let mut backend = AllOpsBackend::default();
@@ -6321,7 +6457,7 @@ mod tests {
     fn abi_s6_d1_default_backend_unmap_is_unavailable_not_a_silent_drop() {
         let region = MappingRegionV1::try_new_anonymous(4, MappingProtectionV1::ReadOnly)
             .expect("represented anonymous mapping");
-        let mut backend = AllOpsBackend::default();
+        let mut backend = |_handle: crate::ResourceHandleV1| Ok(());
         assert_eq!(
             HostEffectBackendV1::resource_unmap(&mut backend, region),
             Err(IoErrorIdentityV1::Unsupported)

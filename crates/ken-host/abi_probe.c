@@ -43,6 +43,8 @@ int main(void) {
     printf("SYS_RENAMEAT=%lld\n", (long long)SYS_renameat);
     printf("SYS_READLINKAT=%lld\n", (long long)SYS_readlinkat);
     printf("SYS_FCHMOD=%lld\n", (long long)SYS_fchmod);
+    printf("SYS_MMAP=%lld\n", (long long)SYS_mmap);
+    printf("SYS_MUNMAP=%lld\n", (long long)SYS_munmap);
     printf("ERRNO_ENOENT=%lld\n", (long long)ENOENT);
     printf("ERRNO_EEXIST=%lld\n", (long long)EEXIST);
     return 0;
