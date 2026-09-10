@@ -1,7 +1,7 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: draft
+status: active
 owner: foundation
 size: L
 gate: none
@@ -11,8 +11,30 @@ github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
-> ## RE-BLOCKED 2026-09-10 (Steward) — HARD STOP #2 (post-kernel-fix). `active`
-> ## -> `draft`. READ THIS FIRST; it supersedes the RE-RELEASED banner below.
+> ## RE-RELEASED 2026-09-10 (Steward) — the elaborator prerequisite LANDED.
+> ## READ THIS FIRST; it supersedes the RE-BLOCKED banner immediately below.
+> ##
+> ## LANG-ELAB-NESTED-FORMER-RECURSION merged at 8508c108b (elaborator sub-cap
+> ## B: the surface now CONSUMES the kernel's nested All-IH for a recursive
+> ## occurrence nested one positive-former deeper than direct). DS-9's D3
+> ## JsonObject fold over List (Pair String Json) now elaborates. RESUME D3+ on
+> ## a base that carries 8508c108b.
+> ##
+> ## AUTHORING CONSTRAINT (Architect evt_11pcvh830sd0h): author the JsonObject
+> ## fold in the B SELECTOR FORM — `recursive result for member` — NOT the
+> ## natural self-call `json_size (pair_snd member)`, which stays NotTerminating
+> ## (sub-cap A is a future kernel WP DS-9 does NOT need). The show_int P2 floor
+> ## remains a SEPARATE, independent gate on the complete number leaf.
+> ##
+> ## NEW ACCEPTANCE — AC-SELF-SUFFICIENT (operator ruling 2026-09-10): the Json
+> ## package MUST elaborate from its own declared imports — a raw `ken-cargo run
+> ## -p ken-cli -- check <Json package>` succeeds WITHOUT any preloading fixture
+> ## supplying its closure. Every catalog module now carries this and DS-9 is not
+> ## exempt; if a needed symbol is undeclared, DECLARE the import rather than
+> ## leaning on the acceptance fixture's mk_env preload.
+> ##
+> ## SUPERSEDED 2026-09-10 — RE-BLOCKED HARD STOP #2 (post-kernel-fix). `active`
+> ## -> `draft`. Kept for history; the RE-RELEASED banner above governs now.
 > ##
 > ## The kernel former-lift ADMISSION fix landed and worked (layer-1): the
 > ## six-arm `Json` match now builds and the direct `List Json` array fold

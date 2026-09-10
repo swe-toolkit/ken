@@ -1,7 +1,7 @@
 ---
 id: LANG-ELAB-NESTED-FORMER-RECURSION
 title: "Extend the elaborator's surface structural-recursion + totality machinery to CONSUME a recursive occurrence nested one positive-former deeper than a direct occurrence (List (Pair String Self)), so a total fold over such a value elaborates — surfacing the nested induction hypothesis the kernel former-lift now builds, and/or accepting the projection-reached nested occurrence as strictly-decreasing. Preserves totality exactly (positive/structural positions only, never a manufactured decrease). Layer-2 of the one nested-former-recursion capability whose layer-1 (kernel former-lift admission) has landed."
-status: active
+status: merged
 owner: language
 size: M
 gate: language

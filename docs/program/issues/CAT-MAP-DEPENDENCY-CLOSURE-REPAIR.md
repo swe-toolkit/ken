@@ -12,13 +12,19 @@ github: null
 origin: "Steward, 2026-08-30, filed on the Architect ruling evt_em72d9eh6ndg (base 0ddd49b3) taken during CAT-BOOL-REUSE-CONSUMERS D2's pre-edit hard stop. The ruling: the Map raw-standalone failure is a PRE-EXISTING module-dependency defect, not a D2 transition, and a separate closure repair is warranted but must NOT gate the one-provider is_some drain. Recorded as a distinct follow-on per that ruling; QUEUED, not released. Steward-filed per COORDINATION section 2."
 ---
 
-> # DRAFT — recorded as a distinct follow-on, NOT released. `draft`.
+> # GROUNDED by operator ruling 2026-09-10 — `draft`, not yet released.
 >
-> Filed only so the pre-existing defect the Architect surfaced during
-> `CAT-BOOL-REUSE-CONSUMERS` D2 is tracked. It is NOT a lane objective and NOT a
-> prerequisite for that drain. Do not start it without a Steward release, and
-> interrogate the constraint's grounding and priority (`steward.md` §4c) before
-> framing it into a real deliverable.
+> Originally filed (Architect `evt_em72d9eh6ndg`) as a tracked follow-on whose
+> governing design question — must every catalog module elaborate from its own
+> declared imports, or is fixture-provided ambient closure acceptable? — was
+> operator-reserved. **The operator RULED it (2026-09-10, this session): every
+> catalog module MUST elaborate from its own declared imports. Rationale
+> (mission-grounded): the catalog is the basis for users of Ken to build real
+> programs and libraries; a package that cannot elaborate from its own declared
+> imports is useless for that purpose.** So the constraint is settled and the
+> requirement is catalog-WIDE, not Map-only. Still `draft`/unreleased: foundation
+> (L3) is stood down and DS-9 is its next objective; this is sequenced behind
+> DS-9 unless the operator preempts. Do not start without a Steward release.
 
 ## The measured defect (Architect `evt_em72d9eh6ndg`, base `0ddd49b3`)
 
@@ -37,11 +43,27 @@ exits 1 with `UnresolvedCon { name: "list_append", span: Span { start: 4210, end
 elaborating the real Map source. So Map does not elaborate from its own declared
 imports today; the fixture supplies the closure.
 
-## Scope note (why this is not yet a framed deliverable)
+## Scope — settled design, open decomposition (operator ruling 2026-09-10)
 
-The repair is potentially broad: it may span the full legacy fixture inventory,
-not just `list_append`. Whether Ken should require every catalog module to
-elaborate from its own imports (vs. an intentional fixture-provided ambient
-closure) is a design/priority question for the operator and Architect, not a
-settled constraint. Frame it only when the constraint is grounded and the lane
-allows — until then it stays a tracked draft.
+The design question is CLOSED (operator: import-self-sufficiency is required,
+above). What remains before release is decomposition and sizing, NOT a design
+call:
+
+- **Breadth is a D0 measurement.** Map's `list_append` is one instance; the
+  requirement is catalog-wide, so D0 must census which catalog packages fail to
+  `check` standalone (raw `ken-cargo run -p ken-cli -- check <pkg>`, not through
+  a preloading fixture) and enumerate each undeclared dependency. That census is
+  the sizing input — it decides whether this is one repair node or a per-package
+  campaign. Run it when foundation picks the node up (not on the local build
+  lock while another lane is building).
+- **Architect decomposition owed at release.** The Steward engages the Architect
+  to decompose the census result into WP(s) and route each; the repair may be
+  purely additive (declare the missing imports) or may surface real ordering or
+  provider gaps per package.
+- **Applies to DS-9 too.** DS-9's JSON codec is a catalog package, so under this
+  ruling it must elaborate from its own declared imports — carried as an AC into
+  the DS-9 re-release, not deferred to this node.
+- **Standing requirement, beyond this node.** Every future catalog authoring /
+  migration node carries an AC that the module elaborates standalone; foundation
+  QA and the Librarian's as-built mandate enforce it. To be codified (ADR +
+  review criterion).
