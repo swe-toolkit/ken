@@ -212,12 +212,29 @@ increment framed below). The node stays `active` across increments.
   its own QA/Architect approval.
 - **D5a-surface — the checked §1.9 composition over the frozen three-op wire
   (D0-first; THIS is the framed/released increment).** Compose the public checked
-  Mapping surface — `withMapping` / `mapView` / `mapBytes` / `mapWrite`, exactly
-  the four `spec/30-surface/38-ffi-io.md §1.9` procs — over the frozen three-op
-  native wire D5a-core delivers, and DISCHARGE the three RED-UNTIL-BUILT seed
-  cases (`conformance/surface/ffi-io/seed-mapping.md`). Grounded on the landed
-  §1.9 contract (`cd62283b8`).
-  - **D0 — characterize the continuation prerequisite; HARD-STOP if unmet.**
+  Mapping surface — `withMapping` / `mapBytes` / `mapWrite`, exactly the **three**
+  `spec/30-surface/38-ffi-io.md §1.9` procs — over the frozen three-op native wire
+  D5a-core delivers, and DISCHARGE the **two ACHIEVABLE** RED-UNTIL-BUILT seed
+  cases (4 KiB granule + opacity/bounds) in
+  `conformance/surface/ffi-io/seed-mapping.md`. The MAP_PRIVATE COW seed case
+  DEFERS to D5b (file acquisition) — see AC-SEED-DISCHARGE-D5A and the D5b
+  deliverable below. Grounded on the landed **window-direct** §1.9 contract
+  (`b33f8ac9b`, the respin that dropped `mapView` / private `MappingSpan` and
+  passes `MappingWindow` directly to `mapBytes` / `mapWrite`; supersedes the
+  earlier `cd62283b8` four-proc contract).
+  - **D0 — RESOLVED 2026-09-10 (Architect evt_56e6jx62s0qpb -> §1.9 window-direct
+    respin, landed `b33f8ac9b`).** The bracket did NOT compose natively over the
+    original four-proc contract — `mapView` returned a `MappingSpan`, a
+    capture-bearing continuation the native path cannot own. The Architect ruled
+    the defect UPSTREAM: `mapView` / private `MappingSpan` did not earn their keep
+    (they copied the `BufferSpan` mechanism without the capping condition that
+    justifies it; a mapping's live subrange equals its window when live, so
+    `MappingSpan` carried no invariant `MappingWindow` doesn't). The fix was the
+    window-direct §1.9 respin, NOT a native continuation prerequisite; the
+    represented-K seam is not needed. The original D0 characterization follows for
+    the record.
+  - **D0 (original) — characterize the continuation prerequisite; HARD-STOP
+    if unmet.**
     `withMapping`'s bracket body `MappingHandle -> HostIO a (ResourceBodyResult e
     r)` composes a checked resource bracket exactly as `withBuffer` (`§1.7.1`) /
     the `FsHandle` acquire/release bracket do. D0 measures whether that checked
@@ -228,19 +245,47 @@ increment framed below). The node stays `active` across increments.
     build new continuation machinery here, do NOT alter the §1.9 contract to route
     around it, and do NOT add an operation — any of those is out of this increment's
     scope and is a distinct node the Architect must rule.
-  - **D1 (only if D0 clears) — build the checked composition + discharge the
-    seed.** Implement the four checked procs over the frozen three-op wire and
-    turn the three seed cases green WITH their discriminating controls intact:
-    MAP_PRIVATE copy-on-write (the in-mapping read observes the write; the
-    ordinary-file read observes the ORIGINAL bytes), the fixed 4 KiB
-    host-independent granule (1 B -> 4096, 4097 B -> 8192; native == interpreted),
-    and opacity + bounds (no raw address in any Ken value or token; out-of-range
-    `mapView` is a fail-visible `ResourceError`; a wrong-kind token is
-    `ResourceKindMismatch` naming `Mapping`; `ReadOnly` refuses `mapWrite`).
+  - **D1 (D0 cleared via the respin) — build the checked composition + discharge
+    the two achievable seed cases.** Implement the three checked procs
+    (`withMapping` / `mapBytes` / `mapWrite`) over the frozen three-op wire and
+    turn the TWO achievable seed cases green WITH their discriminating controls
+    intact: the fixed 4 KiB host-independent granule (1 B -> 4096, 4097 B -> 8192;
+    native == interpreted), and opacity + bounds (no raw address in any Ken value
+    or token; out-of-range `mapBytes` / `mapWrite` is a fail-visible
+    `ResourceError`; a wrong-kind token is `ResourceKindMismatch` naming
+    `Mapping`; `ReadOnly` refuses `mapWrite`). The MAP_PRIVATE COW case STAYS RED,
+    BLOCKED-ON-D5b (file acquisition / `MappingAcquireFile`) — NOT weakened or
+    deleted; discharging it is D5b's acceptance. Rationale (Steward ruling A,
+    Architect-confirmed evt_5en9jgjb24the): COW is intrinsically file-backed —
+    "writes through a file mapping do not reach the backing file" has NO anonymous
+    analog — so it needs `withMapping (FileBacked ...)` -> `MappingAcquireFile`, a
+    fourth op outside D5a-surface's frozen-three-op / no-new-op boundary.
   - **Constraints (hard stops, per the Architect split).** No alteration of the
-    §1.9 contract to match D5a-core; no new operation beyond the four §1.9 procs;
-    the three-op native wire is frozen. Route to the Steward + Architect on any of
-    these rather than absorbing it.
+    §1.9 contract to match D5a-core; no new operation beyond the three §1.9 procs
+    (`withMapping` / `mapBytes` / `mapWrite`); the three-op native wire is frozen.
+    Route to the Steward + Architect on any of these rather than absorbing it.
+- **D5b — native file-backed mapping acquisition + the MAP_PRIVATE COW discharge
+  (the COW successor; framed here per Steward ruling A, Architect-confirmed
+  evt_5en9jgjb24the).** Promote the file-acquisition op `MappingAcquireFile` — the
+  `withMapping (FileBacked ...)` route that D4 landed and the D5a-core split
+  explicitly kept `RepresentedUnavailable` (Architect z4088) — to native (real
+  `mmap`-of-fd / `munmap`), so a real file-backed MAP_PRIVATE mapping can be
+  exercised. This is the fourth op OUTSIDE D5a-surface's frozen three-op wire, so
+  it is its own increment (Architect's z4085/z4088 staging: D5a = anonymous
+  MappingAllocate / ReadView / WriteView + ResourceRelease; D5b = file
+  acquisition). DISCHARGE the deferred MAP_PRIVATE COW seed case
+  (`conformance/surface/ffi-io/seed-mapping.md` case 1, keyed
+  `BLOCKED-ON-ABI-S6-D5b`): a write through a MAP_PRIVATE file mapping is observed
+  in-mapping but does NOT reach the backing file (the ordinary-file read observes
+  the ORIGINAL bytes), so a MAP_SHARED / write-through surface reds — the
+  discriminating control intact; a green-vs-green pass against its named
+  non-conforming implementation is vacuous and is a HARD STOP, not a discharge.
+  **The Architect is D5b's REQUIRED reviewer** (evt_5en9jgjb24the): the COW
+  discriminator is soundness-relevant, and the file-backed lineage/rights rule (a
+  file-backed region shares/derives its revocation lineage from the source
+  `FsHandle` per AC-LIFETIME-REVOCATION) is the Architect's gate. The
+  capacity-governance fork (AC-MAPPING-CAPACITY-GOVERNANCE) applies to any
+  file-acquisition capacity ruling not already settled at D4.
 
 ## Acceptance criteria (each with its control)
 
@@ -348,22 +393,33 @@ increment framed below). The node stays `active` across increments.
   (`export.rs` / `erasure.rs` / `prelude.rs`), the generated catalog data file,
   and the `ken-interp` reify path. Green in CI is the workspace verdict — build
   and test locally targeted only, never `--workspace` (COORDINATION §12).
-- **AC-SEED-DISCHARGE-D5A (D5a-surface — the point of the increment).** The three
+- **AC-SEED-DISCHARGE-D5A (D5a-surface — the point of the increment; scoped to the
+  TWO achievable cases per Steward ruling A, Architect-confirmed
+  evt_5en9jgjb24the).** The **two** anonymous-composition-achievable
   `conformance/surface/ffi-io/seed-mapping.md` cases flip from RED-UNTIL-BUILT to
   GREEN, each with its discriminating control still refuting a non-conforming
-  implementation — the pair, not a lone positive: (1) MAP_PRIVATE — the
-  in-mapping read observes the write AND the ordinary-file read observes the
-  original bytes, so a `MAP_SHARED`/write-through surface reds; (2) 4 KiB granule
-  — the charged sizes are exactly 4096/4096/8192 and NATIVE == INTERPRETED, so a
+  implementation — the pair, not a lone positive: the **4 KiB granule** case — the
+  charged sizes are exactly 4096/4096/8192 and NATIVE == INTERPRETED, so a
   `sysconf(_SC_PAGESIZE)`-derived or byte-granular rule reds (host-independent by
-  construction); (3) opacity + bounds — no raw address in any Ken value or token,
-  out-of-range `mapView` is a fail-visible `ResourceError`, wrong-kind token is
-  `ResourceKindMismatch` naming `Mapping`. Control: neutering any discriminator
-  (write-through, host-page accounting, address exposure, unchecked view) reds the
-  matching case; a case that passes green-vs-green against its named
-  non-conforming implementation is vacuous and does NOT discharge. The seed text
-  is not altered to make a case pass — a case that only passes after weakening its
-  control is a HARD STOP, not a discharge.
+  construction); and the **opacity + bounds** case — no raw address in any Ken
+  value or token, out-of-range `mapBytes` / `mapWrite` is a fail-visible
+  `ResourceError`, a wrong-kind token is `ResourceKindMismatch` naming `Mapping`,
+  and `ReadOnly` refuses `mapWrite`. **The MAP_PRIVATE COW case is OUT of
+  D5a-surface's scope and STAYS RED, keyed `BLOCKED-ON-ABI-S6-D5b`.** It is
+  intrinsically file-backed — "writes through a file mapping do not reach the
+  backing file" has NO anonymous analog — so discharging it needs
+  `MappingAcquireFile`, the fourth op D5a-surface's frozen wire forbids; it is
+  discharged by D5b, NOT here, and its discriminating assertions are NOT weakened
+  or deleted in the interim. Control: neutering either achievable discriminator
+  (host-page accounting, address exposure, unchecked view) reds the matching case;
+  a case that passes green-vs-green against its named non-conforming implementation
+  is vacuous and does NOT discharge. The seed text is not altered to make a case
+  pass — a case that only passes after weakening its control is a HARD STOP.
+  **Honesty of the gated axis (capability-gate lifecycle).** While the COW case is
+  dormant behind D5b, the live opacity/bounds case and every case's
+  native==interpreted parity assertion keep opacity, bounds-not-clamp, and parity
+  enforced across the whole D5b interval — the axis has a live enforcer throughout,
+  never an unguarded gap.
 
 ## Gate, reviewers, sequencing
 
