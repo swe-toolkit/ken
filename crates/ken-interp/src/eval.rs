@@ -4236,6 +4236,9 @@ pub struct FSIds {
     pub private_fs_read_at_id: GlobalId,
     pub private_fs_write_at_id: GlobalId,
     pub private_buffer_freeze_id: GlobalId,
+    pub private_mapping_allocate_id: GlobalId,
+    pub private_mapping_read_view_id: GlobalId,
+    pub private_mapping_write_view_id: GlobalId,
     pub private_resource_release_id: GlobalId,
     pub resource_read_id: GlobalId,
     pub resource_metadata_mode_id: GlobalId,
@@ -4255,6 +4258,8 @@ pub struct FSIds {
     pub invalid_bounds_id: GlobalId,
     pub no_progress_id: GlobalId,
     pub mapping_limit_id: GlobalId,
+    pub mapping_read_only_id: GlobalId,
+    pub mapping_read_write_id: GlobalId,
     pub private_buffer_span_id: GlobalId,
     pub private_transfer_count_id: GlobalId,
     pub read_some_id: GlobalId,
@@ -4314,6 +4319,9 @@ impl FSIds {
             private_fs_read_at_id: elab.prelude_env.private_fs_read_at_id,
             private_fs_write_at_id: elab.prelude_env.private_fs_write_at_id,
             private_buffer_freeze_id: elab.prelude_env.private_buffer_freeze_id,
+            private_mapping_allocate_id: elab.prelude_env.private_mapping_allocate_id,
+            private_mapping_read_view_id: elab.prelude_env.private_mapping_read_view_id,
+            private_mapping_write_view_id: elab.prelude_env.private_mapping_write_view_id,
             private_resource_release_id: elab.prelude_env.private_resource_release_id,
             resource_read_id: get("ResourceRead")?,
             resource_metadata_mode_id: get("ResourceMetadata")?,
@@ -4333,6 +4341,8 @@ impl FSIds {
             invalid_bounds_id: get("InvalidBounds")?,
             no_progress_id: get("NoProgress")?,
             mapping_limit_id: get("MappingLimit")?,
+            mapping_read_only_id: get("ReadOnly")?,
+            mapping_read_write_id: get("ReadWrite")?,
             private_buffer_span_id: elab.env.inductive(get("BufferSpan")?)?.constructors[0].id,
             private_transfer_count_id: elab.env.inductive(get("TransferCount")?)?.constructors[0]
                 .id,
@@ -5305,6 +5315,64 @@ fn fs_dispatch<H: HostHandler>(
             ken_host::CanonicalRequestV1::BufferAllocate { capacity },
             fs.op_metadata_id,
         )
+    } else if op_id == fs.private_mapping_allocate_id {
+        let length = match narrow_host_u64(args.get(1)?, ken_host::ResourceErrorV1::InvalidBounds) {
+            Ok(length) => length,
+            Err(error) => {
+                let error = resource_error_value_v1(error, fs, ids, store);
+                return Some(Ok(make_result(false, error, ids, store)));
+            }
+        };
+        let protection = match args.get(2) {
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.mapping_read_only_id => {
+                ken_host::MappingProtectionV1::ReadOnly
+            }
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.mapping_read_write_id => {
+                ken_host::MappingProtectionV1::Writable
+            }
+            _ => return Some(Err(())),
+        };
+        (
+            ken_host::HostOpV1::MappingAllocate,
+            ken_host::CanonicalRequestV1::MappingAllocate { length, protection },
+            fs.op_metadata_id,
+        )
+    } else if op_id == fs.private_mapping_read_view_id {
+        let start = match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds) {
+            Ok(start) => start,
+            Err(error) => {
+                let error = resource_error_value_v1(error, fs, ids, store);
+                return Some(Ok(make_result(false, error, ids, store)));
+            }
+        };
+        let length = match narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds) {
+            Ok(length) => length,
+            Err(error) => {
+                let error = resource_error_value_v1(error, fs, ids, store);
+                return Some(Ok(make_result(false, error, ids, store)));
+            }
+        };
+        (
+            ken_host::HostOpV1::MappingReadView,
+            ken_host::CanonicalRequestV1::MappingReadView { start, length },
+            fs.op_metadata_id,
+        )
+    } else if op_id == fs.private_mapping_write_view_id {
+        let start = match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds) {
+            Ok(start) => start,
+            Err(error) => {
+                let error = resource_error_value_v1(error, fs, ids, store);
+                return Some(Ok(make_result(false, error, ids, store)));
+            }
+        };
+        (
+            ken_host::HostOpV1::MappingWriteView,
+            ken_host::CanonicalRequestV1::MappingWriteView {
+                start,
+                bytes: bytes_at(3)?,
+            },
+            fs.op_metadata_id,
+        )
     } else if op_id == fs.private_fs_read_at_id {
         let file_offset =
             match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
@@ -5409,6 +5477,9 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::FsReadAt
             | ken_host::HostOpV1::FsWriteAt
             | ken_host::HostOpV1::BufferFreeze
+            | ken_host::HostOpV1::MappingAllocate
+            | ken_host::HostOpV1::MappingReadView
+            | ken_host::HostOpV1::MappingWriteView
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -5473,6 +5544,18 @@ fn fs_dispatch<H: HostHandler>(
             }
             _ => return Some(Err(())),
         },
+        ken_host::HostOpV1::MappingReadView | ken_host::HostOpV1::MappingWriteView => {
+            match (args.get(1), args.get(4)) {
+                (
+                    Some(EvalVal::ResourceToken(target)),
+                    Some(EvalVal::ResourceToken(span_origin)),
+                ) => ken_host::ResourceInputsV1::MappingSpanTarget {
+                    target: *target,
+                    span_origin: *span_origin,
+                },
+                _ => return Some(Err(())),
+            }
+        }
         _ => resource.map_or(
             ken_host::ResourceInputsV1::None,
             ken_host::ResourceInputsV1::Target,
@@ -6729,6 +6812,9 @@ mod px5b_effect_observation_tests {
             private_fs_read_at_id: id(),
             private_fs_write_at_id: id(),
             private_buffer_freeze_id: id(),
+            private_mapping_allocate_id: id(),
+            private_mapping_read_view_id: id(),
+            private_mapping_write_view_id: id(),
             private_resource_release_id: id(),
             resource_read_id: id(),
             resource_metadata_mode_id: id(),
@@ -6748,6 +6834,8 @@ mod px5b_effect_observation_tests {
             invalid_bounds_id: id(),
             no_progress_id: id(),
             mapping_limit_id: id(),
+            mapping_read_only_id: id(),
+            mapping_read_write_id: id(),
             private_buffer_span_id: id(),
             private_transfer_count_id: id(),
             read_some_id: id(),

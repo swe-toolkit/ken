@@ -3670,6 +3670,18 @@ fn checked_host_spine_v1(
             prelude.private_resource_release_id,
             ken_host::HostOpV1::ResourceRelease,
         ),
+        (
+            prelude.private_mapping_allocate_id,
+            ken_host::HostOpV1::MappingAllocate,
+        ),
+        (
+            prelude.private_mapping_read_view_id,
+            ken_host::HostOpV1::MappingReadView,
+        ),
+        (
+            prelude.private_mapping_write_view_id,
+            ken_host::HostOpV1::MappingWriteView,
+        ),
     ] {
         operations.insert(resolve_id(id)?, operation);
     }
