@@ -1,7 +1,7 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: draft
+status: active
 owner: foundation
 size: L
 gate: none
@@ -11,8 +11,48 @@ github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## RE-RELEASED 2026-09-10 (Steward) — the KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE
+> ## blocker is CLEARED. `draft` -> `active`. READ THIS FIRST; it supersedes the
+> ## RE-BLOCKED banner below.
+>
+> `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` LANDED on `origin/main` at `486e9f33`
+> (squash of `eb9910302`, blob-verified byte-identical on both kernel paths). That
+> node was the exact blocker the RE-BLOCKED banner named: the intrinsic All
+> former-lift's guest-path resolution now descends through nested positive formers
+> (`List (Pair String Json)`), so the `Json` eliminator / match method builds and
+> the non-recursive `JsonObject`-arm reject is gone. Its landing satisfies the
+> Architect's ruling (evt_6g6fgjb0qan40) that this node's merge RE-RELEASES DS-9's
+> D3+. The kernel prerequisite is therefore discharged.
+>
+> **The node resumes at the next increment — the first `D3`+ slice promising an
+> unbounded `Json` fold over arrays/objects.** The older `List`-carried
+> recursive-result obstruction (`KERNEL-RECURSIVE-RESULT-SURFACE`, the hidden
+> `All_List` tail result — see the 2026-08-10 ruling below) is **merged/resolved**,
+> so that surface no longer blocks the unbounded fold either. `show_int`
+> (`Capability.Parsing.Numeric`) still defers total `show_int : Int -> String`,
+> which gates the complete `JsonNumber` number leaf — a **SEPARATE, pre-existing
+> floor, not this kernel node**; it remains its own gate on a complete round trip
+> and does not block resuming D3+.
+>
+> **All standing prohibitions still bind** — the W-shaped / `Fin n` / flattening /
+> Church / postulate re-encodings the Architect forbade remain forbidden (that was
+> a ruling, not a consequence of the block); the carrier fork stays as
+> `dec_3n1pp559pxrrw` / frame §3; the `D3a` decoder paragraph is NOT to be deleted
+> (the banner below explains why it only looks redundant). D0/pickup re-measures the
+> frame's fixed inputs and re-checks the §7 contention list against the LIVE lanes
+> (that list is stale).
+>
+> **L3 slot reverted kernel -> foundation (Steward-executed reseat, 2026-09-10)**
+> per the operator's standing ruling that the L3 slot runs the kernel ring while
+> foundation is blocked and reverts to foundation when L3 unblocks — DS-9 becoming
+> startable IS that unblock. The foundation ring is seated and works this node.
+> Reviewer: Foundation QA + CV on the exact SHA, Architect on any carrier/law
+> judgment, then Steward M1-M4 -> lieutenant. One increment at a time.
+>
 > ## RE-BLOCKED 2026-09-10 (Steward) — the RE-RELEASE BELOW WAS COUNTERMANDED by a
-> ## genuine D0 hard stop + Architect ruling. `active` -> `draft`. READ THIS FIRST.
+> ## genuine D0 hard stop + Architect ruling. `active` -> `draft`. [SUPERSEDED by
+> ## the RE-RELEASED banner directly above — the kernel prerequisite it named has
+> ## now landed.]
 >
 > The RE-RELEASED banner directly below fired on the premise that
 > `KERNEL-NESTED-IND` closing made DS-9 startable. **That premise is FALSE** — the
