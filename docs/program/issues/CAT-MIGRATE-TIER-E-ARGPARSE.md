@@ -1,7 +1,7 @@
 ---
 id: CAT-MIGRATE-TIER-E-ARGPARSE
 title: "Scaffold-retirement Tier E, serialization/application spine (first real Schema client): migrate Application.CommandLine.ArgParse off ambient/scaffold resolution onto its D0-measured selective imports — Application.Input.Schema (the ~20 consumed names from the just-published 26-name surface), Capability.Diagnostics.Core (Diagnostic/MkDiagnostic/Origin/DiagnosticCode), Capability.Formatting.Doc (Doc/Text), Data.Collections.Derived (list_append), the bare Data.Collections.NonEmpty import made selective, and Data.Sums.Validation (already selective); string_to_list_char is prelude — and publish its usable consumer surface. D0 measures ArgParse's actual provider closure and client-consumed public surface, adopts exactly that import set, and publishes exactly that surface. NO new proof authoring, NO carrier change; the proven Tier A/B/C/D/E-Json/E-Schema publish-and-import shape."
-status: active
+status: merged
 owner: foundation
 size: S
 gate: none
@@ -11,6 +11,8 @@ blocks: []
 github: null
 origin: "Steward-framed 2026-09-09 on the foundation-leader's named spine (evt_2fk3r5y2g3r61: Json -> Application.Input.Schema -> {ArgParse, Decoder}), released as foundation's next deliverable the moment CAT-MIGRATE-TIER-E-SCHEMA landed (53ae947ad, blob-verified). Third Tier-E node of the [[CAT-SCAFFOLD-RETIREMENT]] DAG and the FIRST real client of the just-published Application.Input.Schema surface (Steward sequencing call between the two independent Schema consumers: ArgParse first as the fuller client — it references ~20 of Schema's 26 published names vs Decoder's ~15). Module identity GROUNDED at origin/main 53ae947ad: ArgParse = catalog/packages/Application/CommandLine/ArgParse.ken.md (blob df69db84a)."
 ---
+
+# LANDED 2026-09-10 at 295ba35a3 — squash of candidate aaa50441e, all 6 paths blob-verified identical by the Steward. Foundation QA evt_13dzv1e8yns7c + CV evt_7e9vrz2g61qb8 on the exact SHA; Decision dec_391wchpvm88z7; no Architect (D0 cleared). ken-ci auto-close did not fire (github: null); Steward flipped active->merged by hand. The last Schema consumer, Application.Configuration.Decoder, is framed one release ahead (CAT-MIGRATE-TIER-E-DECODER).
 
 > # RELEASED 2026-09-09 (Steward) — Tier E spine, node 3: the first Schema client.
 >
