@@ -68,6 +68,11 @@ operator-owned and UNCHANGED. Only the live position is restated here.
 
 > ### LIVE POSITION 2026-09-10 (LATEST — read first): L2 WORK QUEUE SET
 >
+> **EXECUTED same day: LANG-ELAB-NESTED-FORMER-RECURSION LANDED 8508c108b
+> (blob-verified). DS-9 re-released to foundation (L3 comes back up); L2 head
+> LANG-MATCH-PATTERN-FORMS-ABSENT framing + release to the language ring is the
+> Steward's immediate next step.**
+>
 > **Operator (Pat), 2026-09-10, this session: L2's objective SEQUENCE after
 > LANG-ELAB-NESTED-FORMER-RECURSION lands.** The verification workstream (z3,
 > Kripke, FO embedding-adequacy) and module/import are COMPLETE; the remaining
