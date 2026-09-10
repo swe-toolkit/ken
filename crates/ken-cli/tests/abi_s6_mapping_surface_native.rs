@@ -41,12 +41,32 @@ fn expect_bytes (outcome : Result ResourceError Bytes)
     Ok bytes |-> body_ok_io
   }
 
+fn expect_unit (outcome : Result ResourceError Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok unit |-> body_ok_io
+  }
+
+proc map_bytes_window (mapping : MappingHandle) (start : Int) (length : Int)
+  : HostIO AFull (Result ResourceError Bytes) visits [FS] =
+  mapBytes AFull mapping (MkMappingWindow start length)
+
+proc write_body_at (mapping : MappingHandle) (start : Int)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (mapWrite AFull mapping (MkMappingWindow start (4 : Int))
+      (bytes_encode "ABCD"))
+    (\outcome. expect_unit outcome)
+
 proc read_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-    (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
+    (map_bytes_window mapping (2 : Int) (4 : Int))
     (\outcome. expect_bytes outcome)
 
 proc read_stage (_cap : Cap AFull)
@@ -62,11 +82,7 @@ proc after_write (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   match outcome {
     Err error |-> body_error_io;
-    Ok unit |-> bind (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
-      (mapBytes AFull mapping (MkMappingWindow (2 : Int) (4 : Int)))
-      (\bytes. expect_bytes bytes)
+    Ok unit |-> read_body mapping
   }
 
 proc write_read_body (mapping : MappingHandle)
@@ -84,6 +100,30 @@ proc write_read_stage (_cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite write_read_body)
+    (\outcome. finish outcome)
+
+proc after_read (mapping : MappingHandle)
+  (outcome : Result ResourceError Bytes)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> body_error_io;
+    Ok bytes |-> write_body_at mapping (2 : Int)
+  }
+
+proc read_write_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+    (map_bytes_window mapping (2 : Int) (4 : Int))
+    (\outcome. after_read mapping outcome)
+
+proc read_write_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite read_write_body)
     (\outcome. finish outcome)
 
 fn expect_invalid_bounds (outcome : Result ResourceError Bytes)
@@ -276,10 +316,11 @@ fn assert_parity(case: &str, result: &Differential) {
 }
 
 /// Promise class: durable behavioral invariant. MEASURED: an honest checked
-/// `mapBytes mapping window` executes in both engines, returns four copied zero
-/// bytes from exactly [2,6), and releases once. CLAIMED: the public window-direct
-/// read composes over the frozen MappingReadView wire. THE GAP: file acquisition
-/// is not exercised and remains D5b.
+/// `mapBytes mapping window` executes in both engines after both window `Int`s
+/// cross declared proc ABI slots, returns four copied zero bytes from exactly
+/// [2,6), and releases once. CLAIMED: both carried read-window seats compose
+/// over the frozen MappingReadView wire. THE GAP: file acquisition is not
+/// exercised and remains D5b.
 #[test]
 fn window_direct_map_bytes_executes_natively_and_matches_the_interpreter() {
     let result = differential("read", "read_stage");
@@ -301,15 +342,28 @@ fn window_direct_map_bytes_executes_natively_and_matches_the_interpreter() {
     assert_eq!(release_set(&result.native).len(), 1);
 }
 
-/// Promise class: durable behavioral invariant. MEASURED: one checked write is
-/// followed by one checked read of the same immutable window; both engines
-/// observe `ABCD`, the ordered effect trace agrees, and release occurs once.
-/// CLAIMED: sequential window-direct access composes without a Bytes-to-span
-/// response transform. THE GAP: MAP_PRIVATE file isolation remains D5b.
+/// Promise class: durable behavioral invariant. CONTROL: one checked write is
+/// followed by one checked read whose two window `Int`s cross declared proc ABI
+/// slots; both engines must observe `ABCD`, agree on the ordered effect trace,
+/// and release once. CLAIMED: write-then-read carried-window access composes
+/// without a Bytes-to-span response transform. THE GAP: MAP_PRIVATE file
+/// isolation remains D5b.
 #[test]
 fn window_direct_map_write_then_read_executes_and_preserves_process_local_bytes() {
     let result = differential("write-read", "write_read_stage");
     assert_parity("write-read", &result);
+    assert_eq!(
+        non_release_events(&result.native)
+            .iter()
+            .map(|event| event.operation)
+            .collect::<Vec<_>>(),
+        vec![
+            ken_runtime::HostOpV1::MappingAllocate,
+            ken_runtime::HostOpV1::MappingWriteView,
+            ken_runtime::HostOpV1::MappingReadView,
+        ],
+        "write-read: the native trace preserves source order"
+    );
     let writes = operation_events(&result.native, ken_runtime::HostOpV1::MappingWriteView);
     assert_eq!(writes.len(), 1);
     assert_eq!(
@@ -329,6 +383,57 @@ fn window_direct_map_write_then_read_executes_and_preserves_process_local_bytes(
         &reads[0].outcome,
         ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::Bytes(bytes))
             if bytes.as_slice() == b"ABCD"
+    ));
+    assert_eq!(release_set(&result.native).len(), 1);
+}
+
+/// Promise class: durable behavioral invariant. CONTROL: one checked read of
+/// [2,6) is followed by one checked write to the same window after all three
+/// Mapping-window `Int` seats cross declared proc ABI slots; both engines must
+/// preserve the exact read-before-write trace, copied zero bytes, written
+/// bytes, terminal result, and one release. CLAIMED: read-then-write carried
+/// access composes independently of sequential direction. THE GAP: the later
+/// in-mapping readback and MAP_PRIVATE file isolation are covered by the
+/// write-then-read sibling and remain D5b respectively.
+#[test]
+fn window_direct_map_read_then_write_executes_in_source_order() {
+    let result = differential("read-write", "read_write_stage");
+    assert_parity("read-write", &result);
+    let events = non_release_events(&result.native);
+    assert_eq!(
+        events
+            .iter()
+            .map(|event| event.operation)
+            .collect::<Vec<_>>(),
+        vec![
+            ken_runtime::HostOpV1::MappingAllocate,
+            ken_runtime::HostOpV1::MappingReadView,
+            ken_runtime::HostOpV1::MappingWriteView,
+        ],
+        "read-write: the native trace preserves source order"
+    );
+    assert_eq!(
+        events[1].request,
+        ken_runtime::CanonicalRequestV1::MappingReadView {
+            start: 2,
+            length: 4,
+        }
+    );
+    assert!(matches!(
+        &events[1].outcome,
+        ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::Bytes(bytes))
+            if bytes == &[0, 0, 0, 0]
+    ));
+    assert_eq!(
+        events[2].request,
+        ken_runtime::CanonicalRequestV1::MappingWriteView {
+            start: 2,
+            bytes: vec![0, 0, 0, 0],
+        }
+    );
+    assert!(matches!(
+        events[2].outcome,
+        ken_runtime::CanonicalOutcomeV1::Success(ken_runtime::CanonicalReplyV1::Unit)
     ));
     assert_eq!(release_set(&result.native).len(), 1);
 }

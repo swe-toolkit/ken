@@ -3597,6 +3597,53 @@ fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() 
     );
 }
 
+/// ABI-S6 D5a-surface D1's Mapping-window family is one phase contract.
+///
+/// MEASURED: both `MappingReadView` coordinates and the `MappingWriteView`
+/// start coordinate admit their exact-`Int` need in specialized and carried
+/// phases, while both `BufferFreeze` coordinates remain specialized-only.
+/// CLAIMED: checked Mapping composition cannot select a different availability
+/// merely by sequencing read and write, and the repair does not widen Buffer.
+/// THE GAP: this pins planning admission; the native/interpreter surface tests
+/// independently exercise the paired lowering observer and exact wire values.
+///
+/// Promise class: durable invariant. New Mapping operations may add seats, but
+/// these three window coordinates and BufferFreeze's separate contract remain.
+#[test]
+fn mapping_window_int_seats_are_either_phase_without_widening_buffer_freeze() {
+    for (operation, ordinal) in [
+        (ken_host::HostOpV1::MappingReadView, 1),
+        (ken_host::HostOpV1::MappingReadView, 2),
+        (ken_host::HostOpV1::MappingWriteView, 1),
+    ] {
+        let (semantic, need, avail) =
+            host_effect_seat_contract_of(operation, EffectSeatSlot::Argument(ordinal))
+                .unwrap_or_else(|| panic!("{operation:?} argument {ordinal} contract"));
+        assert_eq!(semantic, EffectSeatOperation::NarrowExactInt);
+        assert_eq!(need, EffectSeatNeed::ExactIntU64);
+        assert!(avail.admits(EffectSeatPhase::SpecializedTemplate));
+        assert!(
+            avail.admits(EffectSeatPhase::CarriedWord),
+            "{operation:?} argument {ordinal} must admit a carried exact Int"
+        );
+    }
+
+    for ordinal in [1, 2] {
+        let (semantic, need, avail) = host_effect_seat_contract_of(
+            ken_host::HostOpV1::BufferFreeze,
+            EffectSeatSlot::Argument(ordinal),
+        )
+        .unwrap_or_else(|| panic!("BufferFreeze argument {ordinal} contract"));
+        assert_eq!(semantic, EffectSeatOperation::NarrowExactInt);
+        assert_eq!(need, EffectSeatNeed::ExactIntU64);
+        assert!(avail.admits(EffectSeatPhase::SpecializedTemplate));
+        assert!(
+            !avail.admits(EffectSeatPhase::CarriedWord),
+            "ABI-S6 must not widen BufferFreeze argument {ordinal}"
+        );
+    }
+}
+
 fn compile_resource_token_seat_probe() -> (JITModule, *const u8) {
     static SOURCE: RuntimeExpr = RuntimeExpr::Var(0);
     let (plan, origin) = planned_root_occurrence(&SOURCE);

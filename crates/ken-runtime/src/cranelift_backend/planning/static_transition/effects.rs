@@ -535,11 +535,16 @@ fn host_effect_seat_contract(
         | (Op::MappingReadView, 3)
         | (Op::MappingWriteView, 0)
         | (Op::MappingWriteView, 3) => Some(phase_bearing_resource),
-        (Op::BufferFreeze, 1)
-        | (Op::BufferFreeze, 2)
-        | (Op::MappingReadView, 1)
+        (Op::BufferFreeze, 1) | (Op::BufferFreeze, 2) => Some(exact_int),
+        // ABI-S6 D5a-surface D1: the whole Mapping-window exact-`Int`
+        // family can arrive through a declared ABI slot. Move the two read
+        // coordinates and the write start together; leaving any one
+        // specialized-only makes sequential checked composition depend on
+        // which access happens second. The lowering pairs this availability
+        // with the shared fail-closed carried `Int` decoder.
+        (Op::MappingReadView, 1)
         | (Op::MappingReadView, 2)
-        | (Op::MappingWriteView, 1) => Some(exact_int),
+        | (Op::MappingWriteView, 1) => Some(carried_exact_int),
         (Op::MappingWriteView, 2) => Some(bytes),
         (Op::FsReadAt, 0) | (Op::FsReadAt, 2) | (Op::FsWriteAt, 0) | (Op::FsWriteAt, 2) => {
             Some(resource)

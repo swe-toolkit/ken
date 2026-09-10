@@ -3527,10 +3527,15 @@ impl<'a> Lowering<'a> {
                     "MappingReadView",
                     "mapping",
                 )?;
-                let start = seats.specialized(SEAT_1)?;
-                let length = seats.specialized(SEAT_2)?;
-                let (start, start_valid) = self.narrow_native_int_u64(builder, start)?;
-                let (length, length_valid) = self.narrow_native_int_u64(builder, length)?;
+                // ABI-S6 D5a-surface D1: both Mapping-window coordinates use
+                // the same two-phase, fail-closed exact-`Int` pairing as the
+                // positioned Fs seats. Availability and observation move
+                // together, so an admitted carried seat cannot reach a
+                // specialized-only read.
+                let (start, start_valid) =
+                    self.narrow_positioned_int_seat(builder, &seats, 1, "mapping start")?;
+                let (length, length_valid) =
+                    self.narrow_positioned_int_seat(builder, &seats, 2, "mapping length")?;
                 let valid = builder.ins().band(start_valid, length_valid);
                 let invalid = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
@@ -3566,8 +3571,11 @@ impl<'a> Lowering<'a> {
                     "MappingWriteView",
                     "mapping",
                 )?;
-                let start = seats.specialized(SEAT_1)?;
-                let (start, valid) = self.narrow_native_int_u64(builder, start)?;
+                // The write coordinate is the third member of the same
+                // Mapping-window family; it must not retain a different phase
+                // contract from the read coordinates.
+                let (start, valid) =
+                    self.narrow_positioned_int_seat(builder, &seats, 1, "mapping start")?;
                 let invalid = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
                     valid,
