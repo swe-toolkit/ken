@@ -32,6 +32,7 @@ mod account_db_v1;
 pub mod capability;
 mod effect_v1;
 mod effect_wire;
+mod mapping_v1;
 #[cfg(target_os = "linux")]
 mod resource_close_v1;
 mod revocation_v1;
@@ -1287,7 +1288,7 @@ mod tests {
         // trips `parse_probe`'s "duplicate probe fact". Those pre-existing gates
         // are the real first line for duplicates; this anchor is not, and does
         // not claim to be.
-        const EXPECTED_ABI_FACT_NAMES: [&str; 37] = [
+        const EXPECTED_ABI_FACT_NAMES: [&str; 39] = [
             "POINTER_WIDTH",
             "POINTER_ALIGNMENT",
             "C_CHAR_WIDTH",
@@ -1323,6 +1324,8 @@ mod tests {
             "SYS_RENAMEAT",
             "SYS_READLINKAT",
             "SYS_FCHMOD",
+            "SYS_MMAP",
+            "SYS_MUNMAP",
             "ERRNO_ENOENT",
             "ERRNO_EEXIST",
         ];
@@ -1416,7 +1419,11 @@ mod tests {
     #[test]
     fn producer_inventory_is_bidirectional_and_sync_drift_is_discriminating() {
         let build = include_str!("../build.rs");
-        let host = include_str!("lib.rs");
+        let mapping = include_str!("mapping_v1.rs")
+            .split_once("#[cfg(test)]")
+            .map(|(source, _)| source)
+            .unwrap_or(include_str!("mapping_v1.rs"));
+        let host = format!("{mapping}\n{}", include_str!("lib.rs"));
         let consumer = include_str!("../../ken-interp/src/eval.rs");
         let probe = include_str!("../abi_probe.c");
         let facts = TARGET_ABI
@@ -1425,7 +1432,7 @@ mod tests {
             .map(|fact| (fact.name, fact.value))
             .collect::<Vec<_>>();
 
-        build_support::verify_inventory_closure(build, host, consumer, probe, &facts)
+        build_support::verify_inventory_closure(build, &host, consumer, probe, &facts)
             .expect("the current producer inventory is exactly manifested");
 
         let injected_host = host.replacen(
@@ -1460,7 +1467,7 @@ mod tests {
             1,
         );
         let producer_only =
-            build_support::verify_inventory_closure(&injected_build, host, consumer, probe, &facts)
+            build_support::verify_inventory_closure(&injected_build, &host, consumer, probe, &facts)
                 .expect_err("a producer-only ABI layout fact must fail closed");
         assert_eq!(
             producer_only,
@@ -1471,7 +1478,7 @@ mod tests {
         registry_only_facts.push(("C_UCHAR_WIDTH", 8));
         let registry_only = build_support::verify_inventory_closure(
             build,
-            host,
+            &host,
             consumer,
             probe,
             &registry_only_facts,

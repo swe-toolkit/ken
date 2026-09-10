@@ -736,6 +736,24 @@ impl HostEffectBackendV1 for ProcessHost {
         };
         crate::open_resource_at_v1(&parent, &leaf, request).map_err(host_error)
     }
+
+    fn resource_map_anonymous(
+        &mut self,
+        length: u64,
+        protection: crate::MappingProtectionV1,
+    ) -> Result<crate::MappingRegionV1, crate::SemanticErrorV1> {
+        crate::MappingRegionV1::try_new_mapped_anonymous(length, protection).map_err(|error| {
+            if crate::mapping_v1::is_allocation_failure(error) {
+                crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::AllocationFailed)
+            } else {
+                crate::SemanticErrorV1::Io(error)
+            }
+        })
+    }
+
+    fn resource_unmap(&mut self, region: crate::MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
+        region.unmap_native()
+    }
 }
 
 fn host_error(error: crate::HostError) -> FileErrorCauseV1 {
@@ -1888,6 +1906,68 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 CanonicalRequestV1::BufferFreeze {
                     start: wire.start,
                     length: wire.length,
+                },
+            )
+        }
+        HostOpV1::MappingAllocate
+            if request_size == std::mem::size_of::<MappingAllocateRequestV1>() =>
+        {
+            if !request.cast::<MappingAllocateRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<MappingAllocateRequestV1>()) };
+            let protection = match wire.protection {
+                0 => crate::MappingProtectionV1::ReadOnly,
+                1 => crate::MappingProtectionV1::Writable,
+                _ => return -1,
+            };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingAllocate {
+                    length: wire.length,
+                    protection,
+                },
+            )
+        }
+        HostOpV1::MappingReadView
+            if request_size == std::mem::size_of::<MappingReadViewRequestV1>() =>
+        {
+            if !request.cast::<MappingReadViewRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<MappingReadViewRequestV1>()) };
+            (
+                None,
+                crate::ResourceInputsV1::MappingSpanTarget {
+                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::MappingReadView {
+                    start: wire.start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::MappingWriteView
+            if request_size == std::mem::size_of::<MappingWriteViewRequestV1>() =>
+        {
+            if !request.cast::<MappingWriteViewRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<MappingWriteViewRequestV1>()) };
+            let Some(bytes) = (unsafe { borrowed_slice(&wire.bytes) }) else {
+                return -1;
+            };
+            (
+                None,
+                crate::ResourceInputsV1::MappingSpanTarget {
+                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::MappingWriteView {
+                    start: wire.start,
+                    bytes: bytes.to_vec(),
                 },
             )
         }
@@ -4123,6 +4203,325 @@ mod tests {
         );
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_s6_d5a_native_anonymous_mapping_matches_in_process_semantics() {
+        struct InProcessMappingBackend;
+
+        impl HostEffectBackendV1 for InProcessMappingBackend {
+            fn console_write(
+                &mut self,
+                _: ConsoleStreamV1,
+                _: &[u8],
+            ) -> Result<(), IoErrorIdentityV1> {
+                unreachable!()
+            }
+
+            fn console_flush(&mut self, _: ConsoleStreamV1) -> Result<(), IoErrorIdentityV1> {
+                unreachable!()
+            }
+
+            fn console_is_terminal(&mut self, _: ConsoleStreamV1) -> bool {
+                unreachable!()
+            }
+
+            fn fs_read_file(
+                &mut self,
+                _: &CapabilityGrantV1,
+                _: &[u8],
+            ) -> Result<Vec<u8>, FileErrorCauseV1> {
+                unreachable!()
+            }
+
+            fn fs_write_file(
+                &mut self,
+                _: &CapabilityGrantV1,
+                _: &[u8],
+                _: CreatePolicyV1,
+                _: &[u8],
+            ) -> Result<(), FileErrorCauseV1> {
+                unreachable!()
+            }
+
+            fn resource_map_anonymous(
+                &mut self,
+                length: u64,
+                protection: crate::MappingProtectionV1,
+            ) -> Result<crate::MappingRegionV1, crate::SemanticErrorV1> {
+                crate::MappingRegionV1::try_new_anonymous(length, protection)
+                    .map_err(crate::SemanticErrorV1::Resource)
+            }
+
+            fn resource_unmap(
+                &mut self,
+                region: crate::MappingRegionV1,
+            ) -> Result<(), IoErrorIdentityV1> {
+                region.release_in_process()
+            }
+        }
+
+        let directory = std::env::temp_dir().join(format!(
+            "ken-abi-s6-d5a-native-mapping-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let initialized = context(&directory);
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: 0,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let dispatch = |operation, request: *const c_void, size, reply: &mut HostReplyV1| unsafe {
+            ken_host_dispatch_v1(
+                initialized.context.cast_const(),
+                operation as u64,
+                request,
+                size,
+                (reply as *mut HostReplyV1).cast(),
+            )
+        };
+
+        let allocate = MappingAllocateRequestV1 {
+            length: 8,
+            protection: 1,
+        };
+        assert_eq!(
+            dispatch(
+                HostOpV1::MappingAllocate,
+                (&allocate as *const MappingAllocateRequestV1).cast(),
+                std::mem::size_of::<MappingAllocateRequestV1>(),
+                &mut reply,
+            ),
+            0
+        );
+        assert_eq!(reply.tag, REPLY_RESOURCE);
+        let resource = reply.detail;
+        let token = crate::ResourceTokenV1::from_erased_identity(resource);
+        let context_ref = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        let (region, _) = context_ref
+            .resources
+            .resolve_mapping(token, crate::RightSet::READ)
+            .expect("native mapped region resolves only through its opaque token");
+        assert!(region.is_native_mapped(), "ProcessHost must own mmap pages");
+        assert_eq!(
+            format!("{region:?}"),
+            "MappingRegionV1 { length: 8, backing: Anonymous, protection: Writable }",
+            "the host-private mapped backing must not format or return its address"
+        );
+
+        let bytes = b"map";
+        let write = MappingWriteViewRequestV1 {
+            resource,
+            start: 2,
+            bytes: SliceV1 {
+                data: bytes.as_ptr(),
+                len: bytes.len(),
+            },
+            span_origin: resource,
+        };
+        assert_eq!(
+            dispatch(
+                HostOpV1::MappingWriteView,
+                (&write as *const MappingWriteViewRequestV1).cast(),
+                std::mem::size_of::<MappingWriteViewRequestV1>(),
+                &mut reply,
+            ),
+            0
+        );
+        assert_eq!(reply.tag, REPLY_UNIT);
+
+        let read = MappingReadViewRequestV1 {
+            resource,
+            start: 2,
+            length: 3,
+            span_origin: resource,
+        };
+        assert_eq!(
+            dispatch(
+                HostOpV1::MappingReadView,
+                (&read as *const MappingReadViewRequestV1).cast(),
+                std::mem::size_of::<MappingReadViewRequestV1>(),
+                &mut reply,
+            ),
+            0
+        );
+        assert_eq!(reply.tag, REPLY_BYTES);
+        let native_bytes = unsafe { borrowed_slice(&reply.bytes) }
+            .expect("native copied-byte reply")
+            .to_vec();
+        assert_eq!(native_bytes, b"map");
+
+        let outside = MappingReadViewRequestV1 {
+            resource,
+            start: 7,
+            length: 2,
+            span_origin: resource,
+        };
+        assert_eq!(
+            dispatch(
+                HostOpV1::MappingReadView,
+                (&outside as *const MappingReadViewRequestV1).cast(),
+                std::mem::size_of::<MappingReadViewRequestV1>(),
+                &mut reply,
+            ),
+            0
+        );
+        assert_eq!(reply.tag, REPLY_RESOURCE_ERROR);
+        assert_eq!(reply.detail, 7, "InvalidBounds keeps its frozen identity");
+
+        let release = ResourceRequestV1 { resource };
+        assert_eq!(
+            dispatch(
+                HostOpV1::ResourceRelease,
+                (&release as *const ResourceRequestV1).cast(),
+                std::mem::size_of::<ResourceRequestV1>(),
+                &mut reply,
+            ),
+            0
+        );
+        assert_eq!(reply.tag, REPLY_UNIT);
+        assert_eq!(
+            dispatch(
+                HostOpV1::MappingReadView,
+                (&read as *const MappingReadViewRequestV1).cast(),
+                std::mem::size_of::<MappingReadViewRequestV1>(),
+                &mut reply,
+            ),
+            0
+        );
+        assert_eq!(reply.tag, REPLY_RESOURCE_ERROR);
+        assert_eq!(reply.detail, 0, "released mapping is Closed");
+
+        let over_limit = MappingAllocateRequestV1 {
+            length: crate::DEFAULT_BUFFER_LIMITS_V1.per_mapping_max_capacity + 1,
+            protection: 0,
+        };
+        assert_eq!(
+            dispatch(
+                HostOpV1::MappingAllocate,
+                (&over_limit as *const MappingAllocateRequestV1).cast(),
+                std::mem::size_of::<MappingAllocateRequestV1>(),
+                &mut reply,
+            ),
+            0
+        );
+        assert_eq!(reply.tag, REPLY_RESOURCE_ERROR);
+        assert_eq!(
+            reply.detail, 10,
+            "MappingLimit is live on native allocation"
+        );
+
+        let native_trace = unsafe { &*initialized.context.cast::<ProcessContext>() }
+            .effect_trace
+            .clone();
+
+        let capabilities = crate::CapabilityTableV1::default();
+        let revocation = crate::RevocationDomain::default();
+        let mut resources = crate::ResourceTableV1::default();
+        let mut backend = InProcessMappingBackend;
+        let mut model_trace = Vec::new();
+        let mut model_resource = None;
+        let model_calls = [
+            (
+                HostOpV1::MappingAllocate,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingAllocate {
+                    length: 8,
+                    protection: crate::MappingProtectionV1::Writable,
+                },
+            ),
+            (
+                HostOpV1::MappingWriteView,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingWriteView {
+                    start: 2,
+                    bytes: b"map".to_vec(),
+                },
+            ),
+            (
+                HostOpV1::MappingReadView,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingReadView {
+                    start: 2,
+                    length: 3,
+                },
+            ),
+            (
+                HostOpV1::MappingReadView,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingReadView {
+                    start: 7,
+                    length: 2,
+                },
+            ),
+            (
+                HostOpV1::ResourceRelease,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ResourceRelease,
+            ),
+            (
+                HostOpV1::MappingReadView,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingReadView {
+                    start: 2,
+                    length: 3,
+                },
+            ),
+            (
+                HostOpV1::MappingAllocate,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingAllocate {
+                    length: crate::DEFAULT_BUFFER_LIMITS_V1.per_mapping_max_capacity + 1,
+                    protection: crate::MappingProtectionV1::ReadOnly,
+                },
+            ),
+        ];
+        for (operation, _, request) in model_calls {
+            let inputs = match operation {
+                HostOpV1::MappingWriteView | HostOpV1::MappingReadView => {
+                    let target = model_resource.expect("model mapping was acquired");
+                    crate::ResourceInputsV1::MappingSpanTarget {
+                        target,
+                        span_origin: target,
+                    }
+                }
+                HostOpV1::ResourceRelease => crate::ResourceInputsV1::Target(
+                    model_resource.expect("model mapping was acquired"),
+                ),
+                _ => crate::ResourceInputsV1::None,
+            };
+            let model_reply = crate::dispatch_host_op_v1(
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                operation,
+                None,
+                inputs,
+                &request,
+            )
+            .expect("in-process mapping model dispatch");
+            if operation == HostOpV1::MappingAllocate && model_resource.is_none() {
+                model_resource = model_reply.resource_token;
+            }
+            model_trace.push(crate::effect_event_from_dispatch(
+                model_trace.len() as u64,
+                operation,
+                request,
+                &model_reply,
+            ));
+        }
+        assert_eq!(native_trace, model_trace);
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

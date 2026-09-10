@@ -603,6 +603,8 @@ pub(crate) struct CheckedHostSpineV1 {
     pub file_operation_duplicate: StableSymbol,
     /// ABI-S6 D4 appends without moving established positional roles.
     pub resource_mapping_limit: StableSymbol,
+    /// ABI-S6 D5a appends the now-native Mapping kind role.
+    pub resource_kind_mapping: StableSymbol,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -3855,6 +3857,10 @@ const fn static_host_operation_requires_capability(operation: ken_host::HostOpV1
                 | ken_host::HostOpV1::FsReadAt
                 | ken_host::HostOpV1::FsWriteAt
                 | ken_host::HostOpV1::BufferFreeze
+                | ken_host::HostOpV1::MappingAllocate
+                | ken_host::HostOpV1::MappingReadView
+                | ken_host::HostOpV1::MappingWriteView
+                | ken_host::HostOpV1::MappingAcquireFile
                 | ken_host::HostOpV1::ResourceRelease
         )
 }
@@ -3870,6 +3876,10 @@ const fn runtime_selected_host_operation_requires_capability(
                 | ken_host::HostOpV1::FsReadAt
                 | ken_host::HostOpV1::FsWriteAt
                 | ken_host::HostOpV1::BufferFreeze
+                | ken_host::HostOpV1::MappingAllocate
+                | ken_host::HostOpV1::MappingReadView
+                | ken_host::HostOpV1::MappingWriteView
+                | ken_host::HostOpV1::MappingAcquireFile
                 | ken_host::HostOpV1::ResourceRelease
         )
 }
@@ -8139,6 +8149,7 @@ mod px7l_tests {
                 &family("ResourceError"),
                 "MappingLimit",
             ),
+            resource_kind_mapping: StableSymbol::constructor(&family("ResourceKind"), "Mapping"),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -8445,6 +8456,10 @@ mod px7l_tests {
                         | ken_host::HostOpV1::FsReadAt
                         | ken_host::HostOpV1::FsWriteAt
                         | ken_host::HostOpV1::BufferFreeze
+                        | ken_host::HostOpV1::MappingAllocate
+                        | ken_host::HostOpV1::MappingReadView
+                        | ken_host::HostOpV1::MappingWriteView
+                        | ken_host::HostOpV1::MappingAcquireFile
                         | ken_host::HostOpV1::ResourceRelease
                 );
             assert_eq!(
@@ -8555,6 +8570,7 @@ mod d1b_role_b_decoder_alignment {
             file_operation_set_inheritance: sentinel("file_operation_set_inheritance"),
             file_operation_duplicate: sentinel("file_operation_duplicate"),
             resource_mapping_limit: sentinel("resource_mapping_limit"),
+            resource_kind_mapping: sentinel("resource_kind_mapping"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
@@ -8655,6 +8671,10 @@ mod d1b_role_b_decoder_alignment {
         (
             spine.resource_mapping_limit.as_str(),
             "resource_mapping_limit",
+        ),
+        (
+            spine.resource_kind_mapping.as_str(),
+            "resource_kind_mapping",
         ),
         ];
         for (decoded_symbol, field) in pairs {

@@ -2789,6 +2789,7 @@ fn complete_native_program_preparation(
                     .to_string(),
                 file_operation_duplicate: host_spine.file_operation_duplicate.to_string(),
                 resource_mapping_limit: host_spine.resource_mapping_limit.to_string(),
+                resource_kind_mapping: host_spine.resource_kind_mapping.to_string(),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3709,6 +3710,7 @@ fn checked_host_spine_v1(
         file_operation_set_inheritance: resolve_id(roles.file_operation_set_inheritance)?,
         file_operation_duplicate: resolve_id(roles.file_operation_duplicate)?,
         resource_mapping_limit: resolve_id(roles.resource_mapping_limit)?,
+        resource_kind_mapping: resolve_id(roles.resource_kind_mapping)?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
             roles.io_error_not_found,
@@ -3964,6 +3966,8 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_operation_duplicate,
         // ABI-S6 D4 appends without moving established positional identities.
         &spine.resource_mapping_limit,
+        // ABI-S6 D5a appends the now-native Mapping resource-kind role.
+        &spine.resource_kind_mapping,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -7074,6 +7078,10 @@ mod d1b_role_c1_roster_identity {
             (
                 "resource_mapping_limit",
                 record.spine.resource_mapping_limit.clone(),
+            ),
+            (
+                "resource_kind_mapping",
+                record.spine.resource_kind_mapping.clone(),
             ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             ("io_error_permission_denied", record.spine.io_errors[1].clone()),
