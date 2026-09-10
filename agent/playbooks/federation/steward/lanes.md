@@ -66,7 +66,32 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-10 (LATEST — read first): KERNEL-CONV COMPLETE; L2 back to language; SCT-OPAQUE released
+> ### LIVE POSITION 2026-09-10 (LATEST — read first): SCT MERGED; RT-MAPPING queued; L2 head held
+>
+> **LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN MERGED** at `888e6fe4` (candidate
+> `3d0542d9`, blob-verified). D0 ruled INTENDED conservative limitation
+> (documented in sct.rs module doc, no kernel widening). Node `ready -> merged`.
+>
+> **RT-MAPPING-MULTIOP-DISPATCH respin `0fd1eead9` ROUTED and QUEUED** behind SCT
+> (serial publisher; lieutenant monitor-armed, publish imminent). M1-M4 done:
+> Decision dec_2d203c2h22qp8, merge-base 661d988d7, 17 paths, intersection empty,
+> fix = one elaborator hunk (modules.rs iterator-collect -> explicit for-loop,
+> the AUTHORIZED per-level-frame extraction remedy). On land: blob-verify 17
+> paths + file the OWED runtime test-coverage node (Architect S4 unbounded-chain
+> control + Adversary obs1/obs2); runtime-leader dispatches the ring's next.
+>
+> **L2 language next head = `LANG-CHECKED-IH-BODY-VIEW-CAUSE` (S, Architect-
+> confirmed REAL evt_7msgce14888x4) — HELD until RT-MAPPING lands.** Its whole
+> subject is `crates/ken-elaborator/src/compiler_driver.rs` (the lossy
+> `map_err(|_| ...)` on `checked_core_declaration_body_view`), which RT-MAPPING
+> also modifies (in its 17 paths). Releasing before RT-MAPPING lands would cut a
+> language candidate on a pre-RT-MAPPING base and predictably collide on
+> compiler_driver.rs. So the language ring holds briefly; the Steward flips it
+> `draft -> ready` + kicks the moment RT-MAPPING lands (grounded mechanical-
+> mergeability reason, not phantom safety). Then re-measure the finding at the
+> post-RT-MAPPING main (D0 = surface the discarded cause before sizing).
+>
+> ### LIVE POSITION 2026-09-10 (read first): KERNEL-CONV COMPLETE; L2 back to language; SCT-OPAQUE released
 >
 > **KERNEL-CONV-CONGRUENCE-CLOSURE MERGED** — the closing increment 2 (Cast +
 > QuotElim arms + the J documented-unreachability proof + the stale whnf-J comment

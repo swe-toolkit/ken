@@ -1,7 +1,7 @@
 ---
 id: LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN
 title: "Ken's SCT termination checker traces a structural decrease only through a direct pattern match feeding the recursive call, so factoring a shared guard into a non-recursive helper reds NotTerminating -- forcing duplication at exactly the sites a checker wants one guard"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T2
@@ -12,7 +12,20 @@ github: null
 origin: "Steward, 2026-08-16, on Architect evt_2ee9qfch79vgg reviewing V3-FO-KEN-LEVEL-CHECKER-AUTHORING D2: 'a real Ken ergonomics data point, not a defect in this WP ... worth a line to the Language/Ergo track as an observed limitation with a concrete reproduction, rather than leaving it as a comment in one catalog file.' Reproduction re-verified by the Steward against candidate 7726c108c and against origin/main c8fa12c9b before filing."
 ---
 
- # RELEASED 2026-09-10 (Steward). KERNEL-CONV-CONGRUENCE-CLOSURE MERGED
+ # COMPLETE 2026-09-10 — node MERGED at origin/main 888e6fe4 (candidate
+> # 3d0542d9, blob-verified: crates/ken-kernel/src/sct.rs). D0 RULED by the
+> # Architect (evt_6rnzzrha9e26m): INTENDED conservative limitation, NOT a defect
+> # — the opaque-through-helper-return case stays outside SCT's decreasing-argument
+> # recognition; NotTerminating is the fail-closed refusal direction, never a
+> # soundness hole. D1 discharged: the mechanism, the ruling, the authoring remedy
+> # (inline the structural match at each call site), and both prior encounters are
+> # documented in the sct.rs module doc (+52 lines, all //! comments, zero logic
+> # change — AC-3 held: SCT's acceptance criterion untouched). No kernel widening;
+> # a stronger interprocedural/sized-types terminator would be a separate TCB node.
+> # Gates: Language QA evt_384xqwmx4csh3, Architect evt_6rnzzrha9e26m; Decision
+> # dec_3ad9qn52vxs7m. TCB-neutral, no Adversary required.
+> #
+> # RELEASED 2026-09-10 (Steward). KERNEL-CONV-CONGRUENCE-CLOSURE MERGED
 > # (0c68628f5), the temporary L2 kernel reseat retired, and the L2 slot returned
 > # to the language ring — so this, the effective releasable language head, is
 > # released. status draft->ready; kicked the language ring. Tier T2: the RING
