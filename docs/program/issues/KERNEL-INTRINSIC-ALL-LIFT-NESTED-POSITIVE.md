@@ -1,7 +1,7 @@
 ---
 id: KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE
 title: "Complete the intrinsic All former-lift guest-path resolution to descend through NESTED positive formers (List (Pair String X)), so the eliminator of a strictly-positive inductive whose recursive occurrence sits one former-nesting deeper than a direct application can be built — preserving strict positivity (positive former nestings only, never a negative-position path)."
-status: active
+status: merged
 owner: kernel
 size: M
 gate: kernel
@@ -12,7 +12,26 @@ github: null
 origin: "Steward-filed 2026-09-10 on the Architect ruling evt_6g6fgjb0qan40 (thr_5fw1hbtp3fses), grounded on foundation-implementer's DS-9 D3+ D0 hard stop evt_6ha6y4ghng65j (exact base ed3b57d6). A genuine, grounded kernel-completeness gap — NOT an unsoundness — that totally blocks DS-9 (no Json match method can be built). The Architect ruled it a Kernel WP with the soundness gate below, distinct from and independent of the pre-existing show_int floor and of CAT-MAP; the Architect stated it does NOT need the operator's 12:00 UTC return (bounded, grounded, clear soundness gate)."
 ---
 
-> # KERNEL prerequisite for DS-9. Grounded on Architect ruling evt_6g6fgjb0qan40.
+> # LANDED 2026-09-10 at 486e9f33 (squash of eb9910302) — nested-positive
+> # former-lift guest-path descent completed; DS-9's kernel prerequisite cleared.
+> #
+> # Merged via the publisher (merge-on-green, CI passed), blob-verified
+> # byte-identical on both paths (crates/ken-kernel/src/inductive.rs e7c7c686,
+> # crates/ken-elaborator/tests/ds9_json_codec_acceptance.rs 8e2a9ddc). Mechanism:
+> # thread &GlobalEnv through guest_params_from_shape and WHNF-align each retained
+> # recursive field_type to its already-derived RecursiveShape before shape-matching
+> # — the defect was retained-term/WHNF-shape misalignment at the nested transparent
+> # Pair Sigma boundary, not a missing former descent. The traversal stays over
+> # existing positive-classified shape edges only; no change to check_positivity /
+> # derive_recursive_shape / parameter-polarity admission, so direct and
+> # former-nested Pi-domain negatives still PositivityViolation. Gates: Kernel QA
+> # evt_1yvc0bp1cy237 + Architect positivity-preservation (gate MET)
+> # evt_4tdbyzmfzbg7q; Decision dec_1rbhte5j9pffv. trusted_base() delta ZERO
+> # (mechanical parameter-threading + one whnf call, no new primitive/postulate/
+> # trusted surface). On this landing the Steward RE-RELEASES DS-9's D3+ (the
+> # show_int floor remains a separate, independent gate on the number leaf).
+> #
+> # ORIGINAL FRAME BELOW.
 > #
 > # A fail-closed kernel INCOMPLETENESS: the intrinsic All former-lift rejects a
 > # well-formed strictly-positive type. The fix completes the capability; it does
