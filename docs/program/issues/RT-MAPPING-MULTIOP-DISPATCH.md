@@ -63,6 +63,45 @@ any word, and NOT relax the planner's recursive-body agreement into admitting
 disagreeing units. TCB-adjacent (response-owner decomposition + planner
 invariants) — this is the Architect's required-review criterion.
 
+## Endorsed design target (Architect ruling evt_6yyx5dsyy1h0p)
+
+The Architect ENDORSED research's advisory (evt_1dq89yd8pej68) as the design
+direction, with one native-backend adaptation. This is the target D1 builds to;
+D0 (the older-family sizing probe) decides WIRE vs BUILD but NOT this shape.
+
+THE SHAPE. Ken's IR literally IS an interaction tree (`ITree::Ret` /
+`ITree::Vis`), so the sound static response owner is the free-monad/ITree
+interpreter over the pending-`Vis` chain: dispatch each effect, thread its
+continuation's result to the next, and demand `Ret` ONLY at the recursion base;
+a `Vis` is the RECURSIVE case (dispatch-and-continue), NEVER a terminal.
+`units.rs:3430` is that loop UNROLLED EXACTLY ONCE — it handles the first `Vis`,
+fails to recurse on K's result, then demands `Ret`, so the legitimately-returned
+second `Vis` reads as a failed terminal. The fix makes the owner the loop it
+already half-is. Both guards STRENGTHEN, not weaken: (i) exact-`Ret` is demanded
+only at the true base — the current fail-close conflates "a `Vis` where I
+expected `Ret`" with "non-terminal failure"; the loop distinguishes them
+structurally; (ii) the 3-op "typed continuation units disagree on their declared
+recursive body" is per-op decomposition declaring a body per op — one shared
+interpreter body makes agreement hold by construction. `handler_owner=None` is a
+MIS-DECOMPOSITION (the first effect's result was never threaded back to the same
+owner to produce the next `Vis`), cured by the same owner claiming EVERY effect
+via the recursion — NOT by constructing a new per-effect owner. The 3-op planner
+refusal is the SAME missing multi-dispatch surfacing earlier, cured by the one
+shared body — not a distinct invariant. Q1 = (a) owner-recurses-over-the-chain;
+reserve nested-owner (b) for genuinely nested handler scopes (none here — (b)
+multiplies bodies and re-creates the #3 refusal).
+
+NATIVE-BACKEND ADAPTATION (Architect's, load-bearing). Ken's native path is a
+STATIC cranelift lowering, not a dynamic interpreter. So the native realization
+is a STATIC UNROLL of a STATICALLY-BOUNDED `Vis` chain (N known at plan time for
+a straight-line multi-op `withMapping` body), threading each continuation,
+terminating at `Ret` — the single-effect execute-then-resume (inc3/D1)
+generalized from one step to N. The interpreter loop is the SEMANTICS; the static
+unroll is its native realization, and it MUST equal the interp path
+(native==interp). This is why statically-bounded chains are the hard boundary
+(S4): effectful-recursion / unbounded / multi-shot effect trees are OUT OF SCOPE
+and must be REFUSED fail-closed, never silently unrolled.
+
 ## The one capability, HS#2/#3/#4 are ONE thing (Architect §1b)
 
 Predicate: **the D5a-core native promotion was only ever exercised on SINGLE-op
@@ -113,12 +152,15 @@ confirms the base at pickup (or proposes the fold-in alternative).
   it implies, and a refined size. Hard-stop to the Steward + Architect if the
   answer is NO and the build is materially larger than a re-home (the frame
   re-sizes then).
-- **D1 — build multi-effect dispatch for sequenced Mapping effects, in the shape
-  D0 determined.** The response owner dispatches the pending second (and third)
-  `ITree::Vis` rather than fail-closing on non-`Ret`; the three-op planner accepts
-  the sequenced recursive-body. No weakening of the exact-`Ret` invariant or the
-  planner agreement into unsound acceptance. Carried-seat repairs carried forward
-  and exercised.
+- **D1 — build the endorsed interpreter-loop dispatch (see "Endorsed design
+  target"), in the WIRE-or-BUILD form D0 determines.** Make the static response
+  owner the (statically-unrolled) `Vis`-chain interpreter loop: dispatch the
+  pending second (and third) `ITree::Vis` rather than fail-closing on non-`Ret`;
+  the SAME owner claims every effect via the recursion (no new per-effect owner);
+  one shared interpreter body so the three-op planner recursive-body agreement
+  holds by construction. No weakening of the exact-`Ret` invariant or the planner
+  agreement into unsound acceptance. Statically-bounded chains only (S4).
+  Carried-seat repairs carried forward and exercised (S6).
 
 ## Acceptance criteria (each with its control)
 
@@ -153,6 +195,49 @@ confirms the base at pickup (or proposes the fold-in alternative).
   never `--workspace`; CI is the workspace verdict). `rt_parity_native` and the
   mapping-surface suites green.
 
+### The S1-S6 soundness gate (Architect required-review criteria, evt_6yyx5dsyy1h0p)
+
+The Architect's six-point gate refines AC-INVARIANTS-PRESERVED and is the exact
+criterion the candidate is reviewed against on return to the Architect. Each is
+an acceptance obligation with a control:
+
+- **S1 — exact-`Ret` stays load-bearing.** The recursion's node dispatch is a
+  SEALED, fail-closed match: `Vis` => recurse ONLY if the effect is dispatchable;
+  `Ret` => complete ONLY at the base; any malformed/undispatchable node
+  fail-closes (honest refusal, no silent catch-all, COORDINATION §7). Widening
+  "`Ret` here" to "`Ret`-at-base OR dispatchable-`Vis`-recurse" must admit NO
+  malformed/undispatchable node as terminal. Control: a malformed/undispatchable
+  following node still fail-closes.
+- **S2 — per-effect capability admission fires on effects 2..N exactly as on
+  effect 1.** The loop changes response-owner THREADING only, never per-effect
+  checks: resource/right/protection admission, opacity absolute (no address
+  crosses to Ken/token), bounds-check-NOT-clamp (out-of-range rejects), and
+  revocation/liveness re-checked at EACH access all fire on the 2nd..Nth Mapping
+  effect identically. Controls: ReadOnly-refuses-`mapWrite`, forged-handle,
+  wrong-kind, out-of-range, revoked-mid-sequence — each on effect 2, not just
+  effect 1.
+- **S3 — one shared body preserves per-node effect TYPING.** "One recursive body"
+  means one uniform dispatch structure, NOT type erasure; each `Vis` retains its
+  own effect type and continuation type. Verify no per-op typing is lost in the
+  collapse.
+- **S4 — HARD BOUNDARY: statically-bounded chains ONLY.** Effectful-recursion /
+  unbounded / multi-shot effect trees are OUT OF SCOPE and must be REFUSED
+  (fail-closed), never silently unrolled or looped. Control: if such a sequence
+  is constructible at the D5a surface, it is shown refused; if not constructible
+  here, the boundary is stated explicitly so a future increment does not lean on
+  this loop for the unbounded case (which carries its own totality obligation).
+- **S5 — native==interp trace parity on the COMPLETE multi-op matrix.** The
+  interp path is the reference the loop makes native match: variant / exit /
+  ordered-trace / release-set / dispatch-skip all identical, plus write->read
+  executing to the correct bytes.
+- **S6 — carried-seat co-validation (the atomicity payoff).** The loop's
+  threading of e1's result into e2's dispatch is EXACTLY what exercises the HS#2
+  Int seats and the HS#3 byte-span seat across a continuation — so the carried
+  seats carried forward on `wp/ABI-S6-mapping-surface` get their executing
+  witnesses through this mechanism. Control: a mutation breaking the continuation
+  threading must red a carried-sequential witness program (not only the
+  response-owner control).
+
 ## Gate, reviewer, sequencing
 
 `gate: runtime`, but SOUNDNESS/TCB-ADJACENT (response-owner decomposition +
@@ -167,15 +252,16 @@ multi-op acceptance (full matrix, write->read to correct bytes native==interp),
 which the Steward re-releases on this node's landing; the carried seats get their
 executing witnesses then.
 
-## Research design-input (Architect §1a)
+## Research design-input (Architect §1a — DISCHARGED)
 
-The Architect (evt_559xpa0pqghx8) is posing a sharp research design-input question
-on the static-response-owner decomposition to research (idle/ready, warm on the
-RT-NESTED-IH continuation boundary). It is Ken-specific continuation reasoning, no
-external prior-art analog. It does NOT block D0 — the runtime implementer runs the
-empirical older-family sizing probe in parallel; research contributes to the D1
-fix design once D0 settles its shape. The mechanical §1a 6th-consecutive trigger
-transfers to this WP (Architect owns it here).
+Research delivered the §1a design-input advisory (evt_1dq89yd8pej68): the sound
+shape is the free-monad/ITree interpreter loop (owner recurses over the `Vis`
+chain, `Ret` at base, one shared body), strengthening both guards; the structural
+answer is D0-branch-independent. The Architect ENDORSED it (evt_6yyx5dsyy1h0p)
+with the native static-unroll adaptation and the S1-S6 gate — both folded into
+"Endorsed design target" and the acceptance above. The research pull is
+DISCHARGED; the mechanical §1a 6th-consecutive trigger remains on this WP and the
+Architect owns it here.
 
 ## Hard stop
 
