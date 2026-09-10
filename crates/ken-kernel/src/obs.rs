@@ -651,9 +651,10 @@ fn cast_at_quot(a: &Term, b: &Term, e: &Term, t: &Term) -> Option<Term> {
 // ===========================================================================
 
 /// Reduce `J motive base eq` (`15 §4`). `J-β`: when `eq` whnf's to `refl a`,
-/// reduce to `base`. On a non-`refl` canonical proof, `J` reduces via the
-/// `cast` construction (`15 §4.3`). When `eq` is neutral or the motive is not
-/// constant, `J` stays neutral (stuck) — sound.
+/// reduce to `base`; every other well-typed equality reduces via the `cast`
+/// construction (`15 §4.3`). `infer_j` guarantees that a well-typed `eq` has an
+/// `Eq` type, so `None` is possible only for ill-typed raw input and leaves that
+/// input neutral for fail-closed rejection.
 pub fn j_reduce(
     env: &GlobalEnv,
     ctx: &Context,

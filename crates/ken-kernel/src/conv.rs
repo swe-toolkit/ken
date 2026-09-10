@@ -223,9 +223,11 @@ fn whnf_progress(env: &GlobalEnv, ctx: &Context, t: &Term) -> (Term, WhnfProgres
                 );
             }
             Term::J(motive, base, eq) => {
-                // Derived `J` (`15 §4`): `J-β` on `refl`, and reduction on
-                // non-`refl` via `cast`. A neutral `eq` (or non-constant motive)
-                // leaves `J` neutral.
+                // A well-typed `J` always reduces: `infer_j` guarantees that
+                // `eq` infers to `Eq`, so `j_reduce` returns the base on `refl`
+                // and a `Cast` otherwise (`15 §4`). This rebuild is reachable
+                // only for ill-typed raw input; structural conversion keeps
+                // that residual fail-closed by providing no `J` arm.
                 if let Some(r) = crate::obs::j_reduce(env, ctx, motive, base, eq) {
                     cur = r;
                     continue;
@@ -793,6 +795,15 @@ fn conv_struct_path(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term, path: &[
         }
         (Term::Proj1(p1), Term::Proj1(p2)) => conv_struct_path(env, ctx, p1, p2, child_path),
         (Term::Proj2(p1), Term::Proj2(p2)) => conv_struct_path(env, ctx, p1, p2, child_path),
+        // Neutral Cast congruence (`16 §3.2`, `17 §3.3`): all four fields are
+        // structural. In particular `e` is deliberately not skipped by proof
+        // irrelevance because this type-agnostic path has no trusted field type.
+        (Term::Cast(a1, b1, e1, t1), Term::Cast(a2, b2, e2, t2)) => {
+            conv_struct_path(env, ctx, a1, a2, child_path)
+                && conv_struct_path(env, ctx, b1, b2, child_path)
+                && conv_struct_path(env, ctx, e1, e2, child_path)
+                && conv_struct_path(env, ctx, t1, t2, child_path)
+        }
         // Quotient congruence (`16 §5`, `17 §3.3`): quotient types compare
         // their carriers and relations structurally. Class introductions
         // compare only their representatives; relation-respect is an
@@ -803,6 +814,28 @@ fn conv_struct_path(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term, path: &[
         }
         (Term::QuotClass(t1), Term::QuotClass(t2)) => {
             conv_struct_path(env, ctx, t1, t2, child_path)
+        }
+        // A neutral quotient eliminator is congruent exactly when its four
+        // fields are (`16 §5`, `17 §3.3`). `respect` remains structural rather
+        // than proof-irrelevance-skipped for the same reason as Cast's `e`.
+        (
+            Term::QuotElim {
+                motive: m1,
+                method: f1,
+                respect: r1,
+                scrut: s1,
+            },
+            Term::QuotElim {
+                motive: m2,
+                method: f2,
+                respect: r2,
+                scrut: s2,
+            },
+        ) => {
+            conv_struct_path(env, ctx, m1, m2, child_path)
+                && conv_struct_path(env, ctx, f1, f2, child_path)
+                && conv_struct_path(env, ctx, r1, r2, child_path)
+                && conv_struct_path(env, ctx, s1, s2, child_path)
         }
         // Truncation congruence (`16 §6`): the former compares its underlying
         // type, and `|a|` compares its sole introduction operand.
@@ -1008,6 +1041,40 @@ mod tests {
         Term::app(Term::lam(domain, Term::var(0)), argument)
     }
 
+    fn cast_term(a: Term, b: Term, e: Term, t: Term) -> Term {
+        Term::Cast(Box::new(a), Box::new(b), Box::new(e), Box::new(t))
+    }
+
+    fn quotient_elim_term(motive: Term, method: Term, respect: Term, scrut: Term) -> Term {
+        Term::QuotElim {
+            motive: Box::new(motive),
+            method: Box::new(method),
+            respect: Box::new(respect),
+            scrut: Box::new(scrut),
+        }
+    }
+
+    fn assert_structural_verdict(
+        env: &GlobalEnv,
+        ctx: &Context,
+        left: Term,
+        right: Term,
+        expected: bool,
+        field: &str,
+    ) {
+        assert_ne!(left, right, "{field} control must avoid syntactic equality");
+        assert_eq!(
+            conv_struct_path(env, ctx, &left, &right, &[]),
+            expected,
+            "unexpected {field} verdict left-to-right"
+        );
+        assert_eq!(
+            conv_struct_path(env, ctx, &right, &left, &[]),
+            expected,
+            "unexpected {field} verdict right-to-left"
+        );
+    }
+
     /// Durable invariant (`16 §6`): `Trunc` is congruent exactly when its
     /// interior is; a distinct universe remains distinct.
     #[test]
@@ -1092,6 +1159,83 @@ mod tests {
         ));
     }
 
+    /// Durable invariant (`16 §3.2`, `17 §3.3`): neutral Cast congruence
+    /// recursively compares A, B, proof, and value. Every field independently
+    /// accepts a non-syntactic equality and rejects a distinct term in both
+    /// directions; the neutral endpoints keep the outer Cast from reducing.
+    #[test]
+    fn cast_congruence_compares_all_four_fields_directionally() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        for _ in 0..10 {
+            ctx.push(Term::Type(Level::zero()));
+        }
+        let level = Level::Var(LevelVar(0));
+        let omega = Term::Omega(level.clone());
+        let omega_max_zero = Term::Omega(level.max(Level::zero()));
+        let (a, b, e, t, other) = (
+            Term::var(9),
+            Term::var(8),
+            Term::var(7),
+            Term::var(6),
+            Term::var(5),
+        );
+
+        for (field, left, right) in [
+            (
+                "Cast source type A",
+                cast_term(omega_max_zero.clone(), b.clone(), e.clone(), t.clone()),
+                cast_term(omega.clone(), b.clone(), e.clone(), t.clone()),
+            ),
+            (
+                "Cast target type B",
+                cast_term(a.clone(), omega_max_zero, e.clone(), t.clone()),
+                cast_term(a.clone(), omega, e.clone(), t.clone()),
+            ),
+            (
+                "Cast equality proof e",
+                cast_term(
+                    a.clone(),
+                    b.clone(),
+                    beta_identity(Term::Type(Level::zero()), e.clone()),
+                    t.clone(),
+                ),
+                cast_term(a.clone(), b.clone(), e.clone(), t.clone()),
+            ),
+            (
+                "Cast value t",
+                cast_term(
+                    a.clone(),
+                    b.clone(),
+                    e.clone(),
+                    beta_identity(Term::Type(Level::zero()), t.clone()),
+                ),
+                cast_term(a.clone(), b.clone(), e.clone(), t.clone()),
+            ),
+        ] {
+            assert_structural_verdict(&env, &ctx, left, right, true, field);
+        }
+
+        let baseline = cast_term(a.clone(), b.clone(), e.clone(), t.clone());
+        for (field, changed) in [
+            (
+                "Cast source type A",
+                cast_term(other.clone(), b.clone(), e.clone(), t.clone()),
+            ),
+            (
+                "Cast target type B",
+                cast_term(a.clone(), other.clone(), e.clone(), t.clone()),
+            ),
+            (
+                "Cast equality proof e",
+                cast_term(a.clone(), b.clone(), other.clone(), t.clone()),
+            ),
+            ("Cast value t", cast_term(a, b, e, other)),
+        ] {
+            assert_structural_verdict(&env, &ctx, baseline.clone(), changed, false, field);
+        }
+    }
+
     /// Durable invariant (`16 §5`): quotient-class congruence compares only
     /// representatives. A reducible representative accepts; distinct open
     /// representatives reject rather than acquiring relatedness implicitly.
@@ -1118,6 +1262,136 @@ mod tests {
             &Term::QuotClass(Box::new(Term::var(1))),
             &[],
         ));
+    }
+
+    /// Durable invariant (`16 §5`, `17 §3.3`): a neutral QuotElim compares
+    /// motive, method, respect proof, and scrutinee structurally. Every field
+    /// has a non-syntactic acceptance and a bidirectional lone-field reject.
+    #[test]
+    fn quotient_elim_congruence_compares_all_four_fields_directionally() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        for _ in 0..12 {
+            ctx.push(Term::Type(Level::zero()));
+        }
+        let (motive, method, respect, scrut, other) = (
+            Term::var(11),
+            Term::var(10),
+            Term::var(9),
+            Term::var(8),
+            Term::var(7),
+        );
+        let beta = |term| beta_identity(Term::Type(Level::zero()), term);
+        let level = Level::Var(LevelVar(0));
+        let scrut_left = Term::app(Term::var(6), Term::Omega(level.clone().max(Level::zero())));
+        let scrut_right = Term::app(Term::var(6), Term::Omega(level));
+
+        for (field, left, right) in [
+            (
+                "QuotElim motive",
+                quotient_elim_term(
+                    beta(motive.clone()),
+                    method.clone(),
+                    respect.clone(),
+                    scrut.clone(),
+                ),
+                quotient_elim_term(
+                    motive.clone(),
+                    method.clone(),
+                    respect.clone(),
+                    scrut.clone(),
+                ),
+            ),
+            (
+                "QuotElim method",
+                quotient_elim_term(
+                    motive.clone(),
+                    beta(method.clone()),
+                    respect.clone(),
+                    scrut.clone(),
+                ),
+                quotient_elim_term(
+                    motive.clone(),
+                    method.clone(),
+                    respect.clone(),
+                    scrut.clone(),
+                ),
+            ),
+            (
+                "QuotElim respect proof",
+                quotient_elim_term(
+                    motive.clone(),
+                    method.clone(),
+                    beta(respect.clone()),
+                    scrut.clone(),
+                ),
+                quotient_elim_term(
+                    motive.clone(),
+                    method.clone(),
+                    respect.clone(),
+                    scrut.clone(),
+                ),
+            ),
+            (
+                "QuotElim scrutinee",
+                quotient_elim_term(motive.clone(), method.clone(), respect.clone(), scrut_left),
+                quotient_elim_term(motive.clone(), method.clone(), respect.clone(), scrut_right),
+            ),
+        ] {
+            assert_structural_verdict(&env, &ctx, left, right, true, field);
+        }
+
+        let baseline = quotient_elim_term(
+            motive.clone(),
+            method.clone(),
+            respect.clone(),
+            scrut.clone(),
+        );
+        for (field, changed) in [
+            (
+                "QuotElim motive",
+                quotient_elim_term(
+                    other.clone(),
+                    method.clone(),
+                    respect.clone(),
+                    scrut.clone(),
+                ),
+            ),
+            (
+                "QuotElim method",
+                quotient_elim_term(
+                    motive.clone(),
+                    other.clone(),
+                    respect.clone(),
+                    scrut.clone(),
+                ),
+            ),
+            (
+                "QuotElim respect proof",
+                quotient_elim_term(motive.clone(), method.clone(), other.clone(), scrut.clone()),
+            ),
+            (
+                "QuotElim scrutinee",
+                quotient_elim_term(motive, method, respect, other),
+            ),
+        ] {
+            assert_structural_verdict(&env, &ctx, baseline.clone(), changed, false, field);
+        }
+    }
+
+    /// Durable invariant: heterogeneous heads remain fail-closed after adding
+    /// the two same-former congruence arms.
+    #[test]
+    fn cast_and_quotient_elim_heterogeneous_heads_stay_distinct() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        for _ in 0..4 {
+            ctx.push(Term::Type(Level::zero()));
+        }
+        let cast = cast_term(Term::var(3), Term::var(2), Term::var(1), Term::var(0));
+        let elim = quotient_elim_term(Term::var(3), Term::var(2), Term::var(1), Term::var(0));
+        assert!(!conv_struct_path(&env, &ctx, &cast, &elim, &[]));
+        assert!(!conv_struct_path(&env, &ctx, &elim, &cast, &[]));
     }
 
     /// Durable invariant (`16 §6`): structural `TruncProj` congruence recurses
