@@ -1,25 +1,28 @@
 ---
 id: RT-MAPPING-MULTIOP-DISPATCH
-title: "Build runtime static-response-owner multi-effect dispatch for SEQUENCED Mapping effects, so a native program that performs a second (and third) Mapping effect after the first — through the simple linear-continuation plane — executes and matches the interpreter. The D5a-core native promotion was only ever exercised on SINGLE-op mapping programs, so everything multi-op sequencing requires was left unbuilt; this closes it as one capability rather than patching D5a-surface layer by layer. Carries the already-built carried-Int (HS#2) and carried-byte-span (HS#3) seat repairs forward and gives them their first executing witnesses."
+title: "Build GENERAL runtime static-response-owner dispatch for repeated same-producer / following N>=2 effects through the simple linear-continuation plane, so a native program that sequences a second (and third) effect executes and matches the interpreter with exact-Ret preserved. D0 proved this is a GENERAL plane gap — an older FS-metadata-repeat family traps identically at the same P2 wall (units.rs:3430), not a Mapping-specific defect — so it is fixed ONCE at the response owner; ABI-S6 D5a-surface Mapping multi-op and FS-metadata-repeat are two CONSUMERS of the one fix. Two coordinated sub-parts: P1 the interpreter-loop repeated-dispatch, P2 the planner heterogeneous recursive-body agreement. Carries the Mapping carried-Int (HS#2) and carried-byte-span (HS#3) seat repairs forward atomically and gives them their first executing witnesses."
 status: active
 owner: runtime
-size: unsized
+size: L
 gate: runtime
 tier: T1
 depends_on: []
 blocks: [ABI-S6]
 github: null
-origin: "Steward-filed 2026-09-10 on the Architect ruling evt_559xpa0pqghx8 (D5a-surface HS#4, thr_67d5fmztsmdzj), a PREREQUISITE / SCOPE SPLIT (not a further already-lawful seat repair). runtime-implementer's directed diagnosis (evt_2mhd52b54w2y8) FALSIFIED the Architect's HS#3 carried-Int-representation premise and reached the response-owner continuation boundary the Architect's conditional named — the (b) branch verbatim (a genuine missing continuation capability, not a representation mismatch). The Architect ruled HS#2/#3/#4 ONE predicate (single-op-only D5a-core promotion) and split this out as the structural closure. Soundness/TCB-adjacent (response-owner decomposition + planner invariants) -> Architect REQUIRED review. Bounded/grounded; does not need the operator's return."
+origin: "Steward-filed 2026-09-10 on the Architect ruling evt_559xpa0pqghx8 (D5a-surface HS#4, thr_67d5fmztsmdzj), a PREREQUISITE / SCOPE SPLIT (not a further already-lawful seat repair). runtime-implementer's directed diagnosis (evt_2mhd52b54w2y8) FALSIFIED the Architect's HS#3 carried-Int-representation premise and reached the response-owner continuation boundary the Architect's conditional named — the (b) branch verbatim (a genuine missing continuation capability, not a representation mismatch). The Architect ruled HS#2/#3/#4 ONE predicate (single-op-only D5a-core promotion) and split this out as the structural closure. Soundness/TCB-adjacent (response-owner decomposition + planner invariants) -> Architect REQUIRED review. Bounded/grounded; does not need the operator's return. RESCOPED 2026-09-10 on the Architect ruling evt_7r3ejswrwsxaz (D0=NO adopted): D0 proved the gap is GENERAL (an older FS-metadata-repeat family traps identically), so the node is reframed from Mapping-specific to the general repeated-N>=2 same-producer dispatch capability, sized L, with sub-parts P1/P2 and added criterion S7; the id is kept as the stable handle (reframe, not rename). Design UNCHANGED (S1-S6 stand); the DESIGN needs no operator return to authorize (forced critical path)."
 ---
 
-> # A fail-closed runtime continuation-capability gap. D5a-core's native Mapping
-> # promotion was exercised ONLY on single-op programs, so the static-response
-> # owner cannot execute a SECOND Mapping effect sequenced after the first: it
-> # calls K, requires the returned carrier tag == `ITree::Ret`, but K returns the
-> # pending second `ITree::Vis`, and it fail-closes to a runtime trap. This builds
-> # the missing multi-effect dispatch; it does NOT relax the exact-Ret invariant
-> # or the planner's recursive-body agreement. Those invariants ARE the soundness
-> # gate and the Architect's review criterion.
+> # A fail-closed runtime continuation-capability gap, now known GENERAL. The
+> # static response owner cannot execute a SECOND same-producer effect sequenced
+> # after the first: it calls K, requires the returned carrier tag == `ITree::Ret`,
+> # but K returns the pending second `ITree::Vis`, and it fail-closes to a runtime
+> # trap. D0 proved this is NOT Mapping-specific — an older FS-metadata-repeat
+> # family traps identically at the same P2 wall — so it is fixed ONCE at the
+> # response owner (the interpreter loop over the `Vis` chain), with D5a-surface
+> # Mapping multi-op and FS-metadata-repeat as two consumers. This builds the
+> # missing multi-effect dispatch; it does NOT relax the exact-Ret invariant or the
+> # planner's recursive-body agreement. Those invariants ARE the soundness gate and
+> # the Architect's S1-S7 review criterion.
 
 ## The measured defect (Architect evt_559xpa0pqghx8; runtime-implementer evt_2mhd52b54w2y8)
 
@@ -52,6 +55,38 @@ identically proves it is not write-specific and not carried-representation at al
 This is a genuine continuation-capability gap in the static-response-owner P2
 decomposition. D0 RE-MEASURES the exact loci at pickup (line numbers drift).
 
+## D0 RESOLVED: NO — general plane gap (evt_17wdtegrxyb1j; adopted evt_7r3ejswrwsxaz)
+
+D0 (the older-family sizing probe) is ANSWERED and the answer is **NO**: the same
+simple linear-continuation plane lacks multi-effect dispatch UNIVERSALLY, not just
+for Mapping. An older FS family — a `withResource ... ResourceMetadata` body doing
+a direct linear `bind (resourceMetadata file) (\first. bind (resourceMetadata
+file) (\second. Ret ...))`, and its x3 sibling — builds natively and traps
+IDENTICALLY:
+
+- interpreter: exit 0, `NormalReturn`; trace `[FsOpen, FsHandleMetadata,
+  FsHandleMetadata, ResourceRelease]` (x3 adds a third `FsHandleMetadata`), all
+  metadata outcomes `FileMetadataV1 { size: 13, kind: File }`;
+- native: `Err(UnclassifiedRuntimeTrap { terminal_value: -1 })` — the SAME
+  host-independent trap at `units.rs:3430`. For x2 the first `FsHandleMetadata` is
+  Specialized, the following is `UnconsumedTransportCaller` (`handler_owner=None`);
+  for x3 the first is Specialized and the next two are Deferred P2, both
+  `handler_owner=None`. The first owner's K leads to the next pending `Vis`, not
+  `Ret`.
+
+Evidence: `/tmp/rt-mapping-d0-fs-metadata-compact.log` SHA-256 `796ccbc7…`;
+staticlib materialization SHA-256 `229b9a5e…`. Current mechanism loci at the
+carried tip `d24529b6`: `responses.rs:2369`
+(`requires_execute_then_resume = ordinary_stage_count >= 2` — the promotion exists
+but repeated same-producer stages fall OUTSIDE it), `responses.rs:2418` (those
+demands become `UnconsumedTransportCaller`), `units.rs:3343-3430` (owner requires
+exact `Ret`), `aggregates.rs:6299` (the heterogeneous Mapping three-op recursive-
+body disagreement — P2). The FS-homogeneous x3 reaches native build and traps on
+the P1 gap, BYPASSING the planner refusal, which proves P2 is a SEPARATE
+sub-problem (the disagreement is specific to heterogeneous op bodies in one
+governed invocation), not merely P1 surfacing earlier. So the fix is an L/T1
+GENERAL response-owner/planner build, and it is fixed ONCE at the response owner.
+
 ## Soundness — completeness at the continuation layer, invariants preserved
 
 The response owner's exact-`Ret` requirement and the three-op planner's
@@ -66,8 +101,13 @@ invariants) — this is the Architect's required-review criterion.
 ## Endorsed design target (Architect ruling evt_6yyx5dsyy1h0p)
 
 The Architect ENDORSED research's advisory (evt_1dq89yd8pej68) as the design
-direction, with one native-backend adaptation. This is the target D1 builds to;
-D0 (the older-family sizing probe) decides WIRE vs BUILD but NOT this shape.
+direction, with one native-backend adaptation, and CONFIRMED it unchanged on the
+D0=NO rescope (evt_7r3ejswrwsxaz). This is the target the build realizes. D0
+resolved NO, so the branch is BUILD (construct the loop on this plane), and it is
+GENERAL — producer-agnostic, since the interpreter loop is an eliminator over the
+`ITree` `Vis` chain and does not care which producer minted each `Vis`. It covers
+FS-metadata-repeat, Mapping same-op repeat, and the two-op Mapping owner trap
+alike.
 
 THE SHAPE. Ken's IR literally IS an interaction tree (`ITree::Ret` /
 `ITree::Vis`), so the sound static response owner is the free-monad/ITree
@@ -102,22 +142,27 @@ unroll is its native realization, and it MUST equal the interp path
 (S4): effectful-recursion / unbounded / multi-shot effect trees are OUT OF SCOPE
 and must be REFUSED fail-closed, never silently unrolled.
 
-## The one capability, HS#2/#3/#4 are ONE thing (Architect §1b)
+## The one capability, fixed ONCE at the response owner (Architect §1b closure)
 
-Predicate: **the D5a-core native promotion was only ever exercised on SINGLE-op
-mapping programs, so everything multi-op sequencing requires was left unbuilt at
-every layer it touches.** The three hard-stops were this predicate surfacing at
-successively deeper layers, not independent bugs:
+Predicate: **the static response owner was only ever exercised on programs whose
+governed invocation does at most ONE effect per producer, so repeated-N>=2
+same-producer dispatch was left unbuilt — for EVERY producer that reaches this
+plane, not just Mapping.** D0 proved this general: the FS-metadata-repeat family
+traps identically. So the structural closure is to build the general
+repeated-dispatch capability ONCE at the response owner; the earlier Mapping
+hard-stops and the FS finding are two CONSUMERS of it, not independent bugs:
 
 - HS#2 — carried Int seats (`MappingReadView`/`MappingWriteView` window Ints):
   moved SPECIALIZED_ONLY -> EITHER_PHASE `carried_exact_int`. Built.
 - HS#3 — carried byte-span seat (`MappingWriteView` arg 2): moved to
   `carried_bytes` + `wire_bytes_seat` fail-closed observer. Built.
-- HS#4 — response-owner multi-effect dispatch (this node). The layer that makes
-  the carried seats actually EXECUTE.
+- HS#4 — response-owner multi-effect dispatch (this node), now GENERAL. The layer
+  that makes the carried seats actually EXECUTE, and that D5a-surface Mapping
+  multi-op AND FS-metadata-repeat both consume.
 
-The structural closure is to stop patching D5a-surface layer-by-layer and build
-"sequenced multi-op mapping execution" as one capability.
+The structural closure is to stop patching one producer's surface layer-by-layer
+and build "repeated same-producer / following N>=2 effect dispatch through the
+static response owner" as one general capability.
 
 ## Carried-seat atomicity (the Steward/runtime-leader cut)
 
@@ -135,42 +180,56 @@ controls green). The response-owner fix builds on top; the carried seats get the
 executing witnesses here and land atomically in one candidate. runtime-leader
 confirms the base at pickup (or proposes the fold-in alternative).
 
-## Deliverables (D0-first)
+## Deliverables (D0 resolved; two coordinated sub-parts P1 then P2)
 
-- **D0 — THE deciding sizing question (Architect's, verbatim; answer before D1
-  commits a shape).** Does a native program that sequences two OLDER-family
-  effects — two Buffer ops, or Buffer->FS, or two FS ops — through THIS SAME
-  simple linear-continuation plane EXECUTE (native==interp) today?
-  - **YES** => the multi-effect response-owner dispatch capability EXISTS and
-    Mapping simply is not wired into it: a bounded "re-home Mapping into the
-    existing dispatch" fix.
-  - **NO** => this plane lacks multi-effect dispatch universally: a larger
-    response-owner / planner build.
-  Do not assume older families exercise this exact plane (withFile-style scoping
-  may route them through a different transport path with a handler owner
-  assigned) — this is an EMPIRICAL probe, run it. Report the answer, the fix shape
-  it implies, and a refined size. Hard-stop to the Steward + Architect if the
-  answer is NO and the build is materially larger than a re-home (the frame
-  re-sizes then).
-- **D1 — build the endorsed interpreter-loop dispatch (see "Endorsed design
-  target"), in the WIRE-or-BUILD form D0 determines.** Make the static response
-  owner the (statically-unrolled) `Vis`-chain interpreter loop: dispatch the
-  pending second (and third) `ITree::Vis` rather than fail-closing on non-`Ret`;
-  the SAME owner claims every effect via the recursion (no new per-effect owner);
-  one shared interpreter body so the three-op planner recursive-body agreement
-  holds by construction. No weakening of the exact-`Ret` invariant or the planner
-  agreement into unsound acceptance. Statically-bounded chains only (S4).
-  Carried-seat repairs carried forward and exercised (S6).
+- **D0 — RESOLVED: NO, general (see "D0 RESOLVED").** The sizing question is
+  answered — the plane lacks multi-effect dispatch universally; the fix is an
+  L/T1 general response-owner/planner build, not a Mapping re-home. No further
+  sizing probe owed. Build P1 then P2 to the settled design target.
+- **P1 — general repeated-dispatch (the interpreter loop).** Generalize the
+  existing execute-then-resume promotion so a FOLLOWING same-producer stage gets a
+  handler owner and is dispatched: `responses.rs:2369`
+  (`requires_execute_then_resume = ordinary_stage_count >= 2` — the promotion
+  exists but repeated same-producer stages fall outside it) + `responses.rs:2418`
+  (those demands become `UnconsumedTransportCaller`) + the owner at
+  `units.rs:3343-3430` recursing to `Ret`-at-base. The SAME owner claims every
+  effect via the recursion (no new per-effect owner). This cures the
+  FS-metadata-repeat, the Mapping same-op repeat, AND the two-op Mapping owner
+  trap. Statically-bounded chains only (S4). No weakening of the exact-`Ret`
+  invariant. Carried-seat repairs carried forward and exercised through P1's
+  continuation threading (S6).
+- **P2 — planner recursive-body agreement (heterogeneous multi-op), DISTINCT from
+  P1.** For HETEROGENEOUS multi-op governed invocations (the Mapping three-op
+  forms) reconcile the planner recursive-body agreement at `aggregates.rs:6299`
+  via the one-shared-body (S3). This is verified INDEPENDENTLY of P1: the
+  FS-homogeneous x3 reaches native build and traps on the P1 gap, BYPASSING the
+  planner refusal — proving the disagreement is specific to heterogeneous op
+  bodies in one invocation, not merely P1 surfacing earlier (this refines
+  research's Q3, which slightly over-unified the two). No relaxation of the
+  agreement into admitting genuinely disagreeing units.
 
 ## Acceptance criteria (each with its control)
 
-- **AC-MULTIOP-MATRIX-EXECUTES (the capability).** The full sequenced matrix
-  executes and matches the interpreter: `read->read`, `read->write` (write->read
-  to the CORRECT bytes), `write->read`, `write->write`, and the three-op
-  `read->write->read` / `write->read->write`. Control: each program that today
-  reds `UnclassifiedRuntimeTrap{-1}` (or the planner refusal) goes green with
-  native==interp parity on ordered non-release effects and the release set; the
-  single-op programs stay green (no regression).
+- **AC-MULTIOP-MATRIX-EXECUTES (the capability — both consumers).** The full
+  sequenced matrix executes and matches the interpreter across BOTH consumers of
+  the one fix:
+  - Mapping (D5a-surface): `read->read`, `read->write` (write->read to the CORRECT
+    bytes), `write->read`, `write->write`, and the three-op `read->write->read` /
+    `write->read->write`.
+  - FS-metadata-repeat (the D0 consumer): the x2 and x3 `resourceMetadata` repeat
+    programs execute native==interp (`NormalReturn`, exact trace, identical
+    `FileMetadataV1` outcomes).
+  Control: each program that today reds `UnclassifiedRuntimeTrap{-1}` (or the
+  planner refusal) goes green with native==interp parity on ordered non-release
+  effects and the release set; the single-op programs stay green (no regression).
+- **AC-P2-HETEROGENEOUS (P2, verified independently of P1).** A heterogeneous
+  Mapping three-op governed invocation reaches native build POST-FIX (the
+  `aggregates.rs:6299` recursive-body disagreement is reconciled), then executes
+  via P1. Control: before P2 the heterogeneous three-op form reds the planner
+  refusal while the FS-homogeneous x3 does not (the two are distinct); after P2
+  the heterogeneous form builds and executes, and a mutation re-introducing the
+  per-op body disagreement reds it — without admitting genuinely disagreeing
+  units.
 - **AC-CARRIED-SEATS-WITNESSED (atomicity).** The carried Int-window seats (all
   three) and the carried byte-span seat now have an EXECUTING native==interp
   witness — a sequenced program that carries each across the continuation and
@@ -195,11 +254,13 @@ confirms the base at pickup (or proposes the fold-in alternative).
   never `--workspace`; CI is the workspace verdict). `rt_parity_native` and the
   mapping-surface suites green.
 
-### The S1-S6 soundness gate (Architect required-review criteria, evt_6yyx5dsyy1h0p)
+### The S1-S7 soundness gate (Architect required-review criteria)
 
-The Architect's six-point gate refines AC-INVARIANTS-PRESERVED and is the exact
-criterion the candidate is reviewed against on return to the Architect. Each is
-an acceptance obligation with a control:
+The Architect's gate refines AC-INVARIANTS-PRESERVED and is the exact criterion
+the candidate is reviewed against on return to the Architect. S1-S6 are the
+original gate; S7 was added on the general-scope rescope (evt_7r3ejswrwsxaz)
+because the fix is now on a SHARED response-owner path. Each is an acceptance
+obligation with a control:
 
 - **S1 — exact-`Ret` stays load-bearing.** The recursion's node dispatch is a
   SEALED, fail-closed match: `Vis` => recurse ONLY if the effect is dispatchable;
@@ -237,13 +298,22 @@ an acceptance obligation with a control:
   witnesses through this mechanism. Control: a mutation breaking the continuation
   threading must red a carried-sequential witness program (not only the
   response-owner control).
-
-## Gate, reviewer, sequencing
+- **S7 — ADDITIVE and INERT on the existing corpus (added on the general-scope
+  rescope).** Because the generalization is on a SHARED response-owner path, every
+  program that works today must be UNCHANGED: single-effect programs, and any
+  heterogeneous N>=2 sequence the existing `ordinary_stage_count >= 2` promotion
+  already handles. native==interp parity preserved on the existing effect corpus;
+  the widened gating fires ONLY on the previously-excluded repeated-stage case;
+  census the non-diff dimensions (ID/numbering, stack depth) and do NOT
+  re-baseline a working path as if it were the new capability. Control: the
+  existing effect corpus stays green with identical traces/numbering; a new
+  capability is zero-cost when unused, and any change to a currently-working
+  sequence reds this control (it is a regression, never a rebaseline).
 
 `gate: runtime`, but SOUNDNESS/TCB-ADJACENT (response-owner decomposition +
 planner invariants), so the **Architect owns the soundness gate** (invariants
-preserved — AC-INVARIANTS-PRESERVED is THE criterion) and Runtime QA owns the
-build. On the candidate: Architect required review + Runtime QA + Adversary on the
+preserved — the S1-S7 gate is THE criterion) and Runtime QA owns the build. On the
+candidate: Architect required review AGAINST S1-S7 + Runtime QA + Adversary on the
 exact SHA, then Steward M1-M4 -> lieutenant. CV re-review of the D5a-surface
 conformance seed applies when D5a-surface's own multi-op acceptance resumes on
 this node's landing (this node is runtime continuation machinery, not the
@@ -261,12 +331,15 @@ answer is D0-branch-independent. The Architect ENDORSED it (evt_6yyx5dsyy1h0p)
 with the native static-unroll adaptation and the S1-S6 gate — both folded into
 "Endorsed design target" and the acceptance above. The research pull is
 DISCHARGED; the mechanical §1a 6th-consecutive trigger remains on this WP and the
-Architect owns it here.
+Architect owns it here. The D0=NO rescope did NOT re-fire §1a
+(evt_7r3ejswrwsxaz): the FS probe CONFIRMED the design in hand (same wall, same
+loci), so it is a scope refinement, not a new unaided round.
 
 ## Hard stop
 
-Route to the Steward + Architect if D1 cannot dispatch the sequenced second effect
-without weakening the exact-`Ret` invariant or the planner's recursive-body
-agreement — if the only way to make the matrix execute is to accept an unsound
-continuation, the capability is not what this frame assumes and the soundness gate
-is at risk. Land nothing on that axis until the Architect rules.
+Route to the Steward + Architect if P1 cannot dispatch the sequenced following
+effect, or P2 cannot reconcile the heterogeneous recursive-body, without weakening
+the exact-`Ret` invariant or admitting genuinely disagreeing units — if the only
+way to make the matrix execute is to accept an unsound continuation, the capability
+is not what this frame assumes and the soundness gate is at risk. Land nothing on
+that axis until the Architect rules.
