@@ -358,7 +358,8 @@ bound into the checked/native plan. Reading either limit from an environment
 variable, silently growing a buffer, or placing buffers in the capability table
 is non-conforming.
 
-The closed resource-kind inventory becomes `FsHandle | Buffer`. Supplying a
+The closed resource-kind inventory becomes `FsHandle | Buffer` (`§1.9` adds a
+third kind, `Mapping`). Supplying a
 live token of the wrong kind produces the distinct fail-visible identity
 
 ```text
@@ -681,6 +682,110 @@ and this section is the normative source those laws witness. The conformance
 seed (`../../conformance/surface/ffi-io/`) discriminates each property against
 its non-conformant counterpart — a `retryable`-from-transience-alone
 implementation, and a `Revoked = Transient` or triplicated-`Revoked` surface.
+
+### 1.9 Memory mappings as opaque runtime-owned regions and bounded views (ABI-S6)
+
+A **mapping** — anonymous or file-backed — is a third runtime resource kind
+beside `FsHandle` and `Buffer`, exposed to Ken **only** as an opaque
+runtime-owned region and bounded byte views. The opacity is **absolute**: no raw
+address, host pointer, or page reference ever reaches a Ken value or the resource
+token. Every access is a **bounded-view copy** — bytes out across a checked span,
+or caller bytes in — exactly as `Buffer` exposes `BufferSpan`/`spanBytes`
+(`§1.7.1`), never a mutable pointer into the region. This is the
+mapping/lifetime/bounded-access substrate L2-8 MMIO later builds on, and it is
+what keeps raw pointers out of application Ken
+(`../../docs/program/10-linux-abi-completion.md §4`, §6).
+
+The closed resource-kind inventory becomes `FsHandle | Buffer | Mapping`. A
+wrong-kind live token reports `ResourceKindMismatch` (`§1.7`) with the `Mapping`
+identity in the offending position, under the same non-degenerate accept/reject
+discipline (a mapping token to a buffer- or file-only operation, and the
+reverse, reject; same-kind controls succeed).
+
+**Acquisition and lifetime.** An opaque, constructor-private `MappingHandle` is
+acquired **only** through the public `withMapping` bracket — its sole producer —
+mirroring `withBuffer` (`§1.7.1`) and the `FsHandle` real-syscall-backed
+acquire/release pattern (`§1.3.1`):
+
+```ken
+data MappingHandle = PrivateMappingHandle (Resource Mapping) MappingExtent
+```
+
+`PrivateMappingHandle` and its field projections are absent from the public name
+map: checked user code can neither forge a resource/extent pairing, project the
+raw `Resource Mapping`, nor construct a handle outside `withMapping`. The handle
+may be copied as an ordinary checked value, but every copy denotes the same
+acquisition and becomes invalid when the bracket settles — the runtime
+invalidates escaped copies exactly as for file and buffer resources. Lifetime is
+bracket-scoped; a use after settle, or after revocation at the
+`../60-security/62 §4.2` admission boundary, yields the single `Revoked`
+identity, classified `Permanent` (`§1.8`): a revoked mapping is gone, and retry
+cannot restore it.
+
+**Source, offset, protection, and views.** `withMapping` takes the mapping
+source — anonymous with a length, or a file `Resource FsHandle` with a byte
+offset and length — and a requested protection (`ReadOnly` or `ReadWrite`). Ken
+observes only the opaque `MappingHandle`, an immutable `MappingWindow` request
+descriptor over the region, and a constructor-private immutable `MappingSpan` for
+the exact current live subrange, plus scalar projections (span length, extent).
+A read view copies the span's bytes out; a write view copies caller bytes into
+the span. Every offset and length is bounds-checked against the mapping extent;
+an out-of-range window is a fail-visible `ResourceError`, never an unchecked
+access. The public prelude API has these shapes (mirroring `§1.7.1`):
+
+```ken
+proc withMapping (a : Auth) (e : Type) (r : Type)
+  (source : MappingSource) (prot : MappingProt)
+  (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [FS]
+
+proc mapView (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
+  : HostIO a (Result ResourceError MappingSpan) visits [FS]
+
+proc mapBytes (a : Auth) (mapping : MappingHandle) (span : MappingSpan)
+  : HostIO a (Result ResourceError Bytes) visits [FS]
+
+proc mapWrite (a : Auth) (mapping : MappingHandle) (span : MappingSpan)
+  (bytes : Bytes)
+  : HostIO a (Result ResourceError Unit) visits [FS]
+```
+
+where `MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int Int`
+(length; file offset and length) and `MappingProt = ReadOnly | ReadWrite`. A
+`ReadOnly` mapping refuses `mapWrite` with a fail-visible `ResourceError`.
+
+**MAP_PRIVATE isolation — file mappings are copy-on-write.** A file-backed
+mapping is **private**: writes through a write view are **process-local and never
+reach the backing file**. This preserves the D4 denotation (it is not a new
+choice here). Shared mappings whose writes are visible to the file or to other
+processes (`MAP_SHARED`) are **out of scope**, and a conforming surface exposes
+no such mode. The observable consequence a conformance seed can pin: a program
+that `mapWrite`s through a file mapping and then reads the same file through the
+ordinary `§1.3`/`§1.7` API observes the **original** file bytes, not its private
+writes.
+
+**Page-accounting — normative and host-independent.** The `Mapping` resource kind
+is charged in a **fixed canonical granule of 4096 bytes (4 KiB)**: a mapping of
+`n` bytes charges `ceil(n / 4096) * 4096` against the mapping accounting, and a
+zero-length mapping is not admitted. This granule is **spec-normative and
+host-independent** — it is **never** read from `sysconf(_SC_PAGESIZE)` or any
+host page size, and the native and interpreted paths charge the **identical**
+canonical value, so a program's mapping accounting is deterministic and portable
+and a conformance seed can pin it exactly (a 1-byte mapping charges 4096; a
+4097-byte mapping charges 8192). It is normative precisely because its purpose is
+cross-host conformance determinism, which is unachievable if the granule tracks
+the host; 4 KiB is chosen as the conventional minimum page size and the familiar
+canonical value. It is a pure **accounting** quantity: the runtime still maps
+with the host's real page size, but that host size is invisible to Ken. `Buffer`
+accounting stays **byte-granular** (`§1.7`) — page-rounding is specific to the
+`Mapping` kind.
+
+A conformance seed (`../../conformance/surface/ffi-io/seed-mapping.md`)
+discriminates the load-bearing properties against their non-conforming
+counterparts: the copy-on-write isolation against a `MAP_SHARED`/write-through
+surface, the 4 KiB page-rounding against a host-page-derived or byte-granular
+rule, and the opacity/bounds discipline against an address-exposing or unchecked
+view.
 
 ## 2. The FFI surface — the `foreign` declaration
 
