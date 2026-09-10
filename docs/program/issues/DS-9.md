@@ -1,18 +1,53 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: active
+status: draft
 owner: foundation
 size: L
 gate: none
-depends_on: [KERNEL-NESTED-IND]
+depends_on: [KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE]
 blocks: []
 github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## RE-BLOCKED 2026-09-10 (Steward) — the RE-RELEASE BELOW WAS COUNTERMANDED by a
+> ## genuine D0 hard stop + Architect ruling. `active` -> `draft`. READ THIS FIRST.
+>
+> The RE-RELEASED banner directly below fired on the premise that
+> `KERNEL-NESTED-IND` closing made DS-9 startable. **That premise is FALSE** — the
+> foundation-implementer's D0 (evt_6ha6y4ghng65j, base `ed3b57d6`) found NO honest
+> array/object increment, and the **Architect ruled the hard stop genuine**
+> (evt_6g6fgjb0qan40): there is a real KERNEL incompleteness that totally blocks
+> DS-9. Even a NON-recursive six-arm `match` over the public `Json` fails at the
+> `JsonObject` arm — `PositivityViolation("intrinsic All lift has no guest path")`
+> — while building the eliminator, upstream of any codec recursion. So the whole
+> codec is blocked, not just the recursive fold.
+>
+> **Root cause (kernel, grounded):** `crates/ken-kernel/src/inductive.rs:1455`
+> `intrinsic_former_lift_type` resolves the guest path for a former applied to the
+> recursive type DIRECTLY (`List Json`) but returns "no guest path" when the
+> recursive occurrence sits one former-nesting DEEPER — `List (Pair String Json)`.
+> This is a fail-closed INCOMPLETENESS (the type IS strictly positive; the kernel
+> conservatively rejects it), NOT an unsoundness.
+>
+> **The new blocker is a Kernel WP:** `depends_on` is now
+> `[KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE]` (filed same commit; extends
+> former-lift guest-path descent through nested POSITIVE formers only, preserving
+> strict positivity — the Architect owns that soundness gate). `KERNEL-NESTED-IND`
+> is merged and its edge is discharged; the live edge is the new node.
+> **Independently**, `Capability.Parsing.Numeric` still defers total `show_int : Int
+> -> String`, which gates the complete `JsonNumber` number leaf — a SEPARATE
+> pre-existing floor, not this kernel node. On the kernel node's landing the Steward
+> RE-RELEASES DS-9's D3+; `show_int` remains its own gate on a complete round trip.
+>
+> The held branch `wp/DS-9-json-codec` returns to foundation's home branch, no
+> candidate, no source edit (foundation-leader evt_584mb17dj07yv). The D3a decoder
+> paragraph and every carrier/law prohibition are preserved. The banners below are
+> the increment history; this one supersedes the RE-RELEASE.
+
 > ## RE-RELEASED 2026-09-10 (Steward) — the `KERNEL-NESTED-IND` blocker is CLEARED.
-> ## `draft` -> `active`.
+> ## `draft` -> `active`. [SUPERSEDED by the RE-BLOCKED banner above — see it.]
 >
 > `KERNEL-NESTED-IND` is now **merged** on `origin/main` (verified against
 > IMPLEMENTATION-PROGRESS at current main `ed3b57d6`). This frame's own startable
