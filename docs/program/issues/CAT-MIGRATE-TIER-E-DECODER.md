@@ -6,11 +6,23 @@ owner: foundation
 size: S
 gate: none
 tier: T2
-depends_on: [CAT-MIGRATE-TIER-E-SCHEMA]
+depends_on: [CAT-MIGRATE-TIER-E-SCHEMA, CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT]
 blocks: []
 github: null
 origin: "Steward-framed 2026-09-10 on the foundation-leader's named spine (evt_2fk3r5y2g3r61: Json -> Application.Input.Schema -> {ArgParse, Decoder}), released as foundation's next deliverable the moment CAT-MIGRATE-TIER-E-ARGPARSE landed (295ba35a3, blob-verified). Fourth and FINAL Tier-E serialization/application-spine node of the [[CAT-SCAFFOLD-RETIREMENT]] DAG and the SECOND (smaller) real client of the published Application.Input.Schema surface — the sibling of ArgParse, INDEPENDENT of it (Decoder consumes Schema, not ArgParse; the true dep is on the merged CAT-MIGRATE-TIER-E-SCHEMA, sequenced second under the one-WP rule as the smaller client: it references ~15 of Schema's 26 published names vs ArgParse's ~20). Module identity GROUNDED at origin/main 295ba35a3: Decoder = catalog/packages/Application/Configuration/Decoder.ken.md (blob 5a6ea273f, 159 lines)."
 ---
+
+> # HELD 2026-09-10 — blocked on new predecessor CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT.
+>
+> Decoder's D0 (foundation-implementer evt_18aqwyk476b4w) surfaced a genuine
+> hard-stop (a): it consumes `process_environment`, owned by the UNPUBLISHED
+> `Capability.Process.Environment` (no `pub`/`export` at 710479b5d). Ruling
+> evt_155n7vtdndkm3: publish that provider FIRST — a near-trivial pure migration
+> mirroring the landed `Capability.Process.Arguments`. Decoder resumes (the
+> Steward re-releases it) the moment CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT
+> lands; its D0 picks up from the same point and the LawfulClasses ruling
+> (evt_73wh7dgneqe6y) stands. depends_on updated; do NOT work Decoder until
+> re-released.
 
 > # RELEASED 2026-09-10 (Steward) — Tier E spine, node 4 (FINAL): last Schema client.
 >
@@ -72,6 +84,22 @@ this frame:
     already migrated + published.
   - `Doc` — owned by `Capability.Formatting.Doc` (`export Doc, Text, …`),
     published.
+  - `bytes_deceq_eq` — owned by `Core.Classes.LawfulClasses` (`pub fn
+    bytes_deceq_eq` with `pub proof sound/complete`, in its published
+    inventory), a Core-tier provider already imported by 14+ migrated catalog
+    modules (Diagnostics.Core, Formatting.Doc, Derived among them; Posix imports
+    the sibling `uint8_deceq_eq`, StringKeys the analogue `string_deceq_eq`).
+    D0 measured this AUTHORIZED edge on 2026-09-10 (foundation-implementer
+    evt_7gb92rpvbafz6) and the Steward ruled it in (evt_73wh7dgneqe6y): adopt
+    `import Core.Classes.LawfulClasses (bytes_deceq_eq)`, extended to exactly the
+    LawfulClasses names D0 measures consumed. It is a published lower-tier
+    provider omitted from the original orientation estimate, not a broken cut.
+  - `process_environment` (in `decode_process_environment`) — owned by
+    `Capability.Process.Environment`, which is UNPUBLISHED at 710479b5d (no
+    `pub`/`export`). This is the genuine hard-stop (a) that HOLDS this node: the
+    predecessor CAT-MIGRATE-TIER-D-PROCESS-ENVIRONMENT publishes that surface
+    first; once it lands, Decoder adopts `import Capability.Process.Environment
+    (process_environment, …)` — exactly the D0-measured names.
 - **Prelude-ambient symbols** (`List`, `Cons`, `Nil`, `Char`, `String`, `Bool`,
   `Nat`, `Prod`, `Some`/`None`, `True`/`False`, `match`/`↦`, …): D0 confirms via
   the loader which are prelude/built-in (no import) and which — if any — resolve
@@ -133,8 +161,9 @@ downstream driver, STOP and route to the Steward, not widen scope.
   - (b) an UNEXPECTED TIER-E EDGE — a dependency outside the predicted set
     {Application.Input.Schema, Capability.Diagnostics.Core,
     Capability.Formatting.Doc, Data.Collections.Derived, Data.Collections.NonEmpty,
-    Data.Sums.Validation, prelude}. Cite it; the slice cut is wrong, do not bend
-    scope to absorb it.
+    Data.Sums.Validation, Core.Classes.LawfulClasses,
+    Capability.Process.Environment, prelude}. Cite it; the slice cut is wrong,
+    do not bend scope to absorb it.
 - **D1 — migrate + publish, executing the D0 ledger.** Replace the ambient/
   scaffold resolution with the exact D0-measured selective imports (retire the
   ambient reach; extend the NonEmpty/Validation selective lists only if D0
@@ -204,7 +233,8 @@ Route to the Steward if:
 - D0 surfaces an UNEXPECTED TIER-E EDGE — a provider outside the predicted set
   {Application.Input.Schema, Capability.Diagnostics.Core, Capability.Formatting.Doc,
   Data.Collections.Derived, Data.Collections.NonEmpty, Data.Sums.Validation,
-  prelude}. The DAG cut is wrong; do not bend scope to absorb it; or
+  Core.Classes.LawfulClasses, Capability.Process.Environment, prelude}. The DAG
+  cut is wrong; do not bend scope to absorb it; or
 - delivering D1 appears to require a carrier change, new proof content, binding a
   new class/instance, or pulling in the sibling ArgParse or a downstream driver.
   Any of those means the slice cut is wrong, not that the scope should bend.
