@@ -1,0 +1,2 @@
+fn quot_elim_congruence_consumer (q : ConvBoolQuotient) : ConvQuotElimExpectedOf q =
+  conv_quot_elim_value q

@@ -1,0 +1,2 @@
+fn cast_congruence_consumer (a : Type) (e : Eq Type a Bool) (x : a) : ConvCastExpectedOf a e x =
+  conv_cast_value a e x
