@@ -251,6 +251,14 @@ fn expect_invalid_bounds (outcome : Result ResourceError Bytes)
     Ok bytes |-> body_error_io
   }
 
+fn expect_invalid_bounds_unit (outcome : Result ResourceError Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) =
+  match outcome {
+    Err InvalidBounds |-> body_ok_io;
+    Err error |-> body_error_io;
+    Ok unit |-> body_error_io
+  }
+
 proc out_of_range_body (mapping : MappingHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   bind (Coproduct (FSOp AFull) AmbientOp)
@@ -265,6 +273,24 @@ proc out_of_range_stage (_cap : Cap AFull)
     (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
     (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly out_of_range_body)
+    (\outcome. finish outcome)
+
+proc out_of_range_write_body (mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (mapWrite AFull mapping (MkMappingWindow (6 : Int) (4 : Int))
+      (bytes_encode "ABCD"))
+    (\outcome. expect_invalid_bounds_unit outcome)
+
+proc out_of_range_write_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadWrite
+      out_of_range_write_body)
     (\outcome. finish outcome)
 
 proc negative_window_body (mapping : MappingHandle)
@@ -368,6 +394,26 @@ proc read_only_write_stage (_cap : Cap AFull)
     (withMapping AFull Unit Unit (Anonymous (8 : Int)) ReadOnly read_only_write_body)
     (\outcome. finish outcome)
 
+proc accounting_body (_mapping : MappingHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  body_ok_io
+
+proc one_byte_accounting_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withMapping AFull Unit Unit (Anonymous (1 : Int)) ReadOnly accounting_body)
+    (\outcome. finish outcome)
+
+proc over_page_accounting_stage (_cap : Cap AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withMapping AFull Unit Unit (Anonymous (4097 : Int)) ReadOnly accounting_body)
+    (\outcome. finish outcome)
+
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   : HostIO AFull ExitCode visits [FS] =
   match caps {
@@ -421,29 +467,12 @@ fn try_differential(case: &str, entry: &str, matrix_body: &str) -> Result<Differ
     })
 }
 
-fn try_differential_in_worker(
-    case: &str,
-    entry: &str,
-    matrix_body: &str,
-) -> Result<Differential, String> {
-    let owned_case = case.to_owned();
-    let entry = entry.to_owned();
-    let matrix_body = matrix_body.to_owned();
-    std::thread::Builder::new()
-        .name(format!("abi-s6-{case}"))
-        .stack_size(32 * 1024 * 1024)
-        .spawn(move || try_differential(&owned_case, &entry, &matrix_body))
-        .map_err(|error| format!("starts {case} matrix worker: {error:?}"))?
-        .join()
-        .map_err(|_| format!("{case}: matrix worker panicked"))?
-}
-
 fn differential(case: &str, entry: &str) -> Differential {
-    try_differential_in_worker(case, entry, "read_body").unwrap_or_else(|error| panic!("{error}"))
+    try_differential(case, entry, "read_body").unwrap_or_else(|error| panic!("{error}"))
 }
 
 fn differential_matrix_body(case: &str, body: &str) -> Result<Differential, String> {
-    try_differential_in_worker(case, "matrix_stage", body)
+    try_differential(case, "matrix_stage", body)
 }
 
 fn differential_matrix_body_with_suppressed_local_drive(
@@ -454,7 +483,6 @@ fn differential_matrix_body_with_suppressed_local_drive(
     let body = body.to_owned();
     std::thread::Builder::new()
         .name(format!("abi-s6-{case}-suppressed-local-drive"))
-        .stack_size(32 * 1024 * 1024)
         .spawn(move || {
             let (result, applications) = ken_runtime::with_handler_owned_deferred_response_mutation(
                 ken_runtime::HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
@@ -807,6 +835,45 @@ fn window_direct_map_read_then_write_executes_in_source_order() {
     assert_eq!(release_set(&result.native).len(), 1);
 }
 
+/// Promise class: normative compatibility vector. MEASURED: checked
+/// `withMapping` acquisitions at the two seed boundary lengths reach the real
+/// MappingAllocate operation in both engines with identical requests, a
+/// successful resource acquisition, terminal result, and one release. The shared
+/// accounting seam independently pins those requests to exact canonical charges
+/// in `abi_s6_d5a_mapping_accounting_is_fixed_4kib_and_buffer_is_byte_granular`.
+/// CLAIMED: 1 byte and 4097 bytes exercise the native/interpreter paths whose
+/// common accounting rule charges exactly 4096 and 8192 bytes. THE GAP: the
+/// effect-observation schema intentionally exposes no live-capacity counter;
+/// exact charge is observed at the shared ResourceTable boundary, not inferred
+/// from this trace.
+#[test]
+fn fixed_accounting_boundary_lengths_reach_both_engines() {
+    for (case, entry, length) in [
+        ("accounting-one-byte", "one_byte_accounting_stage", 1),
+        ("accounting-over-page", "over_page_accounting_stage", 4097),
+    ] {
+        let result = differential(case, entry);
+        assert_parity(case, &result);
+        let events = non_release_events(&result.native);
+        assert_eq!(events.len(), 1, "{case}: allocate is the only body effect");
+        assert_eq!(events[0].operation, ken_runtime::HostOpV1::MappingAllocate);
+        assert!(matches!(
+            events[0].request,
+            ken_runtime::CanonicalRequestV1::MappingAllocate {
+                length: actual,
+                ..
+            } if actual == length
+        ));
+        assert!(matches!(
+            events[0].outcome,
+            ken_runtime::CanonicalOutcomeV1::Success(
+                ken_runtime::CanonicalReplyV1::ResourceAcquired { .. }
+            )
+        ));
+        assert_eq!(release_set(&result.native).len(), 1);
+    }
+}
+
 /// Promise class: normative compatibility vector. MEASURED: [6,10) against an
 /// eight-byte mapping enters the real MappingReadView dispatch and returns the
 /// exact InvalidBounds variant in both engines, never a clamped byte result.
@@ -820,6 +887,34 @@ fn out_of_range_window_is_invalid_bounds_not_clamped() {
     assert_eq!(reads.len(), 1);
     assert!(matches!(
         reads[0].outcome,
+        ken_runtime::CanonicalOutcomeV1::Error(ken_runtime::SemanticErrorV1::Resource(
+            ken_runtime::ResourceErrorV1::InvalidBounds
+        ))
+    ));
+    assert_eq!(release_set(&result.native).len(), 1);
+}
+
+/// Promise class: normative compatibility vector. MEASURED: a checked write of
+/// four bytes into [6,10) against an eight-byte mapping reaches the real
+/// MappingWriteView operation and returns exact InvalidBounds in both engines.
+/// CLAIMED: mapWrite bounds-checks the declared window and never clamps or
+/// exposes a partial write. THE GAP: window/payload length agreement is pinned
+/// independently below so this row cannot pass by substituting payload extent.
+#[test]
+fn out_of_range_map_write_is_invalid_bounds_not_clamped() {
+    let result = differential("out-of-range-write", "out_of_range_write_stage");
+    assert_parity("out-of-range-write", &result);
+    let writes = operation_events(&result.native, ken_runtime::HostOpV1::MappingWriteView);
+    assert_eq!(writes.len(), 1);
+    assert_eq!(
+        writes[0].request,
+        ken_runtime::CanonicalRequestV1::MappingWriteView {
+            start: 6,
+            bytes: b"ABCD".to_vec(),
+        }
+    );
+    assert!(matches!(
+        writes[0].outcome,
         ken_runtime::CanonicalOutcomeV1::Error(ken_runtime::SemanticErrorV1::Resource(
             ken_runtime::ResourceErrorV1::InvalidBounds
         ))
