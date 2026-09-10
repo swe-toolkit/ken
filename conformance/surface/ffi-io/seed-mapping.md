@@ -5,8 +5,9 @@ Format: `../../README.md`. These pin the normative Mapping-surface contract of
 byte views; authority `docs/program/10-linux-abi-completion.md §4`). The cases
 net the *discriminating* form of each property — each reds a plausible
 non-conforming implementation — not the prose. The Mapping surface (the
-`withMapping` bracket, `MappingHandle`/`MappingWindow`/`MappingSpan`, the
-`Mapping` resource kind) is the runtime deliverable **ABI-S6 / D5a**, not yet
+`withMapping` bracket, `MappingHandle`/`MappingWindow`, the window-direct
+`mapBytes`/`mapWrite`, the `Mapping` resource kind) is the runtime deliverable
+**ABI-S6 / D5a**, not yet
 landed, so every case is **RED-UNTIL-BUILT / BLOCKED-ON-ABI-S6-D5a**: the
 surface does not yet exist. The seed is staged now as the control that makes
 §1.9's negatives testable, for D5a to build against.
@@ -30,8 +31,8 @@ inspected a raw address would be testing a surface §1.9 forbids.
 - spec: `38 §1.9` (MAP_PRIVATE isolation); `38 §1.3`
 - given: a file with known original bytes; a program that acquires a
   `FileBacked` mapping over it via `withMapping … ReadWrite`, `mapWrite`s
-  different bytes through a `MappingSpan`, then — after the bracket settles —
-  reads the same file through the ordinary `§1.3` file API.
+  different bytes into an in-range `MappingWindow`, then — after the bracket
+  settles — reads the same file through the ordinary `§1.3` file API.
 - expect: **RED-UNTIL-BUILT** — the post-write file read returns the **original**
   bytes, not the mapped write. The in-mapping read view observes the write
   (process-local visibility) while the file is unchanged.
@@ -74,19 +75,20 @@ inspected a raw address would be testing a surface §1.9 forbids.
 - promise class: **normative property** — absolute opacity; bounded, checked
   access
 - spec: `38 §1.9` (opacity, views, `ResourceKindMismatch`); `38 §1.7.1`
-- given: an acquired `MappingHandle`; a `mapView` request for an in-range window
-  and one for a window past the mapping extent; and a live `Mapping` token
-  supplied to a buffer-only operation (and the reverse).
+- given: an acquired `MappingHandle`; a `mapBytes` on an in-range
+  `MappingWindow` and one on a window past the mapping extent; and a live
+  `Mapping` token supplied to a buffer-only operation (and the reverse).
 - expect: **RED-UNTIL-BUILT** — no raw address, pointer, or page reference is
   observable in any Ken value or the resource token (only the opaque handle, the
-  window/span descriptors, and scalar projections); the in-range view yields a
-  `MappingSpan` and copies bytes, the out-of-range window returns a fail-visible
-  `ResourceError` rather than an unchecked access, and a wrong-kind token returns
+  window descriptor, and the scalar extent); the in-range access copies bytes,
+  the out-of-range window returns a fail-visible `ResourceError` rather than an
+  unchecked or clamped access, and a wrong-kind token returns
   `ResourceKindMismatch` naming the `Mapping` identity (with same-kind controls
   succeeding).
 - fixture: **BLOCKED-ON-ABI-S6-D5a**.
 - control: an implementation that projects the raw region address into a Ken
-  value, or that reads an out-of-range window without a fail-visible error, reds;
-  a triplicated or wrong-kind acceptance reds the `ResourceKindMismatch` net.
+  value, that forges a `MappingHandle` outside `withMapping`, or that reads an
+  out-of-range window without a fail-visible error, reds; a triplicated or
+  wrong-kind acceptance reds the `ResourceKindMismatch` net.
 - why: opacity is what keeps raw pointers out of application Ken (`§4`, §6); an
   unchecked or address-exposing view defeats the substrate MMIO later relies on.

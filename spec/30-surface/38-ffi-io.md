@@ -689,9 +689,15 @@ A **mapping** — anonymous or file-backed — is a third runtime resource kind
 beside `FsHandle` and `Buffer`, exposed to Ken **only** as an opaque
 runtime-owned region and bounded byte views. The opacity is **absolute**: no raw
 address, host pointer, or page reference ever reaches a Ken value or the resource
-token. Every access is a **bounded-view copy** — bytes out across a checked span,
-or caller bytes in — exactly as `Buffer` exposes `BufferSpan`/`spanBytes`
-(`§1.7.1`), never a mutable pointer into the region. This is the
+token. Every access is a **bounded-view copy** — bytes out of, or caller bytes
+into, a bounds-checked window — never a mutable pointer into the region. Access
+is **window-direct**: a mapping exposes no separate view token. `Buffer`'s
+`BufferSpan` (`§1.7.1`) earns its keep only because `readAt` **caps** — the
+actually transferred subrange can be smaller than the request (`ReadSome
+BufferSpan _`, `§1.7.2`) — so a minted token must carry what was actually read.
+A mapping does **not** cap: it bounds-checks each window against a fixed extent
+and rejects an out-of-range one (below), so a live window's subrange **is** the
+window and no span carries an invariant the window does not. This is the
 mapping/lifetime/bounded-access substrate L2-8 MMIO later builds on, and it is
 what keeps raw pointers out of application Ken
 (`../../docs/program/10-linux-abi-completion.md §4`, §6).
@@ -725,13 +731,17 @@ cannot restore it.
 **Source, offset, protection, and views.** `withMapping` takes the mapping
 source — anonymous with a length, or a file `Resource FsHandle` with a byte
 offset and length — and a requested protection (`ReadOnly` or `ReadWrite`). Ken
-observes only the opaque `MappingHandle`, an immutable `MappingWindow` request
-descriptor over the region, and a constructor-private immutable `MappingSpan` for
-the exact current live subrange, plus scalar projections (span length, extent).
-A read view copies the span's bytes out; a write view copies caller bytes into
-the span. Every offset and length is bounds-checked against the mapping extent;
-an out-of-range window is a fail-visible `ResourceError`, never an unchecked
-access. The public prelude API has these shapes (mirroring `§1.7.1`):
+observes only the opaque `MappingHandle` and an immutable `MappingWindow`
+(offset, length) naming a subrange, plus the scalar extent. A read view
+(`mapBytes`) copies the window's bytes out; a write view (`mapWrite`) copies
+caller bytes into the window. Every window is bounds-checked against the fixed
+mapping extent; an out-of-range window is a fail-visible `ResourceError`,
+**never clamped** and never an unchecked access. Liveness is re-checked at
+**each** access: a `mapBytes`/`mapWrite` on a mapping used after the bracket
+settles, or after revocation at the `../60-security/62 §4.2` admission boundary,
+yields the single `Revoked` identity, `Permanent` (`§1.8`). Because the check
+lives at the access op, there is no separate view token to invalidate and no
+mint-then-consume gap. The public prelude API has these shapes:
 
 ```ken
 proc withMapping (a : Auth) (e : Type) (r : Type)
@@ -739,20 +749,21 @@ proc withMapping (a : Auth) (e : Type) (r : Type)
   (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
   : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [FS]
 
-proc mapView (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
-  : HostIO a (Result ResourceError MappingSpan) visits [FS]
-
-proc mapBytes (a : Auth) (mapping : MappingHandle) (span : MappingSpan)
+proc mapBytes (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
   : HostIO a (Result ResourceError Bytes) visits [FS]
 
-proc mapWrite (a : Auth) (mapping : MappingHandle) (span : MappingSpan)
+proc mapWrite (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
   (bytes : Bytes)
   : HostIO a (Result ResourceError Unit) visits [FS]
 ```
 
-where `MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int Int`
-(length; file offset and length) and `MappingProt = ReadOnly | ReadWrite`. A
-`ReadOnly` mapping refuses `mapWrite` with a fail-visible `ResourceError`.
+where `MappingWindow = MkMappingWindow Int Int` (offset, length),
+`MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int Int`
+(length; file offset and length), and `MappingProt = ReadOnly | ReadWrite`. A
+`ReadOnly` mapping refuses `mapWrite` with a fail-visible `ResourceError`. Each
+op maps 1:1 onto the frozen wire (`mapBytes` → the read op, `mapWrite` → the
+write op, `withMapping` → allocate + release) and returns that op's response
+directly, so no in-body response transform is introduced.
 
 **MAP_PRIVATE isolation — file mappings are copy-on-write.** A file-backed
 mapping is **private**: writes through a write view are **process-local and never
