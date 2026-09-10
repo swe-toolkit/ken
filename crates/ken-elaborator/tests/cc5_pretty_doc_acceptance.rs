@@ -383,7 +383,10 @@ fn pretty_doc_loader_surface_and_string_boundary_are_behavioral() {
     )
     .expect("selective client must consume Text and text_string at their intended types");
 
-    let render_string = env.globals["Capability.Formatting.Doc.render_string"];
+    let render_string = *env
+        .globals
+        .get("Capability.Formatting.Doc.render_string")
+        .expect("Formatting.Doc must retain its owned private render_string declaration");
     assert!(
         owned.contains(&render_string) && env.env.transparent_body(render_string).is_some(),
         "render_string must remain an owned, checked private adapter"
