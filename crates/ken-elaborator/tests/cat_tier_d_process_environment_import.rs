@@ -101,13 +101,11 @@ fn collect_decl_globals(declaration: &Decl, out: &mut BTreeSet<GlobalId>) {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the real parser finds no import declaration and checked terms have
-/// no identity outside the module and prelude. CLAIMED: the D0 import ledger is
-/// exactly empty. THE GAP: source imports and checked references are independent
-/// observations, so an unused future import and an undeclared dependency both
-/// change one side of this pair.
+/// MEASURED: the real parser finds no import declaration. CLAIMED: the D0
+/// import ledger is exactly empty. THE GAP: an undeclared dependency would not
+/// appear in syntax, so checked identity closure is measured separately.
 #[test]
-fn process_environment_import_and_provider_ledgers_are_empty() {
+fn process_environment_import_ledger_is_empty() {
     let extracted =
         literate::extract_ken_md(ENVIRONMENT_SOURCE).expect("Process.Environment extraction");
     let declarations =
@@ -127,7 +125,16 @@ fn process_environment_import_and_provider_ledgers_are_empty() {
         })
         .collect::<Vec<_>>();
     assert!(imports.is_empty(), "the D0 import ledger is empty");
+}
 
+/// Promise class: durable invariant.
+///
+/// MEASURED: checked terms retain no identity outside the module and prelude.
+/// CLAIMED: Process.Environment has no undeclared provider edge. THE GAP: an
+/// unused import would not reach checked terms, so parsed imports are measured
+/// separately.
+#[test]
+fn process_environment_checked_provider_ledger_is_empty() {
     let (env, owned, base_ids) = load_environment();
     let mut resolved = BTreeSet::new();
     for identity in &owned {
