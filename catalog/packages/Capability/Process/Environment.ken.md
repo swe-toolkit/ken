@@ -33,6 +33,8 @@ proof round_trip for process_environment
   match input {
     MkProcessInput arguments previous working_directory ↦ Refl
   }
+
+export process_environment
 ```
 
 ## 2. Trust & derivation
