@@ -731,13 +731,21 @@ cannot restore it.
 **Source, offset, protection, and views.** `withMapping` takes the mapping
 source — anonymous with a length, or a file `Resource FsHandle` with a byte
 offset and length — and a requested protection (`ReadOnly` or `ReadWrite`). Ken
-observes only the opaque `MappingHandle` and an immutable `MappingWindow`
-(offset, length) naming a subrange, plus the scalar extent. A read view
-(`mapBytes`) copies the window's bytes out; a write view (`mapWrite`) copies
-caller bytes into the window. Every window is bounds-checked against the fixed
-mapping extent; an out-of-range window is a fail-visible `ResourceError`,
-**never clamped** and never an unchecked access. Liveness is re-checked at
-**each** access: a `mapBytes`/`mapWrite` on a mapping used after the bracket
+observes only the opaque `MappingHandle`, an immutable `MappingWindow`
+(offset, length) naming a read subrange, and the scalar extent. A read view
+(`mapBytes`) copies a window's bytes out; a write view (`mapWrite offset bytes`)
+copies the caller's `bytes` into the subrange `[offset, offset + len bytes)`. The
+two are **asymmetric by design**: a read's extent is the requested length, so the
+read window carries it; a write's extent is its **payload**, so `mapWrite` takes
+only an `offset` and derives the range from `len bytes` — there is no
+independent, separately-checked write-window length. Such a length would be
+redundant (the payload already fixes the extent) and, under MAP_PRIVATE COW
+(below), a write range wider than its payload is incoherent — nothing would fill
+the excess. Both a read window and a
+write range are bounds-checked against the fixed extent; an out-of-range one is a
+fail-visible `ResourceError`, **never clamped** and never an unchecked access.
+Liveness is re-checked at **each** access: a `mapBytes`/`mapWrite` on a mapping
+used after the bracket
 settles, or after revocation at the `../60-security/62 §4.2` admission boundary,
 yields the single `Revoked` identity, `Permanent` (`§1.8`). Because the check
 lives at the access op, there is no separate view token to invalidate and no
@@ -752,12 +760,11 @@ proc withMapping (a : Auth) (e : Type) (r : Type)
 proc mapBytes (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
   : HostIO a (Result ResourceError Bytes) visits [FS]
 
-proc mapWrite (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
-  (bytes : Bytes)
+proc mapWrite (a : Auth) (mapping : MappingHandle) (offset : Int) (bytes : Bytes)
   : HostIO a (Result ResourceError Unit) visits [FS]
 ```
 
-where `MappingWindow = MkMappingWindow Int Int` (offset, length),
+where the read window `MappingWindow = MkMappingWindow Int Int` (offset, length),
 `MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int Int`
 (length; file offset and length), and `MappingProt = ReadOnly | ReadWrite`. A
 `ReadOnly` mapping refuses `mapWrite` with a fail-visible `ResourceError`. Each

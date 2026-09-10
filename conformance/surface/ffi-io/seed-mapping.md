@@ -44,8 +44,9 @@ inspected a raw address would be testing a surface §1.9 forbids.
 - spec: `38 §1.9` (MAP_PRIVATE isolation); `38 §1.3`
 - given: a file with known original bytes; a program that acquires a
   `FileBacked` mapping over it via `withMapping … ReadWrite`, `mapWrite`s
-  different bytes into an in-range `MappingWindow`, then — after the bracket
-  settles — reads the same file through the ordinary `§1.3` file API.
+  different bytes at an in-range `offset` (write range `[offset, offset+len
+  bytes)`), then — after the bracket settles — reads the same file through the
+  ordinary `§1.3` file API.
 - expect: **RED — (gated: D5b)** — the post-write file read returns the
   **original** bytes, not the mapped write. The in-mapping read view observes the
   write (process-local visibility) while the file is unchanged.
