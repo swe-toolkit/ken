@@ -1,12 +1,73 @@
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{modules::ModuleState, ElabEnv};
-use ken_kernel::{Decl, Level, Term};
+use ken_elaborator::{ElabEnv, modules::ModuleState};
+use ken_kernel::{Decl, GlobalId, Level, Term};
 
 pub fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join("catalog/packages")
+}
+
+fn collect_references(term: &Term, references: &mut BTreeSet<GlobalId>) {
+    match term {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } | Term::Constructor { id, .. } => {
+            references.insert(*id);
+        }
+        Term::Elim { fam, .. } => {
+            references.insert(*fam);
+        }
+        _ => {}
+    }
+    for child in term.children() {
+        collect_references(child, references);
+    }
+}
+
+pub fn declaration_references(declaration: &Decl) -> BTreeSet<GlobalId> {
+    let mut references = BTreeSet::new();
+    match declaration {
+        Decl::Transparent { ty, body, .. } => {
+            collect_references(ty, &mut references);
+            collect_references(body, &mut references);
+        }
+        Decl::Opaque { ty, .. } | Decl::Primitive { ty, .. } => {
+            collect_references(ty, &mut references);
+        }
+        Decl::Inductive(inductive) => {
+            for term in &inductive.params {
+                collect_references(term, &mut references);
+            }
+            for term in &inductive.indices {
+                collect_references(term, &mut references);
+            }
+            collect_references(&inductive.former_type, &mut references);
+            for constructor in &inductive.constructors {
+                for term in &constructor.args {
+                    collect_references(term, &mut references);
+                }
+                for term in &constructor.target_indices {
+                    collect_references(term, &mut references);
+                }
+                collect_references(&constructor.type_, &mut references);
+            }
+        }
+    }
+    references
+}
+
+pub fn owned_references(env: &ElabEnv, owned: &BTreeSet<GlobalId>) -> BTreeSet<GlobalId> {
+    owned
+        .iter()
+        .flat_map(|id| {
+            declaration_references(
+                env.env
+                    .lookup(*id)
+                    .unwrap_or_else(|| panic!("owned global {id:?} must resolve")),
+            )
+        })
+        .collect()
 }
 
 pub fn load_core_logic_or(env: &mut ElabEnv) {
