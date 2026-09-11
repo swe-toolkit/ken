@@ -12,7 +12,110 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 8 — FORK-3 REPAIR RULING, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 9 — ROOT-PARENT REPAIR RULING, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 9 — ROOT-PARENT REPAIR. Architect ruling
+> # evt_3c1nve6zjmsza (thr_7wy5wy45p7abm), grounded byte-clean fee133142 (all four
+> # HS9 hashes rechecked, the exact ae422b30… attempt applied). The HS8 fork-3
+> # ingress repair is validated (it advanced past HS8); the positive then reached
+> # the new ObjectEmission refusal "OrientedSubcontinuationPlanV1: an external
+> # source parent is not a non-root checked invocation" — consecutive HARD STOP 9.
+> #
+> # §1a MANDATORY RESEARCH (third pull; prior HS3 evt_1w0grnt5xrseq, HS6
+> # evt_1r9vwnfpr7caq): advisory evt_7b67s21nrf1ds. Its core distinction holds — an
+> # external parent is an explicit root/delimiter OR a concrete non-root call;
+> # missing call provenance alone NEVER manufactures root ("source-less" = no
+> # checked-call source, never no control authority). One advisory anchor
+> # corrected: the root normalizer is `make_computational_recursor` (not
+> # `instantiate_checked_invocation_segment`); the architectural conclusion is
+> # unchanged. §1b ENTRIES 7–9: NO single structural predicate joins all three —
+> # "a downstream consumer is too narrow" is too general to name one replaceable
+> # mechanism. Entry 7 = a post-production consumer re-demanding a call after
+> # authoritative `InlineNoCall` settlement; entry 8 = a pre-lifecycle ingress that
+> # never entered its exact transport route; entry 9 = parent-kind admission after
+> # source/mint/edge validation. Settlement, ingress, and parent role are distinct
+> # authorities. Count remains 9; Research next re-triggers at 12.
+> #
+> # CLASSIFICATION: a ONE-CONSUMER DOMAIN MISMATCH over an EXISTING canonical root
+> # class — NOT duplicate dispatcher entry, NOT lost non-root provenance, NOT a
+> # missing representation. The exact attempt proves: (1) `external_source_parent:
+> # Some` has one production origin (the source machine, after minting + exact
+> # call-parent frame/site comparison + `validate_source_dynamic_splice_parent`);
+> # all three non-source composer callers pass `None`, so outer `Some` is positive
+> # current source-open provenance. (2) Reaching the HS9 string means
+> # `parent.nonroot_invocation()? == Ok(None)` and `parent.id == Some(frame)` — the
+> # helper admitted exactly `(Some(frame), None, None, 0)` or `(Some(frame),
+> # Some(0), None, 0)`; partial tuples already refuse. (3) `make_computational_
+> # recursor` maps those roots to frame-retained / invocation+source-absent /
+> # depth-zero; non-roots retain the complete tuple. (4) Minting selects
+> # distinguished parent `0`, allocates a fresh child+edge, inserts once, puts the
+> # edge handle on the child; edge take removes the exact handle before
+> # composition (replay/sibling theft refuse). (5) The composer's LATER tree
+> # already admits external parent invocation `0` keyed with its frame — only the
+> # EARLIER external-parent gate rejects that same root by requiring `Some(nonroot)`.
+> # (6) HS8 is single-entry structurally (`lower_expr` returns before ordinary
+> # occurrence entry; the transport-positive `InvocationReturn` dispatcher enters
+> # once and does not fall back). (7) The source machine binds checked root
+> # authority to `active.cursor` and restores it only through that cursor before
+> # resume; composition consumes the child edge, not root authority.
+> #
+> # RULED REPAIR — change ONLY the early `external_source_parent_key`
+> # classification in `compose_oriented_subcontinuation`. Reuse the existing
+> # two-level sum; add NO enum, carrier, plan field, token, edge kind, or inference:
+> #   let frame_id = parent.id.ok_or_else(|| {
+> #       unsupported("OrientedSubcontinuationPlanV1",
+> #           "an external source parent has no checked frame identity")
+> #   })?;
+> #   let invocation_id = match parent.nonroot_invocation()? {
+> #       Some((invocation_id, _, _)) => invocation_id,
+> #       None => 0,
+> #   };
+> #   let key = (invocation_id, frame_id);
+> # Keep exact-one incoming-edge matching unchanged. An explicit canonical root is
+> # key `(0, frame)`; non-root behavior is BYTE-IDENTICAL. Outer `None` stays
+> # distinct from `Some(canonical root)`; never derive root from absent metadata
+> # outside that outer `Some`. Keep the later id-0 tree law, child order,
+> # frame/site/interface checks, edge removal, affine ledgers, installation, and
+> # source return byte-identical. Do NOT alter `nonroot_invocation`,
+> # `make_computational_recursor`, minting, source-parent validation, edge take,
+> # `external_children`, root authority, cursor restoration, or the HS8 ingress.
+> #
+> # CAUSALITY CONTROL — cfg(any(test, feature = "px8-ds-test-support")): RAII
+> # `D5bHs9ExternalRootMutation::{Exact, RejectExactRoot}` +
+> # `with_d5b_hs9_external_root_mutation<T>(...) -> (T, usize)`. It may apply ONLY
+> # after outer `Some`, `nonroot_invocation() == Ok(None)`, frame present, and
+> # exactly one matching `(0, frame)` edge. `RejectExactRoot` increments once and
+> # returns the exact HS9 refusal; it must NOT fire for no parent, non-root,
+> # partial tuple, frame mismatch, nonzero edge parent, or duplicate edge. Extend
+> # `oriented_external_source_parent_requires_the_exact_invocation_frame_pair`:
+> # both frame-bearing root spellings with exact edge parent `0` install the
+> # child-only segment; the existing non-root row stays green; root-frame mismatch,
+> # nonzero edge parent, partial root tuple, and two matching root edges refuse at
+> # their named gates; child qualification stays the child's nonzero invocation,
+> # never `0`. On the unchanged COW witness with the exact attempt, `RejectExactRoot`
+> # must apply exactly once and reproduce HS9; after RAII restoration, `Exact` must
+> # advance. Then run the full battery (non-root external-parent; edge
+> # deletion/duplication/replay/sibling/cycle; root authority affine/cursor;
+> # frame-sequence + source-return; HS3–HS8 causality incl. HS6 inside-inner
+> # overflow + HS8 bypass; scoped checks, staticlib, COW, ELF census). If it
+> # completes, require native/interpreter value, ordered effect trace, file
+> # preservation, and unchanged-stack parity.
+> #
+> # FENCES: no partial-parent acceptance; no id/source/depth inference; no
+> # root-from-absence outside outer `Some`; no identity/direction/replay change; no
+> # root consumed as child; no dispatcher re-entry; no carrier, continuation, plan,
+> # owner, response, settlement, join, ABI/wire, stack, source-semantic,
+> # generated-code, or TCB change.
+> #
+> # DECISIVE TURN. This closes the diagnosed D5b native-lowering chain IFF the
+> # repaired positive advances past HS9 with no new stop. A NEW structural refusal
+> # is HARD STOP 10: stop, preserve/revert, return it — no Research until 12.
+> # STEWARD PACKAGING: fully fenced (no TCB delta, no ban-lift) => Steward
+> # amend-in-place, no operator sign-off (as at HS3–HS8). Runtime stays byte-clean
+> # at fee133142 until this amendment lands and runtime-leader explicitly re-kicks
+> # the repair build.
+
+# D5b NATIVE HARD-STOP 8 — FORK-3 REPAIR RULING, AMENDED IN PLACE 2026-09-11 (Steward). Superseded by the HS9 root-parent repair ruling above; retained as the fork-3 ingress-repair record that advanced the witness to HS9.
 
 > # D5b native-lowering track, HARD STOP 8 — FORK-3 PRODUCTION REPAIR (the
 > # observation loop is DISCHARGED; a real repair is now authorized). Architect
