@@ -64,7 +64,7 @@ proc file_body (file : Resource FsHandle)
     (Result ResourceError (ResourceBracketResult Unit Unit))
     (ResourceBodyResult Unit Unit)
     (withMapping AFull Unit Unit
-      (FileBacked file (0 : Int) (8 : Int)) ReadWrite mapping_body)
+      (FileBacked file (8 : Int)) ReadWrite mapping_body)
     (\outcome. mapping_bracket_body outcome)
 
 fn finish_file_read (outcome : Result FileError Bytes) : HostIO AFull ExitCode =
