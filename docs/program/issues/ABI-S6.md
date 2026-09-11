@@ -156,6 +156,11 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
    `ComputationalRecursorLayer` from an empty ambient invocation stack as root
    instance 0. Child instance and parent frame still agreed; only the dynamic
    parent invocation disagreed (`evt_49ycrt545sjh4`).
+5. Copying that parent tuple into the selected layer repaired the dynamic edge,
+   but the same frame-0 layer then remained occupied by parent invocation 1 when
+   `instantiate_checked_invocation_segment` had to qualify the call's expected
+   frame-0 sequence for child invocation 2. It instantiated no child frame and
+   refused `expected={0} instantiated={}` (`evt_5246mrbnxprdb`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
@@ -164,6 +169,11 @@ worker-capture, and context-capture partition. Entry 4 is downstream of that
 boundary but is a distinct existing dynamic-splice transport invariant: a
 selected recursor layer must preserve the source computational frame's whole
 checked tuple rather than re-derive any member from ambient state.
+
+Entry 5 refines entry 4 rather than reversing its measured fact: the parent
+identity must survive long enough to mint the edge, but placing it in the child
+layer conflates two roles. Parent-edge provenance and child-frame qualification
+must have separate existing authorities; one invocation scalar cannot name both.
 
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
