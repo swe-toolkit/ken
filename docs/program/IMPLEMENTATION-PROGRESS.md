@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-11 03:21:35Z — from 584 issue file(s) in `docs/program/issues/`.
+2026-09-11 05:48:24Z — from 584 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -276,7 +276,7 @@ the committed file matches the generator's output.
 | `LANG-SYMBOLIC-OPERATOR-NAMES` | `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined | merged | language | S | none | — |
 | `LANG-TRANSPORT-SIGMA-PREMISE-SYNTHESIS` | transport_recursive_group_call_result over-rejects a compound result indexed by BOTH the whole matched record AND a bare component of it: it builds a single raw Eq over the user data record, which obs::eq_reduce will not decompose into per-index Sigma leaves, so the component index goes unrefined and a well-typed program is KernelRejected (TypeMismatch). Fix = route (a): synthesize transport's premise as the Sigma-shaped result-family-index equality and feed the existing walker (REUSE). DEFERRED completeness gap. | draft | language | S | none | — |
 | `LANG-TRIVIA-KIND-MAPPING-PIN` | `LANG-COMMENT-CLASSIFIER-SHARED` made scanner divergence unrepresentable and moved the surface one hop to `From<CommentKind> for TriviaKind`, which is now the sole place a classification becomes a behaviour -- the completeness axis is closed by the compiler but the per-arm mapping is asserted nowhere, and the one fixture that covers the block form is a configuration where the doc rule and the positional heuristic return the same answer, so a Block/DocBlock transposition compiles and reds nothing | merged | language | XS | none | — |
-| `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES` | The `trunc_intro` infer-position diagnostic advises two remedies that both require an annotation-position `‖A‖` spelling the surface does not have, and omits `elim_trunc`'s motive, which is the one position that works | active | language | S | none | — |
+| `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES` | The `trunc_intro` infer-position diagnostic advises two remedies that both require an annotation-position `‖A‖` spelling the surface does not have, and omits `elim_trunc`'s motive, which is the one position that works | merged | language | S | none | — |
 | `LANG-TRUNCATION-SURFACE-SYNTAX` | Give propositional truncation a surface spelling and an elaboration rule -- the kernel already types Trunc and TruncProj, and no .ken file can reach them | merged | language | M | none | — |
 | `LANG-TRUSTED-BASE-LABEL-KIND-TAG` | The `AC-6` trusted-base enumeration is blind to the one movement it exists to catch -- `trusted_base_labels` flattens kernel-declaration and surface names into one untagged `Vec<String>`, so a postulate becoming a primitive under the same spelling renders identically across all 107 entries, and the injectivity the fallback depends on is measured rather than enforced | merged | language | XS | none | — |
 | `LANG-VIEW-RETIRE` | Operator ruling SURF-1 retired the single definition keyword `view` and split it into `const`/`fn`/`proc`, but the landed elaborator still accepts it -- and `view` is not an alias: it takes an EARLY RETURN out of the bidirectional purity check that `33 §1` calls a hard error, so every definition still spelled `view` has never been checked for the effect discipline the spec requires | merged | language | M | none | — |
