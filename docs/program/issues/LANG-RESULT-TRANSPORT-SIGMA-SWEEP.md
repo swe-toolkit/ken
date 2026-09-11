@@ -1,7 +1,7 @@
 ---
 id: LANG-RESULT-TRANSPORT-SIGMA-SWEEP
 title: "Sibling-consumer sweep of the record-index Sigma closure: transport_recursive_group_call_result (elab.rs ~:1934, UNCHANGED by LANG-RECORD-INDEX-SIGMA-CLOSURE) consumes the SAME generated record-index premise as the three consumers that WP made Sigma-aware, but still via the whole-Eq path (try_reindex_cast -> build_index_type_cong -> J over the raw sentinel), NOT the new project_generated_index_equality_leaves walker. A recursive-group fn whose result type is indexed by a COMPONENT of the record (not the whole record) reaches subst_term_generalize, finds no whole-record term, and silently installs no per-component refinement — the exact completeness gap the parent WP closed in the other consumers, left in the result-transport sibling. CONFIRM-OR-REFUTE reachability, then fix-with-the-walker or record EXCLUDED with a cited reason."
-status: draft
+status: active
 owner: language
 size: S
 gate: none
@@ -12,6 +12,40 @@ github: null
 origin: "Adversary M8 hunt on LANG-RECORD-INDEX-SIGMA-CLOSURE (merged 4af6e16f4, PR #3255), verdict NO OBJECTION / clean plus ONE bounded observation (evt_625k42qvwjdqz), Steward triage 2026-09-03. The observation is grounded in the parent WP's OWN AC-CLASS-CLOSED (which required EVERY elaborator consumer of a record-index equality that peels the Eq head to handle the Sigma-decomposition uniformly): the audit's must-classify set named install_hidden_result_variable_refinements but NOT its sibling transport_recursive_group_call_result, which consumes the same premise. Direction is COMPLETENESS-ONLY: the generated-elim assembled term stays kernel_infer-re-derived, so a missing refinement is a silent no-op or a kernel-rejected term (false-reject), never an over-acceptance. NOT a soundness hole, NOT a hard stop, NOT a blocker. Reachability of a component-indexed recursive-group result is UNCONFIRMED (no executed repro — native/cargo blocked by COORDINATION section 12); the language ring knows whether component-indexed recursive-group results occur and can confirm or refute cheaply."
 ---
 
+ # RELEASED 2026-09-11 (Steward) — L2 language head, operator L2 queue item 7
+> # (2026-09-10 ruling; item 6 LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD landed
+> # 8c6136fa3, freeing the ring). status draft->active; kicking the language ring.
+> # Tier T1, size S.
+> #
+> # THE 2026-09-03 SELF-DISPOSITION BELOW IS SUPERSEDED. It said this is NOT
+> # released standalone because it "folds into the live D2b work
+> # (V3-FO-EMBEDDING-ADEQUACY)." That condition no longer holds: D2b — and the
+> # whole FO/Kripke embedding-adequacy workstream — is now COMPLETE/MERGED, and it
+> # did NOT hard-stop to the Steward on this case, so the component-indexed
+> # recursive-group result was NOT reached during D2b. Per the node's own logic
+> # that leaves the case "unreached, node stays queued" — and the operator has now
+> # dequeued it as a standalone item. So the CONFIRM-OR-REFUTE is now a clean
+> # standalone determination, not a watch-during-live-work.
+> #
+> # RELEASED DELIVERABLE (per the node body): CONFIRM-OR-REFUTE reachability of a
+> # COMPONENT-indexed recursive-group result (the un-swept case at
+> # transport_recursive_group_call_result), then EITHER fix-with-the-walker
+> # (apply project_generated_index_equality_leaves exactly as the parent WP applied
+> # it to the other three consumers, pinned with the parent's fixture shape) OR
+> # record EXCLUDED with a cited reason and its test home — a silent omission is
+> # not a valid outcome (the parent WP's own AC-CLASS-CLOSED standard).
+> # Completeness-only, kernel-backstopped (a missing refinement is a false-reject,
+> # never an over-accept), NOT a soundness hole, NOT a hard stop.
+> #
+> # RE-MEASURE THE ANCHORS AT PICKUP — they DRIFT. The body cites
+> # transport_recursive_group_call_result at elab.rs ~:1934 (Adversary ~:1943),
+> # the project_generated_index_equality_leaves walker ~:1394, and
+> # hidden_group_result_refinement ~:3005, all on f01266423; main has moved many
+> # times since (ctor-shadowing landed in elab.rs among others). The ring
+> # re-measures precisely. Reviewers: Architect (required soundness reviewer for
+> # this class, as on the parent WP) + Language QA, standing Adversary hunt
+> # independent -> Steward M1-M4 -> lieutenant.
+> #
 > # QUEUED bounded finding (Steward triage), NOT released. Completeness-only,
 > # kernel-backstopped, reachability unconfirmed. It is the
 > # fourth-consumer sibling of the just-closed {Eq,Sigma,Top}

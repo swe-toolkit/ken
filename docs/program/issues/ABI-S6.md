@@ -12,6 +12,25 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
+ # D5a-surface D1 LANDED 2026-09-11 (Steward) — origin/main 8c6136fa3 currently;
+> # the D1 candidate bf84c1b1 landed at d8bbef963, blob-verified 3/3
+> # (abi_s6_mapping_surface_native.rs, prelude.rs, px8f_buffer_io_surface.rs). Its
+> # prerequisite, the §1.9 FORK below, resolved PATH B: the spec-author correction
+> # (offset-based mapWrite window IS the payload extent) landed at d27bd8d13 (PR
+> # #3483, spec-only), which discharged the mismatch seed and let D1 build. Path A
+> # (independent length seat, host write-wire prerequisite) did NOT fire — no
+> # Steward rescope. Gates on exact bf84c1b1: Runtime QA + Architect M4 + Adversary
+> # NO-DEFECT (evt_78eaxbvtjbde8) + CV APPROVE (evt_5fgekq). ABI-S6 STAYS ACTIVE —
+> # two things remain: (1) D5b MAP_PRIVATE file-backed COW seed (still RED/deferred,
+> # the three-op wire frozen); (2) a CV RESIDUAL — seed case 3
+> # ResourceKindMismatch(Mapping) arm is unnetted, so the merge is unblocked but
+> # seed-case-3-full-green is gated on a small Mapping->buffer-op differential
+> # (follow-on requested by CV). Decide post-land whether the residual folds into
+> # continuing D5a or needs its own small coverage node (like
+> # RT-MAPPING-DISPATCH-CONTROL-COVERAGE) — small, nonblocking. The FORMING
+> # PREDICATE (native mapping surface admits no in-body control at an access site)
+> # did NOT reach its HS#3 structural-closure trigger on this landing.
+> #
 > # D5a-surface D1 HS#2 (mapWrite bounds class) — Architect ruling 2026-09-10
 > # (evt_5xsn7eb40xj8j, thr_2b9zky9skt6hc). CONFORMANCE / SURFACE-HONESTY gap, NOT
 > # a soundness hole: the landed mapWrite bounds the write by the PAYLOAD extent

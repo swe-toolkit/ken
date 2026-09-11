@@ -1,7 +1,7 @@
 ---
 id: LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD
 title: "Elaborator constructor namespace: a later constructor with a spelling already bound silently replaces the earlier binding (flat global map, unqualified pattern resolution). Diagnose it instead of shadowing silently. QUEUED language debt — not on any active lane."
-status: active
+status: merged
 owner: language
 size: S
 gate: none
@@ -12,6 +12,28 @@ github: null
 origin: "Filed by the Steward 2026-09-06. A recurring elaborator limitation hit by TWO lanes in one session: foundation TIER-C (pub data NonEmpty, evt_5h8nbwcweq87m) and runtime ABI-REVOKE-D2 (a second nullary `Revoked` across IOError + ResourceError, evt_1294jtct6rmfa). The runtime-leader named it explicitly as 'separate language debt, not D2 scope' (evt_5qns09rmgar2a). Captured so it is durable; QUEUED behind the three active lanes, NOT released. Flesh the frame at release time."
 ---
 
+> # MERGED 2026-09-11 (Steward) — landed at origin/main 8c6136fa3 as the
+> # corpus-clean respin 33bc3a4f (rebased onto d8bbef963, was b7a9101a),
+> # blob-verified 12/12 across all crates/ken-elaborator paths (data/elab/error/
+> # lib/modules/prelude src + guard test + seal2 census + 4 repaired fixtures).
+> # SUPERSEDED the CI-red 64462ab7; production guard byte-identical to it. The
+> # deliverable landed as framed: a declaration-time DuplicateConstructorSpelling
+> # diagnostic naming both sites, guarding cross-family spelling collisions in the
+> # flat globals map (data.rs constructor inserts). Gates on exact b7a9101a
+> # (production byte-identical, carries to the rebase): Language QA APPROVE
+> # evt_7arnwck41499e (guard suite 3/3, all four repaired fixtures pass, rt_dasm
+> # reframe sound), Architect reframe APPROVE evt_32yhxanfmhrzw (byte-identical
+> # production, rt_dasm reframe faithful and strictly stronger, four repairs are
+> # genuine collision renames preserving each test's subject). Decision
+> # dec_12454ckyvy68m RESOLVED-APPROVED. Steward route evt_4ry9qdd7x9ghs. The
+> # dispositioned CI-red is CLOSED: the four surfaced collisions were real latent
+> # cross-family shadows (not over-fires), repaired in-WP by incidental renames
+> # (lc MkUnit->MkMyUnit, v3_fo FokDerivInit->DummyFokDerivInit, surface_def
+> # MkDecimalPair rename) plus the rt_dasm_d1b test reframed to assert the
+> # DuplicateConstructorSpelling rejection directly (its shadowing premise is now
+> # statically impossible), inventory relation preserved separately. No new node,
+> # no merge-past. No TCB/spec/catalog/kernel change.
+> #
 > # RELEASED 2026-09-10 (Steward) — the L2 language head. LANG-CHECKED-IH-BODY-
 > # VIEW-CAUSE closed (D0 dissolved, 9f91155d0) and the language ring went idle,
 > # so this is the next item in the operator L2 queue (item 6). status
