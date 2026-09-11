@@ -2067,6 +2067,17 @@ impl Parser {
                 self.expect(&Token::RParen)?;
                 Ok(ty)
             }
+            // `‖A‖` in annotation position (LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES
+            // D1). Same token both sides, symmetric with `(A)`: consume the
+            // opener, parse a full type, require the matching closer. Mirrors the
+            // expression-position `Expr::ETrunc` production.
+            Token::TruncBar => {
+                self.advance();
+                let inner = self.parse_type()?;
+                self.expect(&Token::TruncBar)?;
+                let end = self.tokens[self.pos - 1].1.end;
+                Ok(Type::TTrunc(Box::new(inner), Span::new(start, end)))
+            }
             other => Err(ElabError::ParseError {
                 msg: format!("expected a type, found {:?}", other),
                 span: self.peek_span().clone(),
@@ -3262,6 +3273,13 @@ fn reassociate_default_type(ty: Type) -> Type {
             Box::new(reassociate_default_type(*argument)),
             span,
         ),
+        // `‖A‖` — descend into the truncated type (structural closure; mirrors
+        // the expression-side `Expr::ETrunc` arm). Defensive: types have no
+        // user infix operator, so there is no reachable reassociation this
+        // changes today, but the traversal must not silently leaf a `‖…‖`.
+        Type::TTrunc(inner, span) => {
+            Type::TTrunc(Box::new(reassociate_default_type(*inner)), span)
+        }
         leaf => leaf,
     }
 }

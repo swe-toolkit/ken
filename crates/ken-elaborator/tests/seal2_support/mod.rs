@@ -616,6 +616,11 @@ pub fn type_names_in_type(ty: &SurfaceType, out: &mut BTreeSet<String>) {
             type_names_in_type(base, out);
             type_names_in_expr(pred, out);
         }
+        // `‖A‖` — collect names from the truncated type
+        // (LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES D1 added `Type::TTrunc`).
+        SurfaceType::TTrunc(inner, _) => {
+            type_names_in_type(inner, out);
+        }
     }
 }
 

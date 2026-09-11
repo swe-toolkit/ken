@@ -804,6 +804,13 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         // Refinement lowers to the carrier type (`21 §6.3`): `{x:A|φ}` → `A`.
         // The predicate φ is tracked separately; obligation emitted at introduction.
         RType::RRefine(_, carrier, _phi, _) => elab_type(cx, carrier),
+
+        // `‖A‖` — propositional truncation formation in annotation position
+        // (`16 §6`, LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES D1). Raw structural
+        // build to `Term::Trunc`, mirroring the `Term::Eq` arm above; the
+        // kernel's own `Term::Trunc` inference (`‖A‖ : Ω_l` for `A : Type l`)
+        // validates it when the surrounding declaration is checked.
+        RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(elab_type(cx, inner)?))),
     }
 }
 
@@ -8364,6 +8371,8 @@ fn rtype_head_name(ty: &RType) -> String {
         RType::RCon(name, _) => name.clone(),
         RType::RApp(f, _, _) => rtype_head_name(f),
         RType::RVarTy(_, name, _) => name.clone(),
+        // A truncation head, consistent with head_type_name.
+        RType::RTrunc(_, _) => "‖‖".to_string(),
         _ => String::new(),
     }
 }
@@ -8391,6 +8400,10 @@ fn instantiate_instance_rtype(ty: &RType, args: &[RType], param_count: usize) ->
             name.clone(),
             Box::new(instantiate_instance_rtype(carrier, args, param_count)),
             prop.clone(),
+            span.clone(),
+        ),
+        RType::RTrunc(inner, span) => RType::RTrunc(
+            Box::new(instantiate_instance_rtype(inner, args, param_count)),
             span.clone(),
         ),
         _ => ty.clone(),
@@ -8694,6 +8707,7 @@ fn type_contains_effect_row(ty: &RType) -> bool {
         }
         RType::RApp(f, a, _) => type_contains_effect_row(f) || type_contains_effect_row(a),
         RType::RRefine(_, carrier, _, _) => type_contains_effect_row(carrier),
+        RType::RTrunc(inner, _) => type_contains_effect_row(inner),
         RType::RUniv(_, _)
         | RType::RCon(_, _)
         | RType::RVarTy(_, _, _)
@@ -9529,6 +9543,9 @@ fn reassociate_rtype(
             Box::new(reassociate_rtype(*argument, globals, fixities)?),
             span,
         ),
+        RType::RTrunc(inner, span) => {
+            RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities)?), span)
+        }
         leaf => leaf,
     })
 }
@@ -10240,6 +10257,7 @@ fn head_type_name(ty: &RType) -> String {
         }
         RType::RSigma(_, _, _, _) => "×".to_string(),
         RType::RRefine(_, inner, _, _) => head_type_name(inner),
+        RType::RTrunc(_, _) => "‖‖".to_string(),
     }
 }
 
@@ -12037,6 +12055,7 @@ pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
         RType::RRefine(_, carrier, predicate, _) => {
             rtype_mentions_name(carrier, name) || rexpr_mentions_name(predicate, name)
         }
+        RType::RTrunc(inner, _) => rtype_mentions_name(inner, name),
         RType::RUniv(_, _) | RType::RVarTy(_, _, _) | RType::RPatternAliasTy(_, _, _) => false,
     }
 }

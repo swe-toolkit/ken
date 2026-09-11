@@ -828,6 +828,11 @@ pub enum Type {
     TRefine(String, Box<Type>, Box<Expr>, Span),
     /// `T a b` — type application (e.g. `Option Int`, `Vec a`).
     TApp(Box<Type>, Box<Type>, Span),
+    /// `‖A‖` — propositional-truncation formation in annotation position
+    /// (`16 §6`, `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES`). The expression form is
+    /// `Expr::ETrunc`; this is the type-annotation-position sibling so `‖A‖` is
+    /// writable where a type is expected (`x : ‖A‖`, `fn f : ‖A‖`, `let y : ‖A‖`).
+    TTrunc(Box<Type>, Span),
 }
 
 impl Type {
@@ -841,7 +846,8 @@ impl Type {
             | Type::TCon(_, s)
             | Type::TVar(_, s)
             | Type::TRefine(_, _, _, s)
-            | Type::TApp(_, _, s) => s,
+            | Type::TApp(_, _, s)
+            | Type::TTrunc(_, s) => s,
         }
     }
 }

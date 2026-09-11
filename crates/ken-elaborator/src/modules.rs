@@ -1188,6 +1188,9 @@ fn rewrite_rtype_inner(
             Box::new(rewrite_rtype(scope, exports, *a)?),
             s,
         ),
+        RType::RTrunc(a, s) => {
+            RType::RTrunc(Box::new(rewrite_rtype(scope, exports, *a)?), s)
+        }
     })
 }
 
@@ -1888,7 +1891,8 @@ fn named_type_head(ty: &Type) -> Option<&str> {
         | Type::TArr(_, _, _)
         | Type::TEffectArr(_, _, _, _)
         | Type::TPi(_, _, _, _)
-        | Type::TSigma(_, _, _, _) => None,
+        | Type::TSigma(_, _, _, _)
+        | Type::TTrunc(_, _) => None,
     }
 }
 

@@ -744,5 +744,8 @@ fn rtype_to_kernel_checked(
         RType::RRefine(_, carrier, _, _) => {
             rtype_to_kernel_checked(carrier, d_name, d_id, globals, ind_id_set, ctor_id_set)
         }
+        RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(rtype_to_kernel_checked(
+            inner, d_name, d_id, globals, ind_id_set, ctor_id_set,
+        )?))),
     }
 }
