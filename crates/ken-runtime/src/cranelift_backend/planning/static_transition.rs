@@ -17,6 +17,7 @@ mod continuations;
 pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_owned_worker_captures_fixture;
 mod effects;
 mod joins_traps;
+mod immediate_bridge;
 mod occurrences;
 mod responses;
 mod semantic_ir;
@@ -83,6 +84,11 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     SynthesizedFixedConstructorRole,
 };
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
+pub(in crate::cranelift_backend) use immediate_bridge::{
+    classify_immediate_bridge, produces_deforestable_aggregate_with_ih,
+    requires_heterogeneous_deforestation, ImmediateBridgeCause, ImmediateBridgeConsumer,
+    ImmediateBridgeConsumerKind, ImmediateBridgeRealization, ImmediateBridgeSelection,
+};
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
     DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
@@ -96,9 +102,10 @@ pub use responses::{
     mixed_owner_execute_then_resume_overpromotion_is_exact,
     static_response_context_demand_mutation_is_exact,
     suppressed_execute_then_resume_response_is_exact,
+    with_d5b_hs10_inline_response_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
     with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
-    StaticResponseContextDemandMutation,
+    D5bHs10InlineResponseMutation, StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
@@ -574,6 +581,11 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// call identity, never by specialization identity or function provenance.
     required_consumer_projections:
         BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
+    /// Exact immediate producer/eliminator bridges, keyed by the complete call
+    /// identity whose call seat the bridge realizes without a physical call.
+    /// Built once before response phase B and re-derived exactly at closeout.
+    immediate_bridge_realizations:
+        BTreeMap<ContinuationCallIdentity, ImmediateBridgeRealization>,
     /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts.
     /// Causal-call demands retain the exact prefix produced by specialization
     /// planning; validated static-response demands append through the same
@@ -773,15 +785,16 @@ fn inline_synthesized_seat_emission_owners(
         );
         for row in plan.static_response_deferred() {
             let k_body = plan.deferred_response_k_body(row)?;
-            let owns_seat = if row.effect_origin() == seat {
-                true
-            } else if row.sub_case() == DeferredResponseSubCase::UnconsumedTransportCaller {
-                match k_body {
-                    Some(body) => occurrence_subtree_contains(plan, body, seat)?,
-                    None => false,
+            let owns_seat = match row.sub_case() {
+                DeferredResponseSubCase::InlineBridgeNoCall
+                | DeferredResponseSubCase::NoContinuationUnit => row.effect_origin() == seat,
+                DeferredResponseSubCase::UnconsumedTransportCaller => {
+                    row.effect_origin() == seat
+                        || match k_body {
+                            Some(body) => occurrence_subtree_contains(plan, body, seat)?,
+                            None => false,
+                        }
                 }
-            } else {
-                false
             };
             if !owns_seat {
                 continue;

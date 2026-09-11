@@ -345,6 +345,9 @@ pub(in crate::cranelift_backend) enum ResponseDisposition {
 /// route identically to main's pre-WP lowering).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
+    /// A planned immediate bridge realizes this exact non-transport caller
+    /// inline, so no physical response-owner call and no owner exist.
+    InlineBridgeNoCall,
     /// P1 — no continuation unit for this `Vis` (`matching.is_empty()`): the
     /// `1229` absent complement Q1 declined. There is no static continuation to
     /// name and no owner; main already lowers the `Vis` construct.
@@ -647,6 +650,52 @@ pub fn with_mixed_owner_execute_then_resume_overpromotion<T>(
 #[cfg(feature = "px8-ds-test-support")]
 pub fn mixed_owner_execute_then_resume_overpromotion_is_exact() -> bool {
     OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs10InlineResponseMutation {
+    Exact,
+    PromoteInlineBridge,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static D5B_HS10_INLINE_RESPONSE_MUTATION:
+        std::cell::Cell<D5bHs10InlineResponseMutation> =
+        const { std::cell::Cell::new(D5bHs10InlineResponseMutation::Exact) };
+    static D5B_HS10_INLINE_RESPONSE_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+struct D5bHs10InlineResponseMutationGuard(D5bHs10InlineResponseMutation);
+
+#[cfg(feature = "px8-ds-test-support")]
+impl Drop for D5bHs10InlineResponseMutationGuard {
+    fn drop(&mut self) {
+        D5B_HS10_INLINE_RESPONSE_MUTATION.with(|slot| slot.set(self.0));
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_d5b_hs10_inline_response_mutation<T>(
+    mutation: D5bHs10InlineResponseMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    let previous = D5B_HS10_INLINE_RESPONSE_MUTATION.with(|slot| slot.replace(mutation));
+    assert_eq!(
+        previous,
+        D5bHs10InlineResponseMutation::Exact,
+        "HS10 inline-response mutations cannot nest"
+    );
+    D5B_HS10_INLINE_RESPONSE_APPLICATIONS.with(|count| count.set(0));
+    let guard = D5bHs10InlineResponseMutationGuard(previous);
+    let result = operation();
+    let applications =
+        D5B_HS10_INLINE_RESPONSE_APPLICATIONS.with(std::cell::Cell::get);
+    drop(guard);
+    (result, applications)
 }
 
 impl SsaInfeasible {
@@ -2382,6 +2431,35 @@ impl StaticTransitionPlan<'_> {
             #[cfg(not(feature = "px8-ds-test-support"))]
             let overpromote_mixed = false;
             let transport_source = transport_sources.contains(&demand.k_identity);
+            let has_immediate_bridge = self
+                .immediate_bridge_realization(&demand.k_identity)
+                .is_some();
+            let inline_bridge = has_immediate_bridge && !transport_source;
+            #[cfg(feature = "px8-ds-test-support")]
+            let promote_inline_bridge = D5B_HS10_INLINE_RESPONSE_MUTATION.with(|slot| {
+                slot.get() == D5bHs10InlineResponseMutation::PromoteInlineBridge
+                    && inline_bridge
+            });
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            let promote_inline_bridge = false;
+            #[cfg(feature = "px8-ds-test-support")]
+            if promote_inline_bridge {
+                D5B_HS10_INLINE_RESPONSE_APPLICATIONS
+                    .with(|count| count.set(count.get() + 1));
+            }
+            if inline_bridge && !promote_inline_bridge {
+                deferred.push(DeferredResponseRow {
+                    vis_origin: demand.vis_origin,
+                    producer_call_origin: demand.producer_call_origin,
+                    operation_root_origin: demand.operation_root_origin,
+                    effect_origin: demand.effect_origin,
+                    operation: demand.operation,
+                    sub_case: DeferredResponseSubCase::InlineBridgeNoCall,
+                    capture_count: demand.captures.len(),
+                    continuation_input_count: demand.continuation_inputs.len(),
+                });
+                continue;
+            }
             let exclusively_predeclared_stage = transport_producer_owners
                 .get(&demand.producer_call_origin)
                 .is_some_and(|owners| *owners == (true, false));
@@ -2622,6 +2700,11 @@ impl StaticTransitionPlan<'_> {
         &self,
         row: &DeferredResponseRow,
     ) -> Result<Option<DeferredResponseContinuationShape>, CraneliftBackendError> {
+        match row.sub_case {
+            DeferredResponseSubCase::InlineBridgeNoCall => return Ok(None),
+            DeferredResponseSubCase::NoContinuationUnit
+            | DeferredResponseSubCase::UnconsumedTransportCaller => {}
+        }
         let RuntimeExpr::Construct { args, .. } = self.planned_occurrence_expr(row.vis_origin)?
         else {
             return Ok(None);
@@ -2832,8 +2915,10 @@ impl StaticTransitionPlan<'_> {
             let Some(row) = self.deferred_response_at_vis(vis)? else {
                 return Ok(Vec::new());
             };
-            if row.sub_case == DeferredResponseSubCase::NoContinuationUnit {
-                continue;
+            match row.sub_case {
+                DeferredResponseSubCase::InlineBridgeNoCall => return Ok(Vec::new()),
+                DeferredResponseSubCase::NoContinuationUnit => continue,
+                DeferredResponseSubCase::UnconsumedTransportCaller => {}
             }
             if !visited.insert(row.vis_origin()) {
                 return Ok(Vec::new());
@@ -2887,8 +2972,10 @@ impl StaticTransitionPlan<'_> {
         &self,
         row: &DeferredResponseRow,
     ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
-        if row.sub_case != DeferredResponseSubCase::UnconsumedTransportCaller {
-            return Ok(None);
+        match row.sub_case {
+            DeferredResponseSubCase::InlineBridgeNoCall
+            | DeferredResponseSubCase::NoContinuationUnit => return Ok(None),
+            DeferredResponseSubCase::UnconsumedTransportCaller => {}
         }
         let mut owners = Vec::new();
         for response in &self.static_response_continuations {
@@ -2964,15 +3051,20 @@ impl StaticTransitionPlan<'_> {
             [handler] => {
                 let mut contains_unitless = false;
                 for candidate in &self.static_response_deferred {
-                    if candidate.sub_case == DeferredResponseSubCase::NoContinuationUnit
-                        && occurrence_subtree_contains(
-                            self,
-                            handler.k_body_origin(),
-                            candidate.vis_origin,
-                        )?
-                    {
-                        contains_unitless = true;
-                        break;
+                    match candidate.sub_case {
+                        DeferredResponseSubCase::NoContinuationUnit
+                            if occurrence_subtree_contains(
+                                self,
+                                handler.k_body_origin(),
+                                candidate.vis_origin,
+                            )? =>
+                        {
+                            contains_unitless = true;
+                            break;
+                        }
+                        DeferredResponseSubCase::InlineBridgeNoCall
+                        | DeferredResponseSubCase::NoContinuationUnit
+                        | DeferredResponseSubCase::UnconsumedTransportCaller => {}
                     }
                 }
                 Ok(contains_unitless.then(|| handler.base_owner()))
@@ -3021,6 +3113,11 @@ impl StaticTransitionPlan<'_> {
         &self,
         row: &DeferredResponseRow,
     ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+        match row.sub_case {
+            DeferredResponseSubCase::InlineBridgeNoCall => return Ok(None),
+            DeferredResponseSubCase::NoContinuationUnit
+            | DeferredResponseSubCase::UnconsumedTransportCaller => {}
+        }
         let RuntimeExpr::Construct { args, .. } = self.planned_occurrence_expr(row.vis_origin)?
         else {
             return Ok(None);
@@ -3062,10 +3159,15 @@ impl StaticTransitionPlan<'_> {
     ) -> Result<Option<DeferredResponseRow>, CraneliftBackendError> {
         let mut matching = Vec::new();
         for row in &self.static_response_deferred {
-            if row.sub_case == DeferredResponseSubCase::NoContinuationUnit
-                && occurrence_subtree_contains(self, body_origin, row.vis_origin)?
-            {
-                matching.push(row.clone());
+            match row.sub_case {
+                DeferredResponseSubCase::NoContinuationUnit
+                    if occurrence_subtree_contains(self, body_origin, row.vis_origin)? =>
+                {
+                    matching.push(row.clone());
+                }
+                DeferredResponseSubCase::InlineBridgeNoCall
+                | DeferredResponseSubCase::NoContinuationUnit
+                | DeferredResponseSubCase::UnconsumedTransportCaller => {}
             }
         }
         match matching.as_slice() {

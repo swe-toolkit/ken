@@ -513,6 +513,7 @@ fn oriented_same_depth_siblings_require_exact_dynamic_edges() {
         ContinuationActivationId(14),
         segment,
         edges,
+        None,
     )
     .expect("exact child-to-parent edges keep same-depth siblings separate");
     assert_eq!(
@@ -529,6 +530,317 @@ fn oriented_same_depth_siblings_require_exact_dynamic_edges() {
 }
 
 #[test]
+fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
+    let mut plan = oriented_test_ih_plan();
+    let origin = RecursorProducerOriginId(74);
+    let mut selection = oriented_test_layer(
+        0,
+        RecursorLayerRole::SelectsOccurrence { origin },
+    );
+    selection.checked_invocation_id = None;
+    selection.checked_invocation_source = None;
+    selection.checked_invocation_depth = 0;
+    let frame = plan
+        .frames
+        .iter_mut()
+        .find(|frame| frame.frame_id == 0)
+        .expect("fixture carries frame 0");
+    frame.runtime_frame_fingerprint =
+        crate::compiler_private_computational_match_frame_fingerprint(
+            &selection.cases,
+            &selection.default,
+        );
+    frame.occurrence_binding_fingerprint =
+        crate::compiler_private_oriented_occurrence_binding_fingerprint(frame);
+    plan.validate().expect("updated fixture plan remains valid");
+    let segment = RecursorInvocationSegment::new(
+        origin,
+        0,
+        selection,
+        RecursorUnwindStack {
+            later_wrappers_in_construction_order: Vec::new(),
+        },
+        ContinuationCursorId(75),
+        None,
+        Some(200),
+    );
+    let invocation = CheckedRecursiveInvocationInstance {
+        source: InvocationTemplateRef::ComputationalIHCall(100),
+        invocation_instance_id: 12,
+        semantic_depth: 2,
+        dynamic_splice_edge: Some(DynamicSpliceEdgeId(76)),
+    };
+    let edge = || DynamicSpliceEdge {
+        edge_id: DynamicSpliceEdgeId(76),
+        child_invocation_instance_id: 12,
+        parent_invocation_instance_id: 11,
+        checked_call_template_id: 100,
+        parent_frame_template_id: 0,
+        segment_site_id: 9,
+    };
+    let parent = CheckedComputationalFrame {
+        id: Some(0),
+        invocation_id: Some(11),
+        invocation_source: Some(InvocationTemplateRef::ComputationalIHCall(100)),
+        invocation_depth: 1,
+    };
+
+    let installed = compose_oriented_subcontinuation(
+        Some(&plan),
+        Some(invocation),
+        ContinuationActivationId(77),
+        segment.clone(),
+        vec![edge()],
+        Some(parent),
+    )
+    .expect("a child-only segment accepts its exact non-root external parent");
+    assert_eq!(
+        installed
+            .semantic_frames
+            .iter()
+            .map(|layer| (layer.checked_invocation_id, layer.checked_frame_id))
+            .collect::<Vec<_>>(),
+        vec![(Some(12), Some(0))],
+        "instantiation qualifies frame 0 only for the new child"
+    );
+
+    let canonical_root = CheckedComputationalFrame {
+        id: Some(0),
+        invocation_id: None,
+        invocation_source: None,
+        invocation_depth: 0,
+    };
+    let root_edge = || DynamicSpliceEdge {
+        parent_invocation_instance_id: 0,
+        ..edge()
+    };
+    let assert_child_only = |installed: InstalledOrientedSubcontinuationSegment, case: &str| {
+        assert_eq!(
+            installed
+                .semantic_frames
+                .iter()
+                .map(|layer| (layer.checked_invocation_id, layer.checked_frame_id))
+                .collect::<Vec<_>>(),
+            vec![(Some(12), Some(0))],
+            "{case}: frame 0 must stay qualified by nonzero child 12"
+        );
+    };
+    let refusal_reason = |
+        result: Result<InstalledOrientedSubcontinuationSegment, CraneliftBackendError>,
+        case: &str,
+    | {
+        match result {
+            Ok(_) => panic!("{case} must refuse"),
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "OrientedSubcontinuationPlanV1",
+                reason,
+            })) => reason,
+            Err(error) => panic!("{case} reached the wrong refusal: {error:?}"),
+        }
+    };
+
+    for (root, spelling) in [
+        (canonical_root, "invocation-absent root"),
+        (
+            CheckedComputationalFrame {
+                invocation_id: Some(0),
+                ..canonical_root
+            },
+            "explicit-zero root",
+        ),
+    ] {
+        let installed = compose_oriented_subcontinuation(
+            Some(&plan),
+            Some(invocation),
+            ContinuationActivationId(77),
+            segment.clone(),
+            vec![root_edge()],
+            Some(root),
+        )
+        .unwrap_or_else(|error| panic!("{spelling} must install: {error:?}"));
+        assert_child_only(installed, spelling);
+    }
+
+    let (mutated_root, applications) = with_d5b_hs9_external_root_mutation(
+        D5bHs9ExternalRootMutation::RejectExactRoot,
+        || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                Some(canonical_root),
+            )
+        },
+    );
+    assert_eq!(applications, 1, "one exact root and edge pair applies once");
+    assert_eq!(
+        refusal_reason(mutated_root, "exact-root causality mutation"),
+        "an external source parent is not a non-root checked invocation"
+    );
+
+    let (without_parent, applications) = with_d5b_hs9_external_root_mutation(
+        D5bHs9ExternalRootMutation::RejectExactRoot,
+        || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                None,
+            )
+        },
+    );
+    assert_eq!(applications, 0, "outer None must not be inferred as root");
+    assert_child_only(
+        without_parent.expect("an absent external parent remains distinct from explicit root"),
+        "no external parent",
+    );
+
+    let (nonroot, applications) = with_d5b_hs9_external_root_mutation(
+        D5bHs9ExternalRootMutation::RejectExactRoot,
+        || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![edge()],
+                Some(parent),
+            )
+        },
+    );
+    assert_eq!(applications, 0, "the root mutation must not fire for non-root");
+    assert_child_only(
+        nonroot.expect("the non-root row stays admissible under the root mutation"),
+        "non-root parent",
+    );
+
+    let (frame_mismatch, applications) = with_d5b_hs9_external_root_mutation(
+        D5bHs9ExternalRootMutation::RejectExactRoot,
+        || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                Some(CheckedComputationalFrame {
+                    id: Some(1),
+                    ..canonical_root
+                }),
+            )
+        },
+    );
+    assert_eq!(applications, 0, "a root frame mismatch refuses before mutation");
+    assert_eq!(
+        refusal_reason(frame_mismatch, "root frame mismatch"),
+        "an external source parent does not match exactly one incoming dynamic edge"
+    );
+
+    let (nonzero_edge, applications) = with_d5b_hs9_external_root_mutation(
+        D5bHs9ExternalRootMutation::RejectExactRoot,
+        || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![edge()],
+                Some(canonical_root),
+            )
+        },
+    );
+    assert_eq!(applications, 0, "a nonzero parent edge refuses before mutation");
+    assert_eq!(
+        refusal_reason(nonzero_edge, "nonzero edge parent"),
+        "an external source parent does not match exactly one incoming dynamic edge"
+    );
+
+    let partial_root = CheckedComputationalFrame {
+        invocation_source: Some(InvocationTemplateRef::ComputationalIHCall(100)),
+        ..canonical_root
+    };
+    let (partial, applications) = with_d5b_hs9_external_root_mutation(
+        D5bHs9ExternalRootMutation::RejectExactRoot,
+        || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                Some(partial_root),
+            )
+        },
+    );
+    assert_eq!(applications, 0, "a partial tuple refuses before mutation");
+    assert_eq!(
+        refusal_reason(partial, "partial root tuple"),
+        "a computational frame carries an inconsistent checked invocation tuple"
+    );
+
+    let mut duplicate = root_edge();
+    duplicate.edge_id = DynamicSpliceEdgeId(78);
+    let (duplicated, applications) = with_d5b_hs9_external_root_mutation(
+        D5bHs9ExternalRootMutation::RejectExactRoot,
+        || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge(), duplicate],
+                Some(canonical_root),
+            )
+        },
+    );
+    assert_eq!(applications, 0, "two matching root edges refuse before mutation");
+    assert_eq!(
+        refusal_reason(duplicated, "duplicate root edge"),
+        "an external source parent does not match exactly one incoming dynamic edge"
+    );
+
+    for (changed, axis) in [
+        (
+            CheckedComputationalFrame {
+                invocation_id: Some(10),
+                ..parent
+            },
+            "invocation",
+        ),
+        (
+            CheckedComputationalFrame {
+                id: Some(1),
+                ..parent
+            },
+            "frame",
+        ),
+    ] {
+        let error = match compose_oriented_subcontinuation(
+            Some(&plan),
+            Some(invocation),
+            ContinuationActivationId(77),
+            segment.clone(),
+            vec![edge()],
+            Some(changed),
+        ) {
+            Ok(_) => panic!("changing only the external parent {axis} must refuse"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "OrientedSubcontinuationPlanV1",
+                ref reason,
+            }) if reason == "an external source parent does not match exactly one incoming dynamic edge"
+        ));
+    }
+}
+
+#[test]
 fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
     let reject =
         |segment: RecursorInvocationSegment, edges: Vec<DynamicSpliceEdge>, expected: &str| {
@@ -539,6 +851,7 @@ fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
                 ContinuationActivationId(14),
                 segment,
                 edges,
+                None,
             ) {
                 Ok(_) => panic!("a malformed dynamic splice graph must reject before CFG"),
                 Err(error) => error,
@@ -876,6 +1189,17 @@ fn oriented_source_open_occurrence_cross_checks_the_closure_selected_parent() {
         CraneliftBackendError::Unsupported(UnsupportedLowering { reason, .. })
             if reason.contains("source open occurrence disagrees")
     ));
+
+    open.frame.checked_frame_id = Some(2);
+    open.frame.checked_invocation_id = Some(17);
+    let mismatch = compiler
+        .validate_source_dynamic_splice_parent(instance, &open)
+        .expect_err("source and closure parent invocation identities must agree before CFG");
+    assert!(matches!(
+        mismatch,
+        CraneliftBackendError::Unsupported(UnsupportedLowering { reason, .. })
+            if reason.contains("source open occurrence disagrees")
+    ));
 }
 
 #[test]
@@ -1015,6 +1339,7 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         deleted,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("deleting only an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1037,6 +1362,7 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         duplicated,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("duplicating an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1059,6 +1385,7 @@ fn oriented_endpoint_corruption_and_affine_reuse_fail_closed() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("endpoint corruption must reject before installation"),
         Err(error) => error,
@@ -1770,6 +2097,7 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         replayed,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("an inherited open scope cannot replay its semantic transformer"),
         Err(error) => error,
@@ -1788,6 +2116,7 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         omitted,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("a pending selection cannot be omitted from semantic work"),
         Err(error) => error,
@@ -2359,6 +2688,7 @@ fn oriented_segment_keeps_semantic_and_control_axes_independent() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
+        None,
     )
     .unwrap();
     assert_eq!(
@@ -2397,6 +2727,7 @@ fn oriented_fresh_ih_semantics_retain_all_inherited_control_obligations() {
         ContinuationActivationId(8),
         oriented_five_control_invocation(),
         Vec::new(),
+        None,
     )
     .unwrap();
     assert_eq!(
