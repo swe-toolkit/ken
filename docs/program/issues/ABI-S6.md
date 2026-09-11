@@ -12,7 +12,63 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 3 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 4 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 4 — CLOSED. Architect fork-B repair
+> # ruling evt_2c6snkcgb7bnf (thr_7wy5wy45p7abm), grounded at rebased clean
+> # ee708274. The HS3 operand partition WORKS (the 11/6 refusal is closed, both
+> # ruled controls pass); the COW positive then advanced PAST it and tripped a
+> # DEEPER pre-existing invariant, validate_source_dynamic_splice_parent ("source
+> # open occurrence disagrees with the closure-selected dynamic parent"). The
+> # diagnostic (runtime-implementer evt_49ycrt545sjh4) selected FORK B: only the
+> # dynamic PARENT INVOCATION is wrong (child 2==2, parent frame Some(0)==Some(0),
+> # parent-invocation edge 0 != source-open 1). Cause: an existing 4-field D8m
+> # checked tuple was NARROWED at the recursor-layer constructor —
+> # make_computational_recursor took only checked_frame_id and re-derived
+> # (invocation_id, source, depth) from the EMPTY ambient
+> # active_recursive_invocations stack. Same D5b chain, count 4, a DISTINCT
+> # pre-existing dynamic-splice invariant; does NOT change the HS3 ruling. NO §1a
+> # research until stop 6 (the Architect owns the count).
+> #
+> # ARCHITECT RULED FIX (full mechanism in evt_2c6snkcgb7bnf): preserve the WHOLE
+> # D8m tuple at the frame-to-layer edge. Add a private checked_tuple() projection
+> # on ComputationalEliminatorFrame; change make_computational_recursor to take
+> # `checked: CheckedComputationalFrame` (replacing the scalar frame_id);
+> # classify the tuple with a CLOSED match (two root spellings normalize to the
+> # unqualified selected-layer state, a non-root tuple is copied byte-for-value,
+> # a malformed combination refuses) consulting NO ambient state; update all 4
+> # (and only 4) callers to pass `.checked_tuple()`. segment_checked_invocation
+> # stays semantically unchanged — it qualifies the segment being installed, NOT
+> # the selected layer's dynamic parent (conflating those two roles caused HS4).
+> # validate_source_dynamic_splice_parent is NOT weakened/bypassed. NO planner /
+> # plan schema / continuation kind / ABI slot / carrier / runtime tag / surface /
+> # wire / owner / TCB change.
+> #
+> # STEWARD SCOPE CALL (Architect-directed): AMEND D5b IN PLACE, no predecessor —
+> # this is the missing preservation edge of the already-required D8m tuple, with
+> # no independent user-visible deliverable or standalone acceptance beyond D5b
+> # (B-consumes-unbuilt-A). NO FURTHER BAN-LIFT (Architect-confirmed; the HS2/HS3
+> # amendments stand). Grows NO TCB (the fix's own fence forbids it; trusted_base()
+> # untouched), so it is the Steward's call and needs no operator sign-off. The
+> # Architect's current-main symptom inventory (its commit 586f30071, based on
+> # 8aafeee33) is INCORPORATED into this amendment as the "## D5b static-operation
+> # ownership hard-stop symptom inventory" section below.
+> #
+> # RUNTIME: HOLDS CLEAN at ee708274 until THIS amendment LANDS; runtime-leader
+> # then explicitly re-kicks the fork-B repair. Candidate returns to Architect
+> # (REQUIRED reviewer) + runtime-qa + CI -> Steward M1-M4 -> lieutenant. A FIFTH
+> # structural refusal stops AGAIN (preserve the attempt, revert byte-clean, do
+> # not solve ahead). Architect controls: the COW path forms 2 checked-IH edges
+> # root -> inv1 -> inv2 (assert the RELATION, not absolute ids); a feature-gated
+> # make_computational_recursor mutation restoring the ambient-derived tuple
+> # reproduces the HS4 refusal exactly once; the cross-check test refuses on a
+> # changed checked_invocation_id; the HS3 duplicate-worker + missing-context
+> # controls stay independently reaching; all D8m tuple-withdrawal / occurrence /
+> # dynamic-edge sibling / origin / body / header / membership / ownership /
+> # lifetime controls stay red; MappingAllocate byte-for-behaviour unchanged and
+> # avoids the new non-root transport case.
+
+# D5b NATIVE HARD-STOP 3 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward).
 
 > # D5b native-lowering track, HARD STOP 3 — CLOSED. Architect re-ruling
 > # evt_5781rmnajdpbb (thr_7wy5wy45p7abm), grounded at exact b94c5ae7, resolving
