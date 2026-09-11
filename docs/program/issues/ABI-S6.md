@@ -12,7 +12,113 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 10 — OBSERVATION-ONLY, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 10 — PRODUCTION RULING, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 10 — PRODUCTION RULING (repair
+> # authorized). Architect production ruling evt_64v1zc3wjb0pt
+> # (thr_7wy5wy45p7abm), from the observation-only pass result evt_4k3kzg2702s6
+> # (28 contiguous rows, census 2/10/1/5/5/5; full attempt+observer SHA-256
+> # 4168228d…; observation-only diff 57b9a3a3…; the run ended at the SAME HS10
+> # refusal, no HS11). Runtime stays byte-clean at fee133142 until this amendment
+> # lands and runtime-leader explicitly re-kicks the repair.
+> #
+> # FINAL CLASSIFICATION: HS10 is response-plan OVERPROMOTION of one exact
+> # non-transport caller that lowering realizes through its immediate
+> # host-operation bridge (observation fork (a)). It is NOT collector loss, NOT
+> # identity mismatch, NOT bridge failure, NOT an HS7 settlement error, NOT an HS9
+> # regression. The whole owner matrix closes the discriminator: all five selected
+> # callers finish InlineNoCall, but owners 1–4 have 1/2/12/2 verified PHYSICAL
+> # owner calls through transport emissions — owner 0 alone has zero. So neither
+> # InlineNoCall nor non-transport alone classifies lawfully; owner 0 is UNIQUELY
+> # `exact planned immediate bridge realization ∩ non-transport response caller`.
+> # "Pre-phase-B unavailable" (fork (e)) means no current stored plan record
+> # carries this intersection — NOT that it is unknowable: the continuation
+> # unit/call already carries construct, computational frame, alternative and
+> # position, and the retained source plane carries exact producer arguments and
+> # case body. ONE plan-owned derivation must classify the bridge once for BOTH
+> # lowering and response Phase B; two independent derivations would recreate HS10.
+> #
+> # RULED REPAIR — PLAN-OWNED IMMEDIATE-BRIDGE REALIZATION.
+> # (1) Add ONE private static-transition relation keyed by complete
+> # ContinuationCallIdentity. A row carries ONLY: identity; producer construct;
+> # computational frame; alternative and position; case-body and effective
+> # bridge-body origins; selected field; consumer kind
+> # `Ordinary | Computational | CheckedComputational { frame_id }`; the exact
+> # checked-IH-slots-wrapper fact; and cause `Heterogeneous | StaticHostOperation`.
+> # Store NO expression, cases/default, name, HostOp id, owner id, disposition, or
+> # lowering state.
+> # (2) Build it AFTER continuation calls and retained source occurrences are
+> # final, BEFORE response Phase B: (i) resolve the producer Construct by the
+> # identity, the target unit's computational frame, and exact alternative —
+> # require constructor/arity agreement and membership of the identity's position
+> # in that case's declared recursive positions; (ii) resolve the case body through
+> # source-child identity and classify ONLY the four existing bridge spellings —
+> # direct ComputationalMatch, direct Match, exact CheckedSubcontinuationFrame
+> # around ComputationalMatch, and exact CheckedComputationalIHSlots child-Match
+> # host-operation bridge (NO generic peeling); (iii) refactor the existing
+> # `immediate_binder_eliminator`, `requires_heterogeneous_deforestation`, and
+> # `statically_selects_host_operation` logic into ONE shared pure structural
+> # classifier used by planning AND lowering — do NOT copy it into responses.rs;
+> # (iv) the owned descriptor supplies field/kind/wrapper/cause — zero answers = no
+> # bridge; multiplicity, wrong position, out-of-range field, or body/kind/cause
+> # conflict REFUSES.
+> # (3) Validate the complete relation by exact re-derivation. Lowering QUERIES it
+> # at the present bridge seat and compares every locally held coordinate before
+> # using borrowed cases/default; a local bridge without a row, an unreached row,
+> # or any coordinate mismatch REFUSES. The plan record is route authority —
+> # lowering does NOT decide a second bridge population.
+> #
+> # RESPONSE CLASSIFICATION: add the honest Deferred subcase `InlineBridgeNoCall`.
+> # In `static_response_phase_b_split`, classify a demand as that subcase BEFORE
+> # the Specialized fallback IFF its full k_identity has an exact bridge row AND
+> # transport_source == false. It creates NO response owner and NO
+> # StaticResponseDeferred; the same immediate bridge lowers the operation/effect
+> # ordinarily and retains exact InlineNoCall. Bridge+transport is NOT demoted (its
+> # transport is a verified physical owner call); nonbridge+nontransport direct
+> # callers remain Specialized — those two neighbours make the conjunction
+> # load-bearing. Reconcile EVERY DeferredResponseSubCase consumer by TOTAL match:
+> # InlineBridgeNoCall is neither P1 nor an unconsumed-transport suffix, has no
+> # deferred handler owner, and never enters bounded-suffix or unit-less drivers;
+> # its root/effect take only ordinary lowering under the bridge. Keep Phase-A
+> # context/ABI identity stable; only the unused owner is absent.
+> #
+> # FENCES: do NOT weaken response-call coverage, accept an unused Specialized
+> # owner, treat InlineNoCall as discharge, force a claim, route on
+> # post-declaration settlement, infer from zero emissions, defer every
+> # non-transport caller, override the bridge, or add a runtime selector. PRESERVE
+> # complete identity, HS7 settlement/detached exclusion, HS8 ingress, HS9 root
+> # admission, required-consumer realization, exact-owner law, call verification,
+> # effect-seat accounting, ABI/wire, source semantics, stack behavior and TCB.
+> #
+> # CONTROLS: (1) RAII `D5bHs10InlineResponseMutation::{Exact, PromoteInlineBridge}`
+> # plus `with_d5b_hs10_inline_response_mutation<T>(...) -> (T, usize)`, acting only
+> # where exact-bridge-row ∩ nontransport would yield InlineBridgeNoCall — on the
+> # COW witness count 1 restores the exact HS10 refusal; it never acts on
+> # bridge+transport, nonbridge+nontransport, P1, or unconsumed-transport. (2) Plan
+> # controls independently vary full identity, field, consumer kind, wrapper,
+> # cause, body origin, missing row, and duplicate row — reaching each named
+> # validator. (3) Split controls cover all neighbours: bridge+nontransport
+> # Deferred; bridge+transport and nonbridge+nontransport Specialized where their
+> # current conditions hold; P1 and unconsumed transport unchanged. (4) A lowering
+> # control varies one local coordinate after plan publication and refuses before
+> # settlement/effect emission. (5) Restored Exact must ADVANCE, then run all
+> # HS3–HS10 controls, native/interpreter value and ordered effect trace, file
+> # preservation, unchanged-stack parity, scoped checks, staticlib, COW, ELF census
+> # and CI history. A new structural refusal is HS11 — preserve/revert and return
+> # it; Research re-triggers at HS12.
+> #
+> # STEWARD PACKAGING: the repair adds a PRIVATE plan-internal relation, a shared
+> # structural-classifier refactor, and one honest Deferred subcase — all runtime
+> # planner/response machinery, with no kernel/TCB/ABI/wire/spec change and no
+> # ban-lift, squarely within ABI-S6 D5b. => amend-in-place, no operator sign-off
+> # (the HS3–HS9 shape); the Architect assigned "@steward owns the in-place
+> # amendment and explicit Runtime re-kick". The escalation watch armed on fork (e)
+> # RESOLVES: fork (e) "UNAVAILABLE" was ruled knowable-but-unstored, not a hard
+> # design boundary, so no operator escalation. Count remains 10; a genuinely new
+> # structural refusal is HARD STOP 11 (no Research until 12). The HS10
+> # observation-only banner immediately below is SUPERSEDED by this ruling.
+
+# D5b NATIVE HARD-STOP 10 — OBSERVATION-ONLY (Superseded by the HS10 PRODUCTION RULING above; the observation pass is COMPLETE — result evt_4k3kzg2702s6, fork (a) OVERPROMOTION).
 
 > # D5b native-lowering track, HARD STOP 10 — OBSERVATION-ONLY (no repair yet).
 > # Architect classification + observation ruling evt_50ynvegxvydvm
