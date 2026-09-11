@@ -12,7 +12,124 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE POST-HS10 RIGHTS/SURFACE RULING — AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 11 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 11 — PRODUCTION RULING (repair
+> # authorized IN PLACE). Architect production ruling evt_xp8vc845wm0g
+> # (thr_7wy5wy45p7abm), from a 3-cycle observation-only chain on WIP
+> # 37390dfcf89c3930751b6b9eea521ef650b70b34 (13/13 D5b suite green; HS10 +
+> # post-HS10 rights repairs STAND): cycle 1 evt_7m2pkn97vh02k, cycle 2
+> # evt_245qzs850mbvh (refuted a buggy-flag "both eliminated" read), cycle 3
+> # evt_5x2yjrfhe49tw (Architect corrected its OWN producer-site — the real
+> # producer is transfer_constructor_operands, NOT the continuation-call seat).
+> # Runtime stays byte-clean at 37390dfcf until this amendment lands and
+> # runtime-leader explicitly kicks the repair.
+> #
+> # CLASSIFICATION: EXISTING_CARRIED_AGGREGATE_PRODUCER_AUTHORITY_NOT_RETAINED.
+> # The ObjectEmission BoundaryCarrier refusal is a shared deferred-constructor
+> # materializer gap, NOT a top-bridge/continuation-call defect and NOT an HS10
+> # regression (top join exact at (1640,153,0); HS10 sound). Disposition ledger
+> # (measured fail-closed over 3 cycles): depth 0 (1639,453,0) is WHOLE-BOUND —
+> # the Coproduct::InL shell is Vis field 0, installed at computational frame 153
+> # via edge materializer_next_binding=Some((1640,0,153)); depth 1 (1640,153,0)
+> # is IMMEDIATELY-ELIMINATED. The carried whole-bound shell 1639's producer
+> # authority EXISTS: the successful transfer_constructor_operands population's
+> # exact tuple+source-1638 rows (duplicate instances sharing ONE authority)
+> # resolve occurrence 342, producer Source(1638), Constructor, owner 16,
+> # ActivationOwned/InvocationAggregate, children 1637/1636/1634, phases
+> # Carried/Specialized/Specialized; source tree 342/1638 -> 343/1639(child0=
+> # 1638) -> 344/1640(child0=1639). That authority is DISCARDED when the
+> # word-only CarriedBoundaryWord is returned. Duplicate lowering instances share
+> # one authority — the fork is universal over the closed candidate set, so no
+> # pairing is needed; that is NOT a new hard stop.
+> #
+> # RULED REPAIR — PHASE-PRESERVING SHARED DEFERRED-CONSTRUCTOR MATERIALIZER.
+> # (1) Repair the shared materializer, NOT the top bridge or continuation-call
+> # seat. The carried Ordinary arm in lower_computational_match_value_composed_
+> # once may enter the materialization lifecycle before calling the existing
+> # lower_carried_match, supplying its exact resulting frame env. NO
+> # consumer-specific write_all path.
+> # (2) Phase-preserving over LoweringOperand: the completed ordered arg run is
+> # Vec<LoweringOperand> — prefix stays Specialized, the selected field preserves
+> # Carried or Specialized, trailing fields preserve lower_expr. NEVER convert or
+> # decode a carrier.
+> # (3) Derive whole-value need from the actual materializer EDGE, not a new
+> # classifier or named origin: a shell selected into the next nested deferred
+> # case is whole-bound; a retained-index shell is also whole-bound but this
+> # repair still REFUSES all carried retained-scrutinee shapes (observed chain
+> # has none); a shell whose outer frame has neither next deferred binding nor
+> # retained index is immediately eliminated. So 1639 whole-bound, 1640 immediate
+> # — do NOT infer that from depth or names.
+> # (4) Complete a whole-bound shell containing any Carried arg ONLY through
+> # transfer_constructor_operands(builder, deferred.construct_origin,
+> # deferred.constructor, &constructor_args), coordinate = the shell's STORED
+> # source producer origin (1639 -> occurrence 343; NOT frame 450, NOT top 1640,
+> # NOT a call identity or use coordinate). Retain existing
+> # aggregate_carrier_authority, preflight, governed allocation, tag, ordered
+> # stores. All-Specialized args keep the existing Lowered::Constructor build.
+> # (5) Do NOT allocate/transfer an immediately-eliminated shell just because one
+> # field is Carried: validate identity/occurrence/arity/recursive-positions/
+> # selected case as today, install fields directly. Vis 1640 gets no whole
+> # carrier; its field 0 is carried Coproduct 1639, trailing closure Specialized.
+> # (6) Before any new whole-bound allocation, require every computational
+> # recursive-position operand Specialized; carried recursive input is UNRULED
+> # and refuses before allocation. Preserve nonrecursive phases as
+> # LoweringEnvironmentBinding::Value. StaticWorker/IH/binder-order/outer-tail/
+> # checked-frame/active-cursor/response-owner logic unchanged; ordinary cases
+> # bind operands in source order.
+> # (7) ONE shared implementation. An internal optional/required whole-value
+> # state may avoid manufacturing the immediate Vis shell; a second carried-only
+> # recursive materializer may NOT. Missing-required-whole, carried-recursive,
+> # unknown disposition, or plan disagreement FAILS CLOSED. Existing Specialized
+> # behavior unchanged.
+> #
+> # FENCES: no provenance/field on CarriedBoundaryWord, no ConstructorField::
+> # Carried, no generic carried field in Lowered, no carrier inverse, no runtime
+> # decode; no new owner/lifetime/allocation-site/tag/schema/ABI/response-route;
+> # no SSA/order/nearest/count/origin-arithmetic/call-identity inference; no
+> # allocation under frame 450, no use of top 1640 for the depth-0 whole, no
+> # allocation of immediate shell 1640; no weakening of aggregate preflight/
+> # stores, checked frame/site/interface, dynamic edges, response-owner
+> # selection, settlement, required consumers, or StaticResponseDeferred
+> # ownership; no HS6 isolation, stack, COW/source-rights, interpreter, or
+> # effect-order change. PRESERVE HS3-HS10 mechanisms + the post-HS10 rights
+> # repair.
+> #
+> # ACCEPTANCE EVIDENCE (must discriminate loss AND over-materialization): the
+> # unchanged mixed write_all witness compiles and reaches expected native
+> # behavior; a test-support materializer ledger keyed by exact shell identity
+> # shows carried source 1638, exactly ONE whole-bound forward completion of
+> # shell 1639 under occurrence 343, and ZERO whole construction/transfer for
+> # immediate shell 1640. Named mutations, each at the production decision seat,
+> # detector untouched, compile + prove freshness + byte-identical restore:
+> # DropWholeBoundCompletion (suppress only 1639 completion, keep carried input +
+> # outer Vis case -> witness MUST redden; if it stays green, STOP — lexical
+> # binding is not a behavioral consumer); MaterializeImmediateShell (treat 1640
+> # as whole-bound -> ledger MUST redden on unauthorized 1640 whole
+> # construct/transfer); UseCurrentFrameOrigin (frame 450 for deferred origin
+> # 1639 -> MUST refuse before allocation, proving the parent authority
+> # coordinate); a Carried computational-recursive-position negative asserting
+> # the exact pre-allocation refusal, paired with the nonrecursive carried
+> # positive. Specialized deferred controls behaviorally unchanged. Run scoped
+> # Runtime/CLI via scripts/ken-cargo with predicted nonzero counts; retain
+> # ABI-S6 native/interpreter parity, ordered effects, file/COW preservation,
+> # D5b, staticlib, ELF, and CI gates. No detector-side substitute.
+> #
+> # STEWARD PACKAGING: fork (i) — the exact producer authority EXISTS and is
+> # merely discarded, so the repair THREADS existing authority
+> # (transfer_constructor_operands + aggregate_carrier_authority) through the
+> # shared materializer. Reuse of existing planner/lowering machinery, no new
+> # owner/schema/ABI/wire/tag/capability, no ban-lift, no kernel/TCB/spec change,
+> # in-place within ABI-S6 D5b. => amend-in-place, no operator sign-off (the
+> # HS3-HS10 shape); the Architect assigned "@steward owes the in-place
+> # production banner and Runtime kickoff". The escalation watch armed across the
+> # 3 observation cycles on fork (ii) (bare word -> a scoped plan-owned
+> # materialization authority = an operator scope/capability escalation) RESOLVES
+> # to NO ESCALATION: the measured authority outcome landed on fork (i). Hard-
+> # stop count = 11; Research re-triggers at HS12. Runtime implements on the SAME
+> # WIP 37390dfcf; a genuinely new structural refusal would be HS12.
+
+# D5b NATIVE POST-HS10 RIGHTS/SURFACE RULING (Superseded as READ-FIRST by the HARD-STOP 11 PRODUCTION RULING above; the rights/surface repair SUCCEEDED and stands in WIP 37390dfcf, part of the 13/13-green D5b suite).
 
 > # D5b native-lowering track, POST-HS10 RIGHTS/SURFACE RULING (repair authorized;
 > # NOT HS11). Architect ruling evt_cf7sk8pss0dk (thr_7wy5wy45p7abm), grounded on
