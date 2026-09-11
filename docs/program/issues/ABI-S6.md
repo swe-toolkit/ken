@@ -12,6 +12,47 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
+# D5b HARD-STOP 10 — RESPONSE-CALLER REALIZATION MISMATCH
+
+Architect inventory, 2026-09-11.
+
+> Runtime's exact HS9 causality run advanced beyond HS9 and reached a new
+> ObjectEmission refusal at artifact closeout:
+>
+> `a forward-declared response owner has no verified selected incoming call:
+> owner=StaticResponseOwnerId(0), context=ContinuationContextId(1),
+> preexisting=true, ... disposition=Some(InlineNoCall)`.
+>
+> This is consecutive HARD STOP 10 on the same D5b checked-IH/native chain.
+> Exact report: `evt_5w8e94hcn0gjw`; decisive log SHA-256
+> `1d8f7aa75a86edd35a26becb9e99cef14f0b9d6c68587c20e3e0917dc2bfefe8`;
+> HS9 repair-only diff SHA-256
+> `a29bca8bb32ed59f5e80c4e7251fa89b776f56bf66529dfa85b5499e047ef4ad`;
+> full attempt SHA-256
+> `46bf387ec4f52da29a6c6da01061a774220f88ca5a6c8e018a950fe94c3eb82e`.
+> `RejectExactRoot` applied exactly once and restored the exact HS9 refusal;
+> restored `Exact` alone reached HS10. The unit control, feature check, and
+> feature staticlib build passed. Runtime restored byte-clean `fee133142`; the
+> lockfile is unchanged. This is not evidence against HS9.
+>
+> The refused caller is the complete HS7 identity: producer/emission owner
+> `Predeclared(6)`, result origin 832, construct origin 825, alternative 1,
+> sequence 0, target `Specialization(3)`, recursive position 1, worker parent 12,
+> closure 819, body 813, arity 1, and five lexical captures 818 through 814.
+> Prior observation already proved this exact identity settles once as
+> `InlineNoCall`, with no direct emission, pending or verified composed call,
+> checked-IH transport source/emission, or required consumer. The response plan
+> nevertheless selects it as owner 0's incoming caller.
+>
+> CLASSIFICATION HOLD: this is the earlier HS8 diagnostic fork 2 — response-owner
+> classification and authoritative inline realization disagree about whether an
+> incoming call exists. It is not a missing call inferred from absence: the
+> candidate ledger positively records `InlineNoCall`. The response-call coverage
+> gate is correct to refuse because a Specialized response suppresses ordinary
+> host-effect lowering outside its owner. Do not weaken that gate, reinterpret
+> `InlineNoCall` as discharge, force a claim, or tolerate an unused Specialized
+> owner. No Research pull is due until hard stop 12.
+
 # D5b NATIVE HARD-STOP 9 — ROOT-PARENT REPAIR RULING, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
 
 > # D5b native-lowering track, HARD STOP 9 — ROOT-PARENT REPAIR. Architect ruling
