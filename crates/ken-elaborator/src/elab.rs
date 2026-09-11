@@ -9543,6 +9543,18 @@ fn reassociate_rtype(
             Box::new(reassociate_rtype(*argument, globals, fixities)?),
             span,
         ),
+        // `‖A‖` — descend into the truncated type. This is REACHING, not
+        // defensive: this per-declaration pass runs at DECLARED fixity, and its
+        // `RRefine` arm reassociates the predicate (`reassociate_rexpr`). A
+        // refinement predicate nested in a `‖…‖` is reachable only through this
+        // `RTrunc` -> `RRefine` -> `reassociate_rexpr` path — `resolve` performs
+        // no reassociation. The predicate itself is proof-irrelevant and dropped
+        // at elaboration, so a mis-GROUPING is unobservable; but the reassociator
+        // still runs its fixity-ambiguity check over the truncated predicate, so
+        // leafing this arm SILENTLY ACCEPTS an ambiguous-fixity predicate (two
+        // operators of conflicting associativity / a non-associative operator in
+        // a chain) that a correct descent REJECTS. Mutation-proven by
+        // `d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation`.
         RType::RTrunc(inner, span) => {
             RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities)?), span)
         }

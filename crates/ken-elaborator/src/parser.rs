@@ -3274,9 +3274,19 @@ fn reassociate_default_type(ty: Type) -> Type {
             span,
         ),
         // `‖A‖` — descend into the truncated type (structural closure; mirrors
-        // the expression-side `Expr::ETrunc` arm). Defensive: types have no
-        // user infix operator, so there is no reachable reassociation this
-        // changes today, but the traversal must not silently leaf a `‖…‖`.
+        // the expression-side `Expr::ETrunc` arm). This `default`-fixity pass is
+        // reached ONLY by the standalone-expression parser (`parse_expr_only`;
+        // unit parsing deliberately does not call it), where every user operator
+        // takes `Fixity::DEFAULT` and `associate_surface_spine` collapses by
+        // precedence alone and never errors. A refinement predicate nested in a
+        // `‖…‖` is also proof-irrelevant and dropped at elaboration
+        // (`elab_type`'s `RRefine` arm keeps only the carrier;
+        // `innermost_refine_pred` is opaque to `RTrunc`). So no leaf here has a
+        // reachable observable today — this arm is DEFENSIVE structural closure,
+        // distinct from the type-side declaration pass `reassociate_rtype`'s
+        // `RTrunc` arm, which IS reaching (it runs at DECLARED fixity and rejects
+        // an ambiguous-fixity truncated predicate; see that arm and its test).
+        // The traversal must still not silently leaf a `‖…‖`.
         Type::TTrunc(inner, span) => {
             Type::TTrunc(Box::new(reassociate_default_type(*inner)), span)
         }

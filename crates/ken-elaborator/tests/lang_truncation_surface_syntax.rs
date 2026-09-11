@@ -653,23 +653,54 @@ fn d1_truncation_headed_constrained_instance_resolves_by_a_consistent_head() {
     );
 }
 
-/// End-to-end nested form: a refinement whose predicate uses a declared
-/// `infixl` operator, wrapped in `‖…‖` in annotation position, elaborates and
-/// kernel-checks. This exercises the whole descent path — `reassociate_default_type`
-/// / `reassociate_rtype` reaching the truncated refinement, and its predicate's
-/// operator spine reassociating correctly. (The predicate spine is reassociated
-/// by `reassociate_rexpr`/resolve, so this remains green even if the type-side
-/// descent is a leaf — the type-side reassociation descent is defensive, per the
-/// note above; this pins the end-to-end nesting, not a type-operator regrouping,
-/// which the surface has no way to write.)
+/// The type-side reassociation descent into a truncation is REACHING, not
+/// defensive. A declaration's refinement predicate nested under `‖…‖` is
+/// reassociated ONLY by the type-side `reassociate_rtype` `RTrunc` arm
+/// (`RTrunc` -> `RRefine` -> `reassociate_rexpr(predicate)`), because `resolve`
+/// performs no reassociation. This per-declaration pass runs at the program's
+/// DECLARED fixities.
+///
+/// The observable is fixity-AMBIGUITY REJECTION, not a type/value difference:
+/// a truncated refinement predicate is proof-irrelevant and DROPPED at
+/// elaboration (`elab_type`'s `RRefine` arm keeps only the carrier;
+/// `innermost_refine_pred` is opaque to `RTrunc`), so a mis-GROUPING never
+/// reaches a type check. What the reassociator still does is run its fixity
+/// check over the truncated predicate spine: `<+>` (`infixl 6`) and `<*>`
+/// (`infixr 6`) have equal precedence and CONFLICTING associativity, so the
+/// spine `x <+> x <*> x` is genuinely ambiguous and must be REJECTED. Leafing
+/// the `RTrunc` arm skips that descent and SILENTLY ACCEPTS the ambiguous
+/// predicate — that is the discriminating difference (mutation-proven: leafing
+/// `reassociate_rtype`'s `RTrunc` arm turns the rejection below into an
+/// acceptance and reds this test). A same-operator spine could not tell
+/// reaching from defensive, because it is unambiguous and its (dropped)
+/// grouping is unobservable either way.
+///
+/// The parallel parser-side `reassociate_default_type` `TTrunc` arm is instead
+/// DEFENSIVE: it is reached only by the standalone-expression parser at DEFAULT
+/// fixity, where no conflict can arise and the collapse never errors; see the
+/// note on that arm.
 #[test]
-fn d1_annotation_trunc_reassociates_an_infix_predicate_under_truncation() {
+fn d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation() {
     let mut env = mk_env();
-    env.elaborate_file(
-        "fn <+> (a : Nat) (b : Nat) : Nat = a\n\
-         infixl 5 <+>\n\
-         theorem tie (x : Nat) : ‖ { y : Nat | IsTrue (nat_eq (x <+> x <+> x) x) } ‖ = \
-           trunc_intro x",
-    )
-    .expect("an infixl predicate inside ‖{ … }‖ must reassociate (descend into the truncation)");
+    let err = env
+        .elaborate_file(
+            "fn <+> (a : Nat) (b : Nat) : Nat = a\n\
+             infixl 6 <+>\n\
+             fn <*> (a : Nat) (b : Nat) : Nat = a\n\
+             infixr 6 <*>\n\
+             theorem tie (x : Nat) : ‖ { y : Nat | IsTrue (x <+> x <*> x) } ‖ = \
+               trunc_intro x",
+        )
+        .expect_err(
+            "an ambiguous-fixity predicate (`infixl 6 <+>` vs `infixr 6 <*>`) nested in a \
+             `‖{ … }‖` must be REJECTED: the type-side `reassociate_rtype` `RTrunc` arm must \
+             descend into the truncated refinement and run the fixity check; leafing it \
+             silently accepts",
+        );
+    let reason = format!("{err:?}");
+    assert!(
+        reason.contains("conflicting associativity"),
+        "the rejection must come from the reassociation pass's fixity check reaching the \
+         truncated predicate (not some unrelated error): {reason}"
+    );
 }
