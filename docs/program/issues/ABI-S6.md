@@ -272,6 +272,12 @@ identity must survive long enough to mint the edge, but placing it in the child
 layer conflates two roles. Parent-edge provenance and child-frame qualification
 must have separate existing authorities; one invocation scalar cannot name both.
 
+Entry 6 does not presently share that predicate. A stack overflow in the
+in-process test thread carries no ancestry, resume, or progress coordinate. It
+joins entries 4–5 only if an active-ancestry trace shows the source-open parent
+boundary targeting a descendant or replaying the child; otherwise it is an
+independent compiler-progress or physical-stack result.
+
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
 > # D5b native-lowering track, HARD STOP 2 (distinct from the surface HS#1-3
