@@ -444,6 +444,13 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
    causal edge remained residual at the detached-result seat while that unit's
    lowered result was not the specialized producer constructor the existing
    five-guard contract requires (`evt_1rn0v625yq2m6`).
+8. After the exact `InlineNoCall` disposition exclusion advanced the unchanged
+   witness past entry 7, a `StaticResponseDeferred` compiler-control value
+   reached the generic boundary-transfer preflight during object emission and
+   correctly refused instead of crossing as a runtime value. The refusal does
+   not identify its production origin, enclosing lowered-value path, transfer
+   site, defining owner, selected response owner, or causal-call disposition,
+   so its relation to entry 7 is not yet classified (`evt_4cwyw14tmcmv6`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
