@@ -81,6 +81,34 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # avoids this route. HS3 chain CLOSED — no 4th attempt without returning to the
 > # Architect.
 
+## D5b static-operation ownership hard-stop symptom inventory
+
+1. The source `MappingSource` match was already iota-reduced, but the selected
+   `FSOp` operation constructor was materialized in the predeclared handler
+   owner before its dispatch match, losing the known selector at the response
+   owner (`evt_2vc32z6qn13bm`).
+2. The widened checked-slot operation bridge reached the selected operation but
+   bypassed `assemble_continuation_call_operands`, so it built no exact-key
+   `ConstructedContextFrame` for producer-local context inputs
+   (`evt_4by5d3mhtpzbn`).
+3. Once that frame existed, the direct-worker retarget's six-input `Parameter`
+   run already held its five worker captures; appending the frame's same worker
+   vector produced eleven operands for six parameters (`evt_6399w1x64cmqm`).
+4. After the caller partition made the parameter source structural, the same
+   recursor occurrence's checked parent invocation survived in its source-open
+   `ComputationalEliminatorFrame` as instance 1 but was rebuilt in the selected
+   `ComputationalRecursorLayer` from an empty ambient invocation stack as root
+   instance 0. Child instance and parent frame still agreed; only the dynamic
+   parent invocation disagreed (`evt_49ycrt545sjh4`).
+
+Entries 1–3 share the predicate already ruled at hard stop 3: operation
+selection and response ownership lie across the checked-IH specialization
+boundary without one structural authority for the explicit-argument,
+worker-capture, and context-capture partition. Entry 4 is downstream of that
+boundary but is a distinct existing dynamic-splice transport invariant: a
+selected recursor layer must preserve the source computational frame's whole
+checked tuple rather than re-derive any member from ambient state.
+
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
 > # D5b native-lowering track, HARD STOP 2 (distinct from the surface HS#1-3
