@@ -3499,9 +3499,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::FsRemoveDirectory => (REMOVE_DIRECTORY_ERROR, UNIT),
         Op::FsRename => (RENAME_ERROR, UNIT),
         Op::FsChangeMode => (CHANGE_MODE_ERROR, UNIT),
-        Op::BufferAllocate | Op::BufferFreeze | Op::MappingAllocate | Op::MappingReadView => {
-            (RESOURCE_SURFACE, N::Absent)
-        }
+        Op::BufferAllocate
+        | Op::BufferFreeze
+        | Op::MappingAllocate
+        | Op::MappingReadView
+        | Op::MappingAcquireFile => (RESOURCE_SURFACE, N::Absent),
         Op::MappingWriteView => (RESOURCE_SURFACE, UNIT),
         Op::FsHandleMetadata => (RESOURCE_SURFACE, N::Absent),
         Op::ResourceRelease => (RESOURCE_SURFACE, UNIT),

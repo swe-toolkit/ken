@@ -751,6 +751,32 @@ impl HostEffectBackendV1 for ProcessHost {
         })
     }
 
+    fn resource_map_file(
+        &mut self,
+        handle: &crate::ResourceHandleV1,
+        length: u64,
+        protection: crate::MappingProtectionV1,
+    ) -> Result<crate::MappingRegionV1, crate::SemanticErrorV1> {
+        let metadata = crate::resource_metadata_v1(handle)
+            .map_err(|error| crate::SemanticErrorV1::Io(crate::io_error_identity_v1(
+                &error.into_io_error(),
+            )))?;
+        if metadata.size < length {
+            return Err(crate::SemanticErrorV1::Resource(
+                crate::ResourceErrorV1::InvalidBounds,
+            ));
+        }
+        crate::MappingRegionV1::try_new_mapped_file(handle, length, protection).map_err(
+            |error| {
+                if crate::mapping_v1::is_allocation_failure(error) {
+                    crate::SemanticErrorV1::Resource(crate::ResourceErrorV1::AllocationFailed)
+                } else {
+                    crate::SemanticErrorV1::Io(error)
+                }
+            },
+        )
+    }
+
     fn resource_unmap(&mut self, region: crate::MappingRegionV1) -> Result<(), IoErrorIdentityV1> {
         region.unmap_native()
     }
@@ -1925,6 +1951,29 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 None,
                 crate::ResourceInputsV1::None,
                 CanonicalRequestV1::MappingAllocate {
+                    length: wire.length,
+                    protection,
+                },
+            )
+        }
+        HostOpV1::MappingAcquireFile
+            if request_size == std::mem::size_of::<MappingAcquireFileRequestV1>() =>
+        {
+            if !request.cast::<MappingAcquireFileRequestV1>().is_aligned() {
+                return -1;
+            }
+            let wire = unsafe { &*(request.cast::<MappingAcquireFileRequestV1>()) };
+            let protection = match wire.protection {
+                0 => crate::MappingProtectionV1::ReadOnly,
+                1 => crate::MappingProtectionV1::Writable,
+                _ => return -1,
+            };
+            (
+                None,
+                crate::ResourceInputsV1::Target(
+                    crate::ResourceTokenV1::from_erased_identity(wire.resource),
+                ),
+                CanonicalRequestV1::MappingAcquireFile {
                     length: wire.length,
                     protection,
                 },
