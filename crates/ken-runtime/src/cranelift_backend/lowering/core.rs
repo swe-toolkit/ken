@@ -3091,7 +3091,7 @@ impl<'a> Lowering<'a> {
                 // resumption, so no coordinates can be supplied. The callee
                 // fails closed if this body has a generated context.
                 let returned =
-                    self.call_declared_recursive_position_unit(builder, body, &inputs, None)?;
+                    self.call_declared_recursive_position_unit(builder, body, inputs, None)?;
                 return self.lower_computational_match_value_composed(
                     builder,
                     RoutedAnswer::direct(returned),
@@ -3576,6 +3576,7 @@ impl<'a> Lowering<'a> {
                                         activation,
                                         invocation,
                                         dynamic_splice_edges,
+                                        None,
                                     )?;
                                     let frames = installed_oriented_eliminator_frames(&installed);
                                     let mut composed = Vec::with_capacity(frames.len() + 2);
@@ -5013,7 +5014,7 @@ impl<'a> Lowering<'a> {
                                 eliminator.env.to_vec(),
                                 eliminator.static_origin,
                                 eliminator.provenance,
-                                eliminator.checked_frame_id,
+                                eliminator.checked_tuple(),
                                 slot_template_id,
                                 producer_origin,
                                 position,
@@ -5981,7 +5982,7 @@ impl<'a> Lowering<'a> {
                 mut callee @ Lowered::ComputationalRecursorClosure { .. },
             ) => {
                 let checked_ih_invocation =
-                    self.mint_checked_computational_ih_instance(&mut callee)?;
+                    self.mint_checked_computational_ih_instance(&mut callee, None)?;
                 let (base, boundary) =
                     decompose_computational_recursor(LoweringOperand::Specialized(callee));
                 let (activation, invocation) =
@@ -6017,6 +6018,7 @@ impl<'a> Lowering<'a> {
                     activation,
                     invocation,
                     dynamic_splice_edges,
+                    None,
                 )?;
                 let mut composed = installed_oriented_eliminator_frames(&installed);
                 composed.push(EliminatorFrame::InvocationReturn);
@@ -6042,7 +6044,7 @@ impl<'a> Lowering<'a> {
                             .call_declared_recursive_position_unit(
                                 builder,
                                 body,
-                                &inputs,
+                                inputs,
                                 Some(coordinates),
                             )
                             .and_then(|value| {
@@ -6760,15 +6762,170 @@ impl<'a> Lowering<'a> {
             }
         };
 
-        // The bridge eliminator's cases live in the selected case body
-        // itself (`immediate_binder_eliminator` matches only a body that
-        // IS a match), so that body's origin is their parent.
-        let bridge =
-            immediate_binder_eliminator(case_body.expr, argument_binder_offset, args.len());
-        let bridge =
-            bridge.filter(|(field, _)| requires_heterogeneous_deforestation(&args[*field]));
+        // Resolve every causal identity for the selected producer coordinates
+        // before asking whether this source shape is a bridge. The plan-owned
+        // relation, not a lowering-only predicate, owns that population.
+        let bypassed = match selected_computational.as_ref() {
+            None => Vec::new(),
+            Some((frame_origin, case_index, recursive_positions)) => {
+                let alternative = u32::try_from(*case_index).map_err(|_| {
+                    unsupported("ComputationalMatch", "continuation alternative exhausted")
+                })?;
+                let mut identities = Vec::new();
+                for position in recursive_positions.iter().copied() {
+                    if let Some(identity) = self
+                        .static_transition_plan
+                        .continuation_call_binding_for(
+                            static_origin,
+                            *frame_origin,
+                            alternative,
+                            u32::try_from(position).map_err(|_| {
+                                unsupported(
+                                    "ComputationalMatch",
+                                    "continuation recursive position exhausted",
+                                )
+                            })?,
+                        )?
+                    {
+                        identities.push((position, identity));
+                    }
+                }
+                identities
+            }
+        };
+        let local_bridge = classify_immediate_bridge(case_body.expr, args, argument_binder_offset);
+        let planned_bridge_count = bypassed
+            .iter()
+            .filter(|(_, identity)| {
+                self.static_transition_plan
+                    .immediate_bridge_realization(identity)
+                    .is_some()
+            })
+            .count();
+        if !bypassed.is_empty() {
+            match local_bridge {
+                Some(_) if planned_bridge_count != bypassed.len() => {
+                    return Err(unsupported(
+                        "ContinuationSpecialization",
+                        "a local immediate bridge has no exact plan-owned realization row",
+                    ));
+                }
+                None if planned_bridge_count != 0 => {
+                    return Err(unsupported(
+                        "ContinuationSpecialization",
+                        "a plan-owned immediate bridge does not re-derive at lowering",
+                    ));
+                }
+                _ => {}
+            }
+        }
 
-        if let Some((field, consumer)) = bridge {
+        let mut bridge_body = case_body;
+        if let Some(selection) = local_bridge {
+            if !bypassed.is_empty() {
+                let Some((frame_origin, case_index, recursive_positions)) =
+                    selected_computational.as_ref()
+                else {
+                    unreachable!("a nonempty bypassed population has selected coordinates")
+                };
+                let alternative = u32::try_from(*case_index).map_err(|_| {
+                    unsupported("ComputationalMatch", "continuation alternative exhausted")
+                })?;
+                let effective_bridge_body_origin = match case_body.expr {
+                    RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+                    | RuntimeExpr::CheckedComputationalIHSlots { body, .. } => self
+                        .child_occurrence(case_body.static_origin, 0, body)?
+                        .static_origin,
+                    _ => case_body.static_origin,
+                };
+                for (position, identity) in &bypassed {
+                    let row = self
+                        .static_transition_plan
+                        .immediate_bridge_realization(identity)
+                        .ok_or_else(|| {
+                            unsupported(
+                                "ContinuationSpecialization",
+                                "a local immediate bridge lost its plan-owned realization row",
+                            )
+                        })?;
+                    if row.identity() != identity
+                        || row.producer_construct_origin() != static_origin
+                        || row.computational_frame_origin() != *frame_origin
+                        || row.alternative() != alternative
+                        || row.recursive_position()
+                            != u32::try_from(*position).map_err(|_| {
+                                unsupported(
+                                    "ComputationalMatch",
+                                    "continuation recursive position exhausted",
+                                )
+                            })?
+                        || !recursive_positions.contains(position)
+                        || row.case_body_origin() != case_body.static_origin
+                        || row.effective_bridge_body_origin() != effective_bridge_body_origin
+                        || row.selected_field()
+                            != u32::try_from(selection.selected_field).map_err(|_| {
+                                unsupported(
+                                    "ContinuationSpecialization",
+                                    "immediate bridge selected field exhausted",
+                                )
+                            })?
+                        || row.consumer() != selection.consumer.kind()
+                        || row.checked_ih_slots_wrapper()
+                            != selection.checked_ih_slots_wrapper
+                        || row.cause() != selection.cause
+                    {
+                        return Err(unsupported(
+                            "ContinuationSpecialization",
+                            "an immediate bridge lowering coordinate disagrees with its plan-owned descriptor",
+                        ));
+                    }
+                }
+            }
+
+            if selection.checked_ih_slots_wrapper {
+                let RuntimeExpr::CheckedComputationalIHSlots { body, .. } = case_body.expr else {
+                    unreachable!("the shared classifier owns the wrapper spelling")
+                };
+                bridge_body = self.child_occurrence(case_body.static_origin, 0, body)?;
+                self.enter_source_occurrence_plan(case_body.static_origin)?;
+                let [(recursive_position, identity)] = bypassed.as_slice() else {
+                    return Err(unsupported(
+                        "ContinuationSpecialization",
+                        "a checked-IH-slots operation bridge requires exactly one planned continuation identity",
+                    ));
+                };
+                let frame_fields = args
+                    .iter()
+                    .enumerate()
+                    .map(|(position, arg)| {
+                        let arg = self.child_occurrence(static_origin, position, arg)?;
+                        self.lower_expr(builder, arg, producer_env)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let defining = self.defining_unit.ok_or_else(|| {
+                    unsupported(
+                        "ContinuationSpecialization",
+                        "a checked-IH-slots operation bridge was reached outside a unit definition",
+                    )
+                })?;
+                let defining_owner = self.defining_emission_owner.ok_or_else(|| {
+                    unsupported(
+                        "ContinuationSpecialization",
+                        "a checked-IH-slots operation bridge has no emission owner",
+                    )
+                })?;
+                let _ = self.assemble_continuation_call_operands(
+                    identity,
+                    &frame_fields,
+                    *recursive_position,
+                    producer_env,
+                    defining,
+                    defining_owner,
+                    ContinuationOperandEnvironment::DirectEmission,
+                )?;
+            }
+            let field = selection.selected_field;
+            let consumer = selection.consumer;
             let lowered_prefix = args[..field]
                 .iter()
                 .enumerate()
@@ -6832,7 +6989,7 @@ impl<'a> Lowering<'a> {
             };
             let mut composed = Vec::with_capacity(2);
             composed.push(match consumer {
-                ImmediateBinderEliminator::Computational { cases, default } => {
+                ImmediateBridgeConsumer::Computational { cases, default } => {
                     // `D8m` — which arm this composed site took, at the
                     // one place that knows.
                     #[cfg(test)]
@@ -6844,7 +7001,7 @@ impl<'a> Lowering<'a> {
                         cases,
                         default,
                         env: &[],
-                        static_origin: case_body.static_origin,
+                        static_origin: bridge_body.static_origin,
                         retained_scrutinee_index: None,
                         deferred_constructor_case: Some(&deferred),
                         provenance: self.mint_recursor_frame_provenance(),
@@ -6869,7 +7026,7 @@ impl<'a> Lowering<'a> {
                 // and the consumed-once law live, so routing through it
                 // means this adds no second validator and cannot drift
                 // from the one the direct path uses.
-                ImmediateBinderEliminator::CheckedComputational {
+                ImmediateBridgeConsumer::CheckedComputational {
                     frame_id,
                     cases,
                     default,
@@ -6931,7 +7088,7 @@ impl<'a> Lowering<'a> {
                         // on the match.
                         static_origin: {
                             let wrapped = self
-                                .child_occurrence(case_body.static_origin, 0, case_body.expr)?
+                                .child_occurrence(bridge_body.static_origin, 0, bridge_body.expr)?
                                 .static_origin;
                             // `D8m` — SUBSTITUTE THE WRAPPER'S OWN
                             // OCCURRENCE, under test only. One node off,
@@ -6940,7 +7097,7 @@ impl<'a> Lowering<'a> {
                             // on.
                             #[cfg(test)]
                             let wrapped = if d8m_wrapper_origin_substitution() {
-                                case_body.static_origin
+                                bridge_body.static_origin
                             } else {
                                 wrapped
                             };
@@ -6960,7 +7117,7 @@ impl<'a> Lowering<'a> {
                         answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
                     })
                 }
-                ImmediateBinderEliminator::Ordinary { cases, default } => {
+                ImmediateBridgeConsumer::Ordinary { cases, default } => {
                     #[cfg(test)]
                     crate::cranelift_backend::lowering::record_d8m_bridge_arm(
                         self.defining_function_id,
@@ -6970,7 +7127,7 @@ impl<'a> Lowering<'a> {
                         cases,
                         default,
                         env: &[],
-                        static_origin: case_body.static_origin,
+                        static_origin: bridge_body.static_origin,
                         retained_scrutinee_index: None,
                         deferred_constructor_case: Some(&deferred),
                     })
@@ -6978,38 +7135,22 @@ impl<'a> Lowering<'a> {
             });
             composed.push(EliminatorFrame::Active(selected_active));
             let selected = self.child_occurrence(static_origin, field, &args[field])?;
-            // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the candidates
-            // whose call seat this bridge bypasses, read from the plan's
-            // own binding query rather than reconstructed here.
-            let bypassed = match selected_computational.as_ref() {
-                None => Vec::new(),
-                Some((frame_origin, case_index, recursive_positions)) => {
-                    let mut bypassed = Vec::new();
-                    for position in recursive_positions.iter().copied() {
-                        if let Some(identity) =
-                            self.static_transition_plan.continuation_call_binding_for(
-                                static_origin,
-                                *frame_origin,
-                                u32::try_from(*case_index).map_err(|_| {
-                                    unsupported(
-                                        "ComputationalMatch",
-                                        "continuation alternative exhausted",
-                                    )
-                                })?,
-                                u32::try_from(position).map_err(|_| {
-                                    unsupported(
-                                        "ComputationalMatch",
-                                        "continuation recursive position exhausted",
-                                    )
-                                })?,
-                            )?
-                        {
-                            bypassed.push(identity);
-                        }
-                    }
-                    bypassed
+            // Every plan-owned row must be reached at this exact bridge seat.
+            // Marking happens only after all local descriptor coordinates agree
+            // and before the bridge may settle the identity InlineNoCall.
+            for (_, identity) in &bypassed {
+                if self
+                    .static_transition_plan
+                    .immediate_bridge_realization(identity)
+                    .is_some()
+                {
+                    self.mark_immediate_bridge_realization_reached(identity)?;
                 }
-            };
+            }
+            let bypassed = bypassed
+                .iter()
+                .map(|(_, identity)| identity.clone())
+                .collect::<Vec<_>>();
             // `D3` — the ordered causal observation at bridge ENTRY,
             // recorded on EVERY run so the unmutated and armed arms are
             // comparable at the same seat for the same identity.
@@ -7100,6 +7241,54 @@ impl<'a> Lowering<'a> {
                 self.lower_expr(builder, arg, producer_env)
             })
             .collect::<Result<Vec<_>, _>>()?;
+
+        // A statically selected host-operation constructor does not need an
+        // aggregate representation merely to be eliminated by its response
+        // dispatch. In particular, a carried resource field must not force the
+        // known constructor through `transfer_constructor_operands`: doing so
+        // erases the selector and turns the already-selected response case back
+        // into a runtime carrier match. Bind the evaluated fields directly into
+        // the selected case instead. This is ordinary iota reduction, not a new
+        // carried-field representation; each operand keeps its existing phase
+        // and therefore its existing ownership and lifetime.
+        //
+        // The source shape that identifies an operation-dispatch case is the
+        // same one the response planner recognizes: an ordinary Match case whose
+        // body begins by binding a host Effect. Retained-scrutinee and deferred-
+        // constructor frames require representations this direct route does not
+        // have, so they remain on the existing fail-closed path.
+        let direct_operation_iota = lowered_args
+            .iter()
+            .any(|argument| matches!(argument, LoweringOperand::Carried(_)))
+            && matches!(
+                eliminator,
+                EliminatorFrame::Ordinary(frame)
+                    if frame.retained_scrutinee_index.is_none()
+                        && frame.deferred_constructor_case.is_none()
+            )
+            && matches!(
+                case_body.expr,
+                RuntimeExpr::Let { value, .. }
+                    if matches!(value.as_ref(), RuntimeExpr::Effect { .. })
+            );
+        if direct_operation_iota {
+            let EliminatorFrame::Ordinary(frame) = eliminator else {
+                unreachable!("the direct operation iota predicate selects an ordinary frame")
+            };
+            let case_env = env_with_operands(lowered_args, frame.env);
+            let remaining = &eliminators[1..];
+            let lowered = if remaining.is_empty() {
+                self.lower_computational_producer_expr(
+                    builder,
+                    case_body,
+                    &case_env,
+                    &[EliminatorFrame::InvocationReturn],
+                )?
+            } else {
+                self.lower_computational_producer_expr(builder, case_body, &case_env, remaining)?
+            };
+            return Ok(ProducerTrampolineStep::ordinary(lowered));
+        }
 
         // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE.
         //
@@ -7691,7 +7880,7 @@ impl<'a> Lowering<'a> {
                         outer_tail.clone(),
                         frame.static_origin,
                         frame.provenance,
-                        frame.checked_frame_id,
+                        frame.checked_tuple(),
                         slot_template_id,
                         producer_origin,
                         position,
@@ -7797,15 +7986,19 @@ impl<'a> Lowering<'a> {
                         ),
                     ));
                 }
-                constructor_args.extend(specialized_bindings_at(
-                    &outer_tail,
-                    "a deferred constructor's trailing field",
-                )?);
-                Ok(Ok(bound_values(
+                let mut case_env = bound_values(
                     constructor_args
                         .into_iter()
                         .map(LoweringOperand::Specialized),
-                )))
+                );
+                // The outer tail is already a lowering environment. Preserve
+                // each binding exactly as materialized: in particular, a
+                // computational-IH StaticWorker remains compiler-only while an
+                // enclosing ordinary operation-dispatch bridge is eliminated.
+                // Re-reading this tail as specialized values would erase the
+                // binding distinction and reject the statically selected path.
+                case_env.extend(outer_tail);
+                Ok(Ok(case_env))
             }
             EliminatorFrame::PendingLet(_) => {
                 unreachable!("pending Let continuations cannot be deferred constructor frames")
@@ -7891,6 +8084,16 @@ impl<'a> Lowering<'a> {
     ) -> Result<(), CraneliftBackendError> {
         match self.continuation_candidates.as_mut() {
             Some(ledger) => ledger.settle(identity, disposition),
+            None => Ok(()),
+        }
+    }
+
+    fn mark_immediate_bridge_realization_reached(
+        &mut self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<(), CraneliftBackendError> {
+        match self.continuation_candidates.as_mut() {
+            Some(ledger) => ledger.mark_immediate_bridge_reached(identity),
             None => Ok(()),
         }
     }
@@ -10815,19 +11018,20 @@ impl<'a> Lowering<'a> {
         // (`evt_7vh5nccb9gcqy`) and the piece six prior point-fixes each
         // missed. A carried recursive-position invocation of this worker is
         // retargeted onto the generated context that executes it, and that
-        // context declares `Parameter` + `Capture` runs the retarget site
-        // cannot fill:
+        // context declares distinct `Parameter` and `Capture` runs. A raw or
+        // carried-residual retarget supplies only declared application arguments
+        // and therefore uses this frame's selected-worker capture suffix. A
+        // statically selected direct-worker retarget already supplies arguments
+        // followed by those captures and emits zero operands from the frame's
+        // worker vector. The private call-input sum records that structural
+        // choice; no consumer infers it from a vector's length or values.
         //
-        // - the retarget supplies only the raw body's DECLARED ARGUMENTS, so
-        //   the selected closure's capture run -- the tail of the context's
-        //   `Parameter` run -- is absent there entirely;
-        // - the context's own `Capture` run is this specialization's
-        //   continuation inputs, whose producer-local members are values in the
-        //   producer's SEMANTIC environment. `defining_abi_operands` is an ABI
-        //   operand run and structurally cannot hold them, which is the whole
-        //   of the six-hard-stop chain rather than a bug in any one consumer.
+        // The context's own `Capture` run is this specialization's continuation
+        // inputs under either contract. Its producer-local members are values in
+        // the producer's semantic environment. `defining_abi_operands` is an ABI
+        // operand run and structurally cannot hold them.
         //
-        // **Both runs are already assembled above, and neither is
+        // **Both frame views are already assembled above, and neither is
         // re-derived here.** `selected_captures` is the selected closure's own
         // ordered capture vector, checked against the planner's worker facts
         // -- closure occurrence, declared arity, and capture count -- BEFORE
@@ -10845,11 +11049,11 @@ impl<'a> Lowering<'a> {
         // times: an instrument placed at one consumer, blind to another
         // arriving at the same machinery by a different route.
         //
-        // **This supplies members and relaxes nothing.** The consumer
-        // re-checks both cardinalities against the context's own declared frame
-        // header before using the operands, and the context body still walks
-        // its own declared run through the unchanged membership and slot
-        // re-derivation guard.
+        // **This supplies members and relaxes nothing.** The consumer rechecks
+        // the structurally selected worker source and context-capture source
+        // against the context's declared header before using them. The context
+        // body still walks its declared run through the unchanged membership and
+        // slot re-derivation guard.
         self.function_local.constructed_context_frame = Some(ConstructedContextFrame {
             continuation_origin: unit.continuation_origin(),
             recursive_position: unit.recursive_position(),
@@ -11587,6 +11791,14 @@ impl<'a> Lowering<'a> {
                     .pending_composed_discharges
                     .iter()
                     .any(|pending| pending.identity == edge.identity);
+                let inline_no_call = self
+                    .continuation_candidates
+                    .as_ref()
+                    .and_then(|ledger| ledger.disposition(&edge.identity))
+                    == Some(super::units::CandidateDisposition::InlineNoCall);
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                let inline_no_call =
+                    inline_no_call && !d5b_hs7_ignore_inline_no_call(inline_no_call);
                 !self
                     .function_local
                     .continuation_emissions
@@ -11596,6 +11808,7 @@ impl<'a> Lowering<'a> {
                         .composed_discharges
                         .contains_key(&edge.identity)
                     && !claimed
+                    && !inline_no_call
             })
             .collect::<Vec<_>>();
         // `D5a` checkpoint 4 step 3 — the multi-member reaching mutation.
@@ -14384,7 +14597,7 @@ impl<'a> Lowering<'a> {
                         eliminator.env.to_vec(),
                         eliminator.static_origin,
                         eliminator.provenance,
-                        eliminator.checked_frame_id,
+                        eliminator.checked_tuple(),
                         slot_template_id,
                         producer_origin,
                         position,
@@ -14745,6 +14958,31 @@ impl<'a> Lowering<'a> {
             expr,
             static_origin,
         } = occurrence;
+        let transport_destination = matches!(expr, RuntimeExpr::Construct { .. })
+            && match self.defining_emission_owner {
+                Some(owner) => self
+                    .static_transition_plan
+                    .checked_ih_environment_transport_at(owner, static_origin)?
+                    .is_some(),
+                None => false,
+            };
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        let transport_destination = transport_destination
+            && !d5b_hs8_bypass_exact_transport_ingress();
+        if transport_destination {
+            return self.lower_computational_producer_expr(
+                builder,
+                SourceOccurrence {
+                    expr,
+                    static_origin,
+                },
+                env,
+                &[EliminatorFrame::InvocationReturn],
+            );
+        }
+        // The producer dispatcher enters the same occurrence. The redirect must
+        // therefore happen before ordinary entry rather than double-consuming
+        // one source-occurrence plan token.
         self.enter_source_occurrence_plan(static_origin)?;
         match expr {
             RuntimeExpr::Value(value) => self
@@ -16052,7 +16290,7 @@ impl<'a> Lowering<'a> {
                         mut callee @ Lowered::ComputationalRecursorClosure { .. },
                     ) => {
                         let checked_ih_invocation =
-                            self.mint_checked_computational_ih_instance(&mut callee)?;
+                            self.mint_checked_computational_ih_instance(&mut callee, None)?;
                         let (base, boundary) = decompose_computational_recursor(
                             LoweringOperand::Specialized(callee),
                         );
@@ -16079,6 +16317,7 @@ impl<'a> Lowering<'a> {
                             activation,
                             invocation,
                             dynamic_splice_edges,
+                            None,
                         )?;
                         let mut frames = installed_oriented_eliminator_frames(&installed);
                         frames.push(EliminatorFrame::InvocationReturn);
@@ -16104,7 +16343,7 @@ impl<'a> Lowering<'a> {
                                     .call_declared_recursive_position_unit(
                                         builder,
                                         body,
-                                        &inputs,
+                                        inputs,
                                         Some(coordinates),
                                     )
                                     .and_then(|value| {
@@ -16158,7 +16397,7 @@ impl<'a> Lowering<'a> {
                                 "recursive constructor field is not a closure",
                             ));
                         };
-                        let mut call_inputs = args
+                        let arguments = args
                             .iter()
                             .enumerate()
                             .map(|(position, arg)| {
@@ -16167,26 +16406,15 @@ impl<'a> Lowering<'a> {
                                 self.lower_expr(builder, arg, env)
                             })
                             .collect::<Result<Vec<_>, _>>()?;
-                        if params.len() != call_inputs.len() {
-                            return Err(unsupported(
-                                "ComputationalMatch",
-                                format!(
-                                    "recursive field expects {} args but call provides {}",
-                                    params.len(),
-                                    call_inputs.len()
-                                ),
-                            ));
-                        }
-                        // Two roles, as above: ordered unit-call inputs, or an
-                        // environment prefix. Only the second is bound.
-                        call_inputs.extend(captures);
                         self.enter_oriented_semantic_region(installed.checked);
                         let coordinates = carried_coordinates;
                         let result = self
-                            .call_declared_recursive_position_unit(
+                            .call_declared_recursive_position_closure_unit(
                                 builder,
                                 body,
-                                &call_inputs,
+                                &params,
+                                arguments,
+                                captures,
                                 Some(coordinates),
                             )
                             .and_then(|value| {

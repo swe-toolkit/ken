@@ -6337,6 +6337,44 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
          the bare fixture's deliberately absent function-local target: {destination_error:?}"
     );
 
+    // Independently enter that same exact transport destination through ordinary
+    // `lower_expr`. Resetting the decision ledger makes the final `has_transport`
+    // observation depend on this ingress rather than the direct producer control
+    // above.
+    reset_invocation_return_transport_decisions();
+    let mut ingress_compiler = bare_carrier_test_lowering(&seed_env, plan.clone());
+    ingress_compiler.defining_emission_owner = Some(owner);
+    ingress_compiler.defining_unit = Some(defining_unit);
+    ingress_compiler.process_object = true;
+    let mut ingress_func = Function::with_name_signature(
+        UserFuncName::user(0, 0),
+        cranelift_codegen::ir::Signature::new(cranelift_codegen::isa::CallConv::SystemV),
+    );
+    let mut ingress_context = FunctionBuilderContext::new();
+    let mut ingress_builder = FunctionBuilder::new(&mut ingress_func, &mut ingress_context);
+    let ingress_entry = ingress_builder.create_block();
+    ingress_builder.switch_to_block(ingress_entry);
+    bind_bare_test_trap_lane(&mut ingress_compiler, &mut ingress_builder);
+    let ingress_error = expect_lowering_rejection(ingress_compiler.lower_expr(
+        &mut ingress_builder,
+        SourceOccurrence {
+            expr: destination,
+            static_origin: transport.destination_construct_origin(),
+        },
+        &[],
+    ));
+    assert!(
+        matches!(
+            ingress_error,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "CheckedIhEnvironmentTransport",
+                ref reason,
+            }) if reason.contains("force-materialization target was not declared")
+        ),
+        "ordinary ingress must redirect the exact destination into the same \
+         transport-aware producer path: {ingress_error:?}"
+    );
+
     let (_module, code) =
         ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, operands| {
             compiler.defining_emission_owner = Some(owner);
