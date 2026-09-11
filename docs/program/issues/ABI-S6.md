@@ -12,6 +12,53 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
+# D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
+
+> # D5b native-lowering track, HARD STOP 2 (distinct from the surface HS#1-3
+> # closed by the offset drop below). Architect ruling evt_139wvys9mv3z4
+> # (thr_7wy5wy45p7abm), grounded at exact b94c5ae7. The prior operation-iota
+> # attempt (eliminate the FSOp operation-dispatch match entirely inside
+> # lower_computational_producer_construct) was ONE LAYER SHALLOW and is REVERTED:
+> # direct descent through Predeclared(6) reaches the effect but BYPASSES the sole
+> # seam that constructs the Specialization(1) response owner's context frame.
+> #
+> # ARCHITECT CLASSIFICATION: a proven bypass of an EXISTING authority — NOT a new
+> # availability kind, owner transfer, continuation form, or carried aggregate.
+> # The exact ruled repair (4 steps, full detail in the event) REUSES the landed
+> # creation-site frame: widen the immediate checked-IH bridge's closed descriptor
+> # by ONE exact shape (CheckedComputationalIHSlots{body: Match{scrutinee:
+> # Var(operation_field)}} under a statically-known ITree::Vis), run the existing
+> # assemble_continuation_call_operands / ConstructedContextFrame route
+> # (core.rs:10853-10859) in DirectEmission to build the frame, THEN iota-select
+> # the statically-known operation case and bind its lowered fields directly — no
+> # FSOp carrier. Keyed STRUCTURALLY, never on ctor_551/MappingAcquireFile/FSOp/
+> # origin numbers. Full "not authorized" fence + required controls/discriminators
+> # in the event (no new claim/coordinate/slot kind; no owner transfer; no
+> # continuation/carrier form; no verify_entry_frame relaxation; MappingAllocate
+> # scalar path byte-unchanged; all D5b native/interp differentials green).
+> #
+> # STEWARD SCOPE CALL: AMEND D5b IN PLACE — do NOT cut a predecessor. Grounds:
+> # (1) the bounded bridge-widening has NO independent consumer — it exists solely
+> # to co-locate D5b's operation selection with its response ownership, and its
+> # ONLY acceptance is D5b's own native==interp COW differential, so a predecessor
+> # node would have no standalone green (the B-consumes-unbuilt-A decomposition
+> # defect) and would lengthen the priority lane's critical path for zero benefit;
+> # (2) one predicate, one differential, one reviewer set. This amendment
+> # EXPLICITLY LIFTS the frame's own "frozen wire / no new form / no bridge
+> # widening" ban FOR THIS ONE BOUNDED SHAPE ONLY (the closed-descriptor widening
+> # above), reconciling the ban with the authorization the Architect just granted —
+> # the D8m closed-descriptor comment and its exhaustive controls are UPDATED, not
+> # contradicted silently. Nothing else in the frozen-wire / no-4th-op ban relaxes.
+> # This is packaging, not design (Architect); it grows no TCB (the fence forbids
+> # it), so it is the Steward's call and needs no operator sign-off.
+> #
+> # RUNTIME: HOLDS CLEAN at b94c5ae7 (backend/COW work + offset-less prelude
+> # alignment PRESERVED) until this kick; then builds the ruled route. Candidate
+> # returns to Architect (required) + runtime-qa + CI -> Steward M1-M4 ->
+> # lieutenant. Any THIRD hard stop on this same static-operation/response-owner
+> # question returns to the Architect BEFORE a new attempt (research trigger not
+> # yet fired).
+
 > # D5b RECUT 2026-09-11 (Steward) — §1b HS#3 STRUCTURAL CLOSURE, not a point fix
 > # (Architect ruling evt_7c1adrctc3qf1, thr_7wy5wy45p7abm). D5b hit a hard stop
 > # (runtime-implementer evt_6gejx0s8665qw): the frozen §1.9 FileBacked route in
