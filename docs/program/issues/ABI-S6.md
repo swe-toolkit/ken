@@ -12,7 +12,7 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 8 — OBSERVATION-ONLY (SECOND PASS), AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 8 — OBSERVATION-ONLY (THIRD PASS), AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
 
 > # D5b native-lowering track, HARD STOP 8 — OBSERVATION-ONLY (no repair yet).
 > # Architect classification + observation ruling evt_14wxhxwwf403y
@@ -44,74 +44,87 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # adjacency, counts, origin arithmetic, `D9OperandIdentity`, SSA equality, or
 > # frame values is FORBIDDEN. NO production repair is authorized yet.
 > #
-> # SECOND-PASS CORRECTION (Architect ruling evt_1825eynb0dg24): the FIRST
-> # observation's row-UNIQUENESS premise was too strong. Its observer halted on a
-> # multiplicity (two response rows at effect origin 190) BEFORE reaching the
-> # production refusal — a DIAGNOSTIC-logic bug, NOT a production invariant and
-> # NOT hard stop 9. Effect origin is a response-CLASS coordinate and may lawfully
-> # be shared: `responses.rs::response_disposition_at_effect` classifies an effect
-> # origin existentially with `.any(...)`; `static_response_owner_specializations`
-> # requires uniqueness of each complete selected `ContinuationCallIdentity`, NOT
-> # of `effect_origin`; `define_static_response_owner_bodies` creates one owner per
-> # complete row. Row coordinate = row id + complete caller identity, never
-> # `effect_origin` alone. THE HARD-STOP COUNT STAYS 8; no Research fires; NO
-> # inventory entry 9 is appended. Useful facts already observed: the two UNIQUE
-> # rows at origins 824 and 107 are both emitted under `Predeclared(6)` with no
-> # active response owner, select response owner 0 / MappingAcquireFile, and at
-> # production time have selected-caller TRUE but disposition `None` and no
-> # direct/composed/transport/required-consumer evidence — they do not yet
-> # classify the later boundary because the third observer row pre-empted it.
+> # OBSERVATION HISTORY — TWO topology corrections, still HS8 (count firmly 8, no
+> # entry 9, no Research). PASS 1 (Architect evt_1825eynb0dg24): the observer's
+> # row-UNIQUENESS premise was too strong — it halted on a response-row
+> # multiplicity at effect origin 190 before reaching the production refusal.
+> # Effect origin is a shared response-CLASS coordinate
+> # (`responses.rs::response_disposition_at_effect` classifies existentially with
+> # `.any(...)`; `static_response_owner_specializations` requires uniqueness of the
+> # complete selected `ContinuationCallIdentity`, not `effect_origin`); the row
+> # coordinate is row id + complete caller identity. PASS 2 (Architect
+> # evt_4hzvfhvxgb2hs): corrected to candidate sets, the run genuinely reached the
+> # production refusal (16 producer headers, 19 complete candidates, no absent
+> # lookup) but emitted NO refusal row — the observer hooked only 2 of the 8 direct
+> # `boundary_transfer_admissibility` ingress sites. Both were DIAGNOSTIC-topology
+> # defects, never a new production refusal.
 > #
-> # OBSERVATION PROTOCOL — SECOND PASS (supersedes the first-pass protocol;
-> # Steward re-kicks Runtime for THIS pass only). Reapply the byte-identical
-> # nine-path attempt to clean fee133142; same unchanged positive COW witness
-> # only, under `px8-ds-test-support`, `--nocapture --test-threads=1`; NO mutation
-> # or remaining D5b control. Modify ONLY the observation logic:
+> # THE EIGHT DIRECT INGRESS SITES (exact fee133142; grep-confirmed complete
+> # population outside boundary.rs' own definition/recursive arms/tests):
+> # `core.rs::transfer_constructor_operands` + `mod.rs::transfer_into_carrier`
+> # (covered by pass 2), plus six in `lowering/aggregates.rs` blob
+> # 8d117792edd3dba424e033a6e001209fb014b2fa at lines 1060/1086/1143/1179/3983/4113
+> # — represented-boundary leaf fallback, bind-continuation unrecognized-closure
+> # fallback, bind-continuation leaf fallback, the retired-flat-order control,
+> # checked-IH captured-environment child preflight, and boundary-closure-
+> # environment child preflight. The pass-2 diff never touched aggregates.rs, so a
+> # refusal originating at an aggregate-specific preflight could not be observed.
 > #
-> # 1. At both placeholder producers, treat the lookup as a NONEMPTY CANDIDATE
-> #    SET, never a selected row. Emit one `HS8-PRODUCE` header (sequence, seat,
-> #    source origin, candidate count, current defining/response-owner fields),
-> #    then one flushed `HS8-PRODUCE-CANDIDATE` per matching row ordered by
-> #    `StaticResponseContinuationId::ordinal()`, each carrying the row id + the
-> #    full existing row/evidence fields (response owner, Vis, operation root,
-> #    effect, producer call, base owner, operation, complete opaque caller
-> #    identity, disposition, direct membership, pending-composed count,
-> #    verified-composed membership, checked-IH transport-source membership,
-> #    transport-emission count, required-consumer presence, selected-caller).
-> # 2. A ZERO candidate set emits `lookup=ABSENT` and fails closed (production
-> #    reported `Specialized`, so zero contradicts its classifier). A set of size
-> #    >1 emits EVERY candidate and does NOT select one or return an observer
-> #    error — production returns the same wordless placeholder without consulting
-> #    a row, so continuing changes only the diagnostic's premature stop.
-> # 3. At both boundary screens, recursively emit every actual root-to-deferred
-> #    path as already implemented (root/screen/parent position + every aggregate
-> #    occurrence + its planner producer). For each leaf, form the candidate set
-> #    by scanning each response row once and retaining it when
-> #    `operation_root_origin == leaf_origin` OR `effect_origin == leaf_origin`;
-> #    dedup by row id; record `matched_as={OperationRoot,Effect,Both}`. Emit one
-> #    `HS8-REFUSE` header with `join_count`, then one flushed
-> #    `HS8-REFUSE-CANDIDATE` per row-id-ordered candidate with the complete
-> #    row/evidence fields. NEVER collapse two candidates because their operation,
-> #    effect, owner, value, or counts agree.
-> # 4. Candidate-set absence or multiplicity AT THE REFUSAL is evidence, not a
-> #    reason for the observer to replace the production failure: record
-> #    `join=ABSENT` or `join=AMBIGUITY`, return `Ok(())` after all rows flush,
-> #    and let the immediately following UNMODIFIED
-> #    `boundary_transfer_admissibility` / child admissibility call emit the
-> #    original `StaticResponseDeferred` refusal. BY CONTRAST, an absent or
-> #    multiple aggregate CHILD at a claimed structural path still HALTS — without
-> #    exactly one planned child the path itself is untrustworthy.
-> # 5. The run is VALID only if the log reaches at least one `HS8-REFUSE` row and
-> #    ends at the original production message — "a deferred host response is
-> #    compiler control and can only enter its exact response owner", NOT
-> #    `D5bHs8Observation`. Report every refused leaf. A ONE-row candidate set
-> #    yields the exact joined row and selects among the five forks (below). A
-> #    MULTI-row set remains an ambiguity: report the structural path and every
-> #    full candidate, and STOP without choosing by sequence, nearest producer,
-> #    row order, common operation, owner arithmetic, origin arithmetic, counts,
-> #    `D9OperandIdentity`, SSA equality, or frame values.
+> # OBSERVATION PROTOCOL — THIRD PASS (supersedes the pass-2 protocol; Steward
+> # re-kicks Runtime for THIS bounded pass only). Reapply the byte-identical
+> # nine-path attempt (e83f1a20…) AND the final corrected producer/candidate
+> # observer (9b545637…) to clean fee133142. Run only the same unchanged positive
+> # COW witness under `px8-ds-test-support`, `--nocapture --test-threads=1`.
 > #
-> # THE FIVE FORKS the resulting boundary row(s) select among (diagnostic
+> # Add ONE test-support-only helper that returns `()` and NEVER replaces the
+> # result it observes:
+> #   fn d5b_hs8_observe_admissibility_result(&self, layer: &'static str,
+> #       site: &'static str, boundary_root_origin: Option<StaticOriginId>,
+> #       parent: Option<String>, value: &Lowered,
+> #       result: &Result<(), CraneliftBackendError>)
+> # On `Ok` it may return silently. On `Err` it emits+flushes one
+> # `HS8-ADMISSIBILITY` header (sequence, `layer={DirectGuard,EnclosingRoute}`,
+> # exact site, root origin, root lowered variant, parent identity, full error,
+> # current defining/response-owner fields), then runs the EXISTING structural
+> # path collector on the exact `value` and emits the existing row-id-ordered
+> # `HS8-REFUSE-CANDIDATE` records for every path (a header even if no path; on a
+> # collector error, stream `path=INVALID` + the error and PRESERVE the original
+> # result — observation never masks or substitutes the production error).
+> #
+> # At every direct production call OUTSIDE boundary.rs, bind the result before
+> # `?`/`return`, pass that same local by reference to the helper, then propagate
+> # unchanged. Use exactly these EIGHT direct-site labels (the complete grep
+> # population): `RepresentedBoundaryLeaf`, `BindContinuationUnrecognizedClosure`,
+> # `BindContinuationLeaf`, `RetiredFlatOrder`, `CheckedIhCapturedEnvironmentChild`,
+> # `BoundaryClosureEnvironmentChild`, `ConstructorPreAllocationChild`,
+> # `TransferIntoCarrier`. Do NOT call admissibility twice; preserve every guard +
+> # order. For the two synthesized-environment child preflights, destructure the
+> # existing `SynthesizedArgument::WorkerCaptureOperand { seat, ordinal, origin,
+> # value }` and record the exact parent (owner, seat, aggregate record id, capture
+> # ordinal, child origin) — never from vector proximity or counts.
+> #
+> # ALSO bind + observe the enclosing returned result with `layer=EnclosingRoute`
+> # at the three origin-bearing represented routes:
+> # `transfer_bind_continuation_boundary_value` (its `origin`),
+> # `transfer_represented_boundary_value` (its `origin`), and
+> # `transfer_constructor_operands`' represented-child branch (planner-derived child
+> # origin + exact parent constructor/argument position). These supply the
+> # structural root-to-leaf origin when an internal leaf fallback has `origin=None`;
+> # they observe the same returned `Result` and add/suppress/retry/reinterpret
+> # nothing.
+> #
+> # VALID only if the run ends at the original production message ("a deferred host
+> # response is compiler control and can only enter its exact response owner") AND
+> # has at least one `HS8-ADMISSIBILITY` error row whose `result` contains that
+> # exact `StaticResponseDeferred` refusal. Report ALL error rows. A direct row
+> # identifies the exact guard ingress; its enclosing-route row (or synthesized-
+> # environment parent row) must structurally recover each deferred leaf and JOIN
+> # it to the complete response candidate set at refusal time. If an internal
+> # fallback has `origin=None`, do NOT fill it from the nearest producer — use only
+> # the enclosing origin-bearing route. Multiple candidates remain an AMBIGUITY,
+> # all reported; no first/last/nearest selection.
+> #
+> # THE FIVE FORKS the result-bound refused leaf selects among (diagnostic
 > # outcomes, NOT pre-authorized repairs): (1) `DirectCall` caller with a
 > # different/absent actual owner = an existing call-funnel/retarget bypass;
 > # (2) exact `InlineNoCall` caller = response-owner classification and inline
@@ -121,25 +134,26 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # producer/classifier is wrong; (5) a placeholder produced while already inside
 > # its exact response owner = the producer's owner guard is wrong.
 > #
-> # FENCES: no new active-call stack, carrier, tag, owner selector, row field, or
-> # planner authority; the existing aggregate reverse observation accessor stays
-> # read-only/test-support-private. No change to `response_disposition_at_effect`,
-> # either placeholder producer, `boundary_transfer_admissibility`, either inert
-> # call-slot case, response owner selection/body, caller retargeting, continuation
-> # settlement, required-consumer realization, carriers, ABI/wire/runtime tags,
-> # generated native code, source semantics, stack behavior, or TCB. Do NOT run
-> # the HS6 inside-inner mutation or the remaining D5b controls. Preserve the full
-> # streamed log + observation-only diff with SHA-256, then restore the attempt +
-> # all observation edits byte-clean at fee133142; `Cargo.lock` unchanged. This is
-> # an observation-only pass — NO TCB delta, NO ban-lift => Steward amend-in-place,
-> # no operator sign-off (as at HS2–HS7).
+> # FENCES: no active-call stack, TLS context, backtrace, `track_caller`, new
+> # planner/row field, carrier, tag, owner selector, or production accessor — the
+> # helper observes the exact local `Result` already returned by each call. No
+> # change to either placeholder producer, response classification,
+> # `boundary_transfer_admissibility`, represented/bind semantics, aggregate
+> # allocation, owner selection/body, caller retargeting, continuation settlement,
+> # required-consumer realization, the inert call-slot cases, ABI/wire/runtime
+> # tags, generated native code, source semantics, stack behavior, or TCB. No
+> # mutations or remaining D5b controls. Preserve the complete streamed log, the
+> # exact call-site census, and the observation-only diff with SHA-256, then
+> # restore the attempt + every observation edit byte-clean at fee133142;
+> # `Cargo.lock` unchanged. Observation-only — NO TCB delta, NO ban-lift => Steward
+> # amend-in-place, no operator sign-off (as at HS2–HS7).
 > #
 > # Durable: Architect inventory entry 8 committed d8879411 (issue blob 2984805f),
-> # recorded below; this correction adds NO entry 9 (Architect ruling). Stop count
-> # is FIRMLY 8; no §1a Research trigger — the next mechanical trigger is stop 9,
-> # not reached. Runtime STAYS byte-clean at fee133142 until the Steward's explicit
-> # second observation-only re-kick; the boundary row(s) return to the Architect
-> # for the HS8 ruling.
+> # recorded below; the pass-1/2/3 corrections add NO entry 9 (Architect rulings).
+> # Stop count is FIRMLY 8; no §1a Research trigger — a real stop 9 is not reached.
+> # Runtime STAYS byte-clean at fee133142 until the Steward's explicit third
+> # observation-only re-kick; the result-bound refused leaf + final candidate/
+> # evidence vector return to the Architect for the HS8 production ruling.
 
 # D5b NATIVE HARD-STOP 7 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward).
 
