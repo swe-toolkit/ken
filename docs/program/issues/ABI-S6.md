@@ -12,7 +12,95 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 4 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 5 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 5 — CLOSED. Architect fork-1 repair
+> # ruling evt_6j9g88qtwhfrr (thr_7wy5wy45p7abm), grounded at byte-clean
+> # 90df55be. The HS4 whole-tuple preservation WORKS for the dynamic edge, but
+> # copying the non-root parent tuple INTO the selected frame-0 layer left it
+> # OCCUPIED by parent invocation 1 when instantiate_checked_invocation_segment
+> # had to qualify the call's expected frame-0 sequence for child invocation 2:
+> # it instantiated no child frame and refused expected={0} instantiated={}
+> # (evt_5246mrbnxprdb). The diagnostic (runtime-implementer evt_2hsw9q6sr14v0)
+> # established FORK 1: the exact OwnedSelectedScope parent is NOT available at
+> # make_computational_recursor (second-layer construction, core.rs:14531), so
+> # HS4's whole-tuple transport there is NECESSARY — but the same scope IS
+> # independently owned at the source mint (source.rs:4882) and stays live
+> # through the caller of installation. No new stored carrier is justified. Same
+> # D5b chain, count 5, a DISTINCT role-collision at the mint/compose boundary;
+> # does NOT change the HS3 or HS4 rulings. NO §1a research until stop 6 — but a
+> # SIXTH structural refusal MECHANICALLY triggers Research (Architect owns the
+> # count).
+> #
+> # ARCHITECT RULED FIX (full mechanism in evt_6j9g88qtwhfrr): the frame-0 tuple
+> # has SUCCESSIVE roles — make_computational_recursor transports parent
+> # invocation 1; then, BEFORE source mint, OwnedSelectedScope takes over parent
+> # authority and the selected layer becomes unqualified frame 0; mint writes
+> # parent 1 into the existing DynamicSpliceEdge and instantiation qualifies the
+> # layer as child 2. KEEP the HS4 checked_tuple() projection and the
+> # make_computational_recursor(..., checked: CheckedComputationalFrame, ...)
+> # signature and its initial non-root copy. REPLACE the inline closed match with
+> # ONE private classifier CheckedComputationalFrame::nonroot_invocation() reused
+> # at every seat; add the identical checked_tuple() to
+> # ComputationalRecursorFramePayload; expose nothing wider from
+> # OwnedSelectedScope. ATOMIC TRANSFER at mint: change only the private signature
+> # mint_checked_computational_ih_instance(..., source_open_parent:
+> # Option<&OwnedSelectedScope>) — the two core.rs recursor-as-callee sites and
+> # finish_checked_computational_ih_marker pass None, only source_call_state
+> # passes control.selected.selected_scope; transfer the parent BEFORE mint while
+> # both exact representations are present and compared, then clear the three
+> # invocation fields in the selected layer (NEVER clear after mint); a non-root
+> # mismatch REFUSES, never falls back; a source root takes the unchanged
+> # existing-parent arm. TRANSIENT source parent at compose: keep
+> # validate_source_dynamic_splice_parent UNCHANGED; after it succeeds thread a
+> # new final private external_source_parent: Option<CheckedComputationalFrame>
+> # through all three source calls to install_recursor_invocation then
+> # compose_oriented_subcontinuation (other callers/tests pass None); key
+> # external_children by (parent_invocation_id, parent_frame_id), admit an absent
+> # nonzero parent only when its exact key equals external_source_parent, every
+> # other absent nonzero parent keeps "stale parent invocation". Add NO field to
+> # any segment/layer/edge/plan/continuation. NO planner / plan schema /
+> # continuation kind / ABI slot / carrier / runtime tag / surface / wire / owner
+> # / TCB change.
+> #
+> # SUPERSEDES TWO HS4 ELEMENTS (edited in place below, not left contradictory):
+> # (1) HS4's "non-root tuple copied byte-for-value and LEFT in the selected
+> # layer" (persistent parent occupancy) is replaced by transfer-BEFORE-mint then
+> # clear-the-three-fields — the occupancy was the HS5 cause. (2) HS4's
+> # feature-gated ambient-at-make mutation control is RETIRED (it attacks a
+> # boundary this repair retires and proves neither surviving authority edge),
+> # replaced by three HS5 mutations: RetainParentInChildLayer (restores HS5
+> # expected={0} instantiated={}), DropSourceParentAtMint (restores the HS4
+> # source-open-parent refusal), DropSourceParentAtCompose (restores "stale
+> # parent invocation" after child instantiation).
+> #
+> # STEWARD SCOPE CALL (Architect-directed): AMEND D5b IN PLACE, no predecessor —
+> # one transient edge between the existing D8m tuple, the source-open validator,
+> # and the composer, with no independent user-visible deliverable or standalone
+> # acceptance beyond D5b (B-consumes-unbuilt-A). NO FURTHER BAN-LIFT
+> # (Architect-confirmed; HS2/HS3/HS4 stand). Grows NO TCB (adds no stored form,
+> # planner claim, continuation kind, ABI, wire, surface, runtime tag, owner, or
+> # TCB entry), so it is the Steward's call and needs no operator sign-off. The
+> # Architect's current-main symptom inventory (its commit 4c352d41, based on
+> # 96200df25) is INCORPORATED as entries 5 in the symptom-inventory section
+> # below.
+> #
+> # RUNTIME: HOLDS CLEAN at 90df55be until THIS amendment LANDS; runtime-leader
+> # then explicitly re-kicks the fork-1 repair. Candidate returns to Architect
+> # (REQUIRED reviewer) + runtime-qa + CI -> Steward M1-M4 -> lieutenant. A SIXTH
+> # structural refusal stops AGAIN (preserve the attempt, revert byte-clean, do
+> # not solve ahead) and mechanically triggers §1a Research. Architect controls:
+> # positive COW — edge-2 parent == edge-1 child, frame 0 instantiated under
+> # edge-2's child, the external parent key matches exactly one edge (assert
+> # RELATIONS, not absolute ids); the three mutations above each apply exactly
+> # once; a direct compose pair accepts a child-only segment with a matching
+> # non-root external tuple and refuses on a changed external invocation/frame;
+> # the HS3 duplicate-worker + missing-context controls stay independently
+> # reaching; all frame/source-parent, D8m/order/population/edge/origin/ownership/
+> # lifetime controls stay red; MappingAllocate byte-for-behaviour unchanged and
+> # avoids the new non-root transport case.
+
+# D5b NATIVE HARD-STOP 4 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward).
 
 > # D5b native-lowering track, HARD STOP 4 — CLOSED. Architect fork-B repair
 > # ruling evt_2c6snkcgb7bnf (thr_7wy5wy45p7abm), grounded at rebased clean
@@ -36,7 +124,9 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # `checked: CheckedComputationalFrame` (replacing the scalar frame_id);
 > # classify the tuple with a CLOSED match (two root spellings normalize to the
 > # unqualified selected-layer state, a non-root tuple is copied byte-for-value,
-> # a malformed combination refuses) consulting NO ambient state; update all 4
+> # a malformed combination refuses) consulting NO ambient state [SUPERSEDED BY
+> # HS5 (persistent parent occupancy): the make-time copy is retained but the
+> # selected layer is CLEARED before mint — see the HS5 banner]; update all 4
 > # (and only 4) callers to pass `.checked_tuple()`. segment_checked_invocation
 > # stays semantically unchanged — it qualifies the segment being installed, NOT
 > # the selected layer's dynamic parent (conflating those two roles caused HS4).
@@ -61,7 +151,10 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # not solve ahead). Architect controls: the COW path forms 2 checked-IH edges
 > # root -> inv1 -> inv2 (assert the RELATION, not absolute ids); a feature-gated
 > # make_computational_recursor mutation restoring the ambient-derived tuple
-> # reproduces the HS4 refusal exactly once; the cross-check test refuses on a
+> # reproduces the HS4 refusal exactly once [SUPERSEDED BY HS5: this control is
+> # RETIRED — it attacks a boundary the HS5 repair retires; replaced by the three
+> # HS5 mutations RetainParentInChildLayer / DropSourceParentAtMint /
+> # DropSourceParentAtCompose]; the cross-check test refuses on a
 > # changed checked_invocation_id; the HS3 duplicate-worker + missing-context
 > # controls stay independently reaching; all D8m tuple-withdrawal / occurrence /
 > # dynamic-edge sibling / origin / body / header / membership / ownership /
@@ -156,6 +249,11 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
    `ComputationalRecursorLayer` from an empty ambient invocation stack as root
    instance 0. Child instance and parent frame still agreed; only the dynamic
    parent invocation disagreed (`evt_49ycrt545sjh4`).
+5. Copying that parent tuple into the selected layer repaired the dynamic edge,
+   but the same frame-0 layer then remained occupied by parent invocation 1 when
+   `instantiate_checked_invocation_segment` had to qualify the call's expected
+   frame-0 sequence for child invocation 2. It instantiated no child frame and
+   refused `expected={0} instantiated={}` (`evt_5246mrbnxprdb`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
@@ -164,6 +262,11 @@ worker-capture, and context-capture partition. Entry 4 is downstream of that
 boundary but is a distinct existing dynamic-splice transport invariant: a
 selected recursor layer must preserve the source computational frame's whole
 checked tuple rather than re-derive any member from ambient state.
+
+Entry 5 refines entry 4 rather than reversing its measured fact: the parent
+identity must survive long enough to mint the edge, but placing it in the child
+layer conflates two roles. Parent-edge provenance and child-frame qualification
+must have separate existing authorities; one invocation scalar cannot name both.
 
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
