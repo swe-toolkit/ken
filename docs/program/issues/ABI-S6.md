@@ -353,6 +353,10 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
    advanced past both checked-frame-sequence and stale-parent refusals, the
    unmutated native COW witness overflowed its thread stack before returning an
    observable result (`evt_5ss07dc2h1wy0`).
+7. After frame isolation removed the physical overflow, a planner-projected
+   causal edge remained residual at the detached-result seat while that unit's
+   lowered result was not the specialized producer constructor the existing
+   five-guard contract requires (`evt_1rn0v625yq2m6`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
