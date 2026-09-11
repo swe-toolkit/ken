@@ -272,11 +272,16 @@ identity must survive long enough to mint the edge, but placing it in the child
 layer conflates two roles. Parent-edge provenance and child-frame qualification
 must have separate existing authorities; one invocation scalar cannot name both.
 
-Entry 6 does not presently share that predicate. A stack overflow in the
-in-process test thread carries no ancestry, resume, or progress coordinate. It
-joins entries 4–5 only if an active-ancestry trace shows the source-open parent
-boundary targeting a descendant or replaying the child; otherwise it is an
-independent compiler-progress or physical-stack result.
+Entry 6 does not share that predicate. The complete observation trace
+classified it as finite, progressing lowering with physical stack accumulation.
+The first active signature repeat was the source match's synthesized default,
+which deliberately reuses the match occurrence's origin and returned through
+both matching exits. The aborting ancestry instead changed origins on every
+source descent and contained no active signature repeat. The selected parent
+scope stayed stable; it neither targeted a descendant nor replayed a child.
+The compiler's large source-machine inner frame remained live across each
+recursive branch descent, independently of the entry 4–5 parent-provenance and
+child-qualification role split (`evt_6x3kmb11454z2`).
 
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
