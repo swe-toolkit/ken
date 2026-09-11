@@ -254,6 +254,10 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
    `instantiate_checked_invocation_segment` had to qualify the call's expected
    frame-0 sequence for child invocation 2. It instantiated no child frame and
    refused `expected={0} instantiated={}` (`evt_5246mrbnxprdb`).
+6. After the exact pre-mint role transfer and transient source-parent authority
+   advanced past both checked-frame-sequence and stale-parent refusals, the
+   unmutated native COW witness overflowed its thread stack before returning an
+   observable result (`evt_5ss07dc2h1wy0`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
