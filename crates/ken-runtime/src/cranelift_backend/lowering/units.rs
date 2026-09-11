@@ -6107,6 +6107,8 @@ pub(super) struct ContinuationCandidateLedger {
     /// writer of each variant.
     settled: BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
     transport_candidates: BTreeSet<ContinuationCallIdentity>,
+    immediate_bridge_candidates: BTreeSet<ContinuationCallIdentity>,
+    immediate_bridge_reached: BTreeSet<ContinuationCallIdentity>,
 }
 
 impl ContinuationCandidateLedger {
@@ -6139,10 +6141,27 @@ impl ContinuationCandidateLedger {
             .intersection(&candidates)
             .cloned()
             .collect();
+        let immediate_bridge_rows = plan.immediate_bridge_realization_identities();
+        if !immediate_bridge_rows.is_subset(&candidates) {
+            return Err(backend_module(
+                "an immediate-bridge realization names an identity outside the ordinary candidate population"
+                    .to_string(),
+            ));
+        }
+        // A bridge+transport identity remains Specialized: the transport emits
+        // its verified physical owner call and may bypass the inline lowering
+        // seat. Only the non-transport intersection is required to realize the
+        // owner-less bridge in this artifact.
+        let immediate_bridge_candidates = immediate_bridge_rows
+            .difference(&transport_candidates)
+            .cloned()
+            .collect();
         Ok(Self {
             candidates,
             settled: BTreeMap::new(),
             transport_candidates,
+            immediate_bridge_candidates,
+            immediate_bridge_reached: BTreeSet::new(),
         })
     }
 
@@ -6178,6 +6197,34 @@ impl ContinuationCandidateLedger {
         self.settled.contains_key(identity)
     }
 
+    pub(super) fn disposition(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<CandidateDisposition> {
+        self.settled.get(identity).copied()
+    }
+
+    pub(super) fn mark_immediate_bridge_reached(
+        &mut self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.immediate_bridge_candidates.contains(identity) {
+            if self.transport_candidates.contains(identity) {
+                return Ok(());
+            }
+            return Err(backend_module(
+                "lowering reached an immediate bridge absent from the plan-owned relation"
+                    .to_string(),
+            ));
+        }
+        if !self.immediate_bridge_reached.insert(identity.clone()) {
+            return Err(backend_module(
+                "one plan-owned immediate bridge realization was reached twice".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D2` — totality first, then the
     /// derived call-obligation subset. The ORDER is the mechanism.**
     ///
@@ -6197,6 +6244,28 @@ impl ContinuationCandidateLedger {
     /// success path, so plan-only rows and `Err` compilations are absent **by
     /// construction** rather than removed after the fact.
     fn close(mut self) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        if self.immediate_bridge_reached != self.immediate_bridge_candidates {
+            let missing = self
+                .immediate_bridge_candidates
+                .difference(&self.immediate_bridge_reached)
+                .collect::<Vec<_>>();
+            let surplus = self
+                .immediate_bridge_reached
+                .difference(&self.immediate_bridge_candidates)
+                .collect::<Vec<_>>();
+            return Err(backend_module(format!(
+                "the plan-owned immediate bridge population was not reached exactly once: \
+                 missing={missing:?}, surplus={surplus:?}"
+            )));
+        }
+        for identity in &self.immediate_bridge_candidates {
+            if self.settled.get(identity) != Some(&CandidateDisposition::InlineNoCall) {
+                return Err(backend_module(
+                    "a reached immediate bridge did not settle its exact identity InlineNoCall"
+                        .to_string(),
+                ));
+            }
+        }
         for identity in &self.transport_candidates {
             self.settled
                 .entry(identity.clone())

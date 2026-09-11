@@ -171,6 +171,51 @@ enum SourceCallOutcome<'a> {
     Complete(LoweringOperand),
 }
 
+/// A transient exit from the large source-machine frame. Recursive source
+/// descent is dispatched only after the inner frame has returned.
+enum SourceMachineExit<'a> {
+    Complete(LoweringOperand),
+    Reenter {
+        expr: OwnedSourceOccurrence,
+        env: Vec<LoweringEnvironmentBinding>,
+        control: SourceControl<'a>,
+    },
+    DynamicMatch(SourceDynamicMatchRequest<'a>),
+}
+
+/// The exact arguments already selected by the source machine for one dynamic
+/// match. This request is compiler-private and exists only across the inner
+/// frame-pop boundary.
+struct SourceDynamicMatchRequest<'a> {
+    scrutinee: SourceDynamicMatchScrutinee,
+    cases: Vec<crate::RuntimeMatchCase>,
+    default: RuntimeTrap,
+    static_origin: StaticOriginId,
+    env: Vec<LoweringEnvironmentBinding>,
+    control: SourceControl<'a>,
+}
+
+/// Closed dynamic-match dispatch selected before leaving the source machine.
+enum SourceDynamicMatchScrutinee {
+    BoundedNat {
+        value: BoundedNatV1,
+        structural: bool,
+    },
+    Bool {
+        condition: cranelift_codegen::ir::Value,
+        true_case_index: usize,
+        false_case_index: usize,
+    },
+    HostResult {
+        success: cranelift_codegen::ir::Value,
+        error: Lowered,
+        ok: Lowered,
+        err_constructor: String,
+        ok_constructor: String,
+    },
+    DynamicConstructor(DynamicConstructorV1),
+    Carried(CarriedBoundaryWord),
+}
 
 /// `RT-CONTSRC-PRODUCER-LOCAL` `AC-1` -- the source-carried CONTROL mutation
 /// family, for the activation-gate controls of families 5 and 2a.
@@ -759,7 +804,18 @@ impl<'a> Lowering<'a> {
             .live_source_continuations
             .checked_add(1)
             .expect("compiler-private live source-continuation depth exhausted");
-        let result = self.lower_source_machine_with_continuation_inner(builder, expr, env, control);
+        let result = match self
+            .lower_source_machine_with_continuation_inner(builder, expr, env, control)
+        {
+            Ok(SourceMachineExit::Complete(value)) => Ok(value),
+            Ok(SourceMachineExit::Reenter { expr, env, control }) => {
+                self.lower_source_machine_with_continuation(builder, expr, env, control)
+            }
+            Ok(SourceMachineExit::DynamicMatch(request)) => {
+                self.lower_source_dynamic_match_request(builder, request)
+            }
+            Err(error) => Err(error),
+        };
         self.live_source_continuations = self
             .live_source_continuations
             .checked_sub(1)
@@ -768,13 +824,14 @@ impl<'a> Lowering<'a> {
         result
     }
 
+    #[inline(never)]
     fn lower_source_machine_with_continuation_inner<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         expr: OwnedSourceOccurrence,
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
+    ) -> Result<SourceMachineExit<'b>, CraneliftBackendError> {
         let mut state = SourceMachineState::Eval { expr, env, control };
         loop {
             state = match state {
@@ -1294,7 +1351,7 @@ impl<'a> Lowering<'a> {
                     }
                     match control.continuation {
                         SourceContinuation::Terminal(SourceContinuationTerminal::ReturnValue) => {
-                            return Ok(value);
+                            return Ok(SourceMachineExit::Complete(value));
                         }
                         SourceContinuation::Terminal(
                             SourceContinuationTerminal::ReturnToProducerHole {
@@ -1316,7 +1373,7 @@ impl<'a> Lowering<'a> {
                                 ));
                             }
                             if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
-                                return Ok(value);
+                                return Ok(SourceMachineExit::Complete(value));
                             }
                             source_active_cursor(
                                 &control.selected,
@@ -1359,9 +1416,11 @@ impl<'a> Lowering<'a> {
                             }
                             self.restore_root_terminal_authority(root_authority, expected)?;
                             if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
-                                return Ok(value);
+                                return Ok(SourceMachineExit::Complete(value));
                             }
-                            return self.resume_active_continuation(builder, value, *active);
+                            return self
+                                .resume_active_continuation(builder, value, *active)
+                                .map(SourceMachineExit::Complete);
                         }
                         SourceContinuation::Terminal(SourceContinuationTerminal::JumpToJoin(
                             edge,
@@ -1369,7 +1428,9 @@ impl<'a> Lowering<'a> {
                             if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
                                 let failure = builder.ins().iconst(types::I64, -4);
                                 builder.ins().return_(&[failure]);
-                                return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+                                return Ok(SourceMachineExit::Complete(
+                                    LoweringOperand::Specialized(Lowered::RecursiveBackedge),
+                                ));
                             }
                             let value = if edge.target.terminal_active_prefix.is_empty() {
                                 value
@@ -1422,7 +1483,9 @@ impl<'a> Lowering<'a> {
                                         .jump(edge.target.block, &[word.word.into()]);
                                 }
                             }
-                            return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+                            return Ok(SourceMachineExit::Complete(
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge),
+                            ));
                         }
                         SourceContinuation::LetBody { body, env, next } => {
                             control.continuation = *next;
@@ -1827,28 +1890,36 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             };
                             match value {
                                 LoweringOperand::Specialized(Lowered::BoundedNat(nat)) => {
-                                    return self.lower_source_bounded_nat_match(
-                                        builder,
-                                        nat,
-                                        false,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::BoundedNat {
+                                                value: nat,
+                                                structural: false,
+                                            },
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::StructuralNat(nat)) => {
-                                    return self.lower_source_bounded_nat_match(
-                                        builder,
-                                        BoundedNatV1::derived_from_validated(nat.value),
-                                        true,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::BoundedNat {
+                                                value: BoundedNatV1::derived_from_validated(
+                                                    nat.value,
+                                                ),
+                                                structural: true,
+                                            },
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::Bool { value, known }) => {
                                     let true_case = cases.iter().enumerate().find(|(_, case)| {
@@ -1884,27 +1955,22 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                             control,
                                         }
                                     } else {
-                                        let (true_index, true_case) = true_case;
-                                        let (false_index, false_case) = false_case;
-                                        let true_body = self.case_body_occurrence(
-                                            static_origin,
-                                            true_index,
-                                            &true_case.body,
-                                        )?;
-                                        let false_body = self.case_body_occurrence(
-                                            static_origin,
-                                            false_index,
-                                            &false_case.body,
-                                        )?;
-                                        return self.lower_source_dynamic_bool_match(
-                                            builder,
-                                            value,
-                                            true_body,
-                                            false_body,
-                                            static_origin,
-                                            &env,
-                                            control,
-                                        );
+                                        let (true_case_index, _) = true_case;
+                                        let (false_case_index, _) = false_case;
+                                        return Ok(SourceMachineExit::DynamicMatch(
+                                            SourceDynamicMatchRequest {
+                                                scrutinee: SourceDynamicMatchScrutinee::Bool {
+                                                    condition: value,
+                                                    true_case_index,
+                                                    false_case_index,
+                                                },
+                                                cases,
+                                                default,
+                                                static_origin,
+                                                env,
+                                                control,
+                                            },
+                                        ));
                                     }
                                 }
                                 LoweringOperand::Specialized(Lowered::HostResult {
@@ -1914,30 +1980,37 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     err_constructor,
                                     ok_constructor,
                                 }) => {
-                                    return self.lower_source_dynamic_host_result_match(
-                                        builder,
-                                        success,
-                                        *error,
-                                        *ok,
-                                        &err_constructor,
-                                        &ok_constructor,
-                                        &cases,
-                                        default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::HostResult {
+                                                success,
+                                                error: *error,
+                                                ok: *ok,
+                                                err_constructor,
+                                                ok_constructor,
+                                            },
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) => {
-                                    return self.lower_source_dynamic_constructor_match(
-                                        builder,
-                                        dynamic,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee:
+                                                SourceDynamicMatchScrutinee::DynamicConstructor(
+                                                    dynamic,
+                                                ),
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::Constructor {
                                     constructor,
@@ -1953,7 +2026,9 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                             static_origin,
                                             None,
                                         )?;
-                                        return Ok(LoweringOperand::Specialized(Lowered::Trap(default)));
+                                        return Ok(SourceMachineExit::Complete(
+                                            LoweringOperand::Specialized(Lowered::Trap(default)),
+                                        ));
                                     };
                                     self.disposition_statically_unselected_match_cases(
                                         static_origin,
@@ -2026,15 +2101,16 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     ) {
                                         return Err(refusal);
                                     }
-                                    return self.lower_source_carried_match(
-                                        builder,
-                                        word,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::Carried(word),
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(_) => {
                                     #[cfg(any(
@@ -2320,7 +2396,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             trap: default.clone(),
                                         },
                                     );
-                                    return Ok(LoweringOperand::Specialized(Lowered::Trap(default)));
+                                    return Ok(SourceMachineExit::Complete(
+                                        LoweringOperand::Specialized(Lowered::Trap(default)),
+                                    ));
                                 };
                                 #[cfg(test)]
                                 px8tr_record_trap_provenance(
@@ -2342,12 +2420,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     return_index,
                                     return_case.body.clone(),
                                 )?;
-                                return self.lower_source_machine_with_continuation(
-                                    builder,
-                                    body,
-                                    case_env,
+                                return Ok(SourceMachineExit::Reenter {
+                                    expr: body,
+                                    env: case_env,
                                     control,
-                                );
+                                });
                             } else {
                                 if !matches!(&value, LoweringOperand::Specialized(Lowered::Constructor { .. })) {
                                     return Err(unsupported(
@@ -2373,7 +2450,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         },
                                     );
                                 }
-                                return Ok(LoweringOperand::Specialized(Lowered::Trap(default)));
+                                return Ok(SourceMachineExit::Complete(
+                                    LoweringOperand::Specialized(Lowered::Trap(default)),
+                                ));
                             };
                             let LoweringOperand::Specialized(Lowered::Constructor { args, .. }) = value else {
                                 unreachable!("a selected source case has a constructor value")
@@ -2473,7 +2552,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         env.clone(),
                                         static_origin,
                                         provenance,
-                                        frame.checked_frame_id,
+                                        frame.checked_tuple(),
                                         slot_template_id,
                                         producer_origin,
                                         position,
@@ -2503,7 +2582,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 retained.specialized_ref_at("an eliminator frame's scrutinee")?,
                             )? {
                                 Ok(frame_env) => frame_env,
-                                Err(trap) => return Ok(LoweringOperand::Specialized(Lowered::Trap(trap))),
+                                Err(trap) => {
+                                    return Ok(SourceMachineExit::Complete(
+                                        LoweringOperand::Specialized(Lowered::Trap(trap)),
+                                    ));
+                                }
                             };
                             let mut case_env = induction_hypotheses;
                             #[cfg(test)]
@@ -2597,7 +2680,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     control,
                                 )? {
                                     SourceCallOutcome::Continue(state) => state,
-                                    SourceCallOutcome::Complete(value) => return Ok(value),
+                                    SourceCallOutcome::Complete(value) => {
+                                        return Ok(SourceMachineExit::Complete(value));
+                                    }
                                 }
                             } else {
                                 let first = args.remove(0);
@@ -2719,7 +2804,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         .source_call_state(builder, callee, lowered, env, control)?
                                     {
                                         SourceCallOutcome::Continue(state) => state,
-                                        SourceCallOutcome::Complete(value) => return Ok(value),
+                                        SourceCallOutcome::Complete(value) => {
+                                            return Ok(SourceMachineExit::Complete(value));
+                                        }
                                     },
                                 }
                             } else {
@@ -2748,6 +2835,104 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     }
                 }
             };
+        }
+    }
+
+    #[inline(never)]
+    fn lower_source_dynamic_match_request<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        request: SourceDynamicMatchRequest<'b>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let SourceDynamicMatchRequest {
+            scrutinee,
+            cases,
+            default,
+            static_origin,
+            env,
+            control,
+        } = request;
+        match scrutinee {
+            SourceDynamicMatchScrutinee::BoundedNat { value, structural } => self
+                .lower_source_bounded_nat_match(
+                    builder,
+                    value,
+                    structural,
+                    &cases,
+                    &default,
+                    static_origin,
+                    &env,
+                    control,
+                ),
+            SourceDynamicMatchScrutinee::Bool {
+                condition,
+                true_case_index,
+                false_case_index,
+            } => {
+                let true_case = cases.get(true_case_index).ok_or_else(|| {
+                    unsupported("Match", "transported Bool True case index is out of bounds")
+                })?;
+                let false_case = cases.get(false_case_index).ok_or_else(|| {
+                    unsupported("Match", "transported Bool False case index is out of bounds")
+                })?;
+                let true_body = self.case_body_occurrence(
+                    static_origin,
+                    true_case_index,
+                    &true_case.body,
+                )?;
+                let false_body = self.case_body_occurrence(
+                    static_origin,
+                    false_case_index,
+                    &false_case.body,
+                )?;
+                self.lower_source_dynamic_bool_match(
+                    builder,
+                    condition,
+                    true_body,
+                    false_body,
+                    static_origin,
+                    &env,
+                    control,
+                )
+            }
+            SourceDynamicMatchScrutinee::HostResult {
+                success,
+                error,
+                ok,
+                err_constructor,
+                ok_constructor,
+            } => self.lower_source_dynamic_host_result_match(
+                builder,
+                success,
+                error,
+                ok,
+                &err_constructor,
+                &ok_constructor,
+                &cases,
+                default,
+                static_origin,
+                &env,
+                control,
+            ),
+            SourceDynamicMatchScrutinee::DynamicConstructor(dynamic) => self
+                .lower_source_dynamic_constructor_match(
+                    builder,
+                    dynamic,
+                    &cases,
+                    &default,
+                    static_origin,
+                    &env,
+                    control,
+                ),
+            SourceDynamicMatchScrutinee::Carried(word) => self.lower_source_carried_match(
+                builder,
+                word,
+                &cases,
+                &default,
+                static_origin,
+                &env,
+                control,
+            ),
         }
     }
 
@@ -4878,8 +5063,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         control,
                     }));
                 }
-                let checked_ih_invocation =
-                    self.mint_checked_computational_ih_instance(&mut recursor)?;
+                let checked_ih_invocation = self.mint_checked_computational_ih_instance(
+                    &mut recursor,
+                    control.selected.selected_scope.as_ref(),
+                )?;
+                let mut external_source_parent = None;
                 if let Some(CheckedRecursiveInvocationInstance {
                     source: InvocationTemplateRef::ComputationalIHCall(call_template_id),
                     ..
@@ -4909,6 +5097,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         checked_ih_invocation.expect("matched checked IH invocation"),
                         open,
                     )?;
+                    external_source_parent = Some(open.frame.checked_tuple());
                     if call.parent_frame_template_id != open.frame.checked_frame_id
                         || call.parent_segment_site_id
                             != open.frame.checked_frame_id.and_then(|frame_id| {
@@ -4920,6 +5109,14 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             "checked IH invocation parent edge does not match the active open occurrence",
                         ));
                     }
+                }
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                if external_source_parent.is_some()
+                    && d5b_hs5_source_parent_mutation()
+                        == D5bHs5SourceParentMutation::DropSourceParentAtCompose
+                {
+                    d5b_hs5_record_mutation_application();
+                    external_source_parent = None;
                 }
                 let (base, boundary) =
                     decompose_computational_recursor(LoweringOperand::Specialized(recursor));
@@ -4974,6 +5171,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         activation,
                         invocation,
                         checked_ih_invocation,
+                        external_source_parent,
                     )?;
                     #[cfg(test)]
                     d5a_trace(format!(
@@ -4991,7 +5189,7 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                         let value = self.call_declared_recursive_position_unit(
                             builder,
                             body,
-                            &args,
+                            args,
                             Some(coordinates),
                         )?;
                         #[cfg(test)]
@@ -5033,6 +5231,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         activation,
                         invocation,
                         checked_ih_invocation,
+                        external_source_parent,
                     )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
                         value: RoutedAnswer::direct(LoweringOperand::Specialized(
@@ -5053,39 +5252,27 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                             "recursive constructor field is not a closure",
                         ));
                     };
-                    if params.len() != args.len() {
-                        return Err(unsupported(
-                            "ComputationalMatch",
-                            format!(
-                                "recursive field expects {} args but call provides {}",
-                                params.len(),
-                                args.len()
-                            ),
-                        ));
-                    }
-                    // Two roles, as elsewhere on this path: ordered unit-call
-                    // inputs, or an environment prefix. Only the second binds.
-                    // ⚠ The ARGUMENTS cross here; the CAPTURES do not, and that
-                    // is a stated boundary rather than an oversight. A capture
-                    // arrives inside an already-lowered `Lowered::Closure`, so
-                    // a specialized one still reaches
-                    // `call_declared_unit_target`'s fallback — where, since it
-                    // carries its own producer certificate, it authorizes
-                    // itself.
-                    let mut call_inputs = self.carry_source_call_inputs(builder, body, args)?;
-                    call_inputs.extend(captures);
+                    // The source-machine route lowers the application arguments
+                    // under its own control, then presents arguments and the
+                    // selected closure's captures separately. The private
+                    // recursive-call sum records that this is a complete direct
+                    // worker run; no consumer may rediscover that fact by length.
+                    let arguments = self.carry_source_call_inputs(builder, body, args)?;
                     let mut suspended = armed.suspended;
                     suspended.continuation = self.install_recursor_invocation(
                         suspended.continuation,
                         activation,
                         invocation,
                         checked_ih_invocation,
+                        external_source_parent,
                     )?;
                     let coordinates = carried_coordinates;
-                    let value = self.call_declared_recursive_position_unit(
+                    let value = self.call_declared_recursive_position_closure_unit(
                         builder,
                         body,
-                        &call_inputs,
+                        &params,
+                        arguments,
+                        captures,
                         Some(coordinates),
                     )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
@@ -5419,6 +5606,7 @@ impl<'a> Lowering<'a> {
         activation: ContinuationActivationId,
         invocation: RecursorInvocationSegment,
         checked_ih_invocation: Option<CheckedRecursiveInvocationInstance>,
+        external_source_parent: Option<CheckedComputationalFrame>,
     ) -> Result<SourceContinuation<'b>, CraneliftBackendError> {
         if !recursor_invocation_is_checked(&invocation) {
             validate_recursor_invocation_install_shape(&invocation)?;
@@ -5450,6 +5638,7 @@ impl<'a> Lowering<'a> {
             activation,
             invocation,
             dynamic_splice_edges,
+            external_source_parent,
         )?;
         debug_assert_eq!(installed.activation, activation);
         debug_assert!(installed
@@ -6155,6 +6344,7 @@ mod tests {
             ContinuationActivationId(21),
             invocation,
             None,
+            None,
         )
     }
 
@@ -6262,6 +6452,7 @@ mod tests {
                 SourceContinuation::Terminal(SourceContinuationTerminal::ReturnValue),
                 ContinuationActivationId(90),
                 segment,
+                None,
                 None,
             )
             .map(|_| ())

@@ -2161,6 +2161,12 @@ impl ContinuationCallView<'_> {
     pub(in crate::cranelift_backend) fn target(&self) -> ContinuationSpecializationId {
         self.target
     }
+    pub(in crate::cranelift_backend) fn identity(&self) -> ContinuationCallIdentity {
+        ContinuationCallIdentity {
+            token: self.token.clone(),
+            recursive_position: self.recursive_position,
+        }
+    }
 }
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a`** — one already-issued causal call, projected
