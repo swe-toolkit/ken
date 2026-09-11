@@ -12,7 +12,89 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 10 — PRODUCTION RULING, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE POST-HS10 RIGHTS/SURFACE RULING — AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, POST-HS10 RIGHTS/SURFACE RULING (repair authorized;
+> # NOT HS11). Architect ruling evt_cf7sk8pss0dk (thr_7wy5wy45p7abm), grounded on
+> # WIP 37390dfcf89c3930751b6b9eea521ef650b70b34, the checked COW source,
+> # prelude.rs, effect_v1.rs, spec 38 §1.9, the mapping conformance seed, and D4's
+> # rights control. The HS10 compiler repair SUCCEEDED — the plan-owned bridge
+> # relation advanced through ObjectEmission (native AND interpreter both execute),
+> # preserved in WIP 37390dfc. What this ruling fixes is a DIFFERENT class, exposed
+> # only because HS10 let both engines run.
+> #
+> # CLASSIFICATION: there is NO existing checked surface path that mints an FsHandle
+> # with READ|WRITE (ResourceRead mints READ; ResourceWriteCreate mints
+> # WRITE|CREATE; attenuation/duplication cannot add READ) — so the exit-92
+> # RightNotHeld{required:3, held:6} is expected from the current impl. BUT the
+> # repair is NOT a new read-write open mode and NOT weakening a writable Mapping's
+> # rights. The real defect is a pre-existing NARROW D4 one: MappingAcquireFile
+> # reuses the DESTINATION mapping protection's rights as the ADMISSION rights on
+> # the SOURCE file handle. These are two distinct resources / authority questions:
+> #   - Source FsHandle: file-backed acquisition reads/snapshots the file at offset
+> #     zero; under MAP_PRIVATE later mapping writes never reach the file, so its
+> #     governing source right is READ for BOTH ReadOnly and ReadWrite protection.
+> #   - Minted Mapping: rights stay protection-derived (ReadOnly -> READ; Writable
+> #     -> READ|WRITE, and only Writable admits mapWrite).
+> # The code already separates the moments — source admission is
+> # resolve_fs_handle_with_provenance(...) in the MappingAcquireFile dispatch;
+> # destination authority is insert_mapping using region.protection().rights().
+> # Passing protection.rights() to the former CONFLATES them. This FOLLOWS the
+> # locked contract (spec 38 §1.9: FileBacked ReadWrite = private COW, writes
+> # process-local, never reach the file, a later ordinary read observes the
+> # original) rather than changing it — requiring source WRITE for an operation that
+> # cannot write the source is EXCESS authority and makes the specified public
+> # composition impossible. Architect verified the capability on Linux (RO 8-byte
+> # file + writable private mapping; bytes 2..5 changed; mapping shows abNEWfgh,
+> # file stays abcdefgh).
+> #
+> # RULED REPAIR:
+> # (1) In the exact HostOpV1::MappingAcquireFile dispatch, change ONLY source
+> # resolution from resolve_fs_handle_with_provenance(source, protection.rights())
+> # to resolve_fs_handle_with_provenance(source, crate::RightSet::READ). Do NOT
+> # change MappingProtectionV1::rights, insert_mapping, view admission, mapWrite,
+> # the wire, op identity, prelude type, ABI, lineage, or any mapping token rights.
+> # (2) In the checked D5b COW witness, replace ONLY `ResourceWriteCreate
+> # CreateOrKeep` with `ResourceRead` (the Rust fixture already creates/resets
+> # mapped.bin with abcdefgh; the checked source needs no CREATE or file WRITE).
+> # Keep FileBacked...ReadWrite, mapWrite, the in-mapping NEW, the later ordinary
+> # file read, backing-file preservation, exact operation order, and
+> # native/interpreter parity unchanged.
+> # (3) Correct D4's stale rights control and the D5b posture comment that say
+> # "protection-derived source rights." The non-degenerate rights pair: READ-only
+> # source + Writable private mapping SUCCEEDS (minted Mapping resolves under READ
+> # and WRITE, mapWrite admitted); a source holding WRITE|CREATE but no READ REFUSES
+> # before backend mapping with exact RightNotHeld{required:READ, held:WRITE|CREATE}.
+> # A full-rights source may remain a positive compatibility neighbour but cannot be
+> # the SOLE success (it would not prove least source authority). Release successful
+> # mappings inside the control so capacity accounting stays independent.
+> # (4) Add a natural-site mutation/control (e.g. UseProtectionRightsForSource): on
+> # the unchanged ResourceRead COW witness it applies exactly once and restores the
+> # exact pre-acquisition required=3/held=1 failure/exit-92 trace; restoration
+> # produces the full seven-operation successful COW trace. This proves the changed
+> # operand is source admission, not destination Mapping rights.
+> #
+> # FENCES: no new ResourceOpenMode, no new right bit, no attenuation that adds
+> # rights, no test-only handle injection, no mapping-right weakening, no MAP_SHARED,
+> # no read-only mapping, no dropped mapWrite, no change to COW/file-preservation
+> # assertions. PRESERVE HS3-HS10 mechanisms and controls, source lineage/revocation,
+> # exact length/capacity, native/interpreter parity, ABI/wire/spec/TCB, and the
+> # successful plan-owned bridge relation already in WIP 37390dfc.
+> #
+> # STEWARD PACKAGING: this is an acceptance-fixture + D4 source-admission correction
+> # that ALIGNS code to the locked §1.9 contract — no new capability/open-mode/right
+> # bit, no ABI/wire/spec/TCB change, no ban-lift, within ABI-S6 D5b + a narrow D4
+> # control fix. => amend-in-place, no operator sign-off (the HS3-HS10 shape); the
+> # Architect assigned "@steward owns the in-place rights clarification and Runtime
+> # re-kick". The escalation watch armed on a possible surface-capability addition
+> # RESOLVES: ruled a spec-aligned defect fix, NOT a capability addition => no
+> # operator escalation. NOT a new compiler structural refusal => hard-stop count
+> # stays 10, Research trigger stays HS12; Runtime continues on the SAME WIP 37390dfc
+> # after this lands, and a later compiler refusal would be HS11. The HS10 PRODUCTION
+> # RULING banner below is SUPERSEDED (its repair succeeded, preserved in WIP
+> # 37390dfc).
+
+# D5b NATIVE HARD-STOP 10 — PRODUCTION RULING (Superseded by the POST-HS10 RIGHTS/SURFACE RULING above; the HS10 compiler repair SUCCEEDED — plan-owned bridge relation advanced through ObjectEmission, preserved in WIP 37390dfc).
 
 > # D5b native-lowering track, HARD STOP 10 — PRODUCTION RULING (repair
 > # authorized). Architect production ruling evt_64v1zc3wjb0pt
