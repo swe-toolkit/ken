@@ -11,13 +11,36 @@ github: null
 origin: Adversary hunt evt_1m95xs8h72pbm on the merged LANG-TRUNCATION-SURFACE-SYNTAX range 392f228b8..4b2d4cd9a, measured 2026-08-16. Filed draft and NOT released -- the second lane is quiet by operator instruction 2026-08-16. Also carries the Architect's two deferred follow-ups from evt_5f2dy109fjsct, which were routed to the Steward and had no node.
 ---
 
-> # ACTIVE 2026-09-11 (Steward) — L2 head after item 7 (SIGMA-SWEEP) closed;
-> # operator L2 queue item 8. status draft->active. D0 (the spelling ruling)
-> # REQUESTED from the Architect: anchor evt_4q1vfdx5pv5ef. D1 stays blocked on D0
-> # and is NOT yet released to the language ring — the ring holds until D0 rules
-> # (D0 is Architect-only, no code). The old "second lane is quiet" deferral
-> # rationale is superseded (L2 is an active language lane). On D0's answer I
-> # release D1. Size S, tier T2 (mechanical diagnostic/grammar under D0's ruling).
+> # ACTIVE 2026-09-11 (Steward) — L2 head (operator queue item 8), D0 ANSWERED,
+> # D1 RELEASED to the language ring (kick evt_x05a8he9qg4w, thread thr_13cezb1bmqvbz).
+> #
+> # D0 RULING (Architect evt_1mph0zaazh10f, grounded fresh at origin/main): Q1 —
+> # expression-position-only ‖A‖ is STAGING, not the end state; the end state is
+> # ‖A‖ spellable in annotation position. Therefore BRANCH (A): the infer-position
+> # diagnostic (elab.rs:7329) is CORRECT-IN-ADVANCE and STANDS UNCHANGED — it
+> # becomes true the moment D1 lands. D1 = the annotation-position grammar
+> # production: a `Type::Trunc` variant (ast.rs Type enum has none) + a
+> # `parse_atom_type` production for `Token::TruncBar` (parser.rs:2037-2074 rejects
+> # it today), so `x : ‖A‖` / `fn f : ‖A‖` / `let y : ‖A‖` parse and elaborate to
+> # `Term::Trunc`. Grounds: CORE spec makes ‖A‖ a first-class term/type former
+> # (11-syntax.md:39, 16-observational.md §6) usable anywhere a type appears — the
+> # surface should expose the core; the WP's own code marks expression-only as
+> # DEFERRED (elab.rs:7660-7663), not designed. Branch B (cement the elim_trunc
+> # stopgap as a ruled invariant, AC-2) is REJECTED — it would freeze the wart; the
+> # literal-trunc_intro special case is retained as convenience but no longer
+> # load-bearing. Q2 — elim_trunc reservation/shadow policy AFFIRMED as landed:
+> # trunc_intro RESERVED (arity-agnostic sugar), elim_trunc NOT reserved
+> # (arity-GATED per the J/Eq precedent); an exact-sugar-arity elim_trunc collision
+> # copies the J/Eq precedent VERBATIM, no new policy. AC-1 control = RUN the
+> # diagnostic's suggested program (parses), not a string compare. AC-3 no
+> # kernel/spec/catalog. Size S, tier T2 (mechanical grammar production under the
+> # settled ruling); implementer is Opus 4.8 1M/T1 — mildly over-provisioned but not
+> # worth a reseat for one small WP.
+> #
+> # NON-BLOCKING Spec follow-on (Architect boundary note): spec/30-surface is silent
+> # on the whole truncation surface (trunc_intro/elim_trunc/‖ delimiter); spec-leader
+> # anchored a surface-spec reflection to spec-author (evt_m94v82njhx13). D1 does NOT
+> # wait on it.
 
 ## The gap
 
