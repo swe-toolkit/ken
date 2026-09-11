@@ -66,6 +66,84 @@ thread_local! {
         const { std::cell::Cell::new(TrapCallerProtocolMutation::Exact) };
 }
 
+/// Test-only perturbations of the ABI-S6 D5b HS3 worker/context partition.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs3CallMutation {
+    Exact,
+    /// Append the exact-key frame's worker captures after the complete direct
+    /// worker has already supplied them.
+    ReappendFrameWorkerCaptures,
+    /// Withhold the exact-key frame's context-capture run.
+    SuppressFrameContextCaptures,
+}
+
+/// One successfully assembled complete-direct-worker context call.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct D5bHs3CallObservation {
+    pub application_arguments: usize,
+    pub caller_worker_captures: usize,
+    pub frame_worker_captures_available: usize,
+    pub frame_worker_captures_emitted: usize,
+    pub frame_context_captures_available: usize,
+    pub frame_context_captures_emitted: usize,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static D5B_HS3_CALL_MUTATION: std::cell::Cell<D5bHs3CallMutation> =
+        const { std::cell::Cell::new(D5bHs3CallMutation::Exact) };
+    static D5B_HS3_CALL_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static D5B_HS3_CALL_OBSERVATIONS: std::cell::RefCell<Vec<D5bHs3CallObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn d5b_hs3_call_mutation() -> D5bHs3CallMutation {
+    D5B_HS3_CALL_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_d5b_hs3_call_mutation_application() {
+    D5B_HS3_CALL_MUTATION_APPLICATIONS.with(|count| count.set(count.get() + 1));
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_d5b_hs3_call_observation(observation: D5bHs3CallObservation) {
+    D5B_HS3_CALL_OBSERVATIONS.with(|observations| observations.borrow_mut().push(observation));
+}
+
+/// Run one compile under an HS3 partition mutation and return its observations
+/// plus the number of times the selected mutation reached its production seat.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_d5b_hs3_call_mutation<T>(
+    mutation: D5bHs3CallMutation,
+    body: impl FnOnce() -> T,
+) -> (T, Vec<D5bHs3CallObservation>, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D5B_HS3_CALL_MUTATION.with(|cell| cell.set(D5bHs3CallMutation::Exact));
+        }
+    }
+
+    D5B_HS3_CALL_MUTATION.with(|cell| cell.set(mutation));
+    D5B_HS3_CALL_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    D5B_HS3_CALL_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    let restore = Restore;
+    let result = body();
+    let observations =
+        D5B_HS3_CALL_OBSERVATIONS.with(|observations| observations.borrow().clone());
+    let applications = D5B_HS3_CALL_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, observations, applications)
+}
+
 #[cfg(test)]
 thread_local! {
     /// **`RT-DECL-CLOSURE-PORT` `D5` — every declaration-owned unit call this
@@ -747,12 +825,77 @@ impl<'a> Lowering<'a> {
         }
 }
 
+/// The two already-existing recursive-position calling conventions.
+///
+/// This sum is the only authority selecting where the worker-capture suffix
+/// comes from. It is intentionally compiler-private: callers must enter through
+/// one of the two constructors below rather than reconstructing the distinction
+/// from arity or operand values.
+enum RecursivePositionCallInputs {
+    /// A raw or carried-residual call supplies only the worker's declared
+    /// application arguments. A generated-context retarget obtains any worker
+    /// captures from its exact-key construction frame.
+    DeclaredArguments(Vec<LoweringOperand>),
+    /// A statically selected direct-worker call already supplies the complete
+    /// `Parameter` run as application arguments followed by that closure's
+    /// captures. A generated-context retarget must not append frame workers.
+    CompleteDirectWorker {
+        arguments: Vec<LoweringOperand>,
+        worker_captures: Vec<LoweringOperand>,
+    },
+}
+
 impl<'a> Lowering<'a> {
         pub(super) fn call_declared_recursive_position_unit(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             body_origin: StaticOriginId,
-            inputs: &[LoweringOperand],
+            declared_arguments: Vec<LoweringOperand>,
+            coordinates: Option<CarriedInvocationCoordinates>,
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
+            self.resolve_declared_recursive_position_call(
+                builder,
+                body_origin,
+                RecursivePositionCallInputs::DeclaredArguments(declared_arguments),
+                coordinates,
+            )
+        }
+
+        pub(super) fn call_declared_recursive_position_closure_unit(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            body_origin: StaticOriginId,
+            params: &[String],
+            arguments: Vec<LoweringOperand>,
+            worker_captures: Vec<LoweringOperand>,
+            coordinates: Option<CarriedInvocationCoordinates>,
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
+            if params.len() != arguments.len() {
+                return Err(unsupported(
+                    "ComputationalMatch",
+                    format!(
+                        "recursive field expects {} args but call provides {}",
+                        params.len(),
+                        arguments.len()
+                    ),
+                ));
+            }
+            self.resolve_declared_recursive_position_call(
+                builder,
+                body_origin,
+                RecursivePositionCallInputs::CompleteDirectWorker {
+                    arguments,
+                    worker_captures,
+                },
+                coordinates,
+            )
+        }
+
+        fn resolve_declared_recursive_position_call(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            body_origin: StaticOriginId,
+            inputs: RecursivePositionCallInputs,
             coordinates: Option<CarriedInvocationCoordinates>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1 — THE CARRIED
@@ -851,13 +994,25 @@ impl<'a> Lowering<'a> {
                     inputs,
                     coordinates,
                 )?,
-                None => self.call_declared_unit(
-                    builder,
-                    body_origin,
-                    inputs,
-                    #[cfg(test)]
-                    None,
-                )?,
+                None => {
+                    let inputs = match inputs {
+                        RecursivePositionCallInputs::DeclaredArguments(arguments) => arguments,
+                        RecursivePositionCallInputs::CompleteDirectWorker {
+                            mut arguments,
+                            worker_captures,
+                        } => {
+                            arguments.extend(worker_captures);
+                            arguments
+                        }
+                    };
+                    self.call_declared_unit(
+                        builder,
+                        body_origin,
+                        &inputs,
+                        #[cfg(test)]
+                        None,
+                    )?
+                }
             };
             #[cfg(test)]
             RECURSIVE_POSITION_UNIT_CALLS.with(|calls| calls.set(calls.get() + 1));
@@ -866,19 +1021,19 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
-        /// Emit the one exact retargeted callee for a carried invocation.
+        /// Emit the one exact retargeted callee for a recursive-position call.
         ///
-        /// ⭐ Only the **callee** moves. The call is the same already-planned
-        /// emitted call, at the same site, with the same operand prefix and the
-        /// same causal ancestry; its source edge, its predecessor and its
-        /// provenance are untouched. That is what makes this a retarget rather than
-        /// a deletion.
+        /// Only the callee moves. The private input sum preserves which existing
+        /// calling convention produced the `Parameter` run: raw declared
+        /// arguments, or a complete direct worker with its selected captures.
+        /// The source edge, predecessor, causal ancestry, and declared slot order
+        /// are unchanged.
         fn call_declared_context(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             context: ContinuationContextId,
             body_origin: StaticOriginId,
-            inputs: &[LoweringOperand],
+            inputs: RecursivePositionCallInputs,
             // `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- the planner-issued
             // coordinates this retarget was resolved by, carried through so the
             // constructed frame is matched on the same complete key the binding
@@ -898,15 +1053,11 @@ impl<'a> Lowering<'a> {
                         ),
                     )
                 })?;
-            // `D5a` checkpoint 4 step 1b — THE EXACT CAPTURE SUFFIX.
-            //
-            // The context declares a frame of `parameters + captures`; the carried
-            // invocation supplies the parameter run, so retargeting its callee
-            // without appending the captures is a call that does not match the
-            // frame it now names. ⛔ Appended in the context's DECLARED ORDER, and
-            // taken only from the immediate slots the planner assigned -- nothing
-            // is reconstructed from the raw worker, chosen by shape, or routed
-            // through a runtime transport.
+            // `D5a` checkpoint 4 step 1b and ABI-S6 D5b HS3: exact context
+            // selection plus a structurally selected `Parameter` source. The
+            // context declares `parameters + captures`; this consumer preserves
+            // their declared order and obtains each run from exactly one existing
+            // authority.
             let view = self
                 .static_transition_plan
                 .continuation_contexts()?
@@ -918,151 +1069,319 @@ impl<'a> Lowering<'a> {
                         "the bound generated context has no projected view",
                     )
                 })?;
+            let unit = self
+                .static_transition_plan
+                .continuation_units()?
+                .into_iter()
+                .find(|candidate| candidate.id() == view.enclosing_specialization())
+                .ok_or_else(|| {
+                    unsupported(
+                        "ContinuationSpecialization",
+                        "the generated context's enclosing specialization has no projected unit view",
+                    )
+                })?;
+            if view.worker_body_origin() != body_origin
+                || unit.worker_body_origin() != body_origin
+            {
+                return Err(unsupported(
+                    "ContinuationSpecialization",
+                    format!(
+                        "the generated context and its enclosing specialization do not both name \
+                         the retargeted worker body {body_origin:?}"
+                    ),
+                ));
+            }
+
+            // The unit envelope, not operand width or value equality, owns the
+            // complete ordered `Parameter` role run. Reading it here preserves
+            // every closure-origin, capture-ordinal, recursive-position, and
+            // exact-coverage validation performed by the planner projection.
+            let ordinary_envelope = unit.ordinary_envelope()?;
+            let header = view.header();
+            if unit.ordinary_parameters() != view.parameters()
+                || view.parameters() != header.parameters
+                || ordinary_envelope.len() != header.parameters as usize
+            {
+                return Err(unsupported(
+                    "ContinuationSpecialization",
+                    format!(
+                        "the enclosing specialization, generated context, and context header \
+                         disagree on the retargeted Parameter run: unit {}, context {}, header \
+                         {}, roles {}",
+                        unit.ordinary_parameters(),
+                        view.parameters(),
+                        header.parameters,
+                        ordinary_envelope.len(),
+                    ),
+                ));
+            }
+            let worker_declared_arity = unit.worker_declared_arity();
+            let worker_capture_count = unit.worker_capture_count();
+            let claims = view.captures()?;
+            if u32::try_from(claims.len()).ok() != Some(header.captures) {
+                return Err(unsupported(
+                    "ContinuationSpecialization",
+                    format!(
+                        "the generated context projects {} captures, but its header declares {}",
+                        claims.len(),
+                        header.captures,
+                    ),
+                ));
+            }
             let defining_owner = self.defining_emission_owner.ok_or_else(|| {
                 unsupported(
                     "ContinuationSpecialization",
-                    "a carried invocation retarget was reached with no emission owner bound for the                  context currently being defined",
+                    "a carried invocation retarget was reached with no emission owner bound for the \
+                     context currently being defined",
                 )
             })?;
-            let mut inputs = inputs.to_vec();
-            // **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- CONSUME THE FRAME
-            // CONSTRUCTED AT THE CREATION SITE, when this retarget is the one it
-            // was built for.**
+
+            // `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`, closed by ABI-S6 D5b HS3.
             //
-            // **Matched on the COMPLETE planner-issued key** -- continuation
-            // origin, recursive position, and worker body -- exactly the key the
-            // binding above was resolved by. One function can hold two retargets
-            // over one body origin, and a frame consumed at the wrong one is an
-            // arity-correct call carrying another occurrence's values: the silent
-            // shape, not a loud one. A frame that does not match is not used, and
-            // this falls through to the gather below unchanged.
+            // There are two lawful caller contracts, selected only by the
+            // private sum. A raw/carried caller supplies declared application
+            // arguments and obtains the selected worker's capture suffix from
+            // the exact-key construction frame. A statically selected direct
+            // worker supplies `arguments ++ worker_captures` itself and must
+            // emit zero frame worker operands. Both contracts may obtain the
+            // generated context's own `Capture` run from the frame when a claim
+            // is producer-local and therefore not gatherable from this unit's
+            // entry ABI operands.
             //
-            // **Two runs, because the retarget can supply neither.** The
-            // carried invocation carries the raw body's DECLARED ARGUMENTS only,
-            // so the selected closure's captures -- the tail of the context's
-            // `Parameter` run -- are appended here; the context's own `Capture`
-            // run follows, in the planner's ordinal order. Both were assembled at
-            // the creation site from the producer's live environment through the
-            // planner's own projections.
-            //
-            // **The declared frame header is re-checked here, and it is what
-            // makes this supply-not-relax.** The two cardinalities are verified
-            // against the context's OWN header before a single operand is used,
-            // so a short, long, or mis-ordered frame refuses at this call rather
-            // than filling a frame that happened to be big enough to absorb it.
-            // The context body still walks its declared run through the unchanged
-            // membership and slot re-derivation guard.
-            //
-            // **TAKEN ONLY WHERE THE GATHER BELOW STRUCTURALLY CANNOT SERVE.**
-            // This is not an optimization; it is what makes the route an
-            // ADDITION rather than a substitution.
-            //
-            // The gather appends the context's `Capture` run to the operands the
-            // retarget already carries, and that is a COMPLETE call exactly when
-            // the selected worker has no captures -- so the declared arguments
-            // already fill the `Parameter` run -- and every claim is resolvable
-            // where the gather reads. Wherever that holds, the gather has been
-            // emitting the right call all along, and the two routes would source
-            // the same values through DIFFERENT environments: the creation
-            // site's `producer_env` here, this frame's ABI operand run there.
-            // Preferring this route there would silently re-source operands on
-            // paths that are already correct, and any disagreement between the
-            // two environments would surface as changed behaviour instead of as
-            // a refusal.
-            //
-            // So the condition names the two ways the gather falls short and
-            // nothing else: a `Parameter` run the retarget cannot fill, and a
-            // claim with no context-capture availability for the gather to read.
-            let claims = view.captures()?;
-            let header = view.header();
-            let gather_cannot_serve = |worker_captures: &[LoweringOperand]| {
-                !worker_captures.is_empty()
-                    || claims
-                        .iter()
-                        .any(|claim| claim.availability.context_capture.is_none())
-            };
-            let constructed = self
-                .function_local
-                .constructed_context_frame
-                .as_ref()
-                .filter(|frame| {
-                    coordinates.is_some_and(|coordinates| {
+            // The frame remains keyed by the complete planner coordinate triple.
+            // It is alternate-view storage: its worker vector is not an emitted
+            // source on the complete-direct-worker route. Cardinality checks
+            // validate a structurally chosen contract; they never choose one.
+            let context_requires_frame = claims
+                .iter()
+                .any(|claim| claim.availability.context_capture.is_none());
+            let caller_requires_frame_workers = matches!(
+                &inputs,
+                RecursivePositionCallInputs::DeclaredArguments(_)
+            ) && worker_capture_count != 0;
+            let constructed = if caller_requires_frame_workers || context_requires_frame {
+                let coordinates = coordinates.ok_or_else(|| {
+                    unsupported(
+                        "ContinuationSpecialization",
+                        "a retarget requiring creation-site operands carries no planner coordinates \
+                         with which to select its constructed context frame",
+                    )
+                })?;
+                let frame = self
+                    .function_local
+                    .constructed_context_frame
+                    .as_ref()
+                    .filter(|frame| {
                         frame.continuation_origin == coordinates.continuation_origin
                             && frame.recursive_position == coordinates.recursive_position
-                    }) && frame.worker_body_origin == body_origin
-                        && gather_cannot_serve(&frame.worker_captures)
-                })
-                .map(|frame| (frame.worker_captures.clone(), frame.context_captures.clone()));
-            if let Some((worker_captures, context_captures)) = constructed {
-                // `claims` above is claimed even though this route does not READ
-                // it for operands. `captures()` is where the projection is
-                // checked against its validated ABI input authority, and that
-                // check is about the PLAN, not about which route consumes it.
-                // Reaching it on only one route would make the other the one
-                // path on which a plan that disagrees with itself is never
-                // noticed.
-                // Both authorities, not one. `header` is the declared frame
-                // and `claims` is the ordered projection; checking the
-                // constructed run against each separately is what makes a
-                // disagreement BETWEEN them visible here rather than absorbed.
-                if claims.len() != context_captures.len() {
-                    return Err(unsupported(
-                        "ContinuationSpecialization",
-                        format!(
-                            "a constructed context frame supplies {} captures, but the context \
-                             bound to body {body_origin:?} projects {} continuation inputs",
-                            context_captures.len(),
-                            claims.len()
-                        ),
-                    ));
-                }
-                let declared_arguments = inputs.len();
-                let parameters = declared_arguments
-                    .checked_add(worker_captures.len())
+                            && frame.worker_body_origin == body_origin
+                    })
                     .ok_or_else(|| {
                         unsupported(
                             "ContinuationSpecialization",
-                            "a constructed context frame's parameter run exceeded addressable width",
+                            format!(
+                                "the retargeted worker {body_origin:?} requires creation-site \
+                                 operands, but no constructed context frame matches its exact \
+                                 continuation origin and recursive position"
+                            ),
                         )
                     })?;
-                if u32::try_from(parameters).ok() != Some(header.parameters) {
-                    return Err(unsupported(
-                        "ContinuationSpecialization",
-                        format!(
-                            "a constructed context frame supplies {declared_arguments} declared \
-                             arguments and {} worker captures, but the context bound to body \
-                             {body_origin:?} declares a {}-slot Parameter run; a call assembled \
-                             from a run of the wrong length fills declared parameters with values \
-                             that are not theirs",
-                            worker_captures.len(),
-                            header.parameters
-                        ),
-                    ));
+                Some((
+                    frame.worker_captures.clone(),
+                    frame.context_captures.clone(),
+                ))
+            } else {
+                None
+            };
+
+            let (
+                mut emitted_inputs,
+                _application_arguments,
+                _caller_worker_captures,
+                _complete_direct_worker,
+            ) = match inputs {
+                RecursivePositionCallInputs::DeclaredArguments(arguments) => {
+                    if u32::try_from(arguments.len()).ok() != Some(worker_declared_arity) {
+                        return Err(unsupported(
+                            "ContinuationSpecialization",
+                            format!(
+                                "the raw recursive-position caller supplies {} declared arguments, \
+                                 but the selected worker declares {worker_declared_arity}",
+                                arguments.len(),
+                            ),
+                        ));
+                    }
+                    let application_arguments = arguments.len();
+                    let mut emitted = arguments;
+                    if worker_capture_count != 0 {
+                        let frame_workers = &constructed
+                            .as_ref()
+                            .expect("a raw caller needing worker captures required a frame")
+                            .0;
+                        if frame_workers.len() != worker_capture_count {
+                            return Err(unsupported(
+                                "ContinuationSpecialization",
+                                format!(
+                                    "the exact-key context frame supplies {} worker captures, but \
+                                     the enclosing specialization requires {worker_capture_count}",
+                                    frame_workers.len(),
+                                ),
+                            ));
+                        }
+                        emitted.extend(frame_workers.iter().cloned());
+                    }
+                    (emitted, application_arguments, 0usize, false)
                 }
-                if u32::try_from(context_captures.len()).ok() != Some(header.captures) {
+                RecursivePositionCallInputs::CompleteDirectWorker {
+                    mut arguments,
+                    worker_captures,
+                } => {
+                    if u32::try_from(arguments.len()).ok() != Some(worker_declared_arity) {
+                        return Err(unsupported(
+                            "ContinuationSpecialization",
+                            format!(
+                                "the direct-worker caller supplies {} declared arguments, but the \
+                                 selected worker declares {worker_declared_arity}",
+                                arguments.len(),
+                            ),
+                        ));
+                    }
+                    if worker_captures.len() != worker_capture_count {
+                        return Err(unsupported(
+                            "ContinuationSpecialization",
+                            format!(
+                                "the direct-worker caller supplies {} worker captures, but the \
+                                 enclosing specialization requires {worker_capture_count}",
+                                worker_captures.len(),
+                            ),
+                        ));
+                    }
+                    let application_arguments = arguments.len();
+                    let caller_worker_captures = worker_captures.len();
+                    let parameters = application_arguments
+                        .checked_add(caller_worker_captures)
+                        .ok_or_else(|| {
+                            unsupported(
+                                "ContinuationSpecialization",
+                                "the direct-worker Parameter run exceeded addressable width",
+                            )
+                        })?;
+                    if u32::try_from(parameters).ok() != Some(header.parameters) {
+                        return Err(unsupported(
+                            "ContinuationSpecialization",
+                            format!(
+                                "the complete direct-worker caller supplies {} arguments and \
+                                 {caller_worker_captures} worker captures, but the context bound to \
+                                 body {body_origin:?} declares a {}-slot Parameter run",
+                                application_arguments,
+                                header.parameters,
+                            ),
+                        ));
+                    }
+                    arguments.extend(worker_captures);
+                    (
+                        arguments,
+                        application_arguments,
+                        caller_worker_captures,
+                        true,
+                    )
+                }
+            };
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            let mut frame_worker_captures_emitted = 0;
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            if _complete_direct_worker
+                && d5b_hs3_call_mutation()
+                    == D5bHs3CallMutation::ReappendFrameWorkerCaptures
+            {
+                if let Some((frame_workers, _)) = constructed.as_ref() {
+                    record_d5b_hs3_call_mutation_application();
+                    frame_worker_captures_emitted = frame_workers.len();
+                    emitted_inputs.extend(frame_workers.iter().cloned());
+                }
+            }
+            if u32::try_from(emitted_inputs.len()).ok() != Some(header.parameters) {
+                return Err(unsupported(
+                    "ContinuationSpecialization",
+                    format!(
+                        "the structurally selected recursive-position input contract supplies {} \
+                         Parameter operands, but the context bound to body {body_origin:?} declares \
+                         {}",
+                        emitted_inputs.len(),
+                        header.parameters,
+                    ),
+                ));
+            }
+
+            if context_requires_frame {
+                let _frame_worker_captures_available = constructed
+                    .as_ref()
+                    .expect("producer-local context claims required a frame")
+                    .0
+                    .len();
+                let context_captures = constructed
+                    .as_ref()
+                    .expect("producer-local context claims required a frame")
+                    .1
+                    .clone();
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                let context_captures = {
+                    let mut context_captures = context_captures;
+                    if _complete_direct_worker
+                        && d5b_hs3_call_mutation()
+                            == D5bHs3CallMutation::SuppressFrameContextCaptures
+                    {
+                        record_d5b_hs3_call_mutation_application();
+                        context_captures.clear();
+                    }
+                    context_captures
+                };
+                if context_captures.len() != claims.len() {
                     return Err(unsupported(
                         "ContinuationSpecialization",
                         format!(
-                            "a constructed context frame supplies {} captures, but the context \
-                             bound to body {body_origin:?} declares a {}-slot Capture run",
+                            "the exact-key context frame supplies {} context captures, but the \
+                             context bound to body {body_origin:?} projects {}",
                             context_captures.len(),
-                            header.captures
+                            claims.len(),
                         ),
                     ));
                 }
-                inputs.extend(worker_captures);
-                inputs.extend(context_captures);
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                if _complete_direct_worker {
+                    record_d5b_hs3_call_observation(D5bHs3CallObservation {
+                        application_arguments: _application_arguments,
+                        caller_worker_captures: _caller_worker_captures,
+                        frame_worker_captures_available: _frame_worker_captures_available,
+                        frame_worker_captures_emitted,
+                        frame_context_captures_available: context_captures.len(),
+                        frame_context_captures_emitted: context_captures.len(),
+                    });
+                }
+                emitted_inputs.extend(context_captures);
                 return self
                     .call_declared_unit_target(
                         builder,
                         target,
-                        &inputs,
+                        &emitted_inputs,
                         #[cfg(test)]
                         None,
                     )
                     .map(|(operand, _inst)| operand);
             }
-            for capture in view.captures()? {
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            if _complete_direct_worker {
+                record_d5b_hs3_call_observation(D5bHs3CallObservation {
+                    application_arguments: _application_arguments,
+                    caller_worker_captures: _caller_worker_captures,
+                    frame_worker_captures_available: 0,
+                    frame_worker_captures_emitted,
+                    frame_context_captures_available: 0,
+                    frame_context_captures_emitted: 0,
+                });
+            }
+            for capture in claims {
+
                 // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — present a producer-local
                 // coordinate to this seam, so its refusal is measured rather than
                 // merely written. ⛔ Applied BEFORE the domain match, because the
@@ -1115,12 +1434,12 @@ impl<'a> Lowering<'a> {
                         )
                     })?
                     .clone();
-                inputs.push(operand);
+                emitted_inputs.push(operand);
             }
             self.call_declared_unit_target(
                 builder,
                 target,
-                &inputs,
+                &emitted_inputs,
                 #[cfg(test)]
                 None,
             )
