@@ -2642,13 +2642,13 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude mapBytes failed: {e}")))?;
     elab.elaborate_decl(
-        "proc mapWrite (a : Auth) (mapping : MappingHandle) (window : MappingWindow) \
+        "proc mapWrite (a : Auth) (mapping : MappingHandle) (offset : Int) \
            (bytes : Bytes) : HostIO a (Result ResourceError Unit) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
            (Result ResourceError Unit) \
            (InL (FSOp a) AmbientOp (PrivateMappingWriteView a \
-             (mapping_handle_resource mapping) (mapping_window_start window) bytes \
+             (mapping_handle_resource mapping) offset bytes \
              (mapping_handle_resource mapping))) \
            (\\r. Ret (Coproduct (FSOp a) AmbientOp) \
              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \

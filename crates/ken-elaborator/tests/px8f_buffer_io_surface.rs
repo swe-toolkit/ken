@@ -196,19 +196,20 @@ proc px8f_readsome_public_consumers
 }
 
 /// Promise class: normative compatibility vector (`38 §1.9`). The public
-/// Mapping accessors take immutable windows directly, while the handle
-/// constructor, resource projections, and frozen host operations remain absent
-/// from checked source. `mapView`/`MappingSpan` are intentionally not surface
-/// names: mappings reject rather than cap, so no minted subrange is needed.
+/// Mapping reads take immutable windows directly, while writes take an offset
+/// and derive their extent from the byte payload. The handle constructor,
+/// resource projections, and frozen host operations remain absent from checked
+/// source. `mapView`/`MappingSpan` are intentionally not surface names: mappings
+/// reject rather than cap, so no minted subrange is needed.
 #[test]
-fn abi_s6_mapping_surface_is_window_direct_and_the_handle_stays_opaque() {
+fn abi_s6_mapping_surface_is_direct_and_the_handle_stays_opaque() {
     let mut env = ElabEnv::empty().expect("ABI-S6 prelude");
     env.elaborate_file(
         r#"
 proc mapping_surface_write
-  (a : Auth) (mapping : MappingHandle) (window : MappingWindow) (bytes : Bytes)
+  (a : Auth) (mapping : MappingHandle) (offset : Int) (bytes : Bytes)
   : HostIO a (Result ResourceError Unit) visits [FS] =
-  mapWrite a mapping window bytes
+  mapWrite a mapping offset bytes
 
 proc mapping_surface_read
   (a : Auth) (mapping : MappingHandle) (window : MappingWindow)
@@ -216,7 +217,7 @@ proc mapping_surface_read
   mapBytes a mapping window
 "#,
     )
-    .expect("the checked window-direct Mapping surface elaborates");
+    .expect("the checked direct Mapping surface elaborates");
 
     for public in [
         "MappingSource",
