@@ -197,6 +197,7 @@ type ::=
   | "forall" tyvar+ "." type  -- explicit polymorphism (usually implicit)
   | tyvar | atype
 atype ::= ConId | tyvar | "(" type ")"
+  | "‖" type "‖"  -- propositional truncation (16 §6)
 label ::= expr | "ct"  -- a lattice label ℓ, or timing-sensitive ct (61 §3,§5a)
 ```
 
@@ -205,6 +206,32 @@ inferred `ℓ`. Implicit arguments `{…}` are inserted by elaboration (`39`). T
 application is shown by juxtaposition (`ConId atype*`); the chapters also use
 the bracketed spelling `F[T]` (e.g. `Wrapping[T]`, `35 §3`) — the same
 construct, spelling `[OQ-syntax]`.
+
+**Propositional truncation `‖A‖`.** `‖A‖` (ASCII `||A||`; the `‖`/`||`
+delimiter, `31 §1b`) is the surface spelling of the kernel propositional-
+truncation former (`../10-kernel/16 §6`, `‖A‖ : Ω`). It is a first-class atomic
+type, spellable **wherever a type is expected** — including annotation position
+(`x : ‖A‖`, `fn f : ‖A‖`, `let y : ‖A‖`) — and, since types are terms (§3), in
+expression position. (Staging: expression position is landed now; annotation
+position parses once `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES` D1's grammar
+production lands — the annotation-position spelling is the settled end state,
+not yet the current parser, which rejects `‖A‖` in a type position until D1.)
+Its **introduction** is written `trunc_intro a` (arity-1 checked-mode sugar),
+injecting `a : A` into `‖A‖`; the kernel notation for this is `|a|` (`16 §6`),
+which is **not** surface-spellable — a single `|` is an ordinary token, so the
+surface spelling is `trunc_intro a` (the elaborator's own diagnostic advises it).
+Its **elimination** is `elim_trunc P f t`, eliminating `‖A‖` into a proposition
+`P : Ω`. Two surface names carry the intro and elim as checked-mode
+sugar, reserved differently because they intercept different arities:
+`trunc_intro` is **arity-agnostic** sugar (it intercepts every `trunc_intro`),
+so it is a **reserved** name — declaring it is a surface error, failing at the
+declaration rather than leaving it silently shadowed; `elim_trunc` is
+**arity-gated** sugar (only the exact elimination arity is intercepted), so it
+is **not** reserved — a differently-applied `elim_trunc` (another arity, a type
+former, a class) coexists, exactly as the `J`/`Eq` sugar does, and a user
+`elim_trunc` at the exact elimination arity follows the same `J`/`Eq` collision
+precedent. The `‖`/`||` delimiter is a genuine token (`31 §1b`), uncollidable,
+so nothing there is reserved.
 
 ## 3. Expressions
 

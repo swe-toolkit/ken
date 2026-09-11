@@ -78,6 +78,7 @@ digraph where one is unambiguous, else the spelled-out name.
 | `Σ` `Π` | `Sigma` `Pi` | dependent sum / product (binders) |
 | `Ω` | `Omega` | strict-prop universe (`../10-kernel/12`) |
 | `≡` | `===` | propositional equality (`Eq`, `../10-kernel/15`) † |
+| `‖ ‖` | `|| ||` | propositional-truncation delimiter `‖A‖` (`../10-kernel/16 §6`, `32 §2`) |
 | `≤` `≥` `≠` | `<=` `>=` `/=` | comparison |
 | `¬` `∧` `∨` | `not` `/\` `\/` | logical connectives |
 | `∈` | none (glyph-only) | membership notation (§1c exception) |
