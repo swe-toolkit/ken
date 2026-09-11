@@ -382,6 +382,18 @@ The compiler's large source-machine inner frame remained live across each
 recursive branch descent, independently of the entry 4–5 parent-provenance and
 child-qualification role split (`evt_6x3kmb11454z2`).
 
+Entry 7 is a one-layer disposition mismatch, not a genuinely missing call. The
+complete observation proved the exact result edge had no direct emission,
+composed claim or discharge, or checked-IH transport. That absence does not make
+the producer constructor mandatory: the existing deferred bridge resolves the
+same full identity from `(construct 825, frame 12, alternative 1, position 1)`
+and, after successful inline completion, settles it `InlineNoCall` in the
+artifact-wide `ContinuationCandidateLedger`. Its closeout already excludes that
+exact disposition from the call-obligation subset. The earlier per-function
+detached-result filter reads only direct/composed discharge feeds and therefore
+re-demands a producer constructor for an identity the later authoritative
+closeout says is not a call obligation (`evt_28xfh93fkh8hk`).
+
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
 > # D5b native-lowering track, HARD STOP 2 (distinct from the surface HS#1-3
