@@ -401,6 +401,10 @@ pub enum RType {
     RRefine(String, Box<RType>, Box<RExpr>, Span),
     /// `T a b` — type-level application (`34 §1`).
     RApp(Box<RType>, Box<RType>, Span),
+    /// `‖A‖` — propositional-truncation formation in annotation position
+    /// (`16 §6`). Resolved from `Type::TTrunc`; elaborates to `Term::Trunc`. The
+    /// expression-position sibling is `RExpr::RTrunc`.
+    RTrunc(Box<RType>, Span),
 }
 
 impl RType {
@@ -415,7 +419,8 @@ impl RType {
             | RType::RVarTy(_, _, s)
             | RType::RPatternAliasTy(_, _, s)
             | RType::RRefine(_, _, _, s)
-            | RType::RApp(_, _, s) => s,
+            | RType::RApp(_, _, s)
+            | RType::RTrunc(_, s) => s,
         }
     }
 }
@@ -630,6 +635,7 @@ fn collect_instance_head_params(ty: &Type, out: &mut Vec<String>) {
             collect_instance_head_params(b, out);
         }
         Type::TRefine(_, carrier, _, _) => collect_instance_head_params(carrier, out),
+        Type::TTrunc(inner, _) => collect_instance_head_params(inner, out),
         Type::TUniv(_, _) | Type::TCon(_, _) | Type::TVar(_, _) => {}
     }
 }
@@ -2472,6 +2478,11 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
             let rf = resolve_type(scope, f)?;
             let ra = resolve_type(scope, a)?;
             Ok(RType::RApp(Box::new(rf), Box::new(ra), span.clone()))
+        }
+
+        Type::TTrunc(a, span) => {
+            let ra = resolve_type(scope, a)?;
+            Ok(RType::RTrunc(Box::new(ra), span.clone()))
         }
     }
 }

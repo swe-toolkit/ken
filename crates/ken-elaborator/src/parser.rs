@@ -2067,6 +2067,17 @@ impl Parser {
                 self.expect(&Token::RParen)?;
                 Ok(ty)
             }
+            // `‖A‖` in annotation position (LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES
+            // D1). Same token both sides, symmetric with `(A)`: consume the
+            // opener, parse a full type, require the matching closer. Mirrors the
+            // expression-position `Expr::ETrunc` production.
+            Token::TruncBar => {
+                self.advance();
+                let inner = self.parse_type()?;
+                self.expect(&Token::TruncBar)?;
+                let end = self.tokens[self.pos - 1].1.end;
+                Ok(Type::TTrunc(Box::new(inner), Span::new(start, end)))
+            }
             other => Err(ElabError::ParseError {
                 msg: format!("expected a type, found {:?}", other),
                 span: self.peek_span().clone(),
@@ -3262,6 +3273,23 @@ fn reassociate_default_type(ty: Type) -> Type {
             Box::new(reassociate_default_type(*argument)),
             span,
         ),
+        // `‖A‖` — descend into the truncated type (structural closure; mirrors
+        // the expression-side `Expr::ETrunc` arm). This `default`-fixity pass is
+        // reached ONLY by the standalone-expression parser (`parse_expr_only`;
+        // unit parsing deliberately does not call it), where every user operator
+        // takes `Fixity::DEFAULT` and `associate_surface_spine` collapses by
+        // precedence alone and never errors. A refinement predicate nested in a
+        // `‖…‖` is also proof-irrelevant and dropped at elaboration
+        // (`elab_type`'s `RRefine` arm keeps only the carrier;
+        // `innermost_refine_pred` is opaque to `RTrunc`). So no leaf here has a
+        // reachable observable today — this arm is DEFENSIVE structural closure,
+        // distinct from the type-side declaration pass `reassociate_rtype`'s
+        // `RTrunc` arm, which IS reaching (it runs at DECLARED fixity and rejects
+        // an ambiguous-fixity truncated predicate; see that arm and its test).
+        // The traversal must still not silently leaf a `‖…‖`.
+        Type::TTrunc(inner, span) => {
+            Type::TTrunc(Box::new(reassociate_default_type(*inner)), span)
+        }
         leaf => leaf,
     }
 }

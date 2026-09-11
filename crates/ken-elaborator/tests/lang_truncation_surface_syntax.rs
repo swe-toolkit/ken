@@ -543,3 +543,164 @@ fn ac6_lexed_token_fallback_canonicalizes_truncbar_in_an_unparseable_fragment() 
         "TruncBar must canonicalize even when the surrounding fragment does not parse"
     );
 }
+
+// -------------------------------------------------------------------------
+// LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES D1: annotation-position `‖A‖`.
+//
+// The `trunc_intro` infer-position diagnostic (elab.rs) advises two remedies —
+// an ascription `(trunc_intro a : ‖A‖)` and "a declaration's declared type" —
+// both of which require `‖A‖` to be writable where a TYPE is expected, which
+// LANG-TRUNCATION-SURFACE-SYNTAX deliberately did NOT add. D0 ruled (STAGING,
+// branch A) that annotation-position `‖A‖` IS the intended end state, so this
+// adds the grammar and makes the diagnostic's advice true.
+//
+// AC-1 (the control is the SUGGESTION being RUN, never a string compare — a
+// string assertion is what let two unwritable remedies ship): each advertised
+// remedy is exercised by elaborating the suggested program. Before this WP each
+// of these was `parse error: expected a type, found TruncBar`.
+// -------------------------------------------------------------------------
+
+/// Remedy "a declaration's declared type" — a declaration's RETURN type `‖A‖`.
+/// `trunc_intro x` in the body checks against the declared `‖Bool‖`. `‖Bool‖`
+/// is Ω-valued, so the Ω lane (`theorem`) carries it — a `fn` is refused with
+/// "`fn`/`const` compute; use `theorem`/`proof` for an Ω-valued definition",
+/// which is itself the correct guidance, not this WP's concern.
+#[test]
+fn d1_annotation_trunc_as_declaration_return_type_elaborates() {
+    let mut env = mk_env();
+    env.elaborate_decl("theorem truncReturn (x : Bool) : ‖Bool‖ = trunc_intro x")
+        .expect("‖A‖ as a declaration's declared return type must parse and elaborate");
+    // The ASCII spelling `||A||` lexes to the same `TruncBar`; it must work here too.
+    let mut env_ascii = mk_env();
+    env_ascii
+        .elaborate_decl("theorem truncReturnAscii (x : Bool) : ||Bool|| = trunc_intro x")
+        .expect("||A|| as a declaration's declared return type must parse and elaborate");
+}
+
+/// Remedy "a declaration's declared type" — a `let`-binding annotation `‖A‖`.
+#[test]
+fn d1_annotation_trunc_as_let_annotation_elaborates() {
+    let mut env = mk_env();
+    env.elaborate_decl(
+        "theorem truncLet (x : Bool) : ‖Bool‖ = let y : ‖Bool‖ = trunc_intro x in y",
+    )
+    .expect("‖A‖ as a let-binding annotation must parse and elaborate");
+}
+
+/// Remedy — the ASCRIPTION `(trunc_intro a : ‖A‖)`, the diagnostic's primary
+/// advice. The ascription itself supplies the expected type, so it elaborates
+/// in an otherwise infer position (the exact position the diagnostic fires in).
+#[test]
+fn d1_annotation_trunc_as_ascription_elaborates() {
+    let mut env = mk_env();
+    env.elaborate_expr("trunc_intro_ascription_probe", "(trunc_intro True : ‖Bool‖)")
+        .expect("the diagnostic's ascription remedy `(trunc_intro a : ‖A‖)` must parse and elaborate");
+}
+
+// ----- traversal-closure coverage (QA respin) -----
+// The Type/RType traversals that descend on a WILDCARD fallback treated a bare
+// `‖A‖` as a leaf: reassociate_default_type, reassociate_rtype,
+// instantiate_instance_rtype (all now have the recursive arm), plus the
+// leaf-name `rtype_head_name` (returned an empty head, inconsistent with the
+// `head_type_name` arm). `--no-run` cannot see wildcard leaves.
+//
+// Measured (mutation): of these, `rtype_head_name` is the LOAD-BEARING reachable
+// fix — the instance test below reds without it. The three descent arms are
+// DEFENSIVE structural closure: types carry no user infix operator (so
+// reassociate-under-truncation reassociates nothing today, and a refinement
+// predicate's own spine is reassociated by `reassociate_rexpr`/resolve
+// independently of the type traversal), and instance resolution is head-keyed
+// (so a truncation-headed constraint resolves by head without needing its
+// argument substituted). The arms still must not silently leaf a `‖…‖`.
+
+/// A truncation-headed instance constraint must key consistently
+/// (`rtype_head_name`). A constrained instance whose constraint head is `‖a‖`
+/// registers under the truncation head, and resolving it at a concrete use site
+/// must compute the SAME head, or the dictionary is not found. (This test reds
+/// if `rtype_head_name` leaves a truncation an empty head; it also exercises the
+/// `instantiate_instance_rtype` descent, whose result is head-equal here.)
+#[test]
+fn d1_truncation_headed_constrained_instance_resolves_by_a_consistent_head() {
+    let mut env = mk_env();
+    // A property class whose parameter is Ω-valued, so `‖a‖` (an Ω) is a lawful
+    // class argument.
+    env.elaborate_decl("class TruncProp (p : Omega) { }")
+        .expect("an Ω-parameter property class must elaborate");
+    env.elaborate_decl("instance TruncProp ‖Bool‖ { }")
+        .expect("the concrete ‖Bool‖ instance must register");
+    env.elaborate_decl("data TBox (a : Type) : Type where { MkTBox : a -> TBox a }")
+        .expect("box");
+    env.elaborate_decl("class Boxed (a : Type) { boxed : Bool }")
+        .expect("carrier class");
+    // The constrained instance's constraint head is `TruncProp ‖a‖` — `a` occurs
+    // UNDER the truncation. `‖a‖` is not a bare type variable, so the constraint
+    // needs an explicit binder.
+    env.elaborate_decl(
+        "instance Boxed (TBox a) where (dtp : TruncProp ‖a‖) { boxed = True }",
+    )
+    .expect("the constrained instance with a truncation-headed constraint must register");
+    let use_site = env.elaborate_decl(
+        "const boxedUse : Bool where Boxed (TBox Bool) = d.boxed",
+    );
+    // Resolving `Boxed (TBox Bool)` substitutes `a := Bool` into the constraint
+    // head `TruncProp ‖a‖` -> `TruncProp ‖Bool‖`, which is registered. With the
+    // truncation left as a substitution leaf, `‖a‖` stays unbound and no such
+    // instance is found.
+    assert!(
+        use_site.is_ok(),
+        "the constrained instance's `‖a‖` constraint head must substitute a := Bool under the \
+         truncation and resolve to the registered `TruncProp ‖Bool‖`: {use_site:?}"
+    );
+}
+
+/// The type-side reassociation descent into a truncation is REACHING, not
+/// defensive. A declaration's refinement predicate nested under `‖…‖` is
+/// reassociated ONLY by the type-side `reassociate_rtype` `RTrunc` arm
+/// (`RTrunc` -> `RRefine` -> `reassociate_rexpr(predicate)`), because `resolve`
+/// performs no reassociation. This per-declaration pass runs at the program's
+/// DECLARED fixities.
+///
+/// The observable is fixity-AMBIGUITY REJECTION, not a type/value difference:
+/// a truncated refinement predicate is proof-irrelevant and DROPPED at
+/// elaboration (`elab_type`'s `RRefine` arm keeps only the carrier;
+/// `innermost_refine_pred` is opaque to `RTrunc`), so a mis-GROUPING never
+/// reaches a type check. What the reassociator still does is run its fixity
+/// check over the truncated predicate spine: `<+>` (`infixl 6`) and `<*>`
+/// (`infixr 6`) have equal precedence and CONFLICTING associativity, so the
+/// spine `x <+> x <*> x` is genuinely ambiguous and must be REJECTED. Leafing
+/// the `RTrunc` arm skips that descent and SILENTLY ACCEPTS the ambiguous
+/// predicate — that is the discriminating difference (mutation-proven: leafing
+/// `reassociate_rtype`'s `RTrunc` arm turns the rejection below into an
+/// acceptance and reds this test). A same-operator spine could not tell
+/// reaching from defensive, because it is unambiguous and its (dropped)
+/// grouping is unobservable either way.
+///
+/// The parallel parser-side `reassociate_default_type` `TTrunc` arm is instead
+/// DEFENSIVE: it is reached only by the standalone-expression parser at DEFAULT
+/// fixity, where no conflict can arise and the collapse never errors; see the
+/// note on that arm.
+#[test]
+fn d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation() {
+    let mut env = mk_env();
+    let err = env
+        .elaborate_file(
+            "fn <+> (a : Nat) (b : Nat) : Nat = a\n\
+             infixl 6 <+>\n\
+             fn <*> (a : Nat) (b : Nat) : Nat = a\n\
+             infixr 6 <*>\n\
+             theorem tie (x : Nat) : ‖ { y : Nat | IsTrue (x <+> x <*> x) } ‖ = \
+               trunc_intro x",
+        )
+        .expect_err(
+            "an ambiguous-fixity predicate (`infixl 6 <+>` vs `infixr 6 <*>`) nested in a \
+             `‖{ … }‖` must be REJECTED: the type-side `reassociate_rtype` `RTrunc` arm must \
+             descend into the truncated refinement and run the fixity check; leafing it \
+             silently accepts",
+        );
+    let reason = format!("{err:?}");
+    assert!(
+        reason.contains("conflicting associativity"),
+        "the rejection must come from the reassociation pass's fixity check reaching the \
+         truncated predicate (not some unrelated error): {reason}"
+    );
+}

@@ -803,6 +803,7 @@ fn collect_type_spans(ty: &Type, out: &mut Vec<Span>) {
             collect_type_spans(domain, out);
             collect_expr_spans(predicate, out);
         }
+        Type::TTrunc(inner, _) => collect_type_spans(inner, out),
         Type::TUniv(_, _) | Type::TCon(_, _) | Type::TVar(_, _) => {}
     }
 }
