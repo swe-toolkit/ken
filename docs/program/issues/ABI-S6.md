@@ -12,7 +12,118 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 8 — OBSERVATION-ONLY (THIRD PASS), AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 8 — FORK-3 REPAIR RULING, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 8 — FORK-3 PRODUCTION REPAIR (the
+> # observation loop is DISCHARGED; a real repair is now authorized). Architect
+> # fork-3 production repair ruling evt_3pq668qnpt0p2 (thr_7wy5wy45p7abm), grounded
+> # at byte-clean fee133142. The valid third observation is independently verified
+> # (witness e32f9561…; trace 47215748…; census 6acabeac…; observation 9f474ad2…;
+> # facts fd91ae09…). Runtime restored byte-clean fee133142; `Cargo.lock`
+> # unchanged.
+> #
+> # CLASSIFICATION — FORK 3: an ordinary-Construct ingress bypass of the existing
+> # transport-aware producer lifecycle. The exact result-bound route is
+> # `TransferRepresentedBoundaryValue` on source `Constructor`/Vis origin 749; its
+> # position-0 specialized child is structurally joined through aggregate
+> # occurrence 182, producer `Source(749)`, to operation-root origin 748 and
+> # exactly response row 4. Current emission owner `Specialization(1)`; the
+> # selected caller's target is `Specialization(2)` and exact response owner is 4.
+> # At refusal the leaf is selected and a checked-IH transport source, but
+> # disposition is `None` and transport emissions are zero. The direct
+> # represented-boundary guard is therefore CORRECT: the producer reached a carrier
+> # join before the call lifecycle that consumes its transport could run. Fix the
+> # INGRESS, not the join or the boundary.
+> #
+> # No new planner relation is needed. `checked_ih_environment_transport_at(
+> # destination_owner, destination_construct_origin)` is the exact unique lookup.
+> # `lower_computational_producer_expr_once` already treats `InvocationReturn` plus
+> # that per-producer transport as the exception to ordinary lowering, calls
+> # `call_checked_ih_environment_transport`, and replaces the constructor by the
+> # returned value; `resolved_continuation_call_target` retargets the complete
+> # caller to owner 4 and `call_declared_unit_target` writes the wordless input as
+> # the exact inert zero slot the owner never loads. The missing step is REACHING
+> # this path.
+> #
+> # REPAIR (`lowering/core.rs::lower_expr`). Immediately after destructuring
+> # `SourceOccurrence`, and strictly BEFORE `enter_source_occurrence_plan(
+> # static_origin)`, detect only this existing structural fact:
+> #   let transport_destination = matches!(expr, RuntimeExpr::Construct { .. })
+> #       && match self.defining_emission_owner {
+> #           Some(owner) => self.static_transition_plan
+> #               .checked_ih_environment_transport_at(owner, static_origin)?
+> #               .is_some(),
+> #           None => false,
+> #       };
+> #   if transport_destination {
+> #       return self.lower_computational_producer_expr(builder,
+> #           SourceOccurrence { expr, static_origin }, env,
+> #           &[EliminatorFrame::InvocationReturn]);
+> #   }
+> #   self.enter_source_occurrence_plan(static_origin)?;
+> # The placement before `enter_source_occurrence_plan` is MANDATORY: the producer
+> # dispatcher enters the same source occurrence itself, so redirecting after the
+> # ordinary entry would double-enter one occurrence and replace a lifecycle fix
+> # with a second authority. The selector is exactly the `(current emission owner,
+> # destination Construct origin)` transport lookup. Do NOT select on
+> # `StaticResponseDeferred`, constructor name, HostOp, response-row/owner ordinal,
+> # adjacency, counts, `D9OperandIdentity`, SSA equality, or frame values. Do NOT
+> # make it response-only — every exact checked-IH transport destination arriving
+> # at ordinary Construct ingress is already assigned to the transport-aware
+> # producer path; response row 4 is merely the witness that exposed the generic
+> # bypass. The producer dispatcher stays the SOLE consumer: do not pass a token,
+> # call the transport from `lower_expr`, copy its assembly, or settle at the
+> # redirect. Non-Construct, no-owner, and lookup-`None` fall through unchanged;
+> # multiplicity remains the existing accessor's refusal.
+> #
+> # CAUSALITY CONTROL — under `cfg(any(test, feature = "px8-ds-test-support"))`:
+> #   pub enum D5bHs8TransportIngressMutation { Exact, BypassExactTransport }
+> #   pub fn with_d5b_hs8_transport_ingress_mutation<T>(
+> #       mutation: D5bHs8TransportIngressMutation, body: impl FnOnce() -> T,
+> #   ) -> (T, usize);
+> # RAII restores `Exact`. `BypassExactTransport` may act only AFTER the exact
+> # per-owner/per-Construct lookup returned `Some`; it increments its application
+> # count and takes the old ordinary-Construct fallthrough without changing the
+> # plan or value. On the unchanged COW witness: exactly one application and
+> # restoration of the exact HS8 `StaticResponseDeferred` boundary refusal; then
+> # restore `Exact` and the positive must advance beyond HS8. Also extend
+> # `invocation_return_transport_selection_is_per_producer_in_production` with an
+> # independent ordinary-ingress arm (fresh bare compiler: `lower_expr` on the
+> # fixture's exact transport destination reaches the same transport-aware producer
+> # decision and stops only at the deliberately absent function-local force target;
+> # retain the same-owner transport-free producer row and both
+> # `has_transport`/`!has_transport` observations) — proving the ingress uses the
+> # existing per-producer discriminator, not a plan-wide transport-presence test.
+> # After advancement, existing ledgers (not a new counter) must establish that row
+> # 4 emits ONE transport call to its resolved response owner, records that owner
+> # call, and receives one final disposition without generically transferring root
+> # 748. Then run the existing response-retarget / execute-then-resume / transport /
+> # disposition / call-slot controls, the owed HS3–HS7 mutations, the HS6 overflow
+> # control, scoped Runtime checks, staticlib, unchanged-stack COW native/
+> # interpreter/parity, and ELF census. STOP IMMEDIATELY ON HS9.
+> #
+> # FENCES: no change to `carried_join_arm`, join planning/representation,
+> # `transfer_represented_boundary_value`, either boundary admissibility walk,
+> # aggregate allocation, placeholder production/classification,
+> # `checked_ih_environment_transport_at`, transport construction, call operand
+> # assembly, caller retargeting, response owner selection/body, candidate
+> # settlement sites/order, claim/discharge equality, required-consumer
+> # realization, either inert call-slot case, carriers, ABI/wire/runtime tags,
+> # generated native representation, source semantics, stack behavior, or TCB. The
+> # ONLY production change: an exact transport-destination Construct can no longer
+> # bypass the already-landed transport-aware `InvocationReturn` producer
+> # dispatcher when it enters through ordinary `lower_expr`.
+> #
+> # DECISIVE TURN. This closes the diagnosed HS8 mechanism IFF the positive
+> # advances. If the repaired witness reaches a NEW structural refusal, that is
+> # HARD STOP 9: preserve/revert and report it; the Architect then holds before
+> # ruling and triggers mandatory §1a Research. Stop count stays 8 and no Research
+> # fires now. STEWARD PACKAGING: the repair grows NO TCB (fully fenced above) and
+> # needs NO ban-lift => Steward amend-in-place, no operator sign-off (as at
+> # HS3–HS7). Runtime stays byte-clean at fee133142 until this amendment lands and
+> # runtime-leader explicitly re-kicks the repair build.
+
+# D5b NATIVE HARD-STOP 8 — OBSERVATION-ONLY (THIRD PASS), AMENDED IN PLACE 2026-09-11 (Steward). Superseded by the fork-3 repair ruling above; retained as the diagnostic history that located the ingress.
 
 > # D5b native-lowering track, HARD STOP 8 — OBSERVATION-ONLY (no repair yet).
 > # Architect classification + observation ruling evt_14wxhxwwf403y
