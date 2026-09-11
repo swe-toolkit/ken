@@ -93,11 +93,20 @@ pub use lowering::{
     composed_return_ret_sink_mutation_is_exact,
     with_checked_ih_direct_application_mutation,
     with_checked_ih_fresh_result_route_emission_observations,
-    with_composed_return_ret_sink_mutation, with_px8ds_retired_flat_order,
-    CheckedIhDirectApplicationMutation, CheckedIhDirectApplicationObservation,
-    CheckedIhFreshResultRouteEmissionObservation, CheckedIhFreshResultRouteObservationMutation,
-    CheckedIhFreshResultRoutePairingLeg, ComposedReturnRetSinkMutation,
-    ComposedReturnRetSinkObservation,
+    with_composed_return_ret_sink_mutation, with_d5b_hs5_source_parent_mutation,
+    with_d5b_hs7_detached_disposition_mutation, with_d5b_hs8_transport_ingress_mutation,
+    with_d5b_hs9_external_root_mutation, with_px8ds_retired_flat_order,
+    CheckedIhDirectApplicationMutation,
+    CheckedIhDirectApplicationObservation, CheckedIhFreshResultRouteEmissionObservation,
+    CheckedIhFreshResultRouteObservationMutation, CheckedIhFreshResultRoutePairingLeg,
+    ComposedReturnRetSinkMutation, ComposedReturnRetSinkObservation,
+    D5bHs5CompositionObservation, D5bHs5DynamicEdgeObservation,
+    D5bHs5SourceParentMutation, D5bHs7DetachedDispositionMutation,
+    D5bHs8TransportIngressMutation, D5bHs9ExternalRootMutation,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::calls::{
+    with_d5b_hs3_call_mutation, D5bHs3CallMutation, D5bHs3CallObservation,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::source::{
@@ -134,6 +143,7 @@ pub use planning::{
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
+    with_d5b_hs10_inline_response_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
     with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals,
@@ -144,7 +154,8 @@ pub use planning::{
     ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
     ComposedReturnForwardRetRoleWitnessObservation,
-    DeferredResponseObservation, RetainedResultClosureProofMutation,
+    D5bHs10InlineResponseMutation, DeferredResponseObservation,
+    RetainedResultClosureProofMutation,
     StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
     StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
     StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,

@@ -83,6 +83,7 @@ use super::effects::{
     PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[allow(unused_imports)]
+use super::immediate_bridge::validate_immediate_bridge_realization_plan;
 use super::joins_traps::{
     build_join_result_plan, planned_partiality_trap, JoinPlanToken, JoinResultRepresentation,
     PlannedJoinResult,
@@ -2050,6 +2051,10 @@ impl<'src> StaticTransitionPlan<'src> {
         // interpret it. This preserves the originating plane's exact refusal
         // under continuation mutations instead of masking it with a derivative
         // transport error.
+        //
+        // HS10's bridge relation is validated first because response-plan
+        // re-derivation consumes it when deciding the owner-less subcase.
+        validate_immediate_bridge_realization_plan(self)?;
         validate_continuation_specialization_plan(self)?;
         validate_aggregate_ownership_plan(self, &self.aggregate_ownership)?;
         validate_checked_ih_environment_transports(self, &self.checked_ih_environment_transports)?;

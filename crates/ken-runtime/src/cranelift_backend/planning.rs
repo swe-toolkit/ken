@@ -35,6 +35,7 @@ pub use static_transition::{
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
+    with_d5b_hs10_inline_response_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
     with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
     with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals,
@@ -45,7 +46,8 @@ pub use static_transition::{
     ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
     ComposedReturnForwardRetRoleWitnessObservation,
-    DeferredResponseObservation, RetainedResultClosureProofMutation,
+    D5bHs10InlineResponseMutation, DeferredResponseObservation,
+    RetainedResultClosureProofMutation,
     StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
     StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
     StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
@@ -109,11 +111,13 @@ pub(super) use static_transition::{
     RequiredConsumerProjectionDisposition, ScaleBPlanCensus,
 };
 pub(super) use static_transition::{
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
-    BoolMatchCaseOrdinals, CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass,
-    JoinPlanToken,
-    JoinResultRepresentation, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
-    SynthesizedFixedConstructorRole,
+    classify_immediate_bridge, dead_arm_effect_trap, malformed_dynamic_constructor_trap,
+    planned_partiality_trap, produces_deforestable_aggregate_with_ih,
+    requires_heterogeneous_deforestation, BoolMatchCaseOrdinals, CaseEmissionStatus,
+    ConstructorIdentity, DeclarationCallTargetClass, ImmediateBridgeCause,
+    ImmediateBridgeConsumer, ImmediateBridgeConsumerKind, ImmediateBridgeRealization,
+    ImmediateBridgeSelection, JoinPlanToken, JoinResultRepresentation, StaticOriginId,
+    StaticTransitionPlan, SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 // `RT-CONTSPEC-ACTIVATE` `D1` — the activation projection's facade route.
 // Namespace re-exports only: no wrapper, no derivation, no second authority.

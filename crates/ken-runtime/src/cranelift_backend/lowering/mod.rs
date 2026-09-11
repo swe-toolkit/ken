@@ -271,7 +271,10 @@ pub(in crate::cranelift_backend) use super::planning::{
     ContinuationSourceSlotAuthority,
     ContinuationSpecializationId,
     ContinuationUnitView, RequiredConsumerProjection, EmittableCallKind,
-    FieldIdentity, JoinPlanToken,
+    FieldIdentity, ImmediateBridgeCause, ImmediateBridgeConsumer,
+    ImmediateBridgeConsumerKind, ImmediateBridgeRealization, ImmediateBridgeSelection,
+    JoinPlanToken, classify_immediate_bridge, produces_deforestable_aggregate_with_ih,
+    requires_heterogeneous_deforestation,
     CaseEmissionStatus, PlannedReferentLifetime,
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
@@ -1032,24 +1035,25 @@ enum TrapExitAuthority {
 /// **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- the generated context's own frame,
 /// CONSTRUCTED at the creation site from the producer's live environment.**
 ///
-/// The closure conversion the Architect ruled (`evt_7vh5nccb9gcqy`). A carried
-/// recursive-position invocation retargeted onto a generated context must
-/// supply that context's whole declared frame, and two of its runs cannot be
-/// gathered where the retarget happens:
+/// The closure conversion the Architect ruled (`evt_7vh5nccb9gcqy`), with the
+/// ABI-S6 D5b HS3 caller partition. A recursive-position invocation retargeted
+/// onto a generated context reaches one of two compiler-private contracts:
 ///
-/// - the **worker-capture tail of the `Parameter` run** -- the carried
-///   invocation supplies only the raw body's declared arguments, so the
-///   selected closure's captures are simply absent there;
-/// - the **`Capture` run** -- the enclosing specialization's continuation
-///   inputs, whose producer-local members live in the producer's semantic
-///   environment and are **not ABI operands at all**, so
-///   `function_local.defining_abi_operands` structurally cannot hold them.
+/// - a raw or carried-residual caller supplies only declared application
+///   arguments, so the exact-key frame supplies the selected worker's capture
+///   suffix when that suffix is nonempty;
+/// - a statically selected direct-worker caller already supplies application
+///   arguments followed by the selected closure's captures, so the frame's
+///   worker vector is alternate-view storage and emits no operand.
 ///
-/// Both runs ARE in hand at `assemble_continuation_call_operands`, which runs
-/// in the enclosing function's body with `producer_env` live and resolves every
-/// member through the planner's own projections. This carries them from there
-/// to the retarget, so the frame is **materialized where its free variables are
-/// live** rather than re-derived where they are not.
+/// The context's own `Capture` run is separate under both contracts. Its
+/// producer-local members live in the producer's semantic environment and are
+/// not ABI operands, so `function_local.defining_abi_operands` structurally
+/// cannot hold them. Both frame vectors are assembled at
+/// `assemble_continuation_call_operands`, where `producer_env` is live and each
+/// member is resolved through the planner's projection. The private caller sum,
+/// never cardinality or operand equality, selects whether the worker vector is
+/// emitted.
 ///
 /// **This supplies members; it relaxes no check.** The operands are presented
 /// in the context's declared order and the consumer re-verifies both
@@ -1070,9 +1074,10 @@ struct ConstructedContextFrame {
     recursive_position: u32,
     /// The selected worker body the context executes.
     worker_body_origin: StaticOriginId,
-    /// The selected closure's captures, in **capture-ordinal** order -- the
-    /// tail of the context's `Parameter` run, after the declared arguments the
-    /// carried invocation itself supplies.
+    /// The selected closure's captures, in capture-ordinal order. Raw callers
+    /// use this as the tail of the context's `Parameter` run; complete direct
+    /// workers already carry the same role run and emit zero operands from this
+    /// alternate view.
     worker_captures: Vec<LoweringOperand>,
     /// The enclosing specialization's continuation inputs, in ordinal order --
     /// the context's own `Capture` run.
@@ -3237,6 +3242,17 @@ struct ComputationalRecursorFramePayload {
     checked_invocation_source: Option<InvocationTemplateRef>,
     checked_invocation_depth: usize,
 }
+impl ComputationalRecursorFramePayload {
+    fn checked_tuple(&self) -> CheckedComputationalFrame {
+        CheckedComputationalFrame {
+            id: self.checked_frame_id,
+            invocation_id: self.checked_invocation_id,
+            invocation_source: self.checked_invocation_source,
+            invocation_depth: self.checked_invocation_depth,
+        }
+    }
+}
+
 #[derive(Clone)]
 struct OwnedSelectedScope {
     scope_origin: RecursorProducerOriginId,
@@ -4236,6 +4252,320 @@ pub fn checked_ih_realization_observation_scope() -> CheckedIhRealizationObserva
         previous_enabled,
         previous_observations: Some(Box::new(previous_observations)),
     }
+}
+
+/// Test-only perturbations of ABI-S6 D5b's exact external-root admission.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs9ExternalRootMutation {
+    Exact,
+    /// After an explicit canonical root matches exactly one `(0, frame)` edge,
+    /// restore the former non-root-only refusal.
+    RejectExactRoot,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static D5B_HS9_EXTERNAL_ROOT_MUTATION: std::cell::Cell<D5bHs9ExternalRootMutation> =
+        const { std::cell::Cell::new(D5bHs9ExternalRootMutation::Exact) };
+    static D5B_HS9_EXTERNAL_ROOT_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Return whether one fully validated canonical external root must take the
+/// former refusal, recording only exact post-edge-match applications.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn d5b_hs9_reject_exact_external_root() -> bool {
+    if D5B_HS9_EXTERNAL_ROOT_MUTATION.with(std::cell::Cell::get)
+        == D5bHs9ExternalRootMutation::RejectExactRoot
+    {
+        D5B_HS9_EXTERNAL_ROOT_MUTATION_APPLICATIONS
+            .with(|applications| applications.set(applications.get() + 1));
+        true
+    } else {
+        false
+    }
+}
+
+/// Run one compile under the HS9 exact-root mutation and return the number of
+/// fully validated canonical external roots it rejected.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_d5b_hs9_external_root_mutation<T>(
+    mutation: D5bHs9ExternalRootMutation,
+    body: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D5B_HS9_EXTERNAL_ROOT_MUTATION
+                .with(|cell| cell.set(D5bHs9ExternalRootMutation::Exact));
+        }
+    }
+
+    D5B_HS9_EXTERNAL_ROOT_MUTATION.with(|cell| cell.set(mutation));
+    D5B_HS9_EXTERNAL_ROOT_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    let restore = Restore;
+    let result = body();
+    let applications =
+        D5B_HS9_EXTERNAL_ROOT_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, applications)
+}
+
+/// Test-only perturbations of ABI-S6 D5b's exact transport-destination ingress.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs8TransportIngressMutation {
+    Exact,
+    /// After the exact per-owner/per-Construct transport lookup succeeds, take
+    /// the former ordinary `lower_expr` fallthrough instead of redirecting to
+    /// the transport-aware producer dispatcher.
+    BypassExactTransport,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static D5B_HS8_TRANSPORT_INGRESS_MUTATION:
+        std::cell::Cell<D5bHs8TransportIngressMutation> =
+        const { std::cell::Cell::new(D5bHs8TransportIngressMutation::Exact) };
+    static D5B_HS8_TRANSPORT_INGRESS_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Return whether a confirmed exact transport destination must take the old
+/// ordinary ingress, recording only actual post-lookup bypasses.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn d5b_hs8_bypass_exact_transport_ingress() -> bool {
+    if D5B_HS8_TRANSPORT_INGRESS_MUTATION.with(std::cell::Cell::get)
+        == D5bHs8TransportIngressMutation::BypassExactTransport
+    {
+        D5B_HS8_TRANSPORT_INGRESS_MUTATION_APPLICATIONS
+            .with(|applications| applications.set(applications.get() + 1));
+        true
+    } else {
+        false
+    }
+}
+
+/// Run one compile under the HS8 exact-transport ingress mutation and return
+/// the number of confirmed transport destinations it bypassed.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_d5b_hs8_transport_ingress_mutation<T>(
+    mutation: D5bHs8TransportIngressMutation,
+    body: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D5B_HS8_TRANSPORT_INGRESS_MUTATION
+                .with(|cell| cell.set(D5bHs8TransportIngressMutation::Exact));
+        }
+    }
+
+    D5B_HS8_TRANSPORT_INGRESS_MUTATION.with(|cell| cell.set(mutation));
+    D5B_HS8_TRANSPORT_INGRESS_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    let restore = Restore;
+    let result = body();
+    let applications =
+        D5B_HS8_TRANSPORT_INGRESS_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, applications)
+}
+
+/// Test-only perturbations of ABI-S6 D5b's detached-result disposition read.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs7DetachedDispositionMutation {
+    Exact,
+    /// Ignore an exact `InlineNoCall` disposition so the edge remains in the
+    /// constructor-required residual.
+    IgnoreInlineNoCall,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static D5B_HS7_DETACHED_DISPOSITION_MUTATION:
+        std::cell::Cell<D5bHs7DetachedDispositionMutation> =
+        const { std::cell::Cell::new(D5bHs7DetachedDispositionMutation::Exact) };
+    static D5B_HS7_DETACHED_DISPOSITION_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn d5b_hs7_ignore_inline_no_call(inline_no_call: bool) -> bool {
+    if inline_no_call
+        && D5B_HS7_DETACHED_DISPOSITION_MUTATION.with(std::cell::Cell::get)
+            == D5bHs7DetachedDispositionMutation::IgnoreInlineNoCall
+    {
+        D5B_HS7_DETACHED_DISPOSITION_MUTATION_APPLICATIONS
+            .with(|applications| applications.set(applications.get() + 1));
+        true
+    } else {
+        false
+    }
+}
+
+/// Run one compile under the HS7 detached-disposition mutation and return the
+/// number of exact `InlineNoCall` identities on which it applied.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_d5b_hs7_detached_disposition_mutation<T>(
+    mutation: D5bHs7DetachedDispositionMutation,
+    body: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D5B_HS7_DETACHED_DISPOSITION_MUTATION
+                .with(|cell| cell.set(D5bHs7DetachedDispositionMutation::Exact));
+        }
+    }
+
+    D5B_HS7_DETACHED_DISPOSITION_MUTATION.with(|cell| cell.set(mutation));
+    D5B_HS7_DETACHED_DISPOSITION_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    let restore = Restore;
+    let result = body();
+    let applications = D5B_HS7_DETACHED_DISPOSITION_MUTATION_APPLICATIONS
+        .with(std::cell::Cell::get);
+    drop(restore);
+    (result, applications)
+}
+
+/// Test-only perturbations of ABI-S6 D5b's source-parent role transition.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs5SourceParentMutation {
+    Exact,
+    /// Keep the source parent's invocation on the layer that must become the
+    /// newly minted child.
+    RetainParentInChildLayer,
+    /// Unqualify the child layer but withhold the captured parent identity from
+    /// the edge mint.
+    DropSourceParentAtMint,
+    /// Mint and validate the parent edge, then withhold only the transient
+    /// source-parent tuple from composition.
+    DropSourceParentAtCompose,
+}
+
+/// One dynamic-splice edge minted while exercising D5b's checked-IH chain.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct D5bHs5DynamicEdgeObservation {
+    pub child_invocation_instance_id: u64,
+    pub parent_invocation_instance_id: u64,
+    pub checked_call_template_id: u64,
+    pub parent_frame_template_id: u64,
+    pub segment_site_id: u64,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+impl D5bHs5DynamicEdgeObservation {
+    pub fn parent_is_distinguished_root(self) -> bool {
+        self.parent_invocation_instance_id == 0
+    }
+}
+
+/// The exact transient external-parent relation accepted by one composition.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct D5bHs5CompositionObservation {
+    pub external_parent_invocation_instance_id: u64,
+    pub external_parent_frame_template_id: u64,
+    pub matching_edge_count: usize,
+    pub child_invocation_instance_id: u64,
+    pub child_frame_template_id: u64,
+    pub child_key_present: bool,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static D5B_HS5_SOURCE_PARENT_MUTATION: std::cell::Cell<D5bHs5SourceParentMutation> =
+        const { std::cell::Cell::new(D5bHs5SourceParentMutation::Exact) };
+    static D5B_HS5_SOURCE_PARENT_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static D5B_HS5_DYNAMIC_EDGE_OBSERVATIONS:
+        std::cell::RefCell<Vec<D5bHs5DynamicEdgeObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static D5B_HS5_COMPOSITION_OBSERVATIONS:
+        std::cell::RefCell<Vec<D5bHs5CompositionObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn d5b_hs5_source_parent_mutation() -> D5bHs5SourceParentMutation {
+    D5B_HS5_SOURCE_PARENT_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn d5b_hs5_record_mutation_application() {
+    D5B_HS5_SOURCE_PARENT_MUTATION_APPLICATIONS
+        .with(|applications| applications.set(applications.get() + 1));
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_d5b_hs5_dynamic_edge_observation(edge: &DynamicSpliceEdge) {
+    D5B_HS5_DYNAMIC_EDGE_OBSERVATIONS.with(|observations| {
+        observations
+            .borrow_mut()
+            .push(D5bHs5DynamicEdgeObservation {
+                child_invocation_instance_id: edge.child_invocation_instance_id,
+                parent_invocation_instance_id: edge.parent_invocation_instance_id,
+                checked_call_template_id: edge.checked_call_template_id,
+                parent_frame_template_id: edge.parent_frame_template_id,
+                segment_site_id: edge.segment_site_id,
+            });
+    });
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_d5b_hs5_composition_observation(observation: D5bHs5CompositionObservation) {
+    D5B_HS5_COMPOSITION_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().push(observation));
+}
+
+/// Run one compile under an HS5 role-transition mutation and return its exact
+/// mint/composition observations plus the number of mutation applications.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_d5b_hs5_source_parent_mutation<T>(
+    mutation: D5bHs5SourceParentMutation,
+    body: impl FnOnce() -> T,
+) -> (
+    T,
+    Vec<D5bHs5DynamicEdgeObservation>,
+    Vec<D5bHs5CompositionObservation>,
+    usize,
+) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D5B_HS5_SOURCE_PARENT_MUTATION
+                .with(|cell| cell.set(D5bHs5SourceParentMutation::Exact));
+        }
+    }
+
+    D5B_HS5_SOURCE_PARENT_MUTATION.with(|cell| cell.set(mutation));
+    D5B_HS5_SOURCE_PARENT_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    D5B_HS5_DYNAMIC_EDGE_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    D5B_HS5_COMPOSITION_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    let restore = Restore;
+    let result = body();
+    let edges =
+        D5B_HS5_DYNAMIC_EDGE_OBSERVATIONS.with(|observations| observations.borrow().clone());
+    let compositions =
+        D5B_HS5_COMPOSITION_OBSERVATIONS.with(|observations| observations.borrow().clone());
+    let applications =
+        D5B_HS5_SOURCE_PARENT_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, edges, compositions, applications)
 }
 
 #[derive(Clone, Copy)]
@@ -8865,6 +9195,18 @@ struct ComputationalEliminatorFrame<'a> {
     /// which keeps the existing closed default exactly as it was.
     answer_route: SourceComputationalAnswerRoute,
 }
+
+impl ComputationalEliminatorFrame<'_> {
+    fn checked_tuple(&self) -> CheckedComputationalFrame {
+        CheckedComputationalFrame {
+            id: self.checked_frame_id,
+            invocation_id: self.checked_invocation_id,
+            invocation_source: self.checked_invocation_source,
+            invocation_depth: self.checked_invocation_depth,
+        }
+    }
+}
+
 /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1 — one carried
 /// invocation's RETAINED SOURCE COORDINATES.**
 ///
@@ -9427,6 +9769,7 @@ fn compose_oriented_subcontinuation(
     activation: ContinuationActivationId,
     mut segment: RecursorInvocationSegment,
     dynamic_splice_edges: Vec<DynamicSpliceEdge>,
+    external_source_parent: Option<CheckedComputationalFrame>,
 ) -> Result<InstalledOrientedSubcontinuationSegment, CraneliftBackendError> {
     // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the receipt travels ON the segment,
     // so composition is decided where the capability was spent rather than
@@ -9443,6 +9786,62 @@ fn compose_oriented_subcontinuation(
         })?;
         instantiate_checked_invocation_segment(plan, invocation, &mut segment)?;
     }
+    let external_source_parent_key = match external_source_parent {
+        Some(parent) => {
+            let frame_id = parent.id.ok_or_else(|| {
+                unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "an external source parent has no checked frame identity",
+                )
+            })?;
+            let nonroot = parent.nonroot_invocation()?;
+            let invocation_id = match nonroot {
+                Some((invocation_id, _, _)) => invocation_id,
+                None => 0,
+            };
+            let key = (invocation_id, frame_id);
+            let matching = dynamic_splice_edges
+                .iter()
+                .filter(|edge| {
+                    (edge.parent_invocation_instance_id, edge.parent_frame_template_id) == key
+                })
+                .collect::<Vec<_>>();
+            if matching.len() != 1 {
+                return Err(unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "an external source parent does not match exactly one incoming dynamic edge",
+                ));
+            }
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            if nonroot.is_none() && d5b_hs9_reject_exact_external_root() {
+                return Err(unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "an external source parent is not a non-root checked invocation",
+                ));
+            }
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            {
+                let edge = matching[0];
+                let child_key_present = std::iter::once(&segment.selection)
+                    .chain(segment.unwind.later_wrappers_in_construction_order.iter())
+                    .any(|layer| {
+                        layer.checked_invocation_id
+                            == Some(edge.child_invocation_instance_id)
+                            && layer.checked_frame_id == Some(edge.parent_frame_template_id)
+                    });
+                record_d5b_hs5_composition_observation(D5bHs5CompositionObservation {
+                    external_parent_invocation_instance_id: invocation_id,
+                    external_parent_frame_template_id: frame_id,
+                    matching_edge_count: matching.len(),
+                    child_invocation_instance_id: edge.child_invocation_instance_id,
+                    child_frame_template_id: edge.parent_frame_template_id,
+                    child_key_present,
+                });
+            }
+            Some(key)
+        }
+        None => None,
+    };
     let producer_origin = segment.origin;
     let sibling_position = segment.sibling_position;
     let resume_cursor = segment.resume_cursor;
@@ -9737,17 +10136,20 @@ fn compose_oriented_subcontinuation(
                     ));
                 }
             } else {
-                if edge.parent_invocation_instance_id != 0 {
+                let parent_key = (
+                    edge.parent_invocation_instance_id,
+                    edge.parent_frame_template_id,
+                );
+                if edge.parent_invocation_instance_id != 0
+                    && external_source_parent_key != Some(parent_key)
+                {
                     return Err(unsupported(
                         "OrientedSubcontinuationPlanV1",
                         "dynamic splice edge names a stale parent invocation",
                     ));
                 }
                 if external_children
-                    .insert(
-                        edge.parent_frame_template_id,
-                        edge.child_invocation_instance_id,
-                    )
+                    .insert(parent_key, edge.child_invocation_instance_id)
                     .is_some()
                 {
                     return Err(unsupported(
@@ -9765,7 +10167,7 @@ fn compose_oriented_subcontinuation(
                 ));
             }
             let mut roots = external_children.into_iter().collect::<Vec<_>>();
-            roots.sort_by_key(|(parent_frame, _)| {
+            roots.sort_by_key(|((_, parent_frame), _)| {
                 plan.frame(*parent_frame)
                     .expect("validated external parent frame")
                     .semantic_position
@@ -11102,7 +11504,7 @@ struct DeferredConstructorCaseEnvironment<'a> {
 }
 /// **`D8m`** — the four checked facts a source `ComputationalMatch` frame
 /// carries, kept together so no site can supply three of them.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct CheckedComputationalFrame {
     id: Option<u64>,
     invocation_id: Option<u64>,
@@ -11110,110 +11512,30 @@ struct CheckedComputationalFrame {
     invocation_depth: usize,
 }
 
-#[derive(Clone, Copy)]
-/// **`RT-CONTSRC-PRODUCER-LOCAL` `D8m` — the closed bridge descriptor.**
-///
-/// Exactly three admissible shapes for the case body an
-/// `immediate_binder_eliminator` bridge is built from, and no fourth:
-///
-/// 1. a direct [`RuntimeExpr::ComputationalMatch`];
-/// 2. a direct ordinary [`RuntimeExpr::Match`];
-/// 3. exactly `CheckedSubcontinuationFrame { frame_id, body: ComputationalMatch }`.
-///
-/// ⭐⭐ **The third exists because the bridge is an OPTIMIZATION of the source
-/// match, not a new semantic frame.** The source declared one checked frame
-/// there; deforesting the producer into it does not create a second frame and
-/// must not lose the first. Before `D8m` the bridge always carried
-/// `checked_frame_id: None`, so a checked IH slot inside a composed case body
-/// refused as "detached from its checked frame" — the `D8f` hard stop.
-///
-/// ⛔ **Nothing here mints, borrows or infers a frame identity.** The id is the
-/// one the source marker carries and is reached only by matching that exact
-/// shape. There is deliberately no fingerprint lookup, no body-shape match, no
-/// origin coincidence, no "the only frame in the plan", and no generic wrapper
-/// peeling: a marker around anything but a `ComputationalMatch`, or any other
-/// checked wrapper kind, simply is not a bridge.
-enum ImmediateBinderEliminator<'a> {
-    Computational {
-        cases: &'a [crate::RuntimeComputationalMatchCase],
-        default: &'a RuntimeTrap,
-    },
-    Ordinary {
-        cases: &'a [crate::RuntimeMatchCase],
-        default: &'a RuntimeTrap,
-    },
-    /// The wrapped form. ⛔ The match's own occurrence is **child 0 of the
-    /// marker occurrence**, never the wrapper's origin — the wrapper is not the
-    /// frame, it names it.
-    CheckedComputational {
-        frame_id: u64,
-        cases: &'a [crate::RuntimeComputationalMatchCase],
-        default: &'a RuntimeTrap,
-    },
-}
-fn immediate_binder_eliminator(
-    body: &RuntimeExpr,
-    argument_binder_offset: usize,
-    argument_binders: usize,
-) -> Option<(usize, ImmediateBinderEliminator<'_>)> {
-    let (scrutinee, eliminator) = match body {
-        RuntimeExpr::ComputationalMatch {
-            scrutinee,
-            cases,
-            default,
-        } => (
-            scrutinee.as_ref(),
-            ImmediateBinderEliminator::Computational { cases, default },
-        ),
-        // `D8m` — the EXACT wrapped shape, and only it. ⛔ Not a loop, not a
-        // helper that strips any checked wrapper: a `CheckedRecursiveInvocation`
-        // or a `CheckedJoinSite` around a match is a different construct with a
-        // different consumption law, and peeling it here would silently give the
-        // bridge an identity nobody transported for it.
-        RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
-            let RuntimeExpr::ComputationalMatch {
-                scrutinee,
-                cases,
-                default,
-            } = body.as_ref()
-            else {
-                return None;
-            };
-            (
-                scrutinee.as_ref(),
-                ImmediateBinderEliminator::CheckedComputational {
-                    frame_id: *frame_id,
-                    cases,
-                    default,
-                },
-            )
+impl CheckedComputationalFrame {
+    fn nonroot_invocation(
+        self,
+    ) -> Result<Option<(u64, InvocationTemplateRef, usize)>, CraneliftBackendError> {
+        match (
+            self.id,
+            self.invocation_id,
+            self.invocation_source,
+            self.invocation_depth,
+        ) {
+            (None, None, None, 0)
+            | (Some(_), None, None, 0)
+            | (Some(_), Some(0), None, 0) => Ok(None),
+            (Some(_), Some(id), Some(source), depth) if id != 0 && depth != 0 => {
+                Ok(Some((id, source, depth)))
+            }
+            _ => Err(unsupported(
+                "OrientedSubcontinuationPlanV1",
+                "a computational frame carries an inconsistent checked invocation tuple",
+            )),
         }
-        RuntimeExpr::Match {
-            scrutinee,
-            cases,
-            default,
-        } => (
-            scrutinee.as_ref(),
-            ImmediateBinderEliminator::Ordinary { cases, default },
-        ),
-        _ => return None,
-    };
-    let RuntimeExpr::Var(index) = scrutinee else {
-        return None;
-    };
-    let index = usize::try_from(*index).ok()?;
-    let field = index.checked_sub(argument_binder_offset)?;
-    (field < argument_binders).then_some((field, eliminator))
+    }
 }
-fn requires_heterogeneous_deforestation(expr: &RuntimeExpr) -> bool {
-    matches!(
-        expr,
-        RuntimeExpr::Match { .. }
-            | RuntimeExpr::ComputationalMatch { .. }
-            | RuntimeExpr::If { .. }
-            | RuntimeExpr::Call { .. }
-    ) && produces_deforestable_aggregate_with_ih(expr, &BTreeSet::new())
-}
+
 fn reaches_environment_computational_recursor(
     expr: &RuntimeExpr,
     env: &[LoweringEnvironmentBinding],
@@ -11239,75 +11561,6 @@ fn reaches_environment_computational_recursor(
         .collect();
     produces_deforestable_aggregate_with_ih(expr, &recursive_hypotheses)
         && !produces_deforestable_aggregate_with_ih(expr, &BTreeSet::new())
-}
-fn shifted_aggregate_ihs(aggregate_ihs: &BTreeSet<usize>, by: usize) -> BTreeSet<usize> {
-    aggregate_ihs.iter().map(|index| index + by).collect()
-}
-fn produces_deforestable_aggregate_with_ih(
-    expr: &RuntimeExpr,
-    aggregate_ihs: &BTreeSet<usize>,
-) -> bool {
-    match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. } => {
-            produces_deforestable_aggregate_with_ih(body, aggregate_ihs)
-        }
-        RuntimeExpr::Construct { .. } => true,
-        RuntimeExpr::Let { body, .. } => {
-            produces_deforestable_aggregate_with_ih(body, &shifted_aggregate_ihs(aggregate_ihs, 1))
-        }
-        RuntimeExpr::Match { cases, .. } => {
-            !cases.is_empty()
-                && cases.iter().all(|case| {
-                    produces_deforestable_aggregate_with_ih(
-                        &case.body,
-                        &shifted_aggregate_ihs(aggregate_ihs, case.binders),
-                    )
-                })
-        }
-        RuntimeExpr::ComputationalMatch { cases, .. } => {
-            !cases.is_empty()
-                && cases.iter().all(|case| {
-                    let mut case_ihs = (0..case.recursive_positions.len()).collect::<BTreeSet<_>>();
-                    case_ihs.extend(aggregate_ihs.iter().map(|index| {
-                        index + case.recursive_positions.len() + case.argument_binders
-                    }));
-                    produces_deforestable_aggregate_with_ih(&case.body, &case_ihs)
-                })
-        }
-        RuntimeExpr::If {
-            then_expr,
-            else_expr,
-            ..
-        } => {
-            produces_deforestable_aggregate_with_ih(then_expr, aggregate_ihs)
-                && produces_deforestable_aggregate_with_ih(else_expr, aggregate_ihs)
-        }
-        RuntimeExpr::Call { callee, .. } => {
-            if let RuntimeExpr::Var(index) = callee.as_ref() {
-                return usize::try_from(*index).is_ok_and(|index| aggregate_ihs.contains(&index));
-            }
-            match callee.as_ref() {
-                RuntimeExpr::Closure {
-                    captures,
-                    params,
-                    body,
-                } => produces_deforestable_aggregate_with_ih(
-                    body,
-                    &shifted_aggregate_ihs(aggregate_ihs, params.len() + captures.len()),
-                ),
-                RuntimeExpr::LexicalClosure {
-                    captures,
-                    params,
-                    body,
-                } => produces_deforestable_aggregate_with_ih(
-                    body,
-                    &shifted_aggregate_ihs(aggregate_ihs, params.len() + captures.len()),
-                ),
-                _ => false,
-            }
-        }
-        _ => false,
-    }
 }
 fn produces_recursive_deforestable_aggregate(expr: &RuntimeExpr, symbol: &str) -> bool {
     match expr {
@@ -11843,6 +12096,7 @@ impl<'a> Lowering<'a> {
     fn mint_checked_computational_ih_instance(
         &mut self,
         value: &mut Lowered,
+        source_open_parent: Option<&OwnedSelectedScope>,
     ) -> Result<Option<CheckedRecursiveInvocationInstance>, CraneliftBackendError> {
         let Some(pending) = self.pending_computational_ih_call.take() else {
             return Ok(None);
@@ -11886,44 +12140,109 @@ impl<'a> Lowering<'a> {
                 "computational IH invocation has no checked parent segment",
             )
         })?;
-        let mut parents = std::iter::once(&invocation.selection)
-            .chain(
-                invocation
-                    .unwind
-                    .later_wrappers_in_construction_order
-                    .iter(),
-            )
-            .filter(|layer| {
-                layer.semantic_pending && layer.checked_frame_id == Some(parent_frame_template_id)
-            });
-        let selected = parents.next().ok_or_else(|| {
-            unsupported(
-                "OrientedSubcontinuationPlanV1",
-                "computational IH closure has no exact checked open parent occurrence",
-            )
-        })?;
-        if parents.next().is_some() {
-            return Err(unsupported(
-                "OrientedSubcontinuationPlanV1",
-                "computational IH closure has multiple candidate dynamic parent occurrences",
-            ));
-        }
-        let parent_invocation_instance_id = match selected.checked_invocation_id {
-            Some(instance_id) => instance_id,
-            None if selected.checked_invocation_source.is_none() => 0,
-            None => {
-                return Err(unsupported(
-                    "OrientedSubcontinuationPlanV1",
-                    format!(
-                        "computational IH closure-selected occurrence has no dynamic parent identity: frame={:?} source={:?} depth={} handles={:?}",
-                        selected.checked_frame_id,
-                        selected.checked_invocation_source,
-                        selected.checked_invocation_depth,
-                        invocation.dynamic_splice_edges,
-                    ),
-                ))
-            }
-        };
+        let existing_selected_parent_id =
+            |invocation: &RecursorInvocationSegment| -> Result<u64, CraneliftBackendError> {
+                let mut parents = std::iter::once(&invocation.selection)
+                    .chain(
+                        invocation
+                            .unwind
+                            .later_wrappers_in_construction_order
+                            .iter(),
+                    )
+                    .filter(|layer| {
+                        layer.semantic_pending
+                            && layer.checked_frame_id == Some(parent_frame_template_id)
+                    });
+                let selected = parents.next().ok_or_else(|| {
+                    unsupported(
+                        "OrientedSubcontinuationPlanV1",
+                        "computational IH closure has no exact checked open parent occurrence",
+                    )
+                })?;
+                if parents.next().is_some() {
+                    return Err(unsupported(
+                        "OrientedSubcontinuationPlanV1",
+                        "computational IH closure has multiple candidate dynamic parent occurrences",
+                    ));
+                }
+                match selected.checked_invocation_id {
+                    Some(instance_id) => Ok(instance_id),
+                    None if selected.checked_invocation_source.is_none() => Ok(0),
+                    None => Err(unsupported(
+                        "OrientedSubcontinuationPlanV1",
+                        format!(
+                            "computational IH closure-selected occurrence has no dynamic parent identity: frame={:?} source={:?} depth={} handles={:?}",
+                            selected.checked_frame_id,
+                            selected.checked_invocation_source,
+                            selected.checked_invocation_depth,
+                            invocation.dynamic_splice_edges,
+                        ),
+                    )),
+                }
+            };
+        let source_parent = source_open_parent
+            .map(|open| {
+                let checked = open.frame.checked_tuple();
+                Ok((open, checked, checked.nonroot_invocation()?))
+            })
+            .transpose()?;
+        let parent_invocation_instance_id =
+            if let Some((open, checked, Some((parent, _, _)))) = source_parent {
+                let selected = &mut invocation.selection;
+                let held = CheckedComputationalFrame {
+                    id: selected.checked_frame_id,
+                    invocation_id: selected.checked_invocation_id,
+                    invocation_source: selected.checked_invocation_source,
+                    invocation_depth: selected.checked_invocation_depth,
+                };
+                if checked.id != Some(parent_frame_template_id)
+                    || held != checked
+                    || selected.static_origin != open.frame.static_origin
+                    || selected.provenance != open.frame.provenance
+                    || !matches!(
+                        selected.role,
+                        RecursorLayerRole::SelectsOccurrence { origin }
+                            if origin == invocation.origin && origin == open.scope_origin
+                    )
+                {
+                    return Err(unsupported(
+                        "OrientedSubcontinuationPlanV1",
+                        "a source checked-IH child does not match its exact open parent occurrence",
+                    ));
+                }
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                {
+                    match d5b_hs5_source_parent_mutation() {
+                        D5bHs5SourceParentMutation::RetainParentInChildLayer => {
+                            d5b_hs5_record_mutation_application();
+                            parent
+                        }
+                        D5bHs5SourceParentMutation::DropSourceParentAtMint => {
+                            selected.checked_invocation_id = None;
+                            selected.checked_invocation_source = None;
+                            selected.checked_invocation_depth = 0;
+                            d5b_hs5_record_mutation_application();
+                            existing_selected_parent_id(invocation)?
+                        }
+                        D5bHs5SourceParentMutation::Exact
+                        | D5bHs5SourceParentMutation::DropSourceParentAtCompose => {
+                            selected.checked_invocation_id = None;
+                            selected.checked_invocation_source = None;
+                            selected.checked_invocation_depth = 0;
+                            parent
+                        }
+                    }
+                }
+                #[cfg(not(any(test, feature = "px8-ds-test-support")))]
+                {
+                    selected.checked_invocation_id = None;
+                    selected.checked_invocation_source = None;
+                    selected.checked_invocation_depth = 0;
+                    parent
+                }
+            } else {
+                existing_selected_parent_id(invocation)?
+            };
         let selected_site = plan
             .frame(parent_frame_template_id)
             .map(|frame| frame.segment_site_id)
@@ -11974,6 +12293,12 @@ impl<'a> Lowering<'a> {
                 "dynamic splice edge identity was minted twice",
             ));
         }
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        record_d5b_hs5_dynamic_edge_observation(
+            self.dynamic_splice_edges
+                .get(&edge_id)
+                .expect("the dynamic splice edge was inserted immediately above"),
+        );
         invocation.dynamic_splice_edges.push(edge_id);
         #[cfg(any(test, feature = "checked-ih-realization-observation"))]
         record_checked_ih_realization_observation(
@@ -12072,7 +12397,7 @@ impl<'a> Lowering<'a> {
         // carried boundary word is not one and never becomes one, so this stays
         // a specialized-only surface with the ruled fail-closed arm.
         let mut value = value.specialized_at("a checked computational-IH marker")?;
-        let Some(instance) = self.mint_checked_computational_ih_instance(&mut value)? else {
+        let Some(instance) = self.mint_checked_computational_ih_instance(&mut value, None)? else {
             return Ok(LoweringOperand::Specialized(value));
         };
         let Lowered::ComputationalRecursorClosure { invocation, .. } = &mut value else {
@@ -12338,7 +12663,7 @@ impl<'a> Lowering<'a> {
         outer_env: Vec<LoweringEnvironmentBinding>,
         static_origin: StaticOriginId,
         provenance: RecursorFrameProvenance,
-        checked_frame_id: Option<u64>,
+        checked: CheckedComputationalFrame,
         computational_ih_slot_template_id: Option<u64>,
         origin: RecursorProducerOriginId,
         sibling_position: usize,
@@ -12370,26 +12695,26 @@ impl<'a> Lowering<'a> {
         });
         let (residual, payload) = decompose_computational_recursor(recursive);
         let active_instance = self.active_recursive_invocations.last().copied();
-        // ⛔ **The frame identity is TRANSPORTED, never inferred**
-        // (`dec_s30rdnb1dvgk`). This site used to fall back, when
-        // `checked_frame_id` was `None`, to `find`ing a `callee_frame_templates`
-        // entry whose `runtime_frame_fingerprint` equalled one recomputed from
-        // `cases`/`default`. `AC-F1` deliberately makes body-only differences
-        // share a header fingerprint, so that `find` cannot discriminate a
-        // callee declaration's two same-family computational frames — it
-        // returns the first, silently.
+        // ⛔ **The complete checked tuple is TRANSPORTED, never inferred**
+        // (`dec_s30rdnb1dvgk`, Architect `evt_2c6snkcgb7bnf`). This site once
+        // accepted only `checked_frame_id` and re-derived the invocation id,
+        // source, and depth from `active_recursive_invocations`. That stack
+        // describes the invocation currently executing, not the dynamic parent
+        // occurrence owned by the source frame; after a checked-IH installation
+        // it can lawfully be empty while the frame still names its parent.
         //
-        // ⛔ Do not restore any recovery here, in any spelling: not header
-        // equality, not body equality, not `StaticOriginId`, not vector
-        // position, and not "the only remaining match." Each of those is
-        // Runtime *inference*; the oriented plan's checked identity is the
-        // authority. A missing identity is rejected in
-        // `instantiate_checked_invocation_segment`, before CFG.
-        let exact_frame_id = checked_frame_id;
-        let invocation_id = exact_frame_id
-            .and_then(|_| active_instance.map(|instance| instance.invocation_instance_id));
-        let invocation_source = active_instance.map(|instance| instance.source);
-        let invocation_depth = active_instance.map_or(0, |instance| instance.semantic_depth);
+        // The two external-root spellings normalize to the existing
+        // unqualified layer because invocation zero is the distinguished root
+        // and has no `InvocationTemplateRef`. Every non-root tuple is copied
+        // byte-for-value. No frame, origin, provenance, body, arity, or ambient
+        // stack state participates in this classification, and every partial or
+        // contradictory tuple refuses.
+        let exact_frame_id = checked.id;
+        let (invocation_id, invocation_source, invocation_depth) = checked
+            .nonroot_invocation()?
+            .map_or((None, None, 0), |(id, source, depth)| {
+                (Some(id), Some(source), depth)
+            });
         let mut current_layer = ComputationalRecursorLayer {
             cases,
             default,
