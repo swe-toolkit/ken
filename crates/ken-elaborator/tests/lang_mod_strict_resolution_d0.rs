@@ -409,6 +409,28 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            "Algorithm.Sorting.InsertionSort".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // ArgParse now declares its exact Schema, diagnostics, formatting,
             // parsing, and collection dependencies. Its ordinary package
             // boundary loads while strict mode retains only provider compiler
@@ -1008,6 +1030,30 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            "Data.Collections.Map".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "MkUnit",
+                "Not",
+                "Prop",
+                "Proved",
+                "Top",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // NonEmpty now declares its exact LawfulFunctors, Transport, and
             // Derived dependencies. Its ordinary package boundary loads while
             // the strict-floor census retains the compiler convenience names.
@@ -1207,11 +1253,7 @@ fn catalog_ambient_passthrough_migration_census() {
     .into_iter()
     .map(str::to_string)
     .collect::<BTreeSet<_>>();
-    let expected_residuals = [
-        "Algorithm.Searching.OrderedSearch",
-        "Algorithm.Sorting.InsertionSort",
-        "Data.Collections.Map",
-    ]
+    let expected_residuals = ["Algorithm.Searching.OrderedSearch"]
     .into_iter()
     .map(str::to_string)
     .collect::<BTreeSet<_>>();

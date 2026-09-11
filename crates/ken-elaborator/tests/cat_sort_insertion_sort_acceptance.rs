@@ -32,7 +32,8 @@ fn elaborate_insertion_sort(env: &mut ElabEnv) {
     let extracted = ken_elaborator::literate::extract_ken_md(INSERTION_SORT_KEN_MD)
         .expect("InsertionSort literate source must extract");
     let expected_imports = BTreeSet::from([
-        "import Core.Classes.LawfulClasses (ord_leq_at)",
+        "import Core.Classes.LawfulClasses (ord_leq_at, bool_or)",
+        "import Core.Logic.Transport (sym, cong, trans)",
         "import Data.Collections.Derived (count, eq_from_ord)",
     ]);
     let mut removed_imports = BTreeSet::new();
@@ -52,7 +53,7 @@ fn elaborate_insertion_sort(env: &mut ElabEnv) {
         .join("\n");
     assert_eq!(
         removed_imports, expected_imports,
-        "the fixture must remove exactly the two declared provider imports"
+        "the fixture must remove exactly the three declared provider imports"
     );
     env.elaborate_file(&source)
         .expect("Algorithm/Sorting/InsertionSort.ken.md must elaborate");

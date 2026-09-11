@@ -79,8 +79,13 @@ fn module_transparent_kernel_equivalents(
 fn map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    for imported in ["cong", "sym", "trans", "list_append"] {
+        assert!(
+            !env.globals.contains_key(imported),
+            "Map's declared import must supply `{imported}` rather than an ambient alias"
+        );
+    }
     for imported in LC_BOOL_AND_SURFACES {
         assert!(
             env.globals.remove(imported).is_some(),

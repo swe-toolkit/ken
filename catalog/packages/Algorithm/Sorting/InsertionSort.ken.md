@@ -11,7 +11,9 @@ algorithm and its proofs use the same ordering evidence.
 both sides, where equality is induced by the lawful total order.
 
 ```ken
-import Core.Classes.LawfulClasses (ord_leq_at)
+import Core.Classes.LawfulClasses (ord_leq_at, bool_or)
+
+import Core.Logic.Transport (sym, cong, trans)
 
 import Data.Collections.Derived (count, eq_from_ord)
 

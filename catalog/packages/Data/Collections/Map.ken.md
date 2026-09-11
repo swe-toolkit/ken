@@ -81,6 +81,10 @@ import Core.Classes.LawfulClasses (bool_and)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
+import Core.Logic.Transport (cong, trans, sym)
+
+import Data.Collections.Derived (list_append)
+
 import Data.Sums.Combinators (is_some)
 
 data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
