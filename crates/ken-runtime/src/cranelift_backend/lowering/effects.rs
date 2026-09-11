@@ -3516,6 +3516,43 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .stack_store(protection, request, request_offset(1));
             }
+            ken_host::HostOpV1::MappingAcquireFile => {
+                if capability.is_some() {
+                    return Err(unsupported(
+                        "Effect",
+                        "MappingAcquireFile carried a capability",
+                    ));
+                }
+                let source = self.lower_resource_token_seat(
+                    builder,
+                    seats.operand(SEAT_0)?.1,
+                    "MappingAcquireFile",
+                    "file",
+                )?;
+                let (length, valid) =
+                    self.narrow_positioned_int_seat(builder, &seats, 1, "mapping length")?;
+                let invalid = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    valid,
+                    0,
+                );
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
+                let protection = self.wire_constructor_tag_seat(
+                    builder,
+                    &seats,
+                    SEAT_2,
+                    mapping_protection_tag,
+                    "MappingAcquireFile has a malformed MappingProtection",
+                )?;
+                for (index, value) in [source, length, protection].into_iter().enumerate() {
+                    builder
+                        .ins()
+                        .stack_store(value, request, request_offset(index));
+                }
+            }
             ken_host::HostOpV1::MappingReadView => {
                 if capability.is_some() {
                     return Err(unsupported(
@@ -3863,9 +3900,9 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::FsMetadata | ken_host::HostOpV1::FsHandleMetadata => {
                     wire.reply_metadata_tag
                 }
-                ken_host::HostOpV1::BufferAllocate | ken_host::HostOpV1::MappingAllocate => {
-                    wire.reply_resource_tag
-                }
+                ken_host::HostOpV1::BufferAllocate
+                | ken_host::HostOpV1::MappingAllocate
+                | ken_host::HostOpV1::MappingAcquireFile => wire.reply_resource_tag,
                 ken_host::HostOpV1::BufferFreeze | ken_host::HostOpV1::MappingReadView => {
                     wire.reply_bytes_tag
                 }
@@ -3895,7 +3932,8 @@ impl<'a> Lowering<'a> {
                 | ken_host::HostOpV1::FsWriteAt
                 | ken_host::HostOpV1::MappingAllocate
                 | ken_host::HostOpV1::MappingReadView
-                | ken_host::HostOpV1::MappingWriteView => vec![
+                | ken_host::HostOpV1::MappingWriteView
+                | ken_host::HostOpV1::MappingAcquireFile => vec![
                     success_tag,
                     wire.reply_error_tag as i64,
                     wire.reply_resource_error_tag as i64,
@@ -4170,6 +4208,7 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::MappingAllocate
                     | ken_host::HostOpV1::MappingReadView
                     | ken_host::HostOpV1::MappingWriteView
+                    | ken_host::HostOpV1::MappingAcquireFile
                     | ken_host::HostOpV1::FsReadAt
                     | ken_host::HostOpV1::FsWriteAt
             ) {
@@ -4639,7 +4678,9 @@ impl<'a> Lowering<'a> {
                 )?
             } else if matches!(
                 operation,
-                ken_host::HostOpV1::BufferAllocate | ken_host::HostOpV1::MappingAllocate
+                ken_host::HostOpV1::BufferAllocate
+                    | ken_host::HostOpV1::MappingAllocate
+                    | ken_host::HostOpV1::MappingAcquireFile
             ) {
                 Lowered::ResourceToken { value: detail }
             } else if matches!(

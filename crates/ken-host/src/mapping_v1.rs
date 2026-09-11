@@ -91,6 +91,46 @@ pub(crate) fn map_anonymous_v1(
     }
 }
 
+pub(crate) fn map_file_v1(
+    handle: &crate::ResourceHandleV1,
+    length: usize,
+    protection: MappingProtectionV1,
+) -> Result<MappedRegionV1, IoErrorIdentityV1> {
+    #[cfg(target_os = "linux")]
+    {
+        let protection = native_protection_flags_v1(protection);
+        // SAFETY: the held resource owns a live descriptor for this call, the
+        // dispatcher has established that the requested nonzero prefix exists,
+        // and offset zero is page-aligned. MAP_PRIVATE gives copy-on-write
+        // isolation from the backing file.
+        let address = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                length,
+                protection,
+                file_map_flags_v1(),
+                crate::resource_raw_fd_v1(handle),
+                0,
+            )
+        };
+        if address == libc::MAP_FAILED {
+            return Err(io_error_identity_v1(&std::io::Error::last_os_error()));
+        }
+        let Some(address) = std::ptr::NonNull::new(address.cast::<u8>()) else {
+            // A successful mapping at address zero cannot be represented as a
+            // Rust slice. Consume it immediately rather than exposing it.
+            let _ = unsafe { libc::munmap(address, length) };
+            return Err(IoErrorIdentityV1::Other(libc::EFAULT));
+        };
+        Ok(MappedRegionV1 { address, length })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (handle, length, protection);
+        Err(IoErrorIdentityV1::Unsupported)
+    }
+}
+
 pub(crate) fn is_allocation_failure(error: IoErrorIdentityV1) -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -135,6 +175,11 @@ const fn anonymous_map_flags_v1() -> libc::c_int {
     libc::MAP_PRIVATE | libc::MAP_ANONYMOUS
 }
 
+#[cfg(target_os = "linux")]
+const fn file_map_flags_v1() -> libc::c_int {
+    libc::MAP_PRIVATE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +191,20 @@ mod tests {
         assert_ne!(flags & libc::MAP_PRIVATE, 0);
         assert_eq!(flags & libc::MAP_SHARED, 0);
         assert_ne!(flags & libc::MAP_ANONYMOUS, 0);
+    }
+
+    /// Promise class: normative compatibility vector. MEASURED: file mappings
+    /// select MAP_PRIVATE without MAP_SHARED or MAP_ANONYMOUS. CLAIMED: D5b's
+    /// native file mapping is copy-on-write rather than write-through. THE GAP:
+    /// the end-to-end fixture independently observes both the private write and
+    /// unchanged backing file.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn file_mapping_flags_are_private_not_shared_or_anonymous() {
+        let flags = file_map_flags_v1();
+        assert_ne!(flags & libc::MAP_PRIVATE, 0);
+        assert_eq!(flags & libc::MAP_SHARED, 0);
+        assert_eq!(flags & libc::MAP_ANONYMOUS, 0);
     }
 
     #[cfg(target_os = "linux")]

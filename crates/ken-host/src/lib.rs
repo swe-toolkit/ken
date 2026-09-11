@@ -226,6 +226,11 @@ mod linux {
     #[derive(Debug)]
     pub(super) struct ResourceHandle(pub(super) OwnedFd);
 
+    pub(super) fn resource_raw_fd(handle: &ResourceHandle) -> i32 {
+        use std::os::fd::AsRawFd;
+        handle.0.as_raw_fd()
+    }
+
     impl Clone for Handle {
         fn clone(&self) -> Self {
             Self(self.0.clone())
@@ -899,6 +904,11 @@ pub fn open_resource_at_v1(
         let _ = (parent, leaf, request);
         unsupported()
     }
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn resource_raw_fd_v1(handle: &ResourceHandleV1) -> i32 {
+    linux::resource_raw_fd(&handle.inner)
 }
 
 pub fn resource_metadata_v1(handle: &ResourceHandleV1) -> HostResult<Metadata> {
