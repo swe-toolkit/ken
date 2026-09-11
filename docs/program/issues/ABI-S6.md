@@ -12,7 +12,94 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 6 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 7 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 7 — CLOSED. Architect corrected
+> # classification + repair ruling evt_62ec7mwa8pgj2 (thr_7wy5wy45p7abm), on the
+> # fork-4 observation (runtime-implementer evt_28xfh93fkh8hk, complete 45-row
+> # stream, hashes recorded in-thread) at byte-clean c002f2d47. After the HS6
+> # frame isolation removed the physical overflow, the FIRST unmutated native COW
+> # left a planner-projected causal edge residual at the detached-result seat
+> # while that unit's lowered result was not the specialized producer constructor
+> # the five-guard contract requires. That is stop 7.
+> #
+> # CLASSIFICATION: a ONE-LAYER CONSUMER MISMATCH; the native route is LAWFUL (no
+> # operator-surface unlawful-route fork). The Architect's earlier four-fork list
+> # OMITTED the already-landed non-discharge disposition
+> # `CandidateDisposition::InlineNoCall`. At c002f2d47 the deferred bridge in
+> # `lower_computational_producer_construct` resolves the same full identity
+> # (construct 825, frame 12, alternative 1, position 1 => the reported
+> # `ContinuationCallIdentity`) and, after inline completion, settles it
+> # `InlineNoCall` at `BridgeExit`. That disposition is a LAWFUL no-call, NOT a
+> # discharge; the ledger closeout already excludes it from the
+> # `DirectCall ∪ ComposedCall` call-obligation subset. The earlier per-function
+> # residual filter in `eliminate_detached_producer_continuation` reads only
+> # direct/composed feeds, so it re-demands a producer constructor for an identity
+> # whose authoritative disposition says no call was owed. The disposition fix
+> # landed at HS6; this earlier consumer was never reconciled. The five reported
+> # facts are correct — the carried unit is NOT discharge evidence and the
+> # non-constructor guard must NOT be weakened — only the fork-4 "constructor
+> # genuinely required" label was wrong.
+> #
+> # REPAIR (Architect-ruled — teach ONLY the detached residual classifier about
+> # the existing exact `InlineNoCall`): reapply the preserved frame-pop attempt
+> # (ccbf428a) to byte-clean c002f2d47. Add ONE read-only accessor
+> # `disposition(&self, identity: &ContinuationCallIdentity) ->
+> # Option<CandidateDisposition>` beside `ContinuationCandidateLedger::is_settled`
+> # in `lowering/units.rs` (returns `self.settled.get(identity).copied()`). In
+> # `lowering/core.rs::eliminate_detached_producer_continuation`, inside the
+> # existing `result_edges.iter().filter(...)`, derive `inline_no_call` from
+> # `continuation_candidates.disposition(&edge.identity) ==
+> # Some(CandidateDisposition::InlineNoCall)` and add ONLY `&& !inline_no_call`
+> # to the residual predicate. `None` (no ledger, unknown, or unsettled identity)
+> # stays residual and fail-closed. `DirectCall`, `ComposedCall`, and
+> # `TransportDormant` do NOT satisfy it. Do NOT use `is_settled` — clearing every
+> # settled disposition would let a broken direct/composed feed bypass the five
+> # guards. Do NOT add `InlineNoCall` to any discharge set or to claim equality.
+> # An empty residual after the filter returns the already-lowered result through
+> # the existing `[] => Ok(lowered)` arm. No constructor is fabricated and no
+> # identity is inferred from target, origin, shape, value, count, or SSA equality.
+> #
+> # REQUIRED new causality control: under `cfg(any(test, feature =
+> # "px8-ds-test-support"))`, add `D5bHs7DetachedDispositionMutation {Exact,
+> # IgnoreInlineNoCall}` + a `with_d5b_hs7_detached_disposition_mutation(mutation,
+> # body) -> (T, usize)` wrapper (RAII restores `Exact`). `IgnoreInlineNoCall` may
+> # act ONLY when the full identity's disposition is exactly `InlineNoCall`;
+> # increment an application count and treat that one edge as residual. On the
+> # exact COW program: assert ONE application + restoration of the HS7
+> # non-constructor refusal; restore `Exact`, then the unmutated positive must
+> # complete. This proves the disposition filter — not an unrelated frame-pop or
+> # lowering change — removes HS7.
+> #
+> # ALSO re-run (green required): `ced_d2_..._is_not_a_call_obligation`; all five
+> # `ced_d3_m*` mutation rows + their cross-arm independence test;
+> # `d5a_the_detached_result_seats_five_guards_are_each_reached_by_a_real_mutation`
+> # (must still reach all five guards: multi-member, non-constructor, identity,
+> # position, field-run); the still-owed HS6 inside-inner-dispatch overflow
+> # control; every HS3–HS5 control from the prior ruling; the scoped Runtime
+> # default/feature checks; staticlib materialization; the exact unchanged-stack
+> # COW native/interpreter/parity assertions; and the candidate ELF prologue/call
+> # census.
+> #
+> # FENCES: do NOT change the planner projection, `ContinuationResultEdge`,
+> # candidate settlement sites, candidate totality/order, call-obligation
+> # derivation, claim/discharge equality, response-owner coverage,
+> # direct/composed/transport emission, any of the detached seat's five guards,
+> # constructor formation, source return, the frame-pop mechanism, the HS3
+> # partition, HS4 tuple transport, HS5 mint/compose authority,
+> # `SourceContinuation`, `SourceMachineState`, carriers, ABI/wire/runtime tags,
+> # stack settings, or the TCB. The ONLY production semantic change: an edge
+> # already settled `InlineNoCall` by exact identity no longer stays in the
+> # earlier constructor-required residual. NO TCB delta, NO ban-lift => Steward
+> # amend-in-place packaging call, no operator sign-off (as at HS2–HS6).
+> #
+> # This remains STOP 7; no §1a Research trigger is due until stop 9 (Architect
+> # owns the count). Durable classification: Architect inventory tip 41a87a3c
+> # (symptom entry 7 + the disposition-mismatch paragraph recorded below), based
+> # on landed HS6 30062dbdb. Runtime STAYS byte-clean at c002f2d47 until THIS
+> # amendment LANDS; runtime-leader then explicitly re-kicks the repair.
+
+# D5b NATIVE HARD-STOP 6 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward).
 
 > # D5b native-lowering track, HARD STOP 6 — CLOSED. Architect classification +
 > # repair ruling evt_700s4qs9bvp3c (thr_7wy5wy45p7abm), grounded on the
@@ -353,6 +440,10 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
    advanced past both checked-frame-sequence and stale-parent refusals, the
    unmutated native COW witness overflowed its thread stack before returning an
    observable result (`evt_5ss07dc2h1wy0`).
+7. After frame isolation removed the physical overflow, a planner-projected
+   causal edge remained residual at the detached-result seat while that unit's
+   lowered result was not the specialized producer constructor the existing
+   five-guard contract requires (`evt_1rn0v625yq2m6`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
@@ -377,6 +468,18 @@ scope stayed stable; it neither targeted a descendant nor replayed a child.
 The compiler's large source-machine inner frame remained live across each
 recursive branch descent, independently of the entry 4–5 parent-provenance and
 child-qualification role split (`evt_6x3kmb11454z2`).
+
+Entry 7 is a one-layer disposition mismatch, not a genuinely missing call. The
+complete observation proved the exact result edge had no direct emission,
+composed claim or discharge, or checked-IH transport. That absence does not make
+the producer constructor mandatory: the existing deferred bridge resolves the
+same full identity from `(construct 825, frame 12, alternative 1, position 1)`
+and, after successful inline completion, settles it `InlineNoCall` in the
+artifact-wide `ContinuationCandidateLedger`. Its closeout already excludes that
+exact disposition from the call-obligation subset. The earlier per-function
+detached-result filter reads only direct/composed discharge feeds and therefore
+re-demands a producer constructor for an identity the later authoritative
+closeout says is not a call obligation (`evt_28xfh93fkh8hk`).
 
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
