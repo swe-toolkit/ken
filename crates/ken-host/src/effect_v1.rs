@@ -190,7 +190,7 @@ impl HostOpV1 {
             Self::MappingAllocate => HostOpAvailabilityV1::NativeTested,
             Self::MappingReadView => HostOpAvailabilityV1::NativeTested,
             Self::MappingWriteView => HostOpAvailabilityV1::NativeTested,
-            Self::MappingAcquireFile => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
             Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
         }
     }
@@ -257,7 +257,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 25] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 26] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -283,6 +283,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 25] = [
     HostOpV1::MappingAllocate,
     HostOpV1::MappingReadView,
     HostOpV1::MappingWriteView,
+    HostOpV1::MappingAcquireFile,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -532,6 +533,11 @@ pub fn host_effect_wire_layout_v1(
             checked_u32(field("length")?)?,
             checked_u32(field("protection")?)?,
         ],
+        HostOpV1::MappingAcquireFile => vec![
+            checked_u32(field("resource")?)?,
+            checked_u32(field("length")?)?,
+            checked_u32(field("protection")?)?,
+        ],
         HostOpV1::MappingWriteView => {
             let bytes = slice("bytes")?;
             vec![
@@ -563,7 +569,6 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsGetInheritance
         | HostOpV1::FsSetInheritance
         | HostOpV1::FsDuplicate
-        | HostOpV1::MappingAcquireFile
         | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation))
         }
@@ -1140,6 +1145,23 @@ impl MappingRegionV1 {
         Ok(Self {
             storage: MappingStorageV1::Mapped(mapped),
             backing: MappingBackingV1::Anonymous,
+            protection,
+        })
+    }
+
+    pub(crate) fn try_new_mapped_file(
+        handle: &crate::ResourceHandleV1,
+        length: u64,
+        protection: MappingProtectionV1,
+    ) -> Result<Self, IoErrorIdentityV1> {
+        let length = usize::try_from(length).map_err(|_| IoErrorIdentityV1::InvalidInput)?;
+        if length == 0 {
+            return Err(IoErrorIdentityV1::InvalidInput);
+        }
+        let mapped = crate::mapping_v1::map_file_v1(handle, length, protection)?;
+        Ok(Self {
+            storage: MappingStorageV1::Mapped(mapped),
+            backing: MappingBackingV1::FileBacked,
             protection,
         })
     }
@@ -2393,6 +2415,35 @@ pub trait HostEffectBackendV1 {
         Err(SemanticErrorV1::Io(IoErrorIdentityV1::Unsupported))
     }
 
+    /// Interpreter/default file mapping: copy the exact offset-zero prefix into
+    /// host-private bytes. Native ProcessHost overrides this with mmap-of-fd.
+    fn resource_map_file(
+        &mut self,
+        handle: &crate::ResourceHandleV1,
+        length: u64,
+        protection: MappingProtectionV1,
+    ) -> Result<MappingRegionV1, SemanticErrorV1> {
+        let length = usize::try_from(length)
+            .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::MappingLimit))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::AllocationFailed))?;
+        bytes.resize(length, 0);
+        let mut filled = 0usize;
+        while filled < length {
+            let read = self
+                .fs_resource_read_at(handle, filled as u64, &mut bytes[filled..])
+                .map_err(SemanticErrorV1::Io)?;
+            if read == 0 || read > length - filled {
+                return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds));
+            }
+            filled += read;
+        }
+        MappingRegionV1::try_new_file_backed(bytes, protection)
+            .map_err(SemanticErrorV1::Resource)
+    }
+
     fn resource_close(&mut self, handle: crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1> {
         crate::close_resource_v1(handle)
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
@@ -3172,25 +3223,7 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 resources
                     .mapping_capacity_total(*length)
                     .map_err(SemanticErrorV1::Resource)?;
-                let length = usize::try_from(*length)
-                    .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::MappingLimit))?;
-                let mut bytes = Vec::new();
-                bytes
-                    .try_reserve_exact(length)
-                    .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::AllocationFailed))?;
-                bytes.resize(length, 0);
-                let mut filled = 0usize;
-                while filled < length {
-                    let read = backend
-                        .fs_resource_read_at(handle, filled as u64, &mut bytes[filled..])
-                        .map_err(SemanticErrorV1::Io)?;
-                    if read == 0 || read > length - filled {
-                        return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds));
-                    }
-                    filled += read;
-                }
-                let region = MappingRegionV1::try_new_file_backed(bytes, *protection)
-                    .map_err(SemanticErrorV1::Resource)?;
+                let region = backend.resource_map_file(handle, *length, *protection)?;
                 resources
                     .insert_mapping(region, Some(provenance))
                     .map_err(SemanticErrorV1::Resource)
@@ -5326,11 +5359,11 @@ mod tests {
         }
     }
 
-    /// Promise class: transition sentinel. ABI-S6 D5a removes exactly the three
-    /// anonymous Mapping operations from the represented-unavailable tail while
-    /// leaving file-backed acquisition for D5b.
+    /// Promise class: durable inventory invariant. ABI-S6 D5b removes the
+    /// existing file-acquisition operation from the represented-unavailable tail
+    /// without promoting any descriptor or entropy operation.
     #[test]
-    fn abi_s6_d5a_leaves_file_acquisition_represented_unavailable() {
+    fn abi_s6_d5b_promotes_only_file_acquisition_from_the_unavailable_tail() {
         assert_eq!(
             HostOpV1::ALL
                 .into_iter()
@@ -5348,10 +5381,9 @@ mod tests {
                 HostOpV1::FsGetInheritance,
                 HostOpV1::FsSetInheritance,
                 HostOpV1::FsDuplicate,
-                HostOpV1::MappingAcquireFile,
                 HostOpV1::EntropyRandomBytes,
             ],
-            "D5a must leave only file-backed Mapping acquisition in the unavailable tail"
+            "D5b must promote only the existing file-backed Mapping operation"
         );
         assert_eq!(
             HOST_EFFECT_ABI_V1.native_tested_count as usize,
@@ -5472,7 +5504,7 @@ mod tests {
             "MappingAllocate|0404|native|MappingAllocateRequestV1|2|HostReplyV1|1",
             "MappingReadView|0405|native|MappingReadViewRequestV1|4|HostReplyV1|1",
             "MappingWriteView|0406|native|MappingWriteViewRequestV1|4|HostReplyV1|1",
-            "MappingAcquireFile|0407|unavailable|MappingAcquireFileRequestV1|3|HostReplyV1|1",
+            "MappingAcquireFile|0407|native|MappingAcquireFileRequestV1|3|HostReplyV1|1",
             "lifetime=filesystem_observation_schema|2",
             "lifetime=resource_observation_schema|1",
             "lifetime=resource_error_reply_schema|1",
@@ -5888,9 +5920,9 @@ mod tests {
     }
 
     /// Promise class: normative compatibility vector. The three anonymous
-    /// Mapping identities retain their pinned append-only values and move as one
-    /// NativeTested set, without adding a capability seat or promoting the
-    /// adjacent file-backed operation.
+    /// Mapping identities retain their pinned append-only values and remain one
+    /// NativeTested set without adding a capability seat. File acquisition is
+    /// pinned independently by the D5b sibling.
     #[test]
     fn abi_s6_d5a_promotes_the_atomic_anonymous_mapping_operation_set() {
         assert_eq!(HostOpV1::try_from(0x0404), Ok(HostOpV1::MappingAllocate));
@@ -5931,14 +5963,14 @@ mod tests {
         assert!(!HostOpV1::MappingAcquireFile.is_ambient());
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: D4 occupies the
-    /// next Mapping-band identity, stays represented-unavailable and non-ambient,
-    /// admits one Target resource, and has no capability seat or native roster
-    /// entry. CLAIMED: file-backed acquisition extends the represented Mapping
-    /// surface without becoming checked-Ken/native authority. THE GAP: dispatch
-    /// tests independently exercise protection-derived source rights and lineage.
+    /// Promise class: normative compatibility vector. MEASURED: D5b keeps D4's
+    /// Mapping-band identity, non-ambient Target admission, and capability-free
+    /// posture while promoting the existing wire layout and native roster entry.
+    /// CLAIMED: file-backed acquisition is the fourth Mapping op, not a new
+    /// operation or right. THE GAP: dispatch and end-to-end tests independently
+    /// exercise mmap, protection-derived source rights, lineage, and COW.
     #[test]
-    fn abi_s6_d4_file_acquire_identity_and_unavailable_posture_are_pinned() {
+    fn abi_s6_d5b_file_acquire_identity_and_native_posture_are_pinned() {
         assert_eq!(HostOpV1::try_from(0x0407), Ok(HostOpV1::MappingAcquireFile));
         assert_eq!(
             HostOpV1::MappingAcquireFile.next_in_inventory(),
@@ -5946,7 +5978,7 @@ mod tests {
         );
         assert_eq!(
             HostOpV1::MappingAcquireFile.availability(),
-            HostOpAvailabilityV1::RepresentedUnavailable
+            HostOpAvailabilityV1::NativeTested
         );
         assert!(!HostOpV1::MappingAcquireFile.is_ambient());
         assert_eq!(
@@ -5957,13 +5989,8 @@ mod tests {
             HostOpV1::MappingAcquireFile.resource_admission_requirement(),
             ResourceAdmissionRequirementV1::Target
         );
-        assert!(!NATIVE_TESTED_TARGETS_V1.contains(&HostOpV1::MappingAcquireFile));
-        assert_eq!(
-            host_effect_wire_layout_v1(HostOpV1::MappingAcquireFile),
-            Err(TerminalErrorV1::OperationUnavailable(
-                HostOpV1::MappingAcquireFile
-            ))
-        );
+        assert!(NATIVE_TESTED_TARGETS_V1.contains(&HostOpV1::MappingAcquireFile));
+        assert!(host_effect_wire_layout_v1(HostOpV1::MappingAcquireFile).is_ok());
     }
 
     /// Promise class: durable invariant. MEASURED: the three represented D3

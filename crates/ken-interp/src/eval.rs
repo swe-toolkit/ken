@@ -4239,6 +4239,7 @@ pub struct FSIds {
     pub private_mapping_allocate_id: GlobalId,
     pub private_mapping_read_view_id: GlobalId,
     pub private_mapping_write_view_id: GlobalId,
+    pub private_mapping_acquire_file_id: GlobalId,
     pub private_resource_release_id: GlobalId,
     pub resource_read_id: GlobalId,
     pub resource_metadata_mode_id: GlobalId,
@@ -4322,6 +4323,7 @@ impl FSIds {
             private_mapping_allocate_id: elab.prelude_env.private_mapping_allocate_id,
             private_mapping_read_view_id: elab.prelude_env.private_mapping_read_view_id,
             private_mapping_write_view_id: elab.prelude_env.private_mapping_write_view_id,
+            private_mapping_acquire_file_id: elab.prelude_env.private_mapping_acquire_file_id,
             private_resource_release_id: elab.prelude_env.private_resource_release_id,
             resource_read_id: get("ResourceRead")?,
             resource_metadata_mode_id: get("ResourceMetadata")?,
@@ -5337,6 +5339,28 @@ fn fs_dispatch<H: HostHandler>(
             ken_host::CanonicalRequestV1::MappingAllocate { length, protection },
             fs.op_metadata_id,
         )
+    } else if op_id == fs.private_mapping_acquire_file_id {
+        let length = match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds) {
+            Ok(length) => length,
+            Err(error) => {
+                let error = resource_error_value_v1(error, fs, ids, store);
+                return Some(Ok(make_result(false, error, ids, store)));
+            }
+        };
+        let protection = match args.get(3) {
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.mapping_read_only_id => {
+                ken_host::MappingProtectionV1::ReadOnly
+            }
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.mapping_read_write_id => {
+                ken_host::MappingProtectionV1::Writable
+            }
+            _ => return Some(Err(())),
+        };
+        (
+            ken_host::HostOpV1::MappingAcquireFile,
+            ken_host::CanonicalRequestV1::MappingAcquireFile { length, protection },
+            fs.op_metadata_id,
+        )
     } else if op_id == fs.private_mapping_read_view_id {
         let start = match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidBounds) {
             Ok(start) => start,
@@ -5480,6 +5504,7 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::MappingAllocate
             | ken_host::HostOpV1::MappingReadView
             | ken_host::HostOpV1::MappingWriteView
+            | ken_host::HostOpV1::MappingAcquireFile
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -5495,7 +5520,10 @@ fn fs_dispatch<H: HostHandler>(
             _ => None,
         }
     };
-    let resource = if operation == ken_host::HostOpV1::FsHandleMetadata {
+    let resource = if matches!(
+        operation,
+        ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::MappingAcquireFile
+    ) {
         match args.get(1) {
             Some(EvalVal::ResourceToken(token)) => Some(*token),
             _ => None,
@@ -6815,6 +6843,7 @@ mod px5b_effect_observation_tests {
             private_mapping_allocate_id: id(),
             private_mapping_read_view_id: id(),
             private_mapping_write_view_id: id(),
+            private_mapping_acquire_file_id: id(),
             private_resource_release_id: id(),
             resource_read_id: id(),
             resource_metadata_mode_id: id(),
