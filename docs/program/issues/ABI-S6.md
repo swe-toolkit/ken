@@ -12,7 +12,102 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 5 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 6 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 6 — CLOSED. Architect classification +
+> # repair ruling evt_700s4qs9bvp3c (thr_7wy5wy45p7abm), grounded on the
+> # observation-only diagnostic (runtime-implementer evt_6x3kmb11454z2, 246-row
+> # trace) at byte-clean 34d11b8053. The HS5 fork-1 repair PASSED compiler checks
+> # + staticlib materialization, but the FIRST unmutated native COW execution
+> # OVERFLOWED the test thread stack before an observable result. This was the
+> # §1a-mandatory 6th stop: Research delivered the prior-art advisory
+> # (evt_1r9vwnfpr7caq — prior art cannot classify without a runtime trace) and it
+> # is now DISCHARGED by the trace.
+> #
+> # CLASSIFICATION: CLASS 3 — finite, progressing lowering with PHYSICAL STACK
+> # ACCUMULATION. NOT a semantic cycle, NOT changing-signature non-progress. The
+> # native route is LAWFUL (no operator-surface unlawful-route fork). The trace
+> # showed the apparent active repeat 69->112 is the DELIBERATE rule that a
+> # synthesized match default reuses the match occurrence's own origin (returns
+> # through both exits — not a back-edge); the aborting ancestry (source
+> # 313->97->94->91->expr 90) changes origin on every descent with NO active
+> # signature repeat; the selected scope (scope 1, frame-origin 12, prov 0, frame
+> # 0, invocation 1, ComputationalIHCall(3), depth 1) never targets a descendant
+> # or replays child 2. Physical mechanism (exact pass-B ELF): large debug
+> # prologues — lower_source_machine_with_continuation_inner 0x28198 (164,248 B),
+> # lower_expr 0x10528 (66,856 B), producer-once 0x9c38 (39,992 B) — accumulate to
+> # ~1,417,640 B of live frames before helpers/Cranelift/CLI/test exhaust the
+> # physical stack. Max semantic depth 20 (abort at depth 18) => BYTE accumulation,
+> # not unbounded semantic descent.
+> #
+> # §1b ANSWER: NO. Entries 4-5 are the parent-provenance/child-qualification role
+> # collision; ENTRY 6 IS INDEPENDENT — a large compiler traversal frame stays live
+> # across ordinary recursive source-branch lowering. The diagnostic DISPROVED the
+> # condition under which entry 6 would have joined 4-5.
+> #
+> # ARCHITECT RULED FIX (full mechanism in evt_700s4qs9bvp3c): POP the large
+> # source-machine inner frame BEFORE every recursive source descent. Add only
+> # compiler-private TRANSIENT return vocabulary in lowering/source.rs —
+> # SourceMachineExit { Complete | Reenter | DynamicMatch } +
+> # SourceDynamicMatchRequest + SourceDynamicMatchScrutinee (5 variants:
+> # BoundedNat/Bool/HostResult/
+> # DynamicConstructor/Carried). KEEP the public-to-module wrapper signature
+> # unchanged; change ONLY the private inner return type; add ONE private
+> # dispatcher lower_source_dynamic_match_request. #[inline(never)] on the inner +
+> # dispatcher is LOAD-BEARING (function-frame isolation, NOT stack provisioning).
+> # The wrapper increments live_source_continuations + replaces source_control_root
+> # exactly where it does now, calls the inner, then dispatches
+> # Complete/Reenter/DynamicMatch BEFORE decrementing/restoring — so a delegated
+> # child observes the same live depth/root while the 0x28198 inner frame has
+> # returned. Closed inner-site conversion at exact lines (1830/1842 BoundedNat/
+> # StructuralNat; 1899 Bool with exact True/False case indices; 1917 HostResult;
+> # 1932 DynamicConstructor; 2029 classified Carried; 2345 deforested-selected-ret
+> # -> Reenter); every other terminal return -> Complete(value). The dispatcher is
+> # exhaustive, invokes the SAME five existing helpers with the same values/cases/
+> # default/origin/env/control, re-derives Bool bodies only from the transported
+> # exact case indices + parent origin, and must NOT rediscover a variant from
+> # arity/values/counts/names/SSA/frame-state.
+> #
+> # FENCES: NO RUST_MIN_STACK / Builder::stack_size / ulimit / guard / depth cap /
+> # test-thread change (a stack bump is NOT a valid repair — Research + Architect).
+> # No SourceContinuation / SourceMachineState variant; no stored carrier / plan /
+> # edge field / owner / invocation / frame / ABI / wire / runtime tag / TCB change.
+> # Do NOT alter lower_forked_branch, any dynamic-match helper body,
+> # CheckedFrameBranchScope, join/predecessor construction, resume behavior, the
+> # HS3 partition, HS4 validator, HS5 mint/compose authority, the exact-sequence
+> # check, or the dynamic-edge tree checks.
+> #
+> # STEWARD SCOPE CALL (Architect-directed): AMEND D5b IN PLACE, no predecessor, NO
+> # new WP — a bounded lowering-internal frame-isolation refactor with no
+> # independent user-visible deliverable or standalone acceptance beyond D5b.
+> # Grows NO TCB (fenced explicitly) and needs NO ban-lift (lowering-internal, no
+> # frozen wire/bridge), so it is the Steward's call and needs no operator
+> # sign-off. The Architect's HS6 inventory + classification (its commits 71ebb7bf,
+> # 75937f0d5, 4929b8ac on origin/main 4840337) are INCORPORATED into this
+> # amendment (entry 6 + the independence paragraph in the symptom inventory below).
+> #
+> # CONTROLS (full in evt_700s4qs9bvp3c): (1) the exact unmutated COW positive
+> # completes under the UNCHANGED ambient test stack + passes build / native-child /
+> # interpreter / parity / COW / release-set / file-preservation; (2) a temporary
+> # observation mutation keeping the dynamic request INSIDE the inner frame
+> # reproduces the build-phase overflow (proves frame-pop is the repair), restored
+> # before any other control; (3) report candidate-ELF prologue reservations +
+> # active-frame census — NO numeric threshold is acceptance; the STRUCTURAL
+> # property is that no call from the inner reaches the wrapper or any helper that
+> # can reach lower_forked_branch; (4) re-run every prior HS3/HS4/HS5 positive +
+> # mutation control (external inv/frame mismatch, retain-parent, drop-at-mint,
+> # drop-at-compose, duplicate-worker, missing-context); MappingAllocate
+> # byte-for-behaviour unchanged; (5) preserve the HS6 attempt + mutation artifacts
+> # with hashes, then remove all phase/trace/mutation instrumentation.
+> #
+> # RUNTIME: HOLDS byte-clean at 34d11b8053 until THIS LANDS; runtime-leader
+> # then explicitly re-kicks the frame-pop repair. Candidate returns to Architect
+> # (REQUIRED reviewer) + runtime-qa + CI -> Steward M1-M4 -> lieutenant. COUNT IS 6;
+> # the next §1a Research trigger is stop 9 (Architect owns the count) — a 7TH
+> # structural refusal stops AGAIN (preserve, revert byte-clean, do not solve ahead)
+> # but pulls NO research until stop 9.
+
+# D5b NATIVE HARD-STOP 5 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward).
 
 > # D5b native-lowering track, HARD STOP 5 — CLOSED. Architect fork-1 repair
 > # ruling evt_6j9g88qtwhfrr (thr_7wy5wy45p7abm), grounded at byte-clean
@@ -254,6 +349,10 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
    `instantiate_checked_invocation_segment` had to qualify the call's expected
    frame-0 sequence for child invocation 2. It instantiated no child frame and
    refused `expected={0} instantiated={}` (`evt_5246mrbnxprdb`).
+6. After the exact pre-mint role transfer and transient source-parent authority
+   advanced past both checked-frame-sequence and stale-parent refusals, the
+   unmutated native COW witness overflowed its thread stack before returning an
+   observable result (`evt_5ss07dc2h1wy0`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
@@ -267,6 +366,17 @@ Entry 5 refines entry 4 rather than reversing its measured fact: the parent
 identity must survive long enough to mint the edge, but placing it in the child
 layer conflates two roles. Parent-edge provenance and child-frame qualification
 must have separate existing authorities; one invocation scalar cannot name both.
+
+Entry 6 does not share that predicate. The complete observation trace
+classified it as finite, progressing lowering with physical stack accumulation.
+The first active signature repeat was the source match's synthesized default,
+which deliberately reuses the match occurrence's origin and returned through
+both matching exits. The aborting ancestry instead changed origins on every
+source descent and contained no active signature repeat. The selected parent
+scope stayed stable; it neither targeted a descendant nor replayed a child.
+The compiler's large source-machine inner frame remained live across each
+recursive branch descent, independently of the entry 4–5 parent-provenance and
+child-qualification role split (`evt_6x3kmb11454z2`).
 
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
