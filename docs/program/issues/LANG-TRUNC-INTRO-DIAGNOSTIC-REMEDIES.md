@@ -1,7 +1,7 @@
 ---
 id: LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES
 title: "The `trunc_intro` infer-position diagnostic advises two remedies that both require an annotation-position `‖A‖` spelling the surface does not have, and omits `elim_trunc`'s motive, which is the one position that works"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
