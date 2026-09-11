@@ -1,7 +1,7 @@
 ---
 id: LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES
 title: "The `trunc_intro` infer-position diagnostic advises two remedies that both require an annotation-position `‖A‖` spelling the surface does not have, and omits `elim_trunc`'s motive, which is the one position that works"
-status: draft
+status: active
 owner: language
 size: S
 gate: none
@@ -10,6 +10,14 @@ blocks: []
 github: null
 origin: Adversary hunt evt_1m95xs8h72pbm on the merged LANG-TRUNCATION-SURFACE-SYNTAX range 392f228b8..4b2d4cd9a, measured 2026-08-16. Filed draft and NOT released -- the second lane is quiet by operator instruction 2026-08-16. Also carries the Architect's two deferred follow-ups from evt_5f2dy109fjsct, which were routed to the Steward and had no node.
 ---
+
+> # ACTIVE 2026-09-11 (Steward) — L2 head after item 7 (SIGMA-SWEEP) closed;
+> # operator L2 queue item 8. status draft->active. D0 (the spelling ruling)
+> # REQUESTED from the Architect: anchor evt_4q1vfdx5pv5ef. D1 stays blocked on D0
+> # and is NOT yet released to the language ring — the ring holds until D0 rules
+> # (D0 is Architect-only, no code). The old "second lane is quiet" deferral
+> # rationale is superseded (L2 is an active language lane). On D0's answer I
+> # release D1. Size S, tier T2 (mechanical diagnostic/grammar under D0's ruling).
 
 ## The gap
 
