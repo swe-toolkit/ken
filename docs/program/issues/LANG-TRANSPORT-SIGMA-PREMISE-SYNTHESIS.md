@@ -1,7 +1,7 @@
 ---
 id: LANG-TRANSPORT-SIGMA-PREMISE-SYNTHESIS
 title: "transport_recursive_group_call_result over-rejects a compound result indexed by BOTH the whole matched record AND a bare component of it: it builds a single raw Eq over the user data record, which obs::eq_reduce will not decompose into per-index Sigma leaves, so the component index goes unrefined and a well-typed program is KernelRejected (TypeMismatch). Fix = route (a): synthesize transport's premise as the Sigma-shaped result-family-index equality and feed the existing walker (REUSE). DEFERRED completeness gap."
-status: draft
+status: active
 owner: language
 size: S
 gate: none
@@ -12,11 +12,19 @@ github: null
 origin: "Carved by the Steward 2026-09-11 from the discharged confirm-or-refute of [[LANG-RESULT-TRANSPORT-SIGMA-SWEEP]] (closed). Architect design ruling evt_79xy16y7fv5sx (re-grounded at b148a96b): the sweep's confirm-or-refute is DISCHARGED — the compound case is REACHABLE and the framed walker-application fix is REFUTED with grounds — and the correct fix (route (a)) is a real bounded refactor of transport's premise construction that EXCEEDS the confirm-or-refute the sweep was sized for, so it is a separate node (Architect ground iii). Architect RECOMMENDED deferral (completeness-only, kernel-backstopped false-reject = safe; trigger narrow/exotic); the Steward placed it here DEFERRED. NOT released — awaiting an operator L2 priority direction (L2's releasable queue is otherwise near-exhausted; item 8 LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES is blocked on a deferred Architect design call). Re-measure the elab.rs anchors at release — they drift."
 ---
 
-> # DEFERRED, NOT RELEASED. Completeness-only, kernel-backstopped (an over-strict
-> # false-reject, never an over-accept), NOT a soundness hole, NOT a blocker. The
-> # Architect recommended deferral; released only on an operator L2 priority call.
-> # Re-measure ALL anchors at pickup — they drift (the coordinates below are from
-> # the Architect's b148a96b re-grounding and elab.rs moves often).
+> # RELEASED 2026-09-11 (operator L2 priority call, item 9) to the language ring.
+> # The deferral is lifted: L2's releasable queue was near-exhausted and the
+> # operator directed this node into the language lane. Its character is unchanged
+> # — completeness-only, kernel-backstopped (an over-strict false-reject, never an
+> # over-accept), NOT a soundness hole. That safety is why route (a) is a bounded
+> # reuse refactor, not why it stays parked.
+> #
+> # FIRST, RE-MEASURE ALL anchors at pickup — they drift. The elab.rs line
+> # coordinates below are from the Architect's b148a96b re-grounding and elab.rs
+> # moves often; ground the FIRST STEP (below) against the current tree before any
+> # edit. Tier T1 (semantic repair, soundness-adjacent). Reviewers: Architect
+> # (required soundness reviewer for this class) + Language QA; standing Adversary
+> # hunt independent -> Steward M1-M4 -> lieutenant.
 
 ## The finding (Architect ruling evt_79xy16y7fv5sx; confirm-or-refute discharged)
 
@@ -81,7 +89,7 @@ table.
    not a per-index Sigma — the walker cannot decompose it into component-index
    leaves — keyed on premise SHAPE (raw data `Eq` vs synthesized Sigma).
 
-## Acceptance (to be finalized at release)
+## Acceptance (finalized at release, operator L2 item 9)
 
 The reaching fixture (the compound-indexed recursive-group-call result that
 currently false-rejects) compiles; a control keeps the whole-record-indexed case
