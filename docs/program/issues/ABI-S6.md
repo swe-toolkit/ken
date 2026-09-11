@@ -12,18 +12,44 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-> # D5b RELEASED 2026-09-11 (Steward) — the file-backed MappingAcquireFile +
-> # MAP_PRIVATE COW discharge, the framed D5a successor, is now the LIVE increment
-> # of ABI-S6 (node stays active). Runtime ring resumed on it after D5a landed;
-> # fresh thread anchor evt_7jspmenmbm29m (NOT the landed D5a thread). Seat check:
-> # T1 (COW discriminator soundness-relevant) on gpt-5.6-sol/high = T1, provisioned.
-> # Deliverable: promote MappingAcquireFile (4th op, outside D5a's frozen 3-op wire)
-> # to native mmap-of-fd/munmap; discharge seed-mapping.md case 1 (write through a
-> # MAP_PRIVATE file mapping observed in-mapping but NOT reaching the backing file;
-> # write-through/MAP_SHARED control must red — green-vs-green is a VACUOUS HARD
-> # STOP). Architect REQUIRED reviewer (COW discriminator + file-backed lineage/
-> # rights per AC-LIFETIME-REVOCATION); AC-MAPPING-CAPACITY-GOVERNANCE applies to
-> # any file-acquisition capacity ruling not settled at D4. The CV seed-case-3
+> # D5b RECUT 2026-09-11 (Steward) — §1b HS#3 STRUCTURAL CLOSURE, not a point fix
+> # (Architect ruling evt_7c1adrctc3qf1, thr_7wy5wy45p7abm). D5b hit a hard stop
+> # (runtime-implementer evt_6gejx0s8665qw): the frozen §1.9 FileBacked route in
+> # withMapping must eval `eq_int offset 0` in-body before emitting the offset-less
+> # MappingAcquireFile wire; calling eq_int on the carried-eliminated offset hits
+> # the BoundaryCarrier wall — the SAME as the rejected D5a equality precheck.
+> # Architect confirmed this is the 3rd hard-stop KEYED on the FORMING PREDICATE
+> # (see below), so the fix is the general SURFACE RULE, not a 4th point ruling.
+> #
+> # THE STRUCTURAL CLOSURE (the ruled 1:1 surface-wire rule): the checked mapping
+> # surface must be in 1:1 correspondence with the frozen wire — every checked
+> # parameter passes through to a wire field; NONE is validate-and-discard. Entries
+> # 1 (mapView token dropped -> window-direct) and 2 (mapWrite window-length dropped
+> # -> payload carries extent) already closed this way; entry 3 gets the same move:
+> # DROP the FileBacked offset field, `FileBacked (Resource FsHandle) Int Int` ->
+> # `FileBacked (Resource FsHandle) Int` (length only), matching the offset-less
+> # wire — make-illegal-states-unrepresentable, no eq_int, no BoundaryCarrier.
+> #
+> # RECUT SCOPE (replaces the point-fix framing): (a) §1.9 mapping-surface
+> # 1:1-with-wire correction dropping the FileBacked offset (Path B, SPEC's call —
+> # deciding question routed to spec-author/spec-leader: is a non-zero file offset
+> # ever meaningful, or always 0? Expected always-0 per z4080's offset-less wire =>
+> # drop it, §1.9 + seed-mapping update, Architect review + CV Spec-lane ->
+> # spec-leader gate; Path A = a frozen-wire ABI change = Steward rescope, NOT
+> # expected as it contradicts z4080); (b) a WHOLE-SURFACE validate-and-discard
+> # CENSUS (Anonymous length, read window/mapBytes, mapWrite, protection,
+> # withMapping source) proving every param is wire-carried 1:1 or removed = no 4th
+> # entry (three known, two closed, this closes the third); (c) the checked-surface/
+> # prelude alignment (drop the FileBacked offset field + remove the eq_int site),
+> # riding the D5b WP. RETAINED as VALID (Architect): D3/D4/D5a landed; the D5b
+> # native mmap-of-fd/MAP_PRIVATE backend + 0x0407 promotion + COW differential in
+> # WIP ae014a36 (wp/ABI-S6-d5b-file-backed) — dropping the offset removes the
+> # boundary check and turns the intentionally-red COW differential green. Runtime
+> # ring HOLDS the boundary red (no in-body check, no carrier machinery — Architect)
+> # until the surface correction lands. NO research pull (Architect §1a: prior art
+> # has nothing further; the ITree single-unconditional-Vis advisory already
+> # supports the shape; the predicate is our own surface/wire mismatch, 1:1 is
+> # known-best). Runtime seat: implementer gpt-5.6-sol/high = T1. The CV seed-case-3
 > # ResourceKindMismatch(Mapping) residual is a small nonblocking companion on a
 > # DIFFERENT axis — not part of D5b (see the LANDED banner below).
 > #
@@ -90,16 +116,28 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > #      counterpart, forcing a body-level response transform native cannot
 > #      transport — an abstract view-token carrying no invariant the request
 > #      window does not. Resolved by the window-direct §1.9 respin (b33f8ac9b).
-> #   2. (this / HS#2) mapWrite's declared-window-length check cannot be enforced
+> #   2. (z4116 / HS#2) mapWrite's declared-window-length check cannot be enforced
 > #      over the frozen wire without a checked-surface conditional Ret/Vis, which
 > #      native cannot transport (BoundaryCarrier) — the mapping access site cannot
 > #      carry any response shape beyond a single unconditional Vis.
-> # FORMING PREDICATE (NOT yet the §1b structural-closure trigger — that fires at a
-> # 3rd hard-stop keyed on it): "the native mapping surface admits no in-body
-> # control at an access site — every op must be a single unconditional Vis." If a
-> # 3rd bounds/composition hard-stop lands keyed on this same property, that
-> # predicate IS the defect and the fix is a general surface rule (structural
-> # closure), not another point ruling. No research pull yet (fires at HS#3).
+> #   3. (HS#3, D5b) FileBacked carries a file offset the offset-less
+> #      MappingAcquireFile wire drops after an `eq_int offset 0` check —
+> #      BoundaryCarrier over the carried eliminated offset — keyed on a
+> #      validate-and-discard checked-surface parameter absent from the frozen wire.
+> #      Same predicate as 1-2; closed STRUCTURALLY by the 1:1 surface-wire rule
+> #      (drop the offset field), not a point fix (Architect evt_7c1adrctc3qf1).
+> # FORMING PREDICATE — NOW FIRED as the §1b structural-closure trigger (HS#3
+> # landed 2026-09-11): "the checked mapping surface carries a VALIDATE-AND-DISCARD
+> # parameter the frozen wire does not carry, forcing an in-body computation over a
+> # carried eliminated value native owner-lowering cannot transport — every op can
+> # only emit a single unconditional Vis." The three entries are ONE defect;
+> # Architect ruled the general surface rule (checked surface 1:1 with the frozen
+> # wire — every param wire-carried or removed, NONE validate-and-discard), NOT a
+> # 4th point ruling. NO research pull (Architect §1a: prior art has nothing
+> # further; ITree single-unconditional-Vis advisory already supports the shape).
+> # Path B CONFIRMED by spec-author (evt_2gbnzp1qepvc8): a non-zero file offset is
+> # never meaningful for FileBacked (always 0) — §1.9 drops the offset field; no
+> # Steward rescope (Path A did not fire).
 > #
 > # D5a-surface D1 RE-RELEASED 2026-09-10 (Steward) — all three prerequisites
 > # LANDED; runtime ring resume authorized. The held multi-op acceptance resumes
