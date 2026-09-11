@@ -729,8 +729,9 @@ identity, classified `Permanent` (`§1.8`): a revoked mapping is gone, and retry
 cannot restore it.
 
 **Source, offset, protection, and views.** `withMapping` takes the mapping
-source — anonymous with a length, or a file `Resource FsHandle` with a byte
-offset and length — and a requested protection (`ReadOnly` or `ReadWrite`). Ken
+source — anonymous with a length, or a file `Resource FsHandle` with a length
+(the mapping starts at file offset 0) — and a requested protection (`ReadOnly`
+or `ReadWrite`). Ken
 observes only the opaque `MappingHandle`, an immutable `MappingWindow`
 (offset, length) naming a read subrange, and the scalar extent. A read view
 (`mapBytes`) copies a window's bytes out; a write view (`mapWrite offset bytes`)
@@ -765,12 +766,28 @@ proc mapWrite (a : Auth) (mapping : MappingHandle) (offset : Int) (bytes : Bytes
 ```
 
 where the read window `MappingWindow = MkMappingWindow Int Int` (offset, length),
-`MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int Int`
-(length; file offset and length), and `MappingProt = ReadOnly | ReadWrite`. A
-`ReadOnly` mapping refuses `mapWrite` with a fail-visible `ResourceError`. Each
-op maps 1:1 onto the frozen wire (`mapBytes` → the read op, `mapWrite` → the
-write op, `withMapping` → allocate + release) and returns that op's response
-directly, so no in-body response transform is introduced.
+`MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int` (each a
+length; a `FileBacked` mapping starts at file offset 0), and
+`MappingProt = ReadOnly | ReadWrite`. A `ReadOnly` mapping refuses `mapWrite`
+with a fail-visible `ResourceError`.
+
+**The surface is 1:1 with the frozen wire — no validate-and-discard parameter.**
+Every checked parameter of the mapping surface passes through to a frozen-wire
+field; none is checked and then dropped. Census: `Anonymous`'s length and a
+mapping's protection are the allocate op's fields; a `FileBacked` mapping's
+resource and length are the file-acquire op's fields; the read window's offset
+and length are the read op's fields; `mapWrite`'s offset and bytes are the write
+op's fields. The file-acquire wire is **offset-less** (it maps from file offset
+0), so `FileBacked` carries a length and **no offset**: a mapping at a non-zero
+file offset is not expressible, and is deliberately not a checked-then-discarded
+surface field — were one ever needed it is a wire extension, not a surface
+parameter. This is why each op is a **single unconditional wire visit** that
+returns its response directly, with **no in-body response transform**: a checked
+parameter the wire drops would force exactly such a transform, which the native
+lowering cannot carry. (The three ABI-S6 surface corrections — the read
+view-token, the write-window length, and this file offset — are one defect, a
+validate-and-discard parameter absent from the frozen wire, closed by this rule
+rather than per symptom.)
 
 **MAP_PRIVATE isolation — file mappings are copy-on-write.** A file-backed
 mapping is **private**: writes through a write view are **process-local and never
