@@ -12,6 +12,111 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
+# D5b NATIVE HARD-STOP 10 — OBSERVATION-ONLY, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 10 — OBSERVATION-ONLY (no repair yet).
+> # Architect classification + observation ruling evt_50ynvegxvydvm
+> # (thr_7wy5wy45p7abm), grounded byte-clean fee133142 (full attempt 46bf387e…
+> # applied cleanly; HS9 repair-only diff a29bca8b…; decisive log 1d8f7aa7…). The
+> # HS9 root-parent repair is VALIDATED: `RejectExactRoot` applied once + restored
+> # the HS9 refusal, and restored `Exact` alone advanced BEYOND HS9 to this new
+> # ObjectEmission refusal — "a forward-declared response owner has no verified
+> # selected incoming call: owner=StaticResponseOwnerId(0),
+> # context=ContinuationContextId(1), preexisting=true, …,
+> # disposition=Some(InlineNoCall)". HS10 is NOT evidence against HS9.
+> #
+> # CLASSIFICATION: exactly HS8's already-defined diagnostic FORK 2 — response-owner
+> # classification and authoritative inline realization DISAGREE about whether one
+> # complete caller identity is a call. A planning/lowering realization-domain
+> # contradiction; NOT a missing response call inferred from absence, NOT a reason
+> # to weaken closeout. The join is EXACT: owner StaticResponseOwnerId(0) names the
+> # SAME complete identity as HS7 (producer/emission owner Predeclared(6), result
+> # 832, construct 825, alternative 1, sequence 0, target Specialization(3),
+> # recursive position 1, worker parent 12, closure 819, body 813, arity 1, lexical
+> # captures 818–814). The prior HS8 stream already records it selected_caller=true,
+> # transport_source=false, required_consumer=false, no direct/composed/transport
+> # emission, disposition=Some(InlineNoCall); HS7 established the bridge settles this
+> # identity once at successful bridge exit.
+> #
+> # THREE production mechanisms explain the refusal (no speculation): (1)
+> # `responses.rs::static_response_phase_b_split` defers only a transport-source
+> # residual — for this non-transport demand the 2405-2410 condition is false and
+> # `specialized.push(demand)` (2424-2430) is unconditional; `static_response_owner_
+> # specializations` creates an owner on ordinary-call population membership, NOT
+> # realized-call disposition. (2) `core.rs`'s immediate-binder bridge settles every
+> # still-unconsumed member `InlineNoCall` (7076-7088) after successful inline
+> # completion — the ledger's positive authority, which `ContinuationCandidateLedger
+> # ::close` deliberately excludes from DirectCall∪ComposedCall. (3)
+> # `ContinuationClaimLedger::validate_response_owner_call_coverage`
+> # CORRECTLY refuses because no verified response-owner call exists for a
+> # forward-declared Specialized owner — THAT GUARD MUST REMAIN (tolerating an
+> # unused owner would suppress ordinary host-effect lowering with no caller to
+> # execute the owner).
+> #
+> # FENCES ON INTERPRETATION: do NOT reinterpret `InlineNoCall` as discharge, force
+> # or fabricate a claim, remove this identity from candidate totality, accept an
+> # unused Specialized owner, weaken `validate_response_owner_call_coverage`, or make
+> # response-owner selection override the successful bridge. Preserve HS7's exact
+> # settlement and the HS8/HS9 routes.
+> #
+> # NEXT STEP — ONE OBSERVATION-ONLY PASS (do NOT repair yet). On the exact
+> # reapplied attempt + HS8/HS9 repairs, add a cfg test-support, streamed,
+> # explicitly flushed observer with five structurally joined row kinds: (1) at
+> # `static_response_phase_b_split`, one row per demand (response/Vis/op-root/
+> # effect/producer origins, complete k_identity, transport_source, producer-group
+> # ownership flags, requires_execute_then_resume, has_unitless_response, final
+> # Specialized/Deferred branch); (2) at immediate-binder bridge selection + exit,
+> # one row per bypassed identity (defining unit/emission owner, construct +
+> # computational frame origin, alternative, recursive position, selected field,
+> # consumer kind, checked_ih_slots_operation_bridge, both bridge predicates,
+> # completion, disposition before/after, direct/pending-composed/verified-composed/
+> # transport evidence); (3) at each generated Function's finished-CLIF verification
+> # boundary, row the identity ONLY if it is a response selected caller
+> # (defn/emission owner, direct + checked-IH transport + verified-composed emission
+> # counts, resolved target, selected response-owner target, whether
+> # verified_response_owner_calls records it — counts accompany the full identity,
+> # never pair rows); (4) at artifact close, the complete response-owner matrix
+> # joined by owner.selected_caller() (owner id, response row, context/preexisting,
+> # full identity, final disposition, exact response-owner-call evidence — report
+> # EVERY owner whose selected caller is not DirectCall or has no verified physical
+> # response-owner call; do not stop after owner 0); (5) for owner 0's exact
+> # op-root/effect only, observe whether ordinary lowering produced
+> # StaticResponseDeferred outside an owner and whether any actual host-effect seat
+> # was emitted in that same Function (observation, NOT permission to carry/decode
+> # the marker). ALSO attempt an observer-only PRE-phase-B re-derivation of the
+> # bridge-bypassed complete-identity set from existing source/plan records — it
+> # must reproduce the bridge's full selector (construct, computational frame,
+> # alternative, recursive position) and its exact structural predicate, with NO
+> # origin arithmetic, order, counts, nearest match, or candidate disposition; if
+> # the fact cannot be derived without lowering-local eliminator state, REPORT THAT
+> # as the result rather than adding a plan field or duplicating a heuristic.
+> #
+> # VALID RUN: the one unchanged COW positive ending at the SAME HS10 production
+> # refusal, with exactly one complete owner-0 identity joining the phase-B
+> # Specialized row to a successful bridge InlineNoCall row and zero physical
+> # response-owner calls. Preserve all rows, exact census, observation-only diff,
+> # full run, and SHA-256; restore byte-clean fee133142 and return.
+> #
+> # THE NEXT RULING BRANCHES ON the joined result: (a) same identity + successful
+> # bridge + no physical owner call + deferred op/effect = response-plan
+> # OVERPROMOTION (next repair classifies that exact structural no-call BEFORE
+> # owner creation, leaving the row on an existing ordinary/deferred effect path);
+> # (b) finished CLIF contains the exact response-owner call but the global map
+> # lacks it = evidence-collection/recording loss (repair the collector, not
+> # classification); (c) different identities at phase B vs bridge = a structural
+> # join defect; (d) no successful bridge or no ordinary effect realization = a
+> # deeper lifecycle/loss defect (demotion NOT authorized); (e) failure to derive
+> # the bridge class pre-phase-B is itself a HARD DESIGN BOUNDARY — stop rather
+> # than infer from later InlineNoCall or build a speculative owner.
+> #
+> # STEWARD PACKAGING: observation-only, cfg test-support, the coverage guard and
+> # HS7/HS8/HS9 routes all preserved => NO TCB delta, NO ban-lift => amend-in-place,
+> # no operator sign-off (as at HS8's observation passes). Count remains 10; a new
+> # refusal is HARD STOP 11 (no Research until 12). Runtime stays byte-clean at
+> # fee133142 until this amendment lands and runtime-leader explicitly re-kicks the
+> # observation pass. The Architect symptom-inventory record for HS10 follows
+> # immediately below.
+
 # D5b HARD-STOP 10 — RESPONSE-CALLER REALIZATION MISMATCH
 
 Architect inventory, 2026-09-11.
@@ -53,7 +158,7 @@ Architect inventory, 2026-09-11.
 > `InlineNoCall` as discharge, force a claim, or tolerate an unused Specialized
 > owner. No Research pull is due until hard stop 12.
 
-# D5b NATIVE HARD-STOP 9 — ROOT-PARENT REPAIR RULING, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 9 — ROOT-PARENT REPAIR RULING, AMENDED IN PLACE 2026-09-11 (Steward). Superseded by the HS10 observation ruling above; retained as the root-parent repair record that advanced the witness to HS10.
 
 > # D5b native-lowering track, HARD STOP 9 — ROOT-PARENT REPAIR. Architect ruling
 > # evt_3c1nve6zjmsza (thr_7wy5wy45p7abm), grounded byte-clean fee133142 (all four
