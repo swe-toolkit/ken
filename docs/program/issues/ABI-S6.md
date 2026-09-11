@@ -12,6 +12,75 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
+# D5b NATIVE HARD-STOP 3 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 3 — CLOSED. Architect re-ruling
+> # evt_5781rmnajdpbb (thr_7wy5wy45p7abm), grounded at exact b94c5ae7, resolving
+> # the §1a 3rd-stop chain. After HS2's authorized creation-route bridge fired
+> # with the exact key, its CONSUMER refused the constructed frame: it would
+> # append the 5 worker captures AGAIN onto a 6-input Parameter run that already
+> # carries them (11 operands for 6 parameters). Per §1a the 3rd stop pulled a
+> # mandatory Research advisory (evt_1w0grnt5xrseq) — permissive/behavior-only
+> # closure-conversion + CPS prior art — and an independent Ken diagnostic
+> # (runtime-implementer evt_6ecv3f40wtbtx, diagnostic-only on b94c5ae7, reverted
+> # byte-clean). BOTH AGREE on the FIRST partition: the reaching producer is
+> # lower_expr's specialized Lowered::Closure recursor-call arm, which assembles
+> # `arguments ++ selected captures`; the 6 retarget inputs ARE the complete
+> # direct-worker Parameter run, so the exact-key frame contributes ONLY the 4
+> # context Capture operands. Position 0 does not weaken this (retarget input 0 =
+> # call-origin-102/arg-origin-100 response binder, creation ordinary 0 = Vis
+> # origin 825/824; both encode as wordless StaticResponseDeferred so
+> # D9OperandIdentity reports equality but is NON-INJECTIVE there — proof is the
+> # caller's structural application route, not value equality).
+> #
+> # ARCHITECT RULED FIX (full mechanism in evt_5781rmnajdpbb): add a CLOSED
+> # compiler-local input distinction so the consumer never guesses from length —
+> # a private sum RecursivePositionCallInputs { DeclaredArguments |
+> # CompleteDirectWorker { arguments, worker_captures } } in lowering/calls.rs,
+> # with two sibling constructor methods (the raw/carried-residual entry builds
+> # DeclaredArguments; the specialized-closure entry keeps its params==args
+> # refusal and builds CompleteDirectWorker), both routed through ONE private
+> # resolver. Classify all 6 b94c5ae7 call sites (4 carried-residual =
+> # DeclaredArguments; the 2 specialized-closure sites drop their local
+> # extend(captures) and pass separate vectors). The 10-step
+> # call_declared_context resolution selects by STRUCTURE, never by
+> # inputs.len()/skip(5)/subtraction/SSA equality/D9OperandIdentity/frame-value
+> # comparison. NO new planner claim, continuation kind, ABI slot, carrier,
+> # runtime tag, boolean/tag parameter, 7th call site, or second frame — the
+> # existing ConstructedContextFrame already separates worker_captures /
+> # context_captures (plan-validated alternate-view storage, not an emitted
+> # source on the complete route). The false "retarget supplies neither run"
+> # comments (mod.rs:1030-1079, core.rs:10811-10852, calls.rs:940-975) are
+> # corrected to state both contracts.
+> #
+> # STEWARD SCOPE CALL (Architect-directed packaging): AMEND D5b IN PLACE AGAIN —
+> # do NOT cut a predecessor. Grounds: the consumer partition is ATOMIC with the
+> # HS2 creation bridge (one predicate — operation selection and response
+> # ownership on opposite sides of the checked-IH specialization boundary), has
+> # NO independent user-visible deliverable, and its only acceptance is D5b's own
+> # CompleteDirectWorker differential — a predecessor would have no standalone
+> # green (the B-consumes-unbuilt-A defect) and would lengthen the priority lane
+> # for nothing. NO FURTHER BAN-LIFT NEEDED: unlike HS2's closed-descriptor
+> # bridge widening, this fix adds only a compiler-local private sum in calls.rs
+> # and touches no wire / carrier / continuation form, so it does not trip the
+> # frozen-wire ban — recording it here suffices; the HS2 ban-lift below stands
+> # unchanged. Grows NO TCB (runtime lowering internals; trusted_base() delta
+> # zero), so it is the Steward's call and needs no operator sign-off.
+> #
+> # RUNTIME: HOLDS CLEAN at b94c5ae7 until THIS amendment LANDS (the Architect's
+> # explicit gate); runtime-leader then re-kicks the exact implementation.
+> # Candidate returns to Architect (REQUIRED reviewer) + runtime-qa + CI ->
+> # Steward M1-M4 -> lieutenant. Architect acceptance: D5b COW reaches
+> # CompleteDirectWorker (1 application argument + 5 caller captures + 0 frame
+> # worker operands + 4 frame context operands), native/interp parity + file
+> # preservation pass; a test-only mutation appending frame worker captures
+> # reproduces the 11-for-6 refusal; suppressing the 4 context operands still
+> # refuses (the 2 producer-locals never fall back to defining_abi_operands);
+> # existing foreign-origin/header/membership/injectivity/capture-order/ownership/
+> # lifetime mutations stay red; MappingAllocate byte-for-behaviour unchanged and
+> # avoids this route. HS3 chain CLOSED — no 4th attempt without returning to the
+> # Architect.
+
 # D5b NATIVE HARD-STOP 2 — AMENDED IN PLACE 2026-09-11 (Steward scope call)
 
 > # D5b native-lowering track, HARD STOP 2 (distinct from the surface HS#1-3
