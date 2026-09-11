@@ -382,7 +382,11 @@ fn ac7_derive_kernel_rechecks_candidate() {
     // (a) Zero-field property class → candidate RecordNil has type RecordNil = Omega 0
     //     which matches the class's Sigma type → accepted.
     let mut env_a = mk_env();
-    elab(&mut env_a, "data MyUnit = MkUnit").unwrap();
+    // `MkMyUnit`, not `MkUnit`: the prelude's `Unit` already owns the `MkUnit`
+    // constructor spelling, and the flat constructor namespace now rejects a
+    // cross-family reuse (LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD). The zero-
+    // field derive this test exercises does not depend on the spelling.
+    elab(&mut env_a, "data MyUnit = MkMyUnit").unwrap();
     elab(&mut env_a, "class Trivial2 A { }").unwrap();
     let r_a = elab(&mut env_a, "derive Trivial2 for MyUnit");
     assert!(

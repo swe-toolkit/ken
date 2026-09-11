@@ -30,6 +30,7 @@ use crate::resolve::{RCtorDecl, RExplicitCtorDecl, RTelescopeEntry, RType};
 pub fn elab_data_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    ctor_decl_spans: &mut HashMap<String, Span>,
     d_name: &str,
     type_params: &[String],
     ctors: &[RCtorDecl],
@@ -107,11 +108,41 @@ pub fn elab_data_decl(
         .map(|c| c.id)
         .collect();
 
+    let own_ctor_ids: HashSet<GlobalId> = ctor_ids.iter().copied().collect();
     for (i, c) in ctors.iter().enumerate() {
+        guard_constructor_spelling(env, globals, ctor_decl_spans, &own_ctor_ids, &c.name, &c.span)?;
         globals.insert(c.name.clone(), ctor_ids[i]);
+        ctor_decl_spans.insert(c.name.clone(), c.span.clone());
     }
 
     Ok(d_id)
+}
+
+/// Reject a constructor spelling already bound to a constructor of a *different*
+/// inductive family, at declaration time, naming both sites
+/// (`LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD`). The constructor namespace is
+/// flat: an unguarded insert would silently shadow the earlier binding and
+/// surface downstream as an unrelated `TypeMismatch`. Bindings that are not
+/// constructors (a type former, a def) or that belong to the family being
+/// declared (`own_ctor_ids`) are left to the normal insert.
+fn guard_constructor_spelling(
+    env: &GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    ctor_decl_spans: &HashMap<String, Span>,
+    own_ctor_ids: &HashSet<GlobalId>,
+    name: &str,
+    span: &Span,
+) -> Result<(), ElabError> {
+    if let Some(&existing_id) = globals.get(name) {
+        if env.constructor(existing_id).is_some() && !own_ctor_ids.contains(&existing_id) {
+            return Err(ElabError::DuplicateConstructorSpelling {
+                name: name.to_string(),
+                first_span: ctor_decl_spans.get(name).cloned().unwrap_or_else(Span::zero),
+                second_span: span.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn build_legacy_inductive_spec(
@@ -169,6 +200,7 @@ fn empty_inductive_spec() -> InductiveSpec {
 pub fn elab_explicit_data_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    ctor_decl_spans: &mut HashMap<String, Span>,
     d_name: &str,
     params: &[RTelescopeEntry],
     indices: &[RTelescopeEntry],
@@ -273,8 +305,11 @@ pub fn elab_explicit_data_decl(
         .map(|c| c.id)
         .collect();
 
+    let own_ctor_ids: HashSet<GlobalId> = ctor_ids.iter().copied().collect();
     for (i, c) in ctors.iter().enumerate() {
+        guard_constructor_spelling(env, globals, ctor_decl_spans, &own_ctor_ids, &c.name, &c.span)?;
         globals.insert(c.name.clone(), ctor_ids[i]);
+        ctor_decl_spans.insert(c.name.clone(), c.span.clone());
     }
 
     Ok(d_id)

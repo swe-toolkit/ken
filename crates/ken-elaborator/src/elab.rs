@@ -9756,6 +9756,10 @@ pub fn elaborate_rdecl_v1(
 ) -> Result<ElabResult, ElabError> {
     let mut fixities = HashMap::new();
     let mut fixity_spans = HashMap::new();
+    // Standalone (non-module) path: constructor-spelling collisions are tracked
+    // only within this single declaration. The persistent cross-declaration
+    // registry travels through the module path via `ElabEnv::ctor_decl_spans`.
+    let mut ctor_decl_spans = HashMap::new();
     elaborate_rdecl_v1_with_effect_rows(
         env,
         globals,
@@ -9765,6 +9769,7 @@ pub fn elaborate_rdecl_v1(
         &HashMap::new(),
         &mut fixities,
         &mut fixity_spans,
+        &mut ctor_decl_spans,
         None,
         rdecl,
     )
@@ -9799,6 +9804,7 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
+    ctor_decl_spans: &mut HashMap<String, Span>,
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
@@ -9815,6 +9821,7 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
             effect_rows,
             fixities,
             fixity_spans,
+            ctor_decl_spans,
             declared_fixity,
             rdecl,
         );
@@ -9830,6 +9837,7 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
         effect_rows,
         fixities,
         fixity_spans,
+        ctor_decl_spans,
         declared_fixity,
         &associated,
     )
@@ -9845,6 +9853,7 @@ fn elaborate_associated_rdecl(
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
+    ctor_decl_spans: &mut HashMap<String, Span>,
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
@@ -9960,7 +9969,7 @@ fn elaborate_associated_rdecl(
         ),
         RDeclKind::DataDecl { type_params, ctors } => {
             let d_id =
-                data::elab_data_decl(env, globals, &rdecl.name, type_params, ctors, &rdecl.span)?;
+                data::elab_data_decl(env, globals, ctor_decl_spans, &rdecl.name, type_params, ctors, &rdecl.span)?;
             // Register data type in the module map for orphan check (`33 §5.3`).
             class_env
                 .global_modules
@@ -9983,6 +9992,7 @@ fn elaborate_associated_rdecl(
             let d_id = data::elab_explicit_data_decl(
                 env,
                 globals,
+                ctor_decl_spans,
                 &rdecl.name,
                 params,
                 indices,

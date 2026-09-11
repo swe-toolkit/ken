@@ -53,12 +53,17 @@ fn def_refinement_parses_and_elaborates_without_trusted_base_growth() {
 fn def_alias_parses_and_elaborates() {
     let env = elaborate_ok(
         r#"
-        data DecimalPair = MkDecimalPair Int Int
-        def Decimal = DecimalPair
+        data DecimalPairT = MkDecimalPairT Int Int
+        def DecimalT = DecimalPairT
         "#,
     );
-    assert!(env.globals.contains_key("Decimal"));
-    assert!(env.globals.contains_key("DecimalPair"));
+    // `DecimalT`/`DecimalPairT`, not `Decimal`/`DecimalPair`: the prelude's
+    // decimal machinery (`decimal_char.rs`) already registers
+    // `data DecimalPair = MkDecimalPair Int Int` and `def Decimal`, so reusing
+    // those spellings now collides (LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD).
+    // This test is about the `def` alias mechanics, not the specific names.
+    assert!(env.globals.contains_key("DecimalT"));
+    assert!(env.globals.contains_key("DecimalPairT"));
 }
 
 #[test]
@@ -72,13 +77,13 @@ fn def_refinement_and_def_alias_elaborate_to_the_same_core_decl_as_type_used_to(
     // a `def` alias is `Transparent` with body exactly the aliased type.
     let alias_env = elaborate_ok(
         r#"
-        data DecimalPair = MkDecimalPair Int Int
-        def Decimal = DecimalPair
+        data DecimalPairT = MkDecimalPairT Int Int
+        def DecimalT = DecimalPairT
         "#,
     );
-    let decimal_id = *alias_env.globals.get("Decimal").unwrap();
-    let decimalpair_id = *alias_env.globals.get("DecimalPair").unwrap();
-    let decl = alias_env.env.lookup(decimal_id).expect("Decimal registered");
+    let decimal_id = *alias_env.globals.get("DecimalT").unwrap();
+    let decimalpair_id = *alias_env.globals.get("DecimalPairT").unwrap();
+    let decl = alias_env.env.lookup(decimal_id).expect("DecimalT registered");
     match decl {
         Decl::Transparent { body, .. } => {
             let expected = Term::indformer(decimalpair_id, vec![]);

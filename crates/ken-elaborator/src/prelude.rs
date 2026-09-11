@@ -1450,6 +1450,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let empty_id = crate::data::elab_data_decl(
         &mut elab.env,
         &mut elab.globals,
+        &mut elab.ctor_decl_spans,
         "Empty",
         &[],
         &[],
