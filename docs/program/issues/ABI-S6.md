@@ -12,7 +12,22 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
- # D5a-surface D1 LANDED 2026-09-11 (Steward) — origin/main 8c6136fa3 currently;
+> # D5b RELEASED 2026-09-11 (Steward) — the file-backed MappingAcquireFile +
+> # MAP_PRIVATE COW discharge, the framed D5a successor, is now the LIVE increment
+> # of ABI-S6 (node stays active). Runtime ring resumed on it after D5a landed;
+> # fresh thread anchor evt_7jspmenmbm29m (NOT the landed D5a thread). Seat check:
+> # T1 (COW discriminator soundness-relevant) on gpt-5.6-sol/high = T1, provisioned.
+> # Deliverable: promote MappingAcquireFile (4th op, outside D5a's frozen 3-op wire)
+> # to native mmap-of-fd/munmap; discharge seed-mapping.md case 1 (write through a
+> # MAP_PRIVATE file mapping observed in-mapping but NOT reaching the backing file;
+> # write-through/MAP_SHARED control must red — green-vs-green is a VACUOUS HARD
+> # STOP). Architect REQUIRED reviewer (COW discriminator + file-backed lineage/
+> # rights per AC-LIFETIME-REVOCATION); AC-MAPPING-CAPACITY-GOVERNANCE applies to
+> # any file-acquisition capacity ruling not settled at D4. The CV seed-case-3
+> # ResourceKindMismatch(Mapping) residual is a small nonblocking companion on a
+> # DIFFERENT axis — not part of D5b (see the LANDED banner below).
+> #
+> # D5a-surface D1 LANDED 2026-09-11 (Steward) — origin/main 8c6136fa3 currently;
 > # the D1 candidate bf84c1b1 landed at d8bbef963, blob-verified 3/3
 > # (abi_s6_mapping_surface_native.rs, prelude.rs, px8f_buffer_io_surface.rs). Its
 > # prerequisite, the §1.9 FORK below, resolved PATH B: the spec-author correction
