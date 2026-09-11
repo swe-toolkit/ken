@@ -12,7 +12,116 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 7 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 8 — OBSERVATION-ONLY, AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 8 — OBSERVATION-ONLY (no repair yet).
+> # Architect classification + observation ruling evt_14wxhxwwf403y
+> # (thr_7wy5wy45p7abm), grounded at byte-clean fee133142. Nine-path attempt diff
+> # SHA-256 e83f1a20…; run log SHA-256 12b9563c…. The HS7 exact-`InlineNoCall`
+> # repair AND its causal control are ACCEPTED as far as this stop
+> # (`IgnoreInlineNoCall` applied once and restored the HS7 non-constructor
+> # refusal; after RAII restoration the same witness advanced PAST HS7). HS8 is a
+> # NEW, later stop, NOT evidence against the HS7 repair.
+> #
+> # CLASSIFICATION: a CORRECT FAIL-CLOSED refusal over an UNCLASSIFIED
+> # compiler-control escape. It is NOT evidence that `StaticResponseDeferred`
+> # needs a boundary representation, and does NOT authorize weakening its
+> # exact-owner law. At fee133142, `Lowered::boundary_transfer_admissibility`
+> # refuses `StaticResponseDeferred` before generic carrier allocation — the
+> # correct side of the boundary. The only lawful crossings are the two exact
+> # call-slot cases (`lowering/mod.rs::carry_call_input` +
+> # `lowering/calls.rs::call_declared_unit_target` write an inert zero only
+> # because the selected response owner never loads parameter zero);
+> # `lowering/units.rs::define_static_response_owner_bodies` sets
+> # `static_response_owner`, reconstructs the effect from the validated
+> # static-response row, materializes the current `HostResult`, and calls the
+> # row's exact K context. A generic carrier would publish compiler control as a
+> # runtime value — forbidden. The present diagnostic CANNOT decide why the guard
+> # was reached (bypass vs stale classification): it carries no placeholder
+> # production origin, enclosing lowered-value path, boundary screen site,
+> # defining emission owner, response-owner id, full selected
+> # `ContinuationCallIdentity`, or final disposition. Inferring any from
+> # adjacency, counts, origin arithmetic, `D9OperandIdentity`, SSA equality, or
+> # frame values is FORBIDDEN. NO production repair is authorized yet.
+> #
+> # OBSERVATION PROTOCOL (Steward re-kicks Runtime for THIS pass only): run
+> # exactly ONE observation-only pass. Reapply the byte-identical nine-path
+> # attempt. Unchanged positive COW under `px8-ds-test-support`, `--nocapture
+> # --test-threads=1`. Stream and FLUSH rows before the refusal; do NOT retain
+> # the observation only in an unwind-dependent RAII return. Emit two structural
+> # record kinds:
+> #
+> # HS8-PRODUCE, at both placeholder producers (`lower_expr`'s response
+> # operation-root arm and `lower_process_host_effect`'s response-effect arm):
+> # monotone observation sequence + producer seat {OperationRoot, Effect}; exact
+> # source `StaticOriginId`; current `defining_unit`, `defining_emission_owner`,
+> # `function_local.static_response_owner`, `driven_deferred_response_effect`;
+> # the UNIQUE full static-response row selected by that exact origin
+> # (response-owner id, `vis_origin`, `operation_root_origin`, `effect_origin`,
+> # `producer_call_origin`, `base_owner`, operation, complete opaque
+> # `ContinuationCallIdentity` as caller); and for that identity at observation
+> # time: `ContinuationCandidateLedger::disposition`, direct-emission membership,
+> # pending-composed, verified-composed, checked-IH transport-source membership +
+> # emitted transport count, required-consumer projection presence, and
+> # `is_static_response_selected_caller`. Multiplicity or absence at any
+> # supposedly unique lookup is itself a row and a fail-closed result; NEVER pick
+> # first.
+> #
+> # HS8-REFUSE, immediately before each `StaticResponseDeferred` refusal in BOTH
+> # boundary screens (the one-way `transfer_into_carrier` screen and
+> # `transfer_constructor_operands`' pre-allocation child screen): sequence +
+> # exact screen kind; boundary root origin + root lowered variant; for
+> # constructor preflight, the parent constructor origin + exact argument
+> # position; EVERY root-to-`StaticResponseDeferred` path (not only the first) —
+> # field kind + position at each `Constructor`/`Record`/`HostResult`/
+> # `DynamicConstructor` step, each aggregate occurrence id, and the planner's
+> # exact producer for that occurrence (`Source(origin)` or the complete
+> # synthesized-use identity); and the same current defining/response-owner
+> # fields as HS8-PRODUCE. A test-support-only REVERSE observation accessor
+> # `AggregateOccurrenceId` -> its interned planner producer may be added if the
+> # path needs it: read-only, private to the observation, must NOT become a
+> # production accessor or a second identity authority; the path is obtained by
+> # recursive descent through the actual `Lowered` graph, never reconstructed
+> # from source counts or a nearest prior production row.
+> #
+> # After the refusal: derive and report ONE exact joined row per refused leaf —
+> # the leaf's structurally recovered source origin; full response row; expected
+> # response owner; current defining owner; selected caller's full identity;
+> # final disposition/evidence vector. If more than one production could feed a
+> # leaf and the structural join cannot distinguish them, report AMBIGUITY and
+> # STOP rather than choosing by sequence proximity.
+> #
+> # The NEXT ruling branches only on the joined row (these are diagnostic
+> # outcomes, NOT pre-authorized repairs): (1) `DirectCall` caller with a
+> # different/absent actual owner = an existing call-funnel/retarget bypass;
+> # (2) exact `InlineNoCall` caller = response-owner classification and inline
+> # realization disagree about whether a call exists; (3) `None`/unsettled =
+> # lifecycle/order defect, no owner exemption may be inferred; (4) a leaf whose
+> # exact origin is `Deferred` or has no response row = the placeholder
+> # producer/classifier is wrong; (5) a placeholder produced while already inside
+> # its exact response owner = the producer's owner guard is wrong.
+> #
+> # FENCES: no change to `boundary_transfer_admissibility`, `boundary_disposition`,
+> # either inert call-slot case, response classification, owner selection, caller
+> # retargeting, the response-owner body, continuation settlement,
+> # required-consumer realization, carriers, ABI slots, runtime tags, generated
+> # native code, source semantics, or TCB. No stack sizing/limit/guard,
+> # depth/traversal cap, refusal suppression, or runtime experiment. Do NOT run
+> # the HS6 inside-inner mutation or the remaining D5b controls after this stop.
+> # Preserve the full streamed log + observation-only diff with SHA-256, then
+> # restore ALL observation and attempt edits byte-clean at fee133142;
+> # `Cargo.lock` unchanged. This is an observation-only pass — NO TCB delta, NO
+> # ban-lift => Steward amend-in-place packaging call, no operator sign-off (as at
+> # HS2–HS7).
+> #
+> # Durable classification: Architect inventory entry 8 committed d8879411 (issue
+> # blob 2984805f), recorded below. Stop count is 8; no §1a Research trigger is
+> # due — the next mechanical trigger is stop 9 (Architect owns the count).
+> # Runtime STAYS byte-clean at fee133142 until the Steward's explicit
+> # observation-only re-kick; the joined row returns to the Architect for the next
+> # ruling.
+
+# D5b NATIVE HARD-STOP 7 — CLOSED, AMENDED IN PLACE 2026-09-11 (Steward).
 
 > # D5b native-lowering track, HARD STOP 7 — CLOSED. Architect corrected
 > # classification + repair ruling evt_62ec7mwa8pgj2 (thr_7wy5wy45p7abm), on the
