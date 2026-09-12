@@ -1542,6 +1542,14 @@ Architect inventory, 2026-09-11.
     returned word realized the target contract; admitting it compiled, but the
     terminal backstop still observed the wrong Ret identity
     (`evt_4w0v5k6n3v8ap`).
+14. After separating declared-call expectation from realization and preserving
+    both ordinary source-call continuations repaired entry 13, neither ordinary
+    arm was reached. The contracted generated context instead retained seven
+    terminal Result loads from two exact checked-IH transport call identities.
+    Each call was Trap-checked, but its only remaining eliminator was
+    `InvocationReturn`, which returned the bare call word without projecting the
+    existing checked-IH direct-result disposition into affine context-Result
+    authority (`evt_4x47d8j5ypdgw`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
