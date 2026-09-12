@@ -287,18 +287,31 @@ Steward cuts it rather than the ring.
 >   same-constructor unguarded arm reachable), the guard load-bearing to each
 >   verdict. Top-level `_`/`Var` refusal UNCHANGED (a guard does not lift it). Base
 >   `440b16dfc`.
-> - **Slice 6 literals -- RELEASED 2026-09-12.** [[LANG-MATCH-LITERAL-PATTERN]]
->   (`ready`), the FINAL form. The earlier "BLOCKED on DecEq/expected-type"
->   status is SUPERSEDED by the Architect L2 decomposition ruling
->   evt_127n516pkvtnb: literal comparison is VALUE-LEVEL per the 34 §3.2
->   comparator table (Int/fixed-width/Float/Float32/Decimal/String/Char/bytes
->   each named), the comparator returns Bool with no Equal proof or hypothesis,
->   and lawful DecEq is OPTIONAL where normative value semantics fixes a total
->   comparison (so Float/Float32/Decimal participate without lawful DecEq). The
->   prerequisite pin is discharged (SPEC-MATCH-PATTERN-PINS, 34fd01c1: the
->   comparator table + expected-type-is-scrutinee's pin). Fail-closed: unadmitted
->   carriers and user-defined-carrier numeric literals (35 §4.2 unstaged) reject.
->   The top-level `_`/`Var` catch-all is explicitly out of scope. Base d750d694d.
+> - **Slice 6 literals -- RELEASED 2026-09-12, then HELD the same day under
+>   Architect HS1 `evt_1wc0m1xbtk4r`; RECUT.** [[LANG-MATCH-LITERAL-PATTERN]]
+>   (`draft`, held on the spec correction), the FINAL form. HS1
+>   (`PINNED_VALUE_COMPARATOR_HAS_NO_TOTAL_CORE_REALIZATION`, re-derived at
+>   `2d35fd3b6`): spec 34 §3.2 pins each comparison RESULT, but the prelude has no
+>   total `Bool` core realization for the whole population -- fixed-width and Bytes
+>   have only their named widening views, String only its structural view, and
+>   `decimalEq` is stuck beyond the bounded exponent-alignment cascade. **Zero new
+>   TCB is authorized** (no hidden primitive: a new comparator would grow
+>   `declare_primitive`'s trusted base + interpreter/native reduction, ruled out).
+>   The recut is a bounded decomposition: (1) a spec 34 §3.2 realization correction
+>   owned by the enclave, [[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]] -- permit
+>   exact, total, already-landed lossless view composition as an internal
+>   comparator realization, split the compound conformance row per carrier, defer
+>   Decimal; (2) a contained core (direct Int/Float/Float32/Char + literal-shaped
+>   String structural via `string_to_list_char` + `eqChar`; fixed-width/Bytes
+>   conditional on the correction licensing the views; everything else
+>   fail-closed), which BLOCKS on (1); (3) Decimal deferred to the 18a §5.6.1(2)
+>   unbounded-alignment forward obligation, owning team NOT pre-assigned. The
+>   value-level-not-proof property is UNCHANGED (Architect L2 decomposition
+>   `evt_127n516pkvtnb`): the comparator returns `Bool`, no `Equal` proof or
+>   hypothesis, lawful `DecEq` optional. Prerequisite pin discharged
+>   (SPEC-MATCH-PATTERN-PINS, 34fd01c1). Fail-closed: unadmitted carriers and
+>   user-defined-carrier numeric literals (35 §4.2 unstaged) reject. Top-level
+>   `_`/`Var` catch-all out of scope. Base `2d35fd3b6`.
 
 **One thing already decided and needing no further ruling:** this node does
 **not** amend `34`. The enclave ruled the chapter's obligations real, so the
