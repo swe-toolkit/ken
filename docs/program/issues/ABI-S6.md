@@ -12,7 +12,42 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 15 — PRODUCTION DISPOSITION = HOLD, ESCALATED TO OPERATOR — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 15 — RECUT AUTHORIZED (FENCED; operator confirmed no sign-off needed) — RUNTIME KICKED. AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # OPERATOR RULING (Pat, 2026-09-12, this session): the HS15 production repair
+> # does NOT rise to operator scope. It is FENCED — compiler-only, ABI-preserving,
+> # NO TCB, NO runtime ABI, NO schema, NO source-language capability; it EXTENDS
+> # (reuses) the existing required-consumer mechanism to realize the 4442 contract
+> # the validated generated-context ALREADY demands; and it completes the already-
+> # authorized D5b native objective. The prior HOLD/ESCALATION (banner below) is
+> # LIFTED. The Steward frames and routes the repair; no operator sign-off.
+> #
+> # WHAT CHANGED FROM THE HOLD: nothing about the diagnosis or the design. The HOLD
+> # conflated two fences — the D5b OBSERVE-ONLY campaign fence (which the repair
+> # does leave: diagnosis is done, production now changes) and the §3
+> # OPERATOR-ESCALATION fence (TCB growth / ban-lift / scope-fork / spec change /
+> # product capability), which the repair does NOT cross. "New compiler
+> # response-consumption edge" names an INTERNAL mechanism, not a scope expansion.
+> #
+> # AUTHORIZED SCOPE = the RECOMMENDED RECUT and REPAIR GATE in the demoted
+> # PRODUCTION-DISPOSITION banner immediately below (evt_1tssgfmcc8vcn). That text
+> # is the authoritative implementation spec and is UNCHANGED. Implement exactly
+> # it: extend the plan-owned required-consumer relation per checked-IH transport
+> # identity; keep the generic call result non-authoritative; feed it as
+> # EliminatorRole::Scrutinee through the planned consumer; only its governed 4442
+> # realization or Trap mints terminal authority; cover A and every B separately;
+> # produce one complete consumer chain or REFUSE before object emission. Satisfy
+> # the full repair gate (a)-(f), including the three refutation mutations.
+> #
+> # ROUTING: Tier T1. Runtime implements on the SAME WIP branch
+> # wp/ABI-S6-d5b-file-backed over 37390dfcf / b020b71f. Reviewers: Architect
+> # (required soundness reviewer for this class) + runtime-QA; standing Adversary
+> # hunt independent (crates/ touched -> M8 applies) -> Steward M1-M4 -> lieutenant.
+> # Production stays HELD byte-identical at 37390dfcf / b020b71f until the repair
+> # lands and passes the gate + full ABI-S6 success battery in CI. Node is active,
+> # repair IN PROGRESS.
+
+# D5b NATIVE HARD-STOP 15 — PRODUCTION DISPOSITION (SUPERSEDED as READ-FIRST by the RECUT AUTHORIZATION above; its production classification, code location, ruled-out repairs, RECOMMENDED RECUT, and REPAIR GATE STAND as the authoritative implementation spec). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HS15 — ARCHITECT PRODUCTION DISPOSITION
 > # evt_1tssgfmcc8vcn (thr_7wy5wy45p7abm). The HS15 OBSERVATION REQUIREMENT IS
