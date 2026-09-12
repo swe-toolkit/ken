@@ -12,7 +12,139 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 12 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 13 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 13 — PRODUCTION RULING (repair
+> # authorized IN PLACE). Architect production ruling evt_22trdgzzz89ka
+> # (thr_7wy5wy45p7abm), accepting the restored result as a GENUINE NEW REFUSAL
+> # and REJECTING both apparent repairs (runtime-implementer evt_4w0v5k6n3v8ap).
+> # Runtime stays byte-clean at WIP 37390dfcf (restoration base b020b71f) until
+> # this amendment lands and runtime-leader explicitly kicks the repair. Do NOT
+> # treat a declared target contract as proof that this invocation returned that
+> # contract, and do NOT add a carrier-level response transform. HS13 count is a
+> # NEW structural refusal; a further one is HS14 (next mandatory Research
+> # advisory at HS15). Production remains HELD.
+> #
+> # GROUNDED RESULT (Architect independently matched the artifacts): preserved
+> # base 37390dfcf; restored 17-file production diff SHA-256 b020b71f, no
+> # Cargo.lock delta; attempt 0a72ba20, summary 303984be, decisive native log
+> # a31641bb. The six generated contexts demand exact identity DenseRange
+> # { start: 4442, len: 38 }. The real Tail producer/sink comparison observes
+> # producer DenseRange { start: 3380, len: 38 } against sink/context
+> # { start: 4442, len: 38 }, so the optional forward edge must remain
+> # UNAVAILABLE and the existing base call_tail -> Continue(SourceMachineState::
+> # Value { RoutedAnswer::checked, ... }) route is correct. The unchanged native
+> # witness nevertheless still ends at terminal -1.
+> #
+> # THE INVALID INFERENCE (exactly located): static_response_call_result_contract
+> # has an advertised response demand AND a separate direct-target realization
+> # query, but the (Some(expected), _) arm publishes `expected` even when
+> # realization is ABSENT. call_declared_unit_target then registers the returned
+> # CarriedBoundaryWord under that advertised identity. A target's expected
+> # Result contract is a CALLER OBLIGATION; it is NOT evidence that this dynamic
+> # call produced it. The live terminal tag backstop falsifies that promotion.
+> # Carried, status zero, Trap zero, a matching declared target, and a runtime
+> # tag are EACH insufficient to mint semantic-result authority.
+> #
+> # CLASSIFICATION:
+> # HS13_DECLARED_CALL_EXPECTATION_CONFUSED_WITH_RESULT_REALIZATION. This is NOT
+> # a need to broaden the generated-context contract and NOT evidence for a Ret
+> # re-tag/re-wrap. The contract 4442 remains correct. The producer 3380 is an
+> # INPUT to an existing semantic consumer, not a value that may be relabelled as
+> # 4442. The missing step is already represented in the source machine: a
+> # RoutedAnswer pairs a call result with its route and Scrutinee role;
+> # SourceMachineState::Value consumes the current SourceContinuation, and the
+> # ruled Tail fallback enters that path correctly. But source_call_state still
+> # has TWO ordinary declared-call branches that DISCARD the current control by
+> # returning SourceCallOutcome::Complete(called):
+> #   (1) Lowered::Closure { boundary_environment: Some(..) } after
+> #       call_boundary_closure_environment;
+> #   (2) Lowered::DeclarationClosure after call_declaration_closure_unit.
+> # That is the structural gap. A raw declared-call result is an ordinary
+> # scrutinee; completing the function at that seat BYPASSES the remaining
+> # computational eliminator/Ret consumer — the only existing mechanism able to
+> # transform the producer result into the context's final Ret identity.
+> #
+> # RULED REPAIR (compiler-only completion of HS12's base path; NO ABI change):
+> # (1) Preserve the HS12 context contract, response-demand reconciliation, Tail
+> # three-way identity gate, terminal tag backstop, and shared finished-CLIF
+> # validator.
+> # (2) Split EXPECTATION from REALIZATION in compiler types. DeclaredUnitCall or
+> # equivalent call metadata may carry an expected Result contract for agreement/
+> # backstop purposes, but that field must have NO API that registers or returns
+> # GeneratedContextResultAuthority. Remove the `demanded => expected` fallback as
+> # realization. A missing realized contract remains MISSING.
+> # (3) call_declared_unit_target returns the Trap-checked word as a bare
+> # LoweringOperand::Carried. It NEVER mints Result authority from call metadata,
+> # status, Trap, phase, tag, or SSA equality.
+> # (4) In BOTH ordinary source-call branches above, replace early
+> # Complete(called) with the existing continuation-preserving transition:
+> #     Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
+> #         value: RoutedAnswer::direct(called),
+> #         control,
+> #     }))
+> # The result remains EliminatorRole::Scrutinee. Do NOT mark it checked: only
+> # the already-authorized exact selecting-recursor path and an actually claimed
+> # continuation-specialization result may call RoutedAnswer::checked.
+> # (5) Retain SourceCallOutcome::Complete ONLY where an existing semantic
+> # authority actually discharged the rest of the control, notably the proved
+> # composed-return forward edge that jumps to its exact shared Ret sink and
+> # returns RecursiveBackedge. Do NOT infer terminality from call position,
+> # target kind, a Ret-shaped target body, or an empty metadata contract.
+> # (6) Mint the contracted context's affine Result authority ONLY after the
+> # resumed source-machine control produces the final value: an exact specialized
+> # constructor transfer matching the context contract, or a joined value whose
+> # every predecessor already owns that same contract. The strict Ret sink is a
+> # consumer/route coordinate, not by itself a constructor mint. If a bare
+> # declared-call result reaches Terminal(ReturnValue) with NO remaining semantic
+> # consumer and NO independently closed callee realization, compilation must
+> # still REFUSE.
+> # (7) Do NOT add a response transform, carrier inverse, Ret decode/re-wrap, new
+> # function class, interprocedural assumption cycle, ABI/frame/schema field, side
+> # table crossing runtime, allocation, tag, discriminant, response owner, or
+> # route. No Result initialization and no change to the status/Trap/Result
+> # protocol.
+> #
+> # WHY THIS STAYS IN PLACE: this is the exact completion of HS12's already-
+> # authorized base path — carry the result through the final source-machine/Ret
+> # sink instead of fabricating authority at the declared-call boundary. It adds
+> # NO capability, protocol, TCB, ABI, or semantic construct, so it remains an
+> # in-place ABI-S6 compiler repair, NOT an operator architecture fork. If
+> # forwarding both reached ordinary call arms STILL leaves a bare declared-call
+> # result at the contracted terminal, STOP as HS14 with the exact call identity,
+> # ordered remaining control stack, and terminal producer ledger; do not revive
+> # metadata-as-proof or invent a transform. The next mandatory Research trigger
+> # remains HS15.
+> #
+> # ACCEPTANCE + CAUSALITY: the unchanged writeAll witness must reach the
+> # forwarded-call path NON-VACUOUSLY, consume the remaining control, commit exact
+> # Ret tag 0x115a_0000_0027, return NO terminal -1, retain the same ten ordered
+> # effects and abcdef, preserve file/COW behavior, and match the interpreter.
+> # Add one compile-preserving mutation that restores early Complete at EACH
+> # reached ordinary call class independently — each must report a nonzero
+> # application count and either recreate the wrong-Ret backstop/refusal or red
+> # the unchanged witness; a class with no real reached subject is reported
+> # honestly, not claimed as a pin. Mutating the forwarded value to
+> # RoutedAnswer::checked, substituting another continuation/control, bypassing
+> # the exact Ret consumer, or minting authority at the call boundary must EACH
+> # reach and red at its named gate. A terminal ordinary call with no remaining
+> # consumer remains a NEGATIVE control: expected metadata alone cannot make it
+> # compile as a contracted Result. Re-run the HS12 dropped/duplicate/wrong-
+> # identity/Double/Trap-before-Result mutations, the retained-result-closure and
+> # handler-owned Deferred-response controls, HS10/HS11 controls, all-Specialized
+> # neighbours, scoped Runtime/CLI checks, staticlib/ELF census, unchanged 256
+> # MiB stack, observer restoration, and CI.
+> #
+> # SYMPTOM INVENTORY appended entries 9-13 in this same amendment (Architect
+> # commit 5a3470f20, folded here without rewriting history).
+> #
+> # SCOPE (Steward): in-place D5b compiler repair — NO public capability, wire,
+> # ABI, schema, or topology. FENCED (no TCB growth, no new capability, no spec
+> # change, no scope fork), amended in place with no operator sign-off — same
+> # shape as the HS9/HS10/HS11/HS12 in-place amendments. Steward owns amendment;
+> # runtime-leader owns kickoff; production remains HELD.
+
+# D5b NATIVE HARD-STOP 12 — PRODUCTION RULING (Superseded as READ-FIRST by the HARD-STOP 13 PRODUCTION RULING above; the HS12 context-Result-contract repair is the base HS13 completes and its fences STAND). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HARD STOP 12 — PRODUCTION RULING (repair
 > # authorized IN PLACE). Architect production ruling evt_131yfyvg2ew9b
