@@ -1,47 +1,50 @@
 # CAT-4 — Maps / Sets / Relations laws (Layer 2) — conformance seed
 
-Format: `../../README.md`. These pin the **CAT-4 deliverable**
-(`docs/program/wp/CAT-4-maps-sets-relations.md`; the spec chapter is
-spec-author's landed chapter `spec/50-stdlib/58-maps-sets-relations.md` (tip
-`516ba78`, Architect's 3 fidelity fold-ins applied) — cites below are
-**re-pointed to `58 §X`** and re-anchored to that post-fold-in tip). CAT-4
-**extends the landed Map capstone** (`catalog/packages/Data/Collections/Map.ken.md`,
-`spec/50-stdlib/54-map-verified-laws.md` — laws 1/2/3/5 + `toList`-ordered
+Format: `../../README.md`. These pin the **CAT-4 deliverable** against the
+current contract in `spec/50-stdlib/58-maps-sets-relations.md`. CAT-4 **extends
+the landed Map capstone** (`catalog/packages/Data/Collections/Map.ken.md`,
+`spec/50-stdlib/54-map-verified-laws.md` — laws 1/2/3/5 + `to_list`-ordered
 proved) with `delete`, the keyed-merge ops
 (`union`/`intersection`/`difference`), `keys`/`values` coherence, the
-Set-algebra laws (Set = Map-Unit), and the `Relation` frontier (properties now;
-transitive closure design-now/build-later). **Outer-ring, kernel-untouched, zero
-`Axiom`, zero `trusted_base()` delta** — every law is a real proof over the
-landed carriers, `subsume`/`reuse`-don't-re-derive.
+Set-algebra laws (Set = Map-Unit), and the `Relation` frontier (properties
+landed; closure computation next and general laws later). **Outer-ring,
+kernel-untouched, zero `Axiom`, zero `trusted_base()` delta** — every landed law
+is a real proof over the landed carriers, `subsume`/`reuse`-don't-re-derive.
 
-**Grounded (content-verified against `origin/main @ 7169300` — `map.ken`,
-`54`/`52`, `16 §1.1`–`§1.4`/`§6`, `lawful_classes.ken`, `prelude.rs` — plus the
-Architect fork rulings `evt_55htg0ss8y1v6`/`evt_3z7c592g37rtr`, not heading
-numbers, per the `conformance-oracle-grounding-fallback` discipline):**
+**Grounded against `origin/main@1bd3a5667`** (`Map.ken.md`, `54`/`52`,
+`16 §1.1`–`§1.4`/`§6`, `LawfulClasses.ken.md`, and `prelude.rs`; historical
+fork rulings are provenance, not substitutes for the current producers):
 
-- **Reuse corpus (`map.ken`):** `Tree k v = Leaf | Node`; `insert`/`lookup`/
-  `member`/`toList`/`fold`/`fromList`/`fromListAcc`; `Ordered`/`allKeys` (`Ω`
-  via `IsTrue b := Equal Bool b True` + derived `And`,
-  `Leaf → Equal Bool True True` K7-collapses to `Top` → `tt`); the convoy idiom
-  (`boolDichotomy b : Or (Equal Bool b True) (Equal Bool b False)`, `Or` a
-  `Type`-sum built directly against `declare_inductive`); laws 1/2/3/5 +
-  `toList`-ordered (`preservesOrdered`, `lookupFoundAfterInsert`,
-  `lookupLocality`, `lookupAssocAgree` (`map.ken:2212`,
-  `lookup key m ≡ assoc key (toList m)` under `Ordered`+`Distinct`),
-  `toListOrdered`) + `allKeysTransBelow`/`Above`, `isSortedAppend`, and the
-  `trans`/`cong` "stop-one-step-short" transport bridges. **Zero `Axiom`, zero
-  `trusted_base` delta throughout.** Permutation is the one Map law still
-  deferred (proof-relevant, C5).
-- **The LAND-NOW D0–D4 producer is present.** The current Map package contains
-  `leq_nat`, `delete`, `union`, `intersection`, `difference`, `keys`, `values`,
-  `compose`, `converse`, and the relation predicates with their derived proof
-  corpus. The targeted `map_build_acceptance` run passes all 24 tests, including
-  the derived/zero-delta census and executing delete, keyed-merge, projection,
-  and relation controls.
-- **The named closure fast-follow remains deferred:** `size`, bounded
-  `reachableWithin`, and its faithfulness proof are not part of the LAND-NOW
-  producer. The two closure rows below retain that explicit boundary; they are
-  not evidence against the landed D0–D4 result.
+- **Reuse corpus (`catalog/packages/Data/Collections/Map.ken.md`):**
+  `Tree k v = Leaf | Node`; `insert`/`lookup`/`member`/`to_list`/`fold`/
+  `from_list`/`from_list_acc`; `Ordered`/`all_keys` (`Ω` via
+  `IsTrue b := Equal Bool b True` + derived `And`; the `Leaf` goal
+  `Equal Bool True True` K7-collapses to `Top` and closes with `Proved`); the
+  convoy idiom (`bool_dichotomy b : Or (Equal Bool b True)
+  (Equal Bool b False)`, with `Or` a `Type`-sum built directly against
+  `declare_inductive`); laws 1/2/3/5 + `to_list`-ordered
+  (`preserves_ordered`, `lookup_found_after_insert`, `lookup_locality`,
+  `lookup_assoc_agree` at the cited producer's line 5576,
+  `lookup key m ≡ assoc key (to_list m)` under `Ordered`+`Distinct`, and
+  `to_list_ordered`) + `all_keys_trans_below`/`all_keys_trans_above`,
+  `is_sorted_append`, and the `trans`/`cong` "stop-one-step-short" transport
+  bridges. **Zero `Axiom`, zero `trusted_base` delta throughout.** Permutation
+  is the one Map law still deferred (proof-relevant, C5).
+- **The D0–D4 producer has a split evidence boundary.** The current Map package
+  contains `leq_nat`, `delete`, `union`, `intersection`, `difference`, `keys`,
+  `values`, `compose`, `converse`, and the relation-predicate definitions. It
+  contains the D0 order results, D1–D2 general proof corpus, and D3
+  projection/ascending proofs. The D4 region contains transparent operation and
+  predicate definitions, but no general
+  compose/converse membership-law proof or concrete property-predicate proof
+  witness. Those are retained below as conformance obligations, not inferred
+  from declaration presence.
+- **The named closure computation remains deferred:** `size`, `dom`,
+  `reachable_within`, and `reachable_plus` are not part of the landed D0–D4
+  producer. The structured closure rows below are explicitly blocked on
+  `CAT-REL-TRANSITIVE-CLOSURE`; the faithfulness/saturation proof is a separate
+  later follow-on. Neither deferral is evidence against those specifically
+  inventoried landed definitions and proofs.
 
 **Architect fork rulings (source of truth, `evt_55htg0ss8y1v6` +
 `evt_3z7c592g37rtr`):**
@@ -52,126 +55,150 @@ numbers, per the `conformance-oracle-grounding-fallback` discipline):**
   values** — `Ordered`-preservation is `f`-independent. **Map union is NOT
   commutative** in general — maps get only the **lookup characterization** +
   `Ordered`-preservation, **never** a map-commutativity law. Impl
-  `union f a b := fold (\k v acc. insertWith f k v acc) b a`.
-- **Fork B — transitive closure = BOUNDED/DECIDABLE reachability**, `Ω`-native
-  `IsTrue`, NOT `‖·‖`-truncation. `R⁺ x y := IsTrue (reachableWithin N x y)`,
-  `N := size (dom R)`. The exact CAT-3 `Perm` move — push proof-relevant
-  "there-exists-a-path" into a **decidable Bool** bounded computation, then
-  bridge `IsTrue (·) := Equal Bool · True` (`16 §1.1` predicative Π-into-`Ω`).
-  **No raw multi-ctor `data … : Ω`** (proof-relevant, inadmissible
-  `16 §1.4`+§1.1). Faithful: any walk shortens to a simple path ≤ `N−1`, so
-  bounded reachability at `N−1` **equals** full closure. **Decidable beats
-  truncation decisively for conformance: a truncated `‖Reach_rel‖` is
-  non-computational ⇒ NO verdict-flip case can discriminate it**
-  (green-vs-green); `IsTrue (reachableWithin N)` reduces to a concrete `Bool` a
-  broken closure flips.
+  `union f a b := fold (\k v acc. insert_with f k v acc) b a`.
+- **Fork B — transitive closure = BOUNDED/DECIDABLE positive reachability**,
+  `Ω`-native `IsTrue`, not `‖·‖` truncation. `reachable_within Zero = False`;
+  `reachable_within (Suc n) x y r` is the direct edge OR the Boolean fold of
+  `reachable_within n z y r` over `z ∈ succ x r`. `reachable_plus` wraps that
+  result at fuel `N := size (dom r)`. The equations remain total on raw trees.
+  Under one lawful shared order and `Ordered` outer and inner trees, fuel is
+  maximum positive path length and the result denotes `R⁺`, not reflexive `R*`.
+  A shortest positive path then has at most `N` edges: its nonterminal vertices
+  are distinct outer keys, while its terminal may be a target-only sink. **No
+  raw multi-constructor `data … : Ω`** (proof-relevant and inadmissible,
+  `16 §1.4`+§1.1). The decidable form reduces to a concrete `Bool` that the
+  deferred cases below can make flip; a truncated closure cannot provide that
+  execution boundary.
 - **Fork C-rep — `Map K (Set K)` (adjacency), NOT `Set (Pair K K)`.** Rides
   `Ord K` only (`Set (Pair K K)` would force a total lexicographic
-  pair-comparator + 4 pair-order-laws; the landed `pairLeq` compares first
+  pair-comparator + 4 pair-order-laws; the landed `pair_leq` compares first
   components only, non-total on pairs). Just `Tree K (Tree K Unit)` — a
-  landed-`Tree` instantiation at `v := Set K`, zero new machinery. **C-scope:
-  LAND NOW** compose/converse/`succ`/membership +
-  `isReflexive`/`isSymmetric`/`isTransitive`/`isEquivalence` (Π-into-`Ω`);
-  **DESIGN-NOW/DEFER-BUILD** transitive closure (rep pinned; faithfulness law +
-  `size` are the fast-follow — stated, not silently dropped).
-- **Fork D — `delete` = REBUILD-via-`fromList`.**
-  `delete key m := fromList leq (dropKey key (toList m))`, `dropKey` =
+  landed-`Tree` instantiation at `v := Set K`, zero new machinery. **C-scope:**
+  compose/converse/`succ`/membership plus the property predicates are landed.
+  The exact four-function closure computation is the next fast-follow; its
+  faithfulness/saturation laws follow separately.
+- **Fork D — `delete` = REBUILD-via-`from_list`.**
+  `delete key m := from_list leq (drop_key key (to_list m))`, `drop_key` =
   **filter** (removes **ALL** matching entries, not drop-first). Non-recursive
-  (zero own SCT). `Ordered`-preservation reuses landed `preservesOrdered`
-  wholesale via one `fromListPreservesOrdered`. **None-law
+  (zero own SCT). `Ordered`-preservation reuses landed `preserves_ordered`
+  wholesale via one `from_list_preserves_ordered`. **None-law
   `lookup key (delete key m) ≡ None` is UNCONDITIONAL** (nothing with `key`
-  survives to `fromList` — filter semantics); the **other-key** law threads
+  survives to `from_list` — filter semantics); the **other-key** law threads
   `Ordered`+`Distinct` through the law-5 roundtrip.
 - **Sub-ruling (1) — set laws MEMBERSHIP-EXTENSIONAL:**
-  `(∀k. setMember k lhs ≡ setMember k rhs)`, **NEVER** `Equal (Set K) lhs rhs`.
+  `(∀k. set_member k lhs ≡ set_member k rhs)`, **NEVER** `Equal (Set K) lhs rhs`.
   Tree-`Equal` set laws are **false** (fold+insert produces shape-different
   trees with the same key-set) — extensional is the **only sound** formulation,
   and is what makes the set laws corollaries of the map lookup-characterization
   + `bool_or`/`bool_and` algebra.
-- **Sub-ruling (2) — carrier:** build a real Axiom-free `leqNat` + 4 laws as the
-  D0 prerequisite; proved discriminators key on **`Map Nat`/`Set Nat`/
-  `Relation Nat`**, **never `Map Int`** (`Ord Int`/`Ord Char` are Axiom-holed ⇒
-  the proved accept-arm goes vacuous, the flip degenerates to reject-vs-reject).
+- **Sub-ruling (2) — carrier:** use the landed Axiom-free `leq_nat` plus its
+  four order results as the D0 basis; proved discriminators key on
+  **`Map Nat`/`Set Nat`/`Relation Nat`**, never `Map Int` (`Ord Int`/`Ord Char`
+  are Axiom-holed, so the accept arm goes vacuous and the flip degenerates to
+  reject-vs-reject).
   `Ord Bool` is Axiom-free but 2-key — too degenerate for a ≥3-key relation
   discriminator (a→b→c ⊬ a→c). The carrier-vacuity guard binds (the CAT-3
   `List Bool` lesson, one carrier up).
 
-**Status — LAND-NOW cases GREEN; closure fast-follow deferred.** At this
-candidate base, `map_build_acceptance` passes 24/24. In particular,
-`cat4_new_api_is_derived_and_axiom_free` finds every D0–D4 operation and proof
-transparent with zero trusted-base delta; the four executing CAT-4 tests pass
-the delete, union/intersection/difference, keys/values, and
-compose/converse controls. This run, rather than producer presence alone,
-discharges the stale aggregate red. The bounded-closure representation and
-faithfulness rows retain their already-named design/defer boundary.
+**Status — landed definitions and proofs are distinct from executing
+conformance.** On exact candidate `af4e5eb726eae1a73d56e8390dd7985ee5133f99`,
+with test blob `581dd65c494cbecb147fa563284c80f948bfab65` and Map blob
+`60949c3d4b6cc98046789249a4fb51cc385d8165`, the targeted command
+`scripts/ken-cargo test -p ken-elaborator --test map_build_acceptance` returned
+`29 passed; 0 failed; 0 ignored`. This prose-only respin keeps both blobs
+unchanged.
+
+The suite contains five `cat4_*` rows. One checks the named D0–D4 globals for
+transparent declarations and zero trusted-base delta. Four execute values:
+delete removes the requested key; union observes the left-biased collision
+orientation while intersection and difference observe one result each;
+`keys`/`values` produce aligned lists; and relation smoke observes the present
+composed edge `1 → 3` and present converse edge `2 → 1`. That relation smoke
+does **not** execute either absent-edge control below and does not prove a
+general membership law or inhabit a property predicate. The corresponding D4
+rows therefore remain explicit unexecuted obligations. The closure rows retain
+the separate computation-then-laws boundary and do not claim that their four
+functions already execute.
 
 ---
 
-Named `Pair` uses in the D1/map signatures below are positive floor-family
-vectors. They are RED-UNTIL the compiler-origin Pair floor realization and then
-use its always-present transparent-Σ bindings without a package import. The
-relation representation's negative `Set (Pair K K)` discussion is comparative
-and grants no unrelated ambient name.
+Named `Pair` uses below use the landed compiler-origin transparent-Σ floor
+family without a package import. The relation representation's negative
+`Set (Pair K K)` discussion is comparative and grants no unrelated ambient
+name.
 
-## Scope — canonical shapes (Architect-pinned; reconcile spellings at merge)
+## Scope — canonical shapes
+
+This is a signature synopsis, not a compilable package: bodies are omitted.
+Declaration keywords and public identifiers match the current producer; the
+four closure signatures are the deferred contract.
 
 ```
 -- D0 carrier prerequisite (Axiom-free, Nat inductive):
-leqNat : Nat -> Nat -> Bool
-leqNatRefl   : (x : Nat) -> Equal Bool (leqNat x x) True
-leqNatTrans  : (x y z : Nat) -> Equal Bool (leqNat x y) True
-             -> Equal Bool (leqNat y z) True -> Equal Bool (leqNat x z) True
-leqNatTotal  : (x y : Nat) -> Or (Equal Bool (leqNat x y) True)
-                                  (Equal Bool (leqNat y x) True)
-leqNatAntisym: (x y : Nat) -> Equal Bool (leqNat x y) True
-             -> Equal Bool (leqNat y x) True -> Equal Nat x y
+fn leq_nat (m : Nat) (n : Nat) : Bool
+proof refl for leq_nat (x : Nat) : Equal Bool (leq_nat x x) True
+proof trans for leq_nat (x : Nat) (y : Nat) (z : Nat)
+  : Equal Bool (leq_nat x y) True
+    -> Equal Bool (leq_nat y z) True -> Equal Bool (leq_nat x z) True
+fn total_leq_nat (x : Nat) (y : Nat)
+  : Or (Equal Bool (leq_nat x y) True) (Equal Bool (leq_nat y x) True)
+proof antisym for leq_nat (x : Nat) (y : Nat)
+  : Equal Bool (leq_nat x y) True
+    -> Equal Bool (leq_nat y x) True -> Equal Nat x y
 
--- D1 delete (Fork D — rebuild, dropKey = filter):
-dropKey (k v : Type) (leq : k -> k -> Bool) (key : k)
-        (xs : List (Pair k v)) : List (Pair k v)      -- filter out ALL key
-delete  (k v : Type) (leq : k -> k -> Bool) (key : k)
-        (m : Tree k v) : Tree k v
-      = fromList k v leq (dropKey k v leq key (toList k v m))
--- laws:
---   None-law  (UNCONDITIONAL): lookup key (delete key m) = None
---   other-key (Ordered+Distinct): k /= key ->
---                lookup k (delete key m) = lookup k m
---   Ordered-preservation: Ordered m -> Ordered (delete key m)
+-- D1 delete (Fork D — rebuild, drop_key = filter):
+fn drop_key (k : Type) (v : Type) (leq : k -> k -> Bool) (key : k)
+            (xs : List (Pair k v)) : List (Pair k v)
+fn delete (k : Type) (v : Type) (leq : k -> k -> Bool) (key : k)
+          (m : Tree k v) : Tree k v
+  = from_list k v leq (drop_key k v leq key (to_list k v m))
 
--- D2 union (Fork A — combining fn f (from-a, from-b)); lookup characterization:
-union (k v : Type) (leq : k -> k -> Bool) (f : v -> v -> v)
-      (a b : Tree k v) : Tree k v
---   lookup k (union f a b) =
---     None,None    -> None
---     Some x,None  -> Some x
---     None,Some y  -> Some y
---     Some x,Some y-> Some (f x y)          -- orientation f x y, NOT f y x
---   Ordered-preservation: f-independent
--- MAPS GET NO COMMUTATIVITY LAW (union f a b /= union f b a unless f commutes).
+-- D2 map operations; union's f receives (from-a, from-b):
+fn union (k : Type) (v : Type) (leq : k -> k -> Bool) (f : v -> v -> v)
+         (a b : Tree k v) : Tree k v
+fn intersection (k : Type) (v : Type) (leq : k -> k -> Bool)
+                (a b : Tree k v) : Tree k v
+fn difference (k : Type) (v : Type) (leq : k -> k -> Bool)
+              (a b : Tree k v) : Tree k v
+-- Maps get no unconditional commutativity law.
 
--- Set algebra (Set = Map-Unit) — MEMBERSHIP-EXTENSIONAL, never Equal (Set K):
---   setUnionComm: (k : Nat) ->
---     Equal Bool (setMember k (setUnion a b)) (setMember k (setUnion b a))
---   (idempotence / identity / difference-membership: same extensional shape)
+-- Set algebra is membership-extensional, never Equal (Tree k Unit):
+fn set_union (k : Type) (leq : k -> k -> Bool)
+             (s : Tree k Unit) (t : Tree k Unit) : Tree k Unit
 
--- D3 keys/values:
-keys   (k v : Type) (m : Tree k v) : List k       -- = pairKeys (toList m)
-values (k v : Type) (m : Tree k v) : List v       -- = pairVals (toList m)
---   keys-coherence: mem k (keys m) = isSome (lookup k m)   (Ω / Bool bridge)
+-- D3 projections:
+fn keys (k : Type) (v : Type) (m : Tree k v) : List k
+fn values (k : Type) (v : Type) (m : Tree k v) : List v
 
--- D4 relations (Fork C — adjacency Map K (Set K)):
-Relation (K : Type) : Type = Tree K (Tree K Unit)
-succ (K : Type) (x : K) (r : Relation K) : Tree K Unit
-relMember (K : Type) (leq : K -> K -> Bool) (x y : K) (r : Relation K) : Prop
-        = IsTrue (setMember K leq y (succ K x r))       -- already Prop (Ω-native)
-compose  (K)(leq)(R S : Relation K) : Relation K    -- succ x (R.S) = U{succ y S}
-converse (K)(leq)(R : Relation K)   : Relation K    -- y in succ x R <=> x in succ y R'
-isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Omega
-  (x y z : K) -> relMember x y r -> relMember y z r -> relMember x z r
--- NOTE: relMember is ALREADY IsTrue(...), so premises are NOT re-wrapped.
--- transitive closure (DESIGN-NOW / DEFER-BUILD):
---   TransClosure x y := IsTrue (reachableWithin N x y), N := size (dom r)
---   NOT data TransClosure : ... : Omega   (proof-relevant, inadmissible)
+-- D4 relations use Tree k (Tree k Unit); Relation is schematic shorthand only.
+fn succ (k : Type) (leq : k -> k -> Bool) (x : k)
+        (r : Tree k (Tree k Unit)) : Tree k Unit
+fn rel_member (k : Type) (leq : k -> k -> Bool) (x : k) (y : k)
+              (r : Tree k (Tree k Unit)) : Prop
+  = IsTrue (set_member k leq y (succ k leq x r))
+fn compose (k : Type) (leq : k -> k -> Bool)
+           (r : Tree k (Tree k Unit)) (s : Tree k (Tree k Unit))
+         : Tree k (Tree k Unit)
+fn converse (k : Type) (leq : k -> k -> Bool)
+            (r : Tree k (Tree k Unit)) : Tree k (Tree k Unit)
+fn is_transitive (k : Type) (leq : k -> k -> Bool)
+                 (r : Tree k (Tree k Unit)) : Prop
+-- rel_member is already IsTrue(...), so premises are not re-wrapped.
+
+-- Closure computation, BLOCKED-ON-CAT-REL-TRANSITIVE-CLOSURE:
+fn size (k : Type) (v : Type) (t : Tree k v) : Nat
+fn dom (k : Type) (v : Type) (t : Tree k v) : Tree k Unit
+fn reachable_within (k : Type) (leq : k -> k -> Bool) (fuel : Nat)
+                    (x : k) (y : k) (r : Tree k (Tree k Unit)) : Bool
+fn reachable_plus (k : Type) (leq : k -> k -> Bool)
+                  (x : k) (y : k) (r : Tree k (Tree k Unit)) : Prop
+-- reachable_within Zero x y r = False
+-- reachable_within (Suc n) x y r = direct edge OR
+--   fold cat4_bool_or False (reachable_within n z y r for z in succ x r)
+-- reachable_plus k leq x y r =
+--   IsTrue (reachable_within k leq
+--     (size k Unit (dom k (Tree k Unit) r)) x y r)
+-- Positive R+, not reflexive R*, and not data TransClosure : ... : Omega.
 ```
 
 ---
@@ -180,35 +207,36 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 
 ### stdlib/collections/cat4-kernel-untouched-outer-ring (soundness)
 - spec: `58 §9` AC1, `52 §1.1`/§9 (the Map-container AC1 precedent), `16 §1`.
-- given: the CAT-4 build diff (`delete`/`union`/`intersection`/`difference`/
-  `keys`/`values`/`Relation` ops + laws + the `size`/`leqNat` prerequisites).
-- expect: `git diff origin/main -- crates/ken-kernel/` is **empty**; **zero
-  `trusted_base()` delta**; **no new `Term`/`Decl`**. Every op is a
-  `declare_def` `view` over the **existing** landed `Tree` carrier + the
-  existing `declare_inductive`/`Term::Trunc`/`Term::Elim` machinery;
-  `size`/`leqNat` are ordinary total Ken. Assert structurally (grep the
-  admission calls + the empty kernel diff), not from prose.
+- given: the landed D0–D2 proof corpus, D3 projection/ascending proofs, the D4
+  definition producer, and, when built, the
+  `size`/`dom`/`reachable_within`/`reachable_plus` fast-follow.
+- expect: the relevant build diff under `crates/ken-kernel/` is **empty**; zero
+  `trusted_base()` delta; no new `Term`/`Decl`. Every operation is an ordinary
+  `fn`; every landed or later law is an ordinary `proof`/`theorem` over the
+  existing `Tree` carrier and kernel machinery. Assert structurally from
+  declaration forms, the empty kernel diff, and `trusted_base()` delta, not from
+  prose.
 - why: AC1's derived-not-primitive core — CAT-4 rides the outer ring entirely
   ([[enriching-opaque-former-kind-is-kernel-clean]] sibling: even the `Relation`
   former is a plain `Tree K (Set K)` instantiation, no kind extension).
   **`(soundness)`** — a kernel touch or a new `Decl` for any CAT-4 op would grow
   the TCB. Structural (empty kernel diff + admission-kind), not a value.
-  (structural; kernel-untouched; aggregate suite GREEN.)
+  (structural; kernel-untouched.)
 
 ---
 
 ## AC2 — reuse the landed capstone, zero re-derivation
 
 ### stdlib/collections/delete-union-reuse-landed-no-rederivation (soundness)
-- spec: `58 §9` AC2 / `58 §1 pt 4`, `54 §5` (laws 1–5), `map.ken`
-  (`preservesOrdered`/`lookupAssocAgree`/`fold`/`insert`).
-- given: the `delete`/`union`/`intersection`/`difference` proof terms as
-  admitted.
+- spec: `58 §9` AC2 / `58 §1 pt 4`, `54 §5` (laws 1–5),
+  `catalog/packages/Data/Collections/Map.ken.md`
+  (`preserves_ordered`/`lookup_assoc_agree`/`fold`/`insert`).
+- given: the landed `delete`/`union`/`intersection`/`difference` proof terms.
 - expect: `Ordered`-preservation for **all four** routes through **one**
-  `fromListPreservesOrdered`-shaped lemma reusing the landed
-  **`preservesOrdered`** per-insert step (base `orderedEmpty`), and the
+  `from_list_preserves_ordered`-shaped lemma reusing the landed
+  **`preserves_ordered`** per-insert step (base `ordered_empty`), and the
   lookup-side delete/merge laws route through the landed **law 5
-  (`lookupAssocAgree`)** + its `fromList` dual — **no fresh two-tree
+  (`lookup_assoc_agree`)** + its `from_list` dual — **no fresh two-tree
   simultaneous-descent induction, no re-proof of laws 1–5**. Grep-clean of
   `Axiom`/`declare_postulate` for every CAT-4 law. **The flip:** a build that
   re-derives a preservation lemma from scratch **and** `Axiom`-stubs a step is
@@ -217,59 +245,62 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   directive. **`(soundness)`** — a re-derivation that smuggles an `Axiom` reads
   `proved`-by-default ([[untrusted-layer-backstop-hole-for-omissions]]); the
   delta net is the backstop. Structural (proof-term shape + delta membership).
-  (soundness; structural reuse + zero-delta; aggregate suite GREEN.)
+  (soundness; structural reuse + zero-delta.)
 
 ### stdlib/collections/leqnat-d0-real-axiom-free-carrier (soundness)
 - spec: `58 §2` sub-ruling 2, `51 §6` (Axiom-free order carriers),
   `../classes/seed-lawful-classes.md` (`Ord Bool` the only landed Axiom-free
   order carrier; `Ord Int`/`Ord Char` Axiom-holed).
-- given: the D0 prerequisite `leqNat` + its 4 order laws (refl/antisym/trans/
-  total) as admitted.
-- expect: each of the 4 laws is a **real, kernel-checked** proof term over the
-  inductive `Nat` (structural induction on the two `Nat` args), **zero `Axiom`,
-  zero `trusted_base` delta** — `Nat` being inductive, its order laws are
-  genuinely provable (unlike the `Int` primitive, whose `Ord` laws are honest
-  `Axiom`s). **The flip:** stub any of the 4 with `Axiom` → the cone walk counts
-  it → non-empty delta → **rejected**; the real proof → empty delta → accepted.
+- given: the landed D0 basis `leq_nat` plus `proof refl for leq_nat`,
+  `proof trans for leq_nat`, `proof antisym for leq_nat`, and
+  `total_leq_nat`.
+- expect: all four order results are **real and kernel-checked** over inductive
+  `Nat`: the three attached proofs recurse structurally and `total_leq_nat`
+  returns a proof-relevant `Or` value. Each has zero `Axiom` and zero
+  trusted-base delta. Unlike primitive `Int`, `Nat` supplies the eliminator that
+  makes these results derivable. **The flip:** stub any result with `Axiom` →
+  the cone walk reports a non-empty delta → rejected; the real result leaves
+  the delta empty → accepted.
 - why: the carrier prerequisite that makes the proved CAT-4 discriminators
   **non-vacuous** — see the standing carrier discriminator below.
-  **`(soundness)`** — an `Axiom`-holed `leqNat` would make every proved
+  **`(soundness)`** — an `Axiom`-holed `leq_nat` would make every proved
   `Map Nat` law's accept-arm vacuous. Structural delta-flip. (soundness;
-  structural zero-delta; aggregate suite GREEN.)
+  structural zero-delta.)
 
 ---
 
 ## AC3 — invariant preservation (the convoy idiom over `Tree`)
 
 ### stdlib/collections/delete-preserves-ordered (soundness)
-- spec: `58 §3.1` D1, `54 §5.1` (`preservesOrdered`), Fork D
+- spec: `58 §3.1` D1, `54 §5.1` (`preserves_ordered`), Fork D
   (`evt_3z7c592g37rtr`).
 - given: `Ordered m → Ordered (delete key m)` as a proof term, over `Map Nat`
-  (real `leqNat`).
-- expect: **accepts** — `delete = fromList ∘ dropKey ∘ toList`, so preservation
-  is `fromListPreservesOrdered` (plain `List` induction: each step = the landed
-  per-insert `preservesOrdered`, base = `orderedEmpty` `Leaf → tt`; the
-  `fromListAcc Nil acc → acc` base is a **passthrough of `acc`'s `Ordered`, NOT
-  `tt`** — per the sharpened `55 §3.2`/`57 §1 pt 3` endpoint rule,
+  (real `leq_nat`).
+- expect: **accepts** — `delete = from_list ∘ drop_key ∘ to_list`, so preservation
+  is `from_list_preserves_ordered` (plain `List` induction: each step = the landed
+  per-insert `preserves_ordered`, base = `ordered_empty` `Leaf → Proved`; the
+  `from_list_acc Nil acc → acc` base is a **passthrough of `acc`'s `Ordered`,
+  not `Proved`** — per the sharpened `55 §3.2`/`57 §1 pt 3` endpoint rule,
   build-pinned). **Zero `Axiom`, zero delta.** **The flip:** a `delete` that
   emitted a non-`Ordered` tree (e.g. a glue that mis-orders the promoted node)
   could not discharge preservation → `Axiom`-stub → non-empty delta →
   **rejected**.
 - why: AC3's invariant face, reusing the landed machinery wholesale (the reason
   Fork D chose rebuild). **`(soundness)`** — structural zero-delta + the
-  per-branch base-witness pin (`tt` on the `Leaf`/`Equal Bool True True`
-  collapse, passthrough on `fromListAcc Nil`, `Refl`/`cong` on neutral steps —
-  never uniform [[tt-vs-refl-endpoint-rule-for-inductive-equal-law-bases]]).
-  (soundness; structural; aggregate suite GREEN; endpoint tokens landed.)
+  per-branch base-witness pin (`Proved` on the
+  `Leaf`/`Equal Bool True True` collapse, passthrough on `from_list_acc Nil`,
+  `Refl`/`cong` on neutral steps — never uniform
+  [[tt-vs-refl-endpoint-rule-for-inductive-equal-law-bases]]).
+  (soundness; structural; endpoint tokens landed.)
 
 ### stdlib/collections/union-preserves-ordered-f-independent (soundness)
 - spec: `58 §4` D2, Fork A (`f` touches only values).
 - given: `Ordered a → Ordered b → Ordered (union f a b)`, over `Map Nat`.
 - expect: **accepts, and the proof does NOT mention `f`** —
-  `union f a b = fold (\k v acc. insertWith f k v acc) b a`, and `insertWith`'s
+  `union f a b = fold (\k v acc. insert_with f k v acc) b a`, and `insert_with`'s
   **key** placement is `insert`'s, so `Ordered`-preservation is `f`-independent
   (`f` only combines **values** at a collision, never moves a key). One shared
-  `foldPreservesOrdered`-shaped lemma covers
+  shared fold-preserves-`Ordered` lemma covers
   `union`/`intersection`/`difference`. **Mechanism-consistency check (my V2
   carry):** the three merge ops must agree on the shape of this shared lemma.
   **The flip:** a `union` whose merge mis-placed a key by `Ordered` fails
@@ -277,36 +308,36 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 - why: AC3 for the merge ops; pins `f`-independence structurally (guards a
   conformance over-claim that threads `f` into the invariant proof).
   **`(soundness)`** — structural (proof does not cite `f`) + zero-delta.
-  (soundness; structural; aggregate suite GREEN.)
+  (soundness; structural.)
 
 ---
 
 ## D1 — `delete` laws
 
 ### stdlib/collections/delete-none-law-unconditional
-- spec: `58 §3.2` D1, Fork D (filter `dropKey`, unconditional None-law).
+- spec: `58 §3.2` D1, Fork D (filter `drop_key`, unconditional None-law).
 - given: `lookup key (delete key m) ≡ None`, over a **real inserted** `Map Nat`
   (computes) — driven through real `delete`/`lookup`, not hand-fed.
 - expect: **reduces-to `None`** with **no `Ordered`/`Distinct` hypothesis** —
-  `dropKey` filters out every entry matching `key`, so nothing with `key`
-  survives to `fromList`, and `lookup` finds nothing. A `delete` that fails to
+  `drop_key` filters out every entry matching `key`, so nothing with `key`
+  survives to `from_list`, and `lookup` finds nothing. A `delete` that fails to
   remove the key (or removes a different key) yields `Some v` — the value-flip.
 - why: D1's headline delete law, made executable (seed-map
   `insert-lookup-roundtrip` twin, delete side). **Drive the real producer:**
   build via real `insert`, delete via real `delete`, read via real `lookup`.
-  (reduces-to value-flip; aggregate suite GREEN.)
+  (reduces-to value-flip.)
 
 ### stdlib/collections/dropkey-drop-first-fails-none-law-dup (soundness)
-- spec: `58 §3` D1, Fork D **build-pin** (`dropKey` = filter, NOT drop-first;
+- spec: `58 §3` D1, Fork D **build-pin** (`drop_key` = filter, NOT drop-first;
   `evt_3z7c592g37rtr` + spec-leader `evt_51q1f8jcshgcd`).
 - given: a **hand-built duplicate-key** tree
   `Node (Node Leaf k v1 Leaf) k v2 Leaf` (a non-`Distinct` input, the law-5
   counterexample shape) over `Nat`, and `lookup k (delete k ·)`.
-- expect: **filter-`dropKey` reduces-to `None`** (removes **both** `k` entries →
+- expect: **filter-`drop_key` reduces-to `None`** (removes **both** `k` entries →
   nothing survives) — the None-law holds **unconditionally**. A **drop-first**
-  `dropKey` (removes only the first match) leaves the second `k` entry →
-  `fromList` keeps it → `lookup k` reduces-to `Some v` → **the None-law FAILS**.
-  The two `dropKey` semantics land on **opposite** verdicts on this input; over
+  `drop_key` (removes only the first match) leaves the second `k` entry →
+  `from_list` keeps it → `lookup k` reduces-to `Some v` → **the None-law FAILS**.
+  The two `drop_key` semantics land on **opposite** verdicts on this input; over
   a `Distinct` map they coincide (both `None`) — the dup input is what
   discriminates.
 - why: pins the exact soundness-adjacent build-pin — **filter is what makes the
@@ -316,14 +347,15 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   it; keyed on the **structural** discriminator (duplicate-key survivor). Honest
   note: the input is a non-`Distinct` hand-built tree (not reachable by real
   `insert`), asserting the **robustness** the filter semantics guarantee.
-  (soundness; verdict-flip on `dropKey` semantics; aggregate suite GREEN.)
+  (soundness; verdict-flip on `drop_key` semantics.)
 
 ### stdlib/collections/delete-other-key-law-threads-ordered-distinct
-- spec: `58 §3.2` D1, `54 §5` law 5 (`lookupAssocAgree`, `map.ken:2212`), Fork D
+- spec: `58 §3.2` D1, `54 §5` law 5 (`lookup_assoc_agree`,
+  `catalog/packages/Data/Collections/Map.ken.md`), Fork D
   (other-key threads `Ordered`+`Distinct`).
 - given: when `k` is **order-distinct** from `key` (i.e.
-  `IsTrue (orderEquivKey leq k key)` is **false**, with
-  `orderEquivKey leq a b := bool_and (leq a b) (leq b a) : Bool` — Bool-valued
+  `IsTrue (order_equiv_key leq k key)` is **false**, with
+  `order_equiv_key leq a b := bool_and (leq a b) (leq b a) : Bool` — Bool-valued
   per fold-in 1, `58 §3`), the other-key law
   `lookup k (delete key m) ≡ lookup k m`, over a **real inserted** `Map Nat` (so
   `Ordered`+`Distinct` hold), with `k` an **untouched** key present in `m`.
@@ -334,10 +366,10 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   removes the wrong subtree / too much yields `None` or a wrong value at `k` —
   the flip.
 - why: D1's locality face; the law-5-roundtrip law (reuses landed
-  `lookupAssocAgree` + `fromList` dual + a `dropKey`/`assoc` lemma). The
+  `lookup_assoc_agree` + `from_list` dual + a `drop_key`/`assoc` lemma). The
   discriminator MUST probe an untouched key — the
   [[assert-specific-error-variant-not-is-err]] / non-degenerate-pair rule.
-  (reduces-to value-flip; aggregate suite GREEN.)
+  (reduces-to value-flip.)
 
 ---
 
@@ -357,7 +389,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 - why: D2's headline map law (`§5.2`-analog for merge). The **non-commutative
   `f` + both-present key** is the discriminator: a commutative `f` or a
   one-side-only key would be green-vs-green on the orientation. (reduces-to
-  value-flip; orientation-pinned; aggregate suite GREEN.)
+  value-flip; orientation-pinned.)
 
 ### stdlib/collections/map-union-not-commutative-no-false-law (soundness)
 - spec: `58 §4` D2, Fork A (**maps get NO commutativity law**).
@@ -376,21 +408,21 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   shipped a map-commutativity law would either `Axiom`-postulate a false
   equation or fail to elaborate; the discriminator is the concrete
   counterexample. Keyed on the non-commutative `f` (a commutative `f` hides it).
-  (soundness; verdict-flip on a false-law claim; aggregate suite GREEN.)
+  (soundness; verdict-flip on a false-law claim.)
 
 ### stdlib/collections/set-union-comm-extensional-not-tree-equal (soundness)
 - spec: `58 §5`/`§9 AC6` sub-ruling 1, `52 §4.4` (Set = Map-Unit), `16 §1.3`
   (`Ω` props).
 - given: two formulations of set-union commutativity over `Set Nat`
   (`Tree Nat Unit`): **(A) membership-extensional**
-  `(∀k. setMember k (setUnion a b) ≡ setMember k (setUnion b a))`; **(B)
-  Tree-`Equal`** `Equal (Set Nat) (setUnion a b) (setUnion b a)`.
+  `(∀k. set_member k (set_union a b) ≡ set_member k (set_union b a))`; **(B)
+  Tree-`Equal`** `Equal (Set Nat) (set_union a b) (set_union b a)`.
 - expect: **(A) accepts, (B) rejects** — the two formulations **flip**. (A) is a
   real proof: both sides reduce (pointwise) to
-  `bool_or (setMember k a) (setMember k b)` vs the swap, closed by `bool_or`
-  commutativity (finite `2×2` via landed `boolDichotomy`), **no `Tree`
-  induction**. (B) is **false, not merely unprovable**: `setUnion a b` and
-  `setUnion b a` are built by `fold`+`insert` and produce **shape-different
+  `bool_or (set_member k a) (set_member k b)` vs the swap, closed by `bool_or`
+  commutativity (finite `2×2` via landed `bool_dichotomy`), **no `Tree`
+  induction**. (B) is **false, not merely unprovable**: `set_union a b` and
+  `set_union b a` are built by `fold`+`insert` and produce **shape-different
   trees with the same key-set**, so `Equal (Set Nat) …` between them is
   uninhabited (would need `Node`-injectivity on distinct shapes). A build
   proving (B) would inhabit `Bottom` (or `Axiom`-postulate a false `Equal`).
@@ -400,176 +432,268 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   two formulations, opposite verdicts), keyed on the **structural**
   discriminator (extensional-membership vs Tree-`Equal`). A single (A)-accept
   case is green-vs-green under a build that never tries (B). (soundness;
-  verdict-flip pair on formulation; aggregate suite GREEN.)
+  verdict-flip pair on formulation.)
 
 ---
 
 ## D3 — `keys` / `values` coherence
 
 ### stdlib/collections/keys-coherence-mem-iff-issome-lookup
-- spec: `58 §6` D3, `52 §5.3` (`toList`-ordered), `map.ken`
-  (`pairKeys`/`allKeys`/`toListOrdered`).
-- given: `mem k (keys m)` vs `isSome (lookup k m)`, over `Map Nat`, for **k
+- spec: `58 §6` D3, `52 §5.3` (`to_list`-ordered),
+  `catalog/packages/Data/Collections/Map.ken.md`
+  (`pair_keys`/`all_keys`/`to_list_ordered`).
+- given: `mem k (keys m)` vs `is_some (lookup k m)`, over `Map Nat`, for **k
   present** and **k absent** (the non-degenerate pair).
 - expect: **the two `Bool`s reduce to the SAME value** — `True`/`True` for a
-  present key, `False`/`False` for an absent one. `keys m = pairKeys (toList m)`
+  present key, `False`/`False` for an absent one. `keys m = pair_keys (to_list m)`
   (landed pieces), so membership in `keys` tracks `lookup`-someness exactly. A
   `keys` that drops an entry (→ `mem` `False` while `lookup` `Some`) or
   duplicates/fabricates one flips the agreement.
-- why: D3's coherence law; reuses `pairKeys`/`toList`. Non-degenerate present +
+- why: D3's coherence law; reuses `pair_keys`/`to_list`. Non-degenerate present +
   absent pair (a present-only test is green-vs-green under a "keys returns
-  everything" bug). (reduces-to value-flip; aggregate suite GREEN.)
+  everything" bug). (reduces-to value-flip.)
 
 ### stdlib/collections/keys-ascending-off-tolistordered
-- spec: `58 §6` D3 (keys-ascending coherence), `54 §5` (`toListOrdered`),
-  `map.ken` (`pairKeys`/`pairLeq`).
-- given: `isSorted leq (keys m)` over an `Ordered` `Map Nat` built by inserting
+- spec: `58 §6` D3 (keys-ascending coherence), `54 §5` (`to_list_ordered`),
+  `catalog/packages/Data/Collections/Map.ken.md` (`pair_keys`/`pair_leq`).
+- given: `is_sorted leq (keys m)` over an `Ordered` `Map Nat` built by inserting
   keys in **non-ascending** order (e.g. `insert 3 · insert 1 · insert 2`).
 - expect: **reduces-to a proof / ascending list** —
-  `keys m = pairKeys (toList m)`, and the landed `toListOrdered` gives
-  `isSorted (pairLeq leq) (toList m)`; since `pairLeq` compares first components
-  (the keys), projecting via `pairKeys` **preserves** the ascending order, so
-  `isSorted leq (keys m)` holds regardless of insertion order. A `keys` that
-  emitted in insertion/tree order (not the `toList` order) yields a
+  `keys m = pair_keys (to_list m)`, and the landed `to_list_ordered` gives
+  `is_sorted (pair_leq leq) (to_list m)`; since `pair_leq` compares first components
+  (the keys), projecting via `pair_keys` **preserves** the ascending order, so
+  `is_sorted leq (keys m)` holds regardless of insertion order. A `keys` that
+  emitted in insertion/tree order (not the `to_list` order) yields a
   non-ascending list — the flip is on the **list order**.
 - why: D3's ordering-coherence face (`58 §6`), **distinct** from the membership
-  coherence above — reuses the landed `toListOrdered` (the reconcile-surfaced
+  coherence above — reuses the landed `to_list_ordered` (the reconcile-surfaced
   gated addition; `values` carry NO such claim, the adjacent case). Insertion
   out of order is the discriminator (a pre-sorted input is green-vs-green).
-  (value-flip on list order; aggregate suite GREEN.)
+  (value-flip on list order.)
 
 ### stdlib/collections/values-no-ordering-coherence-claim
-- spec: `58 §6` D3 (`values` = `pairVals (toList m)`; no ordering claim).
+- spec: `58 §6` D3 (`values` = `pair_vals (to_list m)`; no ordering claim).
 - given: the `values` op + the D3 law surface.
-- expect: `values m` yields the values **in `toList` (ascending-key) order**,
+- expect: `values m` yields the values **in `to_list` (ascending-key) order**,
   but **no conformance case asserts `values` is itself sorted** — values carry
-  no order (`pairVals` is `pairKeys`'s mirror with `pairSnd`). The **only**
-  ordering coherence is `keys`'s (above), tracking `toListOrdered`. A case
-  asserting `isSorted (values m)` would false-fail a faithful build (values
+  no order (`pair_vals` is `pair_keys`'s mirror with `pair_snd`). The **only**
+  ordering coherence is `keys`'s (above), tracking `to_list_ordered`. A case
+  asserting `is_sorted (values m)` would false-fail a faithful build (values
   needn't be ordered).
 - why: pins the `keys`/`values` **asymmetry** honestly — keys inherit the key
   ordering, values do not. Guards a conformance over-claim. (boundary; named
-  scope; aggregate suite GREEN.)
+  scope.)
 
 ---
 
-## D4 — `Relation` (LAND-NOW half + the deferred-closure boundary)
+## D4 — `Relation` (landed half + the deferred-closure boundary)
 
 ### stdlib/collections/non-transitive-relation-fails-istransitive (soundness)
-- spec: `58 §7` D4 / Fork C-scope (LAND-NOW `isTransitive` Π-into-`Ω`),
+- spec: `58 §7` D4 / Fork C-scope (landed `is_transitive` Π-into-`Ω`),
   `16 §1.1`.
 - given: a concrete relation over **≥3 distinct `Nat` keys** `{a, b, c}` as
   adjacency `Map Nat (Set Nat)`: `R = {a↦{b}, b↦{c}}` (edges a→b, b→c, **no**
   a→c), and its transitive-completion `R' = R ∪ {a↦{b,c}}`.
-- expect: **proof-flip on the Π-into-`Ω` predicate `isTransitive` over `Nat`** —
-  it is `(x y z) → relMember x y r → relMember y z r → relMember x z r`
-  (`relMember` is **already** `IsTrue (setMember …)` : Prop, `58 §7` — the
+- expect: **proof-flip on the Π-into-`Ω` predicate `is_transitive` over `Nat`** —
+  it is `(x y z) → rel_member x y r → rel_member y z r → rel_member x z r`
+  (`rel_member` is **already** `IsTrue (set_member …)` : Prop, `58 §7` — the
   premises are NOT re-wrapped in `IsTrue`). For `R'` it is **provable** (each
   live triple's conclusion holds; every other triple is vacuous — a false
-  premise `relMember _ _ R'` discharges by `absurd`). For `R` the sole live
-  triple `(a,b,c)` has conclusion `relMember a c R`, which reduces to
+  premise `rel_member _ _ R'` discharges by `absurd`). For `R` the sole live
+  triple `(a,b,c)` has conclusion `rel_member a c R`, which reduces to
   `IsTrue False` = **uninhabited** → **not provable** → **reject**. Accept `R'`
   / reject `R`: opposite verdicts, keyed on the closing edge a→c.
 - why: D4's headline relation discriminator (`58 §7`, the chapter's own
   example). **`(soundness)`** — needs **≥3 distinct keys** (a→b→c ⊬ a→c), which
-  `Bool` (2 keys) **cannot** exhibit — hence the `Nat` carrier prerequisite
-  binds here. Over `Nat` the Ω-predicate itself IS the discriminator (no
-  decidable `Bool` `isTransitive` is defined in `58 §7`); its accept-arm proof
-  needs the Axiom-free `leqNat`, so a `Map Int` accept-arm goes vacuous and the
-  flip degenerates to reject-vs-reject. Non-degenerate pair on the closing edge.
-  (soundness; Ω-predicate proof-flip; ≥3-key carrier-gated; aggregate suite
-  GREEN.)
+  `Bool` (2 keys) cannot exhibit; hence the `Nat` carrier prerequisite binds.
+  Over `Nat` the Ω-predicate itself is the discriminator (no decidable `Bool`
+  `is_transitive` is defined). Its accept arm needs the Axiom-free `leq_nat`, so
+  a `Map Int` arm would be vacuous. The producer lands the transparent
+  `is_transitive` definition, but neither this proof-flip nor a general theorem
+  inhabiting it is in `map_build_acceptance`. This remains an **unexecuted
+  relation-law conformance obligation**, with the closing edge as its
+  non-degenerate discriminator. (soundness; unexecuted Ω-predicate proof-flip;
+  ≥3-key carrier-gated.)
 
 ### stdlib/collections/relation-properties-are-pi-into-omega
 - spec: `58 §7` D4 / Fork C-scope, `16 §1.1` (Π-into-`Ω` is sound — properties
   are not proof-relevant).
-- given: `isSymmetric` over concrete `Nat` relations — a symmetric `R_s` (`a↔b`)
+- given: `is_symmetric` over concrete `Nat` relations — a symmetric `R_s` (`a↔b`)
   and a non-symmetric `R_a` (`a→b`, no `b→a`).
 - expect: **proof-flip** —
-  `isSymmetric r := (x y) → relMember x y r → relMember y x r` is **provable**
+  `is_symmetric r := (x y) → rel_member x y r → rel_member y x r` is **provable**
   for `R_s` (each live pair's converse holds, the rest vacuous) and **not
-  provable** for `R_a` (the `(a,b)` obligation `relMember b a R_a` reduces to
-  `IsTrue False`). `isEquivalence` = the `And` of refl/sym/trans. These are
+  provable** for `R_a` (the `(a,b)` obligation `rel_member b a R_a` reduces to
+  `IsTrue False`). `is_equivalence` = the `And` of refl/sym/trans. These are
   `Π`-into-`Ω` predicates (**fine** — proof-irrelevant, no path data), **not**
   proof-relevant inductives. Non-degenerate: the missing `b→a` edge.
-- why: pins the cheap `Ω`-provable half of D4 that **lands now** (`58 §7`).
-  **Reflexivity caveat (soundness — a self-catch):**
-  `isReflexive r := (x:k) → relMember x x r` quantifies over **all** of
-  `k = Nat`, so a **finite** adjacency relation can **never** inhabit it (most
-  `x` have empty `succ`) — a sound `isReflexive`-accept needs a
-  reflexive-by-construction (total-on-domain) relation, not a finite one;
-  symmetry/transitivity avoid this (vacuous off the finite live set), which is
-  why the chapter's own discriminator is transitivity, not reflexivity. Do NOT
-  author a finite-relation `isReflexive`-accept arm. (proof-flip on the
-  Ω-predicate; aggregate suite GREEN.)
+- why: pins the `Ω`-sound shape of the landed predicate definitions and retains
+  the missing concrete discriminator. **Reflexivity caveat (soundness — a
+  self-catch):** `is_reflexive r := (x:k) → rel_member x x r` quantifies over
+  all of `k = Nat`, so a finite adjacency relation can never inhabit it (most
+  `x` have empty `succ`). A sound `is_reflexive` accept arm needs a
+  reflexive-by-construction relation, not a finite one. Symmetry and
+  transitivity avoid this because off-fixture premises are false. The producer
+  lands these transparent definitions; `map_build_acceptance` constructs none
+  of the stated proof-flip arms. This case therefore remains an **unexecuted
+  relation-law conformance obligation**. (soundness; unexecuted Ω-predicate
+  proof-flip.)
 
 ### stdlib/collections/converse-and-compose-membership
-- spec: `58 §7` D4 (LAND-NOW `compose`/`converse` + their laws), `16 §1.1`.
-- given: over `Nat` relations (adjacency `Map Nat (Set Nat)`): the `converse`
-  law `relMember y x (converse R) ⇔ relMember x y R`, and the `compose` law
-  `relMember x z (compose R S)` reflecting
-  `succ x (compose R S) = ⋃ { succ y S : y ∈ succ x R }` (landed
-  `fold`/`union`/`member`).
+- spec: `58 §7` D4 (landed `compose`/`converse` definitions; general membership
+  proofs and the full paired controls remain residual), `16 §1.1`.
+- given: over `Nat` relations (adjacency `Map Nat (Set Nat)`), the required
+  `converse` characterization
+  `rel_member y x (converse R) ⇔ rel_member x y R`, and the required `compose`
+  characterization in which `rel_member x z (compose R S)` reflects
+  `succ x (compose R S) = ⋃ { succ y S : y ∈ succ x R }`.
 - expect: **value-flip on relation membership.** With `R = {a→b}`:
-  `relMember b a (converse R)` holds while `relMember a b (converse R)` reduces
-  to `IsTrue False`; a `converse` that fails to transpose flips it. With
-  `R = {a→b}`, `S = {b→c}`: `relMember a c (compose R S)` holds (composed via
-  `b`) while `relMember a b (compose R S)` does not; a `compose` that mis-unions
-  the `S`-images flips it. Non-degenerate: a present composed edge AND an absent
-  one.
-- why: the LAND-NOW `compose`/`converse` half of D4 needs its **own**
-  discriminators — `58 §7` lands them with laws, and a corpus testing only the
-  property predicates would leave compose/converse untested (my coverage-gap
-  catch at the reconcile). Reuses landed `fold`/`union`/`member`. (value-flip on
-  relation membership; aggregate suite GREEN.)
+  `rel_member b a (converse R)` holds while `rel_member a b (converse R)`
+  reduces to `IsTrue False`. With `R = {a→b}`, `S = {b→c}`:
+  `rel_member a c (compose R S)` holds while
+  `rel_member a b (compose R S)` does not. A failed transpose or a compose that
+  mis-unions the `S`-images flips the paired observation.
+- why: the definitions reuse landed `fold`/`union`/`member`, but definition
+  presence is not a general membership proof. The current reaching test
+  `cat4_relations_compose_and_converse_over_adjacency_maps` observes only the
+  present compose edge `1 → 3` and present converse edge `2 → 1`. It does not
+  execute either absent-edge arm above. The two positives are **landed smoke
+  evidence**; both negatives and both general characterizations remain
+  **unexecuted relation-law conformance obligations**. (partially executed
+  value-flip; full positive/negative pair and general proofs residual.)
 
 ### stdlib/collections/transitive-closure-decidable-not-raw-omega (soundness)
-- spec: `58 §7`/`§1 pt 1` Fork B (`evt_55htg0ss8y1v6`), `16 §1.4`+§1.1
-  (proof-relevant inductive inadmissible at `Ω`),
+- spec: `58 §7`/`§1 pt 1`, `16 §1.4`+§1.1, and
   `../../challenge/C2-proof-relevant-omega`.
-- given: the transitive-closure **representation** as pinned:
-  `R⁺ x y := IsTrue (reachableWithin N x y)`, `N := size (dom R)`,
-  `reachableWithin` a **decidable Bool** bounded fixpoint over the adjacency
-  `Map K (Set K)`.
-- expect: the closure is an **`Ω`-native value-equation**
-  (`IsTrue (·) := Equal Bool · True`, `16 §1.1` predicative Π-into-`Ω`) —
-  **NOT** a raw multi-ctor `data TransClosure … : Ω` carrying paths (that is the
-  inadmissible proof-relevant inductive, `16 §1.4`+§1.1, the exact `Perm`
-  hazard). **The soundness discriminator vs the wrong design:** a raw-`Ω` path
-  inductive admits a `Type`-relevant leak into `Ω` (distinct paths = distinct
-  proofs) that collapses `true ≡ false` — inadmissible; the `IsTrue`-bounded
-  form has proof-irrelevant `Ω` content. **AND the conformance-testability
-  discriminator (my lane, Fork B reason 1):** the decidable form **reduces to a
-  concrete `Bool`** a broken closure flips (a→c present/absent over ≥3 `Nat`
-  keys), so D5 gets a real verdict-flip; a `‖·‖`-truncated closure is
-  **non-computational** ⇒ green-vs-green, no discriminator. Pin the rep as
-  `IsTrue`-decidable, not truncation, not raw-`Ω`.
-- why: AC5's relation-`Ω`-soundness pin, the CAT-3 `Perm` move applied to
-  closure (same `16 §1.4`+§1.1 hazard). **`(soundness)`** — a raw-`Ω` closure is
-  a consistency finding; the `IsTrue`-bounded rep is the checkable substitute.
-  Reconcile note: the landed prelude ships a **different** `Ω`-safe permutation
-  — `Perm := ‖Perm_rel‖` (truncation, `prelude.rs:778`, matching `37 §6`) — and
-  CAT-3 `57 §3.1` ships count-equality `Perm (a)(eqf)…`; closure takes
-  **neither**, it takes decidable-bounded (Fork B), for the computability +
-  L14-model-check-fit reasons. (soundness; design-rep pin; verdict-independent
-  structural; named closure fast-follow deferred.)
+- given: the exact `reachable_plus` result type and definition over the
+  Bool-valued `reachable_within` recurrence.
+- expect: `reachable_plus` is the `Ω`-native value equation
+  `IsTrue (reachable_within k leq (size k Unit (dom k (Tree k Unit) r)) x y r)`.
+  It is not truncation and never a raw multi-constructor
+  `data TransClosure … : Ω` carrying paths. The latter would make distinct paths
+  proof-relevant at `Ω`, which is inadmissible (`16 §1.4`+§1.1). The Bool form
+  has the executable boundary exercised by the cases below.
+- why: pins AC5's representation and trust boundary independently of any one
+  graph. (soundness; structural; four-function computation deferred.)
 
-### stdlib/collections/closure-faithfulness-and-size-deferred
-- spec: `58 §7` Fork C-scope (DESIGN-NOW/DEFER-BUILD).
-- given: the transitive-closure **faithfulness law** (`reachableWithin N` = full
-  closure, via simple-path shortening + `N`-round fixpoint saturation) and its
-  `size` (`Tree k v → Nat`) prerequisite.
-- expect: **deferred — representation pinned (above), the `.ken` faithfulness/
-  saturation proof + `size` are the named fast-follow.** A CAT-4 conformance
-  suite **must not** assert the faithfulness behavior (bounded = full closure)
-  yet, and the absence is the **named** Fork-C-scope deferral, **not** a silent
-  scope truncation. The LAND-NOW half (compose/converse/properties + the closure
-  *rep*) is complete; the closure *proof* defers. Relations feed L14 + Lane B —
-  the seam is stated, not over-built.
-- why: pins the Fork-C-scope split honestly (the
-  [[untrusted-layer-backstop-hole-for-omissions]] absent-clause discipline:
-  state what defers, so its absence never reads as coverage). (boundary; named
-  deferral; closure fast-follow deferred.)
+**Common premises for every deferred behavioral case below.** Each relation uses
+`Nat` with the landed `leq_nat` and its Axiom-free lawful-order results. Outer
+maps and every stored successor set are built with the landed constructors and
+operations so they are `Ordered` under that same comparator. These cases lie
+inside `58 §7`'s path-correspondence premises; none uses a malformed raw tree.
+Each is **BLOCKED-ON-CAT-REL-TRANSITIVE-CLOSURE** until all four named functions
+land. A blocked case is not reported green merely because the current 29-test
+suite run is green.
+The displayed `0`/`1`/`2`/`3` are compact labels for `Zero` and successive
+`Suc` values; executable fixtures use those actual `Nat` constructors.
+**Promise class:** every row is a durable invariant; numeric literals are fixed
+fixture expectations, never a census of current repository state. When the gate
+activates, each case must execute the named public function and its `why` clause
+names the incorrect neighboring behavior that must flip.
+
+### stdlib/collections/closure-size-counts-fixed-three-node-tree (deferred)
+- spec: `58 §7` (`size`).
+- given: an explicitly constructed well-formed `Tree Nat Unit` with exactly
+  three `Node` constructors: one root, one left child, and one right child.
+- expect: `size Nat Unit t` reduces to the fixed independent value
+  `Suc (Suc (Suc Zero))`. The expected value is not computed through `size`,
+  `to_list`, or another traversal of the subject tree.
+- why: pins raw node count and both subtree contributions; empty-only or
+  self-derived expectations would not discriminate an omitted branch.
+  (value-flip; blocked on closure computation.)
+
+### stdlib/collections/closure-dom-keeps-only-outer-keys (deferred)
+- spec: `58 §7` (`dom`).
+- given: a well-formed `r_dom` with outer keys `{0, 2}`, edge `0 → 1`, and
+  edge `2 → 3`, where `1` and `3` occur only in successor sets.
+- expect: `dom Nat (Tree Nat Unit) r_dom` has exactly the preserved outer-tree
+  shape and keys `{0, 2}`, with each value replaced by `MkUnit`; membership is
+  false for target-only
+  keys `1` and `3`. No comparator is consumed by `dom`.
+- why: catches a domain implementation that unions in successor targets rather
+  than projecting the outer key set. (value/shape flip; blocked on closure
+  computation.)
+
+### stdlib/collections/closure-zero-one-direct-edge-boundary (deferred)
+- spec: `58 §7` (fuel recurrence).
+- given: the one-edge relation `r_edge = {0 → 1}`.
+- expect: `reachable_within Nat leq_nat Zero 0 1 r_edge = False` and
+  `reachable_within Nat leq_nat (Suc Zero) 0 1 r_edge = True` on the same
+  relation.
+- why: the paired boundary rejects direct-at-zero and catches an off-by-one fuel
+  convention. (Bool flip; blocked on closure computation.)
+
+### stdlib/collections/closure-positive-self-not-reflexive (deferred)
+- spec: `58 §7` (positive `R⁺`, not reflexive `R*`).
+- given: `r_acyclic = {0 → 1}` and, on the same endpoint `0`,
+  `r_loop = {0 → 0}`.
+- expect: `reachable_plus Nat leq_nat 0 0 r_acyclic` is uninhabited, while
+  `reachable_plus Nat leq_nat 0 0 r_loop` is inhabited; the self-loop already
+  makes `reachable_within Nat leq_nat (Suc Zero) 0 0 r_loop` true.
+- why: a reflexive zero-step base makes both arms succeed and therefore fails
+  this shared-endpoint pair. (proof/Bool flip; blocked on closure computation.)
+
+### stdlib/collections/closure-positive-two-edge-cycle (deferred)
+- spec: `58 §7` (positive-cycle treatment).
+- given: the well-formed two-cycle `r_cycle = {0 → 1, 1 → 0}` with no
+  self-loop.
+- expect: `reachable_within Nat leq_nat (Suc Zero) 0 0 r_cycle` is false,
+  `reachable_within Nat leq_nat (Suc (Suc Zero)) 0 0 r_cycle` is true, and
+  `reachable_plus Nat leq_nat 0 0 r_cycle` is inhabited because the outer-domain size
+  is two.
+- why: distinguishes positive cyclic self-reachability from both direct
+  self-loops and zero-step reflexivity. (Bool/proof flip; blocked on closure
+  computation.)
+
+### stdlib/collections/closure-one-two-fuel-two-edge-path (deferred)
+- spec: `58 §7` (successor fold and public bound).
+- given: `r_path` has outer edges `{0 → {1, 3}, 1 → {2}}`, with no direct
+  edge `0 → 2`. The ordered successor tree for `0` has root `3` and left child
+  `1`, so the required intermediate is not the inner-tree root.
+- expect: `rel_member Nat leq_nat 0 2 r_path` is uninhabited and
+  `reachable_within Nat leq_nat (Suc Zero) 0 2 r_path = False`, while
+  `reachable_within Nat leq_nat (Suc (Suc Zero)) 0 2 r_path = True` and
+  `reachable_plus Nat leq_nat 0 2 r_path` is inhabited at outer-domain size
+  two.
+- why: independently requires the successor fold rather than mistaking direct
+  membership for closure. (Bool/proof flip; blocked on closure computation.)
+
+### stdlib/collections/closure-reverse-direction-unreachable (deferred)
+- spec: `58 §7` (directed positive reachability).
+- given: the same `r_path` as the preceding case.
+- expect: `reachable_within Nat leq_nat (Suc (Suc Zero)) 2 0 r_path = False`
+  and `reachable_plus Nat leq_nat 2 0 r_path` is uninhabited.
+- why: catches direction reversal or accidental undirected traversal; the
+  forward case above is the positive control. (Bool/proof flip; blocked on
+  closure computation.)
+
+### stdlib/collections/closure-target-only-sink-uses-N-not-N-minus-one (deferred)
+- spec: `58 §7` (outer-domain bound).
+- given: `r_sink = {0 → 1}`, whose only outer key is `0`; `1` is a target-only
+  sink.
+- expect: `dom Nat (Tree Nat Unit) r_sink` contains only `0`,
+  `size Nat Unit (dom Nat (Tree Nat Unit) r_sink) = Suc Zero`, and
+  `reachable_plus Nat leq_nat 0 1 r_sink` is inhabited because fuel one recognizes
+  the direct edge.
+- why: an `N−1` bound supplies zero fuel and rejects this valid positive path.
+  This is the independent off-by-one discriminator for the public wrapper, not
+  merely another direct-call recurrence test. (proof flip; blocked on closure
+  computation.)
+
+### stdlib/collections/closure-computation-then-laws-deferred
+- spec: `58 §7` (explicit fast-follow split).
+- given: the four computational functions and the later general-relation-law
+  tranche.
+- expect: **two ordered deferrals.** `CAT-REL-TRANSITIVE-CLOSURE` first lands
+  `size`, `dom`, `reachable_within`, and `reachable_plus`, activating the eight
+  behavioral cases above. A separate follow-on supplies the compose/converse
+  membership proofs, executes the concrete predicate discriminators, and proves
+  closure correspondence by simple-path shortening and `N`-fuel saturation
+  under the lawful-order/`Ordered` representation premises. This seed does not
+  claim that any of those general results is already proved.
+- why: names both boundaries so computation cannot be mistaken for a proof, and
+  proof deferral cannot be mistaken for absent computation requirements.
+  (boundary; computation and laws deferred separately.)
 
 ---
 
@@ -579,24 +703,28 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 - spec: `58 §2`/`§9 AC7` sub-ruling 2, `52 §5.4` (Axiom-holed
   `Ord Int`/`Ord Char`), `../classes/seed-lawful-classes.md`, the CAT-3
   `List Bool` carrier lesson.
-- given: the proved CAT-4 discriminators (delete/union/set/relation laws) and
-  the choice of key carrier.
+- given: the landed D0–D3 proof artifacts, the planned D4 proof-flips, and the
+  choice of key carrier.
 - expect: the proved accept-arms key on **`Map Nat`/`Set Nat`/`Relation Nat`**
-  with the **real Axiom-free `leqNat`** dict — **never `Map Int`**. Over `Int`
+  with the **real Axiom-free `leq_nat`** basis — **never `Map Int`**. Over `Int`
   (or `Char`), `Ord` is **Axiom-holed**, so a "proved" law's accept-arm cites an
   `Axiom` and the arm goes **vacuous**; the discriminator flip degenerates to
   **reject-vs-reject** (green-vs-green). And `Bool` (Axiom-free) has only 2 keys
   — **too few** for a ≥3-key relation-transitivity discriminator. So the sound
-  proved carrier is **`Nat` + real `leqNat`**. **The flip:** a build that
+  proved carrier is **`Nat` + real `leq_nat`**. **The flip:** a build that
   shipped the proved arms over `Map Int` would have a **vacuous** accept-arm
   (its "proof" leans on the `Ord Int` `Axiom`) — the carrier-check catches it.
 - why: the carrier-vacuity guard **promoted to a standing discriminator** so the
   build cannot silently pick an Axiom-holed carrier and ship a vacuous green
   (exactly CAT-3's `verified-sort-proved-carrier-is-lawful-bool`, one carrier up
-  — Nat here because relations need ≥3 keys). **`(soundness)`** —
-  verdict-independent structural (which carrier + whether its `Ord` cites an
-  `Axiom`). (soundness; standing carrier discriminator; aggregate suite
-  GREEN.)
+  — Nat here because relations need ≥3 keys). The current
+  `cat4_new_api_is_derived_and_axiom_free` row establishes that `leq_nat` and
+  its four order results are transparent with zero trusted-base delta. It does
+  not execute every proof-flip's carrier choice; the cross-case inventory below
+  keeps that separate structural obligation explicit. **`(soundness)`** —
+  verdict-independent structural (which carrier + whether its order basis cites
+  an `Axiom`). (soundness; landed order-basis evidence; cross-case carrier-use
+  obligation retained.)
 
 ---
 
@@ -616,18 +744,26 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   `set-union-comm-extensional-not-tree-equal`.
 - **D3 (`keys`/`values`):** `keys-coherence-mem-iff-issome-lookup`,
   `keys-ascending-off-tolistordered`, `values-no-ordering-coherence-claim`.
-- **D4 (relations LAND-NOW + deferred closure):**
+- **D4 (landed definitions + relation-law and closure residuals):**
   `non-transitive-relation-fails-istransitive`,
   `relation-properties-are-pi-into-omega`, `converse-and-compose-membership`,
-  `transitive-closure-decidable-not-raw-omega` (AC5 rep pin),
-  `closure-faithfulness-and-size-deferred` (named deferral).
+  `transitive-closure-decidable-not-raw-omega` (AC5 representation pin),
+  `closure-size-counts-fixed-three-node-tree`,
+  `closure-dom-keeps-only-outer-keys`,
+  `closure-zero-one-direct-edge-boundary`,
+  `closure-positive-self-not-reflexive`,
+  `closure-positive-two-edge-cycle`,
+  `closure-one-two-fuel-two-edge-path`,
+  `closure-reverse-direction-unreachable`,
+  `closure-target-only-sink-uses-N-not-N-minus-one`, and
+  `closure-computation-then-laws-deferred`.
 - **Carrier (standing vacuity guard):** `proved-carrier-is-lawful-nat-not-int`.
 
 ## Cross-case consistency sweep
 
-- **Carrier discipline uniform:** every proved soundness accept-arm keys on
-  `Nat` + real `leqNat` (never `Int`/`Char` Axiom-holed, never `Bool` for the
-  ≥3-key relation cases) — the standing guard binds all of them.
+- **Carrier discipline uniform:** every landed or planned soundness accept arm
+  keys on `Nat` + real `leq_nat` (never `Int`/`Char` Axiom-holed, never `Bool`
+  for the ≥3-key relation cases) — the standing guard binds all of them.
 - **Commutativity, one story across cases:** `map-union-not-commutative` (maps —
   false) and `set-union-comm-membership-extensional` (sets — true, extensional)
   do **not** contradict: map union is non-commutative in general; set union is
@@ -639,31 +775,47 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   `dropkey-drop-first` fires **only** on a non-`Distinct` dup input — the three
   agree on when `Distinct` is / isn't needed (Fork D's exact split).
 - **Endpoint tokens per-branch, NOT uniform:** `Leaf`/`Equal Bool True True`
-  collapse → `tt`; `fromListAcc Nil acc` → passthrough of `acc` (not `tt`);
-  neutral steps → `Refl`/`cong`; the delete lookup-side laws'
+  collapse → `Proved`; `from_list_acc Nil acc` → passthrough of `acc` (not
+  `Proved`); neutral steps → `Refl`/`cong`; the delete lookup-side laws'
   non-nullary-head-with-neutral- component closers → `Refl` (the sharpened
   `57 §1 pt 3` rule) — build-pinned, reconciled at the build.
-- **Closure rep, one design:** `transitive-closure-decidable-not-raw-omega` (rep
-  = `IsTrue` bounded, not raw-`Ω`, not truncation) and
-  `closure-faithfulness-and-size-deferred` (proof + `size` deferred) are the two
-  halves of Fork B/C-scope — rep now, proof later, nothing silently dropped.
+- **D4 evidence has four distinct classes.** `compose`/`converse` and the
+  predicates are landed transparent definitions. The current suite supplies two
+  positive relation smoke observations. The missing negative arms and concrete
+  predicate proof-flips remain conformance obligations. General membership
+  proofs remain later relation-law work. None is inferred from another.
+- **Closure, one design and two stages:**
+  `transitive-closure-decidable-not-raw-omega` pins the `IsTrue` boundary. The
+  eight behavioral rows independently cover raw node count, outer-only domain,
+  fuel, positive self-reachability, directed traversal, and the public `N`
+  bound. All eight activate with the four-function computation. The general
+  faithfulness/saturation proof remains a later, separately named follow-on.
+- **Well-formedness is uniform:** every closure path case uses one lawful
+  `leq_nat` order and `Ordered` outer and inner trees. No case generalizes its
+  expected path semantics to malformed raw trees, even though the equations
+  remain total there.
 
-## Reconcile items for the merge gate (rolling, per the CAT-3 carry)
+## Reconcile state
 
-Cites are re-pointed to the **landed chapter `58`**, re-anchored to the
-post-fold-in tip **`516ba78`**. Reconcile DONE: (a) **field-name spellings**
-aligned (`fromListPreservesOrdered`/`insertWith`/`dropKey`/`reachableWithin`/
-`size`/`relMember`/`succ`/`isTransitive`/`orderEquivKey`); (b) **gated coherence
-additions** folded with a discriminator each — `compose`/`converse` (LAND-NOW,
-`58 §7`) and keys-ascending (`58 §6`), plus the
-`isTransitive`-not-double-`IsTrue` shape fix and the
-`isReflexive`-over-infinite-`Nat` soundness caveat
-([[transcription-moves-contract-requires-three-part-reconcile]]); (c) per-branch
-**endpoint tokens** deferred to the build. **Re-anchor VERIFIED:** the diff
-`de88e5b → 516ba78` is **exactly** Architect's 3 fold-ins (1: `orderEquivKey`
-Bool-valued `bool_and` + `bool_and`/`bool_not` moved to D0 — aligned in this
-seed; 2: `antisymLeq Zero/Zero → tt` not `Refl`, nullary-endpoint; 3: `transLeq`
-`x=Zero → tt` base) — all chapter `§2`/`§3` `leqNat`-proof details, **none moves
-a D5 discriminator**. Reconcile + re-anchor COMPLETE; ready for the
-Spec/fidelity vote on the assembled candidate. The fidelity vote binds the
-seed's **citations AND coverage** to the landed chapter, not just its verdicts.
+This seed is reconciled to the current `58 §7` contract and the producer
+snapshot at `origin/main@1bd3a5667`. In particular:
+
+- operative calls and proof identities use the producer's snake-case public
+  names; `unionWith` is retained only as an explicitly named Haskell analogue,
+  and local binders are not presented as globals;
+- the exact closure names are `size`, `dom`, `reachable_within`, and
+  `reachable_plus`; no camel-case closure spelling remains;
+- the old `N−1` correspondence claim is removed and the target-only-sink case
+  independently requires the corrected `N` bound;
+- D0 order results, D1–D2 general proofs, and D3 projection/ascending proofs
+  are landed; D4 operation/predicate definitions, the two positive smoke
+  observations, unexecuted conformance arms, and general
+  proof residuals are stated separately;
+- the 29-test result is anchored to the exact test and Map blobs that were run,
+  and no individual D4 obligation is credited from aggregate greenness; and
+- the four closure functions and later general relation proofs remain distinct
+  deferrals, while the closure representation, recurrence, behavioral cases, coverage
+  map, and well-formedness assumptions tell one story.
+
+Any independent vote binds both this seed's citations and its case coverage to
+the exact candidate, not merely to the historical CAT-4 fork record.

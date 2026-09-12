@@ -264,9 +264,14 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   takes a **combining function** `(V→V→V)` (subsumes left/right bias; map union
   is **not** commutative, so maps get only the lookup characterization +
   `Ordered`-preservation, never a commutativity law). **B** — the transitive
-  closure is **bounded-reachability `IsTrue`** (`R⁺ x y := IsTrue
-  (reachableWithin N x y)`, `N = size (dom R)`), `Ω`-native, **never** a raw
-  multi-ctor `data … : Ω` (the `Perm` inadmissibility,
+  closure is **bounded-reachability `IsTrue`**. Schematically, with the key
+  type, comparator, and relation fixed:
+  `reachable_plus x y := IsTrue (reachable_within (size (dom R)) x y R)`.
+  Under one lawful shared order and `Ordered` outer and inner trees, fuel bounds
+  maximum positive path length, so this denotes `R⁺`, not reflexive `R*`; the
+  outer-domain simple-path bound is `N`, not `N−1`, because the terminal may be
+  a target-only sink. The result is `Ω`-native and **never** a
+  raw multi-ctor `data … : Ω` (the `Perm` inadmissibility,
   `10-kernel/16 §1.4`+§1.1).
   **C** — a relation is `Map K (Set K)` adjacency (`Tree K (Tree K Unit)`), not
   `Set (Pair K K)` (the landed `pair_leq` is first-component-only, non-total).
@@ -274,19 +279,25 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   (drop_key key (to_list m))`, `drop_key` = filter so the None-law is
   unconditional), reusing the landed `preserves_ordered` wholesale. Enclave
   sub-rulings: set laws are **membership-extensional** (never `Equal (Set K)`);
-  the discriminator carrier is **`Nat`** with a net-new `Axiom`-free `leq_nat`+4
-  laws (the `Axiom`-holed `Ord Int`/`Ord Char` would make the accept-arm
-  vacuous). Kernel-untouched, outer-ring, zero `trusted_base()` delta.
-- **Deferred follow-on (CAT-4 Fork B / C-scope, 2026-07-04) —
-  transitive-closure faithfulness, design-now/build-later.** `58 §7` **pins the
-  closure representation** (bounded-reachability `IsTrue`) and lands the cheap
-  `Ω`-provable half (compose/converse/property-predicates + the non-transitive
-  discriminator); the **faithfulness/saturation laws** (bounded = full closure
-  via simple-path shortening + `N`-round fixpoint) + a net-new
-  `size : Tree k v → Nat` are the **fast-follow build**, per the frame's
-  heavy-encoding latitude —
-  the design is pinned, the proof deferred (no silent truncation). Feeds L14
-  model-check + Lane B.
+  the discriminator carrier is **`Nat`** with the landed `Axiom`-free
+  `leq_nat` plus four order results (the `Axiom`-holed `Ord Int`/`Ord Char` would
+  make the accept-arm vacuous). Kernel-untouched, outer-ring, zero
+  `trusted_base()` delta.
+- **Deferred follow-on (CAT-4 Fork B / C-scope, updated 2026-09-12) —
+  transitive-closure computation, then general relation laws.** `58 §7` pins the
+  exact `size`/`dom`/`reachable_within`/`reachable_plus` contract. The D0 order
+  results, D1–D2 general proofs, and D3 projection/ascending proofs are landed.
+  D4 lands transparent `compose`/`converse` and property-predicate definitions.
+  The paired conformance seed records an exact run of the two positive runtime
+  smoke observations; neither observation supplies the still-missing general
+  membership proofs, the concrete predicate proof-flips, or the closure
+  computation. The four closure functions are the next single computational
+  fast-follow. A separate general-relation-law tranche then supplies those
+  residuals plus the **faithfulness/saturation laws** (bounded = full positive
+  closure by simple-path shortening and `N`-fuel saturation). The design is
+  pinned and no definition, observation, conformance arm, or proof is credited
+  to another.
+  Feeds L14 model-check + Lane B.
 - **Affects.** `30-surface/31 §1a/§1b` (updated), all of `30-surface/`;
   `30-surface/33 §4` (visibility default resolved).
 
