@@ -2,46 +2,54 @@
 
 > **Availability:** partial. **Authority:** explanatory.
 
-The runtime's [native backend](../../../crates/ken-runtime/src/cranelift_backend.rs)
-lowers runtime IR through Cranelift. The backend facade describes its native
-boundary as narrow: scalar results can be returned
-directly, while aggregate observations pass through an opaque Rust-side token
-mechanism. Native addresses, object layout, allocation order, ABI details, and
-Cranelift internals are not Ken-observable meaning.
+The runtime [native backend](../../../crates/ken-runtime/src/cranelift_backend.rs)
+lowers runtime IR through Cranelift. Its native boundary is deliberately narrow:
+scalar results return directly, while aggregate observations use an opaque
+Rust-side token mechanism. Native addresses, object layout, allocation order,
+ABI details, and Cranelift internals are not Ken-observable meaning.
 
-Package-backed native operations first obtain a checked program admission. The
-backend's package path refuses when it cannot establish the required authority
-or when the runtime program lies outside the supported subset. It does not use
-an unchecked source-text fallback for such a program.
+Package-backed native work first obtains checked program admission. The packaging
+path calls `native_program_admission` before any native work and refuses a
+program whose authority does not close against its own checked package. It does
+not fall back to unchecked source text or legacy prelude spellings.
 
-## Object and executable path
+## From runtime IR to an object
 
-The
-[artifact API](../../../crates/ken-runtime/src/cranelift_backend/artifact/api.rs)
-compiles a selected runtime expression into a Cranelift object and records
-object bytes, an object hash, target information, verifier status, assumptions,
-and unsupported entries. The
-[packaging layer](../../../crates/ken-runtime/src/object_linker_packaging.rs)
-can then write an object, create a starter stub, invoke a linker, and record a
-linked executable artifact.
+The artifact API emits an object from a runtime program only through the
+admitted authority path. The resulting object records bytes, an object hash,
+target information, verifier status, assumptions, and unsupported entries. This
+is evidence about one emitted artifact, not a correctness proof or kernel check
+of native output.
 
-This is an implemented starter route, not a general native-library facility.
-Packaging validates an entrypoint package, platform-support report, and
-runtime-IR run report before it emits the object. It also requires a supplied
-boundary resource profile rather than silently selecting one.
+Runtime-IR lowering is distinct from native-library capability. The current
+starter path targets a narrow Ken-only executable route; it records unavailable
+lanes for library ABI, C and Rust interoperation, cross-package linking, foreign
+ABI, host-effect or FFI execution, translation validation, and whole-compiler
+proof. An unavailable lane is reported rather than silently represented as a
+supported library interface.
 
-## Unavailable lanes
+## Packaging and refusal
 
-The compiler program names Cranelift as the first native target. It leaves
-secondary targets as future work and separates native-library output from the
-Ken-only executable route. The implementation's package types likewise report
-unavailable lanes for library ABI, C and Rust interoperation, cross-package
-native linking, host-effect or FFI execution, translation validation, and a
-whole-compiler proof.
+The [object linker packaging layer](../../../crates/ken-runtime/src/object_linker_packaging.rs)
+validates a supplied resource profile, entrypoint package, platform support
+report, runtime-IR run report, and native comparison before emitting and linking
+the starter artifact. Each record is required to bind the exact runtime artifact
+and target. Missing or stale bindings, unsupported platform targets, linker
+failures, and failed smoke execution return packaging errors.
 
-A backend verifier or a successful smoke run is evidence about that artifact; it
-is not kernel checking of native output. For the intended compiler boundary and
-fidelity vocabulary, see the
-[compiler program](../../../docs/program/07-compiler-program.md). Read
-[Validation and limits](validation-and-limits.md) before treating a native
-result as more than its recorded evidence.
+A boundary resource profile is deployment policy. `validate_options` refuses
+its absence before object emission or linking; packaging does not invent or
+silently default that policy. The packaging route writes an object and starter
+stub, invokes a linker, reads linked bytes, and records hashes and smoke-run
+facts. These are build artifacts and tested observations, not semantic authority
+or proof evidence.
+
+## Evidence boundary
+
+A successful backend verifier, object emission, linker invocation, native
+comparison, or smoke run establishes only the evidence explicitly recorded for
+that artifact and target. It neither re-admits the source nor proves that native
+behavior agrees with Ken semantics. The [compiler program](../../../docs/program/07-compiler-program.md)
+and [validation and limits](validation-and-limits.md) describe the broader
+boundary. This page explains the current implementation; native compilation is
+partial and explanatory.
