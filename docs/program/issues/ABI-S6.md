@@ -12,7 +12,117 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 15 — OBSERVATION-ONLY RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 15 — CORRECTED OBSERVATION-ONLY RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HS15 — ARCHITECT CORRECTED-OBSERVATION RULING
+> # evt_4ntsq3baawqds (thr_7wy5wy45p7abm), superseding the observer INSTRUCTION of
+> # the OBSERVATION-ONLY RULING below. The first observation closed INVALID (an
+> # honest outcome; runtime-implementer evt_57759gben3mhb) — the run FAILED ITS OWN
+> # CLOSURE. This does NOT advance the hard-stop count and does NOT reopen Research
+> # (the mandatory §1a HS15 advisory evt_art1rp41qd48 is already complete). The
+> # classification, grounding, and FENCES of the observation-only ruling below ALL
+> # STAND; only the observer changes so ONE close covers all four residuals. Runtime
+> # stays byte-clean at 37390dfcf / b020b71f; production remains HELD; NO production
+> # repair authorized.
+> #
+> # POSITIVE FACTS that stand (authorize no repair): A has one exact canonical Tail
+> # inheritance; its two-step route + complete fresh destination compose
+> # structurally with B; B has one transport, zero inheritances, positively excluded
+> # at fresh_result_or_next_active_frame_exists; body 859's closed source-result
+> # population is one final-contract-shaped ITree::Ret; all seven terminal call
+> # leaves pair exactly by call/frame/load/predecessor.
+> #
+> # THE FOUR UNCLOSED RESIDUALS = the next observation boundary: (a) origin 705 has
+> # no lifecycle or structural non-emission proof; (b) origin-874 token 2 enters the
+> # Active arm with no recorded successor; (c) the eight constructor-authority values
+> # have no terminal predecessor-edge pairing; (d) target 3's emitted terminal
+> # publication is not independently proved (declared shape / status / Trap success /
+> # Carried / source census CANNOT fill it).
+> #
+> # AUTHORIZED: ONE corrected observation-only run of the same unchanged named
+> # positive, again on exact pre-HS15 attempt bcde2f02 over 37390dfcf. RETAIN and
+> # revalidate the already-closed planning + seven-call ledgers; change ONLY the
+> # observer so one close covers all four residuals. Run ONCE, no mutation/controls,
+> # stream+hash all artifacts, restore byte-identical to 37390dfcf / b020b71f
+> # (Cargo.lock unchanged, git diff --check clean). First-observation hashes:
+> # run/summary/planning/lifecycle/lifecycle-summary/finished/terminal-pairing/
+> # observer-attempt/CLIF/manifest: 93876a6d, 244fd88c, b0ae86c3, 3e676e5c, 325cd250,
+> # 438a9640, 8b67add6, 96b09681, 91b11113, 79b81bf0.
+> #
+> # CORRECTED OBSERVER — ONE close covering all four residuals:
+> # (1) ORIGIN 705 from the source-to-emission boundary, NOT from absence at
+> # lower_computational_producer_construct. Derive complete root-1605 ancestry +
+> # every wrapper/case edge; per branch edge read the plan-owned emission/
+> # reachability disposition. Either name the exact eliminating ancestor + positive
+> # structural reason it cannot emit, or attach at the earliest production lowering
+> # entry guaranteed to see 705 and follow to its named consumer + recursively
+> # covered successor. Spelling / absent-transport / zero-rows / count are NOT
+> # evidence. Exactly one of STRUCTURALLY_NON_EMITTED or a full emitted lifecycle.
+> # (2) ORIGIN-874 TOKEN 2 at the existing EliminatorFrame::Active arm. Record the
+> # token before AND after call_checked_ih_environment_transport, pair its exact
+> # (FunctionId, call Inst, returned word, B identity), then record
+> # resume_active_continuation's result: active frame/cursor/parent, selected
+> # ancestry, exact successor edge, resulting answer route/role, and whether it
+> # reaches a governed constructor / another per-emission call / a recursively
+> # covered join. An Active arm is a consumer, not terminal authority. Every nested
+> # emission gets its own token; no ordering/nearest-row inference.
+> # (3) EIGHT CONSTRUCTOR PREDECESSORS via a test-only MINT ledger. At each actual
+> # constructor-authority mint record exact (FunctionId, word, contract identity,
+> # source Construct origin, minting seat) after its production checks succeed. The
+> # finished backward walk uses this immutable observation ledger, NOT the later
+> # affine map (production may consume an authority into a join before terminal
+> # closure runs). For each reachable terminal predecessor, follow the exact
+> # block-argument/union path from v26 to exactly one minted constructor token or one
+> # already-paired call token; emit the whole edge path. Zero/multiple, unvisited
+> # mint, or uncovered incoming edge = INVALID. Cardinalities 8 and 7 are census
+> # cross-checks only, never pairing.
+> # (4) TARGET 3 emitted realization, proved or refuted INDEPENDENTLY. Join complete
+> # B identity + every B call's decoded direct callee to the one emitted
+> # specialization-3 function for worker body 859. On that finished function
+> # enumerate every reachable Return and re-derive the external unit protocol
+> # (nonzero status reads no result; every status-zero path commits exactly one
+> # exact-frame Trap or Result; Trap precedes Result authorization; no Empty/Double).
+> # For every Result commit trace the stored word back through block arguments to the
+> # exact governed lowering of body 859's ITree::Ret payload + plan-owned identity
+> # DenseRange { start: 4442, len: 38 }. Must NOT read DeclaredUnitCall
+> # .result_contract, target metadata, a runtime tag, or a caller assumption; must
+> # show the callee proof does not depend on the caller's context-Result authority
+> # (excludes an interprocedural cycle). Pair each separate B call result with this
+> # one immutable callee proof + its own already-closed call/frame/load row.
+> # (5) RECLOSE the complete terminal function: every reachable incoming edge to v26
+> # terminates in exactly one constructor/call proof above, with a ground on every
+> # accepted forwarding cycle. Re-run exact context-contract comparison + terminal
+> # tag backstop AS OBSERVATION ONLY. Do NOT mint prod authority or allow object
+> # emission merely to make the observer close.
+> #
+> # THE CORRECTED OBSERVER RETURNS EXACTLY ONE OUTCOME:
+> # - EXISTING_FINAL_RESULT_REALIZATION_NOT_PROJECTED: only if 705 structurally
+> #   closed, token 2 recursively closed, all eight constructor + seven call
+> #   predecessors pair, AND target 3 independently publishes only the exact 4442
+> #   Result or Trap under the protocol.
+> # - TARGET3_EMITTED_RESULT_NOT_CLOSED: the exact callee has an Empty/Double/
+> #   wrong-frame/wrong-identity/unproved Result path or an assumption cycle.
+> # - ACTIVE_RESUMPTION_NOT_CLOSED / ORIGIN705_NOT_CLOSED: that named population
+> #   remains incomplete.
+> # - INVALID: any missing/duplicate/ambiguous/uncovered row.
+> #
+> # FENCES: all prior fences hold (no production repair; no rejected Direct-plan
+> # remnant; no Direct-for-Tail; no metadata/status/Trap/tag/Carried/SSA/route-class
+> # authority; no new route/transform/ABI/frame/schema/carrier field/function class/
+> # side table/allocation/response owner/discriminant; no weakened context contract/
+> # Tail fallback/Ret check/HS6-HS14). 256 MiB Builder stack unchanged.
+> #
+> # SCOPE (Steward): FENCED compiler/test-support OBSERVATION — Architect-stated
+> # needs NO operator escalation. Amended in place with no operator sign-off (same
+> # shape as the HS8/HS10 observation passes and the first HS15 observation fold).
+> # Steward owns the read-first fold; runtime-leader owns the corrected-observation
+> # kickoff; production remains HELD. A PRODUCTION ruling follows ONLY from one valid
+> # CLOSED outcome. NOTE: TRANSFORM_OR_ROUTE_CAPABILITY_REQUIRED is NOT among the
+> # corrected observer's four outcomes; should any later ruling leave the fence
+> # (TCB / ABI / route / transform / capability / scope), the Steward escalates it to
+> # the operator (away until 12:00 UTC) rather than authorizing it.
+
+# D5b NATIVE HARD-STOP 15 — OBSERVATION-ONLY RULING (SUPERSEDED as the operative observer INSTRUCTION by the CORRECTED OBSERVATION-ONLY RULING above; its classification, grounding, and fences STAND — the first observation on this instruction closed INVALID, runtime-implementer evt_57759gben3mhb). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HARD STOP 15 — ARCHITECT OBSERVATION-ONLY RULING.
 > # Architect observation ruling evt_7sxh0ntrbxmt4 (thr_7wy5wy45p7abm). The
