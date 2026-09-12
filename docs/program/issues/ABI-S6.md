@@ -12,7 +12,132 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 13 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 14 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 14 — PRODUCTION RULING (bounded in-place
+> # repair authorized). Architect production ruling evt_6s3ykwpw2bkjp
+> # (thr_7wy5wy45p7abm), accepting the restored result as a GENUINE NEW REFUSAL
+> # (runtime-implementer evt_4x47d8j5ypdgw). Runtime stays byte-clean at WIP
+> # 37390dfcf (restoration base b020b71f, zero Cargo.lock delta) until this
+> # amendment lands and runtime-leader explicitly kicks the repair. Production
+> # remains HELD.
+> #
+> # GROUNDED RESULT (Architect re-applied the attempt to 37390dfcf and matched
+> # the artifacts): attempt diff bcde2f02; summary cd273317; corrected refusal
+> # ledger d0b6ab46; diagnostic 568afba1. The report is real: ZERO
+> # HS13-SOURCE-CALL rows, thirteen checked-IH calls, SEVEN unauthorized terminal
+> # Result loads. One is v3363 = stack_load ss320+152, identity origins
+> # 1603/1092, owner Predeclared(14), target 1, parent/body 879/1076, position 1.
+> # Six are v3876/v6030/v8292/v10466/v12618/v14715, identity origins 1605/874,
+> # owner Specialization(2), target 3, parent/body 661/859, position 1. Both
+> # retain exactly [InvocationReturn]; producers are ITree::Vis at 1092/874. The
+> # positive refuses before object emission at ungrounded Param(block7, 0). The
+> # HS13 ordinary arms are NOT reached.
+> #
+> # CLASSIFICATION: symptom name
+> # HS14_GENERATED_CONTEXT_TERMINAL_STILL_HAS_CHECKED_IH_DECLARED_CALL_LEAVES;
+> # design classification
+> # CHECKED_IH_DIRECT_RESULT_DISPOSITION_NOT_PROJECTED_TO_CONTEXT_TERMINAL. HS13
+> # is EXONERATED: ordinary declared calls still must preserve source control,
+> # and expected target metadata still proves no realization. InvocationReturn is
+> # deliberately NOT a semantic eliminator; returning claimed.answer.value
+> # preserves a call result but cannot turn Carried, Trap/status success, or
+> # RoutedAnswer::checked into exact context-Result authority. The missing
+> # authority is NARROWER: planning owns checked-IH inheritance/confluence and
+> # CheckedIhFreshResultRoute::DirectInvocationReturn from an exact governed K
+> # application to its exact Ret/capture destination, but HS14 projects NO proof
+> # that this terminal call is that Direct realization for this contracted
+> # context. Entries 12-14 share one predicate: terminal authority is
+> # reconstructed AFTER the function boundary from phase, advertisement, or route
+> # class instead of retained from an affirmative producer disposition.
+> #
+> # RULED REPAIR (compiler-only terminal-result projection; NO ABI change):
+> # (1) Keep EVERY HS12 and HS13 fence. In particular call_declared_unit_target
+> # returns (bare LoweringOperand::Carried, exact call Inst); its expected-result
+> # field, status, Trap, tag, SSA equality, and RoutedAnswer::checked NEVER mint
+> # GeneratedContextResultAuthority. Keep both ordinary source-call
+> # Continue(Value { RoutedAnswer::direct(called), control }) changes.
+> # (2) Extend planning with ONE compiler-only terminal-result projection, e.g.
+> # CheckedIhInvocationReturnResultPlan. Do NOT add a route variant. Build it only
+> # after the response-context union and checked-IH confluence are complete. Its
+> # key is the exact tuple (ContinuationContextId, destination emission owner,
+> # destination worker body, terminal Construct origin, complete
+> # ContinuationCallIdentity). Its payload retains the existing Direct source, the
+> # exact fresh-result Ret/capture destination, and the one reconciled
+> # k_ret_identity.
+> # (3) Formation is a STRUCTURAL JOIN, never a target-body/metadata inference.
+> # The terminal occurrence must be in the complete result-position population of
+> # that context; its exact CheckedIhEnvironmentTransport must equal the keyed
+> # call identity and destination; that identity must be the exact
+> # confluence/inheritance member whose route is DirectInvocationReturn; the route
+> # source and destination must equal their canonical derivation; and the response
+> # demand resolved to this same context must agree on the exact result identity.
+> # Zero or multiple joins, Direct/Tail disagreement, a different
+> # context/owner/body/origin/identity, or any context-demand disagreement is
+> # INVALID. Tail remains on its already-ruled checked fallback/Ret-consumer path.
+> # (4) Make contracted-context terminal disposition TOTAL before lowering: every
+> # result-position leaf is exactly one of Trap, an exact matching constructor
+> # producer, a join of already-governed predecessors, or a planned checked-IH
+> # Direct invocation-return producer. A bare Call, Carried, Vis, advertised
+> # target contract, or unclassified leaf REFUSES. Nothing may be dropped because
+> # another leaf supplies the same count.
+> # (5) Consume the new proof ONLY at lower_computational_producer_construct's
+> # exact InvocationReturn terminal transport seat, where static_origin, current
+> # context identity/owner/body, the exact transport identity, the returned bare
+> # word, and emitted call Inst are simultaneously present.
+> # call_checked_ih_environment_transport remains generic and mints nothing.
+> # Record a pending seed keyed by the complete plan proof plus the exact
+> # (call Inst, returned word); mint one affine context-Result authority for each
+> # exact emitted result word ONLY after the shared finished-CLIF verification
+> # accepts that seed.
+> # (6) Finished-CLIF verification must RE-DERIVE, not trust the builder record:
+> # the call is direct to the planned target; the Result load is from the exact
+> # call frame and Result offset; nonzero status returns transport failure; status
+> # zero checks the exact-frame Trap BEFORE Result; and the recorded word is that
+> # Result load. Then run the existing path-sensitive Empty|Result|Trap|Double
+> # terminal validator and exact-tag backstop. Missing, duplicate, substituted,
+> # wrong-frame, wrong-offset, wrong-callee, Result-before-Trap, or unreachable
+> # seeds REFUSE before define_function/object emission. Repeated mutually
+> # exclusive emissions of one plan identity are SEPARATE (Inst, word) seeds; a
+> # count never substitutes for pairing.
+> # (7) Do NOT solve this with DeclaredUnitCall.result_contract,
+> # continuation_call_result_contract, a source-level Ret-shaped target-body scan,
+> # an SCC/fixed-point result assumption, or a runtime tag check — those recreate
+> # HS13 or an interprocedural assumption cycle. Add NO response transform,
+> # carrier inverse, Ret decode/re-wrap, function class, ABI/frame/schema field,
+> # runtime side table, allocation, tag, discriminant, owner, or route.
+> #
+> # ACCEPTANCE + MUTATIONS: the unchanged writeAll positive must PAIR every
+> # reached terminal call result, compile and emit, commit tag 0x115a_0000_0027,
+> # remove terminal -1, and preserve the ten ordered effects, abcdef, file/COW
+> # behavior, native/interpreter parity, and the named 256 MiB stack.
+> # Independently mutate: removal AND duplication of a plan row; same-cardinality
+> # swapping of the two real identities; wrong context, owner, body, terminal
+> # origin, Direct source, Ret/capture destination, and result identity;
+> # Direct-to-Tail substitution; expected-metadata and checked-route mint
+> # fallbacks; an independent carried word; wrong call callee/frame/Result offset;
+> # Result-before-Trap; omitted/double terminal commit; and one plan identity
+> # reused for an unpaired emitted seed. Each mutation must reach its named seat
+> # and RED; the expected-metadata-only negative must remain refused. Re-run all
+> # HS12/HS13, HS10/HS11, carried-aggregate, Deferred-response, all-Specialized,
+> # COW/file, staticlib/ELF, observer-restoration, scoped check, and CI gates.
+> #
+> # HS15 STOP: if either reported identity cannot form the exact
+> # Direct-to-this-context/result join, STOP as HS15 with the failed join and the
+> # complete remaining terminal population. Do NOT fall back to metadata or invent
+> # a transform. HS15 requires RESEARCH before the Architect's next ruling (this
+> # is the mandatory §1a hard-stop-15 Research advisory).
+> #
+> # SYMPTOM INVENTORY appended entry 14 in this same amendment (Architect commit
+> # eadd7944, blob 2f58fef1, folded here without rewriting history).
+> #
+> # SCOPE (Steward): in-place D5b compiler repair — NO public capability, wire,
+> # ABI, schema, or topology. FENCED (no TCB growth, no new capability, no spec
+> # change, no scope fork), amended in place with no operator sign-off — same
+> # shape as the HS9/HS10/HS11/HS12/HS13 in-place amendments. Steward owns the
+> # read-first fold; runtime-leader owns kickoff; production remains HELD.
+
+# D5b NATIVE HARD-STOP 13 — PRODUCTION RULING (Superseded as READ-FIRST by the HARD-STOP 14 PRODUCTION RULING above; the HS13 expectation-vs-realization split + both ordinary source-call forwardings are preserved fences the HS14 projection completes). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HARD STOP 13 — PRODUCTION RULING (repair
 > # authorized IN PLACE). Architect production ruling evt_22trdgzzz89ka
@@ -1542,6 +1667,14 @@ Architect inventory, 2026-09-11.
     returned word realized the target contract; admitting it compiled, but the
     terminal backstop still observed the wrong Ret identity
     (`evt_4w0v5k6n3v8ap`).
+14. After separating declared-call expectation from realization and preserving
+    both ordinary source-call continuations repaired entry 13, neither ordinary
+    arm was reached. The contracted generated context instead retained seven
+    terminal Result loads from two exact checked-IH transport call identities.
+    Each call was Trap-checked, but its only remaining eliminator was
+    `InvocationReturn`, which returned the bare call word without projecting the
+    existing checked-IH direct-result disposition into affine context-Result
+    authority (`evt_4x47d8j5ypdgw`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
