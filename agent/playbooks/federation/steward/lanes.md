@@ -66,7 +66,38 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-10 (LATEST — read first): LANG-CHECKED CLOSED; L2 head = ctor-shadowing-guard
+> ### LIVE POSITION 2026-09-12 (LATEST — read first): directed L2 program COMPLETE; new objective = RESERVED INFIX GLYPHS
+>
+> **The 2026-09-10 operator L2 queue (items 1-8) is FULLY CONSUMED** — items 3-8
+> merged/closed (deceq-char, SCT-opaque, checked-IH-view, ctor-shadowing,
+> sigma-sweep, trunc-remedies); item 1 (pattern-forms) is dischargeable (all
+> nine spec-34 forms landed via the LANG-MATCH-* children); item 2 (membership)
+> was deferred not-buildable. The FO/Kripke soundness arc, module/import, and the
+> transport/kernel-view arc (LANG-ACTIVE-PREMISE-KERNEL-VIEW,
+> LANG-TRANSPORT-SIGMA-PREMISE-SYNTHESIS, V3-FO-EMBEDDING-ADEQUACY) are ALL
+> MERGED. The table cells and older blocks below that name any of these as
+> "current" are STALE.
+>
+> **NEW OPERATOR OBJECTIVE (Pat, 2026-09-12, this session): full RESERVED INFIX
+> GLYPHS.** `≤ ≥ ≠ ∧ ∨ ∈` (and ASCII `<= >= != /\ \/`) are lexer-reserved to
+> tokens Le/Ge/Ne/And/Or/Member that the parser never consumes (they dead-end;
+> used only in format.rs). Wire them into the infix path. Split per the operator:
+> - (A) glyph lex/parse plumbing + bind `≤ ≥ ≠ ∧ ∨` to existing machinery
+>   (bool_and/bool_or; Ord; EqEq/DecEq) — "fix the glyph lex problem first". This
+>   is the BUILDABLE L2 node.
+> - (B) MEMBERSHIP (`∈`) is a PARALLEL DESIGN TRACK, categorically different: it
+>   needs a NEW `class Membership` unifying the four functions
+>   (elem/set_member/member/rel_member) + the operator-to-class-method-dispatch
+>   link + a 31-lexical.md:135-137 spec change. Not yet a build node.
+>
+> STATE 2026-09-12: Architect decomposition REQUESTED (evt_2ra3g7djq7j0q); on its
+> return the Steward frames + releases (A) to the language ring and holds (B) as
+> design. Measurement basis: BinOp closed at 5 (ast.rs:596-610) but the infix
+> surface is OPEN (fixity, elab.rs:10420-10436); typeclass dispatch exists
+> (classes.rs:194-202) with no operator-to-class link. Fill in the node ids here
+> once the Architect decomposes.
+>
+> ### LIVE POSITION 2026-09-10: LANG-CHECKED CLOSED; L2 head = ctor-shadowing-guard
 >
 > **LANG-CHECKED-IH-BODY-VIEW-CAUSE MERGED** at `9f91155d0` (candidate `328b40b3`,
 > blob-verified sole path). D0 Outcome A: the D5 two-recursive-position inorder
