@@ -23,7 +23,9 @@ use ken_kernel::{
     Term,
 };
 
-use crate::ast::{BinOp, DefKeyword, Fixity, FixityAssoc, NumLit, RecursiveResultSelector};
+use crate::ast::{
+    BinOp, DefKeyword, Fixity, FixityAssoc, LiteralPat, NumLit, RecursiveResultSelector,
+};
 use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceInfo};
 use crate::data;
 use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
@@ -14580,7 +14582,7 @@ fn expose_current_pattern_aliases(
 
 fn collect_or_pattern_slots(pattern: &RPattern, inside_or: bool, slots: &mut HashSet<usize>) {
     match &pattern.kind {
-        RPatKind::Var(_, Some(slot)) if inside_or => {
+        RPatKind::Var(_, Some(slot)) | RPatKind::Literal(_, Some(slot)) if inside_or => {
             slots.insert(*slot);
         }
         RPatKind::As(inner, _, slot) => {
@@ -14604,7 +14606,7 @@ fn collect_or_pattern_slots(pattern: &RPattern, inside_or: bool, slots: &mut Has
                 collect_or_pattern_slots(&field.pattern, inside_or, slots);
             }
         }
-        RPatKind::Wild | RPatKind::Var(_, _) => {}
+        RPatKind::Wild | RPatKind::Var(_, _) | RPatKind::Literal(_, _) => {}
     }
 }
 
@@ -14802,12 +14804,14 @@ fn guarded_leaf_missing_witness(pattern: &RPattern) -> MissingPatternWitness {
                 constructor: "_".into(),
                 arity: 0,
             }),
-        RPatKind::Tuple(_) | RPatKind::Record(_) | RPatKind::Wild | RPatKind::Var(_, _) => {
-            MissingPatternWitness {
-                constructor: "_".into(),
-                arity: 0,
-            }
-        }
+        RPatKind::Tuple(_)
+        | RPatKind::Record(_)
+        | RPatKind::Wild
+        | RPatKind::Var(_, _)
+        | RPatKind::Literal(_, _) => MissingPatternWitness {
+            constructor: "_".into(),
+            arity: 0,
+        },
     }
 }
 
@@ -14848,6 +14852,653 @@ fn tail_codomain(
             );
             Term::pi(tail_col_types[0].clone(), rest)
         }
+    }
+}
+
+/// The closed, expected-carrier-derived realization of one literal comparison.
+///
+/// This is deliberately separate from `NumericEnv::eq_table`: `Direct` names a
+/// real binary operation, while the other variants are finite compiler-owned
+/// plans over already-landed lossless views. Every variant returns only `Bool`.
+#[derive(Clone)]
+enum LiteralComparatorPlan {
+    Direct {
+        comparator: GlobalId,
+        literal: Term,
+    },
+    FixedWidth {
+        view: GlobalId,
+        eq_int: GlobalId,
+        literal: Term,
+    },
+    String {
+        view: GlobalId,
+        eq_char: GlobalId,
+        elements: Vec<Term>,
+    },
+    Bytes {
+        view: GlobalId,
+        uint8_to_int: GlobalId,
+        eq_int: GlobalId,
+        elements: Vec<Term>,
+    },
+}
+
+/// Host-side key used only to put comparator-equal literal rows in one matrix
+/// bucket. It mirrors the selected value comparator rather than source spelling.
+#[derive(Clone)]
+enum LiteralComparatorValue {
+    Integer(num_bigint::BigInt),
+    Float(f64),
+    Float32(f32),
+    String(crate::NfcString),
+    Char(char),
+    Bytes(Vec<u8>),
+}
+
+impl LiteralComparatorValue {
+    fn same_value(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Integer(left), Self::Integer(right)) => left == right,
+            (Self::Float(left), Self::Float(right)) => left == right,
+            (Self::Float32(left), Self::Float32(right)) => left == right,
+            (Self::String(left), Self::String(right)) => left == right,
+            (Self::Char(left), Self::Char(right)) => left == right,
+            (Self::Bytes(left), Self::Bytes(right)) => left == right,
+            (
+                Self::Integer(_)
+                | Self::Float(_)
+                | Self::Float32(_)
+                | Self::String(_)
+                | Self::Char(_)
+                | Self::Bytes(_),
+                _,
+            ) => false,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum LiteralListElementComparator {
+    Direct(GlobalId),
+    ThroughIntView { view: GlobalId, eq_int: GlobalId },
+}
+
+fn literal_builtin(cx: &ElabCtx<'_>, name: &str) -> Result<GlobalId, ElabError> {
+    cx.globals.get(name).copied().ok_or_else(|| {
+        ElabError::Internal(format!("literal comparator builtin '{name}' is missing"))
+    })
+}
+
+fn literal_expected_is(cx: &ElabCtx<'_>, expected: &Term, carrier: GlobalId) -> bool {
+    let expected = cx.metas.zonk_term(expected);
+    convert_type(cx.env, &cx.ctx, &expected, &Term::const_(carrier, vec![]))
+}
+
+fn literal_carrier_name(cx: &ElabCtx<'_>, expected: &Term) -> String {
+    let expected = cx.metas.zonk_term(expected);
+    let (head, _) = peel_app(&expected);
+    match head {
+        Term::Const { id, .. } | Term::IndFormer { id, .. } => type_name(cx, id),
+        other => format!("{other:?}"),
+    }
+}
+
+fn unsupported_literal_pattern(
+    cx: &ElabCtx<'_>,
+    literal: &LiteralPat,
+    expected: &Term,
+    span: &Span,
+) -> ElabError {
+    let row = match literal {
+        LiteralPat::Numeric(NumLit::Decimal(_, _)) => "Decimal numeric",
+        LiteralPat::Numeric(_) => "numeric",
+        LiteralPat::String(_) => "String",
+        LiteralPat::Char(_) => "Char",
+        LiteralPat::Bytes(_) => "Bytes",
+    };
+    ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: format!(
+            "{row} literal-pattern row is unsupported for carrier '{}'",
+            literal_carrier_name(cx, expected)
+        ),
+    }
+}
+
+/// Check the literal at the scrutinee's expected type, then select exactly one
+/// closed realization plan from that carrier. No representation guess or
+/// dictionary search participates in this selection.
+#[inline(never)]
+fn plan_literal_comparator(
+    cx: &mut ElabCtx<'_>,
+    literal: &LiteralPat,
+    expected: &Term,
+    span: &Span,
+) -> Result<(LiteralComparatorValue, LiteralComparatorPlan), ElabError> {
+    match literal {
+        LiteralPat::Numeric(number) => {
+            let literal_core = elab_num_lit_checked(cx, number, expected, span)?;
+            match number {
+                NumLit::Int(value) => {
+                    if literal_expected_is(cx, expected, cx.numeric_env.int_id) {
+                        let comparator = cx
+                            .numeric_env
+                            .classify_eq(&Term::const_(cx.numeric_env.int_id, vec![]))
+                            .expect("Int has a registered value comparator")
+                            .op_id;
+                        return Ok((
+                            LiteralComparatorValue::Integer(value.clone()),
+                            LiteralComparatorPlan::Direct {
+                                comparator,
+                                literal: literal_core,
+                            },
+                        ));
+                    }
+
+                    let fixed_views = [
+                        (cx.numeric_env.int8_id, "int8_to_int"),
+                        (cx.numeric_env.int16_id, "int16_to_int"),
+                        (cx.numeric_env.int32_id, "int32_to_int"),
+                        (cx.numeric_env.int64_id, "int64_to_int"),
+                        (cx.numeric_env.uint8_id, "uint8_to_int"),
+                        (cx.numeric_env.uint16_id, "uint16_to_int"),
+                        (cx.numeric_env.uint32_id, "uint32_to_int"),
+                        (cx.numeric_env.uint64_id, "uint64_to_int"),
+                    ];
+                    for (carrier, view_name) in fixed_views {
+                        if literal_expected_is(cx, expected, carrier) {
+                            return Ok((
+                                LiteralComparatorValue::Integer(value.clone()),
+                                LiteralComparatorPlan::FixedWidth {
+                                    view: literal_builtin(cx, view_name)?,
+                                    eq_int: literal_builtin(cx, "eq_int")?,
+                                    literal: literal_core,
+                                },
+                            ));
+                        }
+                    }
+                }
+                NumLit::Float(value)
+                    if literal_expected_is(cx, expected, cx.numeric_env.float_id) =>
+                {
+                    let comparator = cx
+                        .numeric_env
+                        .classify_eq(&Term::const_(cx.numeric_env.float_id, vec![]))
+                        .expect("Float has a registered value comparator")
+                        .op_id;
+                    return Ok((
+                        LiteralComparatorValue::Float(*value),
+                        LiteralComparatorPlan::Direct {
+                            comparator,
+                            literal: literal_core,
+                        },
+                    ));
+                }
+                NumLit::Float32(value)
+                    if literal_expected_is(cx, expected, cx.numeric_env.float32_id) =>
+                {
+                    let comparator = cx
+                        .numeric_env
+                        .classify_eq(&Term::const_(cx.numeric_env.float32_id, vec![]))
+                        .expect("Float32 has a registered value comparator")
+                        .op_id;
+                    return Ok((
+                        LiteralComparatorValue::Float32(*value),
+                        LiteralComparatorPlan::Direct {
+                            comparator,
+                            literal: literal_core,
+                        },
+                    ));
+                }
+                NumLit::Decimal(_, _) | NumLit::Float(_) | NumLit::Float32(_) => {}
+            }
+        }
+        LiteralPat::String(value) => {
+            let _checked = elab_str_lit(cx, value, Some(expected), span)?;
+            let string_id = literal_builtin(cx, "String")?;
+            if literal_expected_is(cx, expected, string_id) {
+                let normalized = crate::NfcString::new(value);
+                let mut elements = Vec::new();
+                for scalar in normalized.chars() {
+                    elements.push(elab_char_lit(cx, scalar, span)?.0);
+                }
+                return Ok((
+                    LiteralComparatorValue::String(normalized),
+                    LiteralComparatorPlan::String {
+                        view: literal_builtin(cx, "string_to_list_char")?,
+                        eq_char: literal_builtin(cx, "eqChar")?,
+                        elements,
+                    },
+                ));
+            }
+        }
+        LiteralPat::Char(value) => {
+            let (literal_core, literal_ty) = elab_char_lit(cx, *value, span)?;
+            unify_types(&mut cx.metas, expected, &literal_ty);
+            if literal_expected_is(cx, expected, cx.numeric_env.char_id) {
+                let comparator = cx
+                    .numeric_env
+                    .classify_eq(&Term::const_(cx.numeric_env.char_id, vec![]))
+                    .expect("Char has a registered value comparator")
+                    .op_id;
+                return Ok((
+                    LiteralComparatorValue::Char(*value),
+                    LiteralComparatorPlan::Direct {
+                        comparator,
+                        literal: literal_core,
+                    },
+                ));
+            }
+        }
+        LiteralPat::Bytes(value) => {
+            let (checked, literal_ty) = elab_bytes_lit(cx, value, span)?;
+            unify_types(&mut cx.metas, expected, &literal_ty);
+            let bytes_id = literal_builtin(cx, "Bytes")?;
+            if literal_expected_is(cx, expected, bytes_id) {
+                let uint8_ty = Term::const_(cx.numeric_env.uint8_id, vec![]);
+                let mut elements = Vec::with_capacity(value.len());
+                for octet in value {
+                    elements.push(elab_num_lit_checked(
+                        cx,
+                        &NumLit::Int((*octet).into()),
+                        &uint8_ty,
+                        span,
+                    )?);
+                }
+                let _ = checked;
+                return Ok((
+                    LiteralComparatorValue::Bytes(value.clone()),
+                    LiteralComparatorPlan::Bytes {
+                        view: literal_builtin(cx, "bytes_to_list")?,
+                        uint8_to_int: literal_builtin(cx, "uint8_to_int")?,
+                        eq_int: literal_builtin(cx, "eq_int")?,
+                        elements,
+                    },
+                ));
+            }
+        }
+    }
+    Err(unsupported_literal_pattern(cx, literal, expected, span))
+}
+
+fn literal_bool_value(cx: &ElabCtx<'_>, value: bool) -> Term {
+    Term::constructor(
+        if value {
+            cx.numeric_env.bool_true_id
+        } else {
+            cx.numeric_env.bool_false_id
+        },
+        vec![],
+    )
+}
+
+fn literal_bool_select(
+    cx: &ElabCtx<'_>,
+    condition: Term,
+    then_branch: Term,
+    else_branch: Term,
+) -> Result<Term, ElabError> {
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    let motive = Term::Ascript(
+        Box::new(Term::lam(bool_ty.clone(), weaken(&bool_ty, 1))),
+        Box::new(Term::pi(bool_ty.clone(), Term::ty(Level::Zero))),
+    );
+    let bool_decl = cx
+        .env
+        .inductive(cx.numeric_env.bool_id)
+        .ok_or_else(|| ElabError::Internal("preregistered Bool is missing".into()))?;
+    let methods = bool_decl
+        .constructors
+        .iter()
+        .map(|constructor| {
+            if constructor.id == cx.numeric_env.bool_true_id {
+                Ok(then_branch.clone())
+            } else if constructor.id == cx.numeric_env.bool_false_id {
+                Ok(else_branch.clone())
+            } else {
+                Err(ElabError::Internal(
+                    "preregistered Bool has an unknown constructor identity".into(),
+                ))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Term::Elim {
+        fam: cx.numeric_env.bool_id,
+        level_args: vec![],
+        params: vec![],
+        motive: Box::new(motive),
+        methods,
+        indices: vec![],
+        scrut: Box::new(condition),
+    })
+}
+
+fn compare_literal_list_element(
+    comparator: LiteralListElementComparator,
+    actual: Term,
+    expected: Term,
+) -> Term {
+    match comparator {
+        LiteralListElementComparator::Direct(op) => {
+            apply_term_spine(Term::const_(op, vec![]), &[actual, expected])
+        }
+        LiteralListElementComparator::ThroughIntView { view, eq_int } => {
+            let view = Term::const_(view, vec![]);
+            apply_term_spine(
+                Term::const_(eq_int, vec![]),
+                &[Term::app(view.clone(), actual), Term::app(view, expected)],
+            )
+        }
+    }
+}
+
+/// Compare a `List A` value to a finite literal sequence by unrolling exactly
+/// that sequence and requiring `Nil` after its final element.
+fn build_literal_list_test(
+    cx: &ElabCtx<'_>,
+    element_ty: &Term,
+    elements: &[Term],
+    comparator: LiteralListElementComparator,
+    scrutinee: Term,
+) -> Result<Term, ElabError> {
+    let list_id = literal_builtin(cx, "List")?;
+    let nil_id = literal_builtin(cx, "Nil")?;
+    let cons_id = literal_builtin(cx, "Cons")?;
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    let list_ty = Term::app(Term::indformer(list_id, vec![]), element_ty.clone());
+    let motive = Term::Ascript(
+        Box::new(Term::lam(list_ty.clone(), weaken(&bool_ty, 1))),
+        Box::new(Term::pi(list_ty.clone(), Term::ty(Level::Zero))),
+    );
+
+    let nil_method = literal_bool_value(cx, elements.is_empty());
+    let cons_body = if elements.is_empty() {
+        literal_bool_value(cx, false)
+    } else {
+        let actual_head = Term::var(2);
+        let actual_tail = Term::var(1);
+        let expected_head = weaken(&elements[0], 3);
+        let condition = compare_literal_list_element(comparator, actual_head, expected_head);
+        let nested_element_ty = weaken(element_ty, 3);
+        let nested_elements = elements[1..]
+            .iter()
+            .map(|element| weaken(element, 3))
+            .collect::<Vec<_>>();
+        let then_branch = build_literal_list_test(
+            cx,
+            &nested_element_ty,
+            &nested_elements,
+            comparator,
+            actual_tail,
+        )?;
+        literal_bool_select(cx, condition, then_branch, literal_bool_value(cx, false))?
+    };
+    let cons_method = Term::lam(
+        element_ty.clone(),
+        Term::lam(
+            Term::app(Term::indformer(list_id, vec![]), weaken(element_ty, 1)),
+            Term::lam(bool_ty, cons_body),
+        ),
+    );
+    let list_decl = cx
+        .env
+        .inductive(list_id)
+        .ok_or_else(|| ElabError::Internal("preregistered List is missing".into()))?;
+    let methods = list_decl
+        .constructors
+        .iter()
+        .map(|constructor| {
+            if constructor.id == nil_id {
+                Ok(nil_method.clone())
+            } else if constructor.id == cons_id {
+                Ok(cons_method.clone())
+            } else {
+                Err(ElabError::Internal(
+                    "preregistered List has an unknown constructor identity".into(),
+                ))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Term::Elim {
+        fam: list_id,
+        level_args: vec![],
+        params: vec![element_ty.clone()],
+        motive: Box::new(motive),
+        methods,
+        indices: vec![],
+        scrut: Box::new(scrutinee),
+    })
+}
+
+impl LiteralComparatorPlan {
+    fn condition(&self, cx: &ElabCtx<'_>, scrutinee: Term) -> Result<Term, ElabError> {
+        match self {
+            Self::Direct {
+                comparator,
+                literal,
+            } => Ok(apply_term_spine(
+                Term::const_(*comparator, vec![]),
+                &[scrutinee, literal.clone()],
+            )),
+            Self::FixedWidth {
+                view,
+                eq_int,
+                literal,
+            } => {
+                let view = Term::const_(*view, vec![]);
+                Ok(apply_term_spine(
+                    Term::const_(*eq_int, vec![]),
+                    &[
+                        Term::app(view.clone(), scrutinee),
+                        Term::app(view, literal.clone()),
+                    ],
+                ))
+            }
+            Self::String {
+                view,
+                eq_char,
+                elements,
+            } => build_literal_list_test(
+                cx,
+                &Term::const_(cx.numeric_env.char_id, vec![]),
+                elements,
+                LiteralListElementComparator::Direct(*eq_char),
+                Term::app(Term::const_(*view, vec![]), scrutinee),
+            ),
+            Self::Bytes {
+                view,
+                uint8_to_int,
+                eq_int,
+                elements,
+            } => build_literal_list_test(
+                cx,
+                &Term::const_(cx.numeric_env.uint8_id, vec![]),
+                elements,
+                LiteralListElementComparator::ThroughIntView {
+                    view: *uint8_to_int,
+                    eq_int: *eq_int,
+                },
+                Term::app(Term::const_(*view, vec![]), scrutinee),
+            ),
+        }
+    }
+}
+
+fn expose_current_literal_occurrence(cx: &mut ElabCtx<'_>, mut row: RowState) -> RowState {
+    let RPatKind::Literal(literal, Some(slot)) = row.real_pats[0].kind.clone() else {
+        return row;
+    };
+    cx.pattern_alias_type_frames
+        .last_mut()
+        .expect("literal matrix compilation occurs inside an alias frame")
+        .hidden_slots
+        .insert((row.arm_idx, slot));
+    row = row.bind_current_occurrence_at(slot);
+    row.real_occurrences[0].source_binding = false;
+    row.real_pats[0].kind = RPatKind::Literal(literal, None);
+    row
+}
+
+fn consume_literal_column(row: RowState) -> RowState {
+    row.bind_current_occurrence().drop_current_column()
+}
+
+/// Compile one literal column as ordered value tests plus an unguarded residual
+/// fallback. The fresh binder is an alignment device only: matching never adds
+/// a proof or refinement to `cx`.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn compile_literal_column(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    col_types: &[Term],
+    col_kinds: &[ColKind],
+    rows: Vec<RowState>,
+    real_depth_so_far: usize,
+    top_span: &Span,
+    ret_ty_slot: &mut Option<Term>,
+    arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
+) -> Result<Term, ElabError> {
+    let current_is_live = rows[0].real_occurrences[0].live;
+    let outer_occurrence = rows[0].real_occurrences[0].term.clone();
+    let surface_binder = rows[0].real_occurrences[0].surface_binder;
+    debug_assert!(rows.iter().all(|row| {
+        row.real_occurrences[0].live == current_is_live
+            && row.real_occurrences[0].surface_binder == surface_binder
+    }));
+
+    let current_ty = weaken(&col_types[0], 1);
+    let mut entered_rows = Vec::with_capacity(rows.len());
+    for row in rows {
+        let row = row.enter_current_real_binder();
+        let row = expose_current_pattern_aliases(cx, row, &current_ty);
+        entered_rows.push(expose_current_literal_occurrence(cx, row));
+    }
+    let rows = entered_rows;
+
+    cx.ctx.push(col_types[0].clone());
+    if !surface_binder {
+        cx.hidden_positions.push(cx.ctx.len() - 1);
+    }
+    let result = (|| {
+        let mut row_values = Vec::with_capacity(rows.len());
+        let mut groups: Vec<(LiteralComparatorValue, LiteralComparatorPlan)> = Vec::new();
+        for row in &rows {
+            let value = match &row.real_pats[0].kind {
+                RPatKind::Literal(literal, _) => {
+                    let (value, plan) =
+                        plan_literal_comparator(cx, literal, &current_ty, &row.real_pats[0].span)?;
+                    if !groups
+                        .iter()
+                        .any(|(existing, _)| existing.same_value(&value))
+                    {
+                        groups.push((value.clone(), plan));
+                    }
+                    Some(value)
+                }
+                RPatKind::Wild | RPatKind::Var(_, _) => None,
+                RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {
+                    return Err(ElabError::TypeMismatch {
+                        span: row.real_pats[0].span.clone(),
+                        reason: "literal column cannot mix value literals with structural patterns"
+                            .into(),
+                    })
+                }
+                RPatKind::As(_, _, _) | RPatKind::Or(_) => {
+                    unreachable!("aliases and or-patterns are exposed before literal compilation")
+                }
+            };
+            row_values.push(value);
+        }
+
+        let residual_rows = rows
+            .iter()
+            .zip(&row_values)
+            .filter(|(_, value)| value.is_none())
+            .map(|(row, _)| consume_literal_column(row.clone()))
+            .collect::<Vec<_>>();
+        if residual_rows.is_empty() {
+            return Err(ElabError::ExhaustivenessError {
+                missing: MissingPatternWitness {
+                    constructor: "_".into(),
+                    arity: 0,
+                },
+                span: top_span.clone(),
+            });
+        }
+
+        let mut compiled = Vec::with_capacity(groups.len());
+        for (value, plan) in &groups {
+            let branch_rows = rows
+                .iter()
+                .zip(&row_values)
+                .filter(|(_, candidate)| {
+                    candidate
+                        .as_ref()
+                        .is_none_or(|candidate| candidate.same_value(value))
+                })
+                .map(|(row, _)| consume_literal_column(row.clone()))
+                .collect::<Vec<_>>();
+            let body = compile_match_matrix(
+                cx,
+                arms,
+                &col_types[1..],
+                &col_kinds[1..],
+                branch_rows,
+                real_depth_so_far + 1,
+                top_span,
+                ret_ty_slot,
+                arm_used,
+                subsumed_by,
+            )?;
+            compiled.push((plan.condition(cx, Term::var(0))?, body));
+        }
+        let mut body = compile_match_matrix(
+            cx,
+            arms,
+            &col_types[1..],
+            &col_kinds[1..],
+            residual_rows,
+            real_depth_so_far + 1,
+            top_span,
+            ret_ty_slot,
+            arm_used,
+            subsumed_by,
+        )?;
+        let ret_ty = ret_ty_slot
+            .as_ref()
+            .expect("literal compilation reaches a body leaf")
+            .clone();
+        let branch_ty = tail_codomain(
+            &col_types[1..],
+            &col_kinds[1..],
+            &ret_ty,
+            real_depth_so_far + 1,
+        );
+        for (condition, then_branch) in compiled.into_iter().rev() {
+            body = make_if_elim(cx, condition, then_branch, body, &branch_ty, top_span)?;
+        }
+        Ok((body, branch_ty))
+    })();
+    if !surface_binder {
+        let hidden = cx.hidden_positions.pop();
+        debug_assert_eq!(hidden, Some(cx.ctx.len() - 1));
+    }
+    cx.ctx.pop();
+    let (body, branch_ty) = result?;
+    let function = Term::lam(col_types[0].clone(), body);
+    if current_is_live {
+        Ok(Term::app(
+            Term::Ascript(
+                Box::new(function),
+                Box::new(Term::pi(col_types[0].clone(), branch_ty)),
+            ),
+            outer_occurrence,
+        ))
+    } else {
+        Ok(function)
     }
 }
 
@@ -14923,7 +15574,7 @@ fn compile_tuple_column(
                         .specialize_current_column(vec![wild(), wild()], false),
                 );
             }
-            RPatKind::Ctor(_, _) | RPatKind::Record(_) => {
+            RPatKind::Ctor(_, _) | RPatKind::Record(_) | RPatKind::Literal(_, _) => {
                 return Err(ElabError::TypeMismatch {
                     span: row.real_pats[0].span.clone(),
                     reason: "non-tuple pattern cannot match a pair component".into(),
@@ -15144,7 +15795,7 @@ fn compile_record_column(
                         .specialize_projected_record_column(patterns, source_bindings),
                 );
             }
-            RPatKind::Ctor(_, _) | RPatKind::Tuple(_) => {
+            RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Literal(_, _) => {
                 return Err(ElabError::TypeMismatch {
                     span: row.real_pats[0].span.clone(),
                     reason: "non-record pattern cannot match a named record component".into(),
@@ -15457,6 +16108,27 @@ fn compile_match_matrix(
             // existing leaf winner accounting computes union coverage and
             // whole-arm reachability without a parallel matrix carrier.
             let rows = prepare_current_or_rows(cx, rows);
+            let has_literal = rows.iter().any(|row| {
+                matches!(
+                    pattern_without_aliases(&row.real_pats[0]).kind,
+                    RPatKind::Literal(_, _)
+                )
+            });
+            if has_literal {
+                return compile_literal_column(
+                    cx,
+                    arms,
+                    col_types,
+                    col_kinds,
+                    rows,
+                    real_depth_so_far,
+                    top_span,
+                    ret_ty_slot,
+                    arm_used,
+                    subsumed_by,
+                );
+            }
+
             let has_record = rows.iter().any(|row| {
                 matches!(
                     pattern_without_aliases(&row.real_pats[0]).kind,
@@ -15698,6 +16370,9 @@ fn build_ctor_buckets(
                 }
                 RPatKind::Tuple(_) | RPatKind::Record(_) => {
                     unreachable!("negative columns are projected before constructor bucketing")
+                }
+                RPatKind::Literal(_, _) => {
+                    unreachable!("literal columns are compiled before constructor bucketing")
                 }
                 RPatKind::As(_, _, _) => {
                     unreachable!("current-column aliases are exposed before constructor bucketing")
@@ -15942,7 +16617,10 @@ fn top_pattern_is_catchall(pattern: &RPattern) -> bool {
         RPatKind::Wild | RPatKind::Var(_, _) => true,
         RPatKind::As(inner, _, _) => top_pattern_is_catchall(inner),
         RPatKind::Or(alternatives) => alternatives.iter().any(top_pattern_is_catchall),
-        RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => false,
+        RPatKind::Ctor(_, _)
+        | RPatKind::Tuple(_)
+        | RPatKind::Record(_)
+        | RPatKind::Literal(_, _) => false,
     }
 }
 
@@ -15981,7 +16659,11 @@ fn ensure_top_pattern_ctors_belong_to_family(
                 ensure_top_pattern_ctors_belong_to_family(cx, alternative, ind, d_id)?;
             }
         }
-        RPatKind::Wild | RPatKind::Var(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {}
+        RPatKind::Wild
+        | RPatKind::Var(_, _)
+        | RPatKind::Tuple(_)
+        | RPatKind::Record(_)
+        | RPatKind::Literal(_, _) => {}
     }
     Ok(())
 }
@@ -16070,6 +16752,102 @@ fn infer_or_match(
     Ok((body_core, ret_ty))
 }
 
+fn top_pattern_contains_literal(pattern: &RPattern) -> bool {
+    match &pattern.kind {
+        RPatKind::Literal(_, _) => true,
+        RPatKind::As(inner, _, _) => top_pattern_contains_literal(inner),
+        RPatKind::Or(alternatives) => alternatives.iter().any(top_pattern_contains_literal),
+        RPatKind::Wild
+        | RPatKind::Var(_, _)
+        | RPatKind::Ctor(_, _)
+        | RPatKind::Tuple(_)
+        | RPatKind::Record(_) => false,
+    }
+}
+
+fn top_pattern_is_literal_form(pattern: &RPattern) -> bool {
+    match &pattern.kind {
+        RPatKind::Literal(_, _) | RPatKind::Wild => true,
+        // Preserve the landed refusal for top-level catchall aliases and
+        // catchall or-alternatives. Only aliases/alternatives that actually
+        // retain a literal test participate in this specialized entry path.
+        RPatKind::As(inner, _, _) => {
+            top_pattern_contains_literal(inner) && top_pattern_is_literal_form(inner)
+        }
+        RPatKind::Or(alternatives) => alternatives.iter().all(|alternative| {
+            top_pattern_contains_literal(alternative)
+                && top_pattern_is_literal_form(alternative)
+        }),
+        RPatKind::Var(_, _) | RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {
+            false
+        }
+    }
+}
+
+/// Top-level literal matching is a deliberately separate entry path. It admits
+/// the wildcard residual required by an open value column without lifting the
+/// general top-level variable/wildcard rule for constructor matches.
+#[inline(never)]
+fn infer_literal_match(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    arms: &[RMatchArm],
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    for arm in arms {
+        if !top_pattern_is_literal_form(&arm.pat) {
+            return Err(ElabError::TypeMismatch {
+                span: arm.pat.span.clone(),
+                reason: "literal-pattern match arms require literals and a wildcard residual"
+                    .into(),
+            });
+        }
+    }
+
+    let (scrut_core, scrut_ty) = infer(cx, scrut)?;
+    let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
+    let mut ret_ty_slot = None;
+    let mut arm_used = vec![false; arms.len()];
+    let mut subsumed_by = vec![Vec::new(); arms.len()];
+    let body_result = compile_match_matrix(
+        cx,
+        arms,
+        std::slice::from_ref(&scrut_ty),
+        &[ColKind::Real],
+        rows,
+        0,
+        span,
+        &mut ret_ty_slot,
+        &mut arm_used,
+        &mut subsumed_by,
+    );
+    let body_core = finish_pattern_alias_term_frame(cx, body_result)?;
+
+    for (index, used) in arm_used.iter().enumerate() {
+        if !used {
+            let cause = match subsumed_by[index].split_first() {
+                Some((&first, rest)) => ArmDeadCause::Subsumed {
+                    first: arms[first].span.clone(),
+                    rest: rest
+                        .iter()
+                        .map(|&winner| arms[winner].span.clone())
+                        .collect(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
+            return Err(ElabError::ReachabilityError {
+                span: arms[index].span.clone(),
+                cause,
+            });
+        }
+    }
+
+    Ok((
+        body_core,
+        ret_ty_slot.unwrap_or_else(|| Term::ty(Level::Zero)),
+    ))
+}
+
 fn infer_match(
     cx: &mut ElabCtx,
     scrut: &RExpr,
@@ -16078,6 +16856,9 @@ fn infer_match(
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
+    }
+    if arms.iter().any(|arm| top_pattern_contains_literal(&arm.pat)) {
+        return infer_literal_match(cx, scrut, arms, span);
     }
     if arms_have_top_or(arms) {
         return infer_or_match(cx, scrut, arms, span);
@@ -16265,7 +17046,7 @@ fn ensure_pattern_constructors_resolve(
                 ensure_pattern_constructors_resolve(cx, alternative)?;
             }
         }
-        RPatKind::Wild | RPatKind::Var(_, _) => {}
+        RPatKind::Wild | RPatKind::Var(_, _) | RPatKind::Literal(_, _) => {}
     }
     Ok(())
 }

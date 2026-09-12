@@ -14,8 +14,8 @@ use std::{
 
 use crate::ast::{
     BinOp, ClassField, ConstructorSignatureArg, Decl, DefKeyword, EffectRowSyntax,
-    ExplicitDataCtor, Expr, InfixOperator, InstanceConstraint, NumLit, PatKind, SpaceCell,
-    SpaceOperation, Type,
+    ExplicitDataCtor, Expr, InfixOperator, InstanceConstraint, LiteralPat, NumLit, PatKind,
+    SpaceCell, SpaceOperation, Type,
 };
 use crate::error::{ElabError, Span};
 use num_bigint::BigInt;
@@ -73,6 +73,8 @@ pub enum RPatKind {
     Record(Vec<RRecordPatField>),
     As(Box<RPattern>, String, usize),
     Or(Vec<RPattern>),
+    /// Value literal plus an optional occurrence slot used by record/or layout.
+    Literal(LiteralPat, Option<usize>),
 }
 
 /// A resolved match arm.
@@ -2266,6 +2268,25 @@ fn resolve_pattern_inner(
             ))
         }
         PatKind::Or(alternatives) => resolve_or_pattern(pat, alternatives, next_slot),
+        PatKind::Literal(literal) => {
+            // Like `_`, a literal binds no name but occupies the matched core
+            // column. Counting one anonymous position keeps outer de Bruijn
+            // references aligned with the method/literal-test binder.
+            let slot = occurrence_backed.then_some(*next_slot);
+            *next_slot += 1;
+            Ok((
+                RPattern {
+                    kind: RPatKind::Literal(literal.clone(), slot),
+                    span: pat.span.clone(),
+                },
+                vec![PatternBinding {
+                    name: "_".to_string(),
+                    span: pat.span.clone(),
+                    alias_slot: slot,
+                    is_as_alias: false,
+                }],
+            ))
+        }
     }
 }
 
@@ -2399,7 +2420,10 @@ fn remap_pattern_occurrence_slots(pattern: &mut RPattern, remap: &HashMap<usize,
             *slot = remap[slot];
             remap_pattern_occurrence_slots(inner, remap);
         }
-        RPatKind::Wild | RPatKind::Var(_, None) => {}
+        RPatKind::Literal(_, Some(slot)) => {
+            *slot = remap[slot];
+        }
+        RPatKind::Wild | RPatKind::Var(_, None) | RPatKind::Literal(_, None) => {}
     }
 }
 

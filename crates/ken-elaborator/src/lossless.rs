@@ -692,7 +692,7 @@ fn collect_pattern_spans(pattern: &Pattern, out: &mut Vec<Span>) {
         PatKind::Or(alternatives) => alternatives
             .iter()
             .for_each(|alternative| collect_pattern_spans(alternative, out)),
-        PatKind::Wild | PatKind::Var(_) => {}
+        PatKind::Wild | PatKind::Var(_) | PatKind::Literal(_) => {}
     }
 }
 

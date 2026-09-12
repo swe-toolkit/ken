@@ -11,8 +11,8 @@
 use crate::ast::{
     BinOp, Binder, BoundaryKind, CapabilityDecl, ClassField, ConstructorSignature,
     ConstructorSignatureArg, CtorDecl, Decl, DefKeyword, EffectRowSyntax, ExplicitDataCtor, Expr,
-    FieldPat, Fixity, FixityAssoc, InfixOperator, LetBinding, MatchArm, PatKind, Pattern,
-    PropIntro, SpaceCell, SpaceOperation, Type,
+    FieldPat, Fixity, FixityAssoc, InfixOperator, LetBinding, LiteralPat, MatchArm, NumLit,
+    PatKind, Pattern, PropIntro, SpaceCell, SpaceOperation, Type,
 };
 use crate::error::{ElabError, Span};
 use crate::lexer::Token;
@@ -2586,7 +2586,16 @@ impl Parser {
                 };
                 Ok(Pattern { kind, span })
             }
-            Token::LParen | Token::LBrace => self.parse_atom_pattern(),
+            Token::Nat(_)
+            | Token::IntLit(_)
+            | Token::FloatLit(_)
+            | Token::DecimalLit(_, _)
+            | Token::Float32Lit(_)
+            | Token::Str(_)
+            | Token::CharLit(_)
+            | Token::ByteStr(_)
+            | Token::LParen
+            | Token::LBrace => self.parse_atom_pattern(),
             other => Err(ElabError::ParseError {
                 msg: format!("expected a pattern, found {:?}", other),
                 span: self.peek_span().clone(),
@@ -2597,7 +2606,18 @@ impl Parser {
     fn can_start_pattern(&self) -> bool {
         matches!(
             self.peek(),
-            Token::Ident(_) | Token::ConId(_) | Token::LParen | Token::LBrace
+            Token::Ident(_)
+                | Token::ConId(_)
+                | Token::Nat(_)
+                | Token::IntLit(_)
+                | Token::FloatLit(_)
+                | Token::DecimalLit(_, _)
+                | Token::Float32Lit(_)
+                | Token::Str(_)
+                | Token::CharLit(_)
+                | Token::ByteStr(_)
+                | Token::LParen
+                | Token::LBrace
         )
     }
 
@@ -2605,9 +2625,44 @@ impl Parser {
         self.can_start_pattern() && !self.is_contextual_ident("as")
     }
 
+    fn parse_literal_pattern(&mut self) -> Result<Pattern, ElabError> {
+        let span = self.peek_span().clone();
+        let literal = match self.peek().clone() {
+            Token::Nat(value) => LiteralPat::Numeric(NumLit::Int(value.into())),
+            Token::IntLit(value) => LiteralPat::Numeric(NumLit::Int(value)),
+            Token::FloatLit(value) => LiteralPat::Numeric(NumLit::Float(value)),
+            Token::DecimalLit(coeff, exp) => {
+                LiteralPat::Numeric(NumLit::Decimal(coeff, exp))
+            }
+            Token::Float32Lit(value) => LiteralPat::Numeric(NumLit::Float32(value)),
+            Token::Str(value) => LiteralPat::String(value),
+            Token::CharLit(value) => LiteralPat::Char(value),
+            Token::ByteStr(value) => LiteralPat::Bytes(value),
+            other => {
+                return Err(ElabError::ParseError {
+                    msg: format!("expected a literal pattern, found {:?}", other),
+                    span,
+                })
+            }
+        };
+        self.advance();
+        Ok(Pattern {
+            kind: PatKind::Literal(literal),
+            span,
+        })
+    }
+
     fn parse_atom_pattern(&mut self) -> Result<Pattern, ElabError> {
         let start = self.peek_span().start;
         match self.peek().clone() {
+            Token::Nat(_)
+            | Token::IntLit(_)
+            | Token::FloatLit(_)
+            | Token::DecimalLit(_, _)
+            | Token::Float32Lit(_)
+            | Token::Str(_)
+            | Token::CharLit(_)
+            | Token::ByteStr(_) => self.parse_literal_pattern(),
             Token::Ident(name) => {
                 let span = self.peek_span().clone();
                 self.advance();
@@ -2762,7 +2817,6 @@ impl Parser {
     }
 
     fn parse_atom_expr_base(&mut self) -> Result<Expr, ElabError> {
-        use crate::ast::NumLit;
         let start = self.peek_span().start;
         match self.peek().clone() {
             Token::LBrace => self.parse_record_expr(),

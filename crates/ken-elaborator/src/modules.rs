@@ -1440,6 +1440,7 @@ fn rewrite_rpattern(
                 .map(|alternative| rewrite_rpattern(scope, exports, alternative))
                 .collect::<Result<Vec<_>, ElabError>>()?,
         ),
+        RPatKind::Literal(literal, slot) => RPatKind::Literal(literal, slot),
     };
     Ok(RPattern { kind, span: p.span })
 }
