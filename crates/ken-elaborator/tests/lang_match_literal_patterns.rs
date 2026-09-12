@@ -209,6 +209,23 @@ fn every_supported_carrier_selects_and_falls_through_by_value() {
 }
 
 #[test]
+fn decomposed_string_pattern_compares_at_nfc_value() {
+    // MEASURED: a decomposed pattern selects an NFC-equivalent scrutinee and
+    // rejects a distinct scalar through the executing String comparator.
+    // CLAIMED: String pattern normalization applies to the pattern operand,
+    // not only to the scrutinee or the duplicate-coverage key.
+    // THE GAP: the existing opposite-direction and duplicate controls do not
+    // exercise normalization of the structural pattern scalar sequence.
+    let mut env = ElabEnv::new().expect("base environment");
+    assert_selects(
+        &mut env,
+        r#"fn lit_decomposed_pattern (x : String) : Nat = match x { "e\u{301}" |-> Suc Zero ; _ |-> Zero }"#,
+        r#"const lit_decomposed_pattern_yes : Nat = lit_decomposed_pattern "é""#,
+        r#"const lit_decomposed_pattern_no : Nat = lit_decomposed_pattern "x""#,
+    );
+}
+
+#[test]
 fn unsupported_carriers_fail_closed_with_the_named_row_and_carrier() {
     // MEASURED: Decimal, a user-defined carrier, and an unadmitted native
     // carrier each return TypeMismatch from a real literal match.
