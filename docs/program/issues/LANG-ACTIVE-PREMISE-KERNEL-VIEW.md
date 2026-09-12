@@ -1,7 +1,7 @@
 ---
 id: LANG-ACTIVE-PREMISE-KERNEL-VIEW
 title: "Elaborator contextual kernel-query boundary for active result-refinement premises: a live premise binder can occur in an elaborated term/type while absent from the Context of the immediate kernel judgment, so a well-typed dependent-match program is KernelRejected (TypeMismatch/VarOutOfScope). Fix = a validated ActivePremiseKernelView boundary that makes the active-frame premise domains present, in a disposable validation shadow, at every kernel-query site reachable under a live result refinement (the active-frame-reachable subset of the 20 check + 44 infer sites). Structural completeness capability; elaborator-only, kernel/TCB untouched."
-status: active
+status: merged
 owner: language
 size: L
 gate: none
