@@ -1,111 +1,174 @@
 ---
 id: CAT-REL-TRANSITIVE-CLOSURE
-title: "the binary-relations frontier (spec 58 / CAT-4, Fork B) names transitive closure as R+ x y := IsTrue (reachableWithin N x y), N := size (dom R), but the computational realization is design-pinned PROSE only -- Map.ken.md §4.7.12 lands succ/compose/converse and the reflexive/symmetric/transitive predicates, while size, bounded reachableWithin, and R+ itself do NOT exist on main; this node lands the kernel-untouched, Axiom-free computational closure (the faithfulness/saturation laws are the named deferred fast-follow)"
-status: active
+title: "the binary-relations frontier (spec 58 / CAT-4, Fork B) names transitive closure as R+ x y := IsTrue (reachableWithin N x y), N := size (dom R), but the computational realization is design-pinned PROSE only -- Map.ken.md §4.7.12 lands succ/compose/converse and the property predicates, while size, bounded reachable_within, and reachable_plus do NOT exist on main; this node lands the kernel-untouched, Axiom-free computational closure (ONE node, no size/dom split) once the fuel-recurrence spec correction lands (the faithfulness/saturation laws are the named deferred fast-follow)"
+status: draft
 owner: foundation
 size: M
 gate: none
-depends_on: []
+depends_on: [SPEC-REL-CLOSURE-RECURRENCE]
 blocks: []
 github: null
-origin: "Steward cut 2026-09-12, the first node of the resumed catalog campaign's Band A frontier-harvest tranche, on the operator ruling of 2026-09-12 (Pat: 'develop a work program for L3 ... the catalog is the long arc ... what does the frontier enable'; concurred with the Steward's Band-A-first recommendation, 'concur with rec'). Grounded against the current working tree: relation algebra confirmed at catalog/packages/Data/Collections/Map.ken.md §4.7.12 (succ :15122, rel_member :15128, compose :15153, converse :15173, is_reflexive/symmetric/transitive/equivalence :15182-15194); transitive closure is design-pinned prose only (Map.ken.md:15045-15048, :15219 -- 'intentionally design-now/defer-build'); size, reachableWithin, R+ absent on main. Spec contract in spec/50-stdlib/58-maps-sets-relations.md §7 (D4, Fork C/B): R+ form :362, faithfulness :368-370, deferred laws :378-379/:402-403, AC1 size kernel-untouched :414-417, AC5 Omega-soundness :428-431, AC7 Axiom-free :435-437. Spec 58 is DRAFT v0; the .ken realization is the enclave-intended fast-follow. No capability blocker (ordinary total Ken; nested inductives merged, deceq carried as a leq value parameter). No existing tracker node covers relation closure."
+origin: "Steward cut 2026-09-12, the first node of the resumed catalog campaign's Band A frontier-harvest tranche, on the operator ruling of 2026-09-12 (Pat: 'develop a work program for L3 ... the catalog is the long arc ... what does the frontier enable'; 'concur with rec'). RECUT 2026-09-12 under Architect HS1 evt_16w35x7zxj442 (BOUNDED_CLOSURE_FUEL_CONVENTION_UNSPECIFIED_AND_BOUND_PROSE_OFF_BY_ONE, grounded at exact main b7c829c9f): keep ONE computational node (no size/dom split -- the composition size(dom r) must be gate-inspected in one candidate), but HOLD until the fuel-recurrence spec correction lands. Grounded against the tree: relation algebra at catalog/packages/Data/Collections/Map.ken.md §4.7.12 (succ :15122, rel_member :15128, compose :15153, converse :15173, predicates :15182-15194); closure design-pinned prose only (:15045-48, :15219); size/reachable_within/reachable_plus absent on main. Spec contract spec/50-stdlib/58-maps-sets-relations.md §7 (R+ :362, bound-prose :368-370, laws :378-79/:402-03, Omega-soundness AC5 :428-31, size kernel-untouched AC1 :414-17, Axiom-free AC7 :435-37). Spec 58 DRAFT v0. No capability blocker (ordinary total Ken; nested inductives merged; deceq carried as leq). No pre-existing tracker node for relation closure."
 ---
 
-> # BAND A frontier-harvest node 1 (resumed catalog campaign, operator ruling
-> # 2026-09-12). Computational-first: this lands the closure REALIZATION; the
-> # faithfulness/saturation LAWS are the named deferred fast-follow, not this
-> # node. Owner foundation; Architect required reviewer (relations-frontier
-> # design authority + decomposition) + foundation-QA + CV + standing Adversary
-> # -> Steward M1-M4 -> lieutenant. Kernel-untouched, Axiom-free -- no TCB
-> # growth, no operator touch.
+> # RECUT and HELD 2026-09-12 under Architect HS1 `evt_16w35x7zxj442`. READ FIRST.
+>
+> **Decomposition ruling: KEEP ONE computational node -- do NOT split
+> `size`/`dom` from `reachable_within`/`reachable_plus`.** They are small
+> structural prerequisites whose only new frontier consumer here is the bound
+> `size (dom r)` appearing literally in `reachable_plus`; one candidate lets the
+> gate inspect the actual composition rather than two independently-green
+> artifacts. A split buys no isolation and adds a WP edge for a dependency
+> internal to this closure.
+>
+> **HELD (`status: draft`) on [[SPEC-REL-CLOSURE-RECURRENCE]].** The draft is
+> insufficient to authorize implementation: spec 58:362 fixes the outer formula
+> but never defines what one unit of `reachable_within` fuel recognizes (the
+> earlier frame named zero as "base step (or reflexive+step)" -- different
+> relations, and Foundation must not choose in code), and the 58:368-370 `N - 1`
+> bound is off by one for the outer-key-set `dom`. The spec correction states
+> the exact recurrence and fixes `N - 1 -> N`. **The exact contract lives in
+> that correction; the reflection below is aligned to it.** Re-release is the
+> Steward's after the correction lands -- no source edits until then; branch
+> byte-clean at `2d35fd3b6` (current main is downstream).
+>
+> Kernel-untouched, `Axiom`-free -- no TCB growth, no operator touch. Owner
+> foundation; Architect required reviewer (relations-frontier design authority) +
+> foundation-QA + CV + standing Adversary -> Steward M1-M4 -> lieutenant.
 
 ## What this is
 
 `spec/50-stdlib/58-maps-sets-relations.md §7` (CAT-4, the relations frontier)
-pins transitive closure as **Fork B**: `R+ x y := IsTrue (reachableWithin N x y)`
-with `N := size (dom R)` (58:362), a Π-into-Ω predicate wrapping a decidable
-bounded `Bool` -- deliberately NOT a raw `data ... : Ω` closure inductive
-(58:35-38, :428-430). The relation algebra it builds on is already landed in
+pins transitive closure as **Fork B**: `reachable_plus x y := IsTrue
+(reachable_within (size (dom r)) x y)` -- a Π-into-Ω predicate over a decidable
+bounded `Bool`, deliberately NOT a raw `data ... : Ω` closure inductive
+(58:35-38, :428-430). The relation algebra it builds on is landed in
 `catalog/packages/Data/Collections/Map.ken.md §4.7.12`: a relation is the
 adjacency representation `Tree k (Tree k Unit)` (key to successor-set;
 `Set = Map Unit`), with `succ` (:15122), `rel_member` (:15128), `compose`
-(:15153), `converse` (:15173), and the property predicates `is_reflexive`/
-`is_symmetric`/`is_transitive`/`is_equivalence` (:15182-15194).
+(:15153), `converse` (:15173), and the property predicates (:15182-15194).
 
-**What is missing on main, and what this node lands:** the closure realization
-is prose-only (Map.ken.md:15045-15048, :15219). Concretely absent: `size`,
-bounded `reachableWithin`, and `R+` itself. This node lands the
+**Missing on main, and what this ONE node lands:** the closure realization is
+prose-only (Map.ken.md:15045-15048, :15219). Absent: `size`, bounded
+`reachable_within`, and `reachable_plus`. This node lands all three as the
 **computational** closure, kernel-untouched and `Axiom`-free (58:414-417,
-:435-437). The **faithfulness/saturation laws** (any walk shortens to a simple
-path of length <= N-1, so bounded reachability at bound >= N-1 equals full
-closure, monotone and saturating -- 58:368-370) are the enclave's stated
-deferred fast-follow (58:378-379, :402-403) and are a NAMED follow-on, not this
-node.
+:435-437). The **faithfulness/saturation laws** (58:368-370 as corrected) are
+the enclave's stated deferred fast-follow (58:378-379, :402-403) and a NAMED
+follow-on, not this node.
+
+## The contract (from [[SPEC-REL-CLOSURE-RECURRENCE]], Architect ruling)
+
+Signatures (existing snake-case Map API):
+
+```text
+size            : (k v : Type) -> Tree k v -> Nat
+dom             : (k v : Type) -> Tree k v -> Tree k Unit
+reachable_within: (k : Type) -> (leq : k -> k -> Bool) -> (fuel : Nat)
+                  -> (x y : k) -> (r : Tree k (Tree k Unit)) -> Bool
+reachable_plus  : (k : Type) -> (leq : k -> k -> Bool)
+                  -> (x y : k) -> (r : Tree k (Tree k Unit)) -> Prop
+```
+
+- `dom` = the outer key set: structurally replace every node value by `MkUnit`,
+  preserving `Leaf`/`Node`, key, subtree shape. It does NOT union targets into
+  the domain and needs no comparator.
+- `size` counts raw `Tree` nodes: `Leaf ↦ Zero`;
+  `Node l _ _ r ↦ Suc (add (size l) (size r))`, reusing canonical
+  `Data.Numeric.Nat.Arithmetic.add`.
+- Fuel recurrence, `edge_R x y = set_member k leq y (succ k leq x r)`:
+
+  ```text
+  reachable_within 0       x y r = False
+  reachable_within (Suc n) x y r =
+    edge_R x y
+    OR fold OR False { reachable_within n z y r | z ∈ succ k leq x r }
+  ```
+
+  Every recursive call decreases exactly `n`, including in the fold step.
+- **Fuel is the maximum positive path length** (this is `R+`, not `R*`): fuel 0
+  recognizes no path; fuel 1 exactly a direct edge; fuel 2 additionally a
+  two-edge path; `x = y` is accepted only via a positive self-loop/cycle, never
+  by reflexivity.
+- `reachable_plus k leq x y r = IsTrue (reachable_within k leq
+  (size k Unit (dom k (Tree k Unit) r)) x y r)`. `IsTrue` may unfold to the
+  existing `Equal Bool _ True`; no path witness, no proof-relevant inductive.
 
 ## Deliverables
 
-1. `size : (k v : Type) -> Tree k v -> Nat` -- node count by structural
-   recursion (spec AC1, 58:414-417: ordinary total Ken, kernel-untouched). If
-   `dom : Tree k v -> Tree k Unit` (the key set, for `size (dom R)`) is not
-   already present in Map, land it here too; re-measure at the cut.
-2. `reachableWithin` -- bounded-iteration reachability on the adjacency
-   representation, threading the explicit `leq : k -> k -> Bool` comparator
-   exactly as the §4.7.12 relation ops do: `reachableWithin` of bound `0` is the
-   base step (or reflexive+step per the spec's exact form -- confirm against
-   58:362 at the cut), and each successive round unions the successors reachable
-   in one more step. Ordinary structural recursion on the `Nat` bound.
-3. `R+` (the transitive-closure predicate): `reachablePlus x y :=
-   IsTrue (reachableWithin (size (dom r)) x y)`, matching 58:362 verbatim.
-4. Reaching tests: a small concrete relation (over `Nat` with `leq_nat`, the
-   spec's pinned carrier, 58:395) exercising `size`, a positive `reachableWithin`
-   at a bound that reaches a multi-step target, a negative for an unreachable
-   pair, and `R+` agreeing with a hand-computed closure on the fixture. A
-   control that the existing §4.7.12 ops (`succ`/`compose`/`converse`/predicates)
-   stay green.
+1. `size` and `dom` per the signatures/definitions above.
+2. `reachable_within` per the exact fuel recurrence, and `reachable_plus` per the
+   exact public predicate.
+3. Reaching tests carrying ALL of these independent discriminators (over `Nat`
+   with `leq_nat`, the spec's pinned carrier), each a genuine differential:
+   - direct-edge boundary: `reachable_within 0 a b r = False`,
+     `reachable_within 1 a b r = True` on the same `a -> b`;
+   - positive-vs-reflexive: an acyclic no-self-edge relation rejects
+     `reachable_plus a a`; a self-loop accepts it;
+   - two-step: on `a -> b -> c` with no `a -> c`, fuel 1 rejects `a,c`, fuel 2
+     accepts it, `rel_member a c` rejects it, `reachable_plus a c` accepts it;
+   - unreachable: the same relation rejects `c,a`;
+   - outer-domain off-by-one: on the single edge `a -> b` where `b` has NO outer
+     map entry, `dom r` is `{a}`, `size (dom r) = 1`, and `reachable_plus a b`
+     still accepts (catches both a false `N - 1` assumption and a base case
+     shifted to direct-at-zero).
+   Plus a `dom` successor-leakage pin: adding `b` merely as a target must NOT
+   make `b` a domain member. The `size` oracle in a multi-node test is derived
+   INDEPENDENTLY, not computed through `size` itself.
 
 ## Acceptance criteria
 
-- `size`, `reachableWithin`, and `R+` compile in the Map package and are
+- `size`, `dom`, `reachable_within`, `reachable_plus` compile in the Map package,
   `Axiom`-free and kernel-untouched (no `Decl::Opaque`, no primitive, no TCB
-  entry; 58:435-437). Verify with the catalog build, not by assertion.
-- `R+ x y` reduces to `IsTrue (reachableWithin (size (dom r)) x y)` -- the exact
-  58:362 form, `N` bound as `size (dom R)`, not an arbitrary constant.
-- A genuine differential: the fixture has a pair reachable only in >= 2 steps
-  that `R+` accepts and `succ`/`rel_member` (one step) rejects, and an
-  unreachable pair `R+` rejects; neither is vacuous green-vs-green.
-- The Ω-encoding is sound (58:428-431, AC5): `R+` is a Π-into-Ω predicate over a
-  decidable bounded `Bool`, never a raw proof-relevant `Ω` closure.
+  entry, no raw `data ... : Ω`; 58:435-437). Verified by the catalog build.
+- `reachable_plus x y` reduces to the exact 58:362 form with the bound
+  `size (dom r)`.
+- All five discriminators above hold (none vacuous), and the `dom`-leakage pin
+  holds.
+- The Ω-encoding is sound (58:428-431): `reachable_plus` is Π-into-Ω over a
+  decidable bounded `Bool`.
 - The landed §4.7.12 relation ops stay green.
+
+## Implementation constraints
+
+Reuse `Data.Numeric.Nat.Arithmetic.add`, `fold`, `succ`, `set_member`, and
+`cat4_bool_or` -- no locally rederived `Nat` addition, `Bool` disjunction, set
+traversal, or generic bounded-iteration interface. Add no `Axiom`, primitive,
+`Decl::Opaque`, kernel change, or raw `data ... : Ω`. Lead the new literate
+subsection with the headline `reachable_plus` contract and purpose;
+dependency-ordered checked declarations follow beneath that lede.
 
 ## Not this node
 
-- **The faithfulness and saturation LAWS** (58:368-370, :378-379, :402-403) --
-  the enclave-stated deferred fast-follow; a named follow-on
-  (`CAT-REL-CLOSURE-LAWS`), filed when this lands. This node is computational
-  realization only, per the campaign's computational-first trust level.
-- **Any raw `data ... : Ω` closure inductive** -- explicitly forbidden by the
-  Fork-B design (58:35-38, :428-430); the bounded-`Bool` encoding is the point.
-- **A general bounded-iteration interface beyond what closure needs**
-  (Map.ken.md:15219 defers that) -- land only the `reachableWithin` closure
-  needs.
+- **The faithfulness/saturation LAWS** (58:368-370 corrected, :378-379,
+  :402-403) -- the deferred fast-follow (`CAT-REL-CLOSURE-LAWS`, filed when this
+  lands).
+- **Any raw `data ... : Ω` closure inductive** -- forbidden by Fork B.
+- **A general bounded-iteration interface** beyond what closure needs
+  (Map.ken.md:15219 defers that).
 
-## Contention / spec currency
+## Symptom inventory
+
+Append one entry per Architect hard stop; never rewrite history.
+
+1. `R+` fixes its fuel as `size (dom R)` but does not define
+   `reachableWithin`'s zero/successor convention, while the stated `N - 1`
+   simple-path bound fails when `dom R` is the outer-key set and the endpoint is
+   a target-only sink -- keyed on a named closure form without a closed fuel or
+   vertex-population contract.
+
+## Contention
 
 Foundation ring, `Map.ken.md` (Data/Collections). No cross-lane contention (L1
 runtime on `crates/ken-lowering`; L2 language on `crates/ken-elaborator`).
-**Spec 58 is DRAFT v0** (58:3): the closure FORM and signatures are pinned
-(58:362, :414-437), so the computational realization builds against a stable
-contract, but confirm the exact `reachableWithin` base-case shape against 58:362
-at the cut and raise a hard stop to Architect + Steward if the draft is
-underspecified where the build needs a decision. The law statements (the
-follow-on) may need enclave confirmation before that node is cut.
+Re-measure every Map.ken.md anchor at the cut. The draft-v0 underspecification
+that caused HS1 is resolved by the `depends_on`
+[[SPEC-REL-CLOSURE-RECURRENCE]]; do not begin source edits until it lands and the
+Steward re-releases.
 
 ## Sizing / tier
 
-**Size M, tier T1.** The code is ordinary total Ken (structural recursion on a
-`Nat` bound over the adjacency representation), but the review turns on a design
-argument: the bounded-`Bool` Ω-encoding faithfully realizing the spec's closure
-form without a proof-relevant inductive, and the `N := size (dom R)` bound being
-the right one. Architect is the required reviewer as the relations-frontier
-design authority; the decomposition (whether `size`/`dom` split from
-`reachableWithin`/`R+`) is the Architect's to refine.
+**Size M, tier T1.** Ordinary total Ken (structural recursion on a `Nat` bound
+over the adjacency representation), but the review turns on a design argument:
+the bounded-`Bool` Ω-encoding faithfully realizing closure without a
+proof-relevant inductive, the fuel semantics being `R+` not `R*`, and the
+`size (dom r)` bound. Architect is the required reviewer.
