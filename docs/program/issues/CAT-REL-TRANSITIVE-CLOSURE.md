@@ -1,17 +1,17 @@
 ---
 id: CAT-REL-TRANSITIVE-CLOSURE
 title: "the binary-relations frontier (spec 58 / CAT-4, Fork B) names transitive closure as R+ x y := IsTrue (reachableWithin N x y), N := size (dom R), but the computational realization is design-pinned PROSE only -- Map.ken.md §4.7.12 lands succ/compose/converse and the property predicates, while size, bounded reachable_within, and reachable_plus do NOT exist on main; this node lands the kernel-untouched, Axiom-free computational closure (ONE node, no size/dom split) once the fuel-recurrence spec correction lands (the faithfulness/saturation laws are the named deferred fast-follow)"
-status: draft
+status: ready
 owner: foundation
 size: M
 gate: none
 depends_on: [SPEC-REL-CLOSURE-RECURRENCE]
 blocks: []
 github: null
-origin: "Steward cut 2026-09-12, the first node of the resumed catalog campaign's Band A frontier-harvest tranche, on the operator ruling of 2026-09-12 (Pat: 'develop a work program for L3 ... the catalog is the long arc ... what does the frontier enable'; 'concur with rec'). RECUT 2026-09-12 under Architect HS1 evt_16w35x7zxj442 (BOUNDED_CLOSURE_FUEL_CONVENTION_UNSPECIFIED_AND_BOUND_PROSE_OFF_BY_ONE, grounded at exact main b7c829c9f): keep ONE computational node (no size/dom split -- the composition size(dom r) must be gate-inspected in one candidate), but HOLD until the fuel-recurrence spec correction lands. Grounded against the tree: relation algebra at catalog/packages/Data/Collections/Map.ken.md §4.7.12 (succ :15122, rel_member :15128, compose :15153, converse :15173, predicates :15182-15194); closure design-pinned prose only (:15045-48, :15219); size/reachable_within/reachable_plus absent on main. Spec contract spec/50-stdlib/58-maps-sets-relations.md §7 (R+ :362, bound-prose :368-370, laws :378-79/:402-03, Omega-soundness AC5 :428-31, size kernel-untouched AC1 :414-17, Axiom-free AC7 :435-37). Spec 58 DRAFT v0. No capability blocker (ordinary total Ken; nested inductives merged; deceq carried as leq). No pre-existing tracker node for relation closure."
+origin: "Steward cut 2026-09-12, RE-RELEASED 2026-09-12 after SPEC-REL-CLOSURE-RECURRENCE landed (4ccc932fe): the fuel-recurrence correction is on main and the inline contract below is verified byte-aligned to landed spec 58 §7 (recurrence 58:436-455, public predicate/bound 58:465-477, Omega-soundness 58:479-482, AC1 kernel-untouched 58:540-543). Original cut note follows. Steward cut 2026-09-12, the first node of the resumed catalog campaign's Band A frontier-harvest tranche, on the operator ruling of 2026-09-12 (Pat: 'develop a work program for L3 ... the catalog is the long arc ... what does the frontier enable'; 'concur with rec'). RECUT 2026-09-12 under Architect HS1 evt_16w35x7zxj442 (BOUNDED_CLOSURE_FUEL_CONVENTION_UNSPECIFIED_AND_BOUND_PROSE_OFF_BY_ONE, grounded at exact main b7c829c9f): keep ONE computational node (no size/dom split -- the composition size(dom r) must be gate-inspected in one candidate), but HOLD until the fuel-recurrence spec correction lands. Grounded against the tree: relation algebra at catalog/packages/Data/Collections/Map.ken.md §4.7.12 (succ :15122, rel_member :15128, compose :15153, converse :15173, predicates :15182-15194); closure design-pinned prose only (:15045-48, :15219); size/reachable_within/reachable_plus absent on main. Spec contract spec/50-stdlib/58-maps-sets-relations.md §7 (R+ :362, bound-prose :368-370, laws :378-79/:402-03, Omega-soundness AC5 :428-31, size kernel-untouched AC1 :414-17, Axiom-free AC7 :435-37). Spec 58 DRAFT v0. No capability blocker (ordinary total Ken; nested inductives merged; deceq carried as leq). No pre-existing tracker node for relation closure."
 ---
 
-> # RECUT and HELD 2026-09-12 under Architect HS1 `evt_16w35x7zxj442`. READ FIRST.
+> # RE-RELEASED 2026-09-12 (was RECUT/HELD, Architect HS1 `evt_16w35x7zxj442`). READ.
 >
 > **Decomposition ruling: KEEP ONE computational node -- do NOT split
 > `size`/`dom` from `reachable_within`/`reachable_plus`.** They are small
@@ -21,20 +21,24 @@ origin: "Steward cut 2026-09-12, the first node of the resumed catalog campaign'
 > artifacts. A split buys no isolation and adds a WP edge for a dependency
 > internal to this closure.
 >
-> **HELD (`status: draft`) on [[SPEC-REL-CLOSURE-RECURRENCE]].** The draft is
-> insufficient to authorize implementation: spec 58:362 fixes the outer formula
-> but never defines what one unit of `reachable_within` fuel recognizes (the
-> earlier frame named zero as "base step (or reflexive+step)" -- different
-> relations, and Foundation must not choose in code), and the 58:368-370 `N - 1`
-> bound is off by one for the outer-key-set `dom`. The spec correction states
-> the exact recurrence and fixes `N - 1 -> N`. **The exact contract lives in
-> that correction; the reflection below is aligned to it.** Re-release is the
-> Steward's after the correction lands -- no source edits until then; branch
-> byte-clean at `2d35fd3b6` (current main is downstream).
+> **The [[SPEC-REL-CLOSURE-RECURRENCE]] hold is LIFTED.** The correction landed
+> on main as `4ccc932fe`: it states the exact fuel recurrence (zero recognizes no
+> path; `Suc n` is `edge_R OR fold`), fixes the bound `N - 1 -> N :=
+> size (dom R)`, and settles `R+` (not `R*`) semantics. The inline contract in
+> "The contract" and "Deliverables" below is verified **byte-aligned to the
+> landed spec** on all four points. Authoritative landed anchors (the draft-era
+> `58:XXX` citations elsewhere in this frame predate the +486 reorganization and
+> are historical -- chase these): four signatures 58:405-413; fuel recurrence
+> 58:436-455; `R+`-not-`R*` semantics 58:457-463; public predicate + `size (dom
+> r)` bound 58:465-477; `Perm`-move / no proof-relevant inductive 58:479-482;
+> AC1 kernel-untouched / no `Axiom` 58:540-543; AC5 relation `Omega`-soundness
+> 58:555.
 >
 > Kernel-untouched, `Axiom`-free -- no TCB growth, no operator touch. Owner
 > foundation; Architect required reviewer (relations-frontier design authority) +
 > foundation-QA + CV + standing Adversary -> Steward M1-M4 -> lieutenant.
+> Re-measure every `Map.ken.md` anchor at the cut (current main is downstream of
+> the byte-clean branch base `2d35fd3b6`).
 
 ## What this is
 
@@ -120,12 +124,12 @@ reachable_plus  : (k : Type) -> (leq : k -> k -> Bool)
 - `size`, `dom`, `reachable_within`, `reachable_plus` compile in the Map package,
   `Axiom`-free and kernel-untouched (no `Decl::Opaque`, no primitive, no TCB
   entry, no raw `data ... : Ω`; 58:435-437). Verified by the catalog build.
-- `reachable_plus x y` reduces to the exact 58:362 form with the bound
-  `size (dom r)`.
+- `reachable_plus x y` reduces to the exact landed public-predicate form
+  (58:465-477) with the bound `size (dom r)`.
 - All five discriminators above hold (none vacuous), and the `dom`-leakage pin
   holds.
-- The Ω-encoding is sound (58:428-431): `reachable_plus` is Π-into-Ω over a
-  decidable bounded `Bool`.
+- The Ω-encoding is sound (58:479-482, AC5 58:555): `reachable_plus` is Π-into-Ω
+  over a decidable bounded `Bool`.
 - The landed §4.7.12 relation ops stay green.
 
 ## Implementation constraints
