@@ -2386,6 +2386,71 @@ validation = ["manifest-coverage", "manifest-completeness", "document-kind", "li
 owner = "doc"
 
 [[document]]
+path = "library/guide/compiler/kernel/core-terms.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-kernel/src/term.rs", "crates/ken-kernel/src/subst.rs",
+  "spec/10-kernel/11-syntax.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/kernel/contexts-and-declarations.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-kernel/src/env.rs", "crates/ken-kernel/src/check.rs",
+  "crates/ken-kernel/src/conv.rs", "spec/10-kernel/11-syntax.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/kernel/checking-and-admission.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-kernel/src/check.rs", "spec/10-kernel/18-judgments.md",
+  "spec/10-kernel/14-inductive.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/kernel/conversion-and-reduction.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-kernel/src/conv.rs", "crates/ken-kernel/src/check.rs",
+  "spec/10-kernel/17-conversion.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
+path = "library/guide/compiler/kernel/inductive-admission.md"
+kind = "explanatory"
+audience = ["human-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = ["crates/ken-kernel/src/check.rs", "crates/ken-kernel/src/inductive.rs",
+  "crates/ken-kernel/src/conv.rs", "spec/10-kernel/14-inductive.md"]
+validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
+  "source-currency"]
+owner = "doc"
+
+[[document]]
 path = "library/guide/compiler/interpreter-and-values.md"
 kind = "explanatory"
 audience = ["human-reader"]
