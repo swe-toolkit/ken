@@ -2303,70 +2303,12 @@ kind = "explanatory"
 audience = ["human-reader"]
 authority = "explanatory"
 availability = "partial"
-sources = ["crates/ken-elaborator/src/lib.rs",
-  "crates/ken-elaborator/src/compiler_driver.rs", "crates/ken-cli/src/main.rs",
+sources = ["crates/ken-cli/src/main.rs", "crates/ken-elaborator/src/lib.rs",
+  "crates/ken-elaborator/src/lexer.rs", "crates/ken-elaborator/src/parser.rs",
+  "crates/ken-elaborator/src/resolve.rs", "crates/ken-elaborator/src/elab.rs",
+  "crates/ken-elaborator/src/compiler_driver.rs", "spec/30-surface/31-lexical.md",
+  "spec/30-surface/32-grammar.md", "spec/30-surface/33-declarations.md",
   "spec/30-surface/39-elaboration.md"]
-validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
-  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
-  "source-currency"]
-owner = "doc"
-
-[[document]]
-path = "library/guide/compiler/front-end/source-input.md"
-kind = "explanatory"
-audience = ["human-reader"]
-authority = "explanatory"
-availability = "partial"
-sources = ["crates/ken-cli/src/main.rs"]
-validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
-  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
-  "source-currency"]
-owner = "doc"
-
-[[document]]
-path = "library/guide/compiler/front-end/lexing.md"
-kind = "explanatory"
-audience = ["human-reader"]
-authority = "explanatory"
-availability = "partial"
-sources = ["crates/ken-elaborator/src/lexer.rs", "spec/30-surface/31-lexical.md"]
-validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
-  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
-  "source-currency"]
-owner = "doc"
-
-[[document]]
-path = "library/guide/compiler/front-end/parsing.md"
-kind = "explanatory"
-audience = ["human-reader"]
-authority = "explanatory"
-availability = "partial"
-sources = ["crates/ken-elaborator/src/parser.rs", "spec/30-surface/32-grammar.md"]
-validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
-  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
-  "source-currency"]
-owner = "doc"
-
-[[document]]
-path = "library/guide/compiler/front-end/resolution.md"
-kind = "explanatory"
-audience = ["human-reader"]
-authority = "explanatory"
-availability = "partial"
-sources = ["crates/ken-elaborator/src/resolve.rs", "spec/30-surface/33-declarations.md"]
-validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
-  "source-anchors", "availability-label", "authority-class", "transport-delimiter",
-  "source-currency"]
-owner = "doc"
-
-[[document]]
-path = "library/guide/compiler/front-end/elaboration-and-admission.md"
-kind = "explanatory"
-audience = ["human-reader"]
-authority = "explanatory"
-availability = "partial"
-sources = ["crates/ken-elaborator/src/lib.rs", "crates/ken-elaborator/src/elab.rs",
-  "crates/ken-elaborator/src/compiler_driver.rs", "spec/30-surface/39-elaboration.md"]
 validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
   "source-anchors", "availability-label", "authority-class", "transport-delimiter",
   "source-currency"]
