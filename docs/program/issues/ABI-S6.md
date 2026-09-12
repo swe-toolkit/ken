@@ -1675,6 +1675,13 @@ Architect inventory, 2026-09-11.
     `InvocationReturn`, which returned the bare call word without projecting the
     existing checked-IH direct-result disposition into affine context-Result
     authority (`evt_4x47d8j5ypdgw`).
+15. The exact post-union/post-confluence Direct projection required by entry 14
+    proved that neither reported identity has that disposition. Identity
+    `1605/874`, target 3, belongs to zero confluence classes for contracted
+    context 0/body 1605. Identity `1603/1092`, target 1, belongs to one class,
+    but its exact route is `TailProducerToRet`, sourced at call `883/882/881`
+    through frame 879 and Ret body 910. Treating either result as Direct would
+    invent a join or substitute Direct for Tail (`evt_14ysmv6e7m0e9`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
