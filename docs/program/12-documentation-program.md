@@ -749,14 +749,23 @@ and where its boundary is." The chapters are `README` (the index), `front-end`,
 `kernel`, `artifacts-and-erasure`, `interpreter-and-values`, `native-backend`,
 `validation-and-limits`, and `reading-workflow`.
 
-### Structure: nest, do not replace
+### Structure: deepen each chapter in place, as one page
 
-Each existing page becomes the **chapter landing** — the overview the operator
-found reasonable, kept — and the depth pages sit beneath it. Reflect, do not
-extend: the overview is not discarded; it becomes the index into the depth. The
-corpus convention for the nested pages (a per-chapter subdirectory, the manifest
-records, whether any page is literate `.ken.md`) is the doc-leader's and
-librarian's call, decided on the front-end chapter and then held.
+**Operator correction, 2026-09-12.** "Each paragraph becomes a page" was about
+**detail, not structure** — elaborate each chapter to the length and depth people
+usually expect of a documentation page, keeping it as **one page**. Do **not**
+split a chapter into a landing page plus nested depth pages in a subdirectory.
+Verbatim (Pat): the guide dir's slim per-stage pages "would better be merged
+into `library/guide/compiler/front-end.md`, and the whole treated as a single
+page. That would be about the minimum content length and level of detail that
+people usually expect in a documentation page."
+
+So each chapter is deepened **in place**: `library/guide/compiler/<chapter>.md`
+grows from its ~280-word overview into a full page (source-anchored per claim,
+still explanatory/derived), with no new subdirectory and no per-chapter depth-page
+manifest records. The front-end chapter's earlier nested cut was consolidated
+back to a single `front-end.md` under this correction, and that consolidated page
+is the exemplar the remaining chapters follow.
 
 ### Authority and currency — this is the most drift-prone doc work to date
 
@@ -818,5 +827,5 @@ pre-emptively.
 
 This is doc-track work (`library/`, `docs/`) and runs concurrently with the
 three build lanes per §0's exception — contention-free, not prioritized. The
-depth pages **read** `crates/` to describe it; they do not edit it, so the
+the deepened pages **read** `crates/` to describe it; they do not edit it, so the
 exception holds cleanly even while the build lanes churn the same files.
