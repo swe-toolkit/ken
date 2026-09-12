@@ -1,7 +1,7 @@
 ---
 id: CAT-MAP-DEPENDENCY-CLOSURE-REPAIR
 title: "Repair the Map package's dependency closure so Data/Collections/Map.ken.md elaborates from its own declared imports rather than relying on the map_build_acceptance.rs fixture to preload Compare/Transport/Derived/Or and to resolve undeclared list_append."
-status: active
+status: merged
 owner: foundation
 size: unsized
 gate: none
