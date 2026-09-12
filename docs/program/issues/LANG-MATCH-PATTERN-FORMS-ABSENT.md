@@ -287,9 +287,18 @@ Steward cuts it rather than the ring.
 >   same-constructor unguarded arm reachable), the guard load-bearing to each
 >   verdict. Top-level `_`/`Var` refusal UNCHANGED (a guard does not lift it). Base
 >   `440b16dfc`.
-> - **Slice 6 (literals)** remains a future slice, fail-closed until cut, and stays
->   BLOCKED (the enclave's DecEq/expected-type finding). The Steward cuts it
->   one-release-ahead once its blocker clears.
+> - **Slice 6 literals -- RELEASED 2026-09-12.** [[LANG-MATCH-LITERAL-PATTERN]]
+>   (`ready`), the FINAL form. The earlier "BLOCKED on DecEq/expected-type"
+>   status is SUPERSEDED by the Architect L2 decomposition ruling
+>   evt_127n516pkvtnb: literal comparison is VALUE-LEVEL per the 34 §3.2
+>   comparator table (Int/fixed-width/Float/Float32/Decimal/String/Char/bytes
+>   each named), the comparator returns Bool with no Equal proof or hypothesis,
+>   and lawful DecEq is OPTIONAL where normative value semantics fixes a total
+>   comparison (so Float/Float32/Decimal participate without lawful DecEq). The
+>   prerequisite pin is discharged (SPEC-MATCH-PATTERN-PINS, 34fd01c1: the
+>   comparator table + expected-type-is-scrutinee's pin). Fail-closed: unadmitted
+>   carriers and user-defined-carrier numeric literals (35 §4.2 unstaged) reject.
+>   The top-level `_`/`Var` catch-all is explicitly out of scope. Base d750d694d.
 
 **One thing already decided and needing no further ruling:** this node does
 **not** amend `34`. The enclave ruled the chapter's obligations real, so the
