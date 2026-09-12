@@ -15,11 +15,16 @@ data Tag = A | B | C | D | E | F
 ```
 
 `up : Ord Nat` is the canonical dictionary whose comparator is `leq_nat`.
-`down : Ord Nat` is a separate real law-carrying dictionary with
-`down.leq x y = up.leq y x`; its reflexivity, antisymmetry, transitivity, and
-totality fields are obtained by swapping the corresponding arguments to the
-proved `up` laws. Neither dictionary contains an `Axiom` or stub. A raw
-Boolean comparator without those law fields is not an acceptable substitute.
+`up2 : Ord Nat` is a separately constructed record whose `leq` field is also
+`leq_nat` and whose four law fields use the same already-proved Nat laws; it is
+not an alias for the `up` record. Thus `ord_leq_at Nat up` and
+`ord_leq_at Nat up2` are definitionally equal functions even though the proof
+records are separate values. `down : Ord Nat` is a separate real law-carrying
+dictionary with `down.leq x y = up.leq y x`; its reflexivity, antisymmetry,
+transitivity, and totality fields are obtained by swapping the corresponding
+arguments to the proved `up` laws. None of these dictionaries contains an
+`Axiom` or stub. A raw Boolean comparator without those law fields is not an
+acceptable substitute.
 
 Test-side `drain d q` repeatedly calls public `pop_min` until `None`. It is an
 observer, not a package operation. Expected entry multisets and priority lists
@@ -92,7 +97,8 @@ accepts every permutation within the priority-2 group.
 - given: `q0 = empty Nat Tag up`.
 - expect: `find_min Nat Tag up q0 = None` and
   `pop_min Nat Tag up q0 = None` as two independent observations.
-- why: rejects fabricated defaults and partial empty extraction.
+- why: pins the empty-to-`None` direction separately for both operations and
+  rejects fabricated defaults or partial empty extraction.
 
 ### stdlib/priority-queue/singleton-peek-pop-and-remainder
 - spec: `58a §4.2`, `§4.4`.
@@ -103,8 +109,9 @@ accepts every permutation within the priority-2 group.
   `pop_min up q1 = Some ((2,A),q2)`; both `find_min up q2` and
   `pop_min up q2` are `None`; and the original `q1` still peeks and pops as the
   same singleton after `q2` is observed.
-- why: independently rejects missing insertion, peek/pop disagreement, an
-  unchanged pop remainder, and mutation of the original.
+- why: pins the nonempty-to-`Some` direction separately for both operations
+  while also rejecting missing insertion, peek/pop disagreement, an unchanged
+  pop remainder, and mutation of the original.
 
 ### stdlib/priority-queue/two-identical-entries-pop-one-at-a-time
 - spec: `58a §3`, `§4.1`, `§4.2`.
@@ -148,31 +155,39 @@ accepts every permutation within the priority-2 group.
   calls rather than crediting one aggregate result for both arms.
 - why: catches a one-sided root-selection recurrence and an ignored operand.
 
-### stdlib/priority-queue/opposite-order-merge-is-a-type-error
+### stdlib/priority-queue/equal-function-orders-merge-opposite-order-rejects
 - spec: `58a §2.1`, `§8` item 2.
 - promise: normative compatibility vector.
-- given: `q_up : PriorityQueue Nat Tag (ord_leq_at Nat up)` and
-  `q_down : PriorityQueue Nat Tag (ord_leq_at Nat down)`, each constructed by
-  its own successful public insertion. Attempt `merge Nat Tag up q_up q_down`.
-- expect: kernel `TypeMismatch` between the opposite comparator indices. The
-  matched controls `merge up q_up q_up` and `merge down q_down q_down` accept
-  and drain in their respective orders.
-- why: the negative cannot pass merely because either dictionary or operation
-  is broken; both same-order controls reach the public merge boundary.
+- given: `q_up : PriorityQueue Nat Tag (ord_leq_at Nat up)` contains `(1,A)`,
+  `q_up2 : PriorityQueue Nat Tag (ord_leq_at Nat up2)` contains `(2,B)`, and
+  `q_down : PriorityQueue Nat Tag (ord_leq_at Nat down)` contains `(3,C)`.
+  Each is constructed by its own successful public insertion. Attempt both
+  `merge Nat Tag up q_up q_up2` and `merge Nat Tag up q_up q_down`.
+- expect: the `up`/`up2` merge accepts and drains exactly `[(1,A),(2,B)]`.
+  The `up`/`down` merge rejects with kernel `TypeMismatch` between the opposite
+  comparator indices. Matched controls `merge up q_up q_up` and
+  `merge down q_down q_down` accept and drain in their respective orders.
+- why: the positive rejects proof-record-identity compatibility while the
+  negative pins comparator-function incompatibility. Same-record controls keep
+  a broken dictionary or merge operation from satisfying the rejection.
 
 ## PQ4 — entries, multiplicity, and unspecified ties
 
-### stdlib/priority-queue/equal-priority-distinct-payloads-survive
-- spec: `58a §3`, `§4.1`, `§4.3`.
+### stdlib/priority-queue/equal-priority-payloads-survive-and-peek-pop-agree
+- spec: `58a §3`, `§4.1`–`§4.3`.
 - promise: durable invariant.
-- given: under `up`, insert
-  `[(1,C),(2,A),(2,B),(2,A),(3,D)]`.
-- expect: drain groups are exactly
-  `[(1,C), 2:{A*2,B*1}, (3,D)]`. No assertion fixes the order of `A,B,A`
-  within the priority-2 group.
-- why: catches priority-only deduplication, payload detachment, and accidental
-  FIFO as a conformance requirement without rejecting an implementation that
-  happens to choose FIFO for this one shape.
+- given: under `up`, insert `q = [(1,C),(2,A),(2,B),(2,A),(3,D)]` and separately
+  build `q_tie = [(1,A),(1,B),(2,C)]`.
+- expect: drain groups for `q` are exactly
+  `[(1,C), 2:{A*2,B*1}, (3,D)]`. For the unchanged `q_tie`, the joint
+  `(find_min,pop_min)` observation is exactly one of these two literal rows:
+  `Some (1,A)` with `Some ((1,A),rA)` and drain `rA = [(1,B),(2,C)]`, or
+  `Some (1,B)` with `Some ((1,B),rB)` and drain `rB = [(1,A),(2,C)]`.
+  No assertion chooses between the rows or fixes the order of `A,B,A` within
+  `q`'s priority-2 group.
+- why: the two literal rows require peek and pop to choose the same actual
+  tied-minimum occurrence without imposing stability. The first queue still
+  catches priority-only deduplication and payload detachment.
 
 ### stdlib/priority-queue/self-merge-doubles-entry-multiplicity
 - spec: `58a §4.1`, `§4.4`.
@@ -229,16 +244,26 @@ accepts every permutation within the priority-2 group.
 ### stdlib/priority-queue/bounded-short-traces-match-independent-multiset
 - spec: `58a §4`, `§7` item 2.
 - promise: durable invariant.
-- given: every insertion sequence of length at most three over priorities
-  `{0,1,2}` and payloads `{A,B}`, plus every pairwise merge of queues built by
-  sequences of length at most two. Run the same fixed cases under `up` and
-  `down`. A separate list-multiset model starts from the literal operations.
-- expect: every peek is a model-minimum entry; every pop removes exactly its
-  returned occurrence from the model; every remainder and original queue can be
-  drained independently; termination occurs at model count zero. Equal-priority
-  groups compare as multisets. The executed population is reported explicitly,
-  never as “suite green”.
-- why: finite closure across short histories supplements the named cases. It is
+- given: the entry alphabet is the six literal pairs from priorities `{0,1,2}`
+  and payloads `{A,B}`. Per comparator, all insertion histories of length zero
+  through three give `1 + 6 + 36 + 216 = 259` traces. Histories of length zero
+  through two give `1 + 6 + 36 = 43` queue operands; their full ordered
+  Cartesian product, including both orientations and all 43 self-pairs, gives
+  `43 * 43 = 1849` merge traces. Run both domains under `up` and `down`, for the
+  precomputed total `2 * (259 + 1849) = 4216` traces. A separate list-multiset
+  model starts from the literal operations.
+- expect: exactly 4,216 traces execute: 259 insertion traces and 1,849 ordered
+  merge traces for each comparator. Before every observation, the independent
+  model records whether its entry count is zero. `find_min` returns `None`
+  exactly at model count zero, and independently `pop_min` returns `None`
+  exactly at model count zero. At every nonzero count both return `Some`, their
+  returned entries agree, the peek is a model-minimum entry, and the pop removes
+  exactly its returned occurrence from the model. Every remainder and original
+  queue can be drained independently. Equal-priority groups compare as
+  multisets.
+- why: the pre-execution count prevents a zero or partial run from becoming its
+  own population oracle. The domain also exercises both directions of each
+  `None` equivalence across finite empty and nonempty histories. It remains
   finite evidence, not a general heap theorem.
 
 ## PQ6 — recursive validity and structural cost
@@ -295,19 +320,38 @@ representation uses cached ranks.
 - why: independently reaches the ordering arm rather than relying on one large
   malformed fixture to fail somewhere.
 
-### stdlib/priority-queue/meld-step-count-follows-right-spines
+### stdlib/priority-queue/meld-charge-count-follows-right-spines
 - spec: `58a §6`.
 - promise: durable invariant for the selected realization.
 - given: valid fixtures with independently counted right-spine lengths,
-  including both-empty, one-empty, singleton, balanced unequal-size, and
-  equal-priority roots. Count production meld node steps and priority
-  comparisons without using wall-clock thresholds.
-- expect: `merge q1 q2` takes no more than
-  `right_spine(q1) + right_spine(q2)` meld steps and no more than one priority
-  comparison per two-nonempty step. `find_min` performs none. Rank comparison
-  work and each priority comparator's internal cost are reported separately.
-- why: measures the structural claim the contract makes and no stronger native
-  complexity claim.
+  including both-empty, one-empty, singleton, balanced unequal-size,
+  equal-priority roots, and successful pops whose roots have two nonempty
+  children. Through a private test boundary, count `M(q1,q2)` as zero at either
+  empty base and one for each two-nonempty call before following its selected
+  recursive call. Record that trace separately for direct public `merge`, the
+  singleton meld reached by direct public `insert`, and the two-child meld
+  reached by direct public `pop_min`. Separately count priority comparisons,
+  private meld-worker invocations, and structural accesses; do not use
+  wall-clock thresholds or add a public counter.
+- expect: `empty` returns the selected constant-size single-constructor empty
+  form with no subtree visit or priority comparison. Both-empty and one-empty
+  merges have `M = 0`, zero priority comparisons, and one terminal meld-worker
+  invocation. Every merge has exactly `M` priority
+  comparisons, exactly `M + 1` meld-worker invocations, and
+  `M <= right_spine(q1) + right_spine(q2)`. Direct `insert e q` satisfies the
+  same equalities for `M(singleton(e),q)` and the bound
+  `M <= 1 + right_spine(q)`. A successful `pop_min q`, with root children
+  `left` and `right`, inspects that root and satisfies the same equalities
+  for `M(left,right)` and the bound
+  `M <= right_spine(left) + right_spine(right)`. Each trace touches only current
+  roots, bounded constant metadata and reconstruction sites, and the selected
+  descent spines; none performs a hidden whole-tree traversal. `find_min` has
+  zero meld charges, priority comparisons, and meld-worker invocations.
+  Unary-`Nat` metadata comparison work and each priority comparator's internal
+  cost are reported separately.
+- why: uses the contract's exact charged population and zero/base convention on
+  every directly specified operation. Direct insert/pop traces reject an extra
+  traversal that merge-only evidence cannot see.
 
 ## PQ7 — required mutation provenance
 
@@ -323,9 +367,12 @@ not evidence for an execution property.
 | omit child balancing | `produced-leftist-validity-recomputed` reaches its balance failure on a production history | matched valid shape |
 | cache the wrong child measure | `produced-leftist-validity-recomputed` reaches cache inconsistency on a production history | matched valid cache |
 | return the unchanged queue as pop remainder | `singleton-peek-pop-and-remainder` observes a nonempty second pop | empty and singleton controls |
-| collapse equal priorities | `equal-priority-distinct-payloads-survive` loses a fixed literal occurrence | fixed tie-group multiset |
+| collapse equal priorities | `equal-priority-payloads-survive-and-peek-pop-agree` loses a fixed literal occurrence | fixed tie-group multiset |
+| make tied `find_min` choose a different payload than `pop_min` | `equal-priority-payloads-survive-and-peek-pop-agree` matches neither permitted literal row | tied-minimum two-row observation |
 | shortcut equal-identity merge to one operand | `self-merge-doubles-entry-multiplicity` returns the original rather than doubled multiset | original and doubled literal multisets |
 | detach priority from payload | `interleaved-shared-priority-merge-persists` returns an entry outside the fixed multiset | independent left/right drains |
+| traverse an untouched subtree before `insert` returns | `meld-charge-count-follows-right-spines` records an off-spine direct-insert access | direct-insert trace after restoration |
+| traverse an untouched subtree before successful `pop_min` returns | `meld-charge-count-follows-right-spines` records an off-spine direct-pop access | direct-pop trace after restoration |
 
 If a production validity detector is the sole mechanism for one recursive
 clause, mutate that detector to constant success while keeping the malformed
@@ -339,7 +386,7 @@ Before `CAT-PRIORITY-QUEUE` lands, every case above is a specified expected
 observation and none is reported GREEN. The build must report separately:
 
 1. real public computation and the exact named finite observations it executed;
-2. private abstraction/validity and structural-step observations;
+2. private abstraction/validity and structural-charge observations;
 3. production-side and detector-side mutation failures with restoration;
 4. the still-deferred general kernel proofs.
 

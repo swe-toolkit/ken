@@ -165,10 +165,10 @@ not assert `Equal Q` for two private queue shapes.
 
 ### 4.2 Minimum and optional extraction
 
-Let `e = (minimum_priority, payload)`.
+Let `e = (minimum_priority, payload)`. For every valid `q`:
 
-- `find_min d (empty d) = None` and `pop_min d (empty d) = None`;
-- a valid queue is empty exactly when both operations return `None`;
+- `find_min k v d q = None` if and only if `Entries(q)` is empty;
+- `pop_min k v d q = None` if and only if `Entries(q)` is empty;
 - if `find_min d q = Some e`, then `e` is one occurrence of `Entries(q)` and,
   for every stored occurrence `(priority, payload2)`,
   `IsTrue (ord_leq_at k d minimum_priority priority)` holds;
@@ -238,31 +238,57 @@ time and could not honestly be called deferred.
 
 ## 6. Structural cost account
 
-The cost claim counts **heap-node steps and priority comparisons**, not native
-instructions or wall-clock time. Let `rho(q)` be the number of nonempty nodes on
-the private meld-descent spine. In the selected leftist realization this is the
-right-child spine. `rho` is a review measure, not a public operation.
+The cost claim counts a precisely charged private meld descent and its priority
+comparisons, not native instructions or wall-clock time. Let `rho(q)` be the
+number of nonempty nodes on the private meld-descent spine. In the selected
+leftist realization this is the right-child spine. Let `M(q1,q2)` count only
+calls whose two current operands are nonempty:
 
-For valid queues, the balance part of `Valid_d` must ensure that `rho(q)` is
-logarithmic in the number of stored occurrences. Equivalently, the structural
-account may establish the familiar size lower bound
-`2 ^ rho(q) <= count_by (lambda _ _. True) q + 1`. The computational costs are:
+```
+M(empty,h) = Zero
+M(h,empty) = Zero
+M(q1,q2) = Suc (M(next1,next2))  when q1 and q2 are nonempty
+```
+
+In the last equation, `(next1,next2)` are exactly the operands of the one
+recursive meld call selected after comparing the two current roots. One
+operand advances along its meld-descent spine and the other remains current.
+That unchanged operand may be inspected again; the next two-nonempty call
+receives its own charge. `rho` and `M` are specification and review measures,
+not public operations or runtime instrumentation.
+
+Each two-nonempty call makes exactly one priority comparison. The terminal
+empty-base call makes none. Therefore one merge makes exactly `M(q1,q2)`
+priority comparisons and invokes the private meld worker exactly
+`Suc (M(q1,q2))` times, including its terminal base call. The descent satisfies
+
+```
+M(q1,q2) <= rho(q1) + rho(q2).
+```
+
+For valid queues, the balance part of `Valid_d` must bound `rho(q)` by stored
+occurrences. A sufficient concrete obligation is
+`2 ^ rho(q) <= count_by (lambda _ _. True) q + 1`; this is not an equivalence
+with an arbitrary native-time `O(log n)` statement. The computational costs are:
 
 - `empty` constructs a constant number of nodes and makes no priority
   comparison;
-- `find_min` inspects a constant number of nodes and makes no priority
-  comparison;
-- `merge q1 q2` visits at most `rho(q1) + rho(q2)` meld-spine nodes and makes at
-  most one priority comparison at each step where both queues are nonempty;
+- `find_min` inspects a constant number of nodes, invokes no meld worker, and
+  makes no priority comparison;
+- `merge q1 q2` has the exact `M`, comparison, worker-invocation, and spine
+  bounds above;
 - `insert e q`, implemented through singleton merge, has the corresponding
-  singleton-plus-`rho(q)` structural bound;
-- successful `pop_min` inspects the root and has the structural cost of merging
-  its two child queues.
+  `M(singleton,q)` and singleton-plus-`rho(q)` bounds;
+- successful `pop_min` inspects the root and has the `M` cost of merging its
+  two child queues.
 
-This does **not** make arbitrary priority comparison constant-time. It also does
-not make comparison of unary `Nat` structural metadata constant-time; those
-operation costs must be added to the node-step count. No measured native or
-wall-clock `O(log n)` claim follows. A machine-checked general complexity proof
+Each charged step and the terminal base call perform only a bounded constant
+amount of heap-constructor and cached-metadata access outside the selected
+recursive call. There is no hidden whole-tree traversal. This account makes
+neither an arbitrary priority comparison nor comparison of unary `Nat`
+structural metadata constant-time. Their internal costs are additional to the
+charged `M` and priority-comparison counts. No measured native or wall-clock
+`O(log n)` claim follows. A machine-checked general complexity proof
 is separately deferred; the build must still match this structural account.
 
 ## 7. Delivery and proof status
