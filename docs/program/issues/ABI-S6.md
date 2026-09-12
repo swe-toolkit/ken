@@ -12,7 +12,98 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 15 — CORRECTED OBSERVATION-ONLY RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 15 — THIRD (FINAL) OBSERVATION-ONLY RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HS15 — ARCHITECT THIRD OBSERVATION-ONLY RULING
+> # evt_sackrt5qfzwk (thr_7wy5wy45p7abm), superseding the observer INSTRUCTION of
+> # the CORRECTED and OBSERVATION-ONLY rulings below. BOTH prior observations closed
+> # INVALID (honest; runtime-implementer evt_57759gben3mhb / evt_6rh07cfnbfz7a).
+> # Still HS15: NO hard-stop advancement, NO inventory row, NO Research retrigger.
+> # Runtime clean at 37390dfcf / b020b71f; production HELD; NO repair authorized.
+> #
+> # ARCHITECT SELF-CORRECTION: the three residuals were OBSERVER-DOMAIN placement
+> # errors, not production defects. (1) DIRECT_DESCENT_OBSERVER_APPLIED_TO_
+> # COMPUTATIONAL_PRODUCER_TRAVERSAL — the origin-705 hook sat in lower_expr, but
+> # lower_computational_producer_expr(_once) is the second traversal that unwraps
+> # CheckedComputationalIHSlots; zero rows at lower_expr do NOT prove non-emission.
+> # (2) CONTEXT_EMITTER_OBSERVER_APPLIED_TO_CONTINUATION_SPECIALIZATION_TARGET —
+> # the target-3 hook sat in define_continuation_context_bodies, but B names
+> # ContinuationSpecializationId(3) = funcid55, emitted by define_continuation_bodies
+> # (A = target 1 / funcid53); zero context rows prove wrong placement, not absence.
+> # (3) FUNCTION_WIDE_MINT_CENSUS_CONFUSED_WITH_TERMINAL_VALUE_PROVENANCE — the
+> # all_mints_visited condition is WITHDRAWN; the reverse walk reaches exactly seven
+> # call-result seeds; the eight 4442 mints are function-wide producers, NOT terminal
+> # predecessors (13 call tokens, only 7 terminal — demanding all mints was wrong).
+> #
+> # CLOSED and RETAINED: the A-to-B planning square; all seven terminal call/frame/
+> # load paths (v3363, v3876, v6030, v8292, v10466, v12618, v14715); origin-874
+> # Active token 2 (calls B, returns v8292 via call token 7/inst12101, pending=0,
+> # successor returns input directly as Carried, no nested emission).
+> #
+> # AUTHORIZED: ONE FINAL corrected test-support-only observation of the same
+> # unchanged named positive on exact pre-HS15 attempt bcde2f02 over 37390dfcf.
+> # Retain the closed planning/Active/seven-call ledgers; change ONLY these observer
+> # domains:
+> # A. ORIGIN 705 — assign a visit token at enter_source_occurrence_plan(705) (the
+> #    common occurrence gate); observe every lawful route (lower_computational_
+> #    producer_expr_once, lower_computational_producer_construct, owned source
+> #    machine, direct lower_expr, the immediate-bridge seat consuming
+> #    CheckedComputationalIHSlots). Record FunctionId/owner/unit, eliminator stack,
+> #    branch, consumer before/after, result phase/word, recursively covered
+> #    successor. If the gate is not entered, parent 706/699 must positively name the
+> #    plan-owned structural consumer making 705 non-emitted. Absence/spelling/
+> #    ancestry/count do NOT decide it.
+> # B. TERMINAL SEEDS — keep the exhaustive backward walk from v26, replacing
+> #    all_mints_visited with terminal_seed_closure: every reverse-reachable leaf
+> #    pairs to one immutable constructor OR call-result token; every accepted
+> #    cycle grounded. Separately classify each function-local mint/call OUTSIDE that
+> #    closure by exact first value use (call operand w/ Inst/slot, nonterminal
+> #    consumer, recursively covered join, unreachable block). Dropped/multiple =
+> #    INVALID; proved nonterminal is not a terminal predecessor.
+> # C. BOTH EMITTED CALLEES — attach first to define_continuation_bodies for spec
+> #    1/body 1076 and spec 3/body 859. Record FuncId, frame, selected case,
+> #    retargeted_worker_body, worker route/callee, Result/Trap stores, every
+> #    reachable Return. Follow the actual route (RawWorker -> define_unit_body;
+> #    GeneratedContext -> the exact define_continuation_context_bodies record).
+> #    Recurse through emitted calls to governed materialization. Finished CLIF
+> #    must prove for EVERY function in both chains: nonzero status publishes no
+> #    Result; status-zero commits exactly one exact-frame Trap or Result; Trap
+> #    checked before Result; no Empty/Double; every Result traces through block args
+> #    to governed source materialization with its actual identity. Use complete
+> #    emitter identity + decoded callees, NEVER DeclaredUnitCall.result_contract,
+> #    target metadata, tag, status/Trap success, Carried, SSA-alone, function
+> #    numbering, or caller assumptions. Exclude an interprocedural authority cycle.
+> # D. Pair the independent proof to each terminal emission: A v3363; B v3876/v6030/
+> #    v8292/v10466/v12618/v14715. funcid53/55 numbers are NOT authority — each
+> #    complete call identity, decoded callee, and emitter record is. Reclose all
+> #    incoming edges to v26.
+> #
+> # ONE OUTCOME: COMPOSED_TAIL_RESIDUAL_CHAIN_COMPLETE_AND_DRIVER_DROPPED (A's target
+> # returns an intermediate result; its Tail/Ret route requires the consumer leading
+> # to B; origin 705 closes that consumer family; B's target independently publishes
+> # exact 4442; current A leaf bypasses composition) / EXISTING_FINAL_RESULT_
+> # REALIZATION_NOT_PROJECTED (both target chains publish only exact 4442
+> # Result or Trap; all seven leaves realized, only affine projection missing) /
+> # TARGET_EMITTED_RESULT_NOT_CLOSED (either target has Empty/Double/wrong-frame/
+> # wrong-identity/unproved Result or assumption cycle; name target 1 or 3) /
+> # ORIGIN705_NOT_CLOSED / INVALID.
+> #
+> # FENCES (absolute): no production repair, validator suppression, Direct-for-Tail,
+> # rejected HS14 plan, new route/transform/function class/ABI/schema/frame/carrier/
+> # side table/allocation/owner/discriminant, or weakened HS6-HS14. Preserve the
+> # named 256 MiB Builder stack. Run ONCE, stream/hash artifacts, restore
+> # byte-identical, stop after one outcome.
+> #
+> # SCOPE (Steward): FENCED compiler/test-support OBSERVATION — Architect-stated
+> # needs NO operator escalation. Amended in place with no operator sign-off (same
+> # shape as the first two HS15 observation folds). Steward owns the read-first fold;
+> # runtime-leader owns kickoff; production HELD. A PRODUCTION ruling follows ONLY
+> # from one valid outcome. NONE of the five outcomes is a capability/route/transform
+> # requirement; should any LATER production ruling leave the fence (TCB/ABI/route/
+> # transform/capability/scope), the Steward escalates to the operator (back 12:00
+> # UTC) rather than authorizing it.
+
+# D5b NATIVE HARD-STOP 15 — CORRECTED OBSERVATION-ONLY RULING (SUPERSEDED as the operative observer INSTRUCTION by the THIRD OBSERVATION-ONLY RULING above; the second observation on this corrected instruction closed INVALID, runtime-implementer evt_6rh07cfnbfz7a; its classification, grounding, and fences STAND). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HS15 — ARCHITECT CORRECTED-OBSERVATION RULING
 > # evt_4ntsq3baawqds (thr_7wy5wy45p7abm), superseding the observer INSTRUCTION of
