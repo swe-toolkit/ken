@@ -6,11 +6,34 @@ owner: language
 size: S
 gate: none
 tier: T1
-depends_on: []
+depends_on: [LANG-ACTIVE-PREMISE-KERNEL-VIEW]
 blocks: []
 github: null
 origin: "Carved by the Steward 2026-09-11 from the discharged confirm-or-refute of [[LANG-RESULT-TRANSPORT-SIGMA-SWEEP]] (closed). Architect design ruling evt_79xy16y7fv5sx (re-grounded at b148a96b): the sweep's confirm-or-refute is DISCHARGED — the compound case is REACHABLE and the framed walker-application fix is REFUTED with grounds — and the correct fix (route (a)) is a real bounded refactor of transport's premise construction that EXCEEDS the confirm-or-refute the sweep was sized for, so it is a separate node (Architect ground iii). Architect RECOMMENDED deferral (completeness-only, kernel-backstopped false-reject = safe; trigger narrow/exotic); the Steward placed it here DEFERRED. NOT released — awaiting an operator L2 priority direction (L2's releasable queue is otherwise near-exhausted; item 8 LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES is blocked on a deferred Architect design call). Re-measure the elab.rs anchors at release — they drift."
 ---
+
+# ROUTE-B RECUT 2026-09-12 (operator ruling, this session). READ FIRST.
+
+> # Route (a) alone does NOT close the defect. A three-stop Architect respin
+> # chain proved the sound closure is the STRUCTURAL ActivePremiseKernelView
+> # contextual kernel-query boundary (a live premise binder present in an
+> # elaborated term/type but absent from the immediate kernel judgment's
+> # Context). Research evt_4pzqt85p2zkyf: structural closure is the only sound
+> # fix. That boundary is a T1 capability, not the S reuse this node was framed
+> # for. The operator ruled ROUTE B (2026-09-12, this session; Steward
+> # decision-request evt_8bxk6htpmt9k, recommendation B): SPLIT the boundary into
+> # its own precursor node.
+> #
+> # => THIS NODE IS NOW A THIN DEPENDENT S CONSUMER. The boundary and the
+> # in-flight WIP (6ee74ac1c) move to [[LANG-ACTIVE-PREMISE-KERNEL-VIEW]]
+> # (depends_on set). Route (a) — synthesize transport's premise as the
+> # result-family-index Sigma and feed the existing walker — stays SIZE S and is
+> # a small reuse consumer that lands AFTER the precursor. Do NOT release or kick
+> # this node until the precursor lands; the frame below (route (a) itself) is
+> # unchanged and still correct as the consumer's spec.
+> #
+> # The 2026-09-11 RELEASED banner below is SUPERSEDED as the operative status by
+> # this recut; its route-(a) description remains the accurate consumer spec.
 
 > # RELEASED 2026-09-11 (operator L2 priority call, item 9) to the language ring.
 > # The deferral is lifted: L2's releasable queue was near-exhausted and the
