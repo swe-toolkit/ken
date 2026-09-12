@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-LITERAL-PATTERN
 title: "literal patterns -- slice 6 (final) of 34 §3's six absent pattern forms: a VALUE-LEVEL branch-selection form (34 §3.2:385-420), the comparator returning Bool with NO Equal proof and NO equality hypothesis. RECUT under Architect HS1 (evt_1wc0m1xbtk4r) to a CONTAINED CORE: direct Int/Float/Float32/Char rows + a literal-shaped String structural plan (string_to_list_char + eqChar) + fixed-width and Bytes via the now-LANDED lossless view composition (option 1, SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION merged ceea742831f2), everything else FAIL-CLOSED. Zero new TCB: no hidden primitive, no new PrimReduction::Op, no new trusted-base entry. A sealed LiteralComparatorPlan (derived from the expected carrier after elab_num_lit_checked) selects the comparison; unknown carrier/literal pairs have no catch-all success arm and reject. Decimal is deferred (no unrestricted Decimal literal pattern is total under the present comparator)"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
