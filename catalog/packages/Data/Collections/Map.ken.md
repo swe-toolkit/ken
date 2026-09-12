@@ -89,7 +89,7 @@ import Data.Numeric.Nat.Arithmetic (add)
 
 import Data.Sums.Combinators (is_some)
 
-data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
+pub data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
 
 const empty (k : Type) (v : Type) : Tree k v = Leaf k v
 
@@ -221,10 +221,12 @@ expected membership and algebraic laws (commutativity, associativity,
 idempotence, identity for union/intersection), `keys`/`values` projections,
 and a small binary-relations library (`succ`/`compose`/`converse`/
 `reachable_plus`/`is_equivalence`, …) built on `Tree k (Tree k Unit)` as an
-adjacency-map representation. Every Layer-2 operation is proved against the same
-`Ordered`/`lookup` contract the capstone establishes, so a caller reasoning
-about a `union` or a `delete` gets to reuse the capstone's vocabulary
-directly rather than re-deriving it.
+adjacency-map representation. These operations use the same `Ordered`/`lookup`
+vocabulary as the capstone. The keyed-collection subsections provide the stated
+preservation and lookup proofs. The relation operations are transparent
+checked definitions with concrete computation tests; general compose/converse
+membership results and closure faithfulness and saturation proofs remain
+separate obligations.
 
 ## 4. Laws & proofs
 
@@ -15129,19 +15131,23 @@ uses `size (dom r)` as its bound and wraps the decision in the `IsTrue`
 equation, so endpoint equality alone never creates the zero-step case of
 reflexive-transitive closure.
 
-The computation is total on raw trees. Its correspondence with mathematical
-positive closure assumes the outer tree and every stored successor tree use the
-same lawful order; the faithfulness and saturation proofs remain separate from
-this computational definition.
+The computation is total on raw trees and performs no runtime well-formedness
+check. Its correspondence with mathematical positive closure requires one
+shared lawful comparator, an `Ordered` outer tree, and `Ordered` evidence for
+every stored successor tree. Comparator lawfulness alone is insufficient: in an
+unordered successor tree, `fold` can visit a misplaced key that `set_member`
+lookup rejects, creating a path that is absent from the lookup-defined relation.
+The faithfulness and saturation proofs under the full representation premises
+remain separate from this computational definition.
 
 ```ken
-fn size (k : Type) (v : Type) (m : Tree k v) : Nat =
+pub fn size (k : Type) (v : Type) (m : Tree k v) : Nat =
   match m {
     Leaf ↦ Zero;
     Node l key val r ↦ Suc (add (size k v l) (size k v r))
   }
 
-fn dom (k : Type) (v : Type) (m : Tree k v) : Tree k Unit =
+pub fn dom (k : Type) (v : Type) (m : Tree k v) : Tree k Unit =
   match m {
     Leaf ↦ Leaf k Unit;
     Node l key val r ↦ Node k Unit (dom k v l) key MkUnit (dom k v r)
@@ -15158,7 +15164,7 @@ fn rel_member
     : Prop =
   Equal Bool (set_member k leq y (succ k leq x r)) True
 
-fn reachable_within
+pub fn reachable_within
       (k : Type) (leq : k → k → Bool) (fuel : Nat) (x : k) (y : k) (r : Tree k (Tree k Unit))
     : Bool =
   match fuel {
@@ -15175,7 +15181,7 @@ fn reachable_within
           (succ k leq x r))
   }
 
-fn reachable_plus
+pub fn reachable_plus
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
     : Prop =
   Equal Bool (reachable_within k leq (size k Unit (dom k (Tree k Unit) r)) x y r) True
@@ -15287,15 +15293,12 @@ than adding a generic bounded-iteration interface.
 
 ## 7. Trust & derivation
 
-**Public API (stable names):** `Tree`, `empty`, `to_list`, `fold`,
-`insert`, `lookup`, `member`, `from_list`, `Set` projections
-(`set_insert`/`set_member`/`set_to_list`), `Ordered`, the five capstone
-laws (`preserves_ordered`, `lookup_found_after_insert`, `lookup_locality`,
-`to_list_ordered`, `lookup_assoc_agree`), `delete`, `insert_with`,
-`union`/`intersection`/`difference` and their `Set`-level wrappers,
-`keys`/`values`, and the binary-relations combinators
-(`size`/`dom`/`succ`/`compose`/`converse`/`reachable_within`/
-`reachable_plus`/`is_equivalence`).
+**Public API (selectively importable stable names):** the abstract carrier
+`Tree`, plus `size`, `dom`, `reachable_within`, and `reachable_plus`. `Tree`
+retains its existing kind and checked constructors, but `Leaf` and `Node` remain
+private, as do every other operation and proof in this package. This narrow
+surface supports clients parameterized over supplied trees; it does not expose
+public tree construction or certify `Ordered`/comparator premises.
 
 **Source map:**
 
@@ -15325,8 +15328,10 @@ recursive assembly (every law's own top-level `fn`, §4.1–§4.6, §4.7.5–§4
 → `member`-extensionality against a lookup-table characterization (the
 `Set`-level algebraic laws, §4.7.11).
 
-**Consumers.** Programs that need ordered maps, sets, or finite relations
-can use the capstone laws and keyed operations directly.
+**Consumers.** The selectively importable closure surface serves programs
+parameterized over abstract `Tree` values. The broader checked theory remains
+module-private; this surface neither constructs trees nor supplies the
+representation premises needed by the deferred correspondence proofs.
 
 **Validation evidence.** `ken check` elaborates this entry's tangled source
 fences; the catalog checks its capstone laws and keyed operations.

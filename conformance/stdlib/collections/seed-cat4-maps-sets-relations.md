@@ -6,14 +6,15 @@ the landed Map capstone** (`catalog/packages/Data/Collections/Map.ken.md`,
 `spec/50-stdlib/54-map-verified-laws.md` — laws 1/2/3/5 + `to_list`-ordered
 proved) with `delete`, the keyed-merge ops
 (`union`/`intersection`/`difference`), `keys`/`values` coherence, the
-Set-algebra laws (Set = Map-Unit), and the `Relation` frontier (properties
-landed; closure computation next and general laws later). **Outer-ring,
+Set-algebra laws (Set = Map-Unit), and the `Relation` frontier (properties and
+closure computation landed; general laws later). **Outer-ring,
 kernel-untouched, zero `Axiom`, zero `trusted_base()` delta** — every landed law
 is a real proof over the landed carriers, `subsume`/`reuse`-don't-re-derive.
 
-**Grounded against `origin/main@1bd3a5667`** (`Map.ken.md`, `54`/`52`,
-`16 §1.1`–`§1.4`/`§6`, `LawfulClasses.ken.md`, and `prelude.rs`; historical
-fork rulings are provenance, not substitutes for the current producers):
+**Grounded against the current `58 §7` contract and the exact Map/test blobs
+recorded below** (`Map.ken.md`, `54`/`52`, `16 §1.1`–`§1.4`/`§6`,
+`LawfulClasses.ken.md`, and `prelude.rs`; historical fork rulings are
+provenance, not substitutes for the current producers):
 
 - **Reuse corpus (`catalog/packages/Data/Collections/Map.ken.md`):**
   `Tree k v = Leaf | Node`; `insert`/`lookup`/`member`/`to_list`/`fold`/
@@ -32,19 +33,18 @@ fork rulings are provenance, not substitutes for the current producers):
   is the one Map law still deferred (proof-relevant, C5).
 - **The D0–D4 producer has a split evidence boundary.** The current Map package
   contains `leq_nat`, `delete`, `union`, `intersection`, `difference`, `keys`,
-  `values`, `compose`, `converse`, and the relation-predicate definitions. It
+  `values`, `compose`, `converse`, the relation predicates, and the public
+  closure computation `size`/`dom`/`reachable_within`/`reachable_plus`. It
   contains the D0 order results, D1–D2 general proof corpus, and D3
-  projection/ascending proofs. The D4 region contains transparent operation and
-  predicate definitions, but no general
-  compose/converse membership-law proof or concrete property-predicate proof
-  witness. Those are retained below as conformance obligations, not inferred
-  from declaration presence.
-- **The named closure computation remains deferred:** `size`, `dom`,
-  `reachable_within`, and `reachable_plus` are not part of the landed D0–D4
-  producer. The structured closure rows below are explicitly blocked on
-  `CAT-REL-TRANSITIVE-CLOSURE`; the faithfulness/saturation proof is a separate
-  later follow-on. Neither deferral is evidence against those specifically
-  inventoried landed definitions and proofs.
+  projection/ascending proofs. The D4 operation, predicate, and closure
+  definitions are transparent, but there is still no general compose/converse
+  membership proof, concrete property-predicate proof witness, or general
+  closure faithfulness/saturation proof. Those remain conformance obligations,
+  not consequences inferred from declaration presence.
+- **The named closure computation is landed and executing.** The eight
+  structured closure rows below map to concrete observations over their stated
+  operands. The general faithfulness/saturation proof remains a separate later
+  follow-on; that proof deferral is not evidence against the landed computation.
 
 **Architect fork rulings (source of truth, `evt_55htg0ss8y1v6` +
 `evt_3z7c592g37rtr`):**
@@ -67,15 +67,15 @@ fork rulings are provenance, not substitutes for the current producers):
   are distinct outer keys, while its terminal may be a target-only sink. **No
   raw multi-constructor `data … : Ω`** (proof-relevant and inadmissible,
   `16 §1.4`+§1.1). The decidable form reduces to a concrete `Bool` that the
-  deferred cases below can make flip; a truncated closure cannot provide that
+  executing cases below make flip; a truncated closure cannot provide that
   execution boundary.
 - **Fork C-rep — `Map K (Set K)` (adjacency), NOT `Set (Pair K K)`.** Rides
   `Ord K` only (`Set (Pair K K)` would force a total lexicographic
   pair-comparator + 4 pair-order-laws; the landed `pair_leq` compares first
   components only, non-total on pairs). Just `Tree K (Tree K Unit)` — a
   landed-`Tree` instantiation at `v := Set K`, zero new machinery. **C-scope:**
-  compose/converse/`succ`/membership plus the property predicates are landed.
-  The exact four-function closure computation is the next fast-follow; its
+  compose/converse/`succ`/membership, the property predicates, and the exact
+  four-function closure computation are landed. General membership and closure
   faithfulness/saturation laws follow separately.
 - **Fork D — `delete` = REBUILD-via-`from_list`.**
   `delete key m := from_list leq (drop_key key (to_list m))`, `drop_key` =
@@ -100,25 +100,27 @@ fork rulings are provenance, not substitutes for the current producers):
   discriminator (a→b→c ⊬ a→c). The carrier-vacuity guard binds (the CAT-3
   `List Bool` lesson, one carrier up).
 
-**Status — landed definitions and proofs are distinct from executing
-conformance.** On exact candidate `af4e5eb726eae1a73d56e8390dd7985ee5133f99`,
-with test blob `581dd65c494cbecb147fa563284c80f948bfab65` and Map blob
-`60949c3d4b6cc98046789249a4fb51cc385d8165`, the targeted command
+**Status — landed definitions, concrete execution, and general proofs are
+distinct.** On exact test blob
+`eabd6527b89e50c9c201adfeecc646928c8ae7da` and Map blob
+`8e37b69ba2cfe124e8f9410e54e791e56a86730b`, the targeted command
 `scripts/ken-cargo test -p ken-elaborator --test map_build_acceptance` returned
-`29 passed; 0 failed; 0 ignored`. This prose-only respin keeps both blobs
-unchanged.
+`36 passed; 0 failed; 0 ignored`.
 
-The suite contains five `cat4_*` rows. One checks the named D0–D4 globals for
-transparent declarations and zero trusted-base delta. Four execute values:
+The suite retains five earlier `cat4_*` rows. One checks the named D0–D4 globals
+for transparent declarations and zero trusted-base delta. Four execute values:
 delete removes the requested key; union observes the left-biased collision
 orientation while intersection and difference observe one result each;
 `keys`/`values` produce aligned lists; and relation smoke observes the present
 composed edge `1 → 3` and present converse edge `2 → 1`. That relation smoke
 does **not** execute either absent-edge control below and does not prove a
 general membership law or inhabit a property predicate. The corresponding D4
-rows therefore remain explicit unexecuted obligations. The closure rows retain
-the separate computation-then-laws boundary and do not claim that their four
-functions already execute.
+law rows therefore remain explicit unexecuted obligations.
+
+Seven `cat_rel_*` rows separately check the exact public interface, raw
+`size`/`dom` recurrences and operands, exact fuel/public-predicate equations,
+and all eight concrete closure cases below. Those computations do not prove
+general closure faithfulness or saturation.
 
 ---
 
@@ -130,10 +132,13 @@ name.
 ## Scope — canonical shapes
 
 This is a signature synopsis, not a compilable package: bodies are omitted.
-Declaration keywords and public identifiers match the current producer; the
-four closure signatures are the deferred contract.
+Declaration keywords and public identifiers match the current producer. `Tree`
+is public as an abstract type name; its constructors remain private.
 
 ```
+-- Abstract carrier type name; Leaf and Node remain private constructors:
+pub data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
+
 -- D0 carrier prerequisite (Axiom-free, Nat inductive):
 fn leq_nat (m : Nat) (n : Nat) : Bool
 proof refl for leq_nat (x : Nat) : Equal Bool (leq_nat x x) True
@@ -185,13 +190,13 @@ fn is_transitive (k : Type) (leq : k -> k -> Bool)
                  (r : Tree k (Tree k Unit)) : Prop
 -- rel_member is already IsTrue(...), so premises are not re-wrapped.
 
--- Closure computation, BLOCKED-ON-CAT-REL-TRANSITIVE-CLOSURE:
-fn size (k : Type) (v : Type) (t : Tree k v) : Nat
-fn dom (k : Type) (v : Type) (t : Tree k v) : Tree k Unit
-fn reachable_within (k : Type) (leq : k -> k -> Bool) (fuel : Nat)
-                    (x : k) (y : k) (r : Tree k (Tree k Unit)) : Bool
-fn reachable_plus (k : Type) (leq : k -> k -> Bool)
-                  (x : k) (y : k) (r : Tree k (Tree k Unit)) : Prop
+-- Landed public closure computation:
+pub fn size (k : Type) (v : Type) (t : Tree k v) : Nat
+pub fn dom (k : Type) (v : Type) (t : Tree k v) : Tree k Unit
+pub fn reachable_within (k : Type) (leq : k -> k -> Bool) (fuel : Nat)
+                        (x : k) (y : k) (r : Tree k (Tree k Unit)) : Bool
+pub fn reachable_plus (k : Type) (leq : k -> k -> Bool)
+                      (x : k) (y : k) (r : Tree k (Tree k Unit)) : Prop
 -- reachable_within Zero x y r = False
 -- reachable_within (Suc n) x y r = direct edge OR
 --   fold cat4_bool_or False (reachable_within n z y r for z in succ x r)
@@ -486,7 +491,7 @@ fn reachable_plus (k : Type) (leq : k -> k -> Bool)
 
 ---
 
-## D4 — `Relation` (landed half + the deferred-closure boundary)
+## D4 — `Relation` (landed computation + general-law boundary)
 
 ### stdlib/collections/non-transitive-relation-fails-istransitive (soundness)
 - spec: `58 §7` D4 / Fork C-scope (landed `is_transitive` Π-into-`Ω`),
@@ -574,35 +579,34 @@ fn reachable_plus (k : Type) (leq : k -> k -> Bool)
   proof-relevant at `Ω`, which is inadmissible (`16 §1.4`+§1.1). The Bool form
   has the executable boundary exercised by the cases below.
 - why: pins AC5's representation and trust boundary independently of any one
-  graph. (soundness; structural; four-function computation deferred.)
+  graph. (soundness; structural; four-function computation executing.)
 
-**Common premises for every deferred behavioral case below.** Each relation uses
+**Common premises for every closure behavioral case below.** Each relation uses
 `Nat` with the landed `leq_nat` and its Axiom-free lawful-order results. Outer
 maps and every stored successor set are built with the landed constructors and
 operations so they are `Ordered` under that same comparator. These cases lie
 inside `58 §7`'s path-correspondence premises; none uses a malformed raw tree.
-Each is **BLOCKED-ON-CAT-REL-TRANSITIVE-CLOSURE** until all four named functions
-land. A blocked case is not reported green merely because the current 29-test
-suite run is green.
 The displayed `0`/`1`/`2`/`3` are compact labels for `Zero` and successive
-`Suc` values; executable fixtures use those actual `Nat` constructors.
+`Suc` values; the executing fixtures use those actual `Nat` constructors.
 **Promise class:** every row is a durable invariant; numeric literals are fixed
-fixture expectations, never a census of current repository state. When the gate
-activates, each case must execute the named public function and its `why` clause
-names the incorrect neighboring behavior that must flip.
+fixture expectations, never a census of current repository state. Each case
+executes the named public function, and its `why` clause names the incorrect
+neighboring behavior that must flip.
 
-### stdlib/collections/closure-size-counts-fixed-three-node-tree (deferred)
+### stdlib/collections/closure-size-counts-fixed-three-node-tree
 - spec: `58 §7` (`size`).
 - given: an explicitly constructed well-formed `Tree Nat Unit` with exactly
   three `Node` constructors: one root, one left child, and one right child.
 - expect: `size Nat Unit t` reduces to the fixed independent value
   `Suc (Suc (Suc Zero))`. The expected value is not computed through `size`,
   `to_list`, or another traversal of the subject tree.
+- evidence: `cat_rel_size_and_dom_count_only_outer_relation_keys` evaluates the
+  exact fixed root/left/right tree and compares `size` with literal three.
 - why: pins raw node count and both subtree contributions; empty-only or
   self-derived expectations would not discriminate an omitted branch.
-  (value-flip; blocked on closure computation.)
+  (executing value-flip.)
 
-### stdlib/collections/closure-dom-keeps-only-outer-keys (deferred)
+### stdlib/collections/closure-dom-keeps-only-outer-keys
 - spec: `58 §7` (`dom`).
 - given: a well-formed `r_dom` with outer keys `{0, 2}`, edge `0 → 1`, and
   edge `2 → 3`, where `1` and `3` occur only in successor sets.
@@ -610,30 +614,37 @@ names the incorrect neighboring behavior that must flip.
   shape and keys `{0, 2}`, with each value replaced by `MkUnit`; membership is
   false for target-only
   keys `1` and `3`. No comparator is consumed by `dom`.
+- evidence: `cat_rel_size_and_dom_count_only_outer_relation_keys` constructs
+  exact outer keys `{0, 2}`, observes size two, accepts both sources, and rejects
+  both target-only keys `{1, 3}`.
 - why: catches a domain implementation that unions in successor targets rather
-  than projecting the outer key set. (value/shape flip; blocked on closure
-  computation.)
+  than projecting the outer key set. (executing value/shape flip.)
 
-### stdlib/collections/closure-zero-one-direct-edge-boundary (deferred)
+### stdlib/collections/closure-zero-one-direct-edge-boundary
 - spec: `58 §7` (fuel recurrence).
 - given: the one-edge relation `r_edge = {0 → 1}`.
 - expect: `reachable_within Nat leq_nat Zero 0 1 r_edge = False` and
   `reachable_within Nat leq_nat (Suc Zero) 0 1 r_edge = True` on the same
   relation.
+- evidence: `cat_rel_reachability_obeys_positive_fuel_and_domain_bound`
+  evaluates both fuel values on the exact `0 → 1` relation.
 - why: the paired boundary rejects direct-at-zero and catches an off-by-one fuel
-  convention. (Bool flip; blocked on closure computation.)
+  convention. (executing Bool flip.)
 
-### stdlib/collections/closure-positive-self-not-reflexive (deferred)
+### stdlib/collections/closure-positive-self-not-reflexive
 - spec: `58 §7` (positive `R⁺`, not reflexive `R*`).
 - given: `r_acyclic = {0 → 1}` and, on the same endpoint `0`,
   `r_loop = {0 → 0}`.
 - expect: `reachable_plus Nat leq_nat 0 0 r_acyclic` is uninhabited, while
   `reachable_plus Nat leq_nat 0 0 r_loop` is inhabited; the self-loop already
   makes `reachable_within Nat leq_nat (Suc Zero) 0 0 r_loop` true.
+- evidence: `cat_rel_reachability_obeys_positive_fuel_and_domain_bound`
+  rejects `reachable_plus 0 0` on exact `0 → 1` and inhabits it on exact
+  `0 → 0`.
 - why: a reflexive zero-step base makes both arms succeed and therefore fails
-  this shared-endpoint pair. (proof/Bool flip; blocked on closure computation.)
+  this shared-endpoint pair. (executing proof/Bool flip.)
 
-### stdlib/collections/closure-positive-two-edge-cycle (deferred)
+### stdlib/collections/closure-positive-two-edge-cycle
 - spec: `58 §7` (positive-cycle treatment).
 - given: the well-formed two-cycle `r_cycle = {0 → 1, 1 → 0}` with no
   self-loop.
@@ -641,11 +652,13 @@ names the incorrect neighboring behavior that must flip.
   `reachable_within Nat leq_nat (Suc (Suc Zero)) 0 0 r_cycle` is true, and
   `reachable_plus Nat leq_nat 0 0 r_cycle` is inhabited because the outer-domain size
   is two.
+- evidence: `cat_rel_seed_positive_two_edge_cycle_executes` executes exact
+  `0 → 1, 1 → 0`, observes fuel one false and fuel two true, and inhabits the
+  domain-bounded public predicate.
 - why: distinguishes positive cyclic self-reachability from both direct
-  self-loops and zero-step reflexivity. (Bool/proof flip; blocked on closure
-  computation.)
+  self-loops and zero-step reflexivity. (executing Bool/proof flip.)
 
-### stdlib/collections/closure-one-two-fuel-two-edge-path (deferred)
+### stdlib/collections/closure-one-two-fuel-two-edge-path
 - spec: `58 §7` (successor fold and public bound).
 - given: `r_path` has outer edges `{0 → {1, 3}, 1 → {2}}`, with no direct
   edge `0 → 2`. The ordered successor tree for `0` has root `3` and left child
@@ -655,19 +668,24 @@ names the incorrect neighboring behavior that must flip.
   `reachable_within Nat leq_nat (Suc (Suc Zero)) 0 2 r_path = True` and
   `reachable_plus Nat leq_nat 0 2 r_path` is inhabited at outer-domain size
   two.
+- evidence: `cat_rel_seed_non_root_successor_path_executes` builds exact
+  `0 → {1, 3}, 1 → {2}`, observes successor-tree root `3`, rejects the direct
+  edge and fuel one, accepts fuel two, and inhabits `reachable_plus 0 2`.
 - why: independently requires the successor fold rather than mistaking direct
-  membership for closure. (Bool/proof flip; blocked on closure computation.)
+  membership for closure. (executing Bool/proof flip.)
 
-### stdlib/collections/closure-reverse-direction-unreachable (deferred)
+### stdlib/collections/closure-reverse-direction-unreachable
 - spec: `58 §7` (directed positive reachability).
 - given: the same `r_path` as the preceding case.
 - expect: `reachable_within Nat leq_nat (Suc (Suc Zero)) 2 0 r_path = False`
   and `reachable_plus Nat leq_nat 2 0 r_path` is uninhabited.
+- evidence: `cat_rel_seed_non_root_successor_path_executes` uses the same
+  non-root path, evaluates fuel-two `2 → 0` as false, and rejects its
+  `reachable_plus` proof with the exact kernel mismatch class.
 - why: catches direction reversal or accidental undirected traversal; the
-  forward case above is the positive control. (Bool/proof flip; blocked on
-  closure computation.)
+  forward case above is the positive control. (executing Bool/proof flip.)
 
-### stdlib/collections/closure-target-only-sink-uses-N-not-N-minus-one (deferred)
+### stdlib/collections/closure-target-only-sink-uses-N-not-N-minus-one
 - spec: `58 §7` (outer-domain bound).
 - given: `r_sink = {0 → 1}`, whose only outer key is `0`; `1` is a target-only
   sink.
@@ -675,25 +693,28 @@ names the incorrect neighboring behavior that must flip.
   `size Nat Unit (dom Nat (Tree Nat Unit) r_sink) = Suc Zero`, and
   `reachable_plus Nat leq_nat 0 1 r_sink` is inhabited because fuel one recognizes
   the direct edge.
+- evidence: `cat_rel_size_and_dom_count_only_outer_relation_keys` observes the
+  outer-only domain, while
+  `cat_rel_reachability_obeys_positive_fuel_and_domain_bound` inhabits exact
+  `reachable_plus 0 1` on the one-key relation.
 - why: an `N−1` bound supplies zero fuel and rejects this valid positive path.
   This is the independent off-by-one discriminator for the public wrapper, not
-  merely another direct-call recurrence test. (proof flip; blocked on closure
-  computation.)
+  merely another direct-call recurrence test. (executing proof flip.)
 
-### stdlib/collections/closure-computation-then-laws-deferred
-- spec: `58 §7` (explicit fast-follow split).
-- given: the four computational functions and the later general-relation-law
-  tranche.
-- expect: **two ordered deferrals.** `CAT-REL-TRANSITIVE-CLOSURE` first lands
-  `size`, `dom`, `reachable_within`, and `reachable_plus`, activating the eight
-  behavioral cases above. A separate follow-on supplies the compose/converse
-  membership proofs, executes the concrete predicate discriminators, and proves
-  closure correspondence by simple-path shortening and `N`-fuel saturation
-  under the lawful-order/`Ordered` representation premises. This seed does not
-  claim that any of those general results is already proved.
+### stdlib/collections/closure-computation-landed-laws-deferred
+- spec: `58 §7` (explicit computation/proof split).
+- given: the four landed computational functions and the later
+  general-relation-law tranche.
+- expect: `size`, `dom`, `reachable_within`, and `reachable_plus` are public,
+  transparent, and execute all eight behavioral cases above. A separate
+  follow-on supplies the compose/converse membership proofs, executes the
+  concrete predicate discriminators, and proves closure correspondence by
+  simple-path shortening and `N`-fuel saturation under the
+  lawful-order/`Ordered` representation premises. This seed does not claim that
+  any of those general results is already proved.
 - why: names both boundaries so computation cannot be mistaken for a proof, and
-  proof deferral cannot be mistaken for absent computation requirements.
-  (boundary; computation and laws deferred separately.)
+  proof deferral cannot be mistaken for absent computation.
+  (boundary; computation landed, general laws deferred.)
 
 ---
 
@@ -744,7 +765,7 @@ names the incorrect neighboring behavior that must flip.
   `set-union-comm-extensional-not-tree-equal`.
 - **D3 (`keys`/`values`):** `keys-coherence-mem-iff-issome-lookup`,
   `keys-ascending-off-tolistordered`, `values-no-ordering-coherence-claim`.
-- **D4 (landed definitions + relation-law and closure residuals):**
+- **D4 (landed definitions and closure execution + relation-law residuals):**
   `non-transitive-relation-fails-istransitive`,
   `relation-properties-are-pi-into-omega`, `converse-and-compose-membership`,
   `transitive-closure-decidable-not-raw-omega` (AC5 representation pin),
@@ -756,7 +777,7 @@ names the incorrect neighboring behavior that must flip.
   `closure-one-two-fuel-two-edge-path`,
   `closure-reverse-direction-unreachable`,
   `closure-target-only-sink-uses-N-not-N-minus-one`, and
-  `closure-computation-then-laws-deferred`.
+  `closure-computation-landed-laws-deferred`.
 - **Carrier (standing vacuity guard):** `proved-carrier-is-lawful-nat-not-int`.
 
 ## Cross-case consistency sweep
@@ -788,7 +809,7 @@ names the incorrect neighboring behavior that must flip.
   `transitive-closure-decidable-not-raw-omega` pins the `IsTrue` boundary. The
   eight behavioral rows independently cover raw node count, outer-only domain,
   fuel, positive self-reachability, directed traversal, and the public `N`
-  bound. All eight activate with the four-function computation. The general
+  bound. All eight execute against the four-function computation. The general
   faithfulness/saturation proof remains a later, separately named follow-on.
 - **Well-formedness is uniform:** every closure path case uses one lawful
   `leq_nat` order and `Ordered` outer and inner trees. No case generalizes its
@@ -797,8 +818,8 @@ names the incorrect neighboring behavior that must flip.
 
 ## Reconcile state
 
-This seed is reconciled to the current `58 §7` contract and the producer
-snapshot at `origin/main@1bd3a5667`. In particular:
+This seed is reconciled to the current `58 §7` contract and exact Map/test
+blobs recorded in the status section. In particular:
 
 - operative calls and proof identities use the producer's snake-case public
   names; `unionWith` is retained only as an explicitly named Haskell analogue,
@@ -811,11 +832,12 @@ snapshot at `origin/main@1bd3a5667`. In particular:
   are landed; D4 operation/predicate definitions, the two positive smoke
   observations, unexecuted conformance arms, and general
   proof residuals are stated separately;
-- the 29-test result is anchored to the exact test and Map blobs that were run,
-  and no individual D4 obligation is credited from aggregate greenness; and
-- the four closure functions and later general relation proofs remain distinct
-  deferrals, while the closure representation, recurrence, behavioral cases, coverage
-  map, and well-formedness assumptions tell one story.
+- the targeted result is anchored to the exact test and Map blobs that were run,
+  and no individual D4 law obligation is credited from aggregate greenness; and
+- the landed four-function computation and later general relation proofs remain
+  distinct stages, while the closure representation, recurrence, executing
+  behavioral cases, coverage map, and well-formedness assumptions tell one
+  story.
 
 Any independent vote binds both this seed's citations and its case coverage to
 the exact candidate, not merely to the historical CAT-4 fork record.
