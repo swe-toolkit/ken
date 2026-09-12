@@ -1,7 +1,7 @@
 ---
 id: SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION
 title: "spec 34 §3.2 pins each literal-pattern comparison RESULT but is silent on the IMPLEMENTATION FLOOR: whether exact, total, already-landed lossless views (fixed-width `*_to_int`, `string_to_list_char`, `bytes_to_list`) may realize the comparison internally, or whether direct per-carrier comparators are required -- and the current 'does not widen or narrow' sentence reads as forbidding the view composition the emitted checked core would contain, so the contained literal-pattern core cannot be built without the enclave stating which realization is admitted"
-status: active
+status: merged
 owner: spec
 size: S
 gate: none

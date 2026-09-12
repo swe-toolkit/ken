@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-12 13:16:13Z — from 589 issue file(s) in `docs/program/issues/`.
+2026-09-12 14:55:01Z — from 589 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -582,7 +582,7 @@ the committed file matches the generator's output.
 | `SPEC-CLOSURE-BOUNDARY` | Revise the runtime value spec to remove the closure-identity inconsistency and state the closure/value boundary with minimum constraints on the implementation | merged | spec | M | none | — |
 | `SPEC-ERRATUM-39-2-3-CITATION` | Erratum: 34-data-match.md:625 still cites `39 §2.3` for higher-order pattern abstraction, a coordinate the structural-result merge reassigned to Structural-result association | merged | spec-enclave | S | none | — |
 | `SPEC-IDENT-BLESSED` | Settle the identifier character set: 31-lexical promises a bounded blessed-Unicode-letter table that does not exist, cites a security chapter that carries no such claim, and states a confusable gate the landed lexer does not implement | merged | spec-enclave | M | none | https://github.com/swe-toolkit/ken/pull/1147 |
-| `SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION` | spec 34 §3.2 pins each literal-pattern comparison RESULT but is silent on the IMPLEMENTATION FLOOR: whether exact, total, already-landed lossless views (fixed-width `*_to_int`, `string_to_list_char`, `bytes_to_list`) may realize the comparison internally, or whether direct per-carrier comparators are required -- and the current 'does not widen or narrow' sentence reads as forbidding the view composition the emitted checked core would contain, so the contained literal-pattern core cannot be built without the enclave stating which realization is admitted | active | spec | S | none | — |
+| `SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION` | spec 34 §3.2 pins each literal-pattern comparison RESULT but is silent on the IMPLEMENTATION FLOOR: whether exact, total, already-landed lossless views (fixed-width `*_to_int`, `string_to_list_char`, `bytes_to_list`) may realize the comparison internally, or whether direct per-carrier comparators are required -- and the current 'does not widen or narrow' sentence reads as forbidding the view composition the emitted checked core would contain, so the contained literal-pattern core cannot be built without the enclave stating which realization is admitted | merged | spec | S | none | — |
 | `SPEC-MATCH-PATTERN-PINS` | the five spelling pins 34 §3's absent pattern forms need before any of them can be cut as a slice -- as-association/precedence, tuple comma-versus-grouping, record field_pat form, the or-pattern binder join, and the literal-kind-to-value-comparator table -- none of which exists today, so a Language slice built now is a slice that gets rebuilt | merged | spec-enclave | M | none | — |
 | `SPEC-MISSION-GROUNDING` | Ground the spec as a whole against the mission — audit every retained constraint for which mission property fails without it, and relax the ones where nothing does | draft | spec | L | none | — |
 | `SPEC-NESTED-IND` | un-defer nested strictly-positive inductives in 14 §8.5 — state structural positivity through declared strictly-positive type-parameter positions, the lifted induction hypotheses, and the iota rules, WITHOUT mutual families | merged | spec-enclave | M | none | — |
@@ -658,7 +658,6 @@ is itself not yet `merged`/`closed`:
 
 - `CAT-REL-TRANSITIVE-CLOSURE` blocked by `SPEC-REL-CLOSURE-RECURRENCE` (status: active)
 - `F4` blocked by `A3` (status: draft)
-- `LANG-MATCH-LITERAL-PATTERN` blocked by `SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION` (status: active)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
