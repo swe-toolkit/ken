@@ -1594,6 +1594,103 @@ fn recursive_leftist_validity_and_isolated_malformed_fixtures() {
         "production histories must reach unequal child ranks"
     );
 
+    let swap_operand = build_queue(
+        &env,
+        &mut store,
+        &api,
+        &values,
+        Order::Up,
+        &[
+            Entry {
+                priority: 1,
+                tag: 0,
+            },
+            Entry {
+                priority: 2,
+                tag: 1,
+            },
+        ],
+    );
+    let swap_operand_root = node_view(&env, &api, &values, &swap_operand)
+        .expect("nonempty swap operand")
+        .identity;
+    let swapped = insert_entry(
+        &env,
+        &mut store,
+        &api,
+        &values,
+        Order::Up,
+        Entry {
+            priority: 0,
+            tag: 2,
+        },
+        swap_operand,
+    );
+    assert_eq!(
+        node_view(&env, &api, &values, &swapped)
+            .and_then(|root| node_view(&env, &api, &values, root.left))
+            .expect("inserted root must have a nonempty left child")
+            .identity,
+        swap_operand_root,
+        "a lower-priority singleton with empty left child must swap the recursive operand left"
+    );
+
+    let no_swap_left_entries = (0..6)
+        .map(|priority| Entry {
+            priority,
+            tag: (priority % 6) as u8,
+        })
+        .collect::<Vec<_>>();
+    let no_swap_left = build_queue(
+        &env,
+        &mut store,
+        &api,
+        &values,
+        Order::Up,
+        &no_swap_left_entries,
+    );
+    let retained_left_identity = node_view(&env, &api, &values, &no_swap_left)
+        .and_then(|root| node_view(&env, &api, &values, root.left))
+        .expect("large left operand root must have a left child")
+        .identity;
+    let no_swap_right = build_queue(
+        &env,
+        &mut store,
+        &api,
+        &values,
+        Order::Up,
+        &[Entry {
+            priority: 0,
+            tag: 3,
+        }],
+    );
+    let no_swap_merged = merge_queues(
+        &env,
+        &mut store,
+        &api,
+        &values,
+        Order::Up,
+        no_swap_left,
+        no_swap_right,
+    );
+    let no_swap_root =
+        node_view(&env, &api, &values, &no_swap_merged).expect("nonempty no-swap merge");
+    let no_swap_left_shape = inspect_shape(&env, &api, &values, Order::Up, no_swap_root.left);
+    let no_swap_right_shape = inspect_shape(&env, &api, &values, Order::Up, no_swap_root.right);
+    assert!(no_swap_left_shape.rank > no_swap_right_shape.rank);
+    assert_eq!(
+        node_view(&env, &api, &values, no_swap_root.left)
+            .expect("retained left child")
+            .identity,
+        retained_left_identity,
+        "an unequal-rank make_node must retain the already-larger child on the left"
+    );
+    assert!(
+        inspect_shape(&env, &api, &values, Order::Up, &no_swap_merged)
+            .faults
+            .is_empty()
+    );
+
     let subtree = build_queue(
         &env,
         &mut store,
