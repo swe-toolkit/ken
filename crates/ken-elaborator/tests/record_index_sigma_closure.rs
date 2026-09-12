@@ -372,3 +372,141 @@ fn if_result_classifier_closes_a_substituted_refined_core() {
     )
     .expect("the contextual inference view must expose the active premise");
 }
+
+fn compound_result_transport(record_declaration: &str) -> Result<(), ElabError> {
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_decl(record_declaration)?;
+    env.elaborate_decl(
+        "data CompBoth : CompIx -> Nat -> Bool -> Type where { \
+           MkCompBoth : (whole : CompIx) -> (index : Nat) -> (tag : Bool) \
+             -> CompBoth whole index tag \
+         }",
+    )?;
+    env.elaborate_file(
+        "fn comp_a (fuel : Nat) (index : Nat) (flag : Bool) \
+           : CompBoth (CompMkIx index flag) index True = \
+         match fuel { \
+           Zero ↦ MkCompBoth (CompMkIx index flag) index True; \
+           Suc smaller ↦ match (CompMkIx index flag) { \
+             CompMkIx local local_flag ↦ comp_b smaller local local_flag \
+           } \
+         }\n\
+         fn comp_b (fuel : Nat) (index : Nat) (flag : Bool) \
+           : CompBoth (CompMkIx index flag) index True = \
+         match fuel { \
+           Zero ↦ MkCompBoth (CompMkIx index flag) index True; \
+           Suc smaller ↦ match (CompMkIx index flag) { \
+             CompMkIx local local_flag ↦ comp_a smaller local local_flag \
+           } \
+         }",
+    )
+    .map(|_| ())
+}
+
+#[test]
+fn hidden_result_transport_refines_whole_record_and_component_indices() {
+    // Promise class: durable invariant.
+    // MEASURED: a mutually recursive call returns a family indexed by the
+    // matched record, its Nat field, and a reflexive Bool tag. CLAIMED: hidden
+    // result transport synthesizes reflexive evidence and consumes each
+    // non-reflexive result-index equality through the shared walker. THE GAP:
+    // the whole-record-only control cannot detect a skipped component, while
+    // removing reflexive synthesis makes this three-position plan atomic-fail.
+    compound_result_transport("data CompIx = CompMkIx Nat Bool")
+        .expect("transport must refine both result-family index positions");
+}
+
+#[test]
+fn nested_result_transport_composes_two_hidden_refinement_frames() {
+    // Promise class: durable invariant.
+    // MEASURED: two nested surface matches refine separate Nat indices of one
+    // recursive-group sibling result, and the complete declarations pass the
+    // elaborator's final kernel check. CLAIMED: cumulative transport preserves
+    // both the value and type committed by each distinct refinement frame. THE
+    // GAP: either frame alone leaves one result index at its constructor-local
+    // field; dropping the first cumulative value commit makes final kernel
+    // checking reject even if cumulative type bookkeeping still reaches goal.
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_decl("data NestedIx = NestedMkIx Nat Bool")
+        .expect("NestedIx");
+    env.elaborate_decl("data NestedFuel = NestedDone | NestedMore NestedFuel")
+        .expect("NestedFuel");
+    env.elaborate_decl(
+        "data NestedGate : NestedIx -> Type where { \
+           NestedMkGate : (whole : NestedIx) -> NestedGate whole \
+         }",
+    )
+    .expect("NestedGate");
+    env.elaborate_decl(
+        "data NestedBoth (gate : Type) : Nat -> Nat -> Type where { \
+           NestedMkBoth : (first : Nat) -> (second : Nat) \
+             -> NestedBoth gate first second \
+         }",
+    )
+    .expect("NestedBoth");
+
+    env.elaborate_file(
+        "fn nested_a (fuel : NestedFuel) \
+           (outer_index : Nat) (outer_flag : Bool) \
+           (inner_index : Nat) (inner_flag : Bool) \
+           : NestedBoth (NestedGate (NestedMkIx Zero True)) \
+               outer_index inner_index = \
+         match fuel { \
+           NestedDone ↦ NestedMkBoth \
+             (NestedGate (NestedMkIx Zero True)) outer_index inner_index; \
+           NestedMore smaller ↦ \
+             match (NestedMkIx outer_index outer_flag) { \
+               NestedMkIx local_outer local_outer_flag ↦ \
+                 match (NestedMkIx inner_index inner_flag) { \
+                   NestedMkIx local_inner local_inner_flag ↦ \
+                     nested_b smaller local_outer local_outer_flag \
+                       local_inner local_inner_flag \
+                 } \
+             } \
+         }\n\
+         fn nested_b (fuel : NestedFuel) \
+           (outer_index : Nat) (outer_flag : Bool) \
+           (inner_index : Nat) (inner_flag : Bool) \
+           : NestedBoth (NestedGate (NestedMkIx Zero True)) \
+               outer_index inner_index = \
+         match fuel { \
+           NestedDone ↦ NestedMkBoth \
+             (NestedGate (NestedMkIx Zero True)) outer_index inner_index; \
+           NestedMore smaller ↦ \
+             match (NestedMkIx outer_index outer_flag) { \
+               NestedMkIx local_outer local_outer_flag ↦ \
+                 match (NestedMkIx inner_index inner_flag) { \
+                   NestedMkIx local_inner local_inner_flag ↦ \
+                     nested_a smaller local_outer local_outer_flag \
+                       local_inner local_inner_flag \
+                 } \
+             } \
+         }",
+    )
+    .expect("two nested hidden result refinements must compose through kernel checking");
+}
+
+#[test]
+fn multi_constructor_component_projection_boundary_remains_fail_closed() {
+    // Promise class: transition sentinel. Retire when a future design ruling
+    // authorizes result-transport projection for multi-constructor records.
+    // MEASURED: the positive fixture's identical recursive result shape is
+    // sourced from a two-constructor record, so its bare Nat result index still
+    // differs after whole-record fallback. CLAIMED: source component equality
+    // projection remains limited to single-constructor, non-indexed records.
+    // THE GAP: the positive fixture proves this rejection is not caused by the
+    // result shape; matching the kernel mismatch pins fail-closed transport.
+    let error = compound_result_transport("data CompIx = CompMkIx Nat Bool | CompOtherIx Nat Bool")
+        .expect_err("multi-constructor component projection must fail closed");
+
+    assert!(
+        matches!(
+            error,
+            ElabError::KernelRejected {
+                error: ken_kernel::KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "unsupported projection must reach the result-index mismatch, got {error:?}"
+    );
+}

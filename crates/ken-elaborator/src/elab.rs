@@ -3653,12 +3653,88 @@ fn recursive_group_call_id(cx: &ElabCtx, expr: &RExpr) -> Option<GlobalId> {
     cx.recursive_group.contains(&id).then_some(id)
 }
 
-/// Transport a recursive-group sibling call from the concrete constructor
-/// index produced by its declared result to the refined index expected inside
-/// the current dependent-match method. The bridge is the method's own hidden
-/// propositional equality premise, represented by a sentinel until method
-/// finalization. No `Refl` is synthesized here: `try_reindex_cast` builds a
-/// genuine equality-of-types proof by `J`, and the kernel re-checks the `Cast`.
+fn apply_term_spine(head: Term, arguments: &[Term]) -> Term {
+    arguments.iter().cloned().fold(head, Term::app)
+}
+
+/// Build equality between two applications of one result family while changing
+/// exactly one index argument. Unlike `build_index_type_cong`, this does not
+/// replace equal-looking occurrences in sibling indices: the J motive rebuilds
+/// the application spine and varies only `argument_position`.
+#[allow(clippy::too_many_arguments)]
+fn build_result_index_type_cong(
+    env: &GlobalEnv,
+    ctx: &Context,
+    index_ty: &Term,
+    old_index: &Term,
+    new_index: &Term,
+    result_head: &Term,
+    result_arguments: &[Term],
+    argument_position: usize,
+    type_level: Level,
+    equality: Term,
+) -> (Term, Term) {
+    let source_type = apply_term_spine(result_head.clone(), result_arguments);
+    let mut target_arguments = result_arguments.to_vec();
+    target_arguments[argument_position] =
+        subst_term_generalize(&target_arguments[argument_position], old_index, new_index);
+    let target_type = apply_term_spine(result_head.clone(), &target_arguments);
+
+    let mut arguments_at_y: Vec<Term> = result_arguments
+        .iter()
+        .map(|argument| weaken(argument, 2))
+        .collect();
+    arguments_at_y[argument_position] = subst_term_generalize(
+        &arguments_at_y[argument_position],
+        &weaken(old_index, 2),
+        &Term::var(1),
+    );
+    let type_at_y = apply_term_spine(weaken(result_head, 2), &arguments_at_y);
+    let equality_domain = Term::Eq(
+        Box::new(weaken(index_ty, 1)),
+        Box::new(weaken(old_index, 1)),
+        Box::new(Term::var(0)),
+    );
+    let motive_body = Term::lam(
+        index_ty.clone(),
+        Term::lam(
+            equality_domain.clone(),
+            Term::Eq(
+                Box::new(Term::Type(type_level.clone())),
+                Box::new(weaken(&source_type, 2)),
+                Box::new(type_at_y),
+            ),
+        ),
+    );
+    let motive_type = Term::pi(
+        index_ty.clone(),
+        Term::pi(equality_domain, Term::omega(type_level.clone().suc())),
+    );
+    let motive = Term::Ascript(Box::new(motive_body), Box::new(motive_type));
+    let base = Term::Refl(Box::new(refl_base_arg(
+        env,
+        ctx,
+        &Term::Type(type_level),
+        &source_type,
+    )));
+    (
+        Term::J(Box::new(motive), Box::new(base), Box::new(equality)),
+        target_type,
+    )
+}
+
+/// Transport a recursive-group sibling call from its concrete result-family
+/// indices to the indices expected inside the current dependent-match method.
+/// The method's hidden match equality is represented by a sentinel until method
+/// finalization; the completed eliminator supplies it through
+/// `synth_generated_index_evidence`.
+///
+/// Transport synthesizes one equality per RESULT-family index. Reflexive
+/// positions use the shared synthesizer; non-reflexive positions reuse a leaf
+/// projected from the hidden match equality. Each synthesized premise is then
+/// consumed by `project_generated_index_equality_leaves`. The final J motive
+/// varies only that result-index position, so a component repeated inside a
+/// sibling whole-record index is not accidentally rewritten there too.
 fn transport_recursive_group_call_result(
     cx: &ElabCtx,
     expr: &RExpr,
@@ -3675,7 +3751,7 @@ fn transport_recursive_group_call_result(
     let mut transported = core;
     let mut transported_ty = inferred_ty;
     let mut changed = false;
-    for refinement in cx.result_refinements.iter().rev() {
+    'refinements: for refinement in cx.result_refinements.iter().rev() {
         let growth = cx
             .ctx
             .len()
@@ -3683,35 +3759,271 @@ fn transport_recursive_group_call_result(
             .ok_or_else(|| {
                 ElabError::Internal("result refinement escaped its branch context".into())
             })? as i64;
-        let index_ty = weaken(&refinement.index_ty, growth);
-        let concrete_index = weaken(&refinement.concrete_index, growth);
-        let refined_index = weaken(&refinement.refined_index, growth);
-        // The placeholder is embedded at the current source-binder depth so
-        // `finalize_refined_body` can recover its canonical premise slot.
-        let proof = index_refinement_sentinel(
+        let source_index_ty = weaken(&refinement.index_ty, growth);
+        let source_concrete = weaken(&refinement.concrete_index, growth);
+        let source_refined = weaken(&refinement.refined_index, growth);
+        let source_evidence_ty = Term::Eq(
+            Box::new(source_index_ty.clone()),
+            Box::new(source_concrete.clone()),
+            Box::new(source_refined.clone()),
+        );
+        let source_proof = index_refinement_sentinel(
             refinement.sentinel_region,
             refinement.premise_slot + growth as usize,
         );
-        if let Some((cast, cast_ty)) = try_reindex_cast(
+        let (source_head, _) = peel_app(&source_index_ty);
+        let scoped_source_projection = match source_head {
+            Term::IndFormer { id, .. } => cx.env.inductive(id).is_some_and(|inductive| {
+                inductive.indices.is_empty() && inductive.constructors.len() == 1
+            }),
+            _ => false,
+        };
+        let source_leaves = if scoped_source_projection {
+            project_generated_index_equality_leaves(
+                cx.env,
+                &cx.ctx,
+                &source_evidence_ty,
+                source_proof.clone(),
+            )
+            .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        'result_indices: {
+            let current_whnf = whnf(cx.env, &cx.ctx, &transported_ty);
+            let expected_whnf = whnf(cx.env, &cx.ctx, expected);
+            let (result_head, mut result_arguments) = peel_app(&current_whnf);
+            let (expected_head, expected_arguments) = peel_app(&expected_whnf);
+            let (
+                Term::IndFormer {
+                    id: result_family,
+                    level_args: result_levels,
+                },
+                Term::IndFormer {
+                    id: expected_family,
+                    level_args: expected_levels,
+                },
+            ) = (&result_head, &expected_head)
+            else {
+                break 'result_indices;
+            };
+            if result_family != expected_family || result_levels != expected_levels {
+                break 'result_indices;
+            }
+            let Some(result_decl) = cx.env.inductive(*result_family) else {
+                break 'result_indices;
+            };
+            let parameter_count = result_decl.params.len();
+            let index_count = result_decl.indices.len();
+            if result_arguments.len() != parameter_count + index_count
+                || expected_arguments.len() != result_arguments.len()
+            {
+                break 'result_indices;
+            }
+            let mut parameters_match = true;
+            for (actual, wanted) in result_arguments[..parameter_count]
+                .iter()
+                .zip(&expected_arguments[..parameter_count])
+            {
+                let parameter_ty = kernel_infer_current(cx, actual).map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                        "result refinement: could not classify a result-family parameter: {error:?}"
+                    )),
+                })?;
+                if !convert(cx.env, &cx.ctx, &parameter_ty, actual, wanted) {
+                    parameters_match = false;
+                    break;
+                }
+            }
+            if !parameters_match {
+                break 'result_indices;
+            }
+
+            let mut local_transported = transported.clone();
+            let mut local_transported_ty = transported_ty.clone();
+            let mut local_changed = false;
+            let mut completed_plan = true;
+            for index_ordinal in 0..index_count {
+                let argument_position = parameter_count + index_ordinal;
+                let raw_index_ty = subst_levels(
+                    &subst_outer(
+                        &result_decl.indices[index_ordinal],
+                        parameter_count,
+                        &result_arguments[..parameter_count],
+                        index_ordinal,
+                    ),
+                    &result_decl.level_params,
+                    result_levels,
+                );
+                let index_ty = subst_tel(
+                    &raw_index_ty,
+                    &result_arguments[parameter_count..argument_position],
+                );
+                let raw_expected_index_ty = subst_levels(
+                    &subst_outer(
+                        &result_decl.indices[index_ordinal],
+                        parameter_count,
+                        &expected_arguments[..parameter_count],
+                        index_ordinal,
+                    ),
+                    &result_decl.level_params,
+                    expected_levels,
+                );
+                let expected_index_ty = subst_tel(
+                    &raw_expected_index_ty,
+                    &expected_arguments[parameter_count..argument_position],
+                );
+                if !convert_type(cx.env, &cx.ctx, &index_ty, &expected_index_ty) {
+                    completed_plan = false;
+                    break;
+                }
+                let old_index = result_arguments[argument_position].clone();
+                let new_index = expected_arguments[argument_position].clone();
+                let result_evidence_ty = Term::Eq(
+                    Box::new(index_ty.clone()),
+                    Box::new(old_index.clone()),
+                    Box::new(new_index.clone()),
+                );
+                let result_proof = if convert(cx.env, &cx.ctx, &index_ty, &old_index, &new_index) {
+                    match synth_generated_index_evidence(
+                        cx.env,
+                        &cx.ctx,
+                        &result_evidence_ty,
+                        expr.span(),
+                    ) {
+                        Ok(proof) => proof,
+                        Err(_) => {
+                            completed_plan = false;
+                            break;
+                        }
+                    }
+                } else if convert_type(cx.env, &cx.ctx, &index_ty, &source_index_ty)
+                    && convert(cx.env, &cx.ctx, &index_ty, &old_index, &source_concrete)
+                    && convert(cx.env, &cx.ctx, &index_ty, &new_index, &source_refined)
+                {
+                    source_proof.clone()
+                } else if let Some(leaf) = scoped_source_projection
+                    .then(|| {
+                        source_leaves.iter().find(|leaf| {
+                            convert_type(cx.env, &cx.ctx, &index_ty, &leaf.index_ty)
+                                && convert(cx.env, &cx.ctx, &index_ty, &old_index, &leaf.target)
+                                && convert(cx.env, &cx.ctx, &index_ty, &new_index, &leaf.scrutinee)
+                        })
+                    })
+                    .flatten()
+                {
+                    leaf.proof.clone()
+                } else {
+                    // This result index is unrelated to the current match
+                    // refinement. A different active refinement may own it.
+                    continue;
+                };
+
+                let result_leaves = match project_generated_index_equality_leaves(
+                    cx.env,
+                    &cx.ctx,
+                    &result_evidence_ty,
+                    result_proof,
+                ) {
+                    Ok(leaves) => leaves,
+                    Err(_) => {
+                        completed_plan = false;
+                        break;
+                    }
+                };
+                for leaf in result_leaves {
+                    let next_argument = subst_term_generalize(
+                        &result_arguments[argument_position],
+                        &leaf.target,
+                        &leaf.scrutinee,
+                    );
+                    if next_argument == result_arguments[argument_position] {
+                        continue;
+                    }
+                    let classifier = kernel_infer_current(cx, &local_transported_ty).map_err(
+                        |error| match error {
+                            CurrentKernelQueryError::View(error) => error,
+                            CurrentKernelQueryError::Kernel(error) => {
+                                ElabError::Internal(format!(
+                                    "result refinement: could not classify the recursive result: {error:?}"
+                                ))
+                            }
+                        },
+                    )?;
+                    let Term::Type(type_level) = whnf(cx.env, &cx.ctx, &classifier) else {
+                        completed_plan = false;
+                        break;
+                    };
+                    let (type_equality, next_ty) = build_result_index_type_cong(
+                        cx.env,
+                        &cx.ctx,
+                        &leaf.index_ty,
+                        &leaf.target,
+                        &leaf.scrutinee,
+                        &result_head,
+                        &result_arguments,
+                        argument_position,
+                        type_level,
+                        leaf.proof,
+                    );
+                    local_transported = Term::Cast(
+                        Box::new(local_transported_ty),
+                        Box::new(next_ty.clone()),
+                        Box::new(type_equality),
+                        Box::new(local_transported),
+                    );
+                    local_transported_ty = next_ty;
+                    result_arguments[argument_position] = next_argument;
+                    local_changed = true;
+                }
+                if !completed_plan
+                    || !convert(
+                        cx.env,
+                        &cx.ctx,
+                        &index_ty,
+                        &result_arguments[argument_position],
+                        &new_index,
+                    )
+                {
+                    completed_plan = false;
+                    break;
+                }
+            }
+            if completed_plan && local_changed {
+                transported = local_transported;
+                transported_ty = local_transported_ty;
+                changed = true;
+                if convert_type(cx.env, &cx.ctx, &transported_ty, expected) {
+                    return Ok(Some((transported, transported_ty)));
+                }
+                continue 'refinements;
+            }
+        }
+
+        // Route-(a) was inapplicable or could not complete atomically. Preserve
+        // the former whole-index path on the CURRENT cumulative value/type;
+        // a successful row becomes the input to the next active refinement.
+        if let Some((fallback, fallback_ty)) = try_reindex_cast(
             Some(cx),
             cx.env,
             &cx.ctx,
-            &index_ty,
-            &concrete_index,
-            &refined_index,
+            &source_index_ty,
+            &source_concrete,
+            &source_refined,
             &transported_ty,
             transported.clone(),
-            proof,
+            source_proof,
         )? {
-            transported = cast;
-            transported_ty = cast_ty;
+            transported = fallback;
+            transported_ty = fallback_ty;
             changed = true;
             if convert_type(cx.env, &cx.ctx, &transported_ty, expected) {
                 return Ok(Some((transported, transported_ty)));
             }
         }
     }
-
     if changed && convert_type(cx.env, &cx.ctx, &transported_ty, expected) {
         Ok(Some((transported, transported_ty)))
     } else {
@@ -16595,14 +16907,36 @@ mod omega_index_refinement_tests {
 
 #[cfg(test)]
 mod result_transport_control_flow_tests {
-    use crate::{error::Span, ElabEnv, ElabError};
-    use ken_kernel::{Level, Term};
+    use crate::{error::Span, resolve::RExpr, ElabEnv, ElabError};
+    use ken_kernel::{convert_type, Level, Term};
 
     use super::{
         active_premise_kernel_view, index_refinement_sentinel, kernel_check_current,
-        kernel_infer_current, validate_large_convoy_base, ActiveIndexPremiseFrame,
-        CurrentKernelQueryError, ElabCtx, ExpandedBindingSource, ResultRefinement,
+        kernel_infer_current, transport_recursive_group_call_result, validate_large_convoy_base,
+        ActiveIndexPremiseFrame, CurrentKernelQueryError, ElabCtx, ExpandedBindingSource,
+        ResultRefinement,
     };
+
+    fn app2(head: Term, first: Term, second: Term) -> Term {
+        Term::app(Term::app(head, first), second)
+    }
+
+    fn refinement(
+        index_ty: Term,
+        concrete_index: Term,
+        refined_index: Term,
+        premise_slot: usize,
+        install_depth: usize,
+    ) -> ResultRefinement {
+        ResultRefinement {
+            index_ty,
+            concrete_index,
+            refined_index,
+            premise_slot,
+            sentinel_region: 0,
+            install_depth,
+        }
+    }
 
     #[test]
     fn active_premise_frame_authority_fails_closed() {
@@ -16996,6 +17330,160 @@ mod result_transport_control_flow_tests {
         assert_eq!(returned, base, "the contextual view must never escape");
     }
 
+
+    #[test]
+    fn non_family_result_shape_still_uses_whole_index_fallback() {
+        // Promise class: durable invariant.
+        // MEASURED: transport changes a Sigma result whose first component is
+        // indexed by the hidden equality, even though route (a) requires an
+        // indexed IndFormer result head. CLAIMED: route-(a) inapplicability
+        // falls immediately into the former whole-index transport. THE GAP:
+        // the integration grid kernel-checks real dependent methods; this
+        // focused pin isolates fallback reachability and its returned type.
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_decl(
+            "data FallbackOut : Nat -> Type where { \
+             FallbackMkOut : (index : Nat) -> FallbackOut index }",
+        )
+        .expect("FallbackOut");
+        let nat = Term::IndFormer {
+            id: env.globals["Nat"],
+            level_args: vec![],
+        };
+        let result_head = Term::IndFormer {
+            id: env.globals["FallbackOut"],
+            level_args: vec![],
+        };
+        let result_ctor = Term::Constructor {
+            id: env.globals["FallbackMkOut"],
+            level_args: vec![],
+        };
+        let recursive_id = env.globals["FallbackMkOut"];
+        let old_index = Term::var(1);
+        let new_index = Term::var(0);
+        let inferred = Term::sigma(
+            Term::app(result_head.clone(), old_index.clone()),
+            nat.clone(),
+        );
+        let expected = Term::sigma(Term::app(result_head, new_index.clone()), nat.clone());
+        let core = Term::pair(Term::app(result_ctor, old_index.clone()), old_index.clone());
+        let span = Span::new(0, 0);
+        let expression = RExpr::RCon("FallbackMkOut".into(), span);
+
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "fallback-control",
+        );
+        cx.ctx.push(nat.clone());
+        cx.ctx.push(nat.clone());
+        cx.recursive_group.insert(recursive_id);
+        let premise = Term::Eq(
+            Box::new(nat.clone()),
+            Box::new(old_index.clone()),
+            Box::new(new_index.clone()),
+        );
+        cx.active_index_premise_frames
+            .push(ActiveIndexPremiseFrame {
+                sentinel_region: 0,
+                premise_domains: vec![premise],
+                install_depth: cx.ctx.len(),
+            });
+        cx.result_refinements
+            .push(refinement(nat, old_index, new_index, 0, cx.ctx.len()));
+
+        let (_, transported_ty) =
+            transport_recursive_group_call_result(&cx, &expression, core, inferred, &expected)
+                .expect("fallback transport must remain well-formed")
+                .expect("non-route-(a) result must be transported by the fallback");
+        assert!(convert_type(cx.env, &cx.ctx, &transported_ty, &expected));
+    }
+
+    #[test]
+    fn two_active_result_refinements_compose_cumulatively() {
+        // Promise class: durable invariant.
+        // MEASURED: two active hidden equalities independently move the two
+        // indices of one recursive result to its expected type. CLAIMED: each
+        // successful row commits to cumulative transport state consumed by the
+        // next row. THE GAP: each row alone leaves one index mismatched; the
+        // final conversion assertion makes discarding either row observable.
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_decl(
+            "data DoubleOut : Nat -> Nat -> Type where { \
+             DoubleMkOut : (first : Nat) -> (second : Nat) \
+               -> DoubleOut first second }",
+        )
+        .expect("DoubleOut");
+        let nat = Term::IndFormer {
+            id: env.globals["Nat"],
+            level_args: vec![],
+        };
+        let result_head = Term::IndFormer {
+            id: env.globals["DoubleOut"],
+            level_args: vec![],
+        };
+        let result_ctor = Term::Constructor {
+            id: env.globals["DoubleMkOut"],
+            level_args: vec![],
+        };
+        let recursive_id = env.globals["DoubleMkOut"];
+        let first_old = Term::var(3);
+        let first_new = Term::var(2);
+        let second_old = Term::var(1);
+        let second_new = Term::var(0);
+        let inferred = app2(result_head.clone(), first_old.clone(), second_old.clone());
+        let expected = app2(result_head, first_new.clone(), second_new.clone());
+        let core = app2(result_ctor, first_old.clone(), second_old.clone());
+        let span = Span::new(0, 0);
+        let expression = RExpr::RCon("DoubleMkOut".into(), span);
+
+        let mut cx = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "cumulative-control",
+        );
+        for _ in 0..4 {
+            cx.ctx.push(nat.clone());
+        }
+        cx.recursive_group.insert(recursive_id);
+        let premises = vec![
+            Term::Eq(
+                Box::new(nat.clone()),
+                Box::new(second_old.clone()),
+                Box::new(second_new.clone()),
+            ),
+            Term::Eq(
+                Box::new(nat.clone()),
+                Box::new(first_old.clone()),
+                Box::new(first_new.clone()),
+            ),
+        ];
+        cx.active_index_premise_frames
+            .push(ActiveIndexPremiseFrame {
+                sentinel_region: 0,
+                premise_domains: premises,
+                install_depth: cx.ctx.len(),
+            });
+        cx.result_refinements.push(refinement(
+            nat.clone(),
+            second_old,
+            second_new,
+            0,
+            cx.ctx.len(),
+        ));
+        cx.result_refinements
+            .push(refinement(nat, first_old, first_new, 1, cx.ctx.len()));
+
+        let (_, transported_ty) =
+            transport_recursive_group_call_result(&cx, &expression, core, inferred, &expected)
+                .expect("cumulative transport must remain well-formed")
+                .expect("both active result refinements must compose");
+        assert!(convert_type(cx.env, &cx.ctx, &transported_ty, &expected));
+    }
 
 }
 
