@@ -1381,6 +1381,35 @@ Architect inventory, 2026-09-11.
    not identify its production origin, enclosing lowered-value path, transfer
    site, defining owner, selected response owner, or causal-call disposition,
    so its relation to entry 7 is not yet classified (`evt_4cwyw14tmcmv6`).
+9. After redirecting exact transport-destination `Construct` ingress through the
+   producer dispatcher advanced entry 8, the external source-parent composer
+   refused the canonical root invocation even though the exact frame and unique
+   affine `(0, frame)` edge positively identified it (`evt_7abyxsvrcgjvp`).
+10. After admitting that exact root tuple advanced entry 9, the response plan
+    promoted an exact immediate bridge realization to a `Specialized` response
+    owner even though the authoritative candidate ledger settled its complete
+    call identity as `InlineNoCall` (`evt_5w8e94hcn0gjw`).
+11. After the plan-owned immediate-bridge relation repaired entry 10 and the
+    source-`READ` admission correction completed the COW witness, the unchanged
+    mixed-response neighbour reached `BoundaryCarrier`: a carried producer-call
+    scrutinee met an ordinary eliminator carrying a deferred constructor case.
+    The existing guard refused because that case reconstructs a constructor from
+    a specialized retained field, while the selected field was carried
+    (`evt_3n4ndy20nph94`).
+12. After phase-preserving materialization repaired entry 11, the unchanged
+    witness completed all ten host effects before `u5:59` received status zero
+    from `u0:60`, observed Trap zero, and loaded `ss7+112` with no caller-side
+    Result write. The stale word then failed the plan-owned Ret check, but its
+    bits supply no provenance; callee terminal commitment versus exact-frame
+    identity remained unclassified (`evt_2jygrc5xetdtv`).
+13. After the generated-context Result contract repaired entry 12, the complete
+    Tail proof correctly rejected producer identity `DenseRange { start: 3380,
+    len: 38 }` against the sink/context identity `DenseRange { start: 4442,
+    len: 38 }` and used the existing base route. That route still had no affine
+    producer unless exact declared-target metadata was treated as proof that the
+    returned word realized the target contract; admitting it compiled, but the
+    terminal backstop still observed the wrong Ret identity
+    (`evt_4w0v5k6n3v8ap`).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
