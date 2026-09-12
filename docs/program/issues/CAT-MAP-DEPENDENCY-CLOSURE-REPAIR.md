@@ -12,6 +12,45 @@ github: null
 origin: "Steward, 2026-08-30, filed on the Architect ruling evt_em72d9eh6ndg (base 0ddd49b3) taken during CAT-BOOL-REUSE-CONSUMERS D2's pre-edit hard stop. The ruling: the Map raw-standalone failure is a PRE-EXISTING module-dependency defect, not a D2 transition, and a separate closure repair is warranted but must NOT gate the one-provider is_some drain. Recorded as a distinct follow-on per that ruling; QUEUED, not released. Steward-filed per COORDINATION section 2."
 ---
 
+# D1 CI-RED CONTENT-FENCE AMENDMENT 2026-09-12 (Steward). READ FIRST.
+
+> # The D1 additive-declare candidate (Map + InsertionSort, routed 7e468d36) went
+> # CI-RED on test shard 6/8: lang_mod_catalog_evidence_frontier's ExactLedger
+> # fail-closes on InsertionSort's unclassified identity Ord. Foundation diagnosis
+> # (foundation-implementer evt_5wx06fnhq7swj, foundation-leader evt_5xqj69x1cbzkj),
+> # grounded on exact 7e468d36: D1's new imports let InsertionSort's legacy roots
+> # load, exposing its genuine checked `Ord a` dependency (first use pkg line 20);
+> # its LawfulClasses selective import (line 14) lists only ord_leq_at, bool_or, so
+> # there is no parsed `Ord -> Core.Classes.LawfulClasses` edge. Canonical provider
+> # is public LawfulClasses.Ord (line 119); landed precedent imports it explicitly
+> # (OrderedSearch, Nat.Order, StringKeys). The ledger correctly refuses to
+> # infer/bless the missing edge — a ledger exception would weaken the detector.
+> #
+> # AMENDMENT (FENCED — the same additive-declared-import class this node exists
+> # for; D0's ordinary standalone check was BLIND to this latent dependency because
+> # loading LawfulClasses made the identity resolvable, while the ExactLedger's
+> # identity attribution is the stronger detector that caught the undeclared
+> # selective edge). The content fence's "package source = exactly the D0 import
+> # list" is WIDENED by exactly one identity for InsertionSort: Ord. AUTHORIZED,
+> # both paths already present in the candidate:
+> #  (1) catalog/packages/Algorithm/Sorting/InsertionSort.ken.md line 14 ->
+> #      import Core.Classes.LawfulClasses (Ord, ord_leq_at, bool_or).
+> #  (2) crates/ken-elaborator/tests/cat_sort_insertion_sort_acceptance.rs -> update
+> #      ONLY the exact expected-import string to the same three-item LC import.
+> # ALL OTHER FENCES HOLD: additive imports only; NO source-side workaround; NO
+> # production elaborator code; NO behavior change; do NOT edit
+> # lang_mod_catalog_evidence_frontier.rs (a hardcoded provider exception would hide
+> # the missing edge and defeat the detector's contract). If closing the red needs
+> # anything beyond this additive import, it is a HARD STOP to Steward + Architect,
+> # not a foundation additive repair.
+> #
+> # RE-RELEASE: respin on preserved 7e468d36 -> NEW SHA. Respin validation:
+> # evidence-frontier 8/8, raw InsertionSort check, InsertionSort acceptance 3/3,
+> # strict-resolution census, and a compile-preserving Ord-withdrawal mutation
+> # restoring the exact unclassified-identity red. The routed 7e468d36 stays clean;
+> # the NEW SHA needs FRESH Foundation QA + CV + a NEW merge Decision (the resolved
+> # dec_7gka0dvw4cykd binds ONLY 7e468d36) -> Steward M1-M4 -> lieutenant.
+
 > # RELEASED 2026-09-10 (Steward) — the D0 breadth census. `active`.
 >
 > Filed (Architect `evt_em72d9eh6ndg`) as a tracked follow-on whose governing
