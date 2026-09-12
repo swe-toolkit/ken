@@ -1,7 +1,7 @@
 ---
 id: CAT-REL-TRANSITIVE-CLOSURE
 title: "the binary-relations frontier (spec 58 / CAT-4, Fork B) names transitive closure as R+ x y := IsTrue (reachableWithin N x y), N := size (dom R), but the computational realization is design-pinned PROSE only -- Map.ken.md §4.7.12 lands succ/compose/converse and the reflexive/symmetric/transitive predicates, while size, bounded reachableWithin, and R+ itself do NOT exist on main; this node lands the kernel-untouched, Axiom-free computational closure (the faithfulness/saturation laws are the named deferred fast-follow)"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: none
