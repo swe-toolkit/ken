@@ -58,22 +58,18 @@ introduction and projection helpers and definitional fst/snd β plus
 reconstruction η (`../30-surface/34 §"Canonical non-dependent pair floor
 family"`). It needs no primitive, postulate, package identity, or trust entry.
 The type floor contains `Pair`; its separate companion inventory contains
-`mk_pair`, `pair_fst`, and `pair_snd`. Positive catalog contracts that use these
-names remain RED-UNTIL the floor-realization build admits the four existing
-compiler-installed identities under Strict. No catalog import, alias, or
-fallback supplies them.
+`mk_pair`, `pair_fst`, and `pair_snd`. The floor realization is landed: current
+catalog contracts use those four compiler-installed identities under Strict.
+No catalog import, alias, or fallback supplies them.
 
-Deferring those whole units changes neither declaration ownership nor proof
-ownership. The sole canonical `instance Ord Nat` remains defined by the
-class-owning `Core.Classes.LawfulClasses`; `Data.Numeric.Nat.Order` may later
-import/re-export only that dictionary. The settled conversions of foreign
-attached proofs to private ordinary theorems—`pair_compare_eq_sound`,
-`pair_compare_lt_asym`, and `bool_or_eq_true_of_or`—remain owed when their
-containing units re-enter. Deferral neither reverses nor discharges them. At
-this spec revision, the catalog
-`Order → LawfulClasses → Compare → Pair` dependency remains gated until the
-Pair floor-realization build lands; spec text alone does not make that Strict
-path green.
+The sole canonical `instance Ord Nat` remains defined by the class-owning
+`Core.Classes.LawfulClasses`; `Data.Numeric.Nat.Order` may import/re-export only
+that dictionary. The former Pair-floor proof deferrals are also discharged:
+`pair_compare_eq_sound` and `pair_compare_lt_asym` are ordinary theorems, and
+`proof eq_true_of_or for bool_or` is the exact public selector. The prior Pair
+floor gate on the `Order → LawfulClasses → Compare → Pair` dependency is
+therefore closed; these are landed identities and proofs, not permissions for a
+second package-owned Pair.
 
 ## 2. Lawful classes (the verification-aware core) — packages
 
@@ -148,10 +144,15 @@ reflexive/symmetric/transitive predicates, transitive closure) are pinned in
 **`58-maps-sets-relations.md`** (CAT-4). `delete` is **rebuild-via-`from_list`**
 (reusing the landed `preserves_ordered`); a relation is `Map K (Set K)`
 adjacency; and the transitive closure is **bounded-reachability `IsTrue`** —
-`Ω`-native, the `Perm` move again, never a raw proof-relevant inductive
-(`58 §7`), its faithfulness proof + `size` a designed-and-deferred fast-follow.
-The `Nat` carrier (a net-new `Axiom`-free `leq_nat`) is the discriminator floor,
-not the `Axiom`-holed `Ord Int`/`Ord Char`.
+`reachable_plus` wraps `reachable_within` at fuel `size (dom r)`. Under the
+lawful-order and well-formed-adjacency premises in `58 §7`, it denotes positive
+`R⁺`, never reflexive `R*` or a raw proof-relevant inductive. The `Axiom`-free
+D0 `leq_nat` floor, D1–D2 general proofs, D3 projection/ascending proofs, and
+D4 relation-operation and predicate definitions are landed. D4's general
+membership proofs and concrete predicate discriminators are not. The
+`size`/`dom`/`reachable_within`/`reachable_plus` computation is the next
+fast-follow; the general relation-law tranche, including closure
+faithfulness/saturation, follows separately.
 
 The **Layer-3 parsing/syntax/diagnostics contract** — source artifacts as byte
 identity, half-open byte spans, total parser result values, small package-owned
