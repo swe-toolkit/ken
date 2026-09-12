@@ -47,8 +47,9 @@ Pipeline order, one slice at a time (the doc ring does not fan out):
    `1b9afcec0` (PR #3538), then CONSOLIDATED to a single `front-end.md`
    (DOC-COMPILER-DEEPEN-FRONT-END-CONSOLIDATION, landed `cb74d2cae`); the
    single-page shape is ratified.
-2. `kernel` — nested cut landed `d51d99d2`; its single-page consolidation is the
-   next WP to cut (fold the 5 kernel/ sub-pages into `kernel.md`).
+2. `kernel` — CONSOLIDATED to a single `kernel.md`
+   (DOC-COMPILER-DEEPEN-KERNEL-CONSOLIDATION, landed `aa90da94d`); the earlier
+   nested cut (`d51d99d2`) is folded in and its subdirectory removed.
 3. `artifacts-and-erasure`.
 4. `interpreter-and-values`.
 5. `native-backend`.
@@ -72,9 +73,12 @@ status carrier.
   `front-end.md` (subdirectory deleted, manifest updated), Librarian sole
   as-built APPROVE `evt_796cvne2qevn6`. This consolidated single page is the
   exemplar the remaining chapters inherit.
-- kernel: nested cut LANDED (`d51d99d2`); awaits its single-page consolidation WP
-  (fold the 5 `kernel/` sub-pages into `kernel.md`), to be cut against current
-  main following the front-end pattern.
+- kernel (initial nested cut): LANDED (`d51d99d2`).
+- kernel CONSOLIDATION: LANDED (`aa90da94d`, PR #3549). The 5 nested `kernel/`
+  sub-pages were folded into a single `kernel.md` (subdirectory deleted, manifest
+  updated), Librarian sole as-built APPROVE `evt_3hrc4st4zmetc`. Front-end and
+  kernel are now both single deepened pages; the campaign continues by deepening
+  the remaining chapters (artifacts-and-erasure next) in place, one at a time.
 
 ## The consolidated front-end chapter is the exemplar
 
