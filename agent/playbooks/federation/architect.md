@@ -52,8 +52,13 @@ is yours, not the Steward's, so it fires *before* your ruling instead of racing 
 watchdog to interpose after.
 
 **Mechanical, not a judgment call.** Count **consecutive hard-stops on the same
-design question** on one WP. On the **3rd** — and again at every **3rd** after
-(6th, 9th, 12th, …) — **before you rule**:
+design question** on one WP. **Only *advancing* stops count** — the implementer
+built your last ruling, hit a genuinely **new** structural wall, and needs a new
+one. A D0/feasibility return, a probe or measurement your current ruling already
+asked for, or a recut checkpoint is **non-advancing**: it keeps the current
+`HS<N>`, adds no inventory row, and does not count (canonical definitions in
+`steward/escalation.md`, "What counts as a hard stop"). On the **3rd** — and
+again at every **3rd** after (6th, 9th, 12th, …) — **before you rule**:
 
 1. **Hold your own ruling.** Post in-thread that you are holding the ruling on
    `<WP>` pending a research prior-art advisory. Do **not** keep grinding the
