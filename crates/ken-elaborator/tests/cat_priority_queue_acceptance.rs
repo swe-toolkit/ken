@@ -201,17 +201,42 @@ struct Values {
     tag_ids: [GlobalId; 6],
 }
 
-fn runtime_ord_dictionary(leq: EvalVal) -> EvalVal {
-    // `Ord` is proof-carrying. The strict reference interpreter cannot evaluate
-    // its proposition-valued record terminator, so executable package tests
-    // carry the exact checked runtime field and leave the unused proof tail
-    // opaque. The client checks below independently elaborate the complete real
-    // dictionaries; this value is only the evaluator view of their `leq` field.
-    EvalVal::Pair {
-        fst: Rc::new(leq),
-        snd: Rc::new(EvalVal::Unknown),
-        slot: 0,
+fn reify_checked_record(term: &Term, env: &ElabEnv, store: &mut EvalStore) -> EvalVal {
+    match term {
+        Term::Pair(first, rest) => EvalVal::Pair {
+            fst: Rc::new(eval(&[], first, &env.env, store)),
+            snd: Rc::new(reify_checked_record(rest, env, store)),
+            slot: 0,
+        },
+        other => eval(&[], other, &env.env, store),
     }
+}
+
+fn runtime_ord_dictionary(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
+    // `Ord` is proof-carrying. Strict evaluation of its proposition-valued
+    // record terminator makes the whole ordinary record `Unknown`. Reify the
+    // already kernel-checked transparent record field-by-field so all five real
+    // fields remain present and only the unused terminal stays opaque.
+    let (_, body) = env
+        .env
+        .transparent_body(id)
+        .unwrap_or_else(|| panic!("Ord dictionary {id:?} must be transparent"));
+    let dictionary = reify_checked_record(&body, env, store);
+    let mut current = &dictionary;
+    let mut fields = 0;
+    while let EvalVal::Pair { fst, snd, .. } = current {
+        assert!(
+            !matches!(**fst, EvalVal::Unknown | EvalVal::Neutral),
+            "every reified Ord field must be a real checked runtime value"
+        );
+        fields += 1;
+        current = snd;
+    }
+    assert_eq!(
+        fields, 5,
+        "Ord runtime view must retain all five law fields"
+    );
+    dictionary
 }
 
 fn install_test_values(env: &mut ElabEnv, store: &mut EvalStore) -> Values {
@@ -237,15 +262,11 @@ fn install_test_values(env: &mut ElabEnv, store: &mut EvalStore) -> Values {
     .expect("separate lawful up2/down dictionaries and unordered Tag payload must elaborate");
 
     let up_id = canonical_ord_nat_id(env);
-    assert!(matches!(
-        env.env.lookup(up_id),
-        Some(Decl::Transparent { .. })
-    ));
-    let up_leq = global_value(env, store, env.globals[&format!("{LAWFUL}.leq_nat")]);
-    let down_leq = global_value(env, store, env.globals["cat_pq_down_leq"]);
-    let up = runtime_ord_dictionary(up_leq.clone());
-    let up2 = runtime_ord_dictionary(up_leq);
-    let down = runtime_ord_dictionary(down_leq);
+    let up2_id = env.globals["cat_pq_up2"];
+    let down_id = env.globals["cat_pq_down"];
+    let up = runtime_ord_dictionary(env, store, up_id);
+    let up2 = runtime_ord_dictionary(env, store, up2_id);
+    let down = runtime_ord_dictionary(env, store, down_id);
     let nat_ty = EvalVal::IndFormerVal {
         id: env.prelude_env.nat_id,
     };
