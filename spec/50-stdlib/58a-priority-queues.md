@@ -297,9 +297,10 @@ The three stages are deliberately separate:
 1. **This contract:** fixes the six-name surface, behavioral semantics,
    validity obligations, and structural cost account. It adds no implementation.
 2. **`CAT-PRIORITY-QUEUE` (landed):** ships one complete computational
-   implementation of the carrier and all five operations. It executes the public construction,
-   extraction, multiplicity, order, persistence, validity, abstraction, and
-   structural-cost discriminators in the paired seed. The result is **tested**,
+   implementation of the carrier and all five operations. It executes the
+   public construction, extraction, multiplicity, order, persistence,
+   validity, abstraction, and structural-cost discriminators in the paired
+   seed. The result is **tested**,
    not a verified priority queue or type-certified invariant.
 3. **`CAT-PRIORITY-QUEUE-LAWS`:** proves, for arbitrary valid queues under the
    same fixed lawful order, the §4 count equations, §4.2 minimum/extraction
