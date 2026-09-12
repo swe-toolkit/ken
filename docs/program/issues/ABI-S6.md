@@ -12,7 +12,103 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 15 — ORIGIN-705 DISPOSITION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 15 — PRODUCTION DISPOSITION = HOLD, ESCALATED TO OPERATOR — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HS15 — ARCHITECT PRODUCTION DISPOSITION
+> # evt_1tssgfmcc8vcn (thr_7wy5wy45p7abm). The HS15 OBSERVATION REQUIREMENT IS
+> # COMPLETE: the last origin-705-only observation structurally closed
+> # TARGET_EMITTED_RESULT_NOT_CLOSED (runtime-implementer evt_5yw726b442m18). This
+> # does NOT advance the hard-stop count beyond HS15, add an inventory row, or
+> # retrigger Research (mandatory advisory remains evt_art1rp41qd48). Production
+> # HELD byte-identical at 37390dfcf / b020b71f (zero Cargo.lock delta).
+> #
+> # PRODUCTION CLASSIFICATION:
+> # CHECKED_IH_TRANSPORT_TERMINALIZES_UNCONSUMED_SPECIALIZATION_RESULT.
+> # The two mechanisms prior observations conflated are now separated:
+> # - Origin 705: all six tokens close through the owned source machine — evaluate
+> #   child 703 via ComputationalMatchScrutinee@699, get RecursiveBackedge, forward
+> #   it through CheckedComputationalIHInvocationReturn, complete via the exhaustive
+> #   ConstructArgument::RecursiveBackedgeForward arm WITHOUT materializing a
+> #   constructor, terminate at ResumeOuterAfterActive::RecursiveBackedge. Origin 705
+> #   emits NO 3380 word and contains NO B call; its driver RUNS (not dropped).
+> # - B population is separate/exact: identity 1605/874, target 3, body 859, six
+> #   leaves v3876/v6030/v8292/v10466/v12618/v14715. Target-3 CLIF publishes ONE
+> #   governed Result from source Construct 667, actual identity DenseRange {start:
+> #   3380, len: 38}; NO 4442, NO emitted consumer call. A is the same mismatch:
+> #   target 1/body 1076 publishes 3380 from Construct 885, feeding v3363. So all
+> #   SEVEN terminal seeds are call results publishing 3380 while the validated
+> #   generated-context terminal contract demands DenseRange {start: 4442, len: 38}.
+> #
+> # CODE LOCATION (lowering/core.rs): the checked-IH transport branch (8775-8796)
+> # BYPASSES the ordinary continuation funnel; call_checked_ih_environment_transport
+> # (8877-8897) emits the generic call and returns its word as RoutedAnswer::checked;
+> # the terminal InvocationReturn branch (6640-6652) returns that word unchanged. The
+> # ordinary funnel (10432-10469) can apply the plan-owned RequiredConsumerProjection
+> # and lower_continuation_selected_case_body returns its phase-bearing result to an
+> # existing eliminator. The transport route reaches NEITHER and carries no post-call
+> # consumer, so 3380 becomes a terminal seed with no step that realizes 4442.
+> #
+> # RULED OUT (do NOT): (1) relabel target 1/3 Result or 3380 as 4442 (finished CLIF
+> # proves the actual value); (2) weaken the generated-context contract to 3380 (it
+> # is derived from validated k_ret_identity + response_context_union); (3) treat
+> # status success / zero Trap / Carried / RoutedAnswer::checked / declared meta /
+> # tags / SSA equality / the call identity as final-result authority; (4) add a
+> # target-specific wrapper, writeAll special case, generic runtime decoder, ABI/
+> # schema/frame field, response owner, side table, allocation, or revive
+> # CheckedIhInvocationReturnResultPlan.
+> #
+> # WHY THIS LEAVES THE FENCE: a passing repair requires one fact the current plan
+> # lacks — an exact semantic consumer of the checked-IH transport call's ACTUAL
+> # result, from 3380 to demanded 4442 or Trap. That is a NEW COMPILER
+> # RESPONSE-CONSUMPTION EDGE. It is compiler-only and ABI-PRESERVING (NO TCB, NO
+> # runtime ABI, NO schema, NO source-language capability), but it is OUTSIDE the
+> # operative fence, so Runtime is NOT authorized to implement it.
+> #
+> # >>> PRODUCTION DISPOSITION: HOLD — ESCALATED TO OPERATOR (Steward, 2026-09-12,
+> # Pat away until 12:00 UTC). The scope decision is the operator's; the Steward does
+> # NOT authorize a new capability under away-window latitude. QUEUED for Pat's 12:00
+> # return. Runtime takes NO production action until an operator scope decision is
+> # folded and explicitly kicked. <<<
+> #
+> # RECOMMENDED RECUT (Architect; compiler-only, ABI-preserving — operator to
+> # authorize or decline): EXTEND the existing required-consumer mechanism, not a
+> # parallel carrier/transform. Planning derives, validates, and OWNS a post-call
+> # consumer relation per checked-IH transport identity — key = complete
+> # ContinuationCallIdentity + exact CheckedIhEnvironmentTransport source/destination
+> # endpoints; payload = actual target result identity + demanded context identity +
+> # the exact ordered source consumer frames/occurrences that realize the latter.
+> # Derive the target result identity from the target's selected-case source body and
+> # verify against finished emitted CLIF; derive the demanded identity only from
+> # validated k_ret_identity + complete response_context_union; neither side copied
+> # from the other. Where actual == demanded the existing direct transport call stays
+> # lawful; where they differ, planning produces exactly ONE complete consumer chain
+> # or REFUSES before object emission (no nearest consumer, owner/origin arithmetic,
+> # function numbering, population count, or default route). Lowering keeps the
+> # generic call result NON-authoritative and feeds it as EliminatorRole::Scrutinee
+> # through the planned consumer using existing source-machine/computational-
+> # continuation machinery; only that consumer's governed 4442 realization or Trap
+> # mints the affine generated-context terminal authority. call_declared_unit_target
+> # and call_checked_ih_environment_transport stay generic and mint no Result
+> # authority. Cover A and every B emission SEPARATELY: A's TailProducerToRet route
+> # may be an input but not relabelled Direct; B stays excluded from canonical
+> # inheritance by fresh_result_or_next_active_frame_exists — the new relation must
+> # compose from the already-closed A-to-B fresh-result destination with an
+> # independently derived consumer, or refuse (never invent membership).
+> #
+> # REPAIR GATE (if authorized): (a) compile-preserving mutation deleting the new
+> # post-call consumer relation -> the named positive returns to the exact
+> # terminal-closure refusal; (b) mutation transplanting A's consumer to B (or B's to
+> # A) with plausible target/frame/counts -> identity/endpoint validation refuses;
+> # (c) mutation relabelling 3380 as 4442 without executing the consumer ->
+> # finished-CLIF/terminal validation refuses; (d) per-emission terminal closure for
+> # A v3363 and all six B leaves, post-repair words re-derived (not assuming old SSA
+> # names survive); (e) unchanged 256 MiB Builder stack (no RUST_MIN_STACK/depth/
+> # guard/stack-size change); (f) the full ABI-S6 success battery after causality is
+> # proved (terminal tag 0x115a_0000_0027, no terminal -1, ten ordered effects,
+> # abcdef, file bytes preserved, private writable COW preserved, native/interpreter
+> # parity, staticlib, ELF census, scoped package checks, CI).
+
+# D5b NATIVE HARD-STOP 15 — ORIGIN-705 DISPOSITION RULING (SUPERSEDED as READ-FIRST by the PRODUCTION DISPOSITION above; the observation on this instruction structurally closed TARGET_EMITTED_RESULT_NOT_CLOSED, runtime-implementer evt_5yw726b442m18; its established facts and fences STAND). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HS15 — ARCHITECT ORIGIN-705 DISPOSITION RULING
 > # evt_1cvq23ew7ysts (thr_7wy5wy45p7abm), superseding the observer INSTRUCTION of
