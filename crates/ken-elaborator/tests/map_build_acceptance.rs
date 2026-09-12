@@ -93,8 +93,13 @@ fn module_transparent_kernel_equivalents(
 fn mk_map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    for imported in ["cong", "sym", "trans", "list_append"] {
+        assert!(
+            !env.globals.contains_key(imported),
+            "Map's declared import must supply `{imported}` rather than an ambient alias"
+        );
+    }
     for imported in [
         "bool_and",
         "bool_and::assoc",
@@ -256,27 +261,45 @@ fn cat_bool_reuse_d2_import_withdrawal_and_wrong_name_fail_at_is_some() {
     assert_map_import_mutation_fails_at_is_some(&wrong_name, "wrong-name import");
 }
 
-/// Promise class: transition sentinel. This deliberately remains red as a raw
-/// standalone package until `CAT-MAP-DEPENDENCY-CLOSURE-REPAIR` supplies Map's
-/// full declared dependency closure; that follow-on retires or updates this
-/// boundary sentinel.
+/// Promise class: durable invariant.
 ///
-/// **MEASURED:** the candidate's roots-loader path resolves the new Sums import
-/// and reaches the same first pre-existing unresolved constructor,
-/// `list_append`. **CLAIMED:** D2 does not worsen Map's raw package boundary.
-/// **THE GAP:** this is negative-scope evidence only, not standalone success;
-/// `mk_env` is the separate positive legacy-closure control.
+/// **MEASURED:** a fresh roots-loader environment elaborates Map and its direct
+/// declarations reference each exact provider added by the dependency-closure
+/// repair. **CLAIMED:** Map's declared imports close its production package and
+/// preserve the intended provider identities. **THE GAP:** this guards Map's
+/// repaired edges, not the separate catalog-wide standalone census.
 #[test]
-fn cat_bool_reuse_d2_raw_boundary_remains_unresolved_list_append() {
+fn cat_map_dependency_closure_roots_loads_declared_imports() {
     let mut env = ElabEnv::new().expect("base env");
-    match env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map") {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(
-            name, "list_append",
-            "D2 must preserve Map's first raw unresolved constructor name"
-        ),
-        other => panic!(
-            "raw Map must retain its pre-existing UnresolvedCon list_append boundary, got {other:?}"
-        ),
+    let map_ids: BTreeSet<_> = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map")
+        .expect("Map must roots-load through only its declared imports")
+        .into_iter()
+        .collect();
+
+    for provider_name in [
+        "Data.Collections.Derived.list_append",
+        "Core.Logic.Transport.cong",
+        "Core.Logic.Transport.sym",
+        "Core.Logic.Transport.trans",
+    ] {
+        let provider = env.globals[provider_name];
+        let references = map_ids
+            .iter()
+            .map(|id| match env.env.lookup(*id) {
+                Some(Decl::Transparent { ty, body, .. }) => {
+                    term_reference_count(ty, provider) + term_reference_count(body, provider)
+                }
+                Some(Decl::Opaque { ty, .. }) | Some(Decl::Primitive { ty, .. }) => {
+                    term_reference_count(ty, provider)
+                }
+                _ => 0,
+            })
+            .sum::<usize>();
+        assert!(
+            references > 0,
+            "Map's direct declarations must reference exact provider `{provider_name}`"
+        );
     }
 }
 

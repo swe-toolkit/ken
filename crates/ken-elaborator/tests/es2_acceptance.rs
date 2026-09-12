@@ -36,8 +36,13 @@ fn mk_env() -> ElabEnv {
 fn mk_env_with_map() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
     catalog_or::load_core_logic_compare(&mut env);
-    catalog_or::expose_core_logic_transport(&mut env);
-    catalog_or::load_derived_fixture(&mut env);
+    catalog_or::load_derived_importing_fixture(&mut env, "list_append");
+    for imported in ["cong", "sym", "trans", "list_append"] {
+        assert!(
+            !env.globals.contains_key(imported),
+            "Map's declared import must supply `{imported}` rather than an ambient alias"
+        );
+    }
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
         .expect("Map's canonical Option-combinator provider must roots-load");
     assert!(
