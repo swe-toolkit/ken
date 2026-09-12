@@ -240,8 +240,9 @@ fn evaluate_nat(env: &ElabEnv, id: GlobalId) -> usize {
 /// before retiring the red.
 ///
 /// MEASURED: the fixture loads the real providers through catalog roots, then
-/// elaborates the real consumer after removing exactly its two import lines.
-/// Relative to that provider environment, the candidate adds exactly the base
+/// elaborates the real consumer in a synthetic flat scope after removing
+/// exactly its three current declared import lines. Relative to that provider
+/// environment, the candidate adds exactly the base
 /// declaration population minus the three retired locals. Across every added
 /// transparent body, every applied global convertible to each imported
 /// operation's type has that operation's exact qualified provider `GlobalId`.
@@ -252,9 +253,10 @@ fn evaluate_nat(env: &ElabEnv, id: GlobalId) -> usize {
 /// unclassified population must stay empty. An unused canonical comparison is
 /// removed with its unused let, so it cannot pay for a different operative
 /// decision. CLAIMED: no renamed, mixed, direct, hidden-let, unclassified, or
-/// count-balanced bypass survives. THE GAP: the fixture does not prove raw
-/// standalone success; the authorized raw boundary remains the separately
-/// measured `bool_or` refusal.
+/// count-balanced bypass survives. THE GAP: this synthetic flat fixture does
+/// not prove raw standalone import closure. Fresh roots-loader checks plus
+/// compile-preserving import-withdrawal and wrong-alias mutations own the
+/// standalone-closure and load-bearing evidence.
 #[test]
 fn entry_elaborates_with_exact_inventory_and_canonical_providers() {
     let mut env = base_env();
