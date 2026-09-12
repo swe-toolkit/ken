@@ -155,6 +155,19 @@ executing; the general relation-law tranche, including compose/converse
 membership, concrete predicate discriminators, and closure
 faithfulness/saturation, remains separately deferred.
 
+The **persistent priority queue** is pinned in the dedicated
+**`58a-priority-queues.md`** contract. It exposes exactly one abstract,
+comparator-bound carrier plus `empty`/`insert`/`find_min`/`pop_min`/`merge`,
+with `Ord k` applying only to priorities and no order or equality requirement
+on payloads. Entry multiplicity, optional minimum extraction, persistence,
+non-stable equal-priority ties, abstract recursive validity, and a structural
+right-spine cost account are normative. `CAT-PRIORITY-QUEUE` is the named
+complete computational build; its general validity, conservation, and
+extract-min proofs remain separately deferred to
+`CAT-PRIORITY-QUEUE-LAWS`. This dedicated chapter deliberately does not inherit
+chapter 57's all-laws-land-together posture and freezes no private leftist node
+layout.
+
 The **Layer-3 parsing/syntax/diagnostics contract** — source artifacts as byte
 identity, half-open byte spans, total parser result values, small package-owned
 grammars, parser/printer and formatter laws, and diagnostic primary/secondary
