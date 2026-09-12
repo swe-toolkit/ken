@@ -12,6 +12,33 @@ github: null
 origin: "Carved by the Steward 2026-09-11 from the discharged confirm-or-refute of [[LANG-RESULT-TRANSPORT-SIGMA-SWEEP]] (closed). Architect design ruling evt_79xy16y7fv5sx (re-grounded at b148a96b): the sweep's confirm-or-refute is DISCHARGED — the compound case is REACHABLE and the framed walker-application fix is REFUTED with grounds — and the correct fix (route (a)) is a real bounded refactor of transport's premise construction that EXCEEDS the confirm-or-refute the sweep was sized for, so it is a separate node (Architect ground iii). Architect RECOMMENDED deferral (completeness-only, kernel-backstopped false-reject = safe; trigger narrow/exotic); the Steward placed it here DEFERRED. NOT released — awaiting an operator L2 priority direction (L2's releasable queue is otherwise near-exhausted; item 8 LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES is blocked on a deferred Architect design call). Re-measure the elab.rs anchors at release — they drift."
 ---
 
+# ROUTE-B PRECURSOR LANDED — route (a) RELEASED 2026-09-12 (Steward). READ FIRST.
+
+> # The precursor [[LANG-ACTIVE-PREMISE-KERNEL-VIEW]] is MERGED on main
+> # (3cbfd27a6; code squash 73d481b7d PR #3518, closeout PR #3519). The
+> # depends_on gate is satisfied, so the "do NOT release or kick until the
+> # precursor lands" hold in the RECUT banner below is LIFTED. Route (a) is now
+> # RELEASED to the language ring, executing the operator's standing item-9
+> # direction to run it in L2.
+> #
+> # This is the thin dependent S consumer: synthesize transport's premise as the
+> # result-family-index Sigma equality and feed the existing walker (REUSE, not a
+> # new capability). The frame below is the accurate consumer spec and is
+> # unchanged.
+> #
+> # FIRST STEP at pickup — the elab.rs anchors DRIFTED HARD: the precursor landed
+> # +1811/-278 on elab.rs, so the line coordinates in the frame are STALE.
+> # Re-measure every anchor named below (synth_generated_index_evidence,
+> # project_generated_index_equality_leaves, install_index_refinements,
+> # transport_recursive_group_call_result and its raw-record Eq site) against
+> # current main BEFORE any edit, and re-run the grounding FIRST STEP (whether the
+> # bare-component equality is already available or must be projected).
+> #
+> # Reviewers: Architect (required soundness reviewer for this class) + Language
+> # QA; standing Adversary hunt independent -> Steward M1-M4 -> lieutenant. Tier
+> # T1 (semantic, soundness-adjacent). SEAT NOTE: the T1 language-implementer was
+> # at ~90% ctx at release — it must compact before starting.
+
 # ROUTE-B RECUT 2026-09-12 (operator ruling, this session). READ FIRST.
 
 > # Route (a) alone does NOT close the defect. A three-stop Architect respin
