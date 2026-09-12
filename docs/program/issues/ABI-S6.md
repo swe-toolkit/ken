@@ -12,7 +12,131 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 14 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 15 — OBSERVATION-ONLY RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 15 — ARCHITECT OBSERVATION-ONLY RULING.
+> # Architect observation ruling evt_7sxh0ntrbxmt4 (thr_7wy5wy45p7abm). The
+> # mandatory §1a HS15 Research condition is SATISFIED by advisory evt_art1rp41qd48
+> # (accepted: its reproduced facts and its distinction between a call response, an
+> # ITree continuation result, and the enclosing handler/context Result). Runtime
+> # stays byte-clean at WIP 37390dfcf (restoration base b020b71f, zero Cargo.lock
+> # delta). Production remains HELD. NO production repair is authorized yet — this
+> # ruling classifies the FAILED HS14 repair, not the underlying production defect.
+> #
+> # CLASSIFICATION: DIRECT_MEMBER_QUERY_APPLIED_TO_UNCLASSIFIED_TAIL_RESIDUAL.
+> # HS14's Direct projection is REJECTED for the real population: B is NOT a
+> # confluence member, and A is affirmatively Tail. The attempted
+> # CheckedIhInvocationReturnResultPlan MUST NOT be retained as dormant machinery
+> # or weakened until it accepts these leaves. Grounded evidence: A (origins
+> # 1603/1092, target 1) is the SOLE member of context-0/frame-699's
+> # TailProducerToRet confluence; B (origins 1605/874, target 3) is in ZERO
+> # context-0/body-1605 confluences; the other context-0 class is Direct but
+> # contains only target-0 identity 1594/1474. pre_d3_emission_observation
+> # .ret_case_body_origin == 874 is TEST-ONLY observation metadata and grants NO
+> # authority. HS15 hashes: summary d12e3fa, attempt 94ec1f0c, diagnostic af6aff1f,
+> # terminal-population e3e4d608.
+> #
+> # AUTHORIZED NEXT STEP — ONE observation-only compilation (NOT a repair). Compile
+> # the unchanged writeAll positive
+> # (linked_checked_write_all_observes_short_progress_and_matches_interpreter) under
+> # test support. Reapply the EXACT pre-HS15 HS14 attempt bcde2f02 over 37390dfcf —
+> # the last exact attempt that reaches the generated-context lowering refusal
+> # WITHOUT bypassing a planner failure. Add TEST-SUPPORT INSTRUMENTATION ONLY. Do
+> # NOT carry the rejected Direct-plan type and do NOT suppress a production
+> # validator to get farther. Run ONCE, no mutation, no remaining controls; stream
+> # and hash the full output and closed ledgers; then restore byte-identical to
+> # 37390dfcf / b020b71f (Cargo.lock unchanged, git diff --check clean).
+> #
+> # THE OBSERVER MUST CLOSE THESE POPULATIONS STRUCTURALLY:
+> # (1) CANONICAL PLANNING SQUARE. Enumerate the complete canonical
+> # CheckedIhContinuationInheritance population contributing to context 0/body 1605
+> # and the complete checked-IH transport population in that owner; per row record
+> # source ContinuationCallIdentity, destination owner/body, ordered
+> # self-resumption steps, exact generated-entry coordinate, confluence
+> # membership+route, and complete fresh_result_destination. Join A to EXACTLY ONE
+> # canonical inheritance + its Tail route (source invocation/call/callee
+> # 883/882/881, frame 879, selected body 886, Ret body 910, constructor-child
+> # field 0, direct forward delivery, exact capture ordinal). Zero/multiple =
+> # INVALID.
+> # (2) MEMBER-DOMAIN CLASSIFICATION. From the same canonical builder confluence
+> # formation uses, classify B POSITIVELY as exactly one of: confluence-domain
+> # member omitted by a named filter; local residual call at an inheritance
+> # destination; or outside both closed domains. Absence from the confluence map is
+> # NOT a classification. Name every predicate including/excluding B + its full
+> # identity; do not infer from target 3, origin 874, counts, or map order.
+> # (3) A-TO-B CORRESPONDENCE. Compare A's inheritance complete
+> # fresh_result_destination (active frame, Ret body, constructor-child binder,
+> # closure-env occurrence, closure origin/body, param count, capture
+> # ordinal/occurrence, body-capture reads) with B's exact construct/transport +
+> # complete worker provenance 874/869/859 and captures 868..860; close every
+> # ordered self-resumption step from A's Tail Ret consumer through arrival
+> # 703/702/701. Matching ret_case_body_origin alone is insufficient. Emit exactly
+> # one of COMPOSED_TAIL_RESIDUAL_CHAIN_COMPLETE / B_MEMBER_POPULATION_OMISSION /
+> # TAIL_TO_B_CORRESPONDENCE_INCOMPLETE; zero/multiple/disagreement = INVALID.
+> # (4) ACTUAL CONSUMER LIFECYCLE. At every emitted lowering of source result
+> # origins 705 and 874, record a per-emission token keyed by defining FunctionId +
+> # exact structural occurrence + call Inst (where present); record destination
+> # owner/body, constructor identity, complete remaining eliminator/control spine,
+> # active frame + source-continuation lineage, selected transport/call identity,
+> # answer route + eliminator role before AND after the call, and the exact
+> # successor consumer or terminal predecessor edge. Do NOT classify 705 from
+> # ITree::Vis spelling + transport absence; prove its named consumer + recursively
+> # closed successors, or report it ungoverned. For 874, distinguish return after
+> # [InvocationReturn] from resumption of an existing Vis/Ret driver. Repeated B
+> # emissions are SEPARATE rows, never one count.
+> # (5) SEMANTIC RESULT KIND. Without using declared-target metadata as
+> # realization, enumerate target 3/body 859's complete reachable source-result
+> # shapes and the ordinary consumer source/interpreter semantics applies after the
+> # response. State whether B's call yields the context's FINAL BufferSpan Result
+> # or an intermediate ITree requiring continued Ret/Vis driving. Corroborate
+> # against the interpreter's existing semantic transition if available; no runtime
+> # tags / Ret-shaped body scan to mint authority.
+> # (6) FINISHED-FUNCTION CLOSURE. For all EIGHT governed constructor predecessors
+> # and SEVEN checked-IH Result-load predecessors of the terminal v26 join, one row
+> # per actual predecessor. Call rows: pair exact (FunctionId, call Inst, returned
+> # word, predecessor edge) and re-derive direct callee, call frame, status,
+> # exact-frame Trap-before-Result, Result offset/load, def-use through block
+> # arguments. Constructor rows: retain exact plan-owned constructor identity. Track
+> # every reachable terminal incoming edge; a constructor cannot cover a call, and
+> # one B emission cannot cover another. SSA equality establishes physical def-use
+> # ONLY after semantic authority is proven; it cannot supply that authority.
+> #
+> # THE OBSERVATION MUST CHOOSE ONE DECIDING OUTCOME:
+> # - COMPOSED_TAIL_RESIDUAL_CHAIN_COMPLETE_AND_DRIVER_DROPPED: A's canonical
+> #   Tail/Ret chain uniquely reaches B as a residual call; B returns an
+> #   intermediate ITree; an existing semantic driver is identified; lowering
+> #   terminates at InvocationReturn instead of resuming it.
+> # - B_MEMBER_POPULATION_OMISSION: B is affirmatively in the closed
+> #   confluence-member domain and a named builder filter drops it.
+> # - EXISTING_FINAL_RESULT_REALIZATION_NOT_PROJECTED: an exact already-executed
+> #   semantic consumer produces the contracted identity, with its full chain and
+> #   per-emission proof.
+> # - TRANSFORM_OR_ROUTE_CAPABILITY_REQUIRED: source/interpreter semantics performs
+> #   an operation NOT representable by existing Tail/Ret/source-machine/driver
+> #   machinery. [This outcome is the escalation trigger — see SCOPE below.]
+> # - INVALID: any incomplete/multiple/disagreeing join or unclosed terminal
+> #   predecessor.
+> #
+> # FENCES (absolute): no metadata/status/Trap/tag/Carried/SSA/RoutedAnswer::checked
+> # /InvocationReturn authority; no Direct-for-Tail substitution; no new response
+> # route or transform; no ABI/frame/schema/carrier field, side table, allocation,
+> # discriminant, owner, or function class; no weakening of HS6-HS14, context
+> # contracts, Tail fallback, terminal validation, or exact Ret checking. Preserve
+> # the named 256 MiB Builder stack.
+> #
+> # SYMPTOM INVENTORY appended entry 15 in this same amendment (Architect commit
+> # aaaa649d, blob 1d494118, folded here without rewriting history).
+> #
+> # SCOPE (Steward): FENCED, compiler/test-support-only OBSERVATION — no public
+> # capability, wire, ABI, schema, or topology; does NOT require operator
+> # escalation (Architect-stated). Amended in place with no operator sign-off — same
+> # shape as the HS8/HS10 observation-only passes. Steward owns the read-first fold;
+> # runtime-leader owns the observation kickoff; production remains HELD. The next
+> # Architect ruling follows ONLY from one valid deciding outcome; if that outcome
+> # is TRANSFORM_OR_ROUTE_CAPABILITY_REQUIRED, the subsequent fix leaves the fence
+> # and the Steward escalates it to the operator rather than authorizing it.
+
+# D5b NATIVE HARD-STOP 14 — PRODUCTION RULING (Superseded as READ-FIRST by the HARD-STOP 15 OBSERVATION-ONLY RULING above; the HS14 terminal-result-projection ruling stands as the repair whose failed Direct projection HS15 classifies — its fences hold). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HARD STOP 14 — PRODUCTION RULING (bounded in-place
 > # repair authorized). Architect production ruling evt_6s3ykwpw2bkjp
