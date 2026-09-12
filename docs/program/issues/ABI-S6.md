@@ -12,7 +12,129 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 11 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-11 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 12 — PRODUCTION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HARD STOP 12 — PRODUCTION RULING (repair
+> # authorized IN PLACE). Architect production ruling evt_131yfyvg2ew9b
+> # (thr_7wy5wy45p7abm), accepting the one-run dynamic observation
+> # DYNAMIC_RESULT_COMMIT_WRONG_RET (runtime-implementer evt_531860zwcqhdf).
+> # Runtime stays byte-clean at WIP 37390dfcf (restoration base b020b71f) until
+> # this amendment lands and runtime-leader explicitly kicks the repair. HS12
+> # count stays 12; a NEW structural refusal is HS13 (next mandatory Research
+> # advisory at HS15). Production remains HELD.
+> #
+> # OBSERVATION ACCEPTED (Architect independently verified 13 artifact hashes
+> # incl. exit-record 085b0884...; 8x 768-byte flushed records seq 1..8, single
+> # token/parent/thread/manifest/function pair, no INVALID/mixed outcome).
+> # Physical join: envelope 0x...11de8 both sides; frame 0x...11a48 both sides;
+> # Result 0x...11ab8 == frame+112 at prepare/enter/commit/read; Trap 0x...11ac8
+> # == frame+128 at prepare/enter/read; Result commit/read word 0x2909, status
+> # zero, Trap zero; order commit 3 < return 4 < Trap-read 5 < Result-read 6 <
+> # Ret-check 7; actual tag 0x0d34_0000_0027 vs plan-derived expected
+> # 0x115a_0000_0027. Observer adds no Result load; 256 MiB stack, no
+> # RUST_MIN_STACK, no interpreter/mutation/control; 10 effects + abcdef exact.
+> #
+> # CLASSIFICATION: the caller/callee frame protocol is EXONERATED — not an
+> # empty slot, wrong address, intervening write, Trap misread, alias, or
+> # span-input defect. The callee commits the WRONG SEMANTIC RESULT. The
+> # production gap is visible in current code: StaticResponseContinuation owns
+> # k_ret_identity, but PlannedContinuationContext has NO Result contract;
+> # response_context_union interns/validates a context by specialization/
+> # worker-body/raw-owner/params/captures WITHOUT reconciling the response Result
+> # identity; at emission define_continuation_context_bodies accepts every
+> # LoweringOperand::Carried(word) as a terminal Result and stores the word
+> # before returning zero. Carried PHASE substitutes for positive
+> # semantic-result AUTHORITY. The caller's later exact Ret check detects the
+> # violation, but too late to make the callee's status-zero Result arm true.
+> #
+> # RULED REPAIR (compiler-only context Result contract; NO ABI change):
+> # (1) Add one compiler-only generated-context Result contract. For every
+> # context reachable as a static-response K target, derive the exact expected
+> # ConstructorIdentity from the already-validated response demand's
+> # k_ret_identity. Reconcile the complete demand population at
+> # response_context_union: all demands reusing one context must AGREE on the
+> # identity; a pre-existing context may be enriched only by that exact
+> # agreement. Zero/multiple identities, or disagreement between demand, context,
+> # declared target, and response owner, is PLANNING INFEASIBILITY. Do not
+> # split/renumber contexts to hide disagreement.
+> # (2) Carry that contract ONLY in compiler plan/call metadata. Add NO runtime
+> # ABI, frame slot, carrier field, tag, discriminant, response route,
+> # allocation, schema, or host protocol. CarriedBoundaryWord remains the word
+> # and nothing else. Do not serialize the contract.
+> # (3) Replace phase-as-authority at the generated-context terminal with one
+> # typed, AFFINE Result authority. A terminal Result store for a contracted
+> # context may consume only a value whose lowering route is proven to realize
+> # that context's exact Result contract. LoweringOperand::Carried alone cannot
+> # mint it. Specialized constructors retain their existing governed transfer;
+> # declared call results and checked-IH Direct/Tail results must carry their
+> # existing exact call/forward-route proof through the final source-machine/Ret
+> # sink. The authority contains compiler identity and SSA value only, is
+> # consumed by the existing Result store, and NEVER crosses the ABI.
+> # (4) Pure narrowing is necessary but NOT sufficient for a Tail forward edge.
+> # Strengthen the existing consumption-side collapsibility decision so it yields
+> # the typed Result authority only when the complete plan proves the fresh
+> # producer result, exact Ret binder/sink, and final context Result identity
+> # AGREE. Absence/ambiguity takes the already-existing base call_tail ->
+> # Continue(SourceMachineState::Value { RoutedAnswer::checked, ... }) path.
+> # Never infer from a carrier tag, source name, numeric origin, value equality,
+> # Carried phase, or a successful call. Do not narrow Tail authority formation;
+> # only its optional fast-path consumption is gated.
+> # (5) Keep the existing caller status -> Trap -> Result order and exact Ret
+> # check. At the contracted callee's existing terminal seat, VALIDATE the
+> # committed word against the plan-owned Result identity before publishing
+> # status zero. A mismatch is TRANSPORT FAILURE: no Result store, no status-zero
+> # return; NOT a fabricated language Trap. This is the BACKSTOP, not the
+> # producer — the unchanged witness must take the proved/base semantic route
+> # and produce the correct Ret; merely moving terminal -1 into the callee does
+> # NOT satisfy this repair.
+> # (6) Install ONE shared finished-CLIF terminal-contract validator before
+> # generated-context publication. Key by exact entry frame base + descriptor
+> # offsets; propagate Empty|Result|Trap|Double path-sensitively to a fixpoint;
+> # inspect every reachable Return incl. early branches and loops. Status zero
+> # must see exactly one same-frame Result or Trap arm; nonzero status must not
+> # authorize either caller read; a Result store must be the one consuming the
+> # typed authority. Wrong base/offset, zero-with-Empty, Double, unclosed dynamic
+> # status, or a Result value not owned by the exact contract REFUSES
+> # compilation. Reuse one implementation for contexts; no response-specific
+> # syntactic scans.
+> #
+> # FENCES: preserve HS6 isolation/recursion, HS7 exact disposition, HS8
+> # ingress, HS9 root provenance, HS10 plan-owned bridge, HS11 phase-preserving
+> # materializer, aggregate preflight/ownership, checked frame/site/interface
+> # validation, dynamic-edge validation, response-owner selection, and
+> # StaticResponseDeferred exact-owner law. Do NOT initialize Result, widen the
+> # external status protocol, add a sole-epilogue rewrite, decode/reconstruct
+> # provenance from a carrier, move allocation, add a context-specific writeAll
+> # path, weaken Ret checking, change stack size/limits/guards/traversal, or
+> # alter interpreter/effect/COW/file semantics.
+> #
+> # ACCEPTANCE + MUTATIONS: unchanged writeAll native run has plan-derived Ret
+> # tag 0x115a_0000_0027, NO terminal -1, the same 10 ordered effects, output
+> # abcdef, file/COW preservation, native/interpreter parity. A compile-time
+> # ledger closes every contracted context (exact contract, declared callers,
+> # selected Direct/Tail/base disposition, typed-authority producer, one
+> # consuming Result store, all Return states); the D5b context is NOT accepted
+> # merely because its word is Carried. Population mutations (each alone,
+> # detector unchanged, exact restoration): drop the context Result contract;
+> # vary one reused demand's identity; treat plain Carried as authority; force
+> # the unproved Tail fast path; substitute captured-env/independent word for the
+> # application Result — each must refuse or red the unchanged positive at its
+> # stated gate; the exact/base route stays green. Terminal mutations:
+> # omitted/duplicate Result, Result-then-Trap, wrong frame/offset,
+> # zero-before-commit, looped second commit, Trap-before-Result bypass, wrong
+> # Ret — each reaches and reds distinctly; positive Result/Trap/nonzero-failure
+> # neighbours keep the validator live. Run scoped Runtime/CLI via
+> # scripts/ken-cargo, staticlib + ELF census, all-Specialized neighbours, D5b
+> # controls, COW/file preservation, and CI. Restore every observation hook. A
+> # new structural refusal is HS13; STOP rather than relax this contract.
+> #
+> # SCOPE (Steward): in-place D5b compiler repair — NO public capability, wire,
+> # ABI, schema, or topology. FENCED (no TCB growth, no new capability, no spec
+> # change, no scope fork), amended in place with no operator sign-off — same
+> # shape as the HS9/HS10/HS11 in-place amendments. Steward owns amendment;
+> # runtime-leader owns kickoff; production remains HELD.
+
+# D5b NATIVE HARD-STOP 11 — PRODUCTION RULING (Superseded as READ-FIRST by the HARD-STOP 12 PRODUCTION RULING above; the HS11 phase-preserving shared deferred-constructor materializer repair SUCCEEDED and stands in WIP 37390dfcf as a preserved HS12 fence). AMENDED IN PLACE 2026-09-11 (Steward).
 
 > # D5b native-lowering track, HARD STOP 11 — PRODUCTION RULING (repair
 > # authorized IN PLACE). Architect production ruling evt_xp8vc845wm0g
