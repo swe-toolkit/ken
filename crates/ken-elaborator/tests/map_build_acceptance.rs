@@ -1,17 +1,16 @@
-//! `Map-build` acceptance tests (`docs/program/wp/Map-build.md`,
-//! `spec/50-stdlib/52-map.md`, `conformance/stdlib/map/seed-map.md`).
+//! Map and CAT-4 maps/sets/relations acceptance tests.
 //!
-//! **Partial-scope candidate.** `insert`/`lookup`/`member`/`from_list` and the
-//! `52 §5` proof obligations need a key comparator threaded generically over
-//! an abstract `Ord k` dictionary — no landed mechanism exists for that yet
-//! (confirmed empirically against `elab.rs`'s `instance_search`, escalated to
-//! Architect, `evt_1wd56hecqhm06`/`evt_64j01esqw86pf`/`evt_1wsk6dracp10r` in
-//! the Map-build thread). This file covers only what
-//! `catalog/packages/Data/Collections/Map.ken.md` ships today: the `Tree k v`
-//! carrier, `empty`, `to_list`, `fold`,
-//! and the `Pair`/`mk_pair`/`pair_fst`/`pair_snd` Σ-pair plumbing
-//! (`ken-elaborator/src/prelude.rs`) those two ops route through. Extended
-//! once the generic-dictionary gap resolves.
+//! Authorities: `spec/50-stdlib/52-map.md`, the verified-law continuation in
+//! `spec/50-stdlib/54-map-verified-laws.md`, the relation and positive-closure
+//! contract in `spec/50-stdlib/58-maps-sets-relations.md §7`,
+//! `conformance/stdlib/map/seed-map.md`, and
+//! `conformance/stdlib/collections/seed-cat4-maps-sets-relations.md`.
+//!
+//! The suite covers the original `Tree`/map capstone and later CAT-4
+//! definitions, laws, concrete relation computations, and bounded positive
+//! closure. Each test states its own measured boundary; passing concrete
+//! closure cases does not supply the deferred general compose/converse or
+//! closure faithfulness and saturation proofs.
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
@@ -20,7 +19,7 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, Term};
+use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, KernelError, Term};
 
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
 
@@ -94,7 +93,12 @@ fn mk_map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::load_derived_importing_fixture(&mut env, "list_append");
-    for imported in ["cong", "sym", "trans", "list_append"] {
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Numeric.Nat.Arithmetic",
+    )
+    .expect("Map's canonical Nat addition provider must roots-load");
+    for imported in ["add", "cong", "sym", "trans", "list_append"] {
         assert!(
             !env.globals.contains_key(imported),
             "Map's declared import must supply `{imported}` rather than an ambient alias"
@@ -264,10 +268,11 @@ fn cat_bool_reuse_d2_import_withdrawal_and_wrong_name_fail_at_is_some() {
 /// Promise class: durable invariant.
 ///
 /// **MEASURED:** a fresh roots-loader environment elaborates Map and its direct
-/// declarations reference each exact provider added by the dependency-closure
-/// repair. **CLAIMED:** Map's declared imports close its production package and
-/// preserve the intended provider identities. **THE GAP:** this guards Map's
-/// repaired edges, not the separate catalog-wide standalone census.
+/// declarations reference every selectively imported provider whose flat alias
+/// the legacy fixture withholds. **CLAIMED:** Map's declared imports close its
+/// production package and preserve the intended provider identities. **THE
+/// GAP:** this guards Map's declared edges, not the separate catalog-wide
+/// standalone census.
 #[test]
 fn cat_map_dependency_closure_roots_loads_declared_imports() {
     let mut env = ElabEnv::new().expect("base env");
@@ -279,6 +284,7 @@ fn cat_map_dependency_closure_roots_loads_declared_imports() {
 
     for provider_name in [
         "Data.Collections.Derived.list_append",
+        "Data.Numeric.Nat.Arithmetic.add",
         "Core.Logic.Transport.cong",
         "Core.Logic.Transport.sym",
         "Core.Logic.Transport.trans",
@@ -1277,8 +1283,12 @@ fn cat4_new_api_is_derived_and_axiom_free() {
         "values_project_to_list",
         "keys_values_projection_coherence",
         "keys_ascending",
+        "size",
+        "dom",
         "succ",
         "rel_member",
+        "reachable_within",
+        "reachable_plus",
         "add_edge",
         "compose_succ_step",
         "compose_succ",
@@ -1525,6 +1535,727 @@ fn cat4_relations_compose_and_converse_over_adjacency_maps() {
         ),
     );
     assert!(bool_value(&env, &v), "converse must reverse the adjacency edge 1 -> 2 into 2 -> 1");
+}
+
+/// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and the CAT-4
+/// conformance seed's four-function public-interface boundary.
+///
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** a fresh roots-loaded consumer selectively imports abstract
+/// `Tree` and all four closure functions, calls each through generic tree-valued
+/// parameters, and independently imports and calls canonical `Nat` `add`.
+/// Selective `Leaf`/`Node` imports and a qualified `Leaf` reference are exact
+/// `UnboundName` refusals. **CLAIMED:** the authorized abstract carrier and four
+/// functions are usable while constructors remain private. **THE GAP:**
+/// parameterized calls prove typed abstract-interface usability, not public
+/// construction, an exhaustive census of every private operation, or the
+/// `Ordered` and lawful-comparator premises required for closure correspondence.
+#[test]
+fn cat_rel_public_api_is_usable_while_tree_constructors_stay_private() {
+    let mut env = mk_map_dependency_env();
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.Map")
+        .expect("Map must roots-load before its public closure interface is consumed");
+
+    let tree = env.globals["Data.Collections.Map.Tree"];
+    assert!(
+        matches!(env.env.lookup(tree), Some(Decl::Inductive { .. })),
+        "public Tree must remain the existing checked inductive carrier"
+    );
+    assert!(
+        trusted_base_delta(&env.env, tree).is_empty(),
+        "publishing the abstract Tree name must add no trust"
+    );
+
+    let providers: Vec<_> = [
+        "Data.Numeric.Nat.Arithmetic.add",
+        "Data.Collections.Map.size",
+        "Data.Collections.Map.dom",
+        "Data.Collections.Map.reachable_within",
+        "Data.Collections.Map.reachable_plus",
+    ]
+    .into_iter()
+    .map(|name| (name, env.globals[name]))
+    .collect();
+
+    env.elaborate_file(
+        "import Data.Numeric.Nat.Arithmetic (add)\n\
+         import Data.Collections.Map (Tree, size, dom, reachable_within, reachable_plus)\n\
+         fn cat_rel_public_add (x : Nat) (y : Nat) : Nat = add x y\n\
+         fn cat_rel_public_size (k : Type) (v : Type) (m : Tree k v) : Nat = size k v m\n\
+         fn cat_rel_public_dom (k : Type) (v : Type) (m : Tree k v) : Tree k Unit = dom k v m\n\
+         fn cat_rel_public_within (k : Type) (leq : k -> k -> Bool) (fuel : Nat) (x : k) (y : k) (r : Tree k (Tree k Unit)) : Bool = reachable_within k leq fuel x y r\n\
+         fn cat_rel_public_plus (k : Type) (leq : k -> k -> Bool) (x : k) (y : k) (r : Tree k (Tree k Unit)) : Prop = reachable_plus k leq x y r",
+    )
+    .expect("the abstract Tree and all four closure functions must support typed consumer calls");
+
+    for (wrapper, (_, provider)) in [
+        "cat_rel_public_add",
+        "cat_rel_public_size",
+        "cat_rel_public_dom",
+        "cat_rel_public_within",
+        "cat_rel_public_plus",
+    ]
+    .into_iter()
+    .zip(providers.iter())
+    {
+        let wrapper = env.globals[wrapper];
+        let (_, body) = env
+            .env
+            .transparent_body(wrapper)
+            .expect("consumer wrapper must remain transparent");
+        assert!(
+            term_reference_count(&body, *provider) > 0,
+            "consumer wrapper must call exact provider {}",
+            providers
+                .iter()
+                .find_map(|(name, id)| (*id == *provider).then_some(*name))
+                .expect("provider label")
+        );
+    }
+
+    for private in ["Leaf", "Node"] {
+        let qualified = format!("Data.Collections.Map.{private}");
+        match env.elaborate_file(&format!("import Data.Collections.Map ({private})")) {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, qualified),
+            Err(other) => panic!("private constructor import must fail as UnboundName: {other:?}"),
+            Ok(_) => panic!("private constructor `{private}` became selectively importable"),
+        }
+    }
+
+    match env.elaborate_file(
+        "import Data.Collections.Map (Tree)\n\
+         fn cat_rel_hidden_leaf (k : Type) (v : Type) (m : Tree k v) : Tree k v = \
+           Data.Collections.Map.Leaf k v",
+    ) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, "Data.Collections.Map.Leaf")
+        }
+        Err(other) => panic!("qualified private constructor must fail as UnboundName: {other:?}"),
+        Ok(_) => panic!("qualified private Leaf constructor became reachable"),
+    }
+}
+
+/// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and CAT-4 seed cases
+/// `closure-size-counts-fixed-three-node-tree` and
+/// `closure-dom-keeps-only-outer-keys`.
+///
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** generic kernel identities pin both Node recurrences; literal
+/// expectations count one/two-source relations and the seed's fixed
+/// root/left/right three-node tree; the exact `{0, 2}` outer domain retains
+/// both sources while rejecting target-only `{1, 3}`. **CLAIMED:** `size` counts
+/// raw nodes and
+/// `dom` preserves exactly the outer-tree keys without target leakage. **THE
+/// GAP:** these finite trees exercise the structural equations, not the
+/// separately deferred correspondence law for every ordered relation.
+#[test]
+fn cat_rel_size_and_dom_count_only_outer_relation_keys() {
+    let mut env = mk_env();
+    env.elaborate_decl(
+        "theorem t_cat_rel_size_node_form \
+           (k : Type) (v : Type) (l : Tree k v) (key : k) (val : v) (r : Tree k v) : \
+           Equal Nat \
+             (size k v (Node k v l key val r)) \
+             (Suc (add (size k v l) (size k v r))) = \
+           Refl",
+    )
+    .expect("size must expose the exact add-based Node recurrence");
+    env.elaborate_decl(
+        "theorem t_cat_rel_dom_node_form \
+           (k : Type) (v : Type) (l : Tree k v) (key : k) (val : v) (r : Tree k v) : \
+           Equal (Tree k Unit) \
+             (dom k v (Node k v l key val r)) \
+             (Node k Unit (dom k v l) key MkUnit (dom k v r)) = \
+           Refl",
+    )
+    .expect("dom must preserve the exact Node shape while replacing its value");
+    let mut store = make_store(&env);
+    let zero = nat(0);
+    let one = nat(1);
+    let two = nat(2);
+    let three = nat(3);
+    let fixed_three_node_tree = format!(
+        "Node Nat Unit \
+           (Node Nat Unit (Leaf Nat Unit) ({zero}) MkUnit (Leaf Nat Unit)) \
+           ({one}) MkUnit \
+           (Node Nat Unit (Leaf Nat Unit) ({two}) MkUnit (Leaf Nat Unit))"
+    );
+    let single_edge = format!(
+        "add_edge Nat leq_nat ({one}) ({two}) (empty Nat (Tree Nat Unit))"
+    );
+    let two_sources = format!(
+        "add_edge Nat leq_nat ({two}) ({three}) ({single_edge})"
+    );
+    let seeded_dom = format!(
+        "add_edge Nat leq_nat ({two}) ({three}) \
+           (add_edge Nat leq_nat ({zero}) ({one}) (empty Nat (Tree Nat Unit)))"
+    );
+
+    let value = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_single_size",
+        "Nat",
+        &format!("size Nat (Tree Nat Unit) ({single_edge})"),
+    );
+    assert_eq!(
+        nat_count(&env, &value),
+        1,
+        "one outer source key must give raw relation size one"
+    );
+
+    let value = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_fixed_three_node_size",
+        "Nat",
+        &format!("size Nat Unit ({fixed_three_node_tree})"),
+    );
+    assert_eq!(
+        nat_count(&env, &value),
+        3,
+        "the fixed root/left/right seed tree must have exactly three raw nodes"
+    );
+
+    let value = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_two_source_size",
+        "Nat",
+        &format!("size Nat (Tree Nat Unit) ({two_sources})"),
+    );
+    assert_eq!(
+        nat_count(&env, &value),
+        2,
+        "the independently constructed two-source relation must contain two raw nodes"
+    );
+
+    let value = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_two_source_dom_size",
+        "Nat",
+        &format!(
+            "size Nat Unit (dom Nat (Tree Nat Unit) ({two_sources}))"
+        ),
+    );
+    assert_eq!(
+        nat_count(&env, &value),
+        2,
+        "dom must preserve both and only the two outer nodes"
+    );
+
+    let source_member = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_dom_source_member",
+        "Bool",
+        &format!(
+            "set_member Nat leq_nat ({one}) (dom Nat (Tree Nat Unit) ({single_edge}))"
+        ),
+    );
+    let target_member = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_dom_target_member",
+        "Bool",
+        &format!(
+            "set_member Nat leq_nat ({two}) (dom Nat (Tree Nat Unit) ({single_edge}))"
+        ),
+    );
+    assert!(
+        bool_value(&env, &source_member),
+        "the edge source must remain in the outer domain"
+    );
+    assert!(
+        !bool_value(&env, &target_member),
+        "a successor-only target must not leak into the outer domain"
+    );
+
+    let value = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seeded_dom_size",
+        "Nat",
+        &format!("size Nat Unit (dom Nat (Tree Nat Unit) ({seeded_dom}))"),
+    );
+    assert_eq!(
+        nat_count(&env, &value),
+        2,
+        "the CAT-4 domain seed must retain exactly its two outer keys"
+    );
+    for (name, key, expected) in [
+        ("zero_source", &zero, true),
+        ("two_source", &two, true),
+        ("one_target_only", &one, false),
+        ("three_target_only", &three, false),
+    ] {
+        let member = eval_view(
+            &mut env,
+            &mut store,
+            &format!("t_cat_rel_seeded_dom_{name}"),
+            "Bool",
+            &format!(
+                "set_member Nat leq_nat ({key}) \
+                 (dom Nat (Tree Nat Unit) ({seeded_dom}))"
+            ),
+        );
+        assert_eq!(
+            bool_value(&env, &member),
+            expected,
+            "CAT-4 domain seed membership mismatch for {name}"
+        );
+    }
+}
+
+/// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and the CAT-4 seed's
+/// `transitive-closure-decidable-not-raw-omega` public-predicate boundary.
+///
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** the kernel accepts the identity function from `reachable_plus`
+/// to the exact `Equal Bool (reachable_within ... (size (dom r)) ...) True`
+/// proposition. **CLAIMED:** the public predicate has the specified `IsTrue`
+/// equation and literal domain-size bound. **THE GAP:** this pins the checked
+/// predicate form; the runtime discriminators below own the recurrence's
+/// computation.
+#[test]
+fn cat_rel_reachable_plus_has_exact_public_predicate() {
+    let mut env = mk_env();
+    env.elaborate_decl(
+        "theorem t_cat_rel_reachable_plus_form \
+           (k : Type) (leq : k -> k -> Bool) (x : k) (y : k) \
+           (r : Tree k (Tree k Unit)) : \
+           reachable_plus k leq x y r -> \
+           Equal Bool \
+             (reachable_within k leq \
+               (size k Unit (dom k (Tree k Unit) r)) x y r) \
+             True = \
+           λh. h",
+    )
+    .expect("reachable_plus must reduce to the exact domain-bounded IsTrue equation");
+}
+
+/// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and CAT-4 seed cases
+/// `closure-zero-one-direct-edge-boundary` and
+/// `closure-one-two-fuel-two-edge-path`.
+///
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** the kernel accepts both exact fuel equations, including the
+/// `Suc n` fold step whose sole recursive call receives predecessor `n`.
+/// **CLAIMED:** `reachable_within` implements the specified recurrence rather
+/// than another extensionally similar search. **THE GAP:** these identities pin
+/// the recurrence's checked form; the concrete fuel boundaries below establish
+/// that its branches execute.
+#[test]
+fn cat_rel_reachable_within_has_exact_fuel_recurrence() {
+    let mut env = mk_env();
+    env.elaborate_decl(
+        "theorem t_cat_rel_reachable_zero_form \
+           (k : Type) (leq : k -> k -> Bool) (x : k) (y : k) \
+           (r : Tree k (Tree k Unit)) : \
+           Equal Bool (reachable_within k leq Zero x y r) False = \
+           Proved",
+    )
+    .expect("reachable_within at Zero must reduce to False");
+    env.elaborate_decl(
+        "fn t_cat_rel_expected_suc \
+           (k : Type) (leq : k -> k -> Bool) (n : Nat) (x : k) (y : k) \
+           (r : Tree k (Tree k Unit)) : Bool = \
+           cat4_bool_or \
+             (set_member k leq y (succ k leq x r)) \
+             (fold k Unit Bool \
+               (λz. λu. λseen. \
+                 cat4_bool_or (reachable_within k leq n z y r) seen) \
+               False \
+               (succ k leq x r))",
+    )
+    .expect("the independent expected Suc recurrence must elaborate");
+    env.elaborate_decl(
+        "theorem t_cat_rel_reachable_suc_form \
+           (k : Type) (leq : k -> k -> Bool) (n : Nat) (x : k) (y : k) \
+           (r : Tree k (Tree k Unit)) : \
+           Equal Bool \
+             (reachable_within k leq (Suc n) x y r) \
+             (t_cat_rel_expected_suc k leq n x y r) = \
+           Refl",
+    )
+    .expect("reachable_within at Suc must expose the exact predecessor-fold recurrence");
+}
+
+/// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and the CAT-4 direct
+/// edge, positive-self, ordinary two-edge, reverse, and target-only-sink cases.
+///
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** the CAT-4 seed operands execute the direct-edge 0/1 boundary,
+/// acyclic-self/self-loop pair, reverse negative, and target-only sink at the
+/// one-key domain bound. A separate ordinary chain has no direct shortcut:
+/// one fuel rejects while two fuel, the domain-sized worker, and
+/// `reachable_plus` accept. **CLAIMED:** the fixed recurrence computes positive
+/// bounded reachability and the public predicate
+/// uses exactly `size (dom r)`, never zero-step reflexive closure or `N - 1`.
+/// **THE GAP:** faithfulness and saturation for arbitrary lawful ordered
+/// relations remain the separately stated proof follow-on.
+#[test]
+fn cat_rel_reachability_obeys_positive_fuel_and_domain_bound() {
+    let mut env = mk_env();
+    let mut store = make_store(&env);
+    let zero = nat(0);
+    let one = nat(1);
+    let two = nat(2);
+    let three = nat(3);
+    let seed_edge = format!(
+        "add_edge Nat leq_nat ({zero}) ({one}) (empty Nat (Tree Nat Unit))"
+    );
+    let seed_loop = format!(
+        "add_edge Nat leq_nat ({zero}) ({zero}) (empty Nat (Tree Nat Unit))"
+    );
+    let single_edge = format!(
+        "add_edge Nat leq_nat ({one}) ({two}) (empty Nat (Tree Nat Unit))"
+    );
+    let chain = format!("add_edge Nat leq_nat ({two}) ({three}) ({single_edge})");
+    let direct_zero = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_direct_zero",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({zero}) ({zero}) ({one}) ({seed_edge})"
+        ),
+    );
+    let direct_one = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_direct_one",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({one}) ({zero}) ({one}) ({seed_edge})"
+        ),
+    );
+    assert!(!bool_value(&env, &direct_zero), "fuel zero must reject a direct edge");
+    assert!(bool_value(&env, &direct_one), "fuel one must accept a direct edge");
+
+    let sink_domain_size = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_sink_domain_size",
+        "Nat",
+        &format!("size Nat Unit (dom Nat (Tree Nat Unit) ({seed_edge}))"),
+    );
+    let sink_target_member = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_sink_target_member",
+        "Bool",
+        &format!(
+            "set_member Nat leq_nat ({one}) \
+             (dom Nat (Tree Nat Unit) ({seed_edge}))"
+        ),
+    );
+    assert_eq!(
+        nat_count(&env, &sink_domain_size),
+        1,
+        "the exact CAT-4 target-sink relation must have one outer-domain key"
+    );
+    assert!(
+        !bool_value(&env, &sink_target_member),
+        "target-only sink 1 must remain outside the exact CAT-4 outer domain"
+    );
+
+    let absent_shortcut = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_absent_shortcut",
+        "Bool",
+        &format!(
+            "set_member Nat leq_nat ({three}) (succ Nat leq_nat ({one}) ({chain}))"
+        ),
+    );
+    let two_step_one = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_two_step_one",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({one}) ({one}) ({three}) ({chain})"
+        ),
+    );
+    let two_step_two = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_two_step_two",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({two}) ({one}) ({three}) ({chain})"
+        ),
+    );
+    assert!(
+        !bool_value(&env, &absent_shortcut),
+        "rel_member's underlying decision must reject the absent 1 -> 3 edge"
+    );
+    assert!(
+        !bool_value(&env, &two_step_one),
+        "fuel one must reject a path whose shortest positive length is two"
+    );
+    assert!(
+        bool_value(&env, &two_step_two),
+        "fuel two must accept the 1 -> 2 -> 3 path"
+    );
+
+    let domain_bounded = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_domain_bounded",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat (size Nat Unit (dom Nat (Tree Nat Unit) ({chain}))) ({one}) ({three}) ({chain})"
+        ),
+    );
+    let unreachable = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_unreachable",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({two}) ({three}) ({one}) ({chain})"
+        ),
+    );
+    let acyclic_self = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_acyclic_self",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat (size Nat Unit (dom Nat (Tree Nat Unit) ({seed_edge}))) ({zero}) ({zero}) ({seed_edge})"
+        ),
+    );
+    assert!(
+        bool_value(&env, &domain_bounded),
+        "the hand-computed two-key domain bound must accept the two-edge path"
+    );
+    assert!(
+        !bool_value(&env, &unreachable),
+        "the ordinary chain must not create reverse reachability from 3 to 1"
+    );
+    assert!(
+        !bool_value(&env, &acyclic_self),
+        "endpoint equality must not create a zero-step path"
+    );
+
+    for (name, proposition) in [
+        (
+            "t_cat_rel_plus_chain",
+            format!("reachable_plus Nat leq_nat ({one}) ({three}) ({chain})"),
+        ),
+        (
+            "t_cat_rel_plus_single_target",
+            format!("reachable_plus Nat leq_nat ({zero}) ({one}) ({seed_edge})"),
+        ),
+        (
+            "t_cat_rel_plus_self_loop",
+            format!("reachable_plus Nat leq_nat ({zero}) ({zero}) ({seed_loop})"),
+        ),
+    ] {
+        env.elaborate_decl(&format!("theorem {name} : {proposition} = Proved"))
+            .unwrap_or_else(|error| panic!("{name} must be inhabited: {error}"));
+    }
+
+    for (name, proposition) in [
+        (
+            "t_cat_rel_no_reflexive_step",
+            format!("reachable_plus Nat leq_nat ({zero}) ({zero}) ({seed_edge})"),
+        ),
+        (
+            "t_cat_rel_unreachable_plus",
+            format!("reachable_plus Nat leq_nat ({three}) ({one}) ({chain})"),
+        ),
+    ] {
+        let rejected = env
+            .elaborate_decl(&format!("theorem {name} : {proposition} = Proved"))
+            .expect_err("false reachable_plus proposition must remain uninhabited");
+        assert!(
+            matches!(
+                rejected,
+                ElabError::KernelRejected {
+                    error: KernelError::TypeMismatch { .. },
+                    ..
+                }
+            ),
+            "false reachable_plus proof must fail with a kernel TypeMismatch, got {rejected:?}"
+        );
+    }
+}
+
+/// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and CAT-4 case
+/// `closure-positive-two-edge-cycle`.
+///
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** on exact `0 → 1, 1 → 0` with no self-loop, fuel one rejects
+/// self-reachability, fuel two accepts it, and `reachable_plus 0 0` is inhabited
+/// at outer-domain size two. **CLAIMED:** positive cyclic self-reachability
+/// requires a real nonempty path, not endpoint equality or a direct loop.
+/// **THE GAP:** this concrete cycle executes the positive-path discriminator;
+/// it does not supply the deferred general correspondence proof.
+#[test]
+fn cat_rel_seed_positive_two_edge_cycle_executes() {
+    let mut env = mk_env();
+    let mut store = make_store(&env);
+    let zero = nat(0);
+    let one = nat(1);
+    let two = nat(2);
+    let cycle = format!(
+        "add_edge Nat leq_nat ({one}) ({zero}) \
+           (add_edge Nat leq_nat ({zero}) ({one}) (empty Nat (Tree Nat Unit)))"
+    );
+
+    let fuel_one = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_cycle_one",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({one}) ({zero}) ({zero}) ({cycle})"
+        ),
+    );
+    let fuel_two = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_cycle_two",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({two}) ({zero}) ({zero}) ({cycle})"
+        ),
+    );
+    assert!(
+        !bool_value(&env, &fuel_one),
+        "the two-cycle must not provide direct self-reachability"
+    );
+    assert!(
+        bool_value(&env, &fuel_two),
+        "the two-cycle must provide positive two-edge self-reachability"
+    );
+    env.elaborate_decl(&format!(
+        "theorem t_cat_rel_plus_cycle : \
+           reachable_plus Nat leq_nat ({zero}) ({zero}) ({cycle}) = Proved"
+    ))
+    .expect("the public domain-size bound must inhabit the exact two-cycle");
+}
+
+/// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and CAT-4 cases
+/// `closure-one-two-fuel-two-edge-path` and
+/// `closure-reverse-direction-unreachable`.
+///
+/// Promise class: durable invariant.
+///
+/// **MEASURED:** exact `0 → {1, 3}, 1 → {2}` has successor-tree root `3`, no
+/// direct `0 → 2`, and required intermediate `1` below that root. Fuel one
+/// rejects, fuel two and `reachable_plus 0 2` accept, while fuel-two and public
+/// reverse `2 → 0` reject with the exact kernel mismatch. **CLAIMED:** the fold
+/// visits non-root successors and preserves edge direction. **THE GAP:** this
+/// is a concrete lawful ordered fixture, not a general fold-correspondence law.
+#[test]
+fn cat_rel_seed_non_root_successor_path_executes() {
+    let mut env = mk_env();
+    let mut store = make_store(&env);
+    let zero = nat(0);
+    let one = nat(1);
+    let two = nat(2);
+    let three = nat(3);
+    let path = format!(
+        "add_edge Nat leq_nat ({one}) ({two}) \
+           (add_edge Nat leq_nat ({zero}) ({one}) \
+             (add_edge Nat leq_nat ({zero}) ({three}) (empty Nat (Tree Nat Unit))))"
+    );
+
+    env.elaborate_decl(
+        "fn t_cat_rel_seed_root_key (t : Tree Nat Unit) : Nat = \
+           match t { Leaf ↦ Zero; Node l key val r ↦ key }",
+    )
+    .expect("the seed successor-root observer must elaborate");
+    let successor_root = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_successor_root",
+        "Nat",
+        &format!("t_cat_rel_seed_root_key (succ Nat leq_nat ({zero}) ({path}))"),
+    );
+    let direct = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_non_root_direct",
+        "Bool",
+        &format!(
+            "set_member Nat leq_nat ({two}) (succ Nat leq_nat ({zero}) ({path}))"
+        ),
+    );
+    let fuel_one = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_non_root_one",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({one}) ({zero}) ({two}) ({path})"
+        ),
+    );
+    let fuel_two = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_non_root_two",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({two}) ({zero}) ({two}) ({path})"
+        ),
+    );
+    let reverse = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat_rel_seed_non_root_reverse",
+        "Bool",
+        &format!(
+            "reachable_within Nat leq_nat ({two}) ({two}) ({zero}) ({path})"
+        ),
+    );
+
+    assert_eq!(
+        nat_count(&env, &successor_root),
+        3,
+        "required intermediate 1 must not be successor-tree root 3"
+    );
+    assert!(!bool_value(&env, &direct), "the direct 0 -> 2 edge must be absent");
+    assert!(!bool_value(&env, &fuel_one), "fuel one must reject the two-edge path");
+    assert!(
+        bool_value(&env, &fuel_two),
+        "the fold must find intermediate 1 below successor-tree root 3"
+    );
+    assert!(!bool_value(&env, &reverse), "the directed path must reject 2 -> 0");
+
+    env.elaborate_decl(&format!(
+        "theorem t_cat_rel_plus_non_root_path : \
+           reachable_plus Nat leq_nat ({zero}) ({two}) ({path}) = Proved"
+    ))
+    .expect("reachable_plus must inhabit the exact non-root successor path");
+
+    let rejected = env
+        .elaborate_decl(&format!(
+            "theorem t_cat_rel_no_reverse_non_root_path : \
+             reachable_plus Nat leq_nat ({two}) ({zero}) ({path}) = Proved"
+        ))
+        .expect_err("reverse reachable_plus must remain uninhabited");
+    assert!(
+        matches!(
+            rejected,
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "reverse reachable_plus proof must fail with kernel TypeMismatch, got {rejected:?}"
+    );
 }
 
 // A hand-built concrete-instance application (`tree_2_1_3` under a trivial

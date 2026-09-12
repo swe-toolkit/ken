@@ -283,20 +283,22 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   `leq_nat` plus four order results (the `Axiom`-holed `Ord Int`/`Ord Char` would
   make the accept-arm vacuous). Kernel-untouched, outer-ring, zero
   `trusted_base()` delta.
-- **Deferred follow-on (CAT-4 Fork B / C-scope, updated 2026-09-12) —
-  transitive-closure computation, then general relation laws.** `58 §7` pins the
-  exact `size`/`dom`/`reachable_within`/`reachable_plus` contract. The D0 order
+- **Landed computation + deferred follow-on (CAT-4 Fork B / C-scope, updated
+  2026-09-12) — public transitive-closure computation, then general relation
+  laws.** `58 §7` pins the exact
+  `size`/`dom`/`reachable_within`/`reachable_plus` contract. The D0 order
   results, D1–D2 general proofs, and D3 projection/ascending proofs are landed.
-  D4 lands transparent `compose`/`converse` and property-predicate definitions.
-  The paired conformance seed records an exact run of the two positive runtime
-  smoke observations; neither observation supplies the still-missing general
-  membership proofs, the concrete predicate proof-flips, or the closure
-  computation. The four closure functions are the next single computational
-  fast-follow. A separate general-relation-law tranche then supplies those
-  residuals plus the **faithfulness/saturation laws** (bounded = full positive
-  closure by simple-path shortening and `N`-fuel saturation). The design is
-  pinned and no definition, observation, conformance arm, or proof is credited
-  to another.
+  D4 lands transparent `compose`/`converse`, property-predicate definitions,
+  and the public four-function closure computation. The paired conformance seed
+  records the exact two positive relation smoke observations and executes all
+  eight closure cases. The four closure functions are public and executing;
+  neither that execution nor the relation smoke supplies the still-missing
+  general compose/converse membership proofs, concrete property-predicate
+  proof-flips, or closure faithfulness/saturation laws. A separate
+  general-relation-law tranche supplies those residuals, with bounded/full
+  positive-closure faithfulness established by simple-path shortening and
+  `N`-fuel saturation. The design is pinned and no definition, observation,
+  conformance arm, or proof is credited to another.
   Feeds L14 model-check + Lane B.
 - **Affects.** `30-surface/31 §1a/§1b` (updated), all of `30-surface/`;
   `30-surface/33 §4` (visibility default resolved).
