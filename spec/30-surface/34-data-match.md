@@ -394,20 +394,30 @@ The comparator is a **value-level branch-selection operation**. It returns a
 `Bool`; it neither constructs an `Equal` proof nor adds an equality hypothesis
 to the branch. A lawful `DecEq` certificate may license a comparator, but is not
 required when the type's normative value semantics already fixes a total
-comparison. This distinction is necessary for IEEE floating point and
-non-canonical `Decimal`, whose value comparators are deliberately not lawful
-`DecEq` operations.
+comparison. This distinction admits IEEE floating-point value comparison and
+explains why `Decimal`'s intended value relation is not a lawful `DecEq`;
+comparator totality remains a separate admission condition.
+
+Expected-type carrier selection and comparator realization are separate. The
+expected type fixes the source carrier of both the scrutinee and literal before
+selection; matching introduces no source-visible coercion, widening, narrowing,
+or implicit import. Once that carrier selects a row, the emitted checked core
+may realize the row by composing **exact, total, already-landed lossless views**.
+This license is limited to a result-preserving composition named below. It does
+not create a general comparator, a new surface operation, a primitive reduction,
+or a `trusted_base()` entry. A structural realization may unroll the finite
+source literal and compare it with the scrutinee's lossless view.
 
 | Literal after expected-type checking | Match comparator | Equality authority and boundary |
 |---|---|---|
 | numeric at `Int` | `eq_int` | Exact integer value equality and the registered `Int` equality certificate (`18a §5.4`). |
-| numeric at `Int8`/`Int16`/`Int32`/`Int64` or `UInt8`/`UInt16`/`UInt32`/`UInt64` | exact fixed-width integer value equality | The mathematical fixed-width value fixed by `35 §2.2`; comparison is exact and does not perform arithmetic, wrap, widen, or narrow. |
+| numeric at `Int8`/`Int16`/`Int32`/`Int64` or `UInt8`/`UInt16`/`UInt32`/`UInt64` | exact fixed-width integer value equality | The mathematical fixed-width value fixed by `35 §2.2`; comparison performs no arithmetic or wrapping and does not change either source carrier. An allowed internal realization applies the carrier's total lossless `*_to_int` view to both checked values and compares the exact images with `eq_int`; this internal widening is not a source coercion. |
 | numeric at `Float` | `eq_float` | IEEE-754 binary64 `==`, including NaN unequal to every value and `+0.0` equal to `-0.0` (`35 §2.4`, `18a §5.4`); explicitly not proof equality. |
 | numeric at `Float32` | `eq_float32` | IEEE-754 binary32 `==` with the same boundary (`35 §2.4`, `18a §5.4`); explicitly not proof equality. |
-| numeric at `Decimal` | `decimalEq` | Exact base-10 value equality by exponent alignment (`18a §5.6.1(4)`), not definitional equality of the non-canonical pair carrier and therefore not `DecEq Decimal`. Literal-pattern use additionally requires a total `Bool` result; while `18a §5.6.1(2)` permits the unbounded-alignment case to remain stuck, `Decimal` literal patterns reject rather than emit a non-selecting match. |
-| string, ordinary or raw | codepoint-wise `String` `eq` | Equality of the canonical `String` value (`37 §2.1`, `§2.5`); value-level comparison, independent of whether the lawful `DecEq String` instance has landed. |
+| numeric at `Decimal` | **deferred** (`decimalEq` is the intended value relation) | Exact base-10 value equality by exponent alignment (`18a §5.6.1(4)`), not definitional equality of the non-canonical pair carrier and therefore not `DecEq Decimal`. A literal-pattern comparator must be total over the whole scrutinee carrier. Because `18a §5.6.1(2)` deliberately leaves unbounded alignment stuck, the present admission predicate is `false`: every `Decimal` literal pattern rejects. Strict CBV demands the stuck scale even for a zero coefficient; bounded alignment for one literal does not waive the carrier-wide requirement. |
+| string, ordinary or raw | codepoint-wise `String` `eq` | Equality of the canonical `String` value (`37 §2.1`, `§2.5`); value-level comparison, independent of whether the lawful `DecEq String` instance has landed. An allowed internal realization uses the total `string_to_list_char` view and compares the normalized scalar sequence of the checked literal value with `eqChar`. |
 | character | `eqChar` | Unicode-scalar/codepoint equality, derived through the `Int` projection (`18a §5.9.1(3)`); value-level comparison, independent of the separately staged lawful instance. |
-| byte string or bracketed hexadecimal bytes | byte-sequence content equality | Equality of the immutable, length-determined byte sequence (`38 §1.1`); representation and equality acceleration are unobservable. This row assigns no new surface operation name. |
+| byte string or bracketed hexadecimal bytes | byte-sequence content equality | Equality of the immutable, length-determined byte sequence (`38 §1.1`). An allowed internal realization uses the total `bytes_to_list` view and compares the finite literal's octets through `uint8_to_int` and `eq_int`. Representation and equality acceleration are unobservable, and this row assigns no new surface operation name. |
 
 The absence of a law-carrying `DecEq` instance does not by itself block a row
 licensed by normative value equality: literal matching consumes only the

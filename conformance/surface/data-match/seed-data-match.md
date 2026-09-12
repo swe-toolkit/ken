@@ -164,28 +164,215 @@ prototype's stubbed sums and missing exhaustiveness.
   well-typed environment, and reachability is existential over the duplicated
   residuals rather than requiring every alternative to remain reachable.
 
-## surface/data-match/literal-value-comparator-selection
-- spec: `spec/30-surface/31-lexical.md §3`,
-  `spec/30-surface/34-data-match.md §3.1`, `§4.1`,
-  `spec/30-surface/35-numbers.md §4`
-- given: literals checked at expected `Int`, each fixed-width integer family,
-  `Float`, `Float32`, `Decimal`, `String`, `Char`, and `Bytes`, paired with a
-  wildcard fallback; include `Float` NaN and signed-zero controls, equal
-  non-canonical Decimal values, and a Decimal alignment outside the total
-  comparator boundary
-- expect: comparator-backed literal-pattern forms remain fail-closed while
-  their surface slice is absent. [deferred — literal-pattern surface slice]
-  Each supported carrier uses exactly the value comparator in `34 §3.1`'s
-  table to select an arm; no comparator result constructs `Equal` or adds an
-  equality hypothesis. NaN selects the fallback, `+0.0` and `-0.0` compare
-  equal, and a Decimal case for which `decimalEq` may be stuck rejects at
-  elaboration instead of compiling a silently non-selecting match. Any
-  non-Boolean literal/carrier pair absent from the table also rejects.
-- why: this distinguishes runtime branch selection from proof-producing
-  equality and catches default-driven or representation-driven comparator
-  guesses; the fallback also pins that a comparator-backed literal column never
-  closes coverage. Boolean tokens are constructor patterns, not members of this
-  comparator fixture (`34 §3.1`).
+### Literal-value comparator cases — common contract
+
+Common sources are `spec/30-surface/31-lexical.md §3`,
+`spec/30-surface/34-data-match.md §3.1`/`§4.1`, and
+`spec/30-surface/35-numbers.md §4`.
+
+The supported rows below remain fail-closed until
+`LANG-MATCH-LITERAL-PATTERN` lands. **Supported now** means that `34 §3.1`
+permits a total realization from the landed comparator/view floor; it does not
+claim that literal-pattern elaboration has already landed. Each supported case
+pairs its literal arm with a wildcard fallback. The selected comparison returns
+only `Bool`, adds no `Equal` proof or equality hypothesis, and does not close
+coverage. Boolean tokens remain constructor patterns, not comparator cases.
+
+## surface/data-match/literal-value-comparator-unsupported-carrier
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §4.2`
+- classification: durable absent-row negative, outside the 15-carrier status
+  partition below
+- given: `data WrappedInt = WrapInt Int`; (a) a numeric literal pattern against
+  a bare `WrappedInt` scrutinee; (b) the same pattern with a lawful value-level
+  `Eq WrappedInt` dictionary in scope whose `eq` unwraps and delegates to
+  `eq_int`, but with no `DecEq WrappedInt` certificate; and (c) the same literal
+  pattern against an `Int` scrutinee as the positive control. Every form has a
+  wildcard fallback.
+- expect: (a) and (b) reject even after `LANG-MATCH-LITERAL-PATTERN` lands,
+  while (c) accepts and selects normally. A wildcard and an unrelated lawful
+  `Eq` do not make an unsupported literal/carrier pair valid.
+- why: (a) pins representation/defaulting; (b) independently pins the
+  `Eq`-versus-`DecEq` boundary; and (c) proves the numeric-literal mechanism is
+  reached. The elaborator must not guess a comparator from spelling,
+  representation, or an `Eq` equivalence that does not decide kernel equality.
+  This case retires only if a later contract explicitly adds the user-defined
+  carrier to the table and supplies its total comparator mechanism.
+
+## surface/data-match/literal-value-comparator-int
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §4`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: an `Int` scrutinee and `Int` literal, including values beyond fixed-width
+  range, with a wildcard fallback
+- expect: after the surface gate lands, selection uses total bignum `eq_int`;
+  equal values take the literal arm and unequal values take the fallback.
+- why: the case pins exact integer value equality rather than a truncated host
+  representation.
+
+## surface/data-match/literal-value-comparator-int8
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `Int8` values at both bounds and an `Int8` literal, with a wildcard
+  fallback
+- expect: exact `Int8` equality; an allowed internal realization applies
+  `int8_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `Int8`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-int16
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `Int16` values at both bounds and an `Int16` literal, with a wildcard
+  fallback
+- expect: exact `Int16` equality; an allowed internal realization applies
+  `int16_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `Int16`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-int32
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `Int32` values at both bounds and an `Int32` literal, with a wildcard
+  fallback
+- expect: exact `Int32` equality; an allowed internal realization applies
+  `int32_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `Int32`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-int64
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `Int64` values at both bounds and an `Int64` literal, with a wildcard
+  fallback
+- expect: exact `Int64` equality; an allowed internal realization applies
+  `int64_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `Int64`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-uint8
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `UInt8` values `0` and `255` and a `UInt8` literal, with a wildcard
+  fallback
+- expect: exact `UInt8` equality; an allowed internal realization applies
+  `uint8_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `UInt8`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-uint16
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `UInt16` values at both bounds and a `UInt16` literal, with a wildcard
+  fallback
+- expect: exact `UInt16` equality; an allowed internal realization applies
+  `uint16_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `UInt16`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-uint32
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `UInt32` values at both bounds and a `UInt32` literal, with a wildcard
+  fallback
+- expect: exact `UInt32` equality; an allowed internal realization applies
+  `uint32_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `UInt32`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-uint64
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.2`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: `UInt64` values at both bounds and a `UInt64` literal, with a wildcard
+  fallback
+- expect: exact `UInt64` equality; an allowed internal realization applies
+  `uint64_to_int` to both checked values and compares them with `eq_int`.
+- why: source carrier selection stays `UInt64`; the total lossless internal view
+  neither wraps nor changes the result.
+
+## surface/data-match/literal-value-comparator-float
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.4`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: a `Float` scrutinee against a numeric literal, with NaN and signed-zero
+  controls and a wildcard fallback
+- expect: IEEE-754 binary64 `eq_float`; NaN takes the fallback, while `+0.0` and
+  `-0.0` compare equal and select the same literal arm.
+- why: IEEE value comparison is deliberate branch selection, never proof
+  equality.
+
+## surface/data-match/literal-value-comparator-float32
+- spec: `spec/30-surface/34-data-match.md §3.1`, `35 §2.4`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: a `Float32` scrutinee against a numeric literal, with NaN and
+  signed-zero controls and a wildcard fallback
+- expect: IEEE-754 binary32 `eq_float32`; NaN takes the fallback, while `+0.0`
+  and `-0.0` compare equal and select the same literal arm.
+- why: the row pins binary32 behavior separately from binary64 defaulting.
+
+## surface/data-match/literal-value-comparator-char
+- spec: `spec/30-surface/34-data-match.md §3.1`, `18a §5.9.1(3)`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: a `Char` scrutinee and character literal, with an unequal-scalar
+  fallback control
+- expect: Unicode-scalar/codepoint equality through total `eqChar`.
+- why: the value comparator is independent of the separately staged lawful
+  `DecEq Char` instance.
+
+## surface/data-match/literal-value-comparator-string
+- spec: `spec/30-surface/34-data-match.md §3.1`, `37 §2.1`, `§2.5`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: ordinary and raw string literals against `String` scrutinees, including
+  (a) an equal value, (b) a same-length single-scalar mismatch, (c) the strict
+  prefix pair pattern `"a"` against scrutinee `"ab"`, and (d) source-distinct
+  NFC-equivalent values — composed `U+00E9` against decomposed
+  `U+0065 U+0301` — each with a wildcard fallback
+- expect: codepoint-wise equality over the canonical String value. (a) selects
+  the literal arm; (b) and (c) select the wildcard; (d) selects the literal arm
+  because construction normalizes both values to NFC. An allowed internal
+  realization uses total `string_to_list_char` on the normalized values and
+  compares the finite literal sequence with `eqChar`, including terminal
+  `Nil`/length agreement.
+- why: (b) varies content at fixed length, (c) varies length after a shared
+  prefix, and (d) varies source spelling while holding the canonical value
+  fixed. Together they distinguish full structural comparison from a prefix
+  check or source-spelling comparison without importing a general comparator.
+
+## surface/data-match/literal-value-comparator-bytes
+- spec: `spec/30-surface/34-data-match.md §3.1`, `38 §1.1`
+- realization status: **supported now**; surface implementation is gated on
+  `LANG-MATCH-LITERAL-PATTERN`.
+- given: byte-string and bracketed-hexadecimal literals against `Bytes`
+  scrutinees, with equal-content, unequal-length, and reordered-byte controls
+- expect: exact ordered byte-sequence equality. An allowed internal realization
+  uses total `bytes_to_list` and compares each finite literal octet through
+  `uint8_to_int` and `eq_int`.
+- why: the plan observes content and length, never representation, and adds no
+  surface byte comparator or primitive.
+
+## surface/data-match/literal-value-comparator-decimal
+- spec: `spec/30-surface/34-data-match.md §3.1`,
+  `spec/10-kernel/18a-primitive-registry.md §5.6.1(2)`, `§5.6.1(4)`
+- realization status: **deferred** — no unrestricted total comparator exists.
+- given: non-canonical value-equal `Decimal` pairs and a pair whose exponent
+  alignment exceeds the bounded `decimalPow10` depth, each with a wildcard
+  fallback
+- expect: every `Decimal` literal pattern rejects at elaboration. The present
+  admission predicate is false for the whole carrier; a bounded-looking literal
+  does not make arbitrary scrutinee comparison total.
+- why: `decimalEq` states the intended exact base-10 value relation, but
+  `decimalPow10Unbounded` deliberately stays stuck under `18a §5.6.1(2)`.
+  Compiling a partial `Bool` test would create a silently non-selecting match.
 
 ## surface/data-match/indexed-impossible-pair (AC5) (soundness) — TR5a + TR5b
 - spec: `spec/30-surface/34-data-match.md §2`, `§4.3`

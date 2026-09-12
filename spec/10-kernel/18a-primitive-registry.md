@@ -572,18 +572,31 @@ absolute-vs-net precision as the zero-NEW-delta `Char` laws (§5.9.1).
 
 ### 5.7 Conversions (`35 §5` — closed named set, no implicit coercion)
 
-All `GAP` (none built). Between opaque primitive types there is no shared
-structure to recurse on → each is **NATIVE**. Faces per §2. **★ The COMPLETE
-`IntN↔Int` set** (every width `N∈{8,16,32,64}×{signed,unsigned}`) **is the
-NATIVE floor** under `checked`/`saturating` (§5.3): those DEMOTE *given* the
-full set, so completing it (beyond §5.5's `Int64`/`Int32` representatives) is a
-spec-mandated GAP→NATIVE entry, and this floor does **not** itself demote
-(Architect-ruled — nothing lower to derive it from).
+The conversion state is split. The complete fixed-width `IntN↔Int` floor is
+**BUILT** for every width `N∈{8,16,32,64}×{signed,unsigned}`. Each public,
+total widening `*_to_int : IntN → Int` is a native operation. Each unchecked
+`int_to_*_raw : Int → IntN` cast is also native. The intended safe public
+narrowing contract, `intToIntN : Int → Option IntN`, is an ordinary checked Ken
+definition that range-checks with `leq_int` before calling the raw cast. The
+landed elaborator nevertheless still inserts every raw spelling into the source
+global environment: ordinary source can name it and apply it to an out-of-range
+`Int`. That exposure is a named implementation gap, not a safe narrowing
+contract. Thus the representation crossing stays native while the fallible
+`Option` contract is derived. The literal-comparator realization uses only the
+safe total widening direction. The other cross-representation conversions in
+the table remain `GAP`.
+
+This complete floor is what the derived `checked`/`saturating` families of §5.3
+consume. It does not itself demote: opaque fixed-width values have no lower Ken
+structure from which to derive the representation crossing. Deriving the public
+range check adds no implicit coercion, but it does not hide the raw primitives;
+their source visibility remains a gap until the elaborator stops exporting those
+spellings.
 
 | symbol | signature | face | current-state | oracle boundary | verdict |
 |---|---|---|---|---|---|
-| `IntN.toInt` (all N, widening) | `IntN → Int` | total | GAP | `Int.toIntN ∘ IntN.toInt = Some` on `T_MAX` (defining round-trip law) | **NATIVE** (floor) |
-| `Int.toIntN` (all N, narrowing) | `Int → Option IntN` | **Option** | GAP | just-above-`MAX` ⇒ `None`, **never silent `Some`** | **NATIVE** (floor) |
+| `IntN.toInt` / `*_to_int` (all N, widening) | `IntN → Int` | total | **BUILT** — native exact widening | `Int.toIntN ∘ IntN.toInt = Some` on `T_MAX` (defining round-trip law) | **NATIVE** (floor) |
+| `Int.toIntN` / `intToIntN` (all N, intended safe public narrowing) | `Int → Option IntN` | **Option** | **BUILT** — derived range check over native `int_to_*_raw`; raw spelling remains source-nameable (gap) | just-above-`MAX` ⇒ `None`, **never silent `Some`** | **DERIVED over NATIVE raw floor** |
 | `Int.toFloat` | `Int → Float` | total, **documented-lossy** | GAP | rounding-sensitive value = **defined IEEE r-t-n-e**; opaque `Int`, direct contract | **NATIVE** |
 | `Decimal.toFloat` | `Decimal → Float` | total, **documented-lossy** | GAP | **burden (re-run post-Decimal-DEMOTE):** naive `coeff.toFloat *. 10^exp` over derived `Decimal` **double-rounds** (two roundings compound → wrong last bit); **correctly-rounded decimal→binary is a real algorithm cliff** (David-Gay / Ryū-shaped, not a one-liner) → earns **NATIVE** | **NATIVE** (correct-rounding cliff) |
 | `Float.toDecimal` | `Float → Option Decimal` | **Option** | GAP | `NaN`/`∞` ⇒ `None`; finite ⇒ `Some exact` | **NATIVE** |
