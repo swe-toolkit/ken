@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-12 17:15:22Z — from 590 issue file(s) in `docs/program/issues/`.
+2026-09-12 18:41:48Z — from 590 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -147,7 +147,7 @@ the committed file matches the generator's output.
 | `DOC-ATTEST-LIVING` | attesting living tracker files makes every routine WP status flip redden the currency gate | closed | doc | S | none | — |
 | `DOC-CAP-ASBUILT` | The capability chapter tells readers the catalog has no checked authority exemplar; CAT-CAPEX adds one, falsifying that claim in two places | merged | doc | S | none | — |
 | `DOC-CATALOG-CONTENTS` | Catalog entry format: rename the `## Index` heading to `## Contents` in 19 entries and remove the 16 reading-path sections | merged | doc | M | none | — |
-| `DOC-COMPILER-DEEPEN` | Deepen library/guide/compiler/ one level: elaborate each of the 8 overview chapters IN PLACE as a single fuller page (operator correction 2026-09-12: detail, not structure -- no nested depth pages/subdirectories), executed one chapter at a time in pipeline order, the consolidated front-end.md as the exemplar; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle | active | doc | L | none | — |
+| `DOC-COMPILER-DEEPEN` | Deepen library/guide/compiler/ one level: elaborate each of the 8 overview chapters IN PLACE as a single fuller page (operator correction 2026-09-12: detail, not structure -- no nested depth pages/subdirectories), executed one chapter at a time in pipeline order, the consolidated front-end.md as the exemplar; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle | closed | doc | L | none | — |
 | `DOC-CURRENCY-ANCHOR` | library/REVISION certifies nothing about the corpus — currency is unchecked | closed | doc | S | none | — |
 | `DOC-GATE-CONTROL-BINDING` | validation-gate registry: make the two DOC-GATE-RECORD-AXIS checks orphan-proof by lifting them to pure detectors with committed controls | merged | verify | S | none | https://github.com/swe-toolkit/ken/pull/928 |
 | `DOC-GATE-NEEDLE` | schema-gate controls assert on a needle the test itself supplied, so one constraint class is fully vacuous | merged | verify | S | none | — |

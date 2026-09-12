@@ -1,7 +1,7 @@
 ---
 id: DOC-COMPILER-DEEPEN
 title: "Deepen library/guide/compiler/ one level: elaborate each of the 8 overview chapters IN PLACE as a single fuller page (operator correction 2026-09-12: detail, not structure -- no nested depth pages/subdirectories), executed one chapter at a time in pipeline order, the consolidated front-end.md as the exemplar; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle"
-status: active
+status: closed
 owner: doc
 size: L
 gate: none
@@ -79,6 +79,35 @@ status carrier.
   updated), Librarian sole as-built APPROVE `evt_3hrc4st4zmetc`. Front-end and
   kernel are now both single deepened pages; the campaign continues by deepening
   the remaining chapters (artifacts-and-erasure next) in place, one at a time.
+- artifacts-and-erasure (ch3): LANDED (`2aa6f3c0c`). Deepened in place as a single
+  page under the exemplar; Librarian sole as-built APPROVE.
+- interpreter-and-values (ch4): LANDED (`98dd85178`, PR #3552). Deepened in place;
+  Librarian took one reject for missing reference-interpreter (`ken-interp`) manifest
+  provenance, then APPROVE on a manifest-only respin (`evt_67c9wf75f7ncq`).
+- native-backend (ch5): LANDED (`4f8615b0c`, PR #3553). Deepened in place, single
+  page, Librarian sole as-built APPROVE `evt_7twwnd3wbcy7e`.
+- validation-and-limits (ch6): LANDED (`5582af54c`, PR #3554). Deepened in place;
+  manifest record extended with `crates/ken-kernel/src/check.rs` and
+  `crates/ken-elaborator/src/checked_core.rs` provenance; Librarian sole as-built
+  APPROVE `evt_48ems7fnvgd82`. Authored by a freshly-compacted doc-author after
+  the predecessor turn hit its session budget mid-read — a clean stop/resume with
+  no rework.
+- reading-workflow + README (ch7, the re-index closer): LANDED (`54b9e78f2`,
+  PR #3555). The two navigation pages re-index the six landed chapters by reader
+  question; Librarian took one reject for missing `ken-interp` provenance on the
+  present-tense interpreter claims, then a manifest syntax repair, then APPROVE
+  (`evt_2ky7cr5emff5k`).
+
+## Campaign complete (2026-09-12)
+
+All eight pages are deepened in place as single files on `origin/main` `54b9e78f2`
+— `README.md`, `reading-workflow.md`, and the six stage chapters (`front-end`,
+`kernel`, `artifacts-and-erasure`, `interpreter-and-values`, `native-backend`,
+`validation-and-limits`) — with no nested sub-pages or per-chapter subdirectories,
+per the operator single-page correction. Every chapter passed the Librarian's sole
+as-built review (three took one manifest-provenance reject then a manifest-only
+respin — the confidently-wrong guard doing its job, not the high-round sizing
+signal). This umbrella is `closed`.
 
 ## The consolidated front-end chapter is the exemplar
 
