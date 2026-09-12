@@ -15,6 +15,36 @@ you dispatch research subagents, gather results, and synthesize a report for
 the operator, Spec, or the Architect. Treat it as a bounded, on-demand
 activity, not a role.
 
+## What counts as a hard stop — the number is an advancing count, not a raw tally
+
+Three words get used loosely and only one of them counts toward the cadence.
+Keep them distinct, because the confusion is live: an `HS<N>` label reads like
+"the Nth time we hit a wall," and it is not.
+
+- **Hard stop (`HS<N>`)** — an *advancing* stop: the implementer built the
+  Architect's ruling, hit a genuinely **new** structural wall, and returned with
+  evidence needing a **new** ruling (`../architect.md` §1a). Only this gets the
+  next number, appends one symptom-inventory row, and is what the research
+  cadence counts (every 3rd, then 6th/9th/… → mandatory research pull).
+- **Non-advancing stop** — a stop that needs no new ruling: a D0/feasibility
+  return, a probe or measurement the current ruling already asked for, an
+  exploration returning coordinates, or a recut checkpoint. It keeps the current
+  number ("still `HS<N>`"), adds **no** inventory row, and does **not** retrigger
+  research. Do not label it `HS<N+1>` — the implementer calling it a "hard stop"
+  in prose does not make it one.
+- **Clean stop** — orthogonal: worktree hygiene only (no code retained, baseline
+  restored, no commit/candidate/lockfile change). An advancing hard stop and a
+  non-advancing stop can each be clean or not; "clean" says nothing about
+  whether the count advances.
+
+**The count is per-chain and re-anchors on every recut**, so an `HS` number is
+not a campaign-wide ordinal — a fresh chain restarts the advancing count. ⇒
+**research-due is read off the armed `next research pull = #N` line for the live
+chain, never inferred from whether an `HS` number is divisible by 3.** On a chain
+where the two happen to coincide (pulls at HS9/HS12/HS15, say), that coincidence
+is the trap, not the rule — see the steward lesson
+`anchor-an-armed-trigger-on-an-event-not-on-an-index`.
+
 ## The hard-stop chain: the Architect self-triggers, you backstop
 
 A ruling chain that bounces between the Architect and an implementer as a run
