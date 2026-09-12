@@ -1,7 +1,7 @@
 ---
 id: LANG-TRANSPORT-SIGMA-PREMISE-SYNTHESIS
 title: "transport_recursive_group_call_result over-rejects a compound result indexed by BOTH the whole matched record AND a bare component of it: it builds a single raw Eq over the user data record, which obs::eq_reduce will not decompose into per-index Sigma leaves, so the component index goes unrefined and a well-typed program is KernelRejected (TypeMismatch). Fix = route (a): synthesize transport's premise as the Sigma-shaped result-family-index equality and feed the existing walker (REUSE). DEFERRED completeness gap."
-status: active
+status: merged
 owner: language
 size: S
 gate: none
