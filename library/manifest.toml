@@ -2407,7 +2407,7 @@ sources = ["crates/ken-elaborator/src/lib.rs", "crates/ken-kernel/src/lib.rs",
   "crates/ken-elaborator/src/checked_core.rs", "crates/ken-elaborator/src/erasure.rs",
   "crates/ken-interp/src/lib.rs", "crates/ken-interp/src/eval.rs",
   "crates/ken-runtime/src/values.rs", "crates/ken-runtime/src/store.rs",
-  "crates/ken-runtime/src/runtime_ir_evaluator.rs,
+  "crates/ken-runtime/src/runtime_ir_evaluator.rs",
   "crates/ken-runtime/src/cranelift_backend/artifact/api.rs",
   "docs/program/07-compiler-program.md"]
 validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
