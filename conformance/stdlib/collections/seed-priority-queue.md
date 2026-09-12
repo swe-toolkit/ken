@@ -1,10 +1,11 @@
 # Persistent priority queue — conformance seed
 
 Format: `../../README.md`. These cases pin the contract in
-`spec/50-stdlib/58a-priority-queues.md`. This seed lands before the package
-implementation, so every case is **RED-UNTIL-CAT-PRIORITY-QUEUE**. A later
-GREEN report must name the exact producer and test blobs and the executed case
-population; the presence of this file is not execution evidence.
+`spec/50-stdlib/58a-priority-queues.md`. This seed now accompanies the landed
+`CAT-PRIORITY-QUEUE` computational implementation. Every case is **GREEN for
+that tested finite population**; the closing evidence record names the exact
+producer and test blobs and the executed case population. This is not evidence
+for the deferred general laws.
 
 The cases use the public module `Data.Collections.PriorityQueue`, the canonical
 Axiom-free `Ord Nat` provider, and a finite payload with no order or equality
@@ -382,10 +383,12 @@ population-side mutation above.
 
 ## Evidence and deferral record
 
-Before `CAT-PRIORITY-QUEUE` lands, every case above is a specified expected
-observation and none is reported GREEN. The build must report separately:
+`CAT-PRIORITY-QUEUE` lands every case above as a tested observation. The exact
+producer and test blob identities, executed test population, and mutation
+restoration record are filled at the build's final validated candidate. The
+result reports separately:
 
-1. real public computation and the exact named finite observations it executed;
+1. real public computation and the exact named finite observations it executes;
 2. private abstraction/validity and structural-charge observations;
 3. production-side and detector-side mutation failures with restoration;
 4. the still-deferred general kernel proofs.

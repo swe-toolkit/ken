@@ -42,9 +42,7 @@ pub data PriorityQueue (k : Type) (v : Type) (leq : k → k → Bool) : Type whe
   Node : Nat → k → v → PriorityQueue k v leq → PriorityQueue k v leq → PriorityQueue k v leq
 }
 
-fn rank
-      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
-    : Nat =
+fn rank (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq) : Nat =
   match q {
     Empty ↦ Zero;
     Node cached priority payload left right ↦ cached
@@ -60,26 +58,8 @@ fn make_node
       (right : PriorityQueue k v leq)
     : PriorityQueue k v leq =
   match leq_nat (rank k v leq left) (rank k v leq right) {
-    True ↦
-      Node
-        k
-        v
-        leq
-        (Suc (rank k v leq left))
-        priority
-        payload
-        right
-        left;
-    False ↦
-      Node
-        k
-        v
-        leq
-        (Suc (rank k v leq right))
-        priority
-        payload
-        left
-        right
+    True ↦ Node k v leq (Suc (rank k v leq left)) priority payload right left;
+    False ↦ Node k v leq (Suc (rank k v leq right)) priority payload left right
   }
 
 fn meld
@@ -118,9 +98,7 @@ fn meld
       }
   }
 
-pub fn empty
-      (k : Type) (v : Type) (d : Ord k)
-    : PriorityQueue k v (ord_leq_at k d) =
+pub fn empty (k : Type) (v : Type) (d : Ord k) : PriorityQueue k v (ord_leq_at k d) =
   Empty k v (ord_leq_at k d)
 
 pub fn merge
@@ -156,22 +134,15 @@ pub fn insert
     q
 
 pub fn find_min
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : Option (Pair k v) =
   match q {
     Empty ↦ None (Pair k v);
-    Node cached priority payload left right ↦
-      Some (Pair k v) (mk_pair k v priority payload)
+    Node cached priority payload left right ↦ Some (Pair k v) (mk_pair k v priority payload)
   }
 
 pub fn pop_min
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))) =
   match q {
     Empty ↦ None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)));
