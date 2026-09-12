@@ -1,7 +1,7 @@
 ---
 id: DOC-COMPILER-DEEPEN
 title: "Deepen library/guide/compiler/ one level (paragraph-to-page texture): nest depth pages under each of the 8 overview chapters, executed one chapter at a time in pipeline order, front-end first as the template-setter; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle"
-status: ready
+status: active
 owner: doc
 size: L
 gate: none
@@ -37,13 +37,29 @@ nested pages is settled on the front-end chapter and then held.
 
 Pipeline order, one slice at a time (the doc ring does not fan out):
 
-1. `front-end` — the template-setter (see below).
-2. `kernel`.
+1. `front-end` — the template-setter (see below). LANDED 2026-09-12, squash
+   `1b9afcec0` (PR #3538); exemplar template + corpus convention ratified.
+2. `kernel` — next to cut.
 3. `artifacts-and-erasure`.
 4. `interpreter-and-values`.
 5. `native-backend`.
 6. `validation-and-limits`.
 7. `reading-workflow` and `README` — re-indexed last; they map the others.
+
+## Progress
+
+Each chapter lands as a `docs/program/wp/DOC-COMPILER-DEEPEN-<CHAPTER>.md` frame
+(not a per-chapter `issues/` node); completion is recorded here on the umbrella,
+which stays `active` until every chapter has landed, then `closed`. The standard
+per-node status flip does not apply to the child frames — this section is their
+status carrier.
+
+- front-end: LANDED (`1b9afcec0`). Librarian as-built review took one reject
+  (a false resolver-stage refusal claim in `resolution.md`, corrected to the
+  `RCon`-to-elaborator handoff) then APPROVE on the respin — a clean round
+  count, not the high-round signal the sizing trip-wire watches for. No author
+  reseat indicated. The template it established is the exemplar the remaining
+  chapters inherit.
 
 ## The front-end chapter is the template-setter
 
