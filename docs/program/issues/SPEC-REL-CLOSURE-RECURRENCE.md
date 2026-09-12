@@ -1,7 +1,7 @@
 ---
 id: SPEC-REL-CLOSURE-RECURRENCE
 title: "spec 58 §7 (CAT-4, Fork B) fixes the outer transitive-closure formula R+ x y := IsTrue(reachableWithin N x y), N := size(dom R), but NEVER defines what one unit of reachableWithin fuel recognizes (zero = base step? reflexive+step? direct-edge?) -- and its 58:368-370 'simple path length <= N-1' bound is off by one when dom R is the outer-key set and the endpoint is a target-only sink; Foundation cannot choose the recurrence in code, so the draft must state the exact fuel convention and correct N-1 to N"
-status: active
+status: merged
 owner: spec
 size: S
 gate: none
