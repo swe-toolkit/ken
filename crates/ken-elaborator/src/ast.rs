@@ -166,6 +166,15 @@ pub struct FieldPat {
     pub label_span: Span,
 }
 
+/// A literal matched by its expected carrier's value comparator (`34 §3.2`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum LiteralPat {
+    Numeric(NumLit),
+    String(String),
+    Char(char),
+    Bytes(Vec<u8>),
+}
+
 /// A surface pattern (`34 §3`, `32 §4`).
 #[derive(Clone, Debug)]
 pub struct Pattern {
@@ -190,6 +199,8 @@ pub enum PatKind {
     As(Box<Pattern>, String),
     /// `p₁ | … | pₙ` — a flat same-occurrence alternation, with `n >= 2`.
     Or(Vec<Pattern>),
+    /// A value-level literal pattern. It binds no source name.
+    Literal(LiteralPat),
 }
 
 /// A top-level V0/V1/L2 declaration (`32 §8`, `21 §6.2`, `34`).
