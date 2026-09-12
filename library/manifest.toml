@@ -2381,7 +2381,9 @@ kind = "explanatory"
 audience = ["human-reader"]
 authority = "explanatory"
 availability = "partial"
-sources = ["crates/ken-runtime/src/artifact_validation.rs",
+sources = ["crates/ken-kernel/src/check.rs",
+  "crates/ken-elaborator/src/checked_core.rs",
+  "crates/ken-runtime/src/artifact_validation.rs",
   "crates/ken-runtime/src/runtime_ir_evaluator.rs",
   "crates/ken-runtime/src/cranelift_backend/artifact/api.rs",
   "crates/ken-runtime/src/object_linker_packaging.rs",
