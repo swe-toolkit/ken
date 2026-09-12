@@ -213,8 +213,9 @@ pub fn reachable_plus (k : Type) (leq : k -> k -> Bool)
 ### stdlib/collections/cat4-kernel-untouched-outer-ring (soundness)
 - spec: `58 §9` AC1, `52 §1.1`/§9 (the Map-container AC1 precedent), `16 §1`.
 - given: the landed D0–D2 proof corpus, D3 projection/ascending proofs, the D4
-  definition producer, and, when built, the
-  `size`/`dom`/`reachable_within`/`reachable_plus` fast-follow.
+  definition producer, and the landed public
+  `size`/`dom`/`reachable_within`/`reachable_plus` computation exercised by the
+  closure cases below.
 - expect: the relevant build diff under `crates/ken-kernel/` is **empty**; zero
   `trusted_base()` delta; no new `Term`/`Decl`. Every operation is an ordinary
   `fn`; every landed or later law is an ordinary `proof`/`theorem` over the

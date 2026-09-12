@@ -24,12 +24,11 @@
 > (`Nat`, not the `Axiom`-holed `Ord Int`/`Ord Char`). The D0 order results,
 > D1–D2 operations and general proofs, and D3 projection/ascending operations
 > and proofs are implemented in `catalog/packages/Data/Collections/Map.ken.md`.
-> D4 currently lands transparent
-> `compose`/`converse` and property-predicate definitions, but not their general
-> membership proofs or the concrete predicate discriminators specified below.
-> The four-function closure computation in §7 is the next fast-follow; the
-> remaining general relation laws, including closure faithfulness/saturation,
-> follow separately.
+> D4 currently lands transparent `compose`/`converse`, property-predicate
+> definitions, and the public `size`/`dom`/`reachable_within`/`reachable_plus`
+> closure computation. All four closure functions execute; the general
+> compose/converse membership proofs, the concrete predicate discriminators,
+> and closure faithfulness/saturation laws remain separately deferred.
 
 ## 1. What CAT-4 inherits (`54`/`52` and `55`/`57`)
 
@@ -392,12 +391,12 @@ truncation):**
   `is_transitive`, while its completion must inhabit it. The transparent
   predicate declaration and the suite's zero-delta census do not construct
   either proof-flip arm.
-- These residuals belong to the separate general-relation-law follow-on after
-  the computation below. They are not silently credited to the four-function
-  closure build and do not weaken its contract.
+- These residuals belong to the separate general-relation-law follow-on, not to
+  the landed computation below. They are not silently credited to the
+  four-function closure build and do not weaken its contract.
 
-**CONTRACT PINNED / COMPUTATION NEXT** (the four functions are the immediate
-fast-follow; their faithfulness proof follows separately):
+**CONTRACT AND PUBLIC COMPUTATION LANDED** (the four functions are public and
+executing; their faithfulness proof follows separately):
 
 - **Transitive closure (Fork B): `reachable_plus` decides positive
   reachability.** The four public functions have these signatures:
@@ -503,7 +502,7 @@ fast-follow; their faithfulness proof follows separately):
   `Map`/`Set` operations named above; truncation needs a `Σ`-of-paths inductive
   we do not have.
 
-- **Why the laws remain deferred:** the computational fast-follow supplies
+- **Why the laws remain deferred:** the landed public computation supplies
   `size`, `dom`, `reachable_within`, and `reachable_plus`. A separate
   general-relation-law follow-on supplies the missing compose/converse
   membership proofs, concrete property-predicate discriminators, and the
@@ -526,12 +525,14 @@ have zero `Axiom` or trusted-base delta. D4's general membership proofs and
 concrete predicate proof-flips are not present merely because the definitions
 are.
 
-The next build is one computational fast-follow containing
+The landed public computation contains
 `size`/`dom`/`reachable_within`/`reachable_plus` together, so
-`reachable_plus` visibly fixes its bound as `size (dom r)`. The separate
-relation-law follow-on then proves compose/converse membership, executes the
-property discriminators, and establishes closure faithfulness/saturation.
-Conformance lives at `../../conformance/stdlib/collections/`: its deferred
+`reachable_plus` visibly fixes its bound as `size (dom r)`. The paired
+conformance seed executes all four functions across its eight closure cases.
+The separate relation-law follow-on then proves compose/converse membership,
+executes the property discriminators, and establishes closure
+faithfulness/saturation.
+Conformance lives at `../../conformance/stdlib/collections/`: its executing
 closure cases use the landed lawful `Nat` order and well-formed outer and inner
 trees, never the `Axiom`-holed `Ord Int`/`Ord Char`.
 
@@ -539,9 +540,9 @@ trees, never the `Axiom`-holed `Ord Int`/`Ord Char`.
 
 - **AC1 — Kernel-untouched.** No `crates/ken-kernel/` change; no new `Term`/
   `Decl`; no `declare_primitive`/`declare_postulate`; **no `Axiom`** anywhere.
-  The next closure functions (`size`/`dom`/`reachable_within`/
-  `reachable_plus`) are ordinary total Ken and kernel-untouched, like the
-  already-landed `leq_nat` carrier basis.
+  The landed public closure functions (`size`/`dom`/`reachable_within`/
+  `reachable_plus`) are ordinary total Ken, execute in the outer ring, and are
+  kernel-untouched, like the already-landed `leq_nat` carrier basis.
 - **AC2 — Reuse, not re-derive.** `delete`/`union`/`intersection`/`difference`
   build on the landed `insert`/`lookup`/`to_list`/`fold`/`from_list`+
   `preserves_ordered`+law 5; `leq_nat` plus its four order results are

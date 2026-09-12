@@ -149,10 +149,11 @@ lawful-order and well-formed-adjacency premises in `58 §7`, it denotes positive
 `R⁺`, never reflexive `R*` or a raw proof-relevant inductive. The `Axiom`-free
 D0 `leq_nat` floor, D1–D2 general proofs, D3 projection/ascending proofs, and
 D4 relation-operation and predicate definitions are landed. D4's general
-membership proofs and concrete predicate discriminators are not. The
-`size`/`dom`/`reachable_within`/`reachable_plus` computation is the next
-fast-follow; the general relation-law tranche, including closure
-faithfulness/saturation, follows separately.
+membership proofs and concrete predicate discriminators are not. The public
+`size`/`dom`/`reachable_within`/`reachable_plus` computation is landed and
+executing; the general relation-law tranche, including compose/converse
+membership, concrete predicate discriminators, and closure
+faithfulness/saturation, remains separately deferred.
 
 The **Layer-3 parsing/syntax/diagnostics contract** — source artifacts as byte
 identity, half-open byte spans, total parser result values, small package-owned
