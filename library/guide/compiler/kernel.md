@@ -14,6 +14,18 @@ elaborates surface declarations; the kernel checks the resulting core term
 against its type and decides the conversion relations it implements. This
 separation is why a successful parser or resolver is not an admission result.
 
+## Kernel mechanisms
+
+Read [explicit core terms](kernel/core-terms.md) for the representation the
+kernel receives, then
+[contexts and declarations](kernel/contexts-and-declarations.md) for its lookup
+state. [Checking and admission](kernel/checking-and-admission.md)
+shows how `infer`, `check`, and declaration admission decide a candidate.
+[Conversion and reduction](kernel/conversion-and-reduction.md) follows the
+reducer and equality decision, while [inductive-family
+admission](kernel/inductive-admission.md) covers positivity and the later iota
+consumer.
+
 ## What does not cross the boundary
 
 The kernel does not receive Cranelift instructions, object files, host ABI
