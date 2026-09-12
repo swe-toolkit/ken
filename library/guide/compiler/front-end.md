@@ -28,6 +28,16 @@ elaborator's normal file or literate-file operations. A successful front-end
 stage therefore means that the selected input reached its stated elaboration
 path; it does not mean that a native artifact was produced.
 
+## Front-end stages
+
+Read [source input and dispatch](front-end/source-input.md) for the CLI route
+that selects ordinary, literate, or catalog-addressed input. Then follow the
+source through [lexing](front-end/lexing.md), [parsing](front-end/parsing.md),
+and [resolution](front-end/resolution.md). [Elaboration and kernel
+admission](front-end/elaboration-and-admission.md) closes the chapter by
+showing where resolved syntax becomes core terms and where kernel checking
+remains authoritative.
+
 ## What follows admission
 
 The [compiler driver](../../../crates/ken-elaborator/src/compiler_driver.rs) can
