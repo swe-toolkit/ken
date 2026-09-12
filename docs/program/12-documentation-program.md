@@ -724,3 +724,99 @@ that surface.
   restate it well. A polished duplicate that can drift is worse than an
   incomplete page that names its source.
 - **Nothing here documents the federation.** D3, settled.
+
+---
+
+## 5 — The compiler-guide deepening campaign (operator, 2026-09-12)
+
+**Status:** Framed 2026-09-12. **Owner:** the doc team; Steward (frame,
+sequencing). **Umbrella node:** `issues/DOC-COMPILER-DEEPEN.md`.
+
+**Operator direction, 2026-09-12.** The compiler implementation guide
+(`library/guide/compiler/`) is a reasonable overview but lacks depth. Take it
+one level deeper — the texture of "each paragraph becomes a page," not literally
+one-to-one, but that level of elaboration and enrichment. The operator settled
+two calls: **the full program is committed now** (all chapters, not a pilot),
+and **accuracy review is the librarian's as-built pass only** — no build-team
+review, so the three priority lanes stay focused.
+
+### The source spine, measured
+
+At `origin/main = 1bd3a5667`, 2026-09-12: **8 pages, ~2,263 words, ~280 words a
+page, 2-3 H2 sections each, no H3.** The guide is an implemented-path map — each
+paragraph points at a `crates/` module with one level of "what this stage does
+and where its boundary is." The chapters are `README` (the index), `front-end`,
+`kernel`, `artifacts-and-erasure`, `interpreter-and-values`, `native-backend`,
+`validation-and-limits`, and `reading-workflow`.
+
+### Structure: nest, do not replace
+
+Each existing page becomes the **chapter landing** — the overview the operator
+found reasonable, kept — and the depth pages sit beneath it. Reflect, do not
+extend: the overview is not discarded; it becomes the index into the depth. The
+corpus convention for the nested pages (a per-chapter subdirectory, the manifest
+records, whether any page is literate `.ken.md`) is the doc-leader's and
+librarian's call, decided on the front-end chapter and then held.
+
+### Authority and currency — this is the most drift-prone doc work to date
+
+The deep pages are **explanatory and derived (D1), never normative.** A code-walk
+describes `crates/` internals that the build lanes are actively changing, so
+these pages age faster than any the program has produced. Three disciplines,
+carried into every chapter frame:
+
+- **Anchor every claim to source (file plus symbol or line) or to a spec
+  section**, at a recorded revision. The existing map style already does this;
+  the depth inherits it per claim, not per page.
+- **Prefer stable invariants and boundaries over volatile line-level detail**
+  where the two diverge. A page that turns on a guarantee outlives one that
+  turns on a line number.
+- **Currency is the librarian's as-built mandate plus the program's
+  release-point policy.** Attestations drift between release points and that is
+  accepted (§4b, Wave 6); do **not** build a standing per-merge currency gate —
+  that shape is foreclosed.
+
+### Exit property (the §4a mandate — a predicate, never a page count)
+
+> An engineer unfamiliar with a given compiler stage can, from its chapter,
+> navigate to the exact source that implements it and correctly state what that
+> stage does, what it guarantees, and what it refuses — with **every claim
+> anchored to source or spec, and no claim the cited code does not carry.**
+
+The final clause is the confidently-wrong guard (§4a): the characteristic doc
+defect is a page that reads authoritatively while its cited evidence does not
+carry its claim. The librarian's T1 as-built review is the oracle for it — which
+is exactly why the operator's librarian-only choice is coherent with this
+program's design (judgment concentrated on review, §0).
+
+### Sequencing: committed in full, executed one slice at a time
+
+The full program is committed, but the doc ring runs **one slice at a time**
+(operator, 2026-07-22; three seats, sequential — it does not fan out). Chapters
+execute in pipeline order: `front-end`, `kernel`, `artifacts-and-erasure`,
+`interpreter-and-values`, `native-backend`, `validation-and-limits`, with
+`reading-workflow` and `README` re-indexed last because they map the others.
+
+**The front-end chapter is the template-setter.** It establishes the per-page
+enrichment template and the grounding discipline; the librarian ratifies it as
+the exemplar; the remaining chapters follow it. This is sequencing inside a
+committed program, not a pilot gate — the operator committed the whole program,
+and the first chapter simply keeps the other seven from repeating its mistakes.
+
+### Seats, tier, and the one trip-wire
+
+Authoring stays the program's standing **T2 doc-author**; accuracy is the **T1
+librarian** as-built, no build-team review (operator, 2026-09-12). The
+authoring-comprehension load for compiler internals is higher than the tutorial
+and reference work the seat design (§0) was set against. The trip-wire is the
+**front-end chapter's review round count**: if the T2 author produces repeated
+confidently-wrong drafts, that is the signal to revisit author provisioning for
+this campaign (the §4b sizing-diagnostic pattern), not a reason to reseat
+pre-emptively.
+
+### Concurrency
+
+This is doc-track work (`library/`, `docs/`) and runs concurrently with the
+three build lanes per §0's exception — contention-free, not prioritized. The
+depth pages **read** `crates/` to describe it; they do not edit it, so the
+exception holds cleanly even while the build lanes churn the same files.

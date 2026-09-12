@@ -1,28 +1,37 @@
 ---
 id: LANG-MATCH-LITERAL-PATTERN
-title: "literal patterns -- slice 6 (final) of 34 §3's six absent pattern forms: a VALUE-LEVEL branch-selection form (34 §3.2:385-420), the comparator returning Bool with NO Equal proof and NO equality hypothesis. RECUT under Architect HS1 (evt_1wc0m1xbtk4r) to a CONTAINED CORE: direct Int/Float/Float32/Char rows + a literal-shaped String structural plan (string_to_list_char + eqChar), with fixed-width/Bytes CONDITIONAL on the spec 34 §3.2 realization correction and everything else FAIL-CLOSED. Zero new TCB: no hidden primitive, no new PrimReduction::Op, no new trusted-base entry. A sealed LiteralComparatorPlan (derived from the expected carrier after elab_num_lit_checked) selects the comparison; unknown carrier/literal pairs have no catch-all success arm and reject. Decimal is deferred (no unrestricted Decimal literal pattern is total under the present comparator)"
-status: draft
+title: "literal patterns -- slice 6 (final) of 34 §3's six absent pattern forms: a VALUE-LEVEL branch-selection form (34 §3.2:385-420), the comparator returning Bool with NO Equal proof and NO equality hypothesis. RECUT under Architect HS1 (evt_1wc0m1xbtk4r) to a CONTAINED CORE: direct Int/Float/Float32/Char rows + a literal-shaped String structural plan (string_to_list_char + eqChar) + fixed-width and Bytes via the now-LANDED lossless view composition (option 1, SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION merged ceea742831f2), everything else FAIL-CLOSED. Zero new TCB: no hidden primitive, no new PrimReduction::Op, no new trusted-base entry. A sealed LiteralComparatorPlan (derived from the expected carrier after elab_num_lit_checked) selects the comparison; unknown carrier/literal pairs have no catch-all success arm and reject. Decimal is deferred (no unrestricted Decimal literal pattern is total under the present comparator)"
+status: ready
 owner: language
 size: M
 gate: none
 depends_on: [SPEC-MATCH-PATTERN-PINS, SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]
 blocks: []
 github: null
-origin: "Steward cut 2026-09-12 from the umbrella LANG-MATCH-PATTERN-FORMS-ABSENT on the spec-enclave disposition evt_12qrtnp7237dn (the prerequisite-ordered six-slice cut) and the Architect L2 decomposition ruling evt_127n516pkvtnb. Slices 1-5 landed: as-patterns (LANG-MATCH-AS-PATTERN e6645d7c2), tuple/pair (LANG-MATCH-TUPLE-PATTERN af2b36dc8), record (LANG-MATCH-RECORD-PATTERN a42b90454), or-patterns (LANG-MATCH-OR-PATTERN 7f80228c2), guards (LANG-MATCH-GUARDS, merged). This is slice 6, the final form. RECUT 2026-09-12 under Architect HS1 evt_1wc0m1xbtk4r (classification PINNED_VALUE_COMPARATOR_HAS_NO_TOTAL_CORE_REALIZATION, re-derived at exact 2d35fd3b6): the earlier all-row frame assumed every 34 §3.2 row had a total kernel-checkable Bool comparator; it does not. See the READ-FIRST banner. Anchors measured by the Steward at framing (PatKind ast.rs:178; top-level Wild/Var refusal elab.rs 15772/15859/15999/16133; comparators eq_int/eq_float/eq_float32 numbers.rs, eqChar/decimalEq decimal_char.rs; lossless views conversions.rs:143-166; string_to_list_char/bytes_to_list) -- RE-MEASURE at the cut. The umbrella's slice-6 row flips to blocked."
+origin: "Steward cut 2026-09-12 from the umbrella LANG-MATCH-PATTERN-FORMS-ABSENT on the spec-enclave disposition evt_12qrtnp7237dn (the prerequisite-ordered six-slice cut) and the Architect L2 decomposition ruling evt_127n516pkvtnb. Slices 1-5 landed: as-patterns (LANG-MATCH-AS-PATTERN e6645d7c2), tuple/pair (LANG-MATCH-TUPLE-PATTERN af2b36dc8), record (LANG-MATCH-RECORD-PATTERN a42b90454), or-patterns (LANG-MATCH-OR-PATTERN 7f80228c2), guards (LANG-MATCH-GUARDS, merged). This is slice 6, the final form. RECUT 2026-09-12 under Architect HS1 evt_1wc0m1xbtk4r (classification PINNED_VALUE_COMPARATOR_HAS_NO_TOTAL_CORE_REALIZATION, re-derived at exact 2d35fd3b6): the earlier all-row frame assumed every 34 §3.2 row had a total kernel-checkable Bool comparator; it does not. See the READ-FIRST banner. Anchors measured by the Steward at framing (PatKind ast.rs:178; top-level Wild/Var refusal elab.rs 15772/15859/15999/16133; comparators eq_int/eq_float/eq_float32 numbers.rs, eqChar/decimalEq decimal_char.rs; lossless views conversions.rs:143-166; string_to_list_char/bytes_to_list) -- RE-MEASURE at the cut. RE-RELEASED 2026-09-12 (status draft->ready) after SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION landed at ceea742831f2 (option 1: internal lossless view composition is an admitted realization; conformance split 14 supported-now + Decimal deferred), which promotes fixed-width and Bytes from conditional into this core. New base current main e34597a5a; the 2d35fd3b6 anchors above are superseded -- re-measure every anchor at the implementer's cut."
 ---
 
-> # RECUT and HELD 2026-09-12 under Architect HS1 `evt_1wc0m1xbtk4r`. READ FIRST.
+> # RE-RELEASED 2026-09-12 (Steward): gating spec correction landed. READ FIRST.
 >
-> **The earlier RELEASED all-row frame is SUPERSEDED. HELD (`status: draft`)
-> until [[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]] lands and the Steward
-> re-releases; the `depends_on` records the gate.** HS1
-> (`PINNED_VALUE_COMPARATOR_HAS_NO_TOTAL_CORE_REALIZATION`, re-derived at exact
-> `2d35fd3b60b583c9065286d88aee4d448646a64d`): spec 34 §3.2 pins each comparison
-> RESULT, but the prelude has no total `Bool` core realization for the whole
-> pinned population -- fixed-width and Bytes have only their named widening
-> views, String only its structural view, and `decimalEq` is stuck beyond the
-> bounded exponent-alignment cascade. The old frame's all-row ACs and its
-> no-TCB AC cannot both be discharged on this base.
+> **The gate is cleared: [[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]] merged at
+> `ceea742831f2` (closeout `e34597a5a`), choosing OPTION 1 -- exact, total,
+> already-landed lossless view composition is an admitted INTERNAL comparator
+> realization, the conformance row is split 14 supported-now + Decimal deferred.
+> This node flips `draft -> ready` and is released to the language ring on new
+> base current main `e34597a5a`.** The Architect HS1 that produced this recut
+> (`evt_1wc0m1xbtk4r`, `PINNED_VALUE_COMPARATOR_HAS_NO_TOTAL_CORE_REALIZATION`)
+> is now resolved by that landing: spec 34 §3.2 pins each comparison RESULT, the
+> prelude has no total `Bool` core realization for every row directly, and the
+> spec now admits realizing fixed-width/Bytes/String through their exact total
+> views -- so this core covers them with ZERO new TCB.
+>
+> **What the landing changed for this node:** fixed-width and Bytes move from
+> conditional into the core (their `<snake>_to_int` / `bytes_to_list` + octet
+> views are the admitted realization). Direct Int/Float/Float32/Char and the
+> String structural plan are unchanged. Decimal stays deferred (the landed spec
+> marks it carrier-wide deferred; no total comparator yet). The old "all-row ACs
+> vs no-TCB AC cannot both hold" tension is gone: option 1 makes every
+> supported row realizable without a new primitive.
 >
 > **ZERO new TCB is authorized. There are no intended hidden names to supply.**
 > A value-only comparator primitive is safer than a proof-producing one, but it
@@ -48,10 +57,10 @@ origin: "Steward cut 2026-09-12 from the umbrella LANG-MATCH-PATTERN-FORMS-ABSEN
 > value-level-not-proof boundary, the sealed `LiteralComparatorPlan` mechanism,
 > and fail-closed carrier rejection are a correctness argument, not a mechanical
 > edit. Tier T1. Standing Adversary hunt independent -> Steward M1-M4 ->
-> lieutenant. **Do not begin source edits until
-> [[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]] lands and the Steward
-> RE-RELEASES this node; the current byte-clean branch at `2d35fd3b6` stays
-> clean.**
+> lieutenant. **Now released: cut a fresh branch from current main
+> `e34597a5a` and re-measure every anchor at that cut (five prior slices moved
+> the elab.rs match spine, the PatKind/RPatKind enums, and the top-level refusal
+> repeatedly, and the landed spec correction touched `34`/`18a`).**
 
 ## What this is
 
@@ -98,12 +107,13 @@ no catalog import, no primitive): lower the tested scrutinee through
 literal of N codepoints -- at each `Cons` test the head with `eqChar`, after N
 successes require `Nil`. This is finite source-literal unrolling.
 
-**Conditional on the spec correction** [[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]]:
-if it licenses exact lossless view composition, ADD fixed-width (apply the
+**Licensed by the landed correction (option 1), IN this core**
+[[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]]: fixed-width (apply the
 already-landed lossless `<snake>_to_int` view to both operands, then `eq_int`)
 and Bytes (`bytes_to_list`, octets compared through the existing `UInt8` view).
-If the correction is not landed, or it chooses direct comparators, these two
-rows stay fail-closed in this node and split off separately.
+The merged spec admits exact, total, already-landed lossless view composition as
+an internal realization, so these are supported-now rows here -- not conditional,
+not split off. Zero new TCB: the views and `eq_int` are already trusted surface.
 
 **Deferred, NOT in this node:** `Decimal`. No unrestricted Decimal literal
 pattern is total under `decimalEq` -- the scrutinee exponent is unbounded, and
@@ -151,8 +161,8 @@ unguarded residual fallback, not as an inductive constructor split**.
 2. The sealed `LiteralComparatorPlan` + elaborator selection: expected-type
    check at the scrutinee type (`35 §4`), carrier-driven plan, value-level
    `Bool` result with no `Equal`/hypothesis emission. Direct Int/Float/Float32/
-   Char rows + the String structural plan; fixed-width/Bytes ADDED iff
-   [[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]] licenses the views.
+   Char rows + the String structural plan + fixed-width and Bytes through the
+   landed lossless views (option 1, [[SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION]]).
 3. Fail-closed rejection for every carrier/literal pair not in the implemented
    population -- Decimal, unadmitted carriers, and user-defined-carrier numeric
    literals (`35 §4.2` unstaged) -- with a diagnostic naming the carrier and the
@@ -161,7 +171,7 @@ unguarded residual fallback, not as an inductive constructor split**.
    subsumption cause (by comparator semantics); a partially-covered literal set
    stays reported as non-exhaustive.
 5. Tests: a reaching positive per supported row (at minimum `Int`, `Float`,
-   `Char`, `String`; fixed-width/Bytes iff licensed); a fail-closed control for
+   `Char`, `String`, a fixed-width carrier, and `Bytes`); a fail-closed control for
    Decimal AND for an unadmitted/user carrier; a redundant-literal-arm control
    asserting the subsumption cause not `NoInhabitants`; a control keeping the
    five landed slices green.
@@ -188,8 +198,9 @@ unguarded residual fallback, not as an inductive constructor split**.
 
 ## Not this slice
 
-- **Fixed-width and Bytes when the spec correction does NOT license view
-  composition** (or chooses direct comparators) -- they split off then.
+- **Direct per-carrier comparators for fixed-width/Bytes** -- option 1 landed,
+  so these rows are realized through the lossless views (in this core), not by a
+  new comparator primitive. A direct comparator would be new TCB and is out.
 - **Decimal** -- deferred (18a §5.6.1(2)); the owning team is not pre-assigned.
 - **Top-level `_`/`Var` catch-all and its `ArmDeadCause` obligations.** This
   slice keeps the top-level refusal (`elab.rs` 15772/15859/15999/16133) intact.
@@ -213,7 +224,7 @@ Append one entry per Architect hard stop; never rewrite history.
 ## Contention
 
 One serial language seat; this shares `ast.rs`, `parser.rs`, `resolve.rs`, and
-the `elab.rs` match spine with the five landed slices. Base = `2d35fd3b6`;
+the `elab.rs` match spine with the five landed slices. Base = `e34597a5a`;
 re-measure every anchor at the cut (five prior slices advanced the elab.rs match
 spine, the PatKind/RPatKind enums, arm_used/NoInhabitants/top-level refusal
 repeatedly). No cross-lane contention (L1 runtime is on `crates/ken-lowering`).
