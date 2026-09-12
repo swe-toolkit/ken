@@ -385,7 +385,7 @@ population-side mutation above.
 
 `CAT-PRIORITY-QUEUE` lands every case above as a tested observation. Producer
 blob `1eec578603cdef349af21d944ac174af5919705c` and acceptance-test blob
-`62d9d6b918219f34d5fba4f161a4024b0bf32577` execute all 22 case records through
+`229bbcd89e2041771af44c51e70e9c1f12c02639` execute all 22 case records through
 nine passing tests, including exactly 4,216 bounded traces. Fifteen
 compile-preserving production-side and detector-side mutations reddened their
 named observations, and both files were restored byte-identically. The result
