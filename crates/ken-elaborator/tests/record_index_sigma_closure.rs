@@ -251,3 +251,124 @@ fn hidden_result_refinement_handles_a_reducible_record_scrutinee() {
     )
     .expect("reachable hidden result refinement must project record equality evidence");
 }
+
+#[test]
+fn if_condition_validation_closes_an_active_result_premise() {
+    // Promise class: durable invariant.
+    // MEASURED: an if-condition consumes a field retyped by one active hidden
+    // result refinement, while both branches make the recursive-group call that
+    // keeps that frame live. CLAIMED: immediate condition validation closes the
+    // active premise only in a disposable shadow. THE GAP: branch-body and
+    // completed-Elim shadows run later, so neither can rescue the condition's
+    // own Bool check when this consumer-specific shadow is omitted.
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_decl("data IfIx = IfMkIx Nat Bool")
+        .expect("IfIx");
+    env.elaborate_decl(
+        "data IfCell : Nat -> Type where { \
+           IfMkCell : (index : Nat) -> IfCell index \
+         }",
+    )
+    .expect("IfCell");
+    env.elaborate_decl(
+        "data IfOut : IfIx -> Type where { \
+           IfMkOut : (index : Nat) -> (flag : Bool) \
+             -> IfOut (IfMkIx index flag) \
+         }",
+    )
+    .expect("IfOut");
+    env.elaborate_decl(
+        "fn inspect_if_cell (index : Nat) (cell : IfCell index) : Bool = True",
+    )
+    .expect("inspect_if_cell");
+
+    env.elaborate_file(
+        "fn if_live_a (fuel : Nat) (index : Nat) (flag : Bool) \
+           (cell : IfCell index) : IfOut (IfMkIx index flag) = \
+         match fuel { \
+           Zero ↦ IfMkOut index flag; \
+           Suc smaller ↦ match (IfMkIx index flag) { \
+             IfMkIx local local_flag ↦ \
+               if inspect_if_cell local cell \
+               then if_live_b smaller local local_flag cell \
+               else if_live_b smaller local local_flag cell \
+           } \
+         }\n\
+         fn if_live_b (fuel : Nat) (index : Nat) (flag : Bool) \
+           (cell : IfCell index) : IfOut (IfMkIx index flag) = \
+         match fuel { \
+           Zero ↦ IfMkOut index flag; \
+           Suc smaller ↦ match (IfMkIx index flag) { \
+             IfMkIx local local_flag ↦ \
+               if inspect_if_cell local cell \
+               then if_live_a smaller local local_flag cell \
+               else if_live_a smaller local local_flag cell \
+           } \
+         }",
+    )
+    .expect("the contextual view must expose the condition's active premise");
+}
+
+#[test]
+fn if_result_classifier_closes_a_substituted_refined_core() {
+    // Promise class: durable invariant.
+    // MEASURED: an inferred if-result type indexes `IfBox` by a refined field's
+    // Cast core while the condition itself is the closed literal True. CLAIMED:
+    // current-context result inference inserts every live premise binder and
+    // preserves the exact classifier. THE GAP: the condition control cannot
+    // reach this later query; bypassing only inference restores the sentinel
+    // out-of-scope rejection.
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_decl("data IfIx = IfMkIx Nat Bool")
+        .expect("IfIx");
+    env.elaborate_decl(
+        "data IfCell : Nat -> Type where { \
+           IfMkCell : (index : Nat) -> IfCell index \
+         }",
+    )
+    .expect("IfCell");
+    env.elaborate_decl(
+        "data IfBox : (index : Nat) -> IfCell index -> Type where { \
+           IfMkBox : (index : Nat) -> (cell : IfCell index) \
+             -> IfBox index cell \
+         }",
+    )
+    .expect("IfBox");
+    env.elaborate_decl(
+        "data IfOut : IfIx -> Type where { \
+           IfMkOut : (index : Nat) -> (flag : Bool) \
+             -> IfOut (IfMkIx index flag) \
+         }",
+    )
+    .expect("IfOut");
+
+    env.elaborate_file(
+        "fn if_type_a (fuel : Nat) (index : Nat) (flag : Bool) \
+           (cell : IfCell index) : IfOut (IfMkIx index flag) = \
+         match fuel { \
+           Zero ↦ IfMkOut index flag; \
+           Suc smaller ↦ match (IfMkIx index flag) { \
+             IfMkIx local local_flag ↦ \
+               let boxed = \
+                 if True then IfMkBox local cell else IfMkBox local cell in \
+               if True \
+               then if_type_b smaller local local_flag cell \
+               else if_type_b smaller local local_flag cell \
+           } \
+         }\n\
+         fn if_type_b (fuel : Nat) (index : Nat) (flag : Bool) \
+           (cell : IfCell index) : IfOut (IfMkIx index flag) = \
+         match fuel { \
+           Zero ↦ IfMkOut index flag; \
+           Suc smaller ↦ match (IfMkIx index flag) { \
+             IfMkIx local local_flag ↦ \
+               let boxed = \
+                 if True then IfMkBox local cell else IfMkBox local cell in \
+               if True \
+               then if_type_a smaller local local_flag cell \
+               else if_type_a smaller local local_flag cell \
+           } \
+         }",
+    )
+    .expect("the contextual inference view must expose the active premise");
+}
