@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-12 15:01:00Z — from 590 issue file(s) in `docs/program/issues/`.
+2026-09-12 15:24:22Z — from 590 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -147,7 +147,7 @@ the committed file matches the generator's output.
 | `DOC-ATTEST-LIVING` | attesting living tracker files makes every routine WP status flip redden the currency gate | closed | doc | S | none | — |
 | `DOC-CAP-ASBUILT` | The capability chapter tells readers the catalog has no checked authority exemplar; CAT-CAPEX adds one, falsifying that claim in two places | merged | doc | S | none | — |
 | `DOC-CATALOG-CONTENTS` | Catalog entry format: rename the `## Index` heading to `## Contents` in 19 entries and remove the 16 reading-path sections | merged | doc | M | none | — |
-| `DOC-COMPILER-DEEPEN` | Deepen library/guide/compiler/ one level (paragraph-to-page texture): nest depth pages under each of the 8 overview chapters, executed one chapter at a time in pipeline order, front-end first as the template-setter; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle | ready | doc | L | none | — |
+| `DOC-COMPILER-DEEPEN` | Deepen library/guide/compiler/ one level (paragraph-to-page texture): nest depth pages under each of the 8 overview chapters, executed one chapter at a time in pipeline order, front-end first as the template-setter; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle | active | doc | L | none | — |
 | `DOC-CURRENCY-ANCHOR` | library/REVISION certifies nothing about the corpus — currency is unchecked | closed | doc | S | none | — |
 | `DOC-GATE-CONTROL-BINDING` | validation-gate registry: make the two DOC-GATE-RECORD-AXIS checks orphan-proof by lifting them to pure detectors with committed controls | merged | verify | S | none | https://github.com/swe-toolkit/ken/pull/928 |
 | `DOC-GATE-NEEDLE` | schema-gate controls assert on a needle the test itself supplied, so one constraint class is fully vacuous | merged | verify | S | none | — |
@@ -635,7 +635,6 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
-- `DOC-COMPILER-DEEPEN` — Deepen library/guide/compiler/ one level (paragraph-to-page texture): nest depth pages under each of the 8 overview chapters, executed one chapter at a time in pipeline order, front-end first as the template-setter; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle
 - `LANG-MATCH-LITERAL-PATTERN` — literal patterns -- slice 6 (final) of 34 §3's six absent pattern forms: a VALUE-LEVEL branch-selection form (34 §3.2:385-420), the comparator returning Bool with NO Equal proof and NO equality hypothesis. RECUT under Architect HS1 (evt_1wc0m1xbtk4r) to a CONTAINED CORE: direct Int/Float/Float32/Char rows + a literal-shaped String structural plan (string_to_list_char + eqChar) + fixed-width and Bytes via the now-LANDED lossless view composition (option 1, SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION merged ceea742831f2), everything else FAIL-CLOSED. Zero new TCB: no hidden primitive, no new PrimReduction::Op, no new trusted-base entry. A sealed LiteralComparatorPlan (derived from the expected carrier after elab_num_lit_checked) selects the comparison; unknown carrier/literal pairs have no catch-all success arm and reject. Decimal is deferred (no unrestricted Decimal literal pattern is total under the present comparator)
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
