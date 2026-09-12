@@ -12,7 +12,106 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 15 — THIRD (FINAL) OBSERVATION-ONLY RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# D5b NATIVE HARD-STOP 15 — ORIGIN-705 DISPOSITION RULING — AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+
+> # D5b native-lowering track, HS15 — ARCHITECT ORIGIN-705 DISPOSITION RULING
+> # evt_1cvq23ew7ysts (thr_7wy5wy45p7abm), superseding the observer INSTRUCTION of
+> # the THIRD and prior observation rulings below. The fourth observation validly
+> # closed ORIGIN705_NOT_CLOSED (runtime-implementer evt_6hwhx0c9k207s) — PROGRESS:
+> # a valid outcome, not INVALID. Still HS15: NO hard-stop advance, NO inventory row,
+> # NO Research retrigger. Runtime clean at 37390dfcf / b020b71f; production HELD; NO
+> # repair authorized.
+> #
+> # ESTABLISHED (narrower than a production defect): origin 705 IS emitted, via the
+> # owned source-machine route — all six visits in funcid60 / Specialization(2),
+> # minted at enter_source_occurrence_plan (lowering/source.rs:850); plan ancestry
+> # closes parent 706 CheckedComputationalIHSlots -> child 705 (a two-field
+> # ITree::Vis Construct). Direct descent and lower_computational_producer_expr_once
+> # are RULED OUT as routes. The missing observer rows live in
+> # lower_source_machine_with_continuation_inner (Construct dispatch source.rs:996-
+> # 1063; completion 1710-1811); the prior observers instrumented the separate
+> # lower_expr Construct consumer and the lower_computational_producer_construct
+> # producer consumer, neither of which sees the source-machine arm at :850.
+> # CLASSIFICATION: SOURCE_MACHINE_ORIGIN_TOKEN_NOT_CARRIED_TO_CONSTRUCT_CONTINUATION
+> # — observer-domain only, authorizes no production repair.
+> #
+> # NEW ADVERSE TARGET FACT (accepted, NOT promoted past the unclosed consumer):
+> # BOTH emitted targets independently publish actual identity DenseRange {start:
+> # 3380, len: 38}, NOT the demanded 4442. Target 1/body 1076 stores governed source
+> # Construct 885; target 3/body 859 stores source Construct 667; each: one Result
+> # store, zero Trap stores, one zero Return, only -1 nonzero Returns, no
+> # generated-unit call. All seven terminal calls pair to the 3380 publications.
+> # ⇒ This FALSIFIES any repair that simply declares either target's Result to be
+> # 4442. It does NOT yet distinguish a lawful INTERMEDIATE 3380 that an existing
+> # source consumer must drive, from a genuinely wrong target result — that is what
+> # the last observation decides.
+> #
+> # AUTHORIZED: ONE LAST origin-705-ONLY test-support observation on exact pre-HS15
+> # attempt bcde2f02 over 37390dfcf. REUSE by hash the already-closed planning,
+> # Active, target, nonterminal, seven-call, and terminal-seed artifacts — do NOT
+> # widen or reinstrument them. Run the unchanged named positive once on the existing
+> # 256 MiB Builder stack. Observer constraints:
+> # (1) In lower_source_machine_with_continuation_inner, mint the 705 visit
+> #    immediately after the successful enter_source_occurrence_plan(static_origin)
+> #    at source.rs:850, held in a TEST-SUPPORT-ONLY stack-local owned by that
+> #    source-machine loop invocation. No global last/nearest; no pairing by order,
+> #    adjacency, count, function number, origin alone, or SSA equality. A second
+> #    live 705 visit in one invocation = INVALID.
+> # (2) Do NOT add a field to SourceContinuation/SourceControl/a frame/a carrier, or
+> #    change a discriminant or production signature. The stack-local state follows
+> #    the actual SourceMachineState transition; record Construct branch, ctor,
+> #    child origins, incoming control/continuation, each field's phase + structural
+> #    producer.
+> # (3) At the exact SourceContinuation::ConstructArgument whose static_origin is
+> #    705, record before/after per field step. At completion record whether the
+> #    checked-IH transport lookup ran + its result, whether completion used
+> #    transfer_constructor_operands or finish_source_constructor, the produced
+> #    word/phase + actual constructor identity, and the next continuation. Keep
+> #    the token live across subsequent SourceMachineState::Value transitions until a
+> #    named semantic consumer consumes it or the source machine returns it.
+> # (4) If a ComputationalMatchScrutinee, checked-IH return, handler/driver,
+> #    invocation return, or other continuation consumes the value, record the exact
+> #    variant, frame/cursor/interface identity, selected case/return edge, successor
+> #    occurrence + phase/word. Follow structurally to an independently governed 4442
+> #    Result/Trap, one of the six B calls, or an ordinary nonterminal disposition.
+> #    If the source machine returns the 3380 word, follow the caller edge after
+> #    return; a returned intermediate is NOT terminal authority.
+> # (5) Close all six visit tokens SEPARATELY: each exactly one Construct completion
+> #    and one terminal disposition. Where a token reaches a B call, join it to the
+> #    full B ContinuationCallIdentity, decoded callee, call Inst, returned word, and
+> #    terminal predecessor already in the immutable seven-call ledger. A six-row
+> #    count is not six pairings. Missing/duplicate/multiply-consumed/overwritten/
+> #    unpaired = INVALID.
+> #
+> # ONE OUTCOME (no ORIGIN705_NOT_CLOSED repeat — this scope exists only to close
+> # that exact lifecycle): COMPOSED_TAIL_RESIDUAL_CHAIN_COMPLETE_AND_DRIVER_DROPPED
+> # (every relevant 3380 proved intermediate; the exact existing source
+> # consumer/driver leading toward 4442 identified; current terminal call path proved
+> # to bypass it) / EXISTING_FINAL_RESULT_REALIZATION_NOT_PROJECTED (the exact
+> # source-machine continuation consumes the intermediate and independently realizes
+> # 4442 or Trap, but that authority is not projected to the terminal path) /
+> # TARGET_EMITTED_RESULT_NOT_CLOSED (the complete lifecycle returns/terminates at
+> # 3380 with NO existing semantic consumer that can realize 4442; name the exact
+> # target + missing consumer edge, do NOT relabel the target) / INVALID.
+> #
+> # FENCES (absolute): no production repair, Direct-for-Tail, rejected HS14 plan,
+> # metadata/target/tag/Carried authority, new route/transform/function class/ABI/
+> # schema/frame/carrier/side table/allocation/owner/discriminant, source-program or
+> # source-semantic change, call-order change, Result/Trap store/load change,
+> # validator suppression, or stack-size change. Restore byte-identical, stop after
+> # one outcome.
+> #
+> # SCOPE (Steward): FENCED compiler/test-support OBSERVATION — Architect-stated
+> # needs NO operator escalation. Amended in place with no operator sign-off (same
+> # shape as the first four HS15 observation folds). Steward owns the read-first
+> # fold; runtime-leader owns the kickoff; production HELD. A PRODUCTION ruling
+> # follows ONLY one structurally closed outcome. WATCH: this is the FIFTH HS15
+> # observation; the chain is CONVERGING (3380-vs-4442 is a real semantic finding),
+> # but should a later PRODUCTION ruling leave the fence (TCB/ABI/route/transform/
+> # capability/scope), the Steward escalates to the operator (back 12:00 UTC) rather
+> # than authorizing it.
+
+# D5b NATIVE HARD-STOP 15 — THIRD (FINAL) OBSERVATION-ONLY RULING (SUPERSEDED as the operative observer INSTRUCTION by the ORIGIN-705 DISPOSITION RULING above; its self-correction, grounding, and fences STAND — the observation on this instruction closed ORIGIN705_NOT_CLOSED, runtime-implementer evt_6hwhx0c9k207s). AMENDED IN PLACE 2026-09-12 (Steward).
 
 > # D5b native-lowering track, HS15 — ARCHITECT THIRD OBSERVATION-ONLY RULING
 > # evt_sackrt5qfzwk (thr_7wy5wy45p7abm), superseding the observer INSTRUCTION of
