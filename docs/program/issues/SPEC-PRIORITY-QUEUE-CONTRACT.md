@@ -1,7 +1,7 @@
 ---
 id: SPEC-PRIORITY-QUEUE-CONTRACT
 title: "no priority-queue/heap ADT is specified anywhere in spec/ (every 'heap' hit is the runtime value-store); the Band-A frontier-harvest build CAT-PRIORITY-QUEUE cannot proceed without a normative contract, so the spec enclave authors a short dedicated priority-queue contract: the six-name abstract interface (carrier + empty/insert/find_min/pop_min/merge over an explicit Ord k, payload separate), lawful-order + multiplicity (entries not sets, duplicates preserved), optional extraction, persistence, equal-priority tie NON-stability, recursive representation validity (without freezing the private leftist layout), an honest structural cost model, and the proof-status split (computational now, general laws deferred), with a reaching conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 gate: none

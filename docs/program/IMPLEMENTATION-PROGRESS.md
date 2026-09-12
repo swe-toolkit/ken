@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-12 20:46:10Z — from 594 issue file(s) in `docs/program/issues/`.
+2026-09-12 22:26:22Z — from 594 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -590,7 +590,7 @@ the committed file matches the generator's output.
 | `SPEC-MATCH-PATTERN-PINS` | the five spelling pins 34 §3's absent pattern forms need before any of them can be cut as a slice -- as-association/precedence, tuple comma-versus-grouping, record field_pat form, the or-pattern binder join, and the literal-kind-to-value-comparator table -- none of which exists today, so a Language slice built now is a slice that gets rebuilt | merged | spec-enclave | M | none | — |
 | `SPEC-MISSION-GROUNDING` | Ground the spec as a whole against the mission — audit every retained constraint for which mission property fails without it, and relax the ones where nothing does | draft | spec | L | none | — |
 | `SPEC-NESTED-IND` | un-defer nested strictly-positive inductives in 14 §8.5 — state structural positivity through declared strictly-positive type-parameter positions, the lifted induction hypotheses, and the iota rules, WITHOUT mutual families | merged | spec-enclave | M | none | — |
-| `SPEC-PRIORITY-QUEUE-CONTRACT` | no priority-queue/heap ADT is specified anywhere in spec/ (every 'heap' hit is the runtime value-store); the Band-A frontier-harvest build CAT-PRIORITY-QUEUE cannot proceed without a normative contract, so the spec enclave authors a short dedicated priority-queue contract: the six-name abstract interface (carrier + empty/insert/find_min/pop_min/merge over an explicit Ord k, payload separate), lawful-order + multiplicity (entries not sets, duplicates preserved), optional extraction, persistence, equal-priority tie NON-stability, recursive representation validity (without freezing the private leftist layout), an honest structural cost model, and the proof-status split (computational now, general laws deferred), with a reaching conformance seed | ready | spec | S | none | — |
+| `SPEC-PRIORITY-QUEUE-CONTRACT` | no priority-queue/heap ADT is specified anywhere in spec/ (every 'heap' hit is the runtime value-store); the Band-A frontier-harvest build CAT-PRIORITY-QUEUE cannot proceed without a normative contract, so the spec enclave authors a short dedicated priority-queue contract: the six-name abstract interface (carrier + empty/insert/find_min/pop_min/merge over an explicit Ord k, payload separate), lawful-order + multiplicity (entries not sets, duplicates preserved), optional extraction, persistence, equal-priority tie NON-stability, recursive representation validity (without freezing the private leftist layout), an honest structural cost model, and the proof-status split (computational now, general laws deferred), with a reaching conformance seed | merged | spec | S | none | — |
 | `SPEC-REL-CLOSURE-RECURRENCE` | spec 58 §7 (CAT-4, Fork B) fixes the outer transitive-closure formula R+ x y := IsTrue(reachableWithin N x y), N := size(dom R), but NEVER defines what one unit of reachableWithin fuel recognizes (zero = base step? reflexive+step? direct-edge?) -- and its 58:368-370 'simple path length <= N-1' bound is off by one when dom R is the outer-key set and the endpoint is a target-only sink; Foundation cannot choose the recurrence in code, so the draft must state the exact fuel convention and correct N-1 to N | merged | spec | S | none | — |
 | `SPEC-SELECTOR-SORT-SPLIT` | split the recursive-result selector by motive sort -- `recursive result for x` when Type-classified, `induction hypothesis for x` when Omega-classified -- and remove `structural result of x` | merged | spec | M | none | — |
 | `SPEC-STATUS-RECONCILE` | the spec's two status vocabularies do not correspond — define the correspondence (or replace the ladder), then apply it | merged | spec-enclave | M | none | — |
@@ -654,7 +654,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-UNSUPPORTED-BINDING-ON-REFUSAL` — A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` — Does 45 section 3's 'functions lower to ordinary closures' admit an exception for a function value held in a constructor field with no statically visible consumer -- if not, the native backend's current refusal is a defect against AC3 rather than a permitted narrowing
-- `SPEC-PRIORITY-QUEUE-CONTRACT` — no priority-queue/heap ADT is specified anywhere in spec/ (every 'heap' hit is the runtime value-store); the Band-A frontier-harvest build CAT-PRIORITY-QUEUE cannot proceed without a normative contract, so the spec enclave authors a short dedicated priority-queue contract: the six-name abstract interface (carrier + empty/insert/find_min/pop_min/merge over an explicit Ord k, payload separate), lawful-order + multiplicity (entries not sets, duplicates preserved), optional extraction, persistence, equal-priority tie NON-stability, recursive representation validity (without freezing the private leftist layout), an honest structural cost model, and the proof-status split (computational now, general laws deferred), with a reaching conformance seed
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 
 ## Blockers
@@ -663,7 +662,6 @@ Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
 - `CAT-PRIORITY-QUEUE-LAWS` blocked by `CAT-PRIORITY-QUEUE` (status: draft)
-- `CAT-PRIORITY-QUEUE` blocked by `SPEC-PRIORITY-QUEUE-CONTRACT` (status: ready)
 - `F4` blocked by `A3` (status: draft)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
