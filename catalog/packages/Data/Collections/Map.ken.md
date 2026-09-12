@@ -85,6 +85,8 @@ import Core.Logic.Transport (cong, trans, sym)
 
 import Data.Collections.Derived (list_append)
 
+import Data.Numeric.Nat.Arithmetic (add)
+
 import Data.Sums.Combinators (is_some)
 
 data Tree k v = Leaf | Node (Tree k v) k v (Tree k v)
@@ -218,8 +220,8 @@ Layer 2 (§4.7) is where most callers actually meet this package day to day:
 expected membership and algebraic laws (commutativity, associativity,
 idempotence, identity for union/intersection), `keys`/`values` projections,
 and a small binary-relations library (`succ`/`compose`/`converse`/
-`is_equivalence`, …) built on `Tree k (Tree k Unit)` as an adjacency-map
-representation. Every Layer-2 operation is proved against the same
+`reachable_plus`/`is_equivalence`, …) built on `Tree k (Tree k Unit)` as an
+adjacency-map representation. Every Layer-2 operation is proved against the same
 `Ordered`/`lookup` contract the capstone establishes, so a caller reasoning
 about a `union` or a `delete` gets to reuse the capstone's vocabulary
 directly rather than re-deriving it.
@@ -15038,14 +15040,10 @@ show `keys` is sorted over an `Ordered` tree.
 The package closes with a small binary-relations library represented as
 `Tree k (Tree k Unit)` — an adjacency map from a key to the set of its
 successors: `succ`/`rel_member`/`add_edge` for the raw relation,
-`compose`/`converse` for relational composition and reversal, and
-`is_reflexive`/`is_symmetric`/`is_transitive`/`is_equivalence` as the
-standard relation-property predicates stated directly against `rel_member`.
-
-Transitive closure is intentionally design-now/defer-build: it is to be
-represented as bounded reachability (`IsTrue (reachableWithin N x y)`) once
-`size` and bounded iteration land. This package deliberately does not
-define a raw proof-relevant `data ... : Ω` closure.
+`compose`/`converse` for relational composition and reversal,
+`reachable_plus` for decidable positive transitive closure, and
+`is_reflexive`/`is_symmetric`/`is_transitive`/`is_equivalence` as the standard
+relation-property predicates stated directly against `rel_member`.
 
 ```ken
 fn pair_vals (k : Type) (v : Type) (xs : List (Pair k v)) : List v =
@@ -15118,6 +15116,36 @@ theorem keys_ascending
       (k : Type) (v : Type) (leq : k → k → Bool) (m : Tree k v)
     : Ordered k v leq m → is_sorted k leq (keys k v m) =
   λh. pair_keys_preserves_sorted k v leq (to_list k v m) (to_list_ordered k v leq m h)
+```
+
+##### Positive transitive closure — `reachable_plus`
+
+`reachable_plus` decides whether a positive path exists. `size` counts raw tree
+nodes, while `dom` preserves exactly the outer relation keys and never promotes
+a target-only vertex into the domain. The Boolean worker gives fuel its literal
+path-length meaning: zero accepts no path, and `Suc n` accepts a direct edge or
+a continuation whose recursive call receives exactly `n`. The public predicate
+uses `size (dom r)` as its bound and wraps the decision in the `IsTrue`
+equation, so endpoint equality alone never creates the zero-step case of
+reflexive-transitive closure.
+
+The computation is total on raw trees. Its correspondence with mathematical
+positive closure assumes the outer tree and every stored successor tree use the
+same lawful order; the faithfulness and saturation proofs remain separate from
+this computational definition.
+
+```ken
+fn size (k : Type) (v : Type) (m : Tree k v) : Nat =
+  match m {
+    Leaf ↦ Zero;
+    Node l key val r ↦ Suc (add (size k v l) (size k v r))
+  }
+
+fn dom (k : Type) (v : Type) (m : Tree k v) : Tree k Unit =
+  match m {
+    Leaf ↦ Leaf k Unit;
+    Node l key val r ↦ Node k Unit (dom k v l) key MkUnit (dom k v r)
+  }
 
 fn succ (k : Type) (leq : k → k → Bool) (x : k) (r : Tree k (Tree k Unit)) : Tree k Unit =
   match lookup k (Tree k Unit) leq x r {
@@ -15129,6 +15157,28 @@ fn rel_member
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
     : Prop =
   Equal Bool (set_member k leq y (succ k leq x r)) True
+
+fn reachable_within
+      (k : Type) (leq : k → k → Bool) (fuel : Nat) (x : k) (y : k) (r : Tree k (Tree k Unit))
+    : Bool =
+  match fuel {
+    Zero ↦ False;
+    Suc n ↦
+      cat4_bool_or
+        (set_member k leq y (succ k leq x r))
+        (fold
+          k
+          Unit
+          Bool
+          (λz. λu. λseen. cat4_bool_or (reachable_within k leq n z y r) seen)
+          False
+          (succ k leq x r))
+  }
+
+fn reachable_plus
+      (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
+    : Prop =
+  Equal Bool (reachable_within k leq (size k Unit (dom k (Tree k Unit) r)) x y r) True
 
 fn add_edge
       (k : Type) (leq : k → k → Bool) (x : k) (y : k) (r : Tree k (Tree k Unit))
@@ -15215,8 +15265,9 @@ constructing unnecessary equalities between fully expanded tree nodes.
 
 **Explicit ordering evidence.** Comparator operations and their laws are
 passed as parameters. This preserves genericity while keeping the exact
-ordering assumptions visible in every theorem that needs them. Bounded
-reachability is intentionally left to a future bounded-iteration interface.
+ordering assumptions visible in every theorem that needs them. Positive
+reachability uses a direct structurally decreasing `Nat` recurrence rather
+than adding a generic bounded-iteration interface.
 
 ## 6. References
 
@@ -15243,7 +15294,8 @@ laws (`preserves_ordered`, `lookup_found_after_insert`, `lookup_locality`,
 `to_list_ordered`, `lookup_assoc_agree`), `delete`, `insert_with`,
 `union`/`intersection`/`difference` and their `Set`-level wrappers,
 `keys`/`values`, and the binary-relations combinators
-(`succ`/`compose`/`converse`/`is_equivalence`).
+(`size`/`dom`/`succ`/`compose`/`converse`/`reachable_within`/
+`reachable_plus`/`is_equivalence`).
 
 **Source map:**
 
@@ -15256,7 +15308,9 @@ laws (`preserves_ordered`, `lookup_found_after_insert`, `lookup_locality`,
 | Understand the recurring proof idioms | [§5](#5-design-notes) |
 
 **Derivation path from built-ins.** `Tree` is a checked inductive data type.
-Every operation is an ordinary checked definition; `Or`/`Inl`/`Inr` are
+Every operation is an ordinary checked definition. `size` reuses the checked
+`Nat` addition, and `reachable_plus` uses the `IsTrue` equation
+`Equal Bool _ True` over its bounded Boolean worker. `Or`/`Inl`/`Inr` are
 kernel-checked inductive data, not native primitives.
 
 **`trusted_base()` delta: zero**, throughout the capstone and the keyed
