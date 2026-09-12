@@ -1,15 +1,52 @@
 ---
 id: LANG-DECEQ-CHAR-LAWFUL-INSTANCES
 title: "`37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row"
-status: draft
+status: closed
 owner: language
 size: unsized
-gate: operator
+gate: none
 depends_on: []
 blocks: []
 github: null
 origin: "Steward sweep 2026-08-13 at c1b9a1e8, taken while framing LANG-PRELUDE-ELABORATION-DEPTH. This is the second `tracked follow-on` in spec 37 found with no tracker row -- the first was `filter`, which produced LANG-PRELUDE-COLLECTIONS. Found by grepping the chapter for deferral language rather than by grepping the tracker for gaps."
 ---
+
+# CLOSED 2026-09-12 — ALREADY SATISFIED (surface predates this node). READ FIRST.
+
+> Architect L2 decomposition ruling evt_127n516pkvtnb (thr_4w935jjdyw5tk),
+> re-derived from main c1ef0b004. This node's premise is stale: the entire
+> requested product surface was already landed and checked BEFORE this node was
+> filed (2026-08-13). It is a stale-corpus duplicate born from stale
+> `37 §2.5` wording, not a newly-unblocked implementation obligation.
+>
+> - `DecEq Char` landed in DS-6a at 23e754e2d (2026-07-10). Current source:
+>   `catalog/packages/Core/Classes/LawfulClasses.ken.md:625` (projects all three
+>   `DecEq Int` fields; Char = `{ c : Int | isScalar c }`, `eqChar = eq_int`).
+> - Lawful `DecEq String` / `Ord String` landed in the CC2 family (2026-07-13),
+>   canonically re-homed by 82f5de01 (2026-09-03). Current source:
+>   `LawfulClasses.ken.md:2359` (`DecEq String`) and `:2409` (`Ord String`), with
+>   real `sound`/`complete` and order-law proofs, transported through the
+>   canonical `String -> List Char` view.
+>
+> OPERATOR RULING (Pat, 2026-09-12, rec A): widen decidable equality, accepting
+> +2 irreducible postulates per registrant. STANDS as standing TCB policy for any
+> FUTURE opaque-primitive registrant, but requires NO new postulate for Char or
+> String. The kernel mechanism `declare_deceq_certificate`
+> (`crates/ken-kernel/src/check.rs:1234-1321`) mints exactly two `Decl::Opaque`
+> per registrant; the ONLY production call site is `numbers.rs:403` (Int against
+> `eq_int`), so the registrant population is one and the certificate delta is
+> exactly the two Int postulates. Char is not a second registrant (transparent
+> projection, empty local delta); String/Ord transport structurally (zero-NEW-
+> delta, inheriting the Int certificate + the pre-existing String retraction
+> postulate). The Char-pass/Decimal-reject pair remains the canonicity
+> discriminator.
+>
+> DISPOSITION (Steward): closed as already-satisfied. A spec `37 §2.5` currency
+> correction (the deferral promises a follow-on that already landed) is routed to
+> the spec enclave. The literals pattern slice is INDEPENDENT of this node
+> (spec 34 §…:393-417 makes literal comparison value-level; lawful DecEq optional)
+> and is framed separately as the L2 head — [[LANG-MATCH-PATTERN-FORMS-ABSENT]].
+> The history below is retained for context.
 
 ## What this is
 
