@@ -1,7 +1,7 @@
 ---
 id: CAT-PRIORITY-QUEUE
 title: "the Band-A frontier-harvest priority-queue node: land Data.Collections.PriorityQueue as one complete computational persistent LEFTIST priority queue -- abstract carrier PriorityQueue k v leq with private ranked nodes, five public ops (empty/insert/find_min/pop_min/merge) over an explicit Ord k with payload separate, one private make_node + one private meld worker reusing leq_nat; a TESTED computational implementation (semantics load-bearing and covered, general kernel proof deferred to CAT-PRIORITY-QUEUE-LAWS), kernel-untouched and Axiom-free; do NOT split carrier/insert from meld/pop"
-status: draft
+status: ready
 owner: foundation
 size: L
 gate: none
@@ -9,16 +9,19 @@ depends_on: [SPEC-PRIORITY-QUEUE-CONTRACT]
 blocks: []
 github: null
 tier: T1
-origin: "Steward cut 2026-09-12 from the Architect priority-queue design ruling (Parts A/C/D: evt_3vfd1feghmm2c representation+interface, evt_15etn5hm102n2 decomposition+proof-posture+discriminators), grounded at main 1691160dd. Band-A frontier-harvest, the operator-named next L3 node after CAT-REL (2026-09-12). status draft: HELD until SPEC-PRIORITY-QUEUE-CONTRACT lands, then the Steward flips it ready and releases to foundation. The Architect actually PROBED buildability at 1691160dd (fresh ProbeHeap with both meld branches: meld Transparent; a same-operand recurrence is kernel-rejected NotTerminating 'SCT: idempotent self-loop'; opposite-Nat-comparator gives kernel TypeMismatch; ord_leq_at wrappers check with empty trusted-base delta; the (d.leq) type-argument spelling failed parsing -- use ord_leq_at). No syntax/elaborator repair needed. IN-LANE: computational-first, kernel-untouched/Axiom-free = no TCB, no operator touch. Re-measure every catalog anchor at the cut."
+origin: "Steward cut 2026-09-12 from the Architect priority-queue design ruling (Parts A/C/D: evt_3vfd1feghmm2c representation+interface, evt_15etn5hm102n2 decomposition+proof-posture+discriminators), grounded at main 1691160dd. Band-A frontier-harvest, the operator-named next L3 node after CAT-REL (2026-09-12). status draft: HELD until SPEC-PRIORITY-QUEUE-CONTRACT lands, then the Steward flips it ready and releases to foundation. The Architect actually PROBED buildability at 1691160dd (fresh ProbeHeap with both meld branches: meld Transparent; a same-operand recurrence is kernel-rejected NotTerminating 'SCT: idempotent self-loop'; opposite-Nat-comparator gives kernel TypeMismatch; ord_leq_at wrappers check with empty trusted-base delta; the (d.leq) type-argument spelling failed parsing -- use ord_leq_at). No syntax/elaborator repair needed. IN-LANE: computational-first, kernel-untouched/Axiom-free = no TCB, no operator touch. Re-measure every catalog anchor at the cut. RELEASED 2026-09-12 by the Steward: SPEC-PRIORITY-QUEUE-CONTRACT merged (content db12912693f1a9563ed4bbd5eb1167ace37e6ef0, closeout 85a1775e441ec2a01b72cb571dfa6ee80ce1906e); this node flipped draft->ready and amended to authorize the lifecycle fold (below), grounded at main 85a1775. Amendment answers the CV non-blocking note (evt_26wmnb18v7sm5, evt_5zyckhdms59nc): the contract landed the seed RED-until and the chapter DRAFT-v0, and the pre-amendment scope named only catalog + crate tests, so 'every case RED' / 'adds no implementation' prose would stand after the computation lands -- the same lifecycle-fold gap the CAT-REL build closed."
 ---
 
-> # HELD until [[SPEC-PRIORITY-QUEUE-CONTRACT]] lands. Do NOT begin source edits.
+> # RELEASED 2026-09-12 -- [[SPEC-PRIORITY-QUEUE-CONTRACT]] landed. Foundation ring.
 >
-> This is `draft` and `depends_on` the spec contract. The Steward flips it `ready`
-> and releases to foundation once the contract merges. The design below is the
-> Architect's ruling (Parts A/C/D); the normative behavior it must satisfy is the
-> spec contract. Re-measure `catalog/packages/Data/Collections/` anchors and the
-> `ord_leq_at`/`leq_nat` provider spellings at the cut.
+> The contract merged (content `db12912693f1a9563ed4bbd5eb1167ace37e6ef0`,
+> closeout `85a1775e441ec2a01b72cb571dfa6ee80ce1906e`); this node is `ready` and
+> released to foundation. The design below is the Architect's ruling (Parts
+> A/C/D); the normative behavior it must satisfy is the spec contract
+> (`spec/50-stdlib/58a-priority-queues.md`) and the paired reaching seed
+> (`conformance/stdlib/collections/seed-priority-queue.md`). Re-measure
+> `catalog/packages/Data/Collections/` anchors and the `ord_leq_at`/`leq_nat`
+> provider spellings at the cut.
 
 ## What this is
 
@@ -162,6 +165,35 @@ are a good additional closure test -- finite evidence, NOT arbitrary-heap proofs
 No source-text grep promise, aggregate test-count substitution, wall-clock
 asymptotic claim, local-workspace run, or runtime-instrumentation expansion.
 
+## Lifecycle fold (in scope for this build)
+
+The contract shipped two artifacts pinned to the *pre-implementation* state,
+which this build must carry forward as it lands the computation -- otherwise
+stale "no implementation" / "every case RED" prose stands on `main` after the
+computation is real (the same lifecycle-fold obligation the `CAT-REL` build
+discharged; CV non-blocking note evt_26wmnb18v7sm5, evt_5zyckhdms59nc):
+
+1. `conformance/stdlib/collections/seed-priority-queue.md` -- the reaching seed
+   currently declares "every case is **RED-UNTIL-CAT-PRIORITY-QUEUE**" (its
+   header) with a matching closing status section. Fold the RED-until posture
+   forward to the landed state so the seed's cases read as the now-satisfiable
+   expectations they are. Do NOT weaken or rewrite any case's expected
+   observations -- fold the LIFECYCLE STATUS only; the expected multisets,
+   counts, refusals, and trace totals are the contract and stay exactly as
+   specified.
+2. `spec/50-stdlib/58a-priority-queues.md` -- the chapter's `Status:` header
+   reads `DRAFT v0 (SPEC-PRIORITY-QUEUE-CONTRACT)` and its §7 delivery-status
+   item 2 (`CAT-PRIORITY-QUEUE`) describes the implementation as still owed.
+   Fold the status header and §7 to reflect that the computational build has
+   landed. Do NOT touch the normative behavior (§§1-6), the proof-status split,
+   or the deferred-laws boundary -- that stays the enclave's contract; this is a
+   status fold, not a spec rewrite.
+
+This is a narrow lifecycle-status fold on two enclave-owned files, authorized
+here because it cannot be done before the computation exists and must land in
+the same increment that makes the cases green. It is not a licence to edit the
+normative contract or the seed's expected values.
+
 ## Acceptance criteria
 
 - `Data.Collections.PriorityQueue` lands the carrier + five public ops per the
@@ -176,6 +208,10 @@ asymptotic claim, local-workspace run, or runtime-instrumentation expansion.
   type carries an unproved obligation; the cost account is structural and matches
   the code.
 - Conforms to the reaching seed in `SPEC-PRIORITY-QUEUE-CONTRACT`.
+- The lifecycle fold lands in the same increment: the seed's RED-until posture
+  and the chapter's DRAFT-v0 status/§7 are folded to the landed state, with no
+  change to any expected observation, normative behavior, or the deferred-laws
+  boundary.
 
 ## Not this node
 
@@ -195,9 +231,16 @@ reviewer.
 
 ## Contention
 
-Foundation ring, `catalog/packages/Data/Collections/PriorityQueue.ken.md` (new
-file) + its acceptance tests under `crates/ken-elaborator/tests/`. No cross-lane
-contention (L1 runtime on `crates/ken-lowering`/`crates/ken-runtime`; L2 language
-on `crates/ken-elaborator/src`). The new test files are under `crates/`, so a
-candidate touching them is a CODE merge -> full CI, M8/M8a Adversary. Re-measure
-provider spellings (`ord_leq_at`, `leq_nat`, `Pair`, `Option`) at the cut.
+Foundation ring. Files this build touches:
+- `catalog/packages/Data/Collections/PriorityQueue.ken.md` (new file) + its
+  acceptance tests under `crates/ken-elaborator/tests/`.
+- The lifecycle fold (above), two enclave-owned files, status-only:
+  `conformance/stdlib/collections/seed-priority-queue.md` and
+  `spec/50-stdlib/58a-priority-queues.md`.
+
+No cross-lane contention (L1 runtime on `crates/ken-lowering`/`crates/ken-runtime`;
+L2 language on `crates/ken-elaborator/src`; the spec enclave has no released node
+on these two files -- SPEC-PRIORITY-QUEUE-CONTRACT is merged/closed). The new
+test files are under `crates/`, so a candidate touching them is a CODE merge ->
+full CI, M8/M8a Adversary. Re-measure provider spellings (`ord_leq_at`,
+`leq_nat`, `Pair`, `Option`) and the seed/chapter fold anchors at the cut.
