@@ -2338,9 +2338,10 @@ kind = "explanatory"
 audience = ["human-reader"]
 authority = "explanatory"
 availability = "partial"
-sources = ["crates/ken-runtime/src/runtime_ir_evaluator.rs",
-  "crates/ken-runtime/src/values.rs", "crates/ken-runtime/src/store.rs",
-  "spec/40-runtime/42-evaluation.md", "spec/40-runtime/41-values.md"]
+sources = ["crates/ken-interp/src/lib.rs", "crates/ken-interp/src/eval.rs",
+  "crates/ken-runtime/src/runtime_ir_evaluator.rs", "crates/ken-runtime/src/values.rs",
+  "crates/ken-runtime/src/store.rs", "spec/40-runtime/42-evaluation.md",
+  "spec/40-runtime/41-values.md"]
 validation = ["manifest-coverage", "manifest-completeness", "document-kind", "links",
   "source-anchors", "availability-label", "authority-class", "transport-delimiter",
   "source-currency"]
