@@ -32,7 +32,7 @@ fn elaborate_insertion_sort(env: &mut ElabEnv) {
     let extracted = ken_elaborator::literate::extract_ken_md(INSERTION_SORT_KEN_MD)
         .expect("InsertionSort literate source must extract");
     let expected_imports = BTreeSet::from([
-        "import Core.Classes.LawfulClasses (ord_leq_at, bool_or)",
+        "import Core.Classes.LawfulClasses (Ord, ord_leq_at, bool_or)",
         "import Core.Logic.Transport (sym, cong, trans)",
         "import Data.Collections.Derived (count, eq_from_ord)",
     ]);
