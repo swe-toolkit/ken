@@ -25,6 +25,8 @@ use super::continuations::{
     CheckedBinderResolution, CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
     ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource, SourceReturnContextRole,
 };
+#[cfg(feature = "px8-ds-test-support")]
+use super::responses::RequiredConsumerIncomingEdge;
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority, occurrence_subtree_contains,
     planner_capacity_error, planner_error, AbiCaptureProvenance, AbiUnitDefinition,
@@ -242,13 +244,6 @@ mod required_consumer_destination {
         destination: RequiredConsumerDestination,
     }
 
-    /// The exact before-value call paired with the distinct selected response
-    /// edge that carries its Result into the verified consumer boundary.
-    pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge<'a> {
-        call: &'a RequiredConsumerCall,
-        incoming_call_identity: &'a ContinuationCallIdentity,
-    }
-
     pub(in crate::cranelift_backend::planning::static_transition) fn
     pair_detached_required_consumer(
         plan: &StaticTransitionPlan<'_>,
@@ -286,36 +281,11 @@ mod required_consumer_destination {
         Ok(RequiredConsumerCall { destination })
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn
-    pair_required_consumer_incoming_edge<'a>(
-        call: &'a RequiredConsumerCall,
-        incoming_call_identity: &'a ContinuationCallIdentity,
-    ) -> RequiredConsumerIncomingEdge<'a> {
-        RequiredConsumerIncomingEdge {
-            call,
-            incoming_call_identity,
-        }
-    }
-
     impl RequiredConsumerCall {
         pub(in crate::cranelift_backend) fn destination(
             &self,
         ) -> &RequiredConsumerDestination {
             &self.destination
-        }
-    }
-
-    impl RequiredConsumerIncomingEdge<'_> {
-        pub(in crate::cranelift_backend) fn destination(
-            &self,
-        ) -> &RequiredConsumerDestination {
-            self.call.destination()
-        }
-
-        pub(in crate::cranelift_backend) fn incoming_call_identity(
-            &self,
-        ) -> &ContinuationCallIdentity {
-            self.incoming_call_identity
         }
     }
 
@@ -348,11 +318,9 @@ mod required_consumer_destination {
     }
 }
 
-pub(super) use required_consumer_destination::{
-    pair_detached_required_consumer, pair_required_consumer_incoming_edge,
-};
+pub(super) use required_consumer_destination::pair_detached_required_consumer;
 pub(in crate::cranelift_backend) use required_consumer_destination::{
-    RequiredConsumerCall, RequiredConsumerDestination, RequiredConsumerIncomingEdge,
+    RequiredConsumerCall, RequiredConsumerDestination,
 };
 
 /// Which destination environment one transported continuation input indexes.
