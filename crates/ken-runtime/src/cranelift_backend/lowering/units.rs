@@ -21,8 +21,8 @@
 //! ⛔ **not** because this module filters them out. There is deliberately no
 //! filter here to get wrong.
 
-use super::*;
 use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope};
+use super::*;
 // `close_host_effect_seat_ledger`'s own `#[cfg(test)]` mutation check reaches
 // these directly; moved to `effects.rs` at `RT-EMITTER-EFFECTS-SPLIT` `D1`.
 #[cfg(test)]
@@ -92,7 +92,10 @@ fn validate_admitted_matches_role_sequence(
 ) -> Result<(), CraneliftBackendError> {
     let mut index = 0usize;
     for role in envelope {
-        let ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, source, .. } = role else {
+        let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
+            ordinal, source, ..
+        } = role
+        else {
             continue;
         };
         let Some((admitted_ordinal, admitted_source)) = capture_sources.get(index) else {
@@ -519,14 +522,15 @@ pub fn with_static_response_caller_retarget_mutation<T>(
     STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(|count| count.set(0));
     let _restore = Restore;
     let result = operation();
-    let applications =
-        STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(std::cell::Cell::get);
+    let applications = STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(std::cell::Cell::get);
     (result, applications)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
-    STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get).is_none()
+    STATIC_RESPONSE_CALLER_RETARGET_MUTATION
+        .with(std::cell::Cell::get)
+        .is_none()
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -546,14 +550,15 @@ pub fn with_static_response_owner_body_mutation<T>(
     STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.set(0));
     let _restore = Restore;
     let result = operation();
-    let applications =
-        STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    let applications = STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
     (result, applications)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_owner_body_mutation_is_exact() -> bool {
-    STATIC_RESPONSE_OWNER_BODY_MUTATION.with(std::cell::Cell::get).is_none()
+    STATIC_RESPONSE_OWNER_BODY_MUTATION
+        .with(std::cell::Cell::get)
+        .is_none()
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -562,8 +567,8 @@ fn claim_static_response_owner_body_mutation(
 ) -> Option<StaticResponseOwnerBodyMutation> {
     STATIC_RESPONSE_OWNER_BODY_MUTATION.with(|slot| {
         let mutation = slot.get()?;
-        let already_applied = STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS
-            .with(|count| count.get() != 0);
+        let already_applied =
+            STATIC_RESPONSE_OWNER_BODY_MUTATION_APPLICATIONS.with(|count| count.get() != 0);
         if already_applied || !predicate(mutation) {
             return None;
         }
@@ -628,13 +633,16 @@ pub(in crate::cranelift_backend) struct DeclaredUnitCall {
     pub(in crate::cranelift_backend) header: AbiFrameHeader,
     pub(in crate::cranelift_backend) slots: Vec<AbiSlot>,
     pub(in crate::cranelift_backend) offsets: Vec<u32>,
+    /// Compiler-only contract proven by the declared callee's finished
+    /// terminals. It authorizes the exact Result load from this call frame for
+    /// terminal validation; it is never a runtime slot, tag, or source-cut
+    /// receipt.
+    pub(in crate::cranelift_backend) result_contract: Option<ConstructorIdentity>,
 }
 
 pub(in crate::cranelift_backend) struct DeclaredUnitCalls {
-    pub(in crate::cranelift_backend) static_bodies:
-        BTreeMap<StaticOriginId, DeclaredUnitCall>,
-    pub(in crate::cranelift_backend) declarations:
-        BTreeMap<StaticOriginId, DeclaredUnitCall>,
+    pub(in crate::cranelift_backend) static_bodies: BTreeMap<StaticOriginId, DeclaredUnitCall>,
+    pub(in crate::cranelift_backend) declarations: BTreeMap<StaticOriginId, DeclaredUnitCall>,
 }
 
 impl CallEdgeTargets {
@@ -654,6 +662,7 @@ impl CallEdgeTargets {
                 header: target.header,
                 slots: target.slots.clone(),
                 offsets: target.offsets.clone(),
+                result_contract: None,
             };
             let (calls, duplicate) = match target.kind {
                 EmittableCallKind::StaticBody => (
@@ -856,6 +865,7 @@ impl CallEdgeTargets {
                     header: target.header,
                     slots: target.slots,
                     offsets: target.offsets,
+                    result_contract: None,
                 },
             );
         }
@@ -977,6 +987,7 @@ impl WorkerTargets {
                         header: target.header,
                         slots: target.slots.clone(),
                         offsets: target.offsets.clone(),
+                        result_contract: None,
                     },
                 )
             })
@@ -1007,15 +1018,14 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
     // remains. ⛔ The two populations are otherwise identical on a program with
     // no retarget, which is why this only became measurable at checkpoint 4.
     #[cfg(test)]
-    let template_population =
-        if crate::cranelift_backend::lowering::d5a_route_mutation()
-            == crate::cranelift_backend::lowering::D5aRouteMutation::DropSupersededWorkerTemplates
-        {
-            crate::cranelift_backend::lowering::record_d5a_route_application();
-            plan.executable_units()?
-        } else {
-            plan.emittable_units()?
-        };
+    let template_population = if crate::cranelift_backend::lowering::d5a_route_mutation()
+        == crate::cranelift_backend::lowering::D5aRouteMutation::DropSupersededWorkerTemplates
+    {
+        crate::cranelift_backend::lowering::record_d5a_route_application();
+        plan.executable_units()?
+    } else {
+        plan.emittable_units()?
+    };
     #[cfg(not(test))]
     let template_population = plan.emittable_units()?;
     for unit in template_population {
@@ -1333,9 +1343,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
         match mutation {
             D5DeclaredCallMutation::Exact => {}
             D5DeclaredCallMutation::Carrier => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.carrier = match slot.carrier {
                         AbiCarrier::ValueWord => AbiCarrier::GroundValueCarrier,
                         _ => AbiCarrier::ValueWord,
@@ -1343,9 +1355,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
                 }
             }
             D5DeclaredCallMutation::Ownership => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.ownership = match slot.ownership {
                         AbiOwnership::OwnedByFrame => AbiOwnership::BorrowedForActivation,
                         _ => AbiOwnership::OwnedByFrame,
@@ -1353,9 +1367,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
                 }
             }
             D5DeclaredCallMutation::StorageOwner => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.storage_owner = match slot.storage_owner {
                         AbiStorageOwner::ActivationFrame => AbiStorageOwner::PersistentStore,
                         _ => AbiStorageOwner::ActivationFrame,
@@ -1363,9 +1379,11 @@ fn d5_mutate_declared_calls(calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCal
                 }
             }
             D5DeclaredCallMutation::Ordinal => {
-                if let Some(slot) = call.slots.iter_mut().find(|slot| {
-                    matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture)
-                }) {
+                if let Some(slot) = call
+                    .slots
+                    .iter_mut()
+                    .find(|slot| matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture))
+                {
                     slot.ordinal = slot.ordinal.wrapping_add(1);
                 }
             }
@@ -1476,7 +1494,11 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     // executable/template split above exists to prevent, arriving by a second
     // route.
     let mut continuations = BTreeMap::new();
-    for (ordinal, unit) in plan.ordinary_continuation_targets()?.into_iter().enumerate() {
+    for (ordinal, unit) in plan
+        .ordinary_continuation_targets()?
+        .into_iter()
+        .enumerate()
+    {
         let name = format!("ken_continuation_{ordinal}");
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
@@ -1606,36 +1628,31 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
 ) -> Result<FuncId, CraneliftBackendError> {
     if let Some(response) = selected_response_owner_target(plan, bundle, identity)? {
         #[cfg(feature = "px8-ds-test-support")]
-        if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
-            .with(std::cell::Cell::get)
+        if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get)
         {
-            STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
-                .with(|count| count.set(count.get() + 1));
+            STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS.with(|count| count.set(count.get() + 1));
             return match mutation {
-                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget => bundle
-                    .continuation(identity.target())
-                    .ok_or_else(|| {
+                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget => {
+                    bundle.continuation(identity.target()).ok_or_else(|| {
                         backend_module(
                             "the response-caller mutation found no original K declaration"
                                 .to_string(),
                         )
-                    }),
-                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => Err(
-                    backend_module(
-                        "the response-caller mutation removed one selected incoming caller"
-                            .to_string(),
-                    ),
-                ),
+                    })
+                }
+                StaticResponseCallerRetargetMutation::RemoveSelectedCaller => Err(backend_module(
+                    "the response-caller mutation removed one selected incoming caller".to_string(),
+                )),
                 StaticResponseCallerRetargetMutation::RetargetToDifferentResponseOwner => {
-                    let owners = plan
-                        .static_response_owner_specializations()?
-                        .map_err(|infeasible| {
-                            backend_module(format!(
+                    let owners =
+                        plan.static_response_owner_specializations()?
+                            .map_err(|infeasible| {
+                                backend_module(format!(
                                 "compile-time response specialization is infeasible at {:?}: {}",
                                 infeasible.vis_origin(),
                                 infeasible.reason(),
                             ))
-                        })?;
+                            })?;
                     let substitute = owners
                         .iter()
                         .find(|owner| owner.selected_caller() != identity)
@@ -1999,9 +2016,7 @@ pub(super) fn continuation_case_binder_run(
     {
         let hypotheses = run
             .iter()
-            .filter(|source| {
-                matches!(source, ContinuationCaseBinderSource::InductionHypothesis)
-            })
+            .filter(|source| matches!(source, ContinuationCaseBinderSource::InductionHypothesis))
             .count();
         if hypotheses > 0 && hypotheses < run.len() {
             crate::cranelift_backend::lowering::record_d6c_selection_application();
@@ -2446,8 +2461,7 @@ pub(super) fn lower_continuation_selected_case_body(
 
     // Exact body recovery: the selected case of the computational
     // frame this continuation belongs to, by its own alternative.
-    let frame_occurrence =
-        compiler.retained_body_occurrence(facts.continuation_origin)?;
+    let frame_occurrence = compiler.retained_body_occurrence(facts.continuation_origin)?;
     let RuntimeExpr::ComputationalMatch { cases, .. } = frame_occurrence.expr else {
         return Err(backend_module(
             "a continuation origin does not resolve to a computational frame".to_string(),
@@ -2456,15 +2470,11 @@ pub(super) fn lower_continuation_selected_case_body(
     let alternative = facts.producer_alternative as usize;
     let case = cases.get(alternative).ok_or_else(|| {
         backend_module(
-            "the projected producer alternative is outside the frame's case run"
-                .to_string(),
+            "the projected producer alternative is outside the frame's case run".to_string(),
         )
     })?;
-    let body = compiler.case_body_occurrence(
-        frame_occurrence.static_origin,
-        alternative,
-        &case.body,
-    )?;
+    let body =
+        compiler.case_body_occurrence(frame_occurrence.static_origin, alternative, &case.body)?;
     // The semantic case environment, through the sole binding
     // authority, in the order `continuation_case_binder_run` states:
     // the IH prefix, then ALL the constructor arguments in source
@@ -2487,9 +2497,7 @@ pub(super) fn lower_continuation_selected_case_body(
             ContinuationCaseBinderSource::InductionHypothesis => {
                 LoweringEnvironmentBinding::StaticWorker(worker.clone())
             }
-            ContinuationCaseBinderSource::SelectedRecursiveArgument {
-                source_position,
-            } => {
+            ContinuationCaseBinderSource::SelectedRecursiveArgument { source_position } => {
                 // The plan only ever names the ruled position here;
                 // segment 1 hard-stops on any other. Re-checking it is
                 // what keeps that a fact this site verifies rather than
@@ -2587,13 +2595,10 @@ pub(super) fn lower_continuation_selected_case_body(
             .map(|binding| match binding {
                 LoweringEnvironmentBinding::StaticWorker(worker) => match worker.route {
                     StaticWorkerCallRoute::RawWorker => "StaticWorker(RawWorker)",
-                    StaticWorkerCallRoute::GeneratedContext =>
-                        "StaticWorker(GeneratedContext)",
+                    StaticWorkerCallRoute::GeneratedContext => "StaticWorker(GeneratedContext)",
                 },
-                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) =>
-                    "Carried",
-                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
-                    "Specialized",
+                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) => "Carried",
+                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) => "Specialized",
             })
             .collect::<Vec<_>>()
             .join(", ")
@@ -2794,8 +2799,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             || owner.k_context() != row.k_context()
         {
             return Err(backend_module(
-                "a response-owner definition disagrees with its validated response row"
-                    .to_string(),
+                "a response-owner definition disagrees with its validated response row".to_string(),
             ));
         }
         let effect = compiler
@@ -2815,12 +2819,9 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         let mut operation_arguments = BTreeMap::new();
         for input in row.effect_environment() {
             if let StaticResponseEffectInput::OperationArgument { origin, .. } = input {
-                operation_arguments.entry(*origin).or_insert(
-                    compiler
-                        .retained_body_occurrence(*origin)?
-                        .expr
-                        .clone(),
-                );
+                operation_arguments
+                    .entry(*origin)
+                    .or_insert(compiler.retained_body_occurrence(*origin)?.expr.clone());
             }
         }
         let (offsets, frame_bytes) = owner.slot_offsets()?;
@@ -2890,11 +2891,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(5, id.as_u32()), sig);
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
-        let declared_calls = call_edges.declare_in_func(
-            emission.row.operation_source_owner(),
-            module,
-            &mut func,
-        )?;
+        let declared_calls =
+            call_edges.declare_in_func(emission.row.operation_source_owner(), module, &mut func)?;
         function_local.unit_calls = declared_calls.static_bodies;
         call_edges.declare_retained_body_targets_in_func(
             emission.row.operation_source_owner(),
@@ -2906,32 +2904,29 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
         function_local.raw_worker_calls = function_local.worker_calls.clone();
         function_local.worker_templates = worker_targets.templates().clone();
-        let expected_context_target = bundle
-            .context(emission.owner.k_context())
-            .ok_or_else(|| {
+        let expected_context_target =
+            bundle.context(emission.owner.k_context()).ok_or_else(|| {
                 backend_module("a response owner's exact K context was never declared".to_string())
             })?;
         #[cfg(feature = "px8-ds-test-support")]
-        let body_mutation = claim_static_response_owner_body_mutation(
-            |mutation| match mutation {
-                StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
-                    .static_transition_plan
-                    .continuation_contexts()
-                    .is_ok_and(|contexts| {
-                        contexts.first().is_some_and(|context| {
-                            context.id() != emission.owner.k_context()
-                        })
-                    }),
-                StaticResponseOwnerBodyMutation::ResponseWithPriorResponse => {
-                    emission.owner.id().ordinal() > 0
-                }
-                StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment => {
-                    emission.row.operation() == crate::HostOpV1::BufferAllocate
-                        && emission.owner.header().parameters > 1
-                }
-                _ => true,
-            },
-        );
+        let body_mutation = claim_static_response_owner_body_mutation(|mutation| match mutation {
+            StaticResponseOwnerBodyMutation::SubstituteContextZero => compiler
+                .static_transition_plan
+                .continuation_contexts()
+                .is_ok_and(|contexts| {
+                    contexts
+                        .first()
+                        .is_some_and(|context| context.id() != emission.owner.k_context())
+                }),
+            StaticResponseOwnerBodyMutation::ResponseWithPriorResponse => {
+                emission.owner.id().ordinal() > 0
+            }
+            StaticResponseOwnerBodyMutation::ResponseWithApplicationEnvironment => {
+                emission.row.operation() == crate::HostOpV1::BufferAllocate
+                    && emission.owner.header().parameters > 1
+            }
+            _ => true,
+        });
         #[cfg(feature = "px8-ds-test-support")]
         let selected_context = match body_mutation {
             Some(StaticResponseOwnerBodyMutation::SubstituteContextZero) => {
@@ -2977,6 +2972,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     header: emission.owner.header(),
                     slots: emission.owner.slots().to_vec(),
                     offsets: emission.offsets.clone(),
+                    result_contract: None,
                 }
             }
             _ => declare_response_context_call_in_func(
@@ -3071,7 +3067,9 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     backend_module("response-owner input slot offset exceeds range".to_string())
                 })?;
                 let operand = LoweringOperand::Carried(CarriedBoundaryWord {
-                    word: builder.ins().load(types::I64, MemFlags::trusted(), frame, offset),
+                    word: builder
+                        .ins()
+                        .load(types::I64, MemFlags::trusted(), frame, offset),
                 });
                 if frame_inputs.insert(frame_source, operand.clone()).is_some() {
                     return Err(backend_module(
@@ -3097,8 +3095,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     })
             };
             let mut context_suffix = Vec::with_capacity(
-                emission.row.captures().len()
-                    + emission.row.continuation_inputs().len(),
+                emission.row.captures().len() + emission.row.continuation_inputs().len(),
             );
             for capture in emission.row.captures() {
                 context_suffix.push(
@@ -3131,9 +3128,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             let mut context_calls = Vec::new();
             let mut early_returned = None;
             #[cfg(feature = "px8-ds-test-support")]
-            if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::CallBeforeHostValidation)
-            {
+            if body_mutation == Some(StaticResponseOwnerBodyMutation::CallBeforeHostValidation) {
                 let mut inputs = Vec::with_capacity(1 + context_suffix.len());
                 inputs.push(LoweringOperand::Specialized(
                     Lowered::StaticResponseDeferred,
@@ -3151,9 +3146,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             }
 
             let mut lowered_arguments = BTreeMap::new();
-            let mut effect_environment = Vec::with_capacity(
-                emission.row.effect_environment().len(),
-            );
+            let mut effect_environment =
+                Vec::with_capacity(emission.row.effect_environment().len());
             for input in emission.row.effect_environment() {
                 let operand = match input {
                     StaticResponseEffectInput::Frame(binding) => frame_operand(binding)?,
@@ -3171,19 +3165,20 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                             }
                         };
                         let tag = compiler.emit_carrier_tag(&mut builder, span)?;
-                        let expected = i64::try_from(span_identity.tag_abi_word()?).map_err(|_| {
-                            backend_module(
-                                "response span identity exceeds the runtime tag word".to_string(),
-                            )
-                        })?;
+                        let expected =
+                            i64::try_from(span_identity.tag_abi_word()?).map_err(|_| {
+                                backend_module(
+                                    "response span identity exceeds the runtime tag word"
+                                        .to_string(),
+                                )
+                            })?;
                         Lowering::require_i64(&mut builder, tag, expected);
                         let fields = compiler.emit_carrier_field_count(&mut builder, span)?;
                         Lowering::require_i64(&mut builder, fields, 3);
                         let length = compiler.emit_carrier_field(&mut builder, span, 2)?;
-                        let length_tag = builder.ins().band_imm(
-                            length.word,
-                            crate::boundary_value::BOUNDARY_TAG_MASK as i64,
-                        );
+                        let length_tag = builder
+                            .ins()
+                            .band_imm(length.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
                         Lowering::require_i64(
                             &mut builder,
                             length_tag,
@@ -3213,8 +3208,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                             let argument_environment = environment
                                 .iter()
                                 .map(|binding| {
-                                    frame_operand(binding)
-                                        .map(LoweringEnvironmentBinding::Value)
+                                    frame_operand(binding).map(LoweringEnvironmentBinding::Value)
                                 })
                                 .collect::<Result<Vec<_>, _>>()?;
                             let lowered = compiler.lower_expr(
@@ -3245,7 +3239,10 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 },
                 &effect_environment,
             )?;
-            if !matches!(response, LoweringOperand::Specialized(Lowered::HostResult { .. })) {
+            if !matches!(
+                response,
+                LoweringOperand::Specialized(Lowered::HostResult { .. })
+            ) {
                 return Err(backend_module(
                     "a specialized response owner did not materialize an exact HostResult"
                         .to_string(),
@@ -3266,37 +3263,32 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     )
                 })?;
             #[cfg(feature = "px8-ds-test-support")]
-            let raw_host_result_escape = if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::RawHostResultEscape)
-            {
-                let LoweringOperand::Specialized(value) = &response else {
-                    unreachable!("the HostResult shape was checked above")
+            let raw_host_result_escape =
+                if body_mutation == Some(StaticResponseOwnerBodyMutation::RawHostResultEscape) {
+                    let LoweringOperand::Specialized(value) = &response else {
+                        unreachable!("the HostResult shape was checked above")
+                    };
+                    Some(compiler.transfer_unit_result_into_carrier(
+                        &mut builder,
+                        emission.row.effect_origin(),
+                        value,
+                    )?)
+                } else {
+                    None
                 };
-                Some(compiler.transfer_unit_result_into_carrier(
-                    &mut builder,
-                    emission.row.effect_origin(),
-                    value,
-                )?)
-            } else {
-                None
-            };
 
             let mut response_input = response;
             let mut response_is_current_host_result = true;
             #[cfg(feature = "px8-ds-test-support")]
             match body_mutation {
                 Some(StaticResponseOwnerBodyMutation::ResponseWithOperation) => {
-                    response_input = LoweringOperand::Specialized(
-                        Lowered::StaticResponseDeferred,
-                    );
+                    response_input = LoweringOperand::Specialized(Lowered::StaticResponseDeferred);
                     response_is_current_host_result = false;
                 }
                 Some(StaticResponseOwnerBodyMutation::ResponseWithPriorResponse) => {
                     response_input = frame_inputs
                         .iter()
-                        .find(|(source, _)| {
-                            matches!(source, StaticResponseFrameSource::Capture(_))
-                        })
+                        .find(|(source, _)| matches!(source, StaticResponseFrameSource::Capture(_)))
                         .map(|(_, operand)| operand.clone())
                         .ok_or_else(|| {
                             backend_module(
@@ -3329,9 +3321,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             })?;
             let mut result_store = None;
             #[cfg(feature = "px8-ds-test-support")]
-            if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::CallAfterAnswerCollapse)
-            {
+            if body_mutation == Some(StaticResponseOwnerBodyMutation::CallAfterAnswerCollapse) {
                 let collapsed = builder.ins().iconst(types::I64, 0);
                 result_store = Some(builder.ins().store(
                     MemFlags::trusted(),
@@ -3376,8 +3366,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     context_calls.push(call);
                     #[cfg(feature = "px8-ds-test-support")]
                     if body_mutation == Some(StaticResponseOwnerBodyMutation::DuplicateKCall) {
-                        let (_duplicate_result, duplicate_call) =
-                            compiler.call_declared_unit_target(
+                        let (_duplicate_result, duplicate_call) = compiler
+                            .call_declared_unit_target(
                                 &mut builder,
                                 selected_context.clone(),
                                 &context_inputs,
@@ -3412,9 +3402,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             };
             let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
             #[cfg(feature = "px8-ds-test-support")]
-            let ret_abi_word = if body_mutation
-                == Some(StaticResponseOwnerBodyMutation::VaryRet)
-            {
+            let ret_abi_word = if body_mutation == Some(StaticResponseOwnerBodyMutation::VaryRet) {
                 exact_ret_abi_word.checked_add(1).ok_or_else(|| {
                     backend_module("the response Ret mutation exhausted the ABI word".to_string())
                 })?
@@ -3439,23 +3427,19 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 .ok_or_else(|| {
                     backend_module("response Ret validation emitted no instruction".to_string())
                 })?;
-            let application = CheckedIhApplicationResult::from_declared_call(
-                LoweringOperand::Carried(returned),
-            )?;
+            let application =
+                CheckedIhApplicationResult::from_declared_call(LoweringOperand::Carried(returned))?;
             let result_store = match result_store {
                 Some(store) => store,
                 None => {
                     #[cfg(feature = "px8-ds-test-support")]
-                    let result_word = raw_host_result_escape
-                        .map_or(application.word.word, |word| word.word);
+                    let result_word =
+                        raw_host_result_escape.map_or(application.word.word, |word| word.word);
                     #[cfg(not(feature = "px8-ds-test-support"))]
                     let result_word = application.word.word;
-                    builder.ins().store(
-                        MemFlags::trusted(),
-                        result_word,
-                        frame,
-                        result_offset,
-                    )
+                    builder
+                        .ins()
+                        .store(MemFlags::trusted(), result_word, frame, result_offset)
                 }
             };
             let zero = builder.ins().iconst(types::I64, 0);
@@ -3553,7 +3537,9 @@ pub(super) fn define_continuation_bodies<M: Module>(
     // made elsewhere about what this loop does would agree with itself; this is
     // the loop's own decision, and if it ever stopped omitting, the recorded set
     // would shrink and the range equality would say so.
-    let ordinary_targets = compiler.static_transition_plan.ordinary_continuation_targets()?;
+    let ordinary_targets = compiler
+        .static_transition_plan
+        .ordinary_continuation_targets()?;
     for omitted in compiler
         .static_transition_plan
         .continuation_units()?
@@ -3637,7 +3623,10 @@ pub(super) fn define_continuation_bodies<M: Module>(
         .collect();
 
     let mut defined = 0usize;
-    #[cfg_attr(not(test), expect(unused_mut, reason = "only the D7 control mutates it"))]
+    #[cfg_attr(
+        not(test),
+        expect(unused_mut, reason = "only the D7 control mutates it")
+    )]
     for mut unit in emissions {
         // Resolve the EXACT target first; the control below perturbs only what
         // the definition is handed.
@@ -3677,9 +3666,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 })?;
             let substitute = d7_callable_index
                 .iter()
-                .find(|(shape, origin)| {
-                    *shape == exact_shape && *origin != unit.worker_body_origin
-                })
+                .find(|(shape, origin)| *shape == exact_shape && *origin != unit.worker_body_origin)
                 .map(|(_, origin)| *origin)
                 .ok_or_else(|| {
                     backend_module(
@@ -3749,8 +3736,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
 
         compiler.open_aggregate_events(id)?;
         let sig = unit_signature(module);
-        let mut func =
-            Function::with_name_signature(UserFuncName::user(0, id.as_u32()), sig);
+        let mut func = Function::with_name_signature(UserFuncName::user(0, id.as_u32()), sig);
         // Set by the retarget below; `None` means this specialization calls the
         // raw worker unit directly, which is every pre-`D5a` case.
         let mut retargeted_worker_body: Option<StaticOriginId> = None;
@@ -3887,9 +3873,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 )));
             }
             let target = bundle.context(context.id()).ok_or_else(|| {
-                backend_module(
-                    "a planned generated context was never forward-declared".to_string(),
-                )
+                backend_module("a planned generated context was never forward-declared".to_string())
             })?;
             let (context_offsets, _frame_bytes) = context.slot_offsets()?;
             worker_calls.insert(
@@ -3906,6 +3890,9 @@ pub(super) fn define_continuation_bodies<M: Module>(
                     header: context.header(),
                     slots: context.slots().to_vec(),
                     offsets: context_offsets,
+                    result_contract: compiler
+                        .static_transition_plan
+                        .checked_ih_generated_context_result_contract(context.id())?,
                 },
             );
             retargeted_worker_body = Some(unit.worker_body_origin);
@@ -4003,7 +3990,9 @@ pub(super) fn define_continuation_bodies<M: Module>(
                     backend_module("continuation slot offset exceeds addressable range".to_string())
                 })?;
                 Ok::<_, CraneliftBackendError>(LoweringOperand::Carried(CarriedBoundaryWord {
-                    word: builder.ins().load(types::I64, MemFlags::trusted(), frame, offset),
+                    word: builder
+                        .ins()
+                        .load(types::I64, MemFlags::trusted(), frame, offset),
                 }))
             };
 
@@ -4064,9 +4053,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
             // The Result slot is WRITTEN here and never read.
             let word = match lowered {
                 LoweringOperand::Carried(carried) => carried.word,
-                LoweringOperand::Specialized(value) => {
-                    compiler.emit_result(&mut builder, value)?.0
-                }
+                LoweringOperand::Specialized(value) => compiler.emit_result(&mut builder, value)?.0,
             };
             let result_offset = i32::try_from(result_offset).map_err(|_| {
                 backend_module("continuation result slot offset exceeds range".to_string())
@@ -4212,6 +4199,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         offsets: Vec<u32>,
         header_parameters: u32,
         header_captures: u32,
+        result_contract: Option<ConstructorIdentity>,
         checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
     }
     // Own every projected fact before the loop: the projection borrows the plan
@@ -4263,19 +4251,13 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                         Mutation::WrongDestinationOwner => {
                             Some(ProjectionMutation::DestinationOwner)
                         }
-                        Mutation::WrongDestinationBody => {
-                            Some(ProjectionMutation::DestinationBody)
-                        }
+                        Mutation::WrongDestinationBody => Some(ProjectionMutation::DestinationBody),
                         Mutation::WrongBinding => Some(ProjectionMutation::BindingFrame),
                         Mutation::WrongLocatorInvocation => {
                             Some(ProjectionMutation::LocatorInvocation)
                         }
-                        Mutation::WrongLocatorCallee => {
-                            Some(ProjectionMutation::LocatorCallee)
-                        }
-                        Mutation::WrongLocatorDomain => {
-                            Some(ProjectionMutation::LocatorDomain)
-                        }
+                        Mutation::WrongLocatorCallee => Some(ProjectionMutation::LocatorCallee),
+                        Mutation::WrongLocatorDomain => Some(ProjectionMutation::LocatorDomain),
                         Mutation::WrongLocatorIndex => Some(ProjectionMutation::LocatorIndex),
                         _ => None,
                     };
@@ -4324,6 +4306,9 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 offsets,
                 header_parameters: context.header().parameters,
                 header_captures: context.header().captures,
+                result_contract: compiler
+                    .static_transition_plan
+                    .checked_ih_generated_context_result_contract(context.id())?,
                 checked_ih_generated_entry_access,
             })
         })
@@ -4333,9 +4318,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
     let mut defined = 0usize;
     for context in contexts {
         let id = bundle.context(context.id).ok_or_else(|| {
-            backend_module(
-                "a planned generated context was never forward-declared".to_string(),
-            )
+            backend_module("a planned generated context was never forward-declared".to_string())
         })?;
         let slots = context.slots.as_slice();
         let offsets = context.offsets.as_slice();
@@ -4504,6 +4487,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 record_checked_ih_generated_entry_installed(access);
             }
             compiler.function_local = function_local;
+            compiler.function_local.generated_function_result_contract = context.result_contract;
             compiler.open_aggregate_events(id)?;
             // `D8o` — same binding, same unchanged domain: the emission owner is
             // the enclosing specialization and `defining_unit` stays the RAW
@@ -4683,22 +4667,42 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                 &env,
             )?;
             let word = match lowered {
-                LoweringOperand::Carried(word) => Some(word.word),
+                LoweringOperand::Carried(word) => Some(word),
                 LoweringOperand::Specialized(Lowered::Trap(trap)) => {
                     compiler.emit_current_trap(&mut builder, &trap)?;
                     None
                 }
-                LoweringOperand::Specialized(value) => Some(
-                    compiler
-                        .transfer_unit_result_into_carrier(
-                            &mut builder,
-                            context.worker_body_origin,
-                            &value,
-                        )?
-                        .word,
-                ),
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => None,
+                LoweringOperand::Specialized(value) => {
+                    Some(compiler.transfer_unit_result_into_carrier(
+                        &mut builder,
+                        context.worker_body_origin,
+                        &value,
+                    )?)
+                }
             };
             if let Some(word) = word {
+                let word = if let Some(contract) = context.result_contract {
+                    compiler.close_generated_context_result_forwarding(&*builder.func, word)?;
+                    let authority = compiler.consume_generated_context_result_authority(word)?;
+                    if authority.identity != contract || authority.word != word.word {
+                        return Err(backend_module(
+                            "a generated-context terminal consumed Result authority for another contract or SSA word"
+                                .to_string(),
+                        ));
+                    }
+                    let actual = compiler.emit_carrier_tag(&mut builder, word)?;
+                    let expected = i64::try_from(contract.tag_abi_word()?).map_err(|_| {
+                        backend_module(
+                            "generated context Result identity exceeds the runtime tag word"
+                                .to_string(),
+                        )
+                    })?;
+                    Lowering::require_i64(&mut builder, actual, expected);
+                    authority.word
+                } else {
+                    word.word
+                };
                 builder.ins().store(
                     MemFlags::trusted(),
                     word,
@@ -4740,21 +4744,21 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         let response_owner_calls = verified_response_owner_calls(
             &compiler.static_transition_plan,
             bundle,
-            compiler
-                .function_local
-                .continuation_emissions
-                .keys()
-                .chain(
-                    compiler
-                        .function_local
-                        .checked_ih_transport_emissions
-                        .iter()
-                        .map(|(transport, _)| transport.source_call_identity()),
-                ),
+            compiler.function_local.continuation_emissions.keys().chain(
+                compiler
+                    .function_local
+                    .checked_ih_transport_emissions
+                    .iter()
+                    .map(|(transport, _)| transport.source_call_identity()),
+            ),
         )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
-                compiler.function_local.continuation_emissions.keys().cloned(),
+                compiler
+                    .function_local
+                    .continuation_emissions
+                    .keys()
+                    .cloned(),
             )?;
             ledger.record_response_owner_calls(response_owner_calls);
         }
@@ -4982,7 +4986,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         // names the callees the source named, and it is only its *host* that
         // changed. Not the consumer's edges — the consumer's redirected
         // invocation is the edge that reaches this function, not one inside it.
-        let declared_calls = call_edges.declare_in_func(fusion.producer_owner, module, &mut func)?;
+        let declared_calls =
+            call_edges.declare_in_func(fusion.producer_owner, module, &mut func)?;
         function_local.unit_calls = declared_calls.static_bodies;
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE DEFINITION-LOCAL
         // ---- FUSION-RECURSIVE SELF EDGE (Architect, via `evt_6fzg11hpvfp4w`).
@@ -5080,6 +5085,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             header: fusion.header,
             slots: slots.to_vec(),
             offsets: offsets.to_vec(),
+            result_contract: None,
         };
         // INSERTED, and its absence beforehand is required rather than assumed —
         // the producer's inherited edges must not already answer for this body,
@@ -5293,10 +5299,9 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 // held on the way out rather than cleared, for the same reason
                 // `AmbientBodyAuthority` restores: a nested definition pass must
                 // not be handed `None` when its caller held a key.
-                let enclosing_switch = compiler.fused_consumer_authority.replace((
-                    fusion.continuation_origin,
-                    fusion.consumer_owner,
-                ));
+                let enclosing_switch = compiler
+                    .fused_consumer_authority
+                    .replace((fusion.continuation_origin, fusion.consumer_owner));
                 let lowered = fuse_producer_through_consumer_suffix(
                     compiler,
                     &mut builder,
@@ -5364,21 +5369,21 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         let response_owner_calls = verified_response_owner_calls(
             &compiler.static_transition_plan,
             bundle,
-            compiler
-                .function_local
-                .continuation_emissions
-                .keys()
-                .chain(
-                    compiler
-                        .function_local
-                        .checked_ih_transport_emissions
-                        .iter()
-                        .map(|(transport, _)| transport.source_call_identity()),
-                ),
+            compiler.function_local.continuation_emissions.keys().chain(
+                compiler
+                    .function_local
+                    .checked_ih_transport_emissions
+                    .iter()
+                    .map(|(transport, _)| transport.source_call_identity()),
+            ),
         )?;
         if let Some(ledger) = compiler.continuation_claims.as_mut() {
             ledger.record_emitted(
-                compiler.function_local.continuation_emissions.keys().cloned(),
+                compiler
+                    .function_local
+                    .continuation_emissions
+                    .keys()
+                    .cloned(),
             )?;
             ledger.record_response_owner_calls(response_owner_calls);
         }
@@ -5516,7 +5521,12 @@ fn redirect_fused_producer_invocations<M: Module>(
             .into_iter()
             .map(|fusion| {
                 let (offsets, _frame_bytes) = fusion.slot_offsets()?;
-                Ok((fusion.id(), fusion.header(), fusion.slots().to_vec(), offsets))
+                Ok((
+                    fusion.id(),
+                    fusion.header(),
+                    fusion.slots().to_vec(),
+                    offsets,
+                ))
             })
             .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let mut redirects = Vec::new();
@@ -5565,6 +5575,7 @@ fn redirect_fused_producer_invocations<M: Module>(
             header,
             slots,
             offsets,
+            result_contract: None,
         };
         // The entry is INSERTED, and its absence beforehand is required rather
         // than assumed. Installing body ownership removed this seat's edge from
@@ -5614,14 +5625,15 @@ pub(super) fn define_root_adapter<M: Module>(
                 .static_transition_plan
                 .process_parameter_slot(role)?
                 .ok_or_else(|| {
-                    backend_module("process root has no declared role-keyed ingress slot".to_string())
+                    backend_module(
+                        "process root has no declared role-keyed ingress slot".to_string(),
+                    )
                 })?;
         }
     }
 
     let sig = unit_signature(module);
-    let mut func =
-        Function::with_name_signature(UserFuncName::user(0, adapter_id.as_u32()), sig);
+    let mut func = Function::with_name_signature(UserFuncName::user(0, adapter_id.as_u32()), sig);
     let mut function_local = helpers.declare_in_func(
         module,
         &mut func,
@@ -5645,6 +5657,7 @@ pub(super) fn define_root_adapter<M: Module>(
             header: root.header(),
             slots: root.slots().to_vec(),
             offsets,
+            result_contract: None,
         },
     );
 
@@ -5698,11 +5711,9 @@ pub(super) fn define_root_adapter<M: Module>(
                 crate::boundary_activation::ROOT_INGRESS_CAPABILITY,
             );
             function_local.host_dispatch_context = Some(host_dispatch_context);
-            inputs.push(LoweringOperand::Specialized(
-                Lowered::BorrowedNativeValue {
-                    pointer: process_input,
-                },
-            ));
+            inputs.push(LoweringOperand::Specialized(Lowered::BorrowedNativeValue {
+                pointer: process_input,
+            }));
             inputs.push(LoweringOperand::Specialized(Lowered::CapabilityToken {
                 value: capability,
             }));
@@ -5719,8 +5730,7 @@ pub(super) fn define_root_adapter<M: Module>(
                 }
             });
         } else {
-            function_local.host_dispatch_context =
-                Some(builder.ins().iconst(pointer_type, 0));
+            function_local.host_dispatch_context = Some(builder.ins().iconst(pointer_type, 0));
         }
 
         compiler.function_local = function_local;
@@ -6245,18 +6255,10 @@ impl ContinuationCandidateLedger {
     /// construction** rather than removed after the fact.
     fn close(mut self) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
         if self.immediate_bridge_reached != self.immediate_bridge_candidates {
-            let missing = self
-                .immediate_bridge_candidates
-                .difference(&self.immediate_bridge_reached)
-                .collect::<Vec<_>>();
-            let surplus = self
-                .immediate_bridge_reached
-                .difference(&self.immediate_bridge_candidates)
-                .collect::<Vec<_>>();
-            return Err(backend_module(format!(
-                "the plan-owned immediate bridge population was not reached exactly once: \
-                 missing={missing:?}, surplus={surplus:?}"
-            )));
+            return Err(backend_module(
+                "the plan-owned immediate bridge population was not reached exactly once"
+                    .to_string(),
+            ));
         }
         for identity in &self.immediate_bridge_candidates {
             if self.settled.get(identity) != Some(&CandidateDisposition::InlineNoCall) {
@@ -6271,9 +6273,10 @@ impl ContinuationCandidateLedger {
                 .entry(identity.clone())
                 .or_insert(CandidateDisposition::TransportDormant);
         }
-        let unsettled = self.candidates.difference(
-            &self.settled.keys().cloned().collect::<BTreeSet<_>>(),
-        ).count();
+        let unsettled = self
+            .candidates
+            .difference(&self.settled.keys().cloned().collect::<BTreeSet<_>>())
+            .count();
         if unsettled > 0 {
             return Err(backend_module(format!(
                 "{unsettled} binding candidates reached the artifact closeout without a \
@@ -6287,11 +6290,10 @@ impl ContinuationCandidateLedger {
         Ok(self
             .settled
             .into_iter()
-            .filter(|(_, disposition)| {
-                match disposition {
-                    CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall => true,
-                    CandidateDisposition::InlineNoCall
-                    | CandidateDisposition::TransportDormant => false,
+            .filter(|(_, disposition)| match disposition {
+                CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall => true,
+                CandidateDisposition::InlineNoCall | CandidateDisposition::TransportDormant => {
+                    false
                 }
             })
             .map(|(identity, _)| identity)
@@ -6317,7 +6319,11 @@ impl ContinuationClaimLedger {
         bundle: &UnitBundle,
     ) -> Result<Self, CraneliftBackendError> {
         let resolved = resolve_continuation_targets(plan, bundle)?;
-        let claims = resolved.keys().cloned().map(|identity| (identity, None)).collect();
+        let claims = resolved
+            .keys()
+            .cloned()
+            .map(|identity| (identity, None))
+            .collect();
         // The PLANNED set, taken from the plan's causal call projection rather
         // than from `resolved`. ⚠ Honest note: `resolve_continuation_targets`
         // walks the same projection, so planned == resolved is structural today
@@ -6493,6 +6499,8 @@ impl ContinuationClaimLedger {
                         header: unit.header(),
                         slots: unit.slots().to_vec(),
                         offsets,
+                        result_contract: plan
+                            .static_response_forwarded_result_identity(identity)?,
                     },
                 ))
             })
@@ -6618,7 +6626,10 @@ impl ContinuationClaimLedger {
             .collect::<BTreeSet<_>>();
         let mut called_new_contexts = BTreeSet::new();
         for owner in owners {
-            if !self.response_owner_calls.contains_key(owner.selected_caller()) {
+            if !self
+                .response_owner_calls
+                .contains_key(owner.selected_caller())
+            {
                 return Err(backend_module(format!(
                     "a forward-declared response owner has no verified selected incoming call: \
                      owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}",
@@ -6657,7 +6668,10 @@ impl ContinuationClaimLedger {
         // declared population stays equal to planned even where the discharge
         // took the composed form.
         for (name, set) in [
-            ("resolved", self.resolved.keys().cloned().collect::<BTreeSet<_>>()),
+            (
+                "resolved",
+                self.resolved.keys().cloned().collect::<BTreeSet<_>>(),
+            ),
             ("declared", self.declared.clone()),
         ] {
             if set != self.planned {
@@ -6909,9 +6923,16 @@ impl FusionCompositionLedger {
     ) -> Result<Self, CraneliftBackendError> {
         let planned = plan.fusion_composed_edges().clone();
         let planned_outer = plan.fusion_outer_realizations().clone();
-        let consumed = planned.keys().cloned().map(|identity| (identity, None)).collect();
-        let realized_outer =
-            planned_outer.keys().cloned().map(|identity| (identity, None)).collect();
+        let consumed = planned
+            .keys()
+            .cloned()
+            .map(|identity| (identity, None))
+            .collect();
+        let realized_outer = planned_outer
+            .keys()
+            .cloned()
+            .map(|identity| (identity, None))
+            .collect();
         let classes = fusion_target_classes(&planned, &planned_outer);
         let declaration_omitted = plan
             .continuation_units()?
@@ -7217,8 +7238,8 @@ thread_local! {
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn d1_last_dispositions()
--> std::collections::BTreeMap<CandidateDisposition, usize> {
+pub(in crate::cranelift_backend) fn d1_last_dispositions(
+) -> std::collections::BTreeMap<CandidateDisposition, usize> {
     D1_LAST_DISPOSITIONS.with(|cell| cell.borrow().clone())
 }
 
@@ -7255,8 +7276,9 @@ pub(super) fn open_continuation_claim_ledger(
     // has exactly one of it, and every pass settles into it. Sharing the
     // lifetime is what makes it a sibling in front of the claim ledger rather
     // than a widening of it.
-    compiler.continuation_candidates =
-        Some(ContinuationCandidateLedger::open(&compiler.static_transition_plan)?);
+    compiler.continuation_candidates = Some(ContinuationCandidateLedger::open(
+        &compiler.static_transition_plan,
+    )?);
     // `D7` — the aggregate allocation relation opens on the same boundary and
     // for the same reason: one artifact has exactly one relation, and every
     // body's events commit into it.
@@ -7289,14 +7311,13 @@ pub(super) fn close_continuation_claim_ledger(
     })?;
     #[cfg(test)]
     D1_LAST_DISPOSITIONS.with(|cell| {
-        *cell.borrow_mut() = candidates
-            .dispositions()
-            .values()
-            .copied()
-            .fold(std::collections::BTreeMap::new(), |mut acc, d| {
+        *cell.borrow_mut() = candidates.dispositions().values().copied().fold(
+            std::collections::BTreeMap::new(),
+            |mut acc, d| {
                 *acc.entry(d).or_insert(0usize) += 1;
                 acc
-            });
+            },
+        );
     });
     compiler
         .continuation_claims
@@ -7349,13 +7370,13 @@ pub(super) fn close_continuation_claim_ledger(
 pub(super) fn close_aggregate_allocation_ledger(
     compiler: &mut Lowering<'_>,
 ) -> Result<AggregateRelationClosure, CraneliftBackendError> {
-    let planned = compiler.static_transition_plan.aggregate_ownership_records();
+    let planned = compiler
+        .static_transition_plan
+        .aggregate_ownership_records();
     compiler
         .aggregate_allocations
         .take()
-        .ok_or_else(|| {
-            backend_module("the aggregate allocation ledger went missing".to_string())
-        })?
+        .ok_or_else(|| backend_module("the aggregate allocation ledger went missing".to_string()))?
         .close(planned)
 }
 
@@ -7383,8 +7404,7 @@ pub(super) fn close_host_effect_seat_ledger(
         .host_effect_seat_records()
         .to_vec();
     #[cfg(test)]
-    if effect_seat_visit_mutation()
-        == EffectSeatVisitMutation::DropCommittedGroupBeforeGlobalClose
+    if effect_seat_visit_mutation() == EffectSeatVisitMutation::DropCommittedGroupBeforeGlobalClose
     {
         if let Some(ledger) = compiler.host_effect_seats.as_mut() {
             ledger.drop_one_committed_group_for_tests();
@@ -7460,9 +7480,7 @@ fn declare_response_context_call_in_func<M: Module>(
         .into_iter()
         .find(|context| context.id() == id)
         .ok_or_else(|| {
-            backend_module(
-                "a response owner names no installed continuation context".to_string(),
-            )
+            backend_module("a response owner names no installed continuation context".to_string())
         })?;
     let target = bundle.context(id).ok_or_else(|| {
         backend_module("a response context was never forward-declared".to_string())
@@ -7475,6 +7493,7 @@ fn declare_response_context_call_in_func<M: Module>(
         header: context.header(),
         slots: context.slots().to_vec(),
         offsets,
+        result_contract: plan.checked_ih_generated_context_result_contract(id)?,
     })
 }
 
@@ -7487,9 +7506,7 @@ pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
     let mut calls = BTreeMap::new();
     for context in plan.continuation_contexts()? {
         let target = bundle.context(context.id()).ok_or_else(|| {
-            backend_module(
-                "a planned generated context was never forward-declared".to_string(),
-            )
+            backend_module("a planned generated context was never forward-declared".to_string())
         })?;
         let (offsets, _frame_bytes) = context.slot_offsets()?;
         calls.insert(
@@ -7503,6 +7520,7 @@ pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
                 header: context.header(),
                 slots: context.slots().to_vec(),
                 offsets,
+                result_contract: plan.checked_ih_generated_context_result_contract(context.id())?,
             },
         );
     }
@@ -7517,7 +7535,10 @@ pub(super) fn define_unit_bodies<M: Module>(
     call_edges: &CallEdgeTargets,
     staged_root_value: Option<&RuntimeValue>,
 ) -> Result<RootUnitResult, CraneliftBackendError> {
-    let root = compiler.static_transition_plan.root_emittable_unit()?.function();
+    let root = compiler
+        .static_transition_plan
+        .root_emittable_unit()?
+        .function();
     // `D4`: projected once, declared afresh into each generated function below.
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
     // `RT-DECL-CLOSURE-PORT` `D5` — opened here because this bundle pass is the
@@ -7675,8 +7696,7 @@ pub(in crate::cranelift_backend) fn srcbody_bind_order_record(
 
 /// Drains every environment built on this thread since the last take.
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn srcbody_bind_order_take()
--> Vec<SrcbodyBindOrderObservation> {
+pub(in crate::cranelift_backend) fn srcbody_bind_order_take() -> Vec<SrcbodyBindOrderObservation> {
     SRCBODY_BIND_ORDER.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
 }
 
@@ -7764,20 +7784,16 @@ fn define_unit_body<M: Module>(
     // ordinal, no name parsing and no dynamic lookup anywhere on the path. ⚠ An
     // emitted `call` is not claimed and no control here asserts one.
     #[cfg(test)]
-    let unit_trap_authority =
-        match TRAP_FRAME_BINDING_MUTATION.with(std::cell::Cell::get) {
-            TrapFrameBindingMutation::MisclassifyUnitAsRoot => Some(TrapExitAuthority::Root {
-                process_sentinel: false,
-                source_authorized: false,
-            }),
-            TrapFrameBindingMutation::Exact | TrapFrameBindingMutation::DeleteUnitLane => {
-                None
-            }
-        };
+    let unit_trap_authority = match TRAP_FRAME_BINDING_MUTATION.with(std::cell::Cell::get) {
+        TrapFrameBindingMutation::MisclassifyUnitAsRoot => Some(TrapExitAuthority::Root {
+            process_sentinel: false,
+            source_authorized: false,
+        }),
+        TrapFrameBindingMutation::Exact | TrapFrameBindingMutation::DeleteUnitLane => None,
+    };
     #[cfg(not(test))]
     let unit_trap_authority = None;
-    let mut function_local =
-        helpers.declare_in_func(module, &mut func, unit_trap_authority);
+    let mut function_local = helpers.declare_in_func(module, &mut func, unit_trap_authority);
     let declared_calls = call_edges.declare_in_func(unit.function, module, &mut func)?;
     // `D3` — this ordinary Function declares its OWN `FuncRef` for every causal
     // token it owns, keyed by the four-field identity. Minted here, into this
@@ -7844,7 +7860,14 @@ fn define_unit_body<M: Module>(
     // its ABI arena are the authority the frame contract below is checked
     // against, and mutating them would leave both sides agreeing and prove
     // nothing.
-    redirect_fused_producer_invocations(module, &mut func, compiler, bundle, unit.function, &mut function_local.unit_calls)?;
+    redirect_fused_producer_invocations(
+        module,
+        &mut func,
+        compiler,
+        bundle,
+        unit.function,
+        &mut function_local.unit_calls,
+    )?;
     // `RT-DECL-CLOSURE-PORT` `D5` — the causal control on the ABI half.
     //
     // ⛔⛔ **Injected HERE, on the function-local COPY, and never on the plan's
@@ -7865,12 +7888,8 @@ fn define_unit_body<M: Module>(
     // and deliberately not derived from them.
     function_local.worker_templates = worker_targets.templates().clone();
     // `D5a` checkpoint 4 step 1: this function's own context call targets.
-    function_local.context_calls = declare_context_calls_in_func(
-        module,
-        &mut func,
-        &compiler.static_transition_plan,
-        bundle,
-    )?;
+    function_local.context_calls =
+        declare_context_calls_in_func(module, &mut func, &compiler.static_transition_plan, bundle)?;
     // `D8n` — this generated Function's own checked-frame consumption
     // transaction, spanning the ordinary unit body exactly. ⛔ Opened before the builder and
     // closed after it, so every branch scope inside nests within it.
@@ -8000,49 +8019,40 @@ fn define_unit_body<M: Module>(
                 let (base, offset) = (
                     slots,
                     i32::try_from(*offset).map_err(|_| {
-                        backend_module("abi input slot offset exceeds addressable range".to_string())
+                        backend_module(
+                            "abi input slot offset exceeds addressable range".to_string(),
+                        )
                     })?,
                 );
-                let word = builder.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    base,
-                    offset,
-                );
+                let word = builder
+                    .ins()
+                    .load(types::I64, MemFlags::trusted(), base, offset);
                 let carried = CarriedBoundaryWord { word };
                 // The process root's two ABI ordinals are closed semantic
                 // roles, not generic ValueWord inputs. Recovering them here
                 // prevents a borrowed process-input body from being emitted
                 // twice behind a runtime carried-representation split.
-                let operand = if is_root
-                    && compiler.process_object
-                    && slot.kind == AbiSlotKind::Parameter
-                {
-                    let value = compiler.emit_carrier_scalar(&mut builder, carried)?;
-                    match slot.ordinal {
-                        ordinal
-                            if ordinal == AbiProcessParameter::ProcessInput.ordinal() =>
-                        {
-                            LoweringOperand::Specialized(Lowered::BorrowedNativeValue {
-                                pointer: value,
-                            })
+                let operand =
+                    if is_root && compiler.process_object && slot.kind == AbiSlotKind::Parameter {
+                        let value = compiler.emit_carrier_scalar(&mut builder, carried)?;
+                        match slot.ordinal {
+                            ordinal if ordinal == AbiProcessParameter::ProcessInput.ordinal() => {
+                                LoweringOperand::Specialized(Lowered::BorrowedNativeValue {
+                                    pointer: value,
+                                })
+                            }
+                            ordinal if ordinal == AbiProcessParameter::Capability.ordinal() => {
+                                LoweringOperand::Specialized(Lowered::CapabilityToken { value })
+                            }
+                            _ => {
+                                return Err(backend_module(
+                                    "the process root has an unknown parameter role".to_string(),
+                                ));
+                            }
                         }
-                        ordinal
-                            if ordinal == AbiProcessParameter::Capability.ordinal() =>
-                        {
-                            LoweringOperand::Specialized(Lowered::CapabilityToken {
-                                value,
-                            })
-                        }
-                        _ => {
-                            return Err(backend_module(
-                                "the process root has an unknown parameter role".to_string(),
-                            ));
-                        }
-                    }
-                } else {
-                    LoweringOperand::Carried(carried)
-                };
+                    } else {
+                        LoweringOperand::Carried(carried)
+                    };
                 // `D5a` checkpoint 4 step 1b: the SAME operand, recorded by ABI
                 // position. Taken from this one walk rather than rebuilt, so
                 // "index i is ABI position i" holds by construction instead of
@@ -8146,10 +8156,9 @@ fn define_unit_body<M: Module>(
                     }),
                 ),
                 LoweringOperand::Carried(word) => {
-                    let tag = builder.ins().band_imm(
-                        word.word,
-                        crate::boundary_value::BOUNDARY_TAG_MASK as i64,
-                    );
+                    let tag = builder
+                        .ins()
+                        .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
                     Lowering::require_i64(
                         &mut builder,
                         tag,
@@ -8168,9 +8177,7 @@ fn define_unit_body<M: Module>(
                     #[cfg(test)]
                     if compiler.process_object {
                         px8tr_record_trap_provenance(
-                            Px8trTrapProvenanceEvent::FinalProcessObjectTrap {
-                                trap: trap.clone(),
-                            },
+                            Px8trTrapProvenanceEvent::FinalProcessObjectTrap { trap: trap.clone() },
                         );
                     }
                     compiler.emit_current_trap(&mut builder, &trap)?;
@@ -8251,7 +8258,9 @@ fn define_unit_body<M: Module>(
     #[cfg(test)]
     d5a_trace(format!(
         "UNIT-BODY done function={:?} origin={:?} root={:?}",
-        unit.function, unit.body_occurrence, root_outcome.as_ref().map(|_| "root")
+        unit.function,
+        unit.body_occurrence,
+        root_outcome.as_ref().map(|_| "root")
     ));
     compiler.validate_materialized_dead_join_cfg(unit.function, unit.body_occurrence, &func)?;
     // `4b` -- the emission-seam equality gate, on the FINISHED function and
@@ -8285,21 +8294,23 @@ fn define_unit_body<M: Module>(
     let response_owner_calls = verified_response_owner_calls(
         &compiler.static_transition_plan,
         bundle,
-        compiler
-            .function_local
-            .continuation_emissions
-            .keys()
-            .chain(
-                compiler
-                    .function_local
-                    .checked_ih_transport_emissions
-                    .iter()
-                    .map(|(transport, _)| transport.source_call_identity()),
-            ),
+        compiler.function_local.continuation_emissions.keys().chain(
+            compiler
+                .function_local
+                .checked_ih_transport_emissions
+                .iter()
+                .map(|(transport, _)| transport.source_call_identity()),
+        ),
     )?;
     if let Some(ledger) = compiler.continuation_claims.as_mut() {
         if accumulate {
-            ledger.record_emitted(compiler.function_local.continuation_emissions.keys().cloned())?;
+            ledger.record_emitted(
+                compiler
+                    .function_local
+                    .continuation_emissions
+                    .keys()
+                    .cloned(),
+            )?;
         }
         ledger.record_response_owner_calls(response_owner_calls);
     }

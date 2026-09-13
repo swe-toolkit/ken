@@ -30,7 +30,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 default = []
-px8-ds-test-support = []
+px8-ds-test-support = ["ken-host/px8-ds-test-support"]
 r3-4b-observation = []
 dasm-c2-observation = []
 checked-ih-realization-observation = []

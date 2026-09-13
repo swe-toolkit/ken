@@ -10,20 +10,24 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
 use super::continuations::{
-    continuation_owner_entry_sources, generated_context_parameters,
-    walk_continuation_value_environment, ContinuationCallIdentity,
-    ContinuationContextId,
+    checked_frame_for_consumer, continuation_call_selected_result_identity,
+    continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
+    generated_context_parameters, walk_continuation_value_environment,
+    CheckedIhPostCallConsumerStep, ContinuationCallIdentity, ContinuationContextId,
     ContinuationEmissionOwner, ContinuationInputProjection, ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
     ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
+    RequiredConsumerProjection, SourceReturnContextRole, SourceReturnContextTemplate,
 };
 use super::occurrences::StaticOriginId;
 use super::semantic_ir::ConstructorIdentity;
 use super::{
-    occurrence_subtree_contains, planner_capacity_error, planner_error, CraneliftBackendError,
-    StaticTransitionPlan,
+    checked_ih_post_call_consumer_frames, occurrence_subtree_contains, planner_capacity_error,
+    planner_error, CheckedIhEnvironmentTransport, CraneliftBackendError, StaticTransitionPlan,
 };
-use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue};
+use crate::{
+    CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue,
+};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) struct StaticResponseContinuationId(u32);
@@ -171,9 +175,7 @@ impl StaticResponseContextDemand {
         self.operation_source_owner
     }
 
-    pub(in crate::cranelift_backend) fn effect_environment(
-        &self,
-    ) -> &[StaticResponseEffectInput] {
+    pub(in crate::cranelift_backend) fn effect_environment(&self) -> &[StaticResponseEffectInput] {
         &self.effect_environment
     }
 
@@ -213,6 +215,179 @@ impl StaticResponseContextDemand {
         &self,
     ) -> &[(u32, ContinuationSourceCoordinate, u32)] {
         &self.continuation_inputs
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhDetachedConsumedFrame {
+    origin: StaticOriginId,
+    checked_frame_id: Option<u64>,
+}
+
+impl CheckedIhDetachedConsumedFrame {
+    pub(in crate::cranelift_backend) fn origin(self) -> StaticOriginId {
+        self.origin
+    }
+
+    pub(in crate::cranelift_backend) fn checked_frame_id(self) -> Option<u64> {
+        self.checked_frame_id
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhDetachedCallerCut {
+    selecting_call: ContinuationCallIdentity,
+    caller_result_origin: StaticOriginId,
+    consumed_continuation_origin: StaticOriginId,
+    selected_body_origin: StaticOriginId,
+    checked_frame_id: Option<u64>,
+    consumed_caller_suffix: Vec<CheckedIhDetachedConsumedFrame>,
+    producer_transport: CheckedIhEnvironmentTransport,
+    caller_transport: CheckedIhEnvironmentTransport,
+}
+
+impl CheckedIhDetachedCallerCut {
+    pub(in crate::cranelift_backend) fn selecting_call(&self) -> &ContinuationCallIdentity {
+        &self.selecting_call
+    }
+
+    pub(in crate::cranelift_backend) fn caller_result_origin(&self) -> StaticOriginId {
+        self.caller_result_origin
+    }
+
+    pub(in crate::cranelift_backend) fn consumed_continuation_origin(&self) -> StaticOriginId {
+        self.consumed_continuation_origin
+    }
+
+    pub(in crate::cranelift_backend) fn selected_body_origin(&self) -> StaticOriginId {
+        self.selected_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn checked_frame_id(&self) -> Option<u64> {
+        self.checked_frame_id
+    }
+
+    pub(in crate::cranelift_backend) fn consumed_caller_suffix(
+        &self,
+    ) -> &[CheckedIhDetachedConsumedFrame] {
+        &self.consumed_caller_suffix
+    }
+
+    pub(in crate::cranelift_backend) fn producer_transport(
+        &self,
+    ) -> &CheckedIhEnvironmentTransport {
+        &self.producer_transport
+    }
+
+    pub(in crate::cranelift_backend) fn caller_transport(&self) -> &CheckedIhEnvironmentTransport {
+        &self.caller_transport
+    }
+}
+
+/// Closed compiler proof joining one detached checked-IH return context to the
+/// existing static-response row, owner, complete selected caller and K context.
+/// The response owner forwards the same Result word; this record says which
+/// already-selected source exit that call completed and which caller suffix
+/// remains live. It is not stored in any runtime descriptor.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhStaticResponseReturnBoundary {
+    response: StaticResponseContinuation,
+    owner: StaticResponseOwnerSpecialization,
+    caller_cut: CheckedIhDetachedCallerCut,
+    consumer: CheckedIhPostCallConsumer,
+}
+
+impl CheckedIhStaticResponseReturnBoundary {
+    pub(in crate::cranelift_backend) fn response(&self) -> &StaticResponseContinuation {
+        &self.response
+    }
+
+    pub(in crate::cranelift_backend) fn owner(&self) -> &StaticResponseOwnerSpecialization {
+        &self.owner
+    }
+
+    pub(in crate::cranelift_backend) fn caller_cut(&self) -> &CheckedIhDetachedCallerCut {
+        &self.caller_cut
+    }
+
+    pub(in crate::cranelift_backend) fn consumer(&self) -> &CheckedIhPostCallConsumer {
+        &self.consumer
+    }
+
+    fn caller_exit_index(&self) -> Result<usize, CraneliftBackendError> {
+        let mut matching = self
+            .consumer
+            .selected_case_exits()
+            .iter()
+            .enumerate()
+            .filter(|(_, step)| {
+                step.occurrence().eliminator_origin()
+                    == self.caller_cut.consumed_continuation_origin()
+                    && step.checked_frame_id() == self.caller_cut.checked_frame_id()
+            });
+        let Some((index, _)) = matching.next() else {
+            return Err(planner_error(
+                "a static-response return boundary has no exact selected-caller exit",
+            ));
+        };
+        if matching.next().is_some() {
+            return Err(planner_error(
+                "a static-response return boundary repeats its selected-caller exit",
+            ));
+        }
+        Ok(index)
+    }
+
+    pub(in crate::cranelift_backend) fn owner_completed_exits(
+        &self,
+    ) -> Result<&[CheckedIhPostCallConsumerStep], CraneliftBackendError> {
+        Ok(&self.consumer.selected_case_exits()[..self.caller_exit_index()?])
+    }
+
+    pub(in crate::cranelift_backend) fn caller_completed_exits(
+        &self,
+    ) -> Result<&[CheckedIhPostCallConsumerStep], CraneliftBackendError> {
+        Ok(&self.consumer.selected_case_exits()[self.caller_exit_index()?..])
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumer {
+    transport: CheckedIhEnvironmentTransport,
+    actual_result_identity: ConstructorIdentity,
+    demanded_result_identity: ConstructorIdentity,
+    consumers: Vec<CheckedIhPostCallConsumerStep>,
+    selected_case_exits: Vec<CheckedIhPostCallConsumerStep>,
+    detached_return_context: Option<SourceReturnContextTemplate>,
+}
+
+impl CheckedIhPostCallConsumer {
+    pub(in crate::cranelift_backend) fn transport(&self) -> &CheckedIhEnvironmentTransport {
+        &self.transport
+    }
+
+    pub(in crate::cranelift_backend) fn actual_result_identity(&self) -> ConstructorIdentity {
+        self.actual_result_identity
+    }
+
+    pub(in crate::cranelift_backend) fn demanded_result_identity(&self) -> ConstructorIdentity {
+        self.demanded_result_identity
+    }
+
+    pub(in crate::cranelift_backend) fn consumers(&self) -> &[CheckedIhPostCallConsumerStep] {
+        &self.consumers
+    }
+
+    pub(in crate::cranelift_backend) fn selected_case_exits(
+        &self,
+    ) -> &[CheckedIhPostCallConsumerStep] {
+        &self.selected_case_exits
+    }
+
+    pub(in crate::cranelift_backend) fn detached_return_context(
+        &self,
+    ) -> Option<&SourceReturnContextTemplate> {
+        self.detached_return_context.as_ref()
     }
 }
 
@@ -273,9 +448,7 @@ impl StaticResponseContinuation {
         self.operation_source_owner
     }
 
-    pub(in crate::cranelift_backend) fn effect_environment(
-        &self,
-    ) -> &[StaticResponseEffectInput] {
+    pub(in crate::cranelift_backend) fn effect_environment(&self) -> &[StaticResponseEffectInput] {
         &self.effect_environment
     }
 
@@ -333,7 +506,8 @@ impl StaticResponseContinuation {
 /// (COORDINATION §7), never a CI-red. `Specialized` is the proved path: a
 /// continuation unit plus either an ordinary selected caller or an
 /// execute-then-resume transport emission that becomes a real owner call.
-/// `Deferred` is the complete residual: P1 plus ineligible or suppressed P2.
+/// `Deferred` is the complete residual: plan-owned non-transport immediate
+/// bridges, P1, plus ineligible or suppressed P2.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ResponseDisposition {
     Specialized,
@@ -341,8 +515,9 @@ pub(in crate::cranelift_backend) enum ResponseDisposition {
 }
 
 /// Which residual sub-case a `Deferred` response is, kept for congruence
-/// evidence (AC-1) and control fixtures — never a routing key (both sub-cases
-/// route identically to main's pre-WP lowering).
+/// evidence (AC-1) and consumed by total matches. Immediate bridges retain
+/// ordinary effect lowering without an owner; P1 and P2 keep their established
+/// main-lowering and bounded-suffix routes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// A planned immediate bridge realizes this exact non-transport caller
@@ -373,15 +548,16 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
 pub(in crate::cranelift_backend) struct DeferredResponseRow {
     vis_origin: StaticOriginId,
     /// The producer call origin this Deferred residual belongs to (P1: the
-    /// route's producer edge; P2: the demand's). Retained for the
-    /// closed diagnostic relation and suppression control.
+    /// route's producer edge; immediate bridge or P2: the demand's). Retained
+    /// for the closed diagnostic relation and suppression control.
     producer_call_origin: StaticOriginId,
     operation_root_origin: StaticOriginId,
     effect_origin: StaticOriginId,
     operation: HostOpV1,
     sub_case: DeferredResponseSubCase,
-    /// The K's capture and continuation-input counts (P2: from the demand; P1:
-    /// zero because no continuation unit exists). Eligible-plane census derives
+    /// The K's capture and continuation-input counts (immediate bridge or P2:
+    /// from the demand; P1: zero because no continuation unit exists).
+    /// Eligible-plane census derives
     /// every has-K count from Specialized rows.
     capture_count: usize,
     continuation_input_count: usize,
@@ -664,8 +840,9 @@ thread_local! {
     static D5B_HS10_INLINE_RESPONSE_MUTATION:
         std::cell::Cell<D5bHs10InlineResponseMutation> =
         const { std::cell::Cell::new(D5bHs10InlineResponseMutation::Exact) };
-    static D5B_HS10_INLINE_RESPONSE_APPLICATIONS: std::cell::Cell<usize> =
-        const { std::cell::Cell::new(0) };
+    static D5B_HS10_INLINE_RESPONSE_APPLICATIONS:
+        std::cell::RefCell<BTreeSet<ContinuationCallIdentity>> =
+        const { std::cell::RefCell::new(BTreeSet::new()) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -689,13 +866,90 @@ pub fn with_d5b_hs10_inline_response_mutation<T>(
         D5bHs10InlineResponseMutation::Exact,
         "HS10 inline-response mutations cannot nest"
     );
-    D5B_HS10_INLINE_RESPONSE_APPLICATIONS.with(|count| count.set(0));
+    D5B_HS10_INLINE_RESPONSE_APPLICATIONS.with(|identities| identities.borrow_mut().clear());
     let guard = D5bHs10InlineResponseMutationGuard(previous);
     let result = operation();
     let applications =
-        D5B_HS10_INLINE_RESPONSE_APPLICATIONS.with(std::cell::Cell::get);
+        D5B_HS10_INLINE_RESPONSE_APPLICATIONS.with(|identities| identities.borrow().len());
     drop(guard);
     (result, applications)
+}
+
+fn is_inline_bridge_no_call(has_immediate_bridge: bool, transport_source: bool) -> bool {
+    has_immediate_bridge && !transport_source
+}
+
+/// Compile-preserving HS15/HS17 refutations. Each moves one operand of the
+/// post-call consumer contract while leaving the ordinary call ABI untouched.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs17PostCallConsumerMutation {
+    Exact,
+    DeleteRelation,
+    TransplantConsumer,
+    RelabelWithoutConsumer,
+    DeleteStaticResponseBoundary,
+    TransplantStaticResponseBoundary,
+    SubstituteForwardedResultWord,
+    ReplayCompletedSelectedExit,
+    DropResidualSuffix,
+    MintReceiptAtNonEmittingTail,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static D5B_HS17_POST_CALL_CONSUMER_MUTATION:
+        std::cell::Cell<D5bHs17PostCallConsumerMutation> =
+        const { std::cell::Cell::new(D5bHs17PostCallConsumerMutation::Exact) };
+    static D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+struct D5bHs17PostCallConsumerMutationGuard;
+
+#[cfg(feature = "px8-ds-test-support")]
+impl Drop for D5bHs17PostCallConsumerMutationGuard {
+    fn drop(&mut self) {
+        D5B_HS17_POST_CALL_CONSUMER_MUTATION
+            .with(|slot| slot.set(D5bHs17PostCallConsumerMutation::Exact));
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_d5b_hs17_post_call_consumer_mutation<T>(
+    mutation: D5bHs17PostCallConsumerMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    let previous = D5B_HS17_POST_CALL_CONSUMER_MUTATION.with(|slot| slot.replace(mutation));
+    assert_eq!(
+        previous,
+        D5bHs17PostCallConsumerMutation::Exact,
+        "HS15/HS17 post-call consumer mutations cannot nest"
+    );
+    D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS.with(|count| count.set(0));
+    let guard = D5bHs17PostCallConsumerMutationGuard;
+    let result = operation();
+    let applications = D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS.with(std::cell::Cell::get);
+    drop(guard);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn d5b_hs17_post_call_consumer_mutation_is_exact() -> bool {
+    D5B_HS17_POST_CALL_CONSUMER_MUTATION
+        .with(|slot| slot.get() == D5bHs17PostCallConsumerMutation::Exact)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn d5b_hs17_post_call_consumer_mutation(
+) -> D5bHs17PostCallConsumerMutation {
+    D5B_HS17_POST_CALL_CONSUMER_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_d5b_hs17_post_call_consumer_application() {
+    D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS.with(|count| count.set(count.get().saturating_add(1)));
 }
 
 impl SsaInfeasible {
@@ -986,10 +1240,10 @@ fn exact_response_ret_identity(
             "the static response continuation has no exact one-parameter Ret case",
         ));
     }
-    Ok(Ok(
-        plan.semantic
-            .case_constructor_identity(continuation_origin, matches[0])?,
-    ))
+    Ok(Ok(plan.semantic.case_constructor_identity(
+        continuation_origin,
+        matches[0],
+    )?))
 }
 
 fn free_environment_indices(
@@ -997,9 +1251,7 @@ fn free_environment_indices(
     depth: u32,
     free: &mut BTreeSet<u32>,
 ) -> Result<(), CraneliftBackendError> {
-    let visit = |expr, depth, free: &mut BTreeSet<u32>| {
-        free_environment_indices(expr, depth, free)
-    };
+    let visit = |expr, depth, free: &mut BTreeSet<u32>| free_environment_indices(expr, depth, free);
     match expr {
         RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
@@ -1046,14 +1298,13 @@ fn free_environment_indices(
         } => {
             visit(scrutinee, depth, free)?;
             for case in cases {
-                let binders = u32::try_from(case.binders).map_err(|_| {
-                    planner_capacity_error("response match binder depth exhausted")
-                })?;
+                let binders = u32::try_from(case.binders)
+                    .map_err(|_| planner_capacity_error("response match binder depth exhausted"))?;
                 visit(
                     &case.body,
-                    depth.checked_add(binders).ok_or_else(|| {
-                        planner_capacity_error("response match depth exhausted")
-                    })?,
+                    depth
+                        .checked_add(binders)
+                        .ok_or_else(|| planner_capacity_error("response match depth exhausted"))?,
                     free,
                 )?;
             }
@@ -1212,11 +1463,14 @@ fn is_exact_bounded_nat_to_int(expr: &RuntimeExpr) -> bool {
     let zero = cases.iter().find(|case| {
         case.constructor.as_str().ends_with("::Nat::Zero")
             && case.binders == 0
-            && matches!(case.body, RuntimeExpr::Value(crate::RuntimeValue::Int(crate::RuntimeIntV1::Small(0))))
+            && matches!(
+                case.body,
+                RuntimeExpr::Value(crate::RuntimeValue::Int(crate::RuntimeIntV1::Small(0)))
+            )
     });
-    let suc = cases.iter().find(|case| {
-        case.constructor.as_str().ends_with("::Nat::Suc") && case.binders == 1
-    });
+    let suc = cases
+        .iter()
+        .find(|case| case.constructor.as_str().ends_with("::Nat::Suc") && case.binders == 1);
     if zero.is_none() || suc.is_none() || cases.len() != 2 {
         return false;
     }
@@ -1256,12 +1510,8 @@ fn static_response_effect_environment(
         .into_iter()
         .map(ContinuationValueSourceAuthority::source)
         .collect::<Vec<_>>();
-    let (_, reached) = walk_continuation_value_environment(
-        plan,
-        source_root,
-        effect_origin,
-        &entry_environment,
-    )?;
+    let (_, reached) =
+        walk_continuation_value_environment(plan, source_root, effect_origin, &entry_environment)?;
     let reached = reached.ok_or_else(|| {
         planner_error("a static response effect is outside its source owner subtree")
     })?;
@@ -1298,7 +1548,9 @@ fn static_response_effect_environment(
     };
     let mut actual_argument_inputs = Vec::with_capacity(actual_arguments.len());
     for (ordinal, argument) in actual_arguments.iter().enumerate() {
-        let argument_origin = plan.semantic.child_origin(actual_operation_origin, ordinal)?;
+        let argument_origin = plan
+            .semantic
+            .child_origin(actual_operation_origin, ordinal)?;
         let environment = match static_response_argument_environment(
             plan,
             actual_source_owner,
@@ -1594,7 +1846,632 @@ fn classify_deferred_response_tail(
     Ok(())
 }
 
+fn detached_post_call_consumer_frames(
+    plan: &StaticTransitionPlan<'_>,
+    context: &SourceReturnContextTemplate,
+    frames: &mut Vec<StaticOriginId>,
+) -> Result<(), CraneliftBackendError> {
+    for step in context.steps().iter().rev() {
+        if matches!(
+            step.role(),
+            SourceReturnContextRole::ComputationalMatchCase(_)
+        ) {
+            frames.push(step.parent_origin());
+        }
+    }
+    if let Some(boundary) = context.worker_return() {
+        let selecting = boundary.selecting_call();
+        let target = plan
+            .continuation_specializations
+            .get(selecting.target().0 as usize)
+            .ok_or_else(|| {
+                planner_error(
+                    "a detached return context names an uninstalled selecting specialization",
+                )
+            })?;
+        if target.key.worker.body_origin != context.root_origin()
+            || target.key.producer_construct_origin != boundary.caller_context().result_origin()
+        {
+            return Err(planner_error(
+                "a detached return context does not join its worker root to the selecting call's exact caller result position",
+            ));
+        }
+        frames.push(target.key.continuation_origin);
+        if let Some(source) = target.key.consuming_occurrence {
+            if frames.last().copied() != Some(source.eliminator_origin()) {
+                frames.push(source.eliminator_origin());
+            }
+            if let Some(RequiredConsumerProjection::DirectOuter { required, .. }) =
+                plan.required_consumer_projections.get(selecting)
+            {
+                if frames.last().copied() != Some(required.eliminator_origin()) {
+                    frames.push(required.eliminator_origin());
+                }
+            }
+        }
+        detached_post_call_consumer_frames(plan, boundary.caller_context(), frames)?;
+    }
+    Ok(())
+}
+
+pub(super) fn build_checked_ih_post_call_consumers(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<CheckedIhPostCallConsumer>, CraneliftBackendError> {
+    let mut result = Vec::new();
+    for transport in &plan.checked_ih_environment_transports {
+        let ContinuationEmissionOwner::Specialization(enclosing) = transport.destination_owner()
+        else {
+            continue;
+        };
+        let Some(context) =
+            plan.continuation_context_for(enclosing, transport.destination_body_origin())?
+        else {
+            continue;
+        };
+        let mut demanded = Vec::new();
+        for identity in plan
+            .static_response_continuations
+            .iter()
+            .filter(|row| row.k_context == context.id())
+            .map(|row| row.k_ret_identity)
+        {
+            if !demanded.contains(&identity) {
+                demanded.push(identity);
+            }
+        }
+        let demanded = match demanded.as_slice() {
+            [] => continue,
+            [identity] => *identity,
+            _ => return Err(planner_error(
+                "one checked-IH transport identity has disagreeing response-context Result demands",
+            )),
+        };
+        let actual =
+            continuation_call_selected_result_identity(plan, transport.source_call_identity())?;
+        if actual == demanded {
+            continue;
+        }
+        let detached_return_context = plan
+            .detached_return_context_for(transport.source_call_identity())
+            .cloned();
+        let frame_origins = if let Some(context) = &detached_return_context {
+            let mut frames = Vec::new();
+            detached_post_call_consumer_frames(plan, context, &mut frames)?;
+            if frames.is_empty() {
+                return Err(planner_error(
+                    "a detached checked-IH return context has no exact source consumer exit",
+                ));
+            }
+            frames
+        } else {
+            let Some(frames) = checked_ih_post_call_consumer_frames(plan, transport)? else {
+                continue;
+            };
+            frames
+        };
+        let Some(derived_steps) = derive_checked_ih_post_call_consumer_chain(
+            plan,
+            transport.source_call_identity(),
+            &frame_origins,
+            actual,
+            demanded,
+        )?
+        else {
+            continue;
+        };
+        if derived_steps.is_empty() {
+            return Err(planner_error(
+                "a mismatched checked-IH transport Result produced no source return steps",
+            ));
+        }
+        let (consumers, selected_case_exits) = if detached_return_context.is_some() {
+            (Vec::new(), derived_steps)
+        } else {
+            (derived_steps, Vec::new())
+        };
+        result.push(CheckedIhPostCallConsumer {
+            transport: transport.clone(),
+            actual_result_identity: actual,
+            demanded_result_identity: demanded,
+            consumers,
+            selected_case_exits,
+            detached_return_context,
+        });
+    }
+    result.sort_by(|left, right| left.transport.cmp(&right.transport));
+    Ok(result)
+}
+
+pub(super) fn publish_checked_ih_post_call_consumers(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<CheckedIhPostCallConsumer>, CraneliftBackendError> {
+    let mut rows = build_checked_ih_post_call_consumers(plan)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    if d5b_hs17_post_call_consumer_mutation() == D5bHs17PostCallConsumerMutation::TransplantConsumer
+    {
+        let mut pair = None;
+        'outer: for left in 0..rows.len() {
+            for right in left + 1..rows.len() {
+                if rows[left].transport.source_call_identity()
+                    != rows[right].transport.source_call_identity()
+                    && rows[left].consumers.len() == rows[right].consumers.len()
+                {
+                    pair = Some((left, right));
+                    break 'outer;
+                }
+            }
+        }
+        let (left, right) = pair.ok_or_else(|| {
+            planner_error(
+                "the HS15 transplant control found no distinct equal-length consumer pair",
+            )
+        })?;
+        let left_consumers = rows[left].consumers.clone();
+        rows[left].consumers = rows[right].consumers.clone();
+        rows[right].consumers = left_consumers;
+        record_d5b_hs17_post_call_consumer_application();
+    }
+    Ok(rows)
+}
+
+pub(super) fn validate_checked_ih_post_call_consumers(
+    plan: &StaticTransitionPlan<'_>,
+    consumers: &[CheckedIhPostCallConsumer],
+) -> Result<(), CraneliftBackendError> {
+    if consumers != build_checked_ih_post_call_consumers(plan)? {
+        return Err(planner_error(
+            "the checked-IH post-call consumer relation is not its exact identity-and-endpoint derivation",
+        ));
+    }
+    Ok(())
+}
+
+fn find_worker_return_boundary<'a>(
+    context: &'a SourceReturnContextTemplate,
+    identity: &ContinuationCallIdentity,
+) -> Option<&'a super::continuations::SourceWorkerReturnBoundary> {
+    let boundary = context.worker_return()?;
+    if boundary.selecting_call() == identity {
+        Some(boundary)
+    } else {
+        find_worker_return_boundary(boundary.caller_context(), identity)
+    }
+}
+
 impl StaticTransitionPlan<'_> {
+    pub(in crate::cranelift_backend) fn checked_ih_post_call_consumer(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<Option<&CheckedIhPostCallConsumer>, CraneliftBackendError> {
+        let mut matching = self
+            .checked_ih_post_call_consumers
+            .iter()
+            .filter(|row| row.transport == *transport);
+        let Some(row) = matching.next() else {
+            return Ok(None);
+        };
+        if matching.next().is_some() {
+            return Err(planner_error(
+                "one checked-IH transport endpoint resolves more than one post-call consumer",
+            ));
+        }
+        Ok(Some(row))
+    }
+
+    pub(in crate::cranelift_backend) fn static_response_forwarded_result_identity(
+        &self,
+        selected_caller: &ContinuationCallIdentity,
+    ) -> Result<Option<ConstructorIdentity>, CraneliftBackendError> {
+        let owners = self
+            .static_response_owner_specializations()?
+            .map_err(|infeasible| {
+                planner_error(format!(
+                    "a static-response Result forwarding boundary is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?;
+        let matching_owners = owners
+            .iter()
+            .filter(|owner| owner.selected_caller() == selected_caller)
+            .collect::<Vec<_>>();
+        let owner = match matching_owners.as_slice() {
+            [] => return Ok(None),
+            [owner] => *owner,
+            _ => {
+                return Err(planner_error(
+                    "one selected caller resolves more than one static response owner",
+                ))
+            }
+        };
+        let matching_rows = self
+            .static_response_continuations
+            .iter()
+            .filter(|row| row.id() == owner.response())
+            .collect::<Vec<_>>();
+        let row = match matching_rows.as_slice() {
+            [row] => *row,
+            [] => {
+                return Err(planner_error(
+                    "a static response owner has no exact response row",
+                ))
+            }
+            _ => {
+                return Err(planner_error(
+                    "a static response owner has more than one exact response row",
+                ))
+            }
+        };
+        let context = self
+            .continuation_contexts
+            .iter()
+            .find(|context| context.id() == owner.k_context())
+            .ok_or_else(|| {
+                planner_error("a static-response Result forwarding boundary has no exact K context")
+            })?;
+        if owner.base_owner() != row.base_owner()
+            || owner.selected_caller() != row.k_identity()
+            || owner.k_context() != row.k_context()
+            || row.k_identity() != selected_caller
+            || row.k_specialization() != selected_caller.target()
+            || context.enclosing_specialization() != selected_caller.target()
+            || context.worker_body_origin() != row.k_body_origin()
+        {
+            return Err(planner_error(
+                "a static-response Result forwarding boundary does not join its response row, owner, complete selected caller and K context",
+            ));
+        }
+        Ok(Some(row.k_ret_identity()))
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_static_response_return_boundary(
+        &self,
+        selected_caller: &ContinuationCallIdentity,
+    ) -> Result<Option<CheckedIhStaticResponseReturnBoundary>, CraneliftBackendError> {
+        let owners = self
+            .static_response_owner_specializations()?
+            .map_err(|infeasible| {
+                planner_error(format!(
+                    "a static-response return boundary is infeasible at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?;
+        let matching_owners = owners
+            .iter()
+            .filter(|owner| owner.selected_caller() == selected_caller)
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut owner = match matching_owners.as_slice() {
+            [] => return Ok(None),
+            [owner] => owner.clone(),
+            _ => {
+                return Err(planner_error(
+                    "one selected caller resolves more than one static response owner",
+                ))
+            }
+        };
+        let matching_rows = self
+            .static_response_continuations
+            .iter()
+            .filter(|row| row.id() == owner.response())
+            .collect::<Vec<_>>();
+        let row = match matching_rows.as_slice() {
+            [row] => (*row).clone(),
+            [] => {
+                return Err(planner_error(
+                    "a static response owner has no exact response row",
+                ))
+            }
+            _ => {
+                return Err(planner_error(
+                    "a static response owner has more than one exact response row",
+                ))
+            }
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        if d5b_hs17_post_call_consumer_mutation()
+            == D5bHs17PostCallConsumerMutation::TransplantStaticResponseBoundary
+        {
+            let substitute = owners
+                .iter()
+                .filter(|candidate| candidate.id() != owner.id())
+                .find(|candidate| {
+                    self.static_response_continuations.iter().any(|candidate_row| {
+                        candidate_row.id() == candidate.response()
+                            && candidate_row.k_ret_identity() == row.k_ret_identity()
+                    })
+                })
+                .cloned()
+                .ok_or_else(|| {
+                    planner_error(
+                        "the HS17 static-response transplant control found no equal-Ret foreign owner",
+                    )
+                })?;
+            owner = substitute;
+            record_d5b_hs17_post_call_consumer_application();
+        }
+        if owner.base_owner() != row.base_owner()
+            || owner.selected_caller() != row.k_identity()
+            || owner.k_context() != row.k_context()
+            || row.k_identity() != selected_caller
+            || row.k_specialization() != selected_caller.target()
+        {
+            return Err(planner_error(
+                "a static-response return boundary does not join its response row, owner and complete selected caller",
+            ));
+        }
+        let context = self
+            .continuation_contexts
+            .iter()
+            .find(|context| context.id() == owner.k_context())
+            .ok_or_else(|| {
+                planner_error("a static-response return boundary has no exact K context")
+            })?;
+        if context.enclosing_specialization() != selected_caller.target()
+            || context.worker_body_origin() != row.k_body_origin()
+        {
+            return Err(planner_error(
+                "a static-response return boundary does not join its complete selected caller to the exact K context",
+            ));
+        }
+
+        let mut boundaries = Vec::new();
+        for caller_transport in self
+            .checked_ih_environment_transports
+            .iter()
+            .filter(|transport| transport.source_call_identity() == selected_caller)
+        {
+            let Some(caller_cut) = self.checked_ih_detached_caller_cut(caller_transport)? else {
+                continue;
+            };
+            let matching_consumers = self
+                .checked_ih_post_call_consumers
+                .iter()
+                .filter(|consumer| {
+                    consumer.transport() == caller_cut.producer_transport()
+                        && consumer.detached_return_context().is_some_and(|template| {
+                            find_worker_return_boundary(template, selected_caller).is_some()
+                        })
+                })
+                .collect::<Vec<_>>();
+            let consumer = match matching_consumers.as_slice() {
+                [consumer] => (*consumer).clone(),
+                [] => continue,
+                _ => {
+                    return Err(planner_error(
+                        "one static-response return boundary resolves more than one detached checked-IH consumer",
+                    ))
+                }
+            };
+            if consumer.demanded_result_identity() != row.k_ret_identity()
+                || caller_cut.selecting_call() != selected_caller
+                || caller_cut.caller_transport() != caller_transport
+            {
+                return Err(planner_error(
+                    "a static-response return boundary disagrees with its Result demand or retained checked-IH endpoints",
+                ));
+            }
+            let boundary = CheckedIhStaticResponseReturnBoundary {
+                response: row.clone(),
+                owner: owner.clone(),
+                caller_cut,
+                consumer,
+            };
+            boundary.caller_exit_index()?;
+            boundaries.push(boundary);
+        }
+        #[cfg(feature = "px8-ds-test-support")]
+        if !boundaries.is_empty()
+            && d5b_hs17_post_call_consumer_mutation()
+                == D5bHs17PostCallConsumerMutation::DeleteStaticResponseBoundary
+        {
+            record_d5b_hs17_post_call_consumer_application();
+            return Ok(None);
+        }
+        match boundaries.as_slice() {
+            [] => Ok(None),
+            [boundary] => Ok(Some(boundary.clone())),
+            _ => Err(planner_error(
+                "one selected static-response caller has more than one complete detached return boundary",
+            )),
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_detached_caller_cut(
+        &self,
+        caller_transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<Option<CheckedIhDetachedCallerCut>, CraneliftBackendError> {
+        let identity = caller_transport.source_call_identity();
+        let mut matches = Vec::new();
+        let mut saw_boundary = false;
+        for row in &self.checked_ih_post_call_consumers {
+            let Some(context) = row.detached_return_context() else {
+                continue;
+            };
+            let Some(boundary) = find_worker_return_boundary(context, identity) else {
+                continue;
+            };
+            saw_boundary = true;
+            if boundary.caller_context().result_origin()
+                != caller_transport.destination_construct_origin()
+                || row.transport.destination_owner() != caller_transport.source_owner()
+                || row.transport.destination_body_origin() != context.root_origin()
+            {
+                continue;
+            }
+            let target = self
+                .continuation_specializations
+                .get(identity.target().0 as usize)
+                .ok_or_else(|| {
+                    planner_error(
+                        "a detached checked-IH caller cut names an uninstalled selecting target",
+                    )
+                })?;
+            if target.key.worker.body_origin != context.root_origin()
+                || target.key.producer_construct_origin != boundary.caller_context().result_origin()
+            {
+                return Err(planner_error(
+                    "a detached checked-IH caller cut disagrees with its selecting specialization",
+                ));
+            }
+            let selected_body_origin = self.semantic.child_origin(
+                target.key.continuation_origin,
+                1 + target.key.producer_alternative as usize,
+            )?;
+            let consumer_index = row
+                .selected_case_exits
+                .iter()
+                .position(|step| {
+                    step.occurrence().eliminator_origin()
+                        == target.key.continuation_origin
+                })
+                .ok_or_else(|| {
+                    planner_error(
+                        "a detached checked-IH caller cut did not consume its selecting continuation",
+                    )
+                })?;
+            let consumer_step = row.selected_case_exits.get(consumer_index).ok_or_else(|| {
+                planner_error("a detached checked-IH caller cut lost its consumer")
+            })?;
+            if !row.selected_case_exits[..consumer_index]
+                .iter()
+                .all(|step| step.occurrence().eliminator_origin() != target.key.continuation_origin)
+            {
+                return Err(planner_error(
+                    "a detached checked-IH caller cut exits its selecting continuation more than once",
+                ));
+            }
+            let consumed_caller_suffix = boundary
+                .caller_context()
+                .caller_suffix()
+                .iter()
+                .map(|origin| {
+                    Ok(CheckedIhDetachedConsumedFrame {
+                        origin: *origin,
+                        checked_frame_id: checked_frame_for_consumer(self, *origin)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+            if consumed_caller_suffix
+                .iter()
+                .any(|frame| frame.origin == target.key.continuation_origin)
+            {
+                return Err(planner_error(
+                    "a detached checked-IH caller suffix replays its selecting continuation",
+                ));
+            }
+            matches.push(CheckedIhDetachedCallerCut {
+                selecting_call: identity.clone(),
+                caller_result_origin: boundary.caller_context().result_origin(),
+                consumed_continuation_origin: target.key.continuation_origin,
+                selected_body_origin,
+                checked_frame_id: consumer_step.checked_frame_id(),
+                consumed_caller_suffix,
+                producer_transport: row.transport.clone(),
+                caller_transport: caller_transport.clone(),
+            });
+        }
+        match matches.as_slice() {
+            [] if saw_boundary => Err(planner_error(
+                "a detached checked-IH caller cut has no exact producer-to-caller transport endpoint join",
+            )),
+            [] => Ok(None),
+            [cut] => Ok(Some(cut.clone())),
+            _ => Err(planner_error(
+                "one checked-IH caller transport has more than one detached source return cut",
+            )),
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_detached_caller_construct_binds(
+        &self,
+        cut: &CheckedIhDetachedCallerCut,
+        construct_origin: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        Ok(occurrence_subtree_contains(
+            self,
+            cut.selected_body_origin,
+            construct_origin,
+        )?)
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_generated_context_result_contract(
+        &self,
+        context: ContinuationContextId,
+    ) -> Result<Option<ConstructorIdentity>, CraneliftBackendError> {
+        let planned_context = self
+            .continuation_contexts
+            .iter()
+            .find(|candidate| candidate.id == context)
+            .ok_or_else(|| {
+                planner_error("a generated-context Result contract names no planned context")
+            })?;
+        let has_detached_return = self
+            .checked_ih_post_call_consumers
+            .iter()
+            .any(|row| row.detached_return_context().is_some());
+        if has_detached_return {
+            let selected_callers = self
+                .static_response_continuations
+                .iter()
+                .filter(|row| row.k_context() == context)
+                .map(StaticResponseContinuation::k_identity)
+                .collect::<Vec<_>>();
+            let mut has_completed_boundary = false;
+            for selected_caller in selected_callers {
+                has_completed_boundary |= self
+                    .checked_ih_static_response_return_boundary(selected_caller)?
+                    .is_some();
+            }
+            if !has_completed_boundary {
+                return Ok(None);
+            }
+        }
+        let mut identities = Vec::new();
+        for identity in self
+            .static_response_continuations
+            .iter()
+            .filter(|row| row.k_context == context)
+            .map(|row| row.k_ret_identity)
+        {
+            if !identities.contains(&identity) {
+                identities.push(identity);
+            }
+        }
+        match identities.as_slice() {
+            [] => Ok(None),
+            [identity] => Ok(Some(*identity)),
+            _ => Err(planner_error(
+                "one generated context has disagreeing response Result contracts",
+            )),
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn checked_ih_post_call_actual_identity_for_target(
+        &self,
+        target: ContinuationSpecializationId,
+    ) -> Result<Option<ConstructorIdentity>, CraneliftBackendError> {
+        let mut identities = Vec::new();
+        for identity in self
+            .checked_ih_post_call_consumers
+            .iter()
+            .filter(|row| row.transport.source_specialization() == target)
+            .map(|row| row.actual_result_identity)
+        {
+            if !identities.contains(&identity) {
+                identities.push(identity);
+            }
+        }
+        match identities.as_slice() {
+            [] => Ok(None),
+            [identity] => Ok(Some(*identity)),
+            _ => Err(planner_error(
+                "one continuation target has disagreeing checked-IH post-call actual Result identities",
+            )),
+        }
+    }
+
     /// Derive and fully validate every statically attributable response demand.
     ///
     /// This phase intentionally does not ask whether an old causal caller had
@@ -1763,13 +2640,11 @@ impl StaticTransitionPlan<'_> {
                 // transport-source identity is Specialized and its existing
                 // transport emission is the selected incoming response-owner
                 // call. An open/single-stage plane or suppression retains P2.
-                let k_ret_identity = match exact_response_ret_identity(
-                    self,
-                    unit.continuation_origin(),
-                )? {
-                    Ok(identity) => identity,
-                    Err(reason) => return Ok(Err(infeasible(reason))),
-                };
+                let k_ret_identity =
+                    match exact_response_ret_identity(self, unit.continuation_origin())? {
+                        Ok(identity) => identity,
+                        Err(reason) => return Ok(Err(infeasible(reason))),
+                    };
                 let envelope = unit.ordinary_envelope()?;
                 let mut captures = Vec::new();
                 for (position, member) in envelope.iter().enumerate() {
@@ -2211,26 +3086,16 @@ impl StaticTransitionPlan<'_> {
         #[cfg(feature = "px8-ds-test-support")]
         if STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(std::cell::Cell::get)
             == Some(StaticResponseContextDemandMutation::VaryCausalContextPrefix)
-            && STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
-                .with(std::cell::Cell::get)
-                == 0
+            && STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS.with(std::cell::Cell::get) == 0
         {
             let prefix = contexts.first_mut().ok_or_else(|| {
-                planner_error(
-                    "the causal-prefix mutation found no pre-existing context",
-                )
+                planner_error("the causal-prefix mutation found no pre-existing context")
             })?;
-            prefix.worker_body_origin.0 = prefix
-                .worker_body_origin
-                .0
-                .checked_add(1)
-                .ok_or_else(|| {
-                    planner_capacity_error(
-                        "the causal-prefix mutation exhausted the body origin",
-                    )
+            prefix.worker_body_origin.0 =
+                prefix.worker_body_origin.0.checked_add(1).ok_or_else(|| {
+                    planner_capacity_error("the causal-prefix mutation exhausted the body origin")
                 })?;
-            STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
-                .with(|count| count.set(1));
+            STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS.with(|count| count.set(1));
         }
         if contexts.get(..preexisting_count) != Some(causal_contexts) {
             return Err(planner_error(
@@ -2434,18 +3299,18 @@ impl StaticTransitionPlan<'_> {
             let has_immediate_bridge = self
                 .immediate_bridge_realization(&demand.k_identity)
                 .is_some();
-            let inline_bridge = has_immediate_bridge && !transport_source;
+            let inline_bridge = is_inline_bridge_no_call(has_immediate_bridge, transport_source);
             #[cfg(feature = "px8-ds-test-support")]
             let promote_inline_bridge = D5B_HS10_INLINE_RESPONSE_MUTATION.with(|slot| {
-                slot.get() == D5bHs10InlineResponseMutation::PromoteInlineBridge
-                    && inline_bridge
+                slot.get() == D5bHs10InlineResponseMutation::PromoteInlineBridge && inline_bridge
             });
             #[cfg(not(feature = "px8-ds-test-support"))]
             let promote_inline_bridge = false;
             #[cfg(feature = "px8-ds-test-support")]
             if promote_inline_bridge {
-                D5B_HS10_INLINE_RESPONSE_APPLICATIONS
-                    .with(|count| count.set(count.get() + 1));
+                D5B_HS10_INLINE_RESPONSE_APPLICATIONS.with(|identities| {
+                    identities.borrow_mut().insert(demand.k_identity.clone());
+                });
             }
             if inline_bridge && !promote_inline_bridge {
                 deferred.push(DeferredResponseRow {
@@ -2552,8 +3417,8 @@ impl StaticTransitionPlan<'_> {
                         || landed_contexts != causal_contexts
                     {
                         return Err(planner_error(
-                            "the installed typed SSA refusal disagrees with its complete re-derivation",
-                        ));
+                        "the installed typed SSA refusal disagrees with its complete re-derivation",
+                    ));
                     }
                     return Ok(());
                 }
@@ -3207,10 +4072,8 @@ impl StaticTransitionPlan<'_> {
     /// contract and validate its selected caller against the unchanged K ABI.
     pub(in crate::cranelift_backend) fn static_response_owner_specializations(
         &self,
-    ) -> Result<
-        Result<Vec<StaticResponseOwnerSpecialization>, SsaInfeasible>,
-        CraneliftBackendError,
-    > {
+    ) -> Result<Result<Vec<StaticResponseOwnerSpecialization>, SsaInfeasible>, CraneliftBackendError>
+    {
         let rows = match self.static_response_feasibility_ledger_all()? {
             Ok(rows) => rows,
             Err(infeasible) => return Ok(Err(infeasible)),
@@ -3250,8 +4113,7 @@ impl StaticTransitionPlan<'_> {
                     row.continuation_inputs().len(),
                 )));
             }
-            if row.base_owner()
-                != ContinuationEmissionOwner::Specialization(row.k_specialization())
+            if row.base_owner() != ContinuationEmissionOwner::Specialization(row.k_specialization())
             {
                 return Err(planner_error(
                     "a static response row's emission owner disagrees with its K specialization",
@@ -3287,7 +4149,8 @@ impl StaticTransitionPlan<'_> {
                         row.continuation_inputs().len(),
                     )));
                 };
-                if slot.kind != AbiSlotKind::Parameter || slot.ordinal != capture.producer_abi_slot()
+                if slot.kind != AbiSlotKind::Parameter
+                    || slot.ordinal != capture.producer_abi_slot()
                 {
                     return Ok(Err(SsaInfeasible::at_vis(
                         row.base_owner(),
@@ -3368,6 +4231,21 @@ mod tests {
         }
     }
 
+    /// Promise class: durable invariant. MEASURED: the HS10 override truth
+    /// table selects only bridge plus non-transport; the bridge-plus-transport
+    /// and nonbridge-plus-nontransport neighbours both preserve the pre-HS10
+    /// response classifier. CLAIMED: the new owner-less Deferred subcase is an
+    /// exact conjunction rather than either tempting broad population. THE GAP:
+    /// integration controls separately prove the selected COW row is Deferred,
+    /// and that promoting it recreates HS10.
+    #[test]
+    fn inline_bridge_no_call_override_is_the_exact_two_fact_conjunction() {
+        assert!(is_inline_bridge_no_call(true, false));
+        assert!(!is_inline_bridge_no_call(true, true));
+        assert!(!is_inline_bridge_no_call(false, false));
+        assert!(!is_inline_bridge_no_call(false, true));
+    }
+
     /// A real opaque recursive field, not a population mutation: the Vis K is
     /// `RuntimeValue::Unknown`, so no continuation specialization can name it.
     #[test]
@@ -3392,8 +4270,7 @@ mod tests {
                         call_template_id: 1,
                         checked_occurrence_path: Vec::new(),
                         kind: CheckedComputationalIHInvocationKind::CheckedHostVisContinuation,
-                        binder_morphism:
-                            CheckedComputationalIHBinderMorphism::identity_for_test(0),
+                        binder_morphism: CheckedComputationalIHBinderMorphism::identity_for_test(0),
                         body: Box::new(RuntimeExpr::Call {
                             callee: Box::new(RuntimeExpr::Var(0)),
                             args: vec![RuntimeExpr::Var(0)],
@@ -3403,8 +4280,7 @@ mod tests {
             }],
             default: trap(),
         };
-        let declaration =
-            super::super::tests::b2o_transparent_declaration(response_route);
+        let declaration = super::super::tests::b2o_transparent_declaration(response_route);
         let declarations = BTreeMap::from([(declaration.symbol.as_str(), &declaration)]);
         let vis = RuntimeExpr::Construct {
             constructor: "ctor:fixture::ITree::Vis".to_string(),

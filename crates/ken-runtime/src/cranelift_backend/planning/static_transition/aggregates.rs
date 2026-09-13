@@ -15,28 +15,26 @@
 //! ledger's boundary proposal in
 //! `docs/program/issues/RT-PLANNER-AGGREGATES-SPLIT.md`.
 
-use std::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "px8-ds-test-support")]
 use std::cell::{Cell, RefCell};
+use std::collections::{BTreeMap, BTreeSet};
 
+use super::closure::{derive_case_producer_fact, CaseProducerSet};
 use super::continuations::{
     build_checked_binder_provenance, CheckedBinderProvenance, CheckedBinderResolution,
     CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
     ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource,
 };
 use super::{
-    inline_synthesized_seat_emission_owners, occurrence_authority,
-    occurrence_subtree_contains,
+    inline_synthesized_seat_emission_owners, occurrence_authority, occurrence_subtree_contains,
     planner_capacity_error, planner_error, AbiCaptureProvenance, AbiUnitDefinition,
     BoundaryReferentOwner, ContinuationCallIdentity, ContinuationEmissionOwner,
     ContinuationEnvironmentClaim, ContinuationFrameIdentity, ContinuationSourceCoordinate,
     ContinuationSpecializationId, CraneliftBackendError, DeclarationCallTargetClass,
-    EmittableCallKind, FieldIdentity,
-    JoinResultRepresentation, PlannedOccurrenceChildAuthority, PlannedReferentLifetime,
-    PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
-    SynthesizedFixedConstructorRole,
+    EmittableCallKind, FieldIdentity, JoinResultRepresentation, PlannedOccurrenceChildAuthority,
+    PlannedReferentLifetime, PredeclaredFunctionId, StaticOriginId, StaticTransitionPlan,
+    SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
-use super::closure::{derive_case_producer_fact, CaseProducerSet};
 use crate::boundary_value::{BoundaryClass, BoundaryTag};
 use crate::RuntimeExpr;
 
@@ -70,7 +68,11 @@ pub(in crate::cranelift_backend) struct AggregateOccurrenceId(
 );
 
 impl AggregateOccurrenceId {
-    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+    #[cfg(any(
+        test,
+        feature = "checked-ih-realization-observation",
+        feature = "px8-ds-test-support"
+    ))]
     pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
         self.0
     }
@@ -270,9 +272,7 @@ impl CheckedIhImmediateKBindingLocator {
         self.callee_origin
     }
 
-    pub(in crate::cranelift_backend) fn environment_domain(
-        &self,
-    ) -> CheckedIhKAvailabilityDomain {
+    pub(in crate::cranelift_backend) fn environment_domain(&self) -> CheckedIhKAvailabilityDomain {
         self.environment_domain
     }
 
@@ -525,10 +525,7 @@ pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryAccess {
     context: super::ContinuationContextId,
     enclosing_specialization: ContinuationSpecializationId,
     worker_body_origin: StaticOriginId,
-    admissions: BTreeMap<
-        CheckedIhGeneratedEntryCallCoordinate,
-        CheckedIhGeneratedEntryAdmission,
-    >,
+    admissions: BTreeMap<CheckedIhGeneratedEntryCallCoordinate, CheckedIhGeneratedEntryAdmission>,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -783,9 +780,7 @@ impl CheckedIhGeneratedEntryAccess {
 }
 
 impl CheckedIhGeneratedEntryProjection {
-    pub(in crate::cranelift_backend) fn destination_owner(
-        &self,
-    ) -> ContinuationEmissionOwner {
+    pub(in crate::cranelift_backend) fn destination_owner(&self) -> ContinuationEmissionOwner {
         self.destination_owner
     }
 
@@ -1032,12 +1027,20 @@ impl CheckedIhEnvironmentTransport {
         self.seat
     }
 
+    pub(in crate::cranelift_backend) fn source_worker_body_origin(&self) -> StaticOriginId {
+        self.source_worker_body_origin
+    }
+
     pub(in crate::cranelift_backend) fn source_record(&self) -> AggregateOccurrenceId {
         self.source_record
     }
 
     pub(in crate::cranelift_backend) fn destination_owner(&self) -> ContinuationEmissionOwner {
         self.destination_owner
+    }
+
+    pub(in crate::cranelift_backend) fn destination_body_origin(&self) -> StaticOriginId {
+        self.destination_body_origin
     }
 
     pub(in crate::cranelift_backend) fn destination_construct_origin(&self) -> StaticOriginId {
@@ -1513,9 +1516,8 @@ pub fn with_checked_ih_generated_entry_confluence_mutation<T>(
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            GENERATED_ENTRY_CONFLUENCE_MUTATION.with(|active| {
-                active.set(CheckedIhGeneratedEntryConfluenceMutation::Exact)
-            });
+            GENERATED_ENTRY_CONFLUENCE_MUTATION
+                .with(|active| active.set(CheckedIhGeneratedEntryConfluenceMutation::Exact));
         }
     }
     GENERATED_ENTRY_CONFLUENCE_MUTATION.with(|active| active.set(mutation));
@@ -1714,8 +1716,7 @@ pub fn with_composed_return_forward_edge_collapsibility_observations<T>(
         }
     }
 
-    FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS
-        .with(|observations| observations.borrow_mut().clear());
+    FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
     FORWARD_EDGE_COLLAPSIBILITY_ACTIVE.with(|active| active.set(true));
     let restore = Restore;
     let result = f();
@@ -1766,8 +1767,7 @@ pub fn with_checked_ih_generated_entry_arrival_mutation<T>(
 
 #[cfg(feature = "px8-ds-test-support")]
 pub fn checked_ih_generated_entry_arrival_mutation_is_exact() -> bool {
-    checked_ih_generated_entry_arrival_mutation()
-        == CheckedIhGeneratedEntryArrivalMutation::Exact
+    checked_ih_generated_entry_arrival_mutation() == CheckedIhGeneratedEntryArrivalMutation::Exact
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -1827,8 +1827,7 @@ pub fn with_checked_ih_generated_entry_observations<T>(
 pub fn with_checked_ih_generated_entry_admission_observations<T>(
     f: impl FnOnce() -> T,
 ) -> (T, Vec<CheckedIhGeneratedEntryAdmissionObservation>) {
-    GENERATED_ENTRY_ADMISSION_OBSERVATIONS
-        .with(|observations| observations.borrow_mut().clear());
+    GENERATED_ENTRY_ADMISSION_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
     GENERATED_ENTRY_OBSERVATION_ACTIVE.with(|active| active.set(true));
     let result = f();
     GENERATED_ENTRY_OBSERVATION_ACTIVE.with(|active| active.set(false));
@@ -1839,10 +1838,7 @@ pub fn with_checked_ih_generated_entry_admission_observations<T>(
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(super) fn record_checked_ih_generated_entry_confluences(
-    confluences: &BTreeMap<
-        CheckedIhGeneratedEntryCoordinate,
-        CheckedIhGeneratedEntryConfluence,
-    >,
+    confluences: &BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
 ) {
     if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
         return;
@@ -1859,7 +1855,11 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                 invocation_origin: coordinate.invocation_origin.0,
                 call_origin: coordinate.call_origin.0,
                 callee_origin: coordinate.callee_origin.0,
-                members: confluence.members.iter().map(|member| format!("{member:?}")).collect(),
+                members: confluence
+                    .members
+                    .iter()
+                    .map(|member| format!("{member:?}"))
+                    .collect(),
                 retarget_caller: format!("{:?}", confluence.retarget_caller),
                 destination_owner: format!("{:?}", confluence.projection.destination_owner),
                 destination_body_origin: confluence.projection.destination_body_origin.0,
@@ -1917,10 +1917,7 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                                 "{:?}",
                                 confluence.projection.arrival.callee_origin
                             ),
-                            entry_binding: format!(
-                                "{:?}",
-                                confluence.projection.arrival.binding
-                            ),
+                            entry_binding: format!("{:?}", confluence.projection.arrival.binding),
                             entry_immediate_k_locator: format!(
                                 "{:?}",
                                 confluence.projection.arrival.immediate_k_locator
@@ -1961,17 +1958,13 @@ pub(in crate::cranelift_backend) fn record_checked_ih_generated_entry_installed(
                 .iter_mut()
                 .filter(|observation| {
                     observation.context == access.context.0
-                        && observation.enclosing_specialization
-                            == access.enclosing_specialization.0
+                        && observation.enclosing_specialization == access.enclosing_specialization.0
                         && observation.worker_body_origin == access.worker_body_origin.0
                         && observation.invocation_origin == key.invocation_origin.0
                         && observation.call_origin == key.call_origin.0
                         && observation.callee_origin == key.callee_origin.0
                         && observation.governed
-                            == matches!(
-                                admission,
-                                CheckedIhGeneratedEntryAdmission::Governed(_)
-                            )
+                            == matches!(admission, CheckedIhGeneratedEntryAdmission::Governed(_))
                 })
                 .collect::<Vec<_>>();
             if matches.len() != 1 {
@@ -2081,8 +2074,7 @@ fn with_checked_ih_generated_entry_admission_observation(
             .iter_mut()
             .filter(|observation| {
                 observation.context == access.context.0
-                    && observation.enclosing_specialization
-                        == access.enclosing_specialization.0
+                    && observation.enclosing_specialization == access.enclosing_specialization.0
                     && observation.worker_body_origin == access.worker_body_origin.0
                     && observation.invocation_origin == key.invocation_origin.0
                     && observation.call_origin == key.call_origin.0
@@ -2123,12 +2115,17 @@ fn record_checked_ih_generated_entry_admission_outcome(
     key: CheckedIhGeneratedEntryCallCoordinate,
     governed: bool,
 ) {
-    with_checked_ih_generated_entry_admission_observation(access, key, Some(governed), |observation| {
-        observation.admission_outcome_count = observation
-            .admission_outcome_count
-            .checked_add(1)
-            .expect("generated-entry admission outcome count exhausted");
-    });
+    with_checked_ih_generated_entry_admission_observation(
+        access,
+        key,
+        Some(governed),
+        |observation| {
+            observation.admission_outcome_count = observation
+                .admission_outcome_count
+                .checked_add(1)
+                .expect("generated-entry admission outcome count exhausted");
+        },
+    );
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -2592,8 +2589,7 @@ pub(super) fn run_checked_ih_intervening_binder_population_control(
             .iter()
             .flatten()
             .find_map(|occurrence| {
-                matches!(occurrence.expr, RuntimeExpr::Value(_))
-                    .then_some(occurrence.static_origin)
+                matches!(occurrence.expr, RuntimeExpr::Value(_)).then_some(occurrence.static_origin)
             })
             .ok_or_else(|| planner_error("the binder-bearing plan fixture has no closed value"))?;
         let value_expr = scratch.planned_occurrence_expr(value_origin)?.clone();
@@ -2894,8 +2890,7 @@ pub(in crate::cranelift_backend) struct PlannedAggregateOwnership {
     ///
     /// `None` for a source producer, whose children are occurrences in the
     /// program rather than nodes in a tree.
-    pub(in crate::cranelift_backend) declared_children:
-        Option<&'static [SynthesizedAggregateNode]>,
+    pub(in crate::cranelift_backend) declared_children: Option<&'static [SynthesizedAggregateNode]>,
     pub(in crate::cranelift_backend) children: Vec<PlannedAggregateChild>,
     /// The meet itself, retained beside the lane it selects so a reader can
     /// see the derivation rather than only its verdict.
@@ -3010,8 +3005,8 @@ pub(in crate::cranelift_backend::planning::static_transition) enum SynthesizedAg
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) struct SynthesizedAggregatePath {
     pub(in crate::cranelift_backend::planning::static_transition) root: SynthesizedAggregateRoot,
-    pub(in crate::cranelift_backend::planning::static_transition)
-        steps: Vec<SynthesizedAggregateStep>,
+    pub(in crate::cranelift_backend::planning::static_transition) steps:
+        Vec<SynthesizedAggregateStep>,
 }
 impl SynthesizedAggregatePath {
     /// The empty path at one of a host result's two arms.
@@ -3194,7 +3189,9 @@ impl SynthesizedAggregateNode {
     }
 
     /// A fixed constructor with no children.
-    pub(in crate::cranelift_backend::planning::static_transition) const fn nullary(role: SynthesizedFixedConstructorRole) -> Self {
+    pub(in crate::cranelift_backend::planning::static_transition) const fn nullary(
+        role: SynthesizedFixedConstructorRole,
+    ) -> Self {
         Self::Fixed {
             role,
             children: &[],
@@ -3237,7 +3234,9 @@ impl SynthesizedAggregateNode {
 /// reference it. So the trees below do not contain it at those roots — an
 /// abandoned template is not a semantic use, and giving it a path would plan a
 /// record for an allocation that never happens.
-pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_recipe_tree(operation: ken_host::HostOpV1) -> SynthesizedHostResultTree {
+pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_recipe_tree(
+    operation: ken_host::HostOpV1,
+) -> SynthesizedHostResultTree {
     use ken_host::HostOpV1 as Op;
     use SynthesizedAggregateNode as N;
     use SynthesizedFixedConstructorRole as R;
@@ -3311,16 +3310,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         children: &[N::SiteOperand(1)],
     };
     /// `FileError(FileOperation*, Option::Some(<site path>), IOError)`.
-    const READ_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
-        N::nullary(R::FileOperationRead),
-        SOME_SITE_PATH,
-        IO_ERRORS,
-    ];
-    const WRITE_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
-        N::nullary(R::FileOperationWrite),
-        SOME_SITE_PATH,
-        IO_ERRORS,
-    ];
+    const READ_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] =
+        &[N::nullary(R::FileOperationRead), SOME_SITE_PATH, IO_ERRORS];
+    const WRITE_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] =
+        &[N::nullary(R::FileOperationWrite), SOME_SITE_PATH, IO_ERRORS];
     const APPEND_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
         N::nullary(R::FileOperationAppend),
         SOME_SITE_PATH,
@@ -3441,13 +3434,12 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             },
             N::nullary(R::ReadResultEof),
         ]));
-    const FILE_KIND: SynthesizedAggregateNode =
-        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
-            N::nullary(R::FileKindFile),
-            N::nullary(R::FileKindDirectory),
-            N::nullary(R::FileKindSymlink),
-            N::nullary(R::FileKindOther),
-        ]));
+    const FILE_KIND: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+        N::nullary(R::FileKindFile),
+        N::nullary(R::FileKindDirectory),
+        N::nullary(R::FileKindSymlink),
+        N::nullary(R::FileKindOther),
+    ]));
     const FILE_METADATA: SynthesizedAggregateNode = N::Fixed {
         role: R::FileMetadata,
         children: &[N::native_int(), FILE_KIND],
@@ -3522,7 +3514,10 @@ pub(in crate::cranelift_backend::planning::static_transition) struct Synthesized
     pub(in crate::cranelift_backend::planning::static_transition) ok: SynthesizedAggregateNode,
 }
 impl SynthesizedHostResultTree {
-    pub(in crate::cranelift_backend::planning::static_transition) fn node(&self, root: SynthesizedAggregateRoot) -> SynthesizedAggregateNode {
+    pub(in crate::cranelift_backend::planning::static_transition) fn node(
+        &self,
+        root: SynthesizedAggregateRoot,
+    ) -> SynthesizedAggregateNode {
         match root {
             SynthesizedAggregateRoot::HostResultError => self.error,
             SynthesizedAggregateRoot::HostResultOk => self.ok,
@@ -3544,7 +3539,10 @@ impl SynthesizedHostResultTree {
 /// This walks the same closed recipe that plans aggregate children. It is not
 /// a second operation table: adding or removing a `SiteOperand` in the recipe
 /// changes both the planned child relation and this population together.
-pub(in crate::cranelift_backend::planning::static_transition) fn collect_site_operand_ordinals(node: SynthesizedAggregateNode, ordinals: &mut BTreeSet<u32>) {
+pub(in crate::cranelift_backend::planning::static_transition) fn collect_site_operand_ordinals(
+    node: SynthesizedAggregateNode,
+    ordinals: &mut BTreeSet<u32>,
+) {
     match node {
         SynthesizedAggregateNode::Fixed { children, .. } => {
             for child in children {
@@ -3590,8 +3588,8 @@ enum SynthesizedTreeResolution {
 pub(in crate::cranelift_backend::planning::static_transition) struct FlattenedSynthesizedUse {
     pub(in crate::cranelift_backend::planning::static_transition) path: SynthesizedAggregatePath,
     pub(in crate::cranelift_backend::planning::static_transition) role: SynthesizedConstructorRole,
-    pub(in crate::cranelift_backend::planning::static_transition)
-        children: &'static [SynthesizedAggregateNode],
+    pub(in crate::cranelift_backend::planning::static_transition) children:
+        &'static [SynthesizedAggregateNode],
 }
 /// Flatten one operation's trees to every **allocation-reachable** use.
 ///
@@ -3972,7 +3970,11 @@ impl StaticTransitionPlan<'_> {
     #[cfg(test)]
     pub(in crate::cranelift_backend) fn checked_ih_record_for_test(
         &self,
-    ) -> Option<(ContinuationEmissionOwner, StaticOriginId, Vec<StaticOriginId>)> {
+    ) -> Option<(
+        ContinuationEmissionOwner,
+        StaticOriginId,
+        Vec<StaticOriginId>,
+    )> {
         self.aggregate_ownership.iter().find_map(|record| {
             let AggregateOccurrenceProducer::SynthesizedUse {
                 owner,
@@ -4006,9 +4008,8 @@ impl StaticTransitionPlan<'_> {
         owner: ContinuationEmissionOwner,
         seat: StaticOriginId,
     ) -> Result<&PlannedAggregateOwnership, CraneliftBackendError> {
-        let path = SynthesizedAggregatePath::root(
-            SynthesizedAggregateRoot::CheckedIhCapturedEnvironment,
-        );
+        let path =
+            SynthesizedAggregatePath::root(SynthesizedAggregateRoot::CheckedIhCapturedEnvironment);
         self.synthesized_aggregate_record(
             owner,
             seat,
@@ -4122,8 +4123,7 @@ impl StaticTransitionPlan<'_> {
         owner: ContinuationEmissionOwner,
         seat: StaticOriginId,
     ) -> Result<Option<BoundaryClosureEnvironment>, CraneliftBackendError> {
-        let RuntimeExpr::LexicalClosure { captures, .. } =
-            self.planned_occurrence_expr(seat)?
+        let RuntimeExpr::LexicalClosure { captures, .. } = self.planned_occurrence_expr(seat)?
         else {
             return Ok(None);
         };
@@ -4141,9 +4141,9 @@ impl StaticTransitionPlan<'_> {
             let result_proof =
                 boundary_continuation_result_proof_for_environment(self, environment)?;
             #[cfg(feature = "px8-ds-test-support")]
-            let suppress_result_authorization =
-                RETAINED_RESULT_CLOSURE_PROOF_MUTATION.with(Cell::get)
-                    == RetainedResultClosureProofMutation::SuppressResultAuthorizationArm;
+            let suppress_result_authorization = RETAINED_RESULT_CLOSURE_PROOF_MUTATION
+                .with(Cell::get)
+                == RetainedResultClosureProofMutation::SuppressResultAuthorizationArm;
             #[cfg(not(feature = "px8-ds-test-support"))]
             let suppress_result_authorization = false;
             if suppress_result_authorization {
@@ -4208,9 +4208,7 @@ impl StaticTransitionPlan<'_> {
         let environment = self
             .boundary_closure_environment(*owner, *seat)?
             .ok_or_else(|| {
-                planner_error(
-                    "a boundary closure capsule's environment record has no descriptor",
-                )
+                planner_error("a boundary closure capsule's environment record has no descriptor")
             })?;
         if environment.record != record {
             return Err(planner_error(
@@ -4576,8 +4574,7 @@ const CHECKED_IH_CAPTURE_OPERAND_LIMIT: usize = 64;
 /// itself. `static` rather than `const` on purpose: the slice handed to
 /// `declared_children` must be `&'static`, which a `static` item's address
 /// gives and a `const`'s per-use temporary does not.
-static CHECKED_IH_CAPTURE_OPERANDS: [SynthesizedAggregateNode;
-    CHECKED_IH_CAPTURE_OPERAND_LIMIT] = {
+static CHECKED_IH_CAPTURE_OPERANDS: [SynthesizedAggregateNode; CHECKED_IH_CAPTURE_OPERAND_LIMIT] = {
     let mut operands =
         [SynthesizedAggregateNode::WorkerCaptureOperand(0); CHECKED_IH_CAPTURE_OPERAND_LIMIT];
     let mut position = 0usize;
@@ -4721,9 +4718,7 @@ fn unit_boundary_environment_fields(
         let RuntimeExpr::Call { args, .. } = occurrence.expr else {
             continue;
         };
-        let callee = plan
-            .semantic
-            .child_origin(occurrence.static_origin, 0)?;
+        let callee = plan.semantic.child_origin(occurrence.static_origin, 0)?;
         if !matches!(
             plan.planned_occurrence_expr(callee)?,
             RuntimeExpr::LexicalClosure { .. }
@@ -4735,12 +4730,7 @@ fn unit_boundary_environment_fields(
                 .semantic
                 .child_origin(occurrence.static_origin, 1 + argument_position)?;
             let mut match_scrutinees = BTreeMap::new();
-            let fact = derive_case_producer_fact(
-                plan,
-                argument,
-                &[],
-                &mut match_scrutinees,
-            )?;
+            let fact = derive_case_producer_fact(plan, argument, &[], &mut match_scrutinees)?;
             let CaseProducerSet::Closed(_) = fact.producers else {
                 continue;
             };
@@ -4813,9 +4803,9 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
             // make "this producer plans no name here" and "the lookup did not
             // work" the same answer.
             let field_identity = match shape {
-                PlannedAggregateShape::Record => Some(
-                    plan.record_field_identity(origin, child.position as usize)?,
-                ),
+                PlannedAggregateShape::Record => {
+                    Some(plan.record_field_identity(origin, child.position as usize)?)
+                }
                 PlannedAggregateShape::Constructor => None,
             };
             children.push(PlannedAggregateChild {
@@ -4830,9 +4820,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
         // is membership in the possible set, not a proof that the child *is*
         // invocation-owned — an aggregate is only persistable when no child
         // could be shorter-lived than it.
-        let escapes = children
-            .iter()
-            .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
+        let escapes = children.iter().any(|child| {
+            child
+                .owners
+                .contains(&BoundaryReferentOwner::InvocationArena)
+        });
         let (meet, allocation) = if escapes {
             (
                 PlannedReferentLifetime::ActivationOwned,
@@ -4906,9 +4898,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                         owners,
                     });
                 }
-                let escapes = children
-                    .iter()
-                    .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
+                let escapes = children.iter().any(|child| {
+                    child
+                        .owners
+                        .contains(&BoundaryReferentOwner::InvocationArena)
+                });
                 let (meet, allocation) = if escapes {
                     (
                         PlannedReferentLifetime::ActivationOwned,
@@ -4926,9 +4920,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                         owner,
                         seat,
                         path: semantic_use.path.clone(),
-                        role: SynthesizedAggregateRole::Constructor(
-                            semantic_use.role,
-                        ),
+                        role: SynthesizedAggregateRole::Constructor(semantic_use.role),
                     },
                     // Provenance only, kept for readers. The emission owner that
                     // confers authority is in the key above.
@@ -5010,9 +5002,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 owners,
             });
         }
-        let escapes = children
-            .iter()
-            .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
+        let escapes = children.iter().any(|child| {
+            child
+                .owners
+                .contains(&BoundaryReferentOwner::InvocationArena)
+        });
         let (meet, allocation) = if escapes {
             (
                 PlannedReferentLifetime::ActivationOwned,
@@ -5090,9 +5084,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 owners,
             });
         }
-        let escapes = children
-            .iter()
-            .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
+        let escapes = children.iter().any(|child| {
+            child
+                .owners
+                .contains(&BoundaryReferentOwner::InvocationArena)
+        });
         let (meet, allocation) = if escapes {
             (
                 PlannedReferentLifetime::ActivationOwned,
@@ -5167,8 +5163,9 @@ fn checked_ih_escape_subtree_contains(
                 pending.push(plan.semantic.child_origin(origin, 0)?);
                 for ordinal in 0..cases.len() {
                     match plan.case_emission_status(origin, ordinal)? {
-                        Some(super::CaseEmissionStatus::Reachable) => pending
-                            .push(plan.semantic.child_origin(origin, 1 + ordinal)?),
+                        Some(super::CaseEmissionStatus::Reachable) => {
+                            pending.push(plan.semantic.child_origin(origin, 1 + ordinal)?)
+                        }
                         Some(super::CaseEmissionStatus::Eliminated) => {}
                         None => {
                             return Err(planner_error(
@@ -5182,18 +5179,13 @@ fn checked_ih_escape_subtree_contains(
                 let scrutinee = plan.semantic.child_origin(origin, 0)?;
                 pending.push(scrutinee);
                 let mut match_scrutinees = BTreeMap::new();
-                let fact = derive_case_producer_fact(
-                    plan,
-                    scrutinee,
-                    &[],
-                    &mut match_scrutinees,
-                )?;
+                let fact = derive_case_producer_fact(plan, scrutinee, &[], &mut match_scrutinees)?;
                 for ordinal in 0..cases.len() {
                     let reachable = match &fact.producers {
                         CaseProducerSet::Open => true,
-                        CaseProducerSet::Closed(producers) => producers.contains(
-                            &plan.case_constructor_identity(origin, ordinal)?,
-                        ),
+                        CaseProducerSet::Closed(producers) => {
+                            producers.contains(&plan.case_constructor_identity(origin, ordinal)?)
+                        }
                     };
                     if reachable {
                         pending.push(plan.semantic.child_origin(origin, 1 + ordinal)?);
@@ -5304,11 +5296,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
             }
             let body = destination.worker_body_origin();
             if !checked_ih_escape_subtree_contains(plan, body, parent)?
-                || !checked_ih_escape_subtree_contains(
-                    plan,
-                    body,
-                    source.producer_result_origin(),
-                )?
+                || !checked_ih_escape_subtree_contains(plan, body, source.producer_result_origin())?
             {
                 continue;
             }
@@ -5895,9 +5883,8 @@ fn derive_checked_ih_continuation_inheritance(
             construct_origin,
             active_frame_origin: active_frame,
             recursive_child_origin,
-            selected_alternative: u32::try_from(*alternative).map_err(|_| {
-                planner_capacity_error("checked-IH selected alternative exhausted")
-            })?,
+            selected_alternative: u32::try_from(*alternative)
+                .map_err(|_| planner_capacity_error("checked-IH selected alternative exhausted"))?,
             selected_case_body_origin,
             invocation_origin,
             call_origin,
@@ -5981,6 +5968,112 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
         }
     }
     Ok(inheritances)
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn checked_ih_post_call_consumer_frames(
+    plan: &StaticTransitionPlan<'_>,
+    transport: &CheckedIhEnvironmentTransport,
+) -> Result<Option<Vec<StaticOriginId>>, CraneliftBackendError> {
+    let source_identity = transport.source_call_identity();
+    let source_unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == source_identity.target())
+        .ok_or_else(|| {
+            planner_error("a mismatched checked-IH transport's target has no continuation unit")
+        })?;
+    let consumer_frame = source_unit.continuation_origin();
+    if source_unit
+        .consuming_occurrence()
+        .is_some_and(|occurrence| occurrence.eliminator_origin() != consumer_frame)
+    {
+        return Err(planner_error(
+            "a checked-IH target's exact consuming occurrence disagrees with its continuation origin",
+        ));
+    }
+    let own = plan
+        .checked_ih_continuation_inheritances
+        .iter()
+        .filter(|inheritance| inheritance.transport == *transport)
+        .collect::<Vec<_>>();
+    match own.as_slice() {
+        [inheritance] => {
+            let final_step = inheritance
+                .capability
+                .self_resumption_steps
+                .last()
+                .ok_or_else(|| {
+                    planner_error(
+                        "a checked-IH transport's canonical inheritance has no final step",
+                    )
+                })?;
+            return Ok(
+                match checked_ih_fresh_result_route(plan, inheritance, final_step)? {
+                    CheckedIhFreshResultRoute::TailProducerToRet {
+                        active_frame_origin,
+                        ..
+                    } => {
+                        if active_frame_origin != consumer_frame {
+                            return Err(planner_error(
+                            "a checked-IH Tail route disagrees with its exact source consumer frame",
+                        ));
+                        }
+                        Some(vec![consumer_frame])
+                    }
+                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => None,
+                },
+            );
+        }
+        [] => {}
+        _ => {
+            return Err(planner_error(
+                "one checked-IH transport has more than one canonical inheritance",
+            ))
+        }
+    }
+
+    let binder_provenance = build_checked_binder_provenance(plan)?;
+    let identity = &transport.source_call_identity;
+    let worker = &identity.token.worker;
+    let mut matching = Vec::new();
+    for inheritance in &plan.checked_ih_continuation_inheritances {
+        let destination = &inheritance.fresh_result_destination;
+        if destination.ret_case_body_origin != identity.token.producer_construct_origin
+            || destination.closure_origin != worker.closure_origin
+            || destination.closure_body_origin != worker.body_origin
+            || destination.closure_parameter_count != worker.declared_arity
+        {
+            continue;
+        }
+        let Some(capture) = worker.captures.get(destination.capture_ordinal as usize) else {
+            continue;
+        };
+        if capture.owner != identity.token.producer_owner
+            || capture.closure_origin != destination.closure_origin
+            || capture.source
+                != ContinuationWorkerCaptureSource::Lexical(destination.capture_occurrence)
+            || !destination.body_capture_reads.iter().all(|origin| {
+                binder_provenance.get(origin).is_some_and(|resolution| {
+                    resolution.provenance
+                        == CheckedBinderProvenance::LexicalClosureCapture {
+                            closure_origin: destination.closure_origin,
+                            capture_ordinal: destination.capture_ordinal,
+                            source_origin: destination.capture_occurrence,
+                        }
+                })
+            })
+        {
+            continue;
+        }
+        matching.push(vec![destination.active_frame_origin]);
+    }
+    match matching.as_slice() {
+        [] => Ok(None),
+        [frames] => Ok(Some(frames.clone())),
+        _ => Err(planner_error(
+            "one checked-IH transport has more than one exact fresh-result predecessor",
+        )),
+    }
 }
 
 pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_continuation_inheritances(
@@ -6546,7 +6639,9 @@ fn tail_fresh_result_capture_ordinal(
         if let Some(CheckedBinderProvenance::LexicalClosureParameter {
             parameter_ordinal: 0,
             ..
-        }) = binder_provenance.get(&origin).map(|resolution| resolution.provenance)
+        }) = binder_provenance
+            .get(&origin)
+            .map(|resolution| resolution.provenance)
         {
             if found.is_some() {
                 return Err(planner_error(
@@ -6556,9 +6651,9 @@ fn tail_fresh_result_capture_ordinal(
             }
             found = Some(ordinal);
         }
-        ordinal = ordinal.checked_add(1).ok_or_else(|| {
-            planner_capacity_error("Tail producer capture ordinal exhausted")
-        })?;
+        ordinal = ordinal
+            .checked_add(1)
+            .ok_or_else(|| planner_capacity_error("Tail producer capture ordinal exhausted"))?;
     }
     found.ok_or_else(|| {
         planner_error(
@@ -7013,8 +7108,8 @@ fn checked_ih_generated_entry_row(
         return Ok(None);
     };
     let worker_body_origin = inheritance.capability.destination_body_origin;
-    let Some(context) = plan
-        .continuation_context_for(enclosing_specialization, worker_body_origin)?
+    let Some(context) =
+        plan.continuation_context_for(enclosing_specialization, worker_body_origin)?
     else {
         return Ok(None);
     };
@@ -7296,8 +7391,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                 match first_coordinate_by_context.get(&coordinate.context) {
                     Some(first) => coordinate = first.clone(),
                     None => {
-                        first_coordinate_by_context
-                            .insert(coordinate.context, coordinate.clone());
+                        first_coordinate_by_context.insert(coordinate.context, coordinate.clone());
                     }
                 }
             }
@@ -7309,9 +7403,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                             StaticOriginId(coordinate.call_origin.0.wrapping_add(1));
                     }
                     Mutation::ProjectionInKey => {
-                        projection.destination_body_origin = StaticOriginId(
-                            projection.destination_body_origin.0.wrapping_add(1),
-                        );
+                        projection.destination_body_origin =
+                            StaticOriginId(projection.destination_body_origin.0.wrapping_add(1));
                         coordinate.call_origin =
                             StaticOriginId(coordinate.call_origin.0.wrapping_add(1));
                     }
@@ -7327,14 +7420,12 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                         let source = projection.fresh_result_route.source_mut();
                         source.invocation_origin.0 = source.invocation_origin.0.wrapping_add(1);
                     }
-                    _ => mutate_checked_ih_generated_entry_projection(
-                        &mut projection,
-                        mutation,
-                    ),
+                    _ => mutate_checked_ih_generated_entry_projection(&mut projection, mutation),
                 }
             }
         }
-        if let Some(existing) = caller_by_context.insert(coordinate.context, retarget_caller.clone())
+        if let Some(existing) =
+            caller_by_context.insert(coordinate.context, retarget_caller.clone())
         {
             if existing != retarget_caller {
                 return Err(planner_error(
@@ -7394,12 +7485,12 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
 fn checked_ih_generated_entry_call_population(
     plan: &StaticTransitionPlan<'_>,
     worker_body_origin: StaticOriginId,
+    post_call_consumer_roots: &[StaticOriginId],
     binder_resolutions: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
-) -> Result<
-    BTreeMap<CheckedIhGeneratedEntryCallCoordinate, CheckedIhBinding>,
-    CraneliftBackendError,
-> {
+) -> Result<BTreeMap<CheckedIhGeneratedEntryCallCoordinate, CheckedIhBinding>, CraneliftBackendError>
+{
     let mut pending = vec![worker_body_origin];
+    pending.extend(post_call_consumer_roots.iter().copied());
     let mut visited = BTreeSet::new();
     let mut population = BTreeMap::new();
     while let Some(origin) = pending.pop() {
@@ -7423,9 +7514,7 @@ fn checked_ih_generated_entry_call_population(
                 ));
             };
             let resolution = binder_resolutions.get(&callee_origin).ok_or_else(|| {
-                planner_error(
-                    "a checked-IH call-population Var has no forward binder resolution",
-                )
+                planner_error("a checked-IH call-population Var has no forward binder resolution")
             })?;
             let CheckedBinderProvenance::InductionHypothesis(binding) = resolution.provenance
             else {
@@ -7456,10 +7545,7 @@ fn checked_ih_generated_entry_call_population(
 
 pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_generated_entry_accesses(
     plan: &StaticTransitionPlan<'_>,
-    confluences: &BTreeMap<
-        CheckedIhGeneratedEntryCoordinate,
-        CheckedIhGeneratedEntryConfluence,
-    >,
+    confluences: &BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
 ) -> Result<
     BTreeMap<super::ContinuationContextId, CheckedIhGeneratedEntryAccess>,
     CraneliftBackendError,
@@ -7476,9 +7562,26 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
             .iter()
             .find(|context| context.id() == context_id)
             .ok_or_else(|| planner_error("a generated-entry class names no exact context"))?;
+        let post_call_consumer_roots = plan
+            .checked_ih_post_call_consumers
+            .iter()
+            .filter(|relation| {
+                relation.transport().destination_owner()
+                    == ContinuationEmissionOwner::Specialization(context.enclosing_specialization())
+                    && relation.transport().destination_body_origin()
+                        == context.worker_body_origin()
+            })
+            .flat_map(|relation| {
+                relation
+                    .consumers()
+                    .iter()
+                    .map(|step| step.occurrence().body_origin)
+            })
+            .collect::<Vec<_>>();
         let population = checked_ih_generated_entry_call_population(
             plan,
             context.worker_body_origin(),
+            &post_call_consumer_roots,
             &binder_resolutions,
         )?;
         let population_keys = population.keys().copied().collect::<BTreeSet<_>>();
@@ -7642,15 +7745,13 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
         let admitted_governed = admissions
             .iter()
             .filter_map(|(key, admission)| {
-                matches!(admission, CheckedIhGeneratedEntryAdmission::Governed(_))
-                    .then_some(*key)
+                matches!(admission, CheckedIhGeneratedEntryAdmission::Governed(_)).then_some(*key)
             })
             .collect::<BTreeSet<_>>();
         let admitted_non_governed = admissions
             .iter()
             .filter_map(|(key, admission)| {
-                matches!(admission, CheckedIhGeneratedEntryAdmission::NonGoverned)
-                    .then_some(*key)
+                matches!(admission, CheckedIhGeneratedEntryAdmission::NonGoverned).then_some(*key)
             })
             .collect::<BTreeSet<_>>();
         if admission_keys != population_keys {
@@ -7688,10 +7789,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
 
 pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_generated_entry_accesses(
     plan: &StaticTransitionPlan<'_>,
-    confluences: &BTreeMap<
-        CheckedIhGeneratedEntryCoordinate,
-        CheckedIhGeneratedEntryConfluence,
-    >,
+    confluences: &BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
     accesses: &BTreeMap<super::ContinuationContextId, CheckedIhGeneratedEntryAccess>,
 ) -> Result<(), CraneliftBackendError> {
     if accesses != &build_checked_ih_generated_entry_accesses(plan, confluences)? {
@@ -7713,9 +7811,25 @@ pub(super) fn record_checked_ih_generated_entry_admissions(
     let binder_resolutions = build_checked_binder_provenance(plan)?;
     let mut rows = Vec::new();
     for access in accesses.values() {
+        let post_call_consumer_roots = plan
+            .checked_ih_post_call_consumers
+            .iter()
+            .filter(|relation| {
+                relation.transport().destination_owner()
+                    == ContinuationEmissionOwner::Specialization(access.enclosing_specialization)
+                    && relation.transport().destination_body_origin() == access.worker_body_origin
+            })
+            .flat_map(|relation| {
+                relation
+                    .consumers()
+                    .iter()
+                    .map(|step| step.occurrence().body_origin)
+            })
+            .collect::<Vec<_>>();
         let population = checked_ih_generated_entry_call_population(
             plan,
             access.worker_body_origin,
+            &post_call_consumer_roots,
             &binder_resolutions,
         )?;
         for (key, binding) in population {
@@ -7757,10 +7871,7 @@ pub(super) fn record_checked_ih_generated_entry_admissions(
 
 pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_generated_entry_confluences(
     plan: &StaticTransitionPlan<'_>,
-    confluences: &BTreeMap<
-        CheckedIhGeneratedEntryCoordinate,
-        CheckedIhGeneratedEntryConfluence,
-    >,
+    confluences: &BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
 ) -> Result<(), CraneliftBackendError> {
     let rebuilt = build_checked_ih_generated_entry_confluences(plan)?;
     if confluences != &rebuilt {
@@ -7779,8 +7890,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
     // that validator the SOLE reader of the stored field.
     let mut governed_pairs = BTreeSet::new();
     for inheritance in &build_checked_ih_continuation_inheritances(plan)? {
-        if let Some((coordinate, member, _, _)) =
-            checked_ih_generated_entry_row(plan, inheritance)?
+        if let Some((coordinate, member, _, _)) = checked_ih_generated_entry_row(plan, inheritance)?
         {
             governed_pairs.insert((coordinate, member));
         }
@@ -7847,7 +7957,10 @@ impl StaticTransitionPlan<'_> {
                 "a generated-entry access request disagrees with its context identity",
             ));
         }
-        let access = self.checked_ih_generated_entry_accesses.get(&context).cloned();
+        let access = self
+            .checked_ih_generated_entry_accesses
+            .get(&context)
+            .cloned();
         if let Some(access) = &access {
             if access.context != context
                 || access.enclosing_specialization != enclosing_specialization
@@ -7910,11 +8023,7 @@ impl StaticTransitionPlan<'_> {
         &self,
         transport: &CheckedIhEnvironmentTransport,
     ) -> Result<Vec<StaticOriginId>, CraneliftBackendError> {
-        let producer_active_frame = transport
-            .source_call_identity()
-            .token
-            .worker
-            .parent_origin;
+        let producer_active_frame = transport.source_call_identity().token.worker.parent_origin;
         // Read the producer self-resumption step from the CANONICAL continuation
         // inheritances DERIVED from the inert plan -- never the stored, suppressible
         // `checked_ih_continuation_inheritances` field (whose sole reader is
@@ -8669,9 +8778,7 @@ fn boundary_continuation_result_proofs(
                 .iter()
                 .find(|unit| unit.id() == edge.identity.target())
                 .ok_or_else(|| {
-                    planner_error(
-                        "a continuation result edge targets no planned specialization",
-                    )
+                    planner_error("a continuation result edge targets no planned specialization")
                 })?;
             if unit.emission_owner() != owner
                 || unit.producer_owner() != edge.identity.producer_owner()
@@ -8703,9 +8810,7 @@ fn boundary_continuation_result_proofs(
                 .map(|ordinal| plan.semantic.child_origin(seat, 1 + ordinal))
                 .collect::<Result<Vec<_>, _>>()?;
             let source_owner = plan.semantic.function_owner(seat)?.ok_or_else(|| {
-                planner_error(
-                    "a continuation result closure has no predeclared source owner",
-                )
+                planner_error("a continuation result closure has no predeclared source owner")
             })?;
             if unit.worker_body_origin() != body_origin
                 || unit.worker_declared_arity() as usize != params.len()
@@ -9051,9 +9156,10 @@ fn boundary_bind_continuation_is_authorized(
     // The per-response pairing is derived independently from the source
     // constructor record and the environment record. It is not filled merely
     // because the expected body is known.
-    let mut parent_records = plan.aggregate_ownership.iter().filter(|record| {
-        record.producer == AggregateOccurrenceProducer::Source(*resume_site)
-    });
+    let mut parent_records = plan
+        .aggregate_ownership
+        .iter()
+        .filter(|record| record.producer == AggregateOccurrenceProducer::Source(*resume_site));
     let Some(parent_record) = parent_records.next() else {
         return Ok(false);
     };
@@ -9073,7 +9179,9 @@ fn boundary_bind_continuation_is_authorized(
     if paired_fields.next().is_some() {
         return Ok(false);
     }
-    let Some(environment_record) = plan.aggregate_ownership.get(environment.record().0 as usize)
+    let Some(environment_record) = plan
+        .aggregate_ownership
+        .get(environment.record().0 as usize)
     else {
         return Ok(false);
     };
@@ -9139,8 +9247,7 @@ fn boundary_bind_continuation_is_authorized(
 
     // Both values are emitted in the same owner. Otherwise a source occurrence
     // could borrow another specialization's environment record.
-    if !inline_synthesized_seat_emission_owners(plan, seat)?
-        .contains(&environment.owner())
+    if !inline_synthesized_seat_emission_owners(plan, seat)?.contains(&environment.owner())
         || !inline_synthesized_seat_emission_owners(plan, *resume_site)?
             .contains(&environment.owner())
     {
@@ -9319,10 +9426,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_aggreg
         }
     }
     for record in records {
-        let escapes = record
-            .children
-            .iter()
-            .any(|child| child.owners.contains(&BoundaryReferentOwner::InvocationArena));
+        let escapes = record.children.iter().any(|child| {
+            child
+                .owners
+                .contains(&BoundaryReferentOwner::InvocationArena)
+        });
         let expected = if escapes {
             PlannedAggregateAllocation::InvocationAggregate
         } else {
@@ -9374,9 +9482,7 @@ impl<'src> StaticTransitionPlan<'src> {
             .aggregate_ownership
             .iter()
             .find(|record| record.producer == AggregateOccurrenceProducer::Source(origin))
-            .ok_or_else(|| {
-                planner_error("aggregate producer has no planned ownership record")
-            })?;
+            .ok_or_else(|| planner_error("aggregate producer has no planned ownership record"))?;
         if record.shape != shape {
             return Err(planner_error(
                 "aggregate producer disagrees with its planned ownership shape",
@@ -9447,10 +9553,9 @@ impl<'src> StaticTransitionPlan<'src> {
         seat: StaticOriginId,
         position: u32,
     ) -> Option<AggregateOccurrenceId> {
-        let path = SynthesizedAggregatePath::root(
-            SynthesizedAggregateRoot::UnitBoundaryEnvironment,
-        )
-        .field(position);
+        let path =
+            SynthesizedAggregatePath::root(SynthesizedAggregateRoot::UnitBoundaryEnvironment)
+                .field(position);
         self.aggregate_ownership
             .iter()
             .find(|record| {
@@ -9531,16 +9636,19 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
         seat: StaticOriginId,
         path: &SynthesizedAggregatePath,
-    ) -> Result<(SynthesizedConstructorRole, &'static [SynthesizedAggregateNode]),
-        CraneliftBackendError>
-    {
+    ) -> Result<
+        (
+            SynthesizedConstructorRole,
+            &'static [SynthesizedAggregateNode],
+        ),
+        CraneliftBackendError,
+    > {
         let operation = self.host_effect_operation(seat)?;
         let roles = self.semantic.synthesized_io_error_roles();
         match self.synthesized_tree_walk(operation, path)? {
-            SynthesizedTreeResolution::Node(SynthesizedAggregateNode::Fixed {
-                role,
-                children,
-            }) => Ok((SynthesizedConstructorRole::Fixed(role), children)),
+            SynthesizedTreeResolution::Node(SynthesizedAggregateNode::Fixed { role, children }) => {
+                Ok((SynthesizedConstructorRole::Fixed(role), children))
+            }
             SynthesizedTreeResolution::IoErrorAlternative(position) => {
                 let role = roles.get(position as usize).copied().ok_or_else(|| {
                     planner_error(
@@ -9624,17 +9732,10 @@ impl<'src> StaticTransitionPlan<'src> {
                     SynthesizedAggregateStep::Alternative(_),
                 )
                 | (
-                    SynthesizedAggregateNode::Dynamic(
-                        SynthesizedDynamicSet::Alternatives(_),
-                    ),
+                    SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::Alternatives(_)),
                     SynthesizedAggregateStep::Field(_),
                 )
-                | (
-                    SynthesizedAggregateNode::Dynamic(
-                        SynthesizedDynamicSet::IoErrors,
-                    ),
-                    _,
-                )
+                | (SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::IoErrors), _)
                 | (SynthesizedAggregateNode::Scalar { .. }, _)
                 | (SynthesizedAggregateNode::SiteOperand(_), _)
                 | (SynthesizedAggregateNode::HostResponseReferent { .. }, _)
@@ -9864,10 +9965,8 @@ impl<'src> StaticTransitionPlan<'src> {
             path,
             SynthesizedAggregateRole::Constructor(role),
         )?
-            .declared_children
-            .ok_or_else(|| {
-                planner_error("synthesized aggregate use has a record but no child model")
-            })
+        .declared_children
+        .ok_or_else(|| planner_error("synthesized aggregate use has a record but no child model"))
     }
     /// The ruled allocation lane of an already-interned aggregate occurrence.
     ///
@@ -9895,11 +9994,10 @@ impl<'src> StaticTransitionPlan<'src> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::super::*;
     use super::super::tests::unit;
+    use super::super::*;
     use crate::RuntimeValue;
 
     /// Promise class: durable invariant.
@@ -9929,7 +10027,9 @@ mod tests {
                 args: Vec::new(),
             }));
             let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plans");
-            let root = plan.root_occurrence.expect("the Call has a root occurrence");
+            let root = plan
+                .root_occurrence
+                .expect("the Call has a root occurrence");
             plan.checked_ih_body_is_pure_narrowing(root)
                 .expect("the purity walk resolves the exact static body")
         };
@@ -9952,7 +10052,11 @@ mod tests {
     pub(super) fn d7_seat_fixture(
         operation: ken_host::HostOpV1,
         args: Vec<RuntimeExpr>,
-    ) -> (StaticTransitionPlan<'static>, StaticOriginId, ContinuationEmissionOwner) {
+    ) -> (
+        StaticTransitionPlan<'static>,
+        StaticOriginId,
+        ContinuationEmissionOwner,
+    ) {
         let expr = Box::leak(Box::new(RuntimeExpr::Effect {
             family: "FS".to_string(),
             operation,
@@ -10074,20 +10178,16 @@ mod tests {
                 RuntimeExpr::Value(RuntimeValue::Int(2.into())),
             ],
         );
-        let chunk_path = SynthesizedAggregatePath::root(
-            SynthesizedAggregateRoot::HostResultOk,
-        )
-        .alternative(0);
+        let chunk_path =
+            SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk).alternative(0);
         let record = plan
             .synthesized_aggregate_record(
                 owner,
                 seat,
                 &chunk_path,
-                SynthesizedAggregateRole::Constructor(
-                    SynthesizedConstructorRole::Fixed(
-                        SynthesizedFixedConstructorRole::ReadChunk,
-                    ),
-                ),
+                SynthesizedAggregateRole::Constructor(SynthesizedConstructorRole::Fixed(
+                    SynthesizedFixedConstructorRole::ReadChunk,
+                )),
             )
             .expect("ConsoleRead Chunk has a governed ownership record");
         assert_eq!(record.declared_children, Some(&[response][..]));
@@ -10391,30 +10491,23 @@ mod tests {
         .chain(
             // `ResourceKind` at its THREE distinct parent paths, each with its
             // own three alternatives. These are the repeated-role sites.
-            [
-                (4_u32, 0_u32),
-                (5, 0),
-                (5, 1),
-            ]
-            .into_iter()
-            .flat_map(|(alternative, position)| {
-                [
-                    R::ResourceKindFsHandle,
-                    R::ResourceKindBuffer,
-                    R::ResourceKindMapping,
-                ]
+            [(4_u32, 0_u32), (5, 0), (5, 1)]
+                .into_iter()
+                .flat_map(|(alternative, position)| {
+                    [
+                        R::ResourceKindFsHandle,
+                        R::ResourceKindBuffer,
+                        R::ResourceKindMapping,
+                    ]
                     .into_iter()
                     .enumerate()
                     .map(move |(index, role)| {
                         (
-                            path(
-                                ERR,
-                                &[alt(alternative), field(position), alt(index as u32)],
-                            ),
+                            path(ERR, &[alt(alternative), field(position), alt(index as u32)]),
                             Fixed(role),
                         )
                     })
-            }),
+                }),
         )
         .chain(std::iter::once((
             path(ERR, &[alt(4), field(1)]),
@@ -10433,36 +10526,34 @@ mod tests {
                         .enumerate()
                         .map(move |(index, role)| {
                             (
-                                path(
-                                    ERR,
-                                    &[alt(alternative), field(position), alt(index as u32)],
-                                ),
+                                path(ERR, &[alt(alternative), field(position), alt(index as u32)]),
                                 SynthesizedConstructorRole::IoError(*role),
                             )
                         })
                 })
                 .collect();
 
-        let file_error = |operation: R| -> Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)> {
-            let mut rows = vec![
-                (path(ERR, &[]), Fixed(R::FileError)),
-                (path(ERR, &[field(0)]), Fixed(operation)),
-                (path(ERR, &[field(1)]), Fixed(R::OptionSome)),
-            ];
-            rows.extend(
-                plan.semantic
-                    .synthesized_io_error_roles()
-                    .iter()
-                    .enumerate()
-                    .map(|(index, role)| {
-                        (
-                            path(ERR, &[field(2), alt(index as u32)]),
-                            SynthesizedConstructorRole::IoError(*role),
-                        )
-                    }),
-            );
-            rows
-        };
+        let file_error =
+            |operation: R| -> Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)> {
+                let mut rows = vec![
+                    (path(ERR, &[]), Fixed(R::FileError)),
+                    (path(ERR, &[field(0)]), Fixed(operation)),
+                    (path(ERR, &[field(1)]), Fixed(R::OptionSome)),
+                ];
+                rows.extend(
+                    plan.semantic
+                        .synthesized_io_error_roles()
+                        .iter()
+                        .enumerate()
+                        .map(|(index, role)| {
+                            (
+                                path(ERR, &[field(2), alt(index as u32)]),
+                                SynthesizedConstructorRole::IoError(*role),
+                            )
+                        }),
+                );
+                rows
+            };
         let console_error = || -> Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)> {
             plan.semantic
                 .synthesized_io_error_roles()
@@ -10478,7 +10569,10 @@ mod tests {
         };
         let unit = || vec![(path(OK, &[]), Fixed(R::Unit))];
 
-        let expected: Vec<(Op, Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)>)> = vec![
+        let expected: Vec<(
+            Op,
+            Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)>,
+        )> = vec![
             // Returns a `Bool` above the synthesis entirely.
             (Op::ConsoleIsTerminal, vec![]),
             (
@@ -10499,10 +10593,7 @@ mod tests {
                 Op::ConsoleFlush,
                 console_error().into_iter().chain(unit()).collect(),
             ),
-            (
-                Op::ClockWallNow,
-                vec![(path(OK, &[]), Fixed(R::MkInstant))],
-            ),
+            (Op::ClockWallNow, vec![(path(OK, &[]), Fixed(R::MkInstant))]),
             (Op::FsReadFile, file_error(R::FileOperationRead)),
             (Op::FsOpen, file_error(R::FileOperationRead)),
             // The `Unit` row is the emitter's `else` branch, which the flat
@@ -10528,14 +10619,8 @@ mod tests {
                     .chain([
                         (path(OK, &[]), Fixed(R::FileMetadata)),
                         (path(OK, &[field(1), alt(0)]), Fixed(R::FileKindFile)),
-                        (
-                            path(OK, &[field(1), alt(1)]),
-                            Fixed(R::FileKindDirectory),
-                        ),
-                        (
-                            path(OK, &[field(1), alt(2)]),
-                            Fixed(R::FileKindSymlink),
-                        ),
+                        (path(OK, &[field(1), alt(1)]), Fixed(R::FileKindDirectory)),
+                        (path(OK, &[field(1), alt(2)]), Fixed(R::FileKindSymlink)),
                         (path(OK, &[field(1), alt(3)]), Fixed(R::FileKindOther)),
                     ])
                     .collect(),
@@ -10654,8 +10739,9 @@ mod tests {
         ];
         let mut identities = BTreeSet::new();
         for parent in &kind_parents {
-            for (position, role) in
-                [R::ResourceKindFsHandle, R::ResourceKindBuffer].iter().enumerate()
+            for (position, role) in [R::ResourceKindFsHandle, R::ResourceKindBuffer]
+                .iter()
+                .enumerate()
             {
                 let occurrence = plan
                     .synthesized_aggregate_occurrence(
@@ -10789,8 +10875,10 @@ mod tests {
             .expect_err("a path may not continue past an IOError alternative");
         plan.synthesized_tree_node(
             seat,
-            &io.alternative(u32::try_from(plan.semantic.synthesized_io_error_roles().len())
-                .expect("the inventory fits")),
+            &io.alternative(
+                u32::try_from(plan.semantic.synthesized_io_error_roles().len())
+                    .expect("the inventory fits"),
+            ),
         )
         .expect_err("a position past the closed IOError inventory must refuse");
 
@@ -10802,8 +10890,12 @@ mod tests {
             Fixed(R::Wrote)
         );
         assert_ne!(
-            plan.synthesized_tree_node(seat, &ok).map(|node| node.0).ok(),
-            plan.synthesized_tree_node(seat, &err).map(|node| node.0).ok(),
+            plan.synthesized_tree_node(seat, &ok)
+                .map(|node| node.0)
+                .ok(),
+            plan.synthesized_tree_node(seat, &err)
+                .map(|node| node.0)
+                .ok(),
             "the two arms must not resolve to the same node"
         );
     }
@@ -11042,11 +11134,11 @@ mod tests {
         // population. An empty expectation would make an emitter's own
         // emptiness agree, which is the failure this row exists to exclude.
         for wrong in [
-            err.alternative(4),                          // a constructor
-            err.alternative(4).field(1),                 // a constructor
-            err.alternative(0).field(0).alternative(0),  // an IOError ALTERNATIVE
-            err.alternative(12),                         // no node at all
-            SynthesizedAggregatePath::root(OK),          // `Wrote`, a constructor
+            err.alternative(4),                         // a constructor
+            err.alternative(4).field(1),                // a constructor
+            err.alternative(0).field(0).alternative(0), // an IOError ALTERNATIVE
+            err.alternative(12),                        // no node at all
+            SynthesizedAggregatePath::root(OK),         // `Wrote`, a constructor
         ] {
             assert!(
                 plan.synthesized_dynamic_alternatives(seat, &wrong).is_err(),
@@ -11088,13 +11180,11 @@ mod tests {
 
         // Dynamic root: a nonempty population. Its exact ordered inventory is
         // pinned by `the_planner_owns_the_ordered_alternative_population`.
-        assert!(
-            !plan
-                .synthesized_root_alternative_population(seat, &err)
-                .expect("the error root resolves")
-                .expect("the error root is the resource surface")
-                .is_empty()
-        );
+        assert!(!plan
+            .synthesized_root_alternative_population(seat, &err)
+            .expect("the error root resolves")
+            .expect("the error root is the resource surface")
+            .is_empty());
 
         // ⭐ LAWFULLY non-dynamic: `Wrote` is a constructor, so the answer is a
         // resolved absence rather than a failure.
@@ -11137,11 +11227,8 @@ mod tests {
              as a root with no planned set"
         );
         assert!(
-            plan.synthesized_root_alternative_population(
-                StaticOriginId(u32::MAX),
-                &err
-            )
-            .is_err(),
+            plan.synthesized_root_alternative_population(StaticOriginId(u32::MAX), &err)
+                .is_err(),
             "an origin outside the occurrence population must fail, not resolve \
              to an absence"
         );
@@ -11154,9 +11241,9 @@ mod tests {
         assert!(
             plan.synthesized_root_alternative_population(
                 seat,
-                &err.alternative(0).field(0).alternative(
-                    u32::try_from(inventory).expect("the inventory fits")
-                )
+                &err.alternative(0)
+                    .field(0)
+                    .alternative(u32::try_from(inventory).expect("the inventory fits"))
             )
             .is_err(),
             "an IOError position outside the closed inventory must fail, not \
@@ -11214,18 +11301,6 @@ mod tests {
         );
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
     /// A host-result constructor emitted from a specialization's selected body
     /// receives the exact owner the consumer binds while lowering that body.
     ///
@@ -11250,7 +11325,9 @@ mod tests {
             .find(|occurrence| matches!(occurrence.expr, RuntimeExpr::Effect { .. }))
             .expect("the fixture has one effect seat")
             .static_origin;
-        let units = plan.continuation_units().expect("the plan exposes its units");
+        let units = plan
+            .continuation_units()
+            .expect("the plan exposes its units");
         assert_eq!(
             units.len(),
             1,
@@ -11282,10 +11359,8 @@ mod tests {
             "negative discriminator: the context-containment proxy must omit this real emission"
         );
 
-        let path = SynthesizedAggregatePath::root(
-            SynthesizedAggregateRoot::HostResultError,
-        )
-        .field(0);
+        let path =
+            SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultError).field(0);
         let actual = plan
             .aggregate_ownership
             .iter()
@@ -11294,11 +11369,10 @@ mod tests {
                     owner,
                     seat: record_seat,
                     path: record_path,
-                    role: SynthesizedAggregateRole::Constructor(
-                        SynthesizedConstructorRole::Fixed(
+                    role:
+                        SynthesizedAggregateRole::Constructor(SynthesizedConstructorRole::Fixed(
                             SynthesizedFixedConstructorRole::FileOperationRead,
-                        ),
-                    ),
+                        )),
                 } if *record_seat == seat && record_path == &path => Some(*owner),
                 AggregateOccurrenceProducer::Source(_)
                 | AggregateOccurrenceProducer::SynthesizedUse { .. } => None,
@@ -11358,13 +11432,14 @@ mod tests {
                 _ => None,
             })
             .expect("the fixture has one UBE producer seat");
-        let units = plan.continuation_units().expect("the plan exposes its units");
+        let units = plan
+            .continuation_units()
+            .expect("the plan exposes its units");
         assert_eq!(units.len(), 1, "the fixture has one specialization");
         let specialization = ContinuationEmissionOwner::Specialization(units[0].id());
-        let path = SynthesizedAggregatePath::root(
-            SynthesizedAggregateRoot::UnitBoundaryEnvironment,
-        )
-        .field(0);
+        let path =
+            SynthesizedAggregatePath::root(SynthesizedAggregateRoot::UnitBoundaryEnvironment)
+                .field(0);
         let actual = plan
             .aggregate_ownership
             .iter()
@@ -11529,12 +11604,8 @@ mod checked_ih_captured_env_schema {
             owners.insert(ContinuationEmissionOwner::Predeclared(predeclared));
         }
         for context in &plan.continuation_contexts {
-            if super::super::occurrence_subtree_contains(
-                plan,
-                context.worker_body_origin,
-                seat,
-            )
-            .expect("the context subtree is valid")
+            if super::super::occurrence_subtree_contains(plan, context.worker_body_origin, seat)
+                .expect("the context subtree is valid")
             {
                 owners.insert(ContinuationEmissionOwner::Specialization(
                     context.enclosing_specialization,
@@ -11550,7 +11621,10 @@ mod checked_ih_captured_env_schema {
         plan: &StaticTransitionPlan<'_>,
     ) -> BTreeSet<(ContinuationEmissionOwner, StaticOriginId)> {
         let mut edges = BTreeSet::new();
-        for unit in plan.continuation_units().expect("the plan exposes its units") {
+        for unit in plan
+            .continuation_units()
+            .expect("the plan exposes its units")
+        {
             let Some(envelope) = unit
                 .ruled_ordinary_envelope()
                 .expect("no fixture here has a malformed envelope")
@@ -11573,10 +11647,7 @@ mod checked_ih_captured_env_schema {
                 })
                 .collect::<BTreeSet<_>>();
             if let Some(seat) = seats.iter().next().filter(|_| seats.len() == 1) {
-                edges.insert((
-                    ContinuationEmissionOwner::Specialization(unit.id()),
-                    *seat,
-                ));
+                edges.insert((ContinuationEmissionOwner::Specialization(unit.id()), *seat));
             }
         }
         edges
@@ -11594,7 +11665,10 @@ mod checked_ih_captured_env_schema {
         plan: &StaticTransitionPlan<'_>,
     ) -> BTreeMap<StaticOriginId, Vec<(u32, StaticOriginId)>> {
         let mut runs = BTreeMap::new();
-        for unit in plan.continuation_units().expect("the plan exposes its units") {
+        for unit in plan
+            .continuation_units()
+            .expect("the plan exposes its units")
+        {
             let Some(envelope) = unit
                 .ruled_ordinary_envelope()
                 .expect("no fixture here has a malformed envelope")
@@ -11672,8 +11746,7 @@ mod checked_ih_captured_env_schema {
     fn the_issued_seats_are_exactly_the_seats_with_a_coordinate_run() {
         for fixture in [
             super::super::continuations::tests::contspec_multiple_worker_captures_fixture(),
-            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(
-            ),
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(),
             super::super::continuations::tests::contspec_capture_free_worker_fixture(),
         ] {
             let plan = plan_of(fixture);
@@ -11703,8 +11776,7 @@ mod checked_ih_captured_env_schema {
     fn each_records_ordered_run_matches_the_authoritative_roles() {
         for fixture in [
             super::super::continuations::tests::contspec_multiple_worker_captures_fixture(),
-            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(
-            ),
+            super::super::continuations::tests::contspec_activation_owned_worker_captures_fixture(),
             super::super::tests::contspec_nested_fixture(),
         ] {
             let plan = plan_of(fixture);
@@ -11754,7 +11826,10 @@ mod checked_ih_captured_env_schema {
             .into_iter()
             .map(record_key)
             .collect::<BTreeSet<_>>();
-        assert!(!forced.is_empty(), "the fixture must carry real force edges");
+        assert!(
+            !forced.is_empty(),
+            "the fixture must carry real force edges"
+        );
         assert_eq!(actual, forced, "record keys must equal the force edges");
 
         let mut containment_only = BTreeSet::new();
@@ -11780,7 +11855,9 @@ mod checked_ih_captured_env_schema {
     #[test]
     fn capture_origin_rejects_a_force_owner_paired_with_the_wrong_seat() {
         let plan = plan_of(super::super::tests::contspec_nested_fixture());
-        let edges = authoritative_force_edges(&plan).into_iter().collect::<Vec<_>>();
+        let edges = authoritative_force_edges(&plan)
+            .into_iter()
+            .collect::<Vec<_>>();
         let (owner, seat) = *edges.first().expect("the fixture has a force edge");
         let wrong_seat = edges
             .iter()
@@ -12145,11 +12222,8 @@ mod checked_ih_captured_env_schema {
             Some(transport),
         );
         assert_eq!(
-            plan.checked_ih_environment_transport_at(
-                transport.destination_owner,
-                transport_free,
-            )
-            .expect("the transport-free producer query is valid"),
+            plan.checked_ih_environment_transport_at(transport.destination_owner, transport_free,)
+                .expect("the transport-free producer query is valid"),
             None,
             "a plan-wide transport presence must not reroute another producer"
         );
@@ -12178,15 +12252,15 @@ mod checked_ih_captured_env_schema {
                 )
             })
             .collect::<Vec<_>>();
-        assert!(
-            field_plan.validate_checked_ih_capture_suffix(field_owner, field_seat, &exact)
-            .expect("the exact suffix validates")
-        );
+        assert!(field_plan
+            .validate_checked_ih_capture_suffix(field_owner, field_seat, &exact)
+            .expect("the exact suffix validates"));
         let mut reordered = exact.clone();
         reordered.reverse();
         assert!(
-            field_plan.validate_checked_ih_capture_suffix(field_owner, field_seat, &reordered)
-            .is_err(),
+            field_plan
+                .validate_checked_ih_capture_suffix(field_owner, field_seat, &reordered)
+                .is_err(),
             "reordering the independently assembled call suffix must refuse"
         );
 

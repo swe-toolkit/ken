@@ -11,6 +11,10 @@ rust-version.workspace = true
 [lib]
 crate-type = ["rlib", "staticlib"]
 
+[features]
+default = []
+px8-ds-test-support = []
+
 [dependencies]
 rustix = { version = "=1.1.4", default-features = false, features = ["std", "fs", "process", "try_close"] }
 

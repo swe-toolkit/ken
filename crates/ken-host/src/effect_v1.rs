@@ -1069,6 +1069,65 @@ impl MappingProtectionV1 {
     }
 }
 
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bFileSourceAdmissionMutation {
+    Exact,
+    UseProtectionRightsForSource,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static D5B_FILE_SOURCE_ADMISSION_MUTATION:
+        std::cell::Cell<D5bFileSourceAdmissionMutation> =
+        const { std::cell::Cell::new(D5bFileSourceAdmissionMutation::Exact) };
+    static D5B_FILE_SOURCE_ADMISSION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+struct D5bFileSourceAdmissionMutationGuard(D5bFileSourceAdmissionMutation);
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+impl Drop for D5bFileSourceAdmissionMutationGuard {
+    fn drop(&mut self) {
+        D5B_FILE_SOURCE_ADMISSION_MUTATION.with(|slot| slot.set(self.0));
+        D5B_FILE_SOURCE_ADMISSION_APPLICATIONS.with(|count| count.set(0));
+    }
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+pub fn with_d5b_file_source_admission_mutation<T>(
+    mutation: D5bFileSourceAdmissionMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    let previous = D5B_FILE_SOURCE_ADMISSION_MUTATION.with(|slot| slot.replace(mutation));
+    assert_eq!(
+        previous,
+        D5bFileSourceAdmissionMutation::Exact,
+        "D5b file-source admission mutations cannot nest"
+    );
+    D5B_FILE_SOURCE_ADMISSION_APPLICATIONS.with(|count| count.set(0));
+    let guard = D5bFileSourceAdmissionMutationGuard(previous);
+    let result = operation();
+    let applications = D5B_FILE_SOURCE_ADMISSION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(guard);
+    (result, applications)
+}
+
+fn mapping_acquire_file_source_rights(protection: MappingProtectionV1) -> crate::RightSet {
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    if D5B_FILE_SOURCE_ADMISSION_MUTATION
+        .with(|slot| slot.get() == D5bFileSourceAdmissionMutation::UseProtectionRightsForSource)
+    {
+        D5B_FILE_SOURCE_ADMISSION_APPLICATIONS.with(|count| count.set(count.get() + 1));
+        return protection.rights();
+    }
+
+    let _ = protection;
+    crate::RightSet::READ
+}
+
 /// Host-private storage for an opaque mapping resource.
 ///
 /// The in-process variant models mappings for the interpreter and represented
@@ -1778,17 +1837,14 @@ impl ResourceTableV1 {
         let mut entries = Vec::with_capacity(tokens.len());
         let mut revocation_leases = Vec::new();
         for token in tokens {
-            let slot = self
-                .lookup(*token)
-                .map_err(SemanticErrorV1::Resource)?;
+            let slot = self.lookup(*token).map_err(SemanticErrorV1::Resource)?;
             let (identity, provenance) = match &slot.state {
                 ResourceSlotStateV1::Live {
                     identity,
                     provenance,
                     ..
                 } => (*identity, *provenance),
-                ResourceSlotStateV1::Closing { .. }
-                | ResourceSlotStateV1::Retired { .. } => {
+                ResourceSlotStateV1::Closing { .. } | ResourceSlotStateV1::Retired { .. } => {
                     return Err(SemanticErrorV1::Resource(ResourceErrorV1::Closed))
                 }
                 ResourceSlotStateV1::Vacant { .. } => {
@@ -1831,10 +1887,7 @@ impl ResourceTableV1 {
         })
     }
 
-    fn finish_admission(
-        &mut self,
-        lease: ResourceAdmissionLeaseV1,
-    ) -> Vec<PendingResourceCloseV1> {
+    fn finish_admission(&mut self, lease: ResourceAdmissionLeaseV1) -> Vec<PendingResourceCloseV1> {
         let mut pending = Vec::new();
         for entry in lease.entries {
             let completed_close = {
@@ -1870,8 +1923,7 @@ impl ResourceTableV1 {
                             )
                         })
                     }
-                    ResourceSlotStateV1::Vacant { .. }
-                    | ResourceSlotStateV1::Retired { .. } => {
+                    ResourceSlotStateV1::Vacant { .. } | ResourceSlotStateV1::Retired { .. } => {
                         unreachable!("resource was reused before its admitted lease drained")
                     }
                 }
@@ -1939,9 +1991,7 @@ impl ResourceTableV1 {
             ResourceSlotStateV1::Closing { .. } | ResourceSlotStateV1::Retired { .. } => {
                 return Err(ResourceErrorV1::Closed)
             }
-            ResourceSlotStateV1::Vacant { .. } => {
-                return Err(ResourceErrorV1::MalformedResource)
-            }
+            ResourceSlotStateV1::Vacant { .. } => return Err(ResourceErrorV1::MalformedResource),
             ResourceSlotStateV1::Live { .. } => {}
         }
         let state = std::mem::replace(
@@ -1976,13 +2026,11 @@ impl ResourceTableV1 {
                 .expect("live owned capacity accounting underflow");
         }
         Self::vacate_released_slot(slot, identity);
-        Ok(ResourceReleaseReadinessV1::Ready(
-            PendingResourceCloseV1 {
-                owner,
-                kind,
-                identity,
-            },
-        ))
+        Ok(ResourceReleaseReadinessV1::Ready(PendingResourceCloseV1 {
+            owner,
+            kind,
+            identity,
+        }))
     }
 
     fn owned_capacity(owner: &ResourceOwnerV1) -> Option<u64> {
@@ -2440,8 +2488,7 @@ pub trait HostEffectBackendV1 {
             }
             filled += read;
         }
-        MappingRegionV1::try_new_file_backed(bytes, protection)
-            .map_err(SemanticErrorV1::Resource)
+        MappingRegionV1::try_new_file_backed(bytes, protection).map_err(SemanticErrorV1::Resource)
     }
 
     fn resource_close(&mut self, handle: crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1> {
@@ -2700,39 +2747,33 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
         ) | (
             HostOpV1::MappingReadView | HostOpV1::MappingWriteView,
             ResourceInputsV1::MappingSpanTarget { .. }
-        ) | (
-            HostOpV1::MappingAcquireFile,
-            ResourceInputsV1::Target(_)
-        ) | (
-            HostOpV1::FsReadAt,
-            ResourceInputsV1::FileBuffer { .. }
-        ) | (
-            HostOpV1::FsWriteAt,
-            ResourceInputsV1::FileBufferSpan { .. }
-        ) | (
-            HostOpV1::BufferAllocate
-                | HostOpV1::MappingAllocate
-                | HostOpV1::ConsoleRead
-                | HostOpV1::ConsoleWrite
-                | HostOpV1::ConsoleFlush
-                | HostOpV1::ConsoleIsTerminal
-                | HostOpV1::ClockWallNow
-                | HostOpV1::ClockMonotonicNow
-                | HostOpV1::ClockSleepUntil
-                | HostOpV1::EntropyRandomBytes
-                | HostOpV1::FsReadFile
-                | HostOpV1::FsWriteFile
-                | HostOpV1::FsAppendFile
-                | HostOpV1::FsMetadata
-                | HostOpV1::FsReadDirectory
-                | HostOpV1::FsCreateDirectory
-                | HostOpV1::FsRemoveFile
-                | HostOpV1::FsRemoveDirectory
-                | HostOpV1::FsRename
-                | HostOpV1::FsChangeMode
-                | HostOpV1::FsOpen,
-            ResourceInputsV1::None
-        )
+        ) | (HostOpV1::MappingAcquireFile, ResourceInputsV1::Target(_))
+            | (HostOpV1::FsReadAt, ResourceInputsV1::FileBuffer { .. })
+            | (HostOpV1::FsWriteAt, ResourceInputsV1::FileBufferSpan { .. })
+            | (
+                HostOpV1::BufferAllocate
+                    | HostOpV1::MappingAllocate
+                    | HostOpV1::ConsoleRead
+                    | HostOpV1::ConsoleWrite
+                    | HostOpV1::ConsoleFlush
+                    | HostOpV1::ConsoleIsTerminal
+                    | HostOpV1::ClockWallNow
+                    | HostOpV1::ClockMonotonicNow
+                    | HostOpV1::ClockSleepUntil
+                    | HostOpV1::EntropyRandomBytes
+                    | HostOpV1::FsReadFile
+                    | HostOpV1::FsWriteFile
+                    | HostOpV1::FsAppendFile
+                    | HostOpV1::FsMetadata
+                    | HostOpV1::FsReadDirectory
+                    | HostOpV1::FsCreateDirectory
+                    | HostOpV1::FsRemoveFile
+                    | HostOpV1::FsRemoveDirectory
+                    | HostOpV1::FsRename
+                    | HostOpV1::FsChangeMode
+                    | HostOpV1::FsOpen,
+                ResourceInputsV1::None
+            )
     );
     if !resource_shape_matches {
         return Ok(resource_denied(
@@ -2743,14 +2784,19 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     }
     let request_shape_matches = matches!(
         (operation, request),
-        (HostOpV1::ConsoleRead, CanonicalRequestV1::ConsoleRead { .. })
-            | (HostOpV1::ConsoleWrite, CanonicalRequestV1::ConsoleWrite { .. })
-            | (HostOpV1::ConsoleFlush, CanonicalRequestV1::ConsoleFlush { .. })
-            | (
-                HostOpV1::ConsoleIsTerminal,
-                CanonicalRequestV1::ConsoleIsTerminal { .. }
-            )
-            | (HostOpV1::ClockWallNow, CanonicalRequestV1::ClockWallNow)
+        (
+            HostOpV1::ConsoleRead,
+            CanonicalRequestV1::ConsoleRead { .. }
+        ) | (
+            HostOpV1::ConsoleWrite,
+            CanonicalRequestV1::ConsoleWrite { .. }
+        ) | (
+            HostOpV1::ConsoleFlush,
+            CanonicalRequestV1::ConsoleFlush { .. }
+        ) | (
+            HostOpV1::ConsoleIsTerminal,
+            CanonicalRequestV1::ConsoleIsTerminal { .. }
+        ) | (HostOpV1::ClockWallNow, CanonicalRequestV1::ClockWallNow)
             | (
                 HostOpV1::ClockMonotonicNow,
                 CanonicalRequestV1::ClockMonotonicNow
@@ -3021,10 +3067,9 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             let ResourceInputsV1::Target(token) = resource else {
                 unreachable!("resource shape validated")
             };
-            match resources.resolve_fs_handle(
-                token,
-                crate::FsCapabilityOperation::Seek.required_right(),
-            ) {
+            match resources
+                .resolve_fs_handle(token, crate::FsCapabilityOperation::Seek.required_right())
+            {
                 Ok((handle, identity)) => {
                     resource_bindings.push((ResourceBindingRole::Target, identity));
                     backend
@@ -3057,10 +3102,9 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
             let ResourceInputsV1::Target(token) = resource else {
                 unreachable!("resource shape validated")
             };
-            match resources.resolve_fs_handle(
-                token,
-                crate::FsCapabilityOperation::Sync.required_right(),
-            ) {
+            match resources
+                .resolve_fs_handle(token, crate::FsCapabilityOperation::Sync.required_right())
+            {
                 Ok((handle, identity)) => {
                     resource_bindings.push((ResourceBindingRole::Target, identity));
                     backend
@@ -3216,8 +3260,9 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
                 unreachable!("resource shape validated")
             };
             let acquired = (|| {
+                let source_rights = mapping_acquire_file_source_rights(*protection);
                 let (handle, source_identity, _, provenance) = resources
-                    .resolve_fs_handle_with_provenance(source, protection.rights())
+                    .resolve_fs_handle_with_provenance(source, source_rights)
                     .map_err(SemanticErrorV1::Resource)?;
                 resource_bindings.push((ResourceBindingRole::Target, source_identity));
                 resources
@@ -5368,8 +5413,7 @@ mod tests {
             HostOpV1::ALL
                 .into_iter()
                 .filter(|operation| {
-                    operation.availability()
-                        == HostOpAvailabilityV1::RepresentedUnavailable
+                    operation.availability() == HostOpAvailabilityV1::RepresentedUnavailable
                 })
                 .collect::<Vec<_>>(),
             vec![
@@ -5674,8 +5718,8 @@ mod tests {
     fn caller_control_release_invalidates_before_close_and_never_retries() {
         let (root, owner) = resource_fixture("first");
         let mut table = ResourceTableV1::default();
-        let (token, identity) = table
-            .insert_fs_handle_without_provenance_for_test(owner, crate::RightSet::METADATA);
+        let (token, identity) =
+            table.insert_fs_handle_without_provenance_for_test(owner, crate::RightSet::METADATA);
         assert_eq!(identity, ResourceTraceIdentityV1(1));
         assert!(table
             .resolve_fs_handle(token, crate::RightSet::METADATA)
@@ -5968,7 +6012,8 @@ mod tests {
     /// posture while promoting the existing wire layout and native roster entry.
     /// CLAIMED: file-backed acquisition is the fourth Mapping op, not a new
     /// operation or right. THE GAP: dispatch and end-to-end tests independently
-    /// exercise mmap, protection-derived source rights, lineage, and COW.
+    /// exercise mmap, READ-only source admission, protection-derived destination
+    /// rights, lineage, and COW.
     #[test]
     fn abi_s6_d5b_file_acquire_identity_and_native_posture_are_pinned() {
         assert_eq!(HostOpV1::try_from(0x0407), Ok(HostOpV1::MappingAcquireFile));
@@ -6268,27 +6313,35 @@ mod tests {
         assert_eq!(resources.live_owned_capacity, 8193);
     }
 
-    /// Promise class: durable discriminator. MEASURED: otherwise-identical
-    /// file acquisitions refuse missing write rights, over-cap length, and a
-    /// short source with their exact distinct identities and no token; the
-    /// admitted request loops exact reads from offset zero, owns FileBacked
-    /// bytes, inherits the source lineage, and returns its capacity on release.
-    /// CLAIMED: D4 composes FsHandle authority/lifetime with the bounded Mapping
-    /// representation without a new backend acquisition seam. THE GAP: a future
-    /// native mmap promotion must independently prove its zero-copy OS path.
+    /// Promise class: durable discriminator. MEASURED: a READ-only source admits
+    /// a Writable private mapping whose destination holds READ|WRITE, while a
+    /// WRITE|CREATE source lacking READ refuses before backend mapping; over-cap
+    /// length and a short source retain their exact distinct refusals. An admitted
+    /// request loops exact reads from offset zero, owns FileBacked bytes, inherits
+    /// the source lineage, and returns its capacity on release. CLAIMED: D4 keeps
+    /// source-read authority distinct from destination Mapping protection while
+    /// composing FsHandle lifetime with the bounded Mapping representation. THE
+    /// GAP: the native COW differential independently pins the zero-copy OS path.
     #[cfg(target_os = "linux")]
     #[test]
     fn abi_s6_d4_file_acquire_enforces_rights_exact_length_lineage_and_capacity() {
         let (read_root, read_owner) = resource_fixture("mapping-read-source");
+        let (write_root, write_owner) = resource_fixture("mapping-write-source");
         let (full_root, full_owner) = resource_fixture("mapping-full-source");
         let mut revocation = RevocationDomain::default();
         let read_lineage = revocation.mint_root();
+        let write_lineage = revocation.mint_root();
         let full_lineage = revocation.mint_root();
         let mut resources = ResourceTableV1::with_buffer_limits(
             BufferLimitsV1::new(8, 4096, 4096).expect("valid mapping limits"),
         );
-        let (read_source, _) =
+        let (read_source, read_source_identity) =
             resources.insert_fs_handle(read_owner, crate::RightSet::READ, read_lineage);
+        let (write_source, _) = resources.insert_fs_handle(
+            write_owner,
+            crate::RightSet::WRITE.union(crate::RightSet::CREATE),
+            write_lineage,
+        );
         let (full_source, full_source_identity) = resources.insert_fs_handle(
             full_owner,
             crate::RightSet::READ.union(crate::RightSet::WRITE),
@@ -6318,21 +6371,61 @@ mod tests {
             .expect("represented file mapping dispatch")
         };
 
+        let read_acquired = acquire(
+            &mut backend,
+            &mut resources,
+            read_source,
+            8,
+            MappingProtectionV1::Writable,
+        );
+        let read_mapping = read_acquired
+            .resource_token
+            .expect("READ-only source admits a private writable mapping");
+        let read_mapping_identity = read_acquired.resource_bindings[1].1;
+        assert_eq!(
+            read_acquired.resource_bindings,
+            vec![
+                (ResourceBindingRole::Target, read_source_identity),
+                (ResourceBindingRole::Target, read_mapping_identity),
+            ]
+        );
+        assert_eq!(
+            backend.read_calls, 3,
+            "partial reads fill the exact request"
+        );
+        assert_eq!(resources.live_owned_capacity, 4096);
+        assert!(resources
+            .resolve_mapping(read_mapping, crate::RightSet::READ)
+            .is_ok());
+        assert!(resources
+            .resolve_mapping(read_mapping, crate::RightSet::WRITE)
+            .is_ok());
+        let pending = resources
+            .begin_release(read_mapping)
+            .expect("least-authority mapping release");
+        ResourceTableV1::finish_release_with(pending, &mut backend)
+            .expect("least-authority mapping unmap");
+        assert_eq!(resources.live_owned_capacity, 0);
+
+        backend.read_calls = 0;
         assert_eq!(
             acquire(
                 &mut backend,
                 &mut resources,
-                read_source,
+                write_source,
                 8,
                 MappingProtectionV1::Writable,
             )
             .outcome,
             CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
-                required: crate::RightSet::READ.union(crate::RightSet::WRITE).bits(),
-                held: crate::RightSet::READ.bits(),
+                required: crate::RightSet::READ.bits(),
+                held: crate::RightSet::WRITE.union(crate::RightSet::CREATE).bits(),
             }))
         );
-        assert_eq!(backend.read_calls, 0, "rights refuse before file reads");
+        assert_eq!(
+            backend.read_calls, 0,
+            "missing READ refuses before file reads"
+        );
 
         assert_eq!(
             acquire(
@@ -6426,6 +6519,7 @@ mod tests {
 
         drop(resources);
         std::fs::remove_dir_all(read_root).unwrap();
+        std::fs::remove_dir_all(write_root).unwrap();
         std::fs::remove_dir_all(full_root).unwrap();
     }
 
@@ -6597,11 +6691,8 @@ mod tests {
             &mut revocation,
         );
         let mut table = ResourceTableV1::default();
-        let (token, identity) = table.insert_fs_handle(
-            owner,
-            crate::RightSet::METADATA,
-            grant.revocation_node,
-        );
+        let (token, identity) =
+            table.insert_fs_handle(owner, crate::RightSet::METADATA, grant.revocation_node);
         let first = table.admit_resources(&revocation, &[token]).unwrap();
         let second = table.admit_resources(&revocation, &[token]).unwrap();
         assert!(grant.revoke(&mut revocation));
@@ -6641,10 +6732,10 @@ mod tests {
         let (root_a, owner_a) = resource_fixture("final-a");
         let (root_b, owner_b) = resource_fixture("final-b");
         let mut table = ResourceTableV1::default();
-        let (token_a, identity_a) = table
-            .insert_fs_handle_without_provenance_for_test(owner_a, crate::RightSet::METADATA);
-        let (token_b, identity_b) = table
-            .insert_fs_handle_without_provenance_for_test(owner_b, crate::RightSet::METADATA);
+        let (token_a, identity_a) =
+            table.insert_fs_handle_without_provenance_for_test(owner_a, crate::RightSet::METADATA);
+        let (token_b, identity_b) =
+            table.insert_fs_handle_without_provenance_for_test(owner_b, crate::RightSet::METADATA);
         let calls = std::cell::Cell::new(0);
         let settlements = table.finalize_all_with(&mut |owner| {
             let call = calls.get();
@@ -6696,8 +6787,8 @@ mod tests {
         let (root_b, owner_b) = resource_fixture("b");
         let (root_c, owner_c) = resource_fixture("c");
         let mut table = ResourceTableV1::default();
-        let (stale, _) = table
-            .insert_fs_handle_without_provenance_for_test(owner_a, crate::RightSet::METADATA);
+        let (stale, _) =
+            table.insert_fs_handle_without_provenance_for_test(owner_a, crate::RightSet::METADATA);
         let metadata = crate::resource_metadata_v1(
             table
                 .resolve_fs_handle(stale, crate::RightSet::METADATA)
@@ -6734,8 +6825,8 @@ mod tests {
             Err(ResourceErrorV1::MalformedResource)
         ));
 
-        let (reused, second_identity) = table
-            .insert_fs_handle_without_provenance_for_test(owner_b, crate::RightSet::METADATA);
+        let (reused, second_identity) =
+            table.insert_fs_handle_without_provenance_for_test(owner_b, crate::RightSet::METADATA);
         assert_eq!(reused.slot, stale.slot);
         assert_ne!(reused.generation, stale.generation);
         assert_eq!(second_identity, ResourceTraceIdentityV1(2));
@@ -6751,8 +6842,8 @@ mod tests {
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         })
         .unwrap();
-        let (after_wrap, third_identity) = table
-            .insert_fs_handle_without_provenance_for_test(owner_c, crate::RightSet::METADATA);
+        let (after_wrap, third_identity) =
+            table.insert_fs_handle_without_provenance_for_test(owner_c, crate::RightSet::METADATA);
         assert_ne!(
             after_wrap.slot, wrapped.slot,
             "wrapped slots retire permanently"
@@ -6909,10 +7000,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn resource_tokens_admit_through_acquiring_lineage_without_error_collapse() {
-        let root = std::env::temp_dir().join(format!(
-            "ken-revoke-d2-resource-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("ken-revoke-d2-resource-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("held.bin"), b"resource-bytes").unwrap();
@@ -7010,21 +7099,20 @@ mod tests {
             FsOpenModeV1::Metadata,
         );
         let metadata_request = CanonicalRequestV1::FsHandleMetadata;
-        let metadata_operation = |backend: &mut RealResourceBackend,
-                                  resources: &mut ResourceTableV1,
-                                  token| {
-            dispatch_host_op_v1(
-                backend,
-                &capabilities,
-                &revocation,
-                resources,
-                HostOpV1::FsHandleMetadata,
-                None,
-                ResourceInputsV1::Target(token),
-                &metadata_request,
-            )
-            .unwrap()
-        };
+        let metadata_operation =
+            |backend: &mut RealResourceBackend, resources: &mut ResourceTableV1, token| {
+                dispatch_host_op_v1(
+                    backend,
+                    &capabilities,
+                    &revocation,
+                    resources,
+                    HostOpV1::FsHandleMetadata,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &metadata_request,
+                )
+                .unwrap()
+            };
 
         let live = metadata_operation(&mut backend, &mut resources, grandchild_resource);
         assert_eq!(
@@ -7037,21 +7125,20 @@ mod tests {
         assert_eq!(backend.metadata_calls, 1);
 
         assert!(child.revoke(&mut revocation));
-        let metadata_operation = |backend: &mut RealResourceBackend,
-                                  resources: &mut ResourceTableV1,
-                                  token| {
-            dispatch_host_op_v1(
-                backend,
-                &capabilities,
-                &revocation,
-                resources,
-                HostOpV1::FsHandleMetadata,
-                None,
-                ResourceInputsV1::Target(token),
-                &metadata_request,
-            )
-            .unwrap()
-        };
+        let metadata_operation =
+            |backend: &mut RealResourceBackend, resources: &mut ResourceTableV1, token| {
+                dispatch_host_op_v1(
+                    backend,
+                    &capabilities,
+                    &revocation,
+                    resources,
+                    HostOpV1::FsHandleMetadata,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &metadata_request,
+                )
+                .unwrap()
+            };
         let copied_resource_token = grandchild_resource;
         let denied = metadata_operation(&mut backend, &mut resources, copied_resource_token);
         assert_eq!(
@@ -7075,8 +7162,7 @@ mod tests {
         };
         *provenance = None;
         backend.metadata_error = Some(IoErrorIdentityV1::NotFound);
-        let bypass_control =
-            metadata_operation(&mut backend, &mut resources, grandchild_resource);
+        let bypass_control = metadata_operation(&mut backend, &mut resources, grandchild_resource);
         assert_eq!(
             bypass_control.outcome,
             CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::NotFound))
@@ -7093,16 +7179,13 @@ mod tests {
             panic!("the read-only resource remains live")
         };
         *provenance = None;
-        let insufficient =
-            metadata_operation(&mut backend, &mut resources, read_only_resource);
+        let insufficient = metadata_operation(&mut backend, &mut resources, read_only_resource);
         assert_eq!(
             insufficient.outcome,
-            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(
-                ResourceErrorV1::RightNotHeld {
-                    required: crate::RightSet::METADATA.bits(),
-                    held: crate::RightSet::READ.bits(),
-                }
-            ))
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: crate::RightSet::METADATA.bits(),
+                held: crate::RightSet::READ.bits(),
+            }))
         );
 
         let buffer = dispatch_host_op_v1(
@@ -7142,21 +7225,20 @@ mod tests {
             ))
         );
 
-        let release = |backend: &mut RealResourceBackend,
-                       resources: &mut ResourceTableV1,
-                       token| {
-            dispatch_host_op_v1(
-                backend,
-                &capabilities,
-                &revocation,
-                resources,
-                HostOpV1::ResourceRelease,
-                None,
-                ResourceInputsV1::Target(token),
-                &CanonicalRequestV1::ResourceRelease,
-            )
-            .unwrap()
-        };
+        let release =
+            |backend: &mut RealResourceBackend, resources: &mut ResourceTableV1, token| {
+                dispatch_host_op_v1(
+                    backend,
+                    &capabilities,
+                    &revocation,
+                    resources,
+                    HostOpV1::ResourceRelease,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &CanonicalRequestV1::ResourceRelease,
+                )
+                .unwrap()
+            };
         assert!(matches!(
             release(&mut backend, &mut resources, grandchild_resource).outcome,
             CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(_))
@@ -7862,12 +7944,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            get(
-                &mut backend,
-                &revocation,
-                &mut resources,
-                inherited_alias,
-            ),
+            get(&mut backend, &revocation, &mut resources, inherited_alias,),
             CanonicalOutcomeV1::Success(CanonicalReplyV1::FdInheritancePolicy(
                 FdInheritancePolicyV1::Inherit
             ))
@@ -7922,12 +7999,7 @@ mod tests {
 
         assert!(revocation.revoke(lineage));
         assert_eq!(
-            get(
-                &mut backend,
-                &revocation,
-                &mut resources,
-                inherited_alias,
-            ),
+            get(&mut backend, &revocation, &mut resources, inherited_alias,),
             CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked))
         );
         assert_eq!(
@@ -8358,9 +8430,8 @@ mod tests {
             let revoke_wins_file = open_write().resource_token.unwrap();
             drop(open_write);
 
-            let allocate_buffer = |resources: &mut ResourceTableV1| {
-                resources.insert_buffer(2).unwrap().0
-            };
+            let allocate_buffer =
+                |resources: &mut ResourceTableV1| resources.insert_buffer(2).unwrap().0;
             let admitted_buffer = allocate_buffer(&mut resources);
             let revoke_wins_buffer = allocate_buffer(&mut resources);
             for buffer in [admitted_buffer, revoke_wins_buffer] {
@@ -8548,8 +8619,9 @@ mod tests {
         }
 
         let impossible_capacity = usize::MAX as u64;
-        let mut admitted =
-            ResourceTableV1::with_buffer_limits(BufferLimitsV1::new(u64::MAX, u64::MAX, u64::MAX).unwrap());
+        let mut admitted = ResourceTableV1::with_buffer_limits(
+            BufferLimitsV1::new(u64::MAX, u64::MAX, u64::MAX).unwrap(),
+        );
         let admitted_before = (
             admitted.slots.len(),
             admitted.next_acquisition_identity,
@@ -8625,7 +8697,8 @@ mod tests {
             cap,
             &mut revocation,
         ));
-        let mut resources = ResourceTableV1::with_buffer_limits(BufferLimitsV1::new(4, 4, 6).unwrap());
+        let mut resources =
+            ResourceTableV1::with_buffer_limits(BufferLimitsV1::new(4, 4, 6).unwrap());
         let mut backend = PositionedBackend {
             root: rooted,
             write_limit: None,
@@ -9076,8 +9149,7 @@ mod tests {
         // field: capacity, start, length, and live window are all equal, so this
         // fails a numeric-only admission and its own-span controls fail an
         // always-reject one (AC-8 discriminator).
-        let root =
-            std::env::temp_dir().join(format!("ken-spanprov-unit-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("ken-spanprov-unit-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("source.bin"), b"AAAABBBB").unwrap();
@@ -9281,8 +9353,7 @@ mod tests {
         // alone aliases the two acquisitions, but the full acquisition token
         // (slot+generation) does not, so release/reallocation is a permanent
         // verdict flip. A fresh span from B (`span_origin = token_b`) succeeds.
-        let root = std::env::temp_dir()
-            .join(format!("ken-spanprov-reuse-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("ken-spanprov-reuse-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("source.bin"), b"AAAABBBB").unwrap();
