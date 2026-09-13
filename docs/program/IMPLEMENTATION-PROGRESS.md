@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-13 05:13:32Z — from 601 issue file(s) in `docs/program/issues/`.
+2026-09-13 07:19:21Z — from 601 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -157,7 +157,7 @@ the committed file matches the generator's output.
 | `DOC-GATE-NEEDLE` | schema-gate controls assert on a needle the test itself supplied, so one constraint class is fully vacuous | merged | verify | S | none | — |
 | `DOC-GATE-RECORD-AXIS` | validation-gate registry: bind token→runner COVERAGE on the record axis, and close the `kind` vocabulary | merged | verify | S | none | https://github.com/swe-toolkit/ken/pull/922 |
 | `DOC-GATE-WIRE-BINDING` | validation-gate registry: bind the kind-vocabulary RULE to its GATE by registering it as a VALIDATION_GATES row | merged | verify | XS | none | https://github.com/swe-toolkit/ken/pull/933 |
-| `DOC-GUIDE-PROOF-COMPLETENESS` | The proof-techniques guide does not state that a catalog package is finished only when its proofs are complete, and that computational tests are external to the package (a reader must trust them, not verify them) — the operator principle recorded as PRINCIPLES #16. Weave it into library/guide/proof-techniques.ken.md. | ready | doc | S | none | — |
+| `DOC-GUIDE-PROOF-COMPLETENESS` | The proof-techniques guide does not state that a catalog package is finished only when its proofs are complete, and that computational tests are external to the package (a reader must trust them, not verify them) — the operator principle recorded as PRINCIPLES #16. Weave it into library/guide/proof-techniques.ken.md. | merged | doc | S | none | — |
 | `DOC-PROGRAM-SELF-REFUTE` | three sites of current program law assert assurances the same corpus has already measured as absent, and 12-documentation-program.md now carries both a drift-gate claim and the measurement refuting it | merged | doc | M | none | — |
 | `DOC-PROGRAM-WAVE-RECONCILE` | Reconcile the documentation program's wave status against the landed corpus — the status line, the wave table, and the section 4b headers all say map only over bodies that measured otherwise, and produce the residual register that says what the doc ring owes next | merged | doc | M | none | — |
 | `DOC-VALIDATION-BINDING` | validation vocabulary claims a 1:1 binding to the gates; nothing binds it | merged | verify | S | none | — |
@@ -647,7 +647,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CAT-PRIORITY-QUEUE-LAWS` — the deferred proof follow-on to CAT-PRIORITY-QUEUE: discharge the general kernel proofs the computational build ships as tested-only -- meld/insert/pop_min representation validity, entry multiplicity conservation (count_by p), and extract-min (global-minimum + nondecreasing drain) under the same fixed lawful order; introduce NO second queue, no Omega path carrier/postulate/new primitive; operator-released proof completion
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
-- `DOC-GUIDE-PROOF-COMPLETENESS` — The proof-techniques guide does not state that a catalog package is finished only when its proofs are complete, and that computational tests are external to the package (a reader must trust them, not verify them) — the operator principle recorded as PRINCIPLES #16. Weave it into library/guide/proof-techniques.ken.md.
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed

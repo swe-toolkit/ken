@@ -1,7 +1,7 @@
 ---
 id: DOC-GUIDE-PROOF-COMPLETENESS
 title: "The proof-techniques guide does not state that a catalog package is finished only when its proofs are complete, and that computational tests are external to the package (a reader must trust them, not verify them) — the operator principle recorded as PRINCIPLES #16. Weave it into library/guide/proof-techniques.ken.md."
-status: ready
+status: merged
 owner: doc
 size: S
 gate: none
