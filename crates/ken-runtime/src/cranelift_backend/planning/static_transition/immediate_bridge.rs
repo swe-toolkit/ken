@@ -459,6 +459,141 @@ pub(super) fn build_immediate_bridge_realization_plan(
     relation_from_rows(derive_immediate_bridge_realizations(plan)?)
 }
 
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs10BridgePlanMutation {
+    Exact,
+    ChangeFullIdentity,
+    ChangeSelectedField,
+    ChangeConsumerKind,
+    ChangeCheckedIhSlotsWrapper,
+    ChangeCause,
+    ChangeBodyOrigin,
+    DropRow,
+    DuplicateRow,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static D5B_HS10_BRIDGE_PLAN_MUTATION: std::cell::Cell<D5bHs10BridgePlanMutation> =
+        const { std::cell::Cell::new(D5bHs10BridgePlanMutation::Exact) };
+    static D5B_HS10_BRIDGE_PLAN_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+struct D5bHs10BridgePlanMutationGuard(D5bHs10BridgePlanMutation);
+
+#[cfg(feature = "px8-ds-test-support")]
+impl Drop for D5bHs10BridgePlanMutationGuard {
+    fn drop(&mut self) {
+        D5B_HS10_BRIDGE_PLAN_MUTATION.with(|slot| slot.set(self.0));
+        D5B_HS10_BRIDGE_PLAN_APPLICATIONS.with(|count| count.set(0));
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_d5b_hs10_bridge_plan_mutation<T>(
+    mutation: D5bHs10BridgePlanMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    let previous = D5B_HS10_BRIDGE_PLAN_MUTATION.with(|slot| slot.replace(mutation));
+    assert_eq!(
+        previous,
+        D5bHs10BridgePlanMutation::Exact,
+        "HS10 immediate-bridge plan mutations cannot nest"
+    );
+    D5B_HS10_BRIDGE_PLAN_APPLICATIONS.with(|count| count.set(0));
+    let guard = D5bHs10BridgePlanMutationGuard(previous);
+    let result = operation();
+    let applications = D5B_HS10_BRIDGE_PLAN_APPLICATIONS.with(std::cell::Cell::get);
+    drop(guard);
+    (result, applications)
+}
+
+pub(super) fn publish_immediate_bridge_realization_plan(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<BTreeMap<ContinuationCallIdentity, ImmediateBridgeRealization>, CraneliftBackendError> {
+    let mut rows = derive_immediate_bridge_realizations(plan)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    if D5B_HS10_BRIDGE_PLAN_MUTATION
+        .with(|slot| slot.get() == D5bHs10BridgePlanMutation::DuplicateRow)
+    {
+        if let Some(row) = rows.first().cloned() {
+            D5B_HS10_BRIDGE_PLAN_APPLICATIONS.with(|count| count.set(count.get() + 1));
+            rows.push(row);
+        }
+    }
+    let relation = relation_from_rows(rows)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    let mut relation = relation;
+
+    #[cfg(feature = "px8-ds-test-support")]
+    {
+        let mutation = D5B_HS10_BRIDGE_PLAN_MUTATION.with(std::cell::Cell::get);
+        if !matches!(
+            mutation,
+            D5bHs10BridgePlanMutation::Exact | D5bHs10BridgePlanMutation::DuplicateRow
+        ) {
+            if let Some(key) = relation.keys().next().cloned() {
+                let mut row = relation
+                    .remove(&key)
+                    .expect("the selected immediate-bridge row is present");
+                D5B_HS10_BRIDGE_PLAN_APPLICATIONS.with(|count| count.set(count.get() + 1));
+                match mutation {
+                    D5bHs10BridgePlanMutation::ChangeFullIdentity => {
+                        row.identity.recursive_position =
+                            row.identity.recursive_position.wrapping_add(1);
+                        relation.insert(row.identity.clone(), row);
+                    }
+                    D5bHs10BridgePlanMutation::ChangeSelectedField => {
+                        row.selected_field = row.selected_field.wrapping_add(1);
+                        relation.insert(key, row);
+                    }
+                    D5bHs10BridgePlanMutation::ChangeConsumerKind => {
+                        row.consumer = match row.consumer {
+                            ImmediateBridgeConsumerKind::Ordinary => {
+                                ImmediateBridgeConsumerKind::Computational
+                            }
+                            ImmediateBridgeConsumerKind::Computational
+                            | ImmediateBridgeConsumerKind::CheckedComputational { .. } => {
+                                ImmediateBridgeConsumerKind::Ordinary
+                            }
+                        };
+                        relation.insert(key, row);
+                    }
+                    D5bHs10BridgePlanMutation::ChangeCheckedIhSlotsWrapper => {
+                        row.checked_ih_slots_wrapper = !row.checked_ih_slots_wrapper;
+                        relation.insert(key, row);
+                    }
+                    D5bHs10BridgePlanMutation::ChangeCause => {
+                        row.cause = match row.cause {
+                            ImmediateBridgeCause::Heterogeneous => {
+                                ImmediateBridgeCause::StaticHostOperation
+                            }
+                            ImmediateBridgeCause::StaticHostOperation => {
+                                ImmediateBridgeCause::Heterogeneous
+                            }
+                        };
+                        relation.insert(key, row);
+                    }
+                    D5bHs10BridgePlanMutation::ChangeBodyOrigin => {
+                        row.effective_bridge_body_origin.0 =
+                            row.effective_bridge_body_origin.0.wrapping_add(1);
+                        relation.insert(key, row);
+                    }
+                    D5bHs10BridgePlanMutation::DropRow => {}
+                    D5bHs10BridgePlanMutation::Exact | D5bHs10BridgePlanMutation::DuplicateRow => {
+                        unreachable!("non-mutating plan cases were excluded")
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(relation)
+}
+
 pub(super) fn validate_immediate_bridge_realization_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<(), CraneliftBackendError> {
