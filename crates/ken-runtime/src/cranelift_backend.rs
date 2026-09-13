@@ -88,8 +88,9 @@ pub use lowering::source::{
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::units::{
     retained_unit_call_target_mutation_is_exact, static_response_caller_retarget_mutation_is_exact,
-    static_response_owner_body_mutation_is_exact, with_retained_unit_call_target_mutation,
-    with_static_response_caller_retarget_mutation, with_static_response_owner_body_mutation,
+    static_response_owner_body_mutation_is_exact, with_generated_result_path_proof_mutation,
+    with_retained_unit_call_target_mutation, with_static_response_caller_retarget_mutation,
+    with_static_response_owner_body_mutation, GeneratedResultPathProofMutation,
     RetainedUnitCallTargetMutation, StaticResponseCallerRetargetMutation,
     StaticResponseOwnerBodyMutation,
 };
