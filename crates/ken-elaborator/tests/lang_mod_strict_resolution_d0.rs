@@ -1079,6 +1079,25 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // PriorityQueue declares its exact LawfulClasses dependency. Its
+            // ordinary package boundary loads while this transition sentinel
+            // still records the provider's compiler-convenience proof aliases.
+            "Data.Collections.PriorityQueue".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Data.Numeric.Nat.Arithmetic".to_string(),
             ["Equal", "Proved"]
                 .into_iter()

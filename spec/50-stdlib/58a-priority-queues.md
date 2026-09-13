@@ -1,13 +1,12 @@
 # Persistent priority queues
 
-> Status: **DRAFT v0 (SPEC-PRIORITY-QUEUE-CONTRACT); contract-pinned for
-> CAT-PRIORITY-QUEUE.** This chapter is normative for the abstract carrier, its
-> five public operations, and their behavioral and structural-cost contract.
-> No priority-queue implementation is present at this cut. The named build
-> successor must ship the whole interface as a tested computational
-> implementation; the general kernel proofs are separately deferred to
-> `CAT-PRIORITY-QUEUE-LAWS`. This is ordinary standard-package Ken: no new
-> kernel rule, primitive, postulate, or trusted-base entry.
+> Status: **LANDED COMPUTATION (CAT-PRIORITY-QUEUE).** This chapter is
+> normative for the abstract carrier, its five public operations, and their
+> behavioral and structural-cost contract. The complete interface is present as
+> a tested computational implementation; the general kernel proofs remain
+> separately deferred to `CAT-PRIORITY-QUEUE-LAWS`. This is ordinary
+> standard-package Ken: no new kernel rule, primitive, postulate, or trusted-base
+> entry.
 
 A priority queue stores **entries** made of a priority and a payload. Extraction
 chooses an entry with minimum priority under one fixed lawful order. The payload
@@ -297,10 +296,11 @@ The three stages are deliberately separate:
 
 1. **This contract:** fixes the six-name surface, behavioral semantics,
    validity obligations, and structural cost account. It adds no implementation.
-2. **`CAT-PRIORITY-QUEUE`:** ships one complete computational implementation of
-   the carrier and all five operations. It must execute the public construction,
-   extraction, multiplicity, order, persistence, validity, abstraction, and
-   structural-cost discriminators in the paired seed. The result is **tested**,
+2. **`CAT-PRIORITY-QUEUE` (landed):** ships one complete computational
+   implementation of the carrier and all five operations. It executes the
+   public construction, extraction, multiplicity, order, persistence,
+   validity, abstraction, and structural-cost discriminators in the paired
+   seed. The result is **tested**,
    not a verified priority queue or type-certified invariant.
 3. **`CAT-PRIORITY-QUEUE-LAWS`:** proves, for arbitrary valid queues under the
    same fixed lawful order, the §4 count equations, §4.2 minimum/extraction

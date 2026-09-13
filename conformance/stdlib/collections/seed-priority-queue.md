@@ -1,10 +1,11 @@
 # Persistent priority queue — conformance seed
 
 Format: `../../README.md`. These cases pin the contract in
-`spec/50-stdlib/58a-priority-queues.md`. This seed lands before the package
-implementation, so every case is **RED-UNTIL-CAT-PRIORITY-QUEUE**. A later
-GREEN report must name the exact producer and test blobs and the executed case
-population; the presence of this file is not execution evidence.
+`spec/50-stdlib/58a-priority-queues.md`. This seed now accompanies the landed
+`CAT-PRIORITY-QUEUE` computational implementation. Every case is **GREEN for
+that tested finite population**; the closing evidence record names the exact
+producer and test blobs and the executed case population. This is not evidence
+for the deferred general laws.
 
 The cases use the public module `Data.Collections.PriorityQueue`, the canonical
 Axiom-free `Ord Nat` provider, and a finite payload with no order or equality
@@ -326,13 +327,16 @@ representation uses cached ranks.
 - given: valid fixtures with independently counted right-spine lengths,
   including both-empty, one-empty, singleton, balanced unequal-size,
   equal-priority roots, and successful pops whose roots have two nonempty
-  children. Through a private test boundary, count `M(q1,q2)` as zero at either
-  empty base and one for each two-nonempty call before following its selected
-  recursive call. Record that trace separately for direct public `merge`, the
-  singleton meld reached by direct public `insert`, and the two-child meld
-  reached by direct public `pop_min`. Separately count priority comparisons,
-  private meld-worker invocations, and structural accesses; do not use
-  wall-clock thresholds or add a public counter.
+  children. A test-local fail-closed semantic verifier consumes the actual
+  kernel-checked producer terms, follows aliases and call arguments, and closes
+  every reachable queue-touching helper. It certifies both empty terminals,
+  each two-root branch's one saturated priority comparison and one recursive
+  edge, bounded reconstruction, root-only rank/empty/find behavior, make-node
+  metadata roles, and the exact meld operands used by public merge, insert, and
+  pop. Unknown executable calls, eliminators, or operand roles reject. Fixture
+  `M`, comparison, worker-invocation, and structural-access accounts are then
+  derived from that certified relation and actual private children; no
+  wall-clock threshold or public counter is used.
 - expect: `empty` returns the selected constant-size single-constructor empty
   form with no subtree visit or priority comparison. Both-empty and one-empty
   merges have `M = 0`, zero priority comparisons, and one terminal meld-worker
@@ -349,9 +353,10 @@ representation uses cached ranks.
   zero meld charges, priority comparisons, and meld-worker invocations.
   Unary-`Nat` metadata comparison work and each priority comparator's internal
   cost are reported separately.
-- why: uses the contract's exact charged population and zero/base convention on
-  every directly specified operation. Direct insert/pop traces reject an extra
-  traversal that merge-only evidence cannot see.
+- why: binds the contract's exact charged population and zero/base convention
+  to the checked program rather than a second recurrence. Direct insert/pop
+  certification rejects an extra traversal that merge-only evidence cannot
+  see.
 
 ## PQ7 — required mutation provenance
 
@@ -371,8 +376,8 @@ not evidence for an execution property.
 | make tied `find_min` choose a different payload than `pop_min` | `equal-priority-payloads-survive-and-peek-pop-agree` matches neither permitted literal row | tied-minimum two-row observation |
 | shortcut equal-identity merge to one operand | `self-merge-doubles-entry-multiplicity` returns the original rather than doubled multiset | original and doubled literal multisets |
 | detach priority from payload | `interleaved-shared-priority-merge-persists` returns an entry outside the fixed multiset | independent left/right drains |
-| traverse an untouched subtree before `insert` returns | `meld-charge-count-follows-right-spines` records an off-spine direct-insert access | direct-insert trace after restoration |
-| traverse an untouched subtree before successful `pop_min` returns | `meld-charge-count-follows-right-spines` records an off-spine direct-pop access | direct-pop trace after restoration |
+| traverse an untouched subtree before `insert` returns | `meld-charge-count-follows-right-spines` rejects the extra direct-insert eliminator/callback outside the certified meld operands | direct-insert certification after restoration |
+| traverse an untouched subtree before successful `pop_min` returns | `meld-charge-count-follows-right-spines` rejects the extra direct-pop eliminator/callback outside the certified child meld | direct-pop certification after restoration |
 
 If a production validity detector is the sole mechanism for one recursive
 clause, mutate that detector to constant success while keeping the malformed
@@ -382,10 +387,20 @@ population-side mutation above.
 
 ## Evidence and deferral record
 
-Before `CAT-PRIORITY-QUEUE` lands, every case above is a specified expected
-observation and none is reported GREEN. The build must report separately:
+`CAT-PRIORITY-QUEUE` lands the named finite observations above. Producer blob
+`1eec578603cdef349af21d944ac174af5919705c`, acceptance-test blob
+`9853d43fa4e3c1c66ce4d00ce2c600a38e4e65a9`, and owner-local resolver-test blob
+`eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7` execute nine passing acceptance
+tests, including exactly 4,216 bounded traces, plus two passing export-table
+closure tests. Thirty compile-preserving population-side and detector-side
+mutations reddened their named observations. They include recursive rank
+descent, an extra find comparison, extra meld comparison/worker calls, direct
+insert/pop traversal, operation-specific constant-success structural detectors,
+the shared trace detector's constant-success neighbour, and original-name and
+renamed re-exports. All mutated files were restored byte-identically. The
+result reports separately:
 
-1. real public computation and the exact named finite observations it executed;
+1. real public computation and the exact named finite observations it executes;
 2. private abstraction/validity and structural-charge observations;
 3. production-side and detector-side mutation failures with restoration;
 4. the still-deferred general kernel proofs.

@@ -109,7 +109,7 @@ to that same declaration, including its qualifications.
 | `50-stdlib/56-effectful-classes.md` | `DRAFT v0 (CAT-2)` | Binding CAT-2 contract with the declared SURF-1/SURF-2 gates for Traversable. |
 | `50-stdlib/57-collections-and-views.md` | `DRAFT v0 (CAT-3)` | Binding CAT-3 contract for collection laws and views; build work remains staged as declared. |
 | `50-stdlib/58-maps-sets-relations.md` | `DRAFT v0 (CAT-4)` | Binding CAT-4 contract for keyed collections, sets, and the relations frontier; build scope remains split as declared. |
-| `50-stdlib/58a-priority-queues.md` | `DRAFT v0 (SPEC-PRIORITY-QUEUE-CONTRACT); contract-pinned for CAT-PRIORITY-QUEUE` | Normative for the abstract six-name interface, priority-queue semantics, validity obligations, and structural cost account; implementation and general proofs remain staged as declared. |
+| `50-stdlib/58a-priority-queues.md` | `LANDED COMPUTATION (CAT-PRIORITY-QUEUE)` | Normative for the abstract six-name interface, priority-queue semantics, validity obligations, and structural cost account; the tested computational implementation is landed and general proofs remain deferred to `CAT-PRIORITY-QUEUE-LAWS`. |
 | `50-stdlib/59-parsing-syntax-diagnostics.md` | `DRAFT v0 (CAT-5)` | Binding CAT-5 package contract with the stated compiler/reflection exclusions. |
 | `50-stdlib/60-length-indexed-vectors.md` | not declared | Normative for the Vec family and landed operations; `zip` and `lookup` remain gated on `DS-5c`. |
 | `50-stdlib/README.md` | `DRAFT v0` | Binding standard-package-tier boundary and derivation-path requirement. |
