@@ -4,7 +4,7 @@
 
 The [reference interpreter](../../../crates/ken-interp/src/lib.rs) evaluates
 core terms to runtime values in call-by-value order with sharing. Its `eval`
-entry point takes an environment and an `EvalStore`; its result is an execution
+entry point takes an environment and an `EvalStore`, and its result is an execution
 observation. It does not constitute kernel evidence, source-level proof, native
 backend validation, object validation, linker validation, or native execution.
 
@@ -12,7 +12,7 @@ The [runtime-IR evaluator](../../../crates/ken-runtime/src/runtime_ir_evaluator.
 is a separate consumer of `RuntimeExpr` in a `RuntimeProgram`. When it compares
 its result with a caller-supplied interpreter observation, both observations
 must bind the same runtime artifact and target. Agreement reports that bounded
-comparison; it does not make either evaluator proof-producing.
+comparison, and it does not make either evaluator proof-producing.
 
 ## Values and closures
 
@@ -32,7 +32,7 @@ values that may participate in the value-store mechanism.
 The [value store](../../../crates/ken-runtime/src/store.rs) interns compound
 canonical values in a space-owned arena and index. Equal canonical bytes yield
 a new or existing slot, and resetting a space releases its pages. Slots, arenas,
-and allocation lifetime are implementation mechanisms; they are not a portable
+and allocation lifetime are implementation mechanisms, and they are not a portable
 semantic identity rule for a Ken value.
 
 Sharing is consequently an operational property of this evaluator and store.
@@ -46,7 +46,7 @@ Before evaluating a runtime program, the runtime-IR evaluator checks metadata
 and expression shapes against its supported subset. Effects, capabilities,
 runtime checks, trust metadata, unsupported entries, and non-supported
 lowerability are preflight boundaries in that implementation. A refusal is a
-supported-subset result; it is not a fallback that silently asks the native
+supported-subset result, and it is not a fallback that silently asks the native
 backend to execute the program.
 
 The [operational semantics](../../../spec/40-runtime/42-evaluation.md) and
