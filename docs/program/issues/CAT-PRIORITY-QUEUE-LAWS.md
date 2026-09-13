@@ -1,7 +1,7 @@
 ---
 id: CAT-PRIORITY-QUEUE-LAWS
 title: "the deferred proof follow-on to CAT-PRIORITY-QUEUE: discharge the general kernel proofs the computational build ships as tested-only -- meld/insert/pop_min representation validity, entry multiplicity conservation (count_by p), and extract-min (global-minimum + nondecreasing drain) under the same fixed lawful order; introduce NO second queue, no Omega path carrier/postulate/new primitive; gated on an operator/Architect laws-tranche ruling"
-status: draft
+status: ready
 owner: foundation
 size: L
 gate: none
@@ -50,12 +50,15 @@ entry, kernel-untouched. Machine-checked complexity bounds are a SEPARATE deferr
 
 ## Gating
 
-DEFERRED. Do NOT release without (a) `CAT-PRIORITY-QUEUE` merged and (b) an
-operator/Architect ruling to open a laws tranche (the current Band-A tranche is
-computational-first; laws are the natural next depth, but their sequencing against
-Band A / Band B is an operator call). The Architect is the required reviewer and
-design authority for the proof strategy. Re-measure every `CAT-PRIORITY-QUEUE`
-anchor at the cut.
+RELEASED 2026-09-13 (Steward) on the operator ruling (Pat, this session): "A
+catalog package is not finished until its proofs are complete ... computational
+tests are not part of the package ... this is inherently inferior and weakens
+the promise ken strives to make." That is the operator laws-tranche ruling this
+node was gated on, and it makes the proof follow-on a completion REQUIREMENT for
+the package, not an optional deferral. Both preconditions are met: (a)
+`CAT-PRIORITY-QUEUE` merged (main 5d1347aaf) and (b) the operator ruling above.
+The Architect remains the required reviewer and design authority for the proof
+strategy. Re-measure every `CAT-PRIORITY-QUEUE` anchor at the cut.
 
 ## Not this node
 

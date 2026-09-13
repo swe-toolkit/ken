@@ -66,7 +66,34 @@ history and their closing sentences are frequently older than this block. The
 roster STRUCTURE they encode — three lanes, runtime / language / foundation — is
 operator-owned and UNCHANGED. Only the live position is restated here.
 
-> ### LIVE POSITION 2026-09-12 (LATEST — read first): directed L2 program COMPLETE; new objective = RESERVED INFIX GLYPHS
+> ### LIVE POSITION 2026-09-13 (LATEST — read first): L3 foundation objective = COMPLETE CATALOG PROOFS (no tested-only deferrals)
+>
+> **Operator ruling (Pat, 2026-09-13, this session):** "The proofs are not done.
+> A catalog package is not finished until its proofs are complete. Declaring
+> that they are tested computation is less valuable than proven correct
+> behavior." And: "computational tests are not part of the package, so a reader
+> cannot trust them as intrinsics, but must believe that the implementation of
+> both the package and its tests was done correctly. This is inherently inferior
+> and weakens the promise that ken strives to make." Recorded as
+> `docs/PRINCIPLES.md` #16.
+>
+> **L3 (foundation) objective is re-scoped to PROOF COMPLETION of the shipped
+> catalog packages, ahead of new catalog packages:**
+> - RELEASED: `CAT-PRIORITY-QUEUE-LAWS` (the deferred PQ proofs -- validity,
+>   count_by conservation, extract-min) -- this ruling is the operator
+>   laws-tranche gate it waited on. It is L3's immediate objective.
+> - THEN a catalog PROOF-COMPLETENESS SURVEY (operator-directed): inventory every
+>   catalog package for incomplete proofs / dependence on computational tests;
+>   the gaps become proof-completion nodes. Known second instance already framed:
+>   `CAT-REL-CLOSURE-LAWS` (draft; same tested-only posture as CAT-REL).
+> - GOING FORWARD: catalog packages carry proof completion as an acceptance
+>   criterion, not a deferrable follow-on (PRINCIPLES #16). A tested-computation
+>   increment may land, but the package is not finished until its proofs land.
+>
+> The two glyph/L2 lanes are unaffected (this is L3-only). The 2026-09-12 L2
+> block below is still current FOR L2.
+>
+> ### LIVE POSITION 2026-09-12 (L2 objective, current for L2): directed L2 program COMPLETE; new objective = RESERVED INFIX GLYPHS
 >
 > **The 2026-09-10 operator L2 queue (items 1-8) is FULLY CONSUMED** — items 3-8
 > merged/closed (deceq-char, SCT-opaque, checked-IH-view, ctor-shadowing,
