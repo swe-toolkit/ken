@@ -3,14 +3,48 @@ id: LANG-MEMBERSHIP-OPERATOR-SURFACE
 title: "membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator"
 status: draft
 owner: language
-size: M
+size: L
 gate: none
-depends_on: []
+depends_on: [SPEC-MEMBERSHIP-CLASS-CONTRACT, LANG-RESERVED-INFIX-NAMES, LANG-STANDARD-INFIX-CALL-COMPLETION]
 blocks: []
 github: null
-origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. See the recut banner."
+tier: T1
+origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. RE-CUT AGAIN 2026-09-13 (Steward) on the operator directive (Pat, this session): the deferred split-(B) trigger has fired -- the typeclass-method-dispatch capability is now being cut for real demand (A1's factored resolver LANG-STANDARD-INFIX-CALL-COMPLETION + the SPEC-MEMBERSHIP-CLASS-CONTRACT contract), so this node is re-cut as the membership BUILD against them. Stays draft, HELD until its three deps land; then the Steward frames the full ACs and releases. See the 2026-09-13 banner."
 ---
 
+> # RE-CUT 2026-09-13 -- THE DEFERRED (B) TRIGGER HAS FIRED (operator directive,
+> # Pat, this session: "Frame the L2 binop typeclass work to support membership").
+> # This banner supersedes the 2026-09-06 defer banner below; that banner and the
+> # original body are retained for history.
+> #
+> # The 2026-09-06 recut deferred split-(B) -- the membership VALUE operator --
+> # "GATED on a membership/typeclass-dispatch capability that does not exist ...
+> # When a typeclass-method-dispatch capability is cut for real demand, this node
+> # is re-cut against it." That capability is now being cut, with operator demand:
+> #  - the DISPATCH: A1 [[LANG-STANDARD-INFIX-CALL-COMPLETION]] factors a
+> #    scoped/coherent use-site dictionary resolver "so later membership reuses the
+> #    SAME resolver" -- membership is a CONSUMER of it, never a second dispatcher;
+> #  - the CONTRACT: [[SPEC-MEMBERSHIP-CLASS-CONTRACT]] specifies the Membership
+> #    class, the nominal witness-bound carrier views, the `∈` standard binding +
+> #    completion, and the law model (grounded in the Research advisory
+> #    thr_60s5rhqdh4ht8; Architect rules class/carrier);
+> #  - the `∈` PARSE: A0 [[LANG-RESERVED-INFIX-NAMES]] admits `∈` as a name.
+> #
+> # SO THIS NODE IS RE-CUT as the membership BUILD: define the Membership class +
+> # the three provider views (list; ordered-key serving Map and Set; relation-edge)
+> # in catalog, and wire `∈` elaboration to member-dispatch through A1's resolver
+> # (carrier inferred from the RHS first; witness/comparator bound in the view
+> # value; no `Membership Tree`; no Prop-to-Bool elimination; missing/ambiguous
+> # provider = normal instance error). Bool result; `member_holds := IsTrue(member)`.
+> # depends_on the three nodes above; stays `draft`, HELD until all three land,
+> # then the Steward frames the full ACs from the landed contract + A1 surface and
+> # releases to the language ring. language-leader owner; Architect required
+> # reviewer. CODE merge (catalog + crates/ken-elaborator) -> full CI + M8/M8a
+> # Adversary on its candidate. The A0/A1 ASCII-role material below is SUBSUMED:
+> # `∈` is glyph-only (A0), so there is no `let ... in` collision to resolve here.
+> #
+> # --- 2026-09-06 defer banner + original body retained below for history ---
+>
 > # RECUT 2026-09-06 -- NOT BUILDABLE AS FRAMED (Architect evt_356e6vfg2hrs6).
 > # Hard stop #1 on this WP. The node is split, deferred, and returned to draft.
 > # This banner supersedes the Deliverables and Acceptance criteria below; the
