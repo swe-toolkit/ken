@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-13 14:26:58Z — from 603 issue file(s) in `docs/program/issues/`.
+2026-09-13 14:41:55Z — from 603 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -152,7 +152,7 @@ the committed file matches the generator's output.
 | `DOC-CAP-ASBUILT` | The capability chapter tells readers the catalog has no checked authority exemplar; CAT-CAPEX adds one, falsifying that claim in two places | merged | doc | S | none | — |
 | `DOC-CATALOG-CONTENTS` | Catalog entry format: rename the `## Index` heading to `## Contents` in 19 entries and remove the 16 reading-path sections | merged | doc | M | none | — |
 | `DOC-COMPILER-DEEPEN` | Deepen library/guide/compiler/ one level: elaborate each of the 8 overview chapters IN PLACE as a single fuller page (operator correction 2026-09-12: detail, not structure -- no nested depth pages/subdirectories), executed one chapter at a time in pipeline order, the consolidated front-end.md as the exemplar; explanatory/derived, source-anchored per claim, librarian as-built as the sole accuracy oracle | closed | doc | L | none | — |
-| `DOC-COMPILER-GUIDE-STYLE-PASS` | First test of the new library-style AI-pattern guidance: review and revise the compiler guide (library/guide/compiler/, 8 files) applying the DOC-LIBRARY-STYLE-AI-PATTERNS heuristics, and report whether the writing improved. Standard doc-ring workflow (doc-author revises, Librarian QA). | ready | doc | M | none | — |
+| `DOC-COMPILER-GUIDE-STYLE-PASS` | First test of the new library-style AI-pattern guidance: review and revise the compiler guide (library/guide/compiler/, 8 files) applying the DOC-LIBRARY-STYLE-AI-PATTERNS heuristics, and report whether the writing improved. Standard doc-ring workflow (doc-author revises, Librarian QA). | merged | doc | M | none | — |
 | `DOC-CURRENCY-ANCHOR` | library/REVISION certifies nothing about the corpus — currency is unchecked | closed | doc | S | none | — |
 | `DOC-GATE-CONTROL-BINDING` | validation-gate registry: make the two DOC-GATE-RECORD-AXIS checks orphan-proof by lifting them to pure detectors with committed controls | merged | verify | S | none | https://github.com/swe-toolkit/ken/pull/928 |
 | `DOC-GATE-NEEDLE` | schema-gate controls assert on a needle the test itself supplied, so one constraint class is fully vacuous | merged | verify | S | none | — |
@@ -649,7 +649,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CAT-PROOF-COMPLETENESS-SURVEY` — Survey every catalog package for incomplete proofs and dependence on computational tests: classify each package as fully-proven, tested-only-with-deferred-proofs, or no-proof-obligation, citing the exact intrinsics vs tests per package; produce the ledger from which the Steward frames the missing *-LAWS follow-ons. Grounded in PRINCIPLES #16 (a package is finished only when proven).
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
-- `DOC-COMPILER-GUIDE-STYLE-PASS` — First test of the new library-style AI-pattern guidance: review and revise the compiler guide (library/guide/compiler/, 8 files) applying the DOC-LIBRARY-STYLE-AI-PATTERNS heuristics, and report whether the writing improved. Standard doc-ring workflow (doc-author revises, Librarian QA).
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
