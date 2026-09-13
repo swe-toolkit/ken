@@ -1,7 +1,7 @@
 ---
 id: DOC-LIBRARY-STYLE-ROLLOUT
 title: "Apply the revised library-style AI-pattern guidance (including the new semicolon-restraint rule) to the rest of the library prose beyond the compiler guide. Standard doc-ring workflow (doc-author revises, Librarian QA), sliced into one-turn increments by the doc-leader."
-status: draft
+status: active
 owner: doc
 size: L
 gate: none

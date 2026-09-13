@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-13 21:44:43Z — from 605 issue file(s) in `docs/program/issues/`.
+2026-09-13 21:46:18Z — from 605 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -160,7 +160,7 @@ the committed file matches the generator's output.
 | `DOC-GATE-WIRE-BINDING` | validation-gate registry: bind the kind-vocabulary RULE to its GATE by registering it as a VALIDATION_GATES row | merged | verify | XS | none | https://github.com/swe-toolkit/ken/pull/933 |
 | `DOC-GUIDE-PROOF-COMPLETENESS` | The proof-techniques guide does not state that a catalog package is finished only when its proofs are complete, and that computational tests are external to the package (a reader must trust them, not verify them) — the operator principle recorded as PRINCIPLES #16. Weave it into library/guide/proof-techniques.ken.md. | merged | doc | S | none | — |
 | `DOC-LIBRARY-STYLE-AI-PATTERNS` | Draft AI-pattern prose-quality guidance for library/ documentation into the library-style authoring skill plus a doc-author review checklist -- judgment heuristics (never an authorship test) that require every negative to name the specific operation, condition, and consequence, oriented to BOTH revising current docs and future authoring. Grounded in PRINCIPLES #2/#8/#14. Librarian-authored per operator ruling. | merged | doc | S | none | — |
-| `DOC-LIBRARY-STYLE-ROLLOUT` | Apply the revised library-style AI-pattern guidance (including the new semicolon-restraint rule) to the rest of the library prose beyond the compiler guide. Standard doc-ring workflow (doc-author revises, Librarian QA), sliced into one-turn increments by the doc-leader. | draft | doc | L | none | — |
+| `DOC-LIBRARY-STYLE-ROLLOUT` | Apply the revised library-style AI-pattern guidance (including the new semicolon-restraint rule) to the rest of the library prose beyond the compiler guide. Standard doc-ring workflow (doc-author revises, Librarian QA), sliced into one-turn increments by the doc-leader. | active | doc | L | none | — |
 | `DOC-PROGRAM-SELF-REFUTE` | three sites of current program law assert assurances the same corpus has already measured as absent, and 12-documentation-program.md now carries both a drift-gate claim and the measurement refuting it | merged | doc | M | none | — |
 | `DOC-PROGRAM-WAVE-RECONCILE` | Reconcile the documentation program's wave status against the landed corpus — the status line, the wave table, and the section 4b headers all say map only over bodies that measured otherwise, and produce the residual register that says what the doc ring owes next | merged | doc | M | none | — |
 | `DOC-STYLE-SEMICOLON-RULE` | Add a semicolon-restraint heuristic to the library-style AI-pattern guidance (agent/playbooks/tools/library-style.md), then apply a semicolon-only revision to the compiler guide (library/guide/compiler/). Operator finding: semicolons are overused (kernel.md has 8, all prose). Standard doc-ring workflow (doc-author revises, Librarian QA). | merged | doc | M | none | — |
