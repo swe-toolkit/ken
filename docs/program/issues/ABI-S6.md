@@ -285,6 +285,23 @@ M1-M4 -> lieutenant. Local gates targeted; full CI is separate.
    is a CLOSED set of two sites (`aggregates.rs:6722` and `:6777`), measured. Both
    Architect stops so far were scoping defects in the rule's statement; the 3rd
    triggers a research prior-art hold before any further amendment.
+   THAT TRIGGER FIRED. Hard stop 3 (`evt_41kgw2qkw0xey`): under amendment 2 the
+   planner closure holds — neither Direct nor Tail constructs on Mapping — and the
+   witness still fails, because the carried destination does not determine WHICH
+   value the consumer applies to. The Architect HELD the ruling and called the
+   research prior-art advisory (`evt_76xhx9x5fpafq`); NO amendment 3 is issued and
+   none is authorized until the advisory returns. The amendment-2 assessment that
+   both prior stops were mere scoping defects is treated as REFUTED rather than
+   repeated, per the pre-commitment. Candidate predicate posted as a HYPOTHESIS for
+   the advisory to test, not as a ruling: the projection is being treated as a
+   static keying problem while the obligation it encodes is a per-activation fact
+   about one value occurrence, so the carrier may need to be the value rather than
+   the destination. The stop's "reuse across semantic phases" characterization is
+   NOT adopted — the trace halts after one reach and amendment 1 measured context 0
+   invoked exactly once — and a bounded observer-only three-arm pass is authorized
+   in parallel, gating nothing. Runtime stays held at `5d977ac79`;
+   `37591f0019379fbd0bd6a64342673de12ba8e062` is NOT a candidate. Next §1a
+   re-trigger is the 6th. See SYMPTOM INVENTORY entry 20.
 3. The Steward releases the recut to the runtime ring; runtime implements under the
    Architect's design; runtime-QA + Architect review; Steward M1-M4 -> lieutenant.
 4. Optional, in parallel, neither gating: the px8f observer-only measurement the
@@ -2575,6 +2592,39 @@ Architect inventory, 2026-09-11.
     its tag query never executing. The continuation is OMITTED. The bounded
     repair that finding would have earned is withheld — see the shared
     predicate below.
+20. The closure mechanism is built and takes three consecutive Architect hard
+    stops. Amendment 1 (`evt_3t44j4xy0bqh6`) corrects a rule keyed on the
+    producer's own projection, which is absent by design when the consumer is
+    detached. Amendment 2 (`evt_18wh9v6f8ykts`) corrects a rule keyed on the
+    Tail variant, `DirectInvocationReturn` having been an unguarded escape, and
+    moves the disposition above both forks over a production set measured
+    closed at two sites. Under amendment 2 the planner closure holds — neither
+    Direct nor Tail constructs on Mapping, both rows carry
+    `ProducerThroughRequiredConsumerToRet` — and the witness still fails
+    (`evt_41kgw2qkw0xey`): the carried destination does not determine which
+    value the consumer applies to, because route shape, source identity and
+    enclosing specialization are identical at the early already-consumed
+    `ResourceBodyOk` `0x0305` and the later pre-consumption `ResourceBracketOk`
+    `0x0f09`. Applying at the governed source arm misses the executed seat;
+    applying at the executed transport seat traps. Non-candidate
+    `37591f0019379fbd0bd6a64342673de12ba8e062`. Per the Architect's §1a trigger
+    pre-committed in amendment 2, the ruling is HELD and a research prior-art
+    advisory is called (`evt_76xhx9x5fpafq`); no amendment 3 is issued.
+    The amendment-2 assessment that both prior stops were mere scoping defects
+    is treated as REFUTED rather than repeated, per that pre-commitment. The
+    Architect's candidate predicate across the three stops, posted as a
+    hypothesis for the advisory to test rather than as a ruling: the design
+    treats the required-consumer projection as a static keying problem — which
+    code coordinates must derive from it — while the obligation it encodes is a
+    per-activation fact about one value occurrence. If that holds, the rule is
+    the wrong shape rather than too narrow, and the carrier of the obligation
+    must be the value rather than the destination. Separately, the hard stop's
+    "reuse across semantic phases" characterization is NOT adopted: the offered
+    trace halts after a single reach, and amendment 1's own measurement states
+    context 0 is invoked exactly once. A bounded observer-only pass over three
+    arms — genuine reuse, wrong seat, and wrong datum at a correct seat — is
+    authorized in parallel and gates nothing. The third arm would make the
+    refutation above premature and is deliberately kept alive.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
