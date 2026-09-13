@@ -1,7 +1,7 @@
 ---
 id: DOC-COMPILER-GUIDE-STYLE-PASS
 title: "First test of the new library-style AI-pattern guidance: review and revise the compiler guide (library/guide/compiler/, 8 files) applying the DOC-LIBRARY-STYLE-AI-PATTERNS heuristics, and report whether the writing improved. Standard doc-ring workflow (doc-author revises, Librarian QA)."
-status: ready
+status: merged
 owner: doc
 size: M
 gate: none
