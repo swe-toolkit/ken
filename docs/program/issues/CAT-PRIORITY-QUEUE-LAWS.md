@@ -1,6 +1,6 @@
 ---
 id: CAT-PRIORITY-QUEUE-LAWS
-title: "the deferred proof follow-on to CAT-PRIORITY-QUEUE: discharge the general kernel proofs the computational build ships as tested-only -- meld/insert/pop_min representation validity, entry multiplicity conservation (count_by p), and extract-min (global-minimum + nondecreasing drain) under the same fixed lawful order; introduce NO second queue, no Omega path carrier/postulate/new primitive; gated on an operator/Architect laws-tranche ruling"
+title: "the deferred proof follow-on to CAT-PRIORITY-QUEUE: discharge the general kernel proofs the computational build ships as tested-only -- meld/insert/pop_min representation validity, entry multiplicity conservation (count_by p), and extract-min (global-minimum + nondecreasing drain) under the same fixed lawful order; introduce NO second queue, no Omega path carrier/postulate/new primitive; operator-released proof completion"
 status: ready
 owner: foundation
 size: L
@@ -20,7 +20,8 @@ minimum, occurrence preservation, exactly-one removal, remainder validity,
 persistence) are load-bearing and covered by acceptance tests, but their GENERAL
 kernel proof is deferred to this node. The Architect ruled it a separately named
 follow-on, not part of the build (evt_15etn5hm102n2, Part C). Filed so the
-obligation is not lost; NOT released.
+obligation is not lost. The operator released this tranche on 2026-09-13;
+see Gating below.
 
 ## What this discharges (Architect Part C)
 
@@ -40,6 +41,30 @@ Over the SAME fixed lawful order the build uses (do NOT introduce a second queue
    the stored priorities under the lawful order (root's global-minimum property
    from comparator transitivity + the invariant); repeated `pop_min` drains in
    nondecreasing priority. State the exact propositions and their premises.
+
+## Component design and acceptance
+
+The Architect's [proof-strategy ruling](../CAT-PRIORITY-QUEUE-LAWS-design.md)
+is the implementation design. Its exact general propositions, premises,
+induction decomposition, shared proof dependencies, private finite-pop
+observation and acceptance requirements are load-bearing here.
+
+Keep the same six-name public queue surface. Queue predicates, measures,
+observers and checked laws remain private; complete private proofs are intrinsic
+package proofs, not an importable client proof API. No existing queue operation
+may call a proof observer, validity traversal, size function, or fuel wrapper.
+The design's small proof-only spillover to `Data.Numeric.Nat.Arithmetic` and
+`Core.Classes.LawfulClasses` exposes/reuses shared laws rather than duplicating
+them in the queue package.
+
+Completion requires every stated general law, arbitrary-predicate conservation,
+nonvacuous validity witnesses/refutations, and total drain at the structural
+entry count, not just sortedness conditional on a completed trace. Verify that
+representative defects in actual workers invalidate unchanged general proofs.
+Preserve public privacy, same-order typing, persistence and cost evidence;
+complexity proofs remain deferred. Local tests are targeted; whole-repo gates
+run only in CI. The design's admission probes establish the named techniques,
+not the full theorem suite, which Foundation must author and have checked.
 
 ## Trust posture and constraints
 
