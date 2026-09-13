@@ -387,13 +387,17 @@ population-side mutation above.
 
 ## Evidence and deferral record
 
-`CAT-PRIORITY-QUEUE` lands every case above as a tested observation. Producer
-blob `1eec578603cdef349af21d944ac174af5919705c` and acceptance-test blob
-`229bbcd89e2041771af44c51e70e9c1f12c02639` execute all 22 case records through
-nine passing tests, including exactly 4,216 bounded traces. Fifteen
-compile-preserving production-side and detector-side mutations reddened their
-named observations, and both files were restored byte-identically. The result
-reports separately:
+`CAT-PRIORITY-QUEUE` lands the named finite observations above. Producer blob
+`1eec578603cdef349af21d944ac174af5919705c`, acceptance-test blob
+`b1168ecba6570f6172dc1e15a6fb747bf2bfda9d`, and owner-local resolver-test blob
+`eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7` execute nine passing acceptance
+tests, including exactly 4,216 bounded traces, plus two passing export-table
+closure tests. Twenty-nine compile-preserving population-side and detector-side
+mutations reddened their named observations. They include recursive rank
+descent, an extra find comparison, extra meld comparison/worker calls, direct
+insert/pop traversal, constant-success structural detectors, and original-name
+and renamed re-exports. All mutated files were restored byte-identically. The
+result reports separately:
 
 1. real public computation and the exact named finite observations it executes;
 2. private abstraction/validity and structural-charge observations;
