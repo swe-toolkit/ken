@@ -389,7 +389,7 @@ population-side mutation above.
 
 `CAT-PRIORITY-QUEUE` lands the named finite observations above. Producer blob
 `1eec578603cdef349af21d944ac174af5919705c`, acceptance-test blob
-`b1168ecba6570f6172dc1e15a6fb747bf2bfda9d`, and owner-local resolver-test blob
+`66596ec20efe636d16dfd4dd81c1342e0c845221`, and owner-local resolver-test blob
 `eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7` execute nine passing acceptance
 tests, including exactly 4,216 bounded traces, plus two passing export-table
 closure tests. Twenty-nine compile-preserving population-side and detector-side
