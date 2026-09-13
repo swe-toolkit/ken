@@ -10,15 +10,14 @@
 
 use std::collections::BTreeSet;
 
-use super::semantic_ir::SemanticSourceKind;
-use super::{
-    planner_capacity_error, planner_error, runtime_value_lifetime,
-    CraneliftBackendError, PlannedReferentLifetime, PredeclaredFunctionId,
-    StaticNodeId, StaticTransitionPlan,
-};
 use super::construction::Planner;
+use super::semantic_ir::SemanticSourceKind;
 #[cfg(test)]
 use super::AC4_RESOLUTIONS;
+use super::{
+    planner_capacity_error, planner_error, runtime_value_lifetime, CraneliftBackendError,
+    PlannedReferentLifetime, PredeclaredFunctionId, StaticNodeId, StaticTransitionPlan,
+};
 use crate::RuntimeExpr;
 
 /// The preallocated positional identity of one planned occurrence.
@@ -45,7 +44,11 @@ impl StaticOriginId {
         Self(id)
     }
 
-    #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+    #[cfg(any(
+        test,
+        feature = "checked-ih-realization-observation",
+        feature = "px8-ds-test-support"
+    ))]
     pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
         self.0
     }
@@ -254,7 +257,10 @@ pub(super) fn validate_occurrence_authority_plan(
 /// that stopped at the outermost value would miss a constructor buried in an
 /// argument, a record field, or a closure capture -- and missing one is the
 /// unsound direction for a deadness proof.
-fn runtime_value_constructs(value: &crate::RuntimeValue, constructor: &crate::RuntimeSymbol) -> bool {
+fn runtime_value_constructs(
+    value: &crate::RuntimeValue,
+    constructor: &crate::RuntimeSymbol,
+) -> bool {
     match value {
         crate::RuntimeValue::Constructor {
             constructor: constructed,
@@ -313,7 +319,6 @@ pub(super) fn occurrence_authority<'plan>(
 }
 
 impl<'src> Planner<'src> {
-
     /// Files this occurrence's term under the origin the planner just gave it.
     ///
     /// ⭐ This is deliberately the *same* function that emits the semantic seed,
@@ -345,11 +350,9 @@ impl<'src> Planner<'src> {
         });
         Ok(())
     }
-
 }
 
 impl<'src> StaticTransitionPlan<'src> {
-
     /// **`RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the whole-program
     /// construction-site census: is this constructor EVER constructed?**
     ///
@@ -684,17 +687,16 @@ impl<'src> StaticTransitionPlan<'src> {
         }
         Ok(())
     }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::*;
     use super::super::tests::{
         b2ac_topology_fixtures, b2o_transparent_declaration, equal_shaped_atom_fixture,
-        equal_shaped_child_fixture, fixture_witness, nested_resource_bracket, nodes_of_shape, substrate_case, substrate_constructor, trap,
-        unit,
+        equal_shaped_child_fixture, fixture_witness, nested_resource_bracket, nodes_of_shape,
+        substrate_case, substrate_constructor, trap, unit,
     };
+    use super::super::*;
     use crate::RuntimeValue;
 
     /// Three occurrences that are **equal as terms**. A content or hash lookup
@@ -989,8 +991,8 @@ mod tests {
             .into_iter()
             .find(|(name, _)| *name == "computational")
             .expect("the computational fixture");
-        let plan = plan_static_transition_graph(&computational, &BTreeMap::new())
-            .expect("plannable");
+        let plan =
+            plan_static_transition_graph(&computational, &BTreeMap::new()).expect("plannable");
 
         // A control node: in range, and its source slot is empty.
         let (control_index, _) = plan
@@ -1006,8 +1008,7 @@ mod tests {
         );
 
         let mut mutated = plan.clone();
-        mutated.planned_entry_bodies[0].body_occurrence =
-            StaticOriginId(control_index as u32);
+        mutated.planned_entry_bodies[0].body_occurrence = StaticOriginId(control_index as u32);
         assert_eq!(
             mutated.validate().unwrap_err(),
             planner_error("scheduling entry body occurrence is not a planned source occurrence"),
@@ -1385,11 +1386,9 @@ mod tests {
                     owner,
                     seat: StaticOriginId(seat),
                     path,
-                    role: SynthesizedAggregateRole::Constructor(
-                        SynthesizedConstructorRole::Fixed(
-                            SynthesizedFixedConstructorRole::Unit,
-                        ),
-                    ),
+                    role: SynthesizedAggregateRole::Constructor(SynthesizedConstructorRole::Fixed(
+                        SynthesizedFixedConstructorRole::Unit,
+                    )),
                 },
                 owner: None,
                 shape: PlannedAggregateShape::Constructor,
@@ -1455,10 +1454,8 @@ mod tests {
         environment.producer = AggregateOccurrenceProducer::SynthesizedUse {
             owner: unit_a,
             seat: StaticOriginId(11),
-            path: SynthesizedAggregatePath::root(
-                SynthesizedAggregateRoot::UnitBoundaryEnvironment,
-            )
-            .field(0),
+            path: SynthesizedAggregatePath::root(SynthesizedAggregateRoot::UnitBoundaryEnvironment)
+                .field(0),
             role: SynthesizedAggregateRole::UnitBoundaryEnvironment,
         };
         environment.shape = PlannedAggregateShape::Record;
@@ -1470,11 +1467,8 @@ mod tests {
         // key. The production validator must make that one-field perturbation
         // red.
         environment.producer = host.producer.clone();
-        let alias =
-            validate_aggregate_producers_are_unique(&[host, environment])
-                .expect_err(
-                    "collapsing the environment key onto a host key must refuse",
-                );
+        let alias = validate_aggregate_producers_are_unique(&[host, environment])
+            .expect_err("collapsing the environment key onto a host key must refuse");
         assert!(format!("{alias:?}").contains("same producer"));
 
         // Same SEAT, same role, same owner, SAME PATH: one use, so a second is
@@ -1536,20 +1530,16 @@ mod tests {
             .flatten()
             .find_map(|occurrence| match occurrence.expr {
                 RuntimeExpr::Construct { args, .. }
-                    if matches!(
-                        args.as_slice(),
-                        [RuntimeExpr::LexicalClosure { .. }]
-                    ) =>
+                    if matches!(args.as_slice(), [RuntimeExpr::LexicalClosure { .. }]) =>
                 {
                     Some(occurrence.static_origin)
                 }
                 _ => None,
             })
             .expect("the fixture has one closure-bearing constructor producer");
-        let expected_path = SynthesizedAggregatePath::root(
-            SynthesizedAggregateRoot::UnitBoundaryEnvironment,
-        )
-        .field(0);
+        let expected_path =
+            SynthesizedAggregatePath::root(SynthesizedAggregateRoot::UnitBoundaryEnvironment)
+                .field(0);
         let environment_records = plan
             .aggregate_ownership
             .iter()
@@ -1583,11 +1573,8 @@ mod tests {
 
         let mut duplicate = environment.clone();
         duplicate.id = AggregateOccurrenceId(environment.id.0 + 1);
-        let refusal = validate_aggregate_producers_are_unique(&[
-            environment.clone(),
-            duplicate,
-        ])
-        .expect_err("duplicating the real environment key must refuse");
+        let refusal = validate_aggregate_producers_are_unique(&[environment.clone(), duplicate])
+            .expect_err("duplicating the real environment key must refuse");
         assert!(
             format!("{refusal:?}").contains("same producer"),
             "the production non-aliasing law must own the refusal: {refusal:?}"

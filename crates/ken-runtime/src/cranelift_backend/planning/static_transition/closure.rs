@@ -39,12 +39,11 @@ use super::aggregates::{
 use super::aggregates::{
     build_aggregate_ownership_plan, lifetime_referent_affinity, validate_aggregate_ownership_plan,
     validate_checked_ih_continuation_inheritances, validate_checked_ih_environment_transports,
-    validate_checked_ih_generated_entry_accesses,
-    validate_checked_ih_generated_entry_confluences, AggregateOccurrenceId,
-    AggregateOccurrenceProducer,
-    PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
-    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
-    SynthesizedAggregateRoot, SynthesizedDynamicSet,
+    validate_checked_ih_generated_entry_accesses, validate_checked_ih_generated_entry_confluences,
+    AggregateOccurrenceId, AggregateOccurrenceProducer, PlannedAggregateAllocation,
+    PlannedAggregateOwnership, PlannedAggregateShape, SynthesizedAggregateNode,
+    SynthesizedAggregatePath, SynthesizedAggregateRole, SynthesizedAggregateRoot,
+    SynthesizedDynamicSet,
 };
 use super::continuations::validate_continuation_specialization_plan;
 #[allow(unused_imports)]
@@ -91,6 +90,7 @@ use super::joins_traps::{
 use super::occurrences::{
     validate_occurrence_authority_plan, PlannedOccurrenceAuthority, StaticOriginId,
 };
+use super::responses::validate_checked_ih_post_call_consumers;
 use super::semantic_ir::{
     self, BoolMatchCaseOrdinals, ConstructorIdentity, FieldIdentity, SemanticSourceKind,
     SynthesizedConstructorRole, SynthesizedIoErrorRole,
@@ -2062,6 +2062,7 @@ impl<'src> StaticTransitionPlan<'src> {
             self,
             &self.checked_ih_continuation_inheritances,
         )?;
+        validate_checked_ih_post_call_consumers(self, &self.checked_ih_post_call_consumers)?;
         validate_checked_ih_generated_entry_confluences(
             self,
             &self.checked_ih_generated_entry_confluences,
@@ -2499,20 +2500,20 @@ impl<'src> StaticTransitionPlan<'src> {
 #[cfg(test)]
 mod tests {
 
-    use super::super::*;
-    use crate::{RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
-    use super::super::tests::{
-        D2G_DECLARATION, b2o_retained_closure, b2o_transparent_declaration, b2o_two_closure_fixture,
-        census, contspec_complete_environment_fixture, contspec_required_tail_fixture,
-        contsrc_d2_ih_and_argument_case_fixture, d2g_declaration, d2g_entry, d2g_oriented_plan,
-        equal_shaped_atom_fixture, equal_shaped_child_fixture, fixture_witness,
-        nested_resource_bracket, nodes_of_shape, substrate_case, substrate_constructor, trap, unit,
-    };
     use super::super::semantic_ir::{
         build_semantic_plane, DenseRange, RuntimeExprShape, SemanticAtomKind,
         SemanticOperandElement, SemanticOwner, SemanticSourceKind,
     };
-
+    use super::super::tests::{
+        b2o_retained_closure, b2o_transparent_declaration, b2o_two_closure_fixture, census,
+        contspec_complete_environment_fixture, contspec_required_tail_fixture,
+        contsrc_d2_ih_and_argument_case_fixture, d2g_declaration, d2g_entry, d2g_oriented_plan,
+        equal_shaped_atom_fixture, equal_shaped_child_fixture, fixture_witness,
+        nested_resource_bracket, nodes_of_shape, substrate_case, substrate_constructor, trap, unit,
+        D2G_DECLARATION,
+    };
+    use super::super::*;
+    use crate::{RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
     #[cfg(test)]
     pub(in crate::cranelift_backend::planning::static_transition) fn d2h_plane_fixture() -> (
@@ -2542,7 +2543,11 @@ mod tests {
 
         let id = StaticContinuationFusionId(0);
         let key = fusion.key_for(id).expect("ID -> key").clone();
-        assert_eq!(fusion.id_for(&key), Some(id), "key -> ID -> key round-trips");
+        assert_eq!(
+            fusion.id_for(&key),
+            Some(id),
+            "key -> ID -> key round-trips"
+        );
 
         let descriptor = fusion.descriptor_for(id).expect("ID -> descriptor");
         assert_eq!(descriptor.id, id);
@@ -2634,7 +2639,9 @@ mod tests {
         push("selected_case_body", &|k| {
             k.selected_case_body = bump(k.selected_case_body)
         });
-        push("consuming_call", &|k| k.consuming_call = bump(k.consuming_call));
+        push("consuming_call", &|k| {
+            k.consuming_call = bump(k.consuming_call)
+        });
         push("consuming_callee", &|k| {
             k.consuming_callee = bump(k.consuming_callee)
         });
@@ -2694,11 +2701,7 @@ mod tests {
                 Some(variant),
                 "and {label}'s id must round-trip to the key it was minted from"
             );
-            assert_eq!(
-                fusion.id_for(variant),
-                Some(id),
-                "and back again"
-            );
+            assert_eq!(fusion.id_for(variant), Some(id), "and back again");
             assert!(
                 fusion.descriptor_for(id).is_some(),
                 "and carry a descriptor of its own"
@@ -2715,7 +2718,6 @@ mod tests {
             "and the original key still resolves to its original id"
         );
     }
-
 
     /// `D2h` — the independent re-derivation CATCHES a mutation of the primary
     /// derivation.
@@ -2762,8 +2764,7 @@ mod tests {
         // that cannot be justified never gets to select the members that hang
         // off it.
         assert!(
-            format!("{caught:?}")
-                .contains("admitted discovery is not in the production ledger"),
+            format!("{caught:?}").contains("admitted discovery is not in the production ledger"),
             "and caught where the locator is established, not merely at the closing \
              comparison: {caught:?}"
         );
@@ -2844,17 +2845,24 @@ mod tests {
         );
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn values(rows: &[BoundaryACensus], field: impl Fn(&BoundaryACensus) -> usize) -> Vec<isize> {
+    pub(in crate::cranelift_backend::planning::static_transition) fn values(
+        rows: &[BoundaryACensus],
+        field: impl Fn(&BoundaryACensus) -> usize,
+    ) -> Vec<isize> {
         rows.iter().map(|row| field(row) as isize).collect()
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn differences(values: &[isize]) -> (Vec<isize>, Vec<isize>) {
+    pub(in crate::cranelift_backend::planning::static_transition) fn differences(
+        values: &[isize],
+    ) -> (Vec<isize>, Vec<isize>) {
         let first = values.windows(2).map(|v| v[1] - v[0]).collect::<Vec<_>>();
         let second = first.windows(2).map(|v| v[1] - v[0]).collect::<Vec<_>>();
         (first, second)
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn semantic_census(depth: usize) -> (BoundaryACensus, BoundaryB1Census) {
+    pub(in crate::cranelift_backend::planning::static_transition) fn semantic_census(
+        depth: usize,
+    ) -> (BoundaryACensus, BoundaryB1Census) {
         let expr = nested_resource_bracket(depth);
         plan_static_transition_graph(&expr, &BTreeMap::new())
             .map(|plan| (plan.census(), plan.semantic_census()))
@@ -2870,7 +2878,10 @@ mod tests {
         rows.iter().map(|row| field(row) as isize).collect()
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn index_of_edge_helper(plan: &StaticTransitionPlan, edge: StaticEdgeId) -> usize {
+    pub(in crate::cranelift_backend::planning::static_transition) fn index_of_edge_helper(
+        plan: &StaticTransitionPlan,
+        edge: StaticEdgeId,
+    ) -> usize {
         plan.planned_helpers
             .iter()
             .position(|helper| matches!(helper, PlannedHelperKey::Edge(_, id) if *id == edge))
@@ -3529,7 +3540,10 @@ mod tests {
         );
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn primitive_call(symbol: &str, partiality: crate::RuntimePartiality) -> RuntimeExpr {
+    pub(in crate::cranelift_backend::planning::static_transition) fn primitive_call(
+        symbol: &str,
+        partiality: crate::RuntimePartiality,
+    ) -> RuntimeExpr {
         RuntimeExpr::PrimitiveCall {
             primitive: crate::RuntimePrimitive {
                 symbol: symbol.to_string(),
@@ -3554,7 +3568,10 @@ mod tests {
     /// Decodes one record's single descriptor atom back out of the closed name
     /// arena, so a control asserts on the material's CONTENT and not on the
     /// incidental fact that two occurrences interned at different offsets.
-    pub(in crate::cranelift_backend::planning::static_transition) fn descriptor_bytes(plan: &StaticTransitionPlan, node: StaticNodeId) -> Vec<u8> {
+    pub(in crate::cranelift_backend::planning::static_transition) fn descriptor_bytes(
+        plan: &StaticTransitionPlan,
+        node: StaticNodeId,
+    ) -> Vec<u8> {
         let record = plan.semantic.records[node.0 as usize];
         assert_eq!(record.operands.len, 1, "a primitive owns one atom");
         let atom = plan.semantic.operands[record.operands.start as usize];
@@ -3678,7 +3695,8 @@ mod tests {
     /// rather than assumed: `Match` pushes the scrutinee then the case bodies
     /// (`children.push(scrutinee); children.extend(case_bodies)`), and `Project`
     /// plans its record at position 0.
-    pub(in crate::cranelift_backend::planning::static_transition) fn identity_fixture() -> RuntimeExpr {
+    pub(in crate::cranelift_backend::planning::static_transition) fn identity_fixture(
+    ) -> RuntimeExpr {
         RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Construct {
                 constructor: IDENTITY_CTOR.to_string(),
@@ -5020,7 +5038,9 @@ mod tests {
     }
 
     impl StaticTransitionPlan<'_> {
-        pub(in crate::cranelift_backend::planning::static_transition) fn terminal_id(&self) -> StaticNodeId {
+        pub(in crate::cranelift_backend::planning::static_transition) fn terminal_id(
+            &self,
+        ) -> StaticNodeId {
             self.nodes
                 .iter()
                 .find(|node| node.transition == TransitionKind::Terminal)
@@ -5159,7 +5179,10 @@ mod tests {
         );
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn b2o_units(expr: &RuntimeExpr, declarations: &BTreeMap<&str, &RuntimeDeclaration>) -> usize {
+    pub(in crate::cranelift_backend::planning::static_transition) fn b2o_units(
+        expr: &RuntimeExpr,
+        declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    ) -> usize {
         plan_static_transition_graph(expr, declarations)
             .expect("plannable")
             .semantic
@@ -5484,7 +5507,10 @@ mod tests {
                 Disposition::Live,
             ),
             ("function unit identity exhausted", Disposition::Capacity),
-            ("function unit is not positional for its seed", Disposition::Live),
+            (
+                "function unit is not positional for its seed",
+                Disposition::Live,
+            ),
             (
                 "function unit body occurrence is not a planned occurrence",
                 Disposition::Live,
@@ -5523,7 +5549,10 @@ mod tests {
                 "ownership edge endpoint has no semantic descriptor",
                 Disposition::Live,
             ),
-            ("shared exit has an outgoing transfer edge", Disposition::Live),
+            (
+                "shared exit has an outgoing transfer edge",
+                Disposition::Live,
+            ),
             (
                 "static body edge targets a shared exit",
                 Disposition::Shadowed("static body target has no issued body occurrence"),
@@ -6253,7 +6282,9 @@ mod tests {
     /// ⚠ There is no Rust identifier, file name, method name or source offset
     /// anywhere in this function, and that absence is the point: it is why a Rust
     /// wrapper cannot move the result.
-    pub(in crate::cranelift_backend::planning::static_transition) fn b2o_disposition(plan: &StaticTransitionPlan) -> (usize, usize, usize, usize) {
+    pub(in crate::cranelift_backend::planning::static_transition) fn b2o_disposition(
+        plan: &StaticTransitionPlan,
+    ) -> (usize, usize, usize, usize) {
         let owner_of = |node: StaticNodeId| plan.semantic.descriptors[node.0 as usize].owner;
         let (mut cross_owner, mut intra_owner, mut shared_exit, mut other) = (0, 0, 0, 0);
         for edge in &plan.edges {
@@ -6463,7 +6494,6 @@ mod tests {
         );
     }
 
-
     /// `AC-6` — **inert.** The ABI plane declares and validates; it never emits.
     ///
     /// ⚠ MEASURED: the production region of `abi.rs` contains no emission
@@ -6551,14 +6581,16 @@ mod tests {
         }
     }
 
-
     /// Whole-token occurrences of `needle` in `source`'s **code**, with line and
     /// block comments stripped.
     ///
     /// ⛔ Tokenized rather than substring-matched: `line.contains("ins")` is a
     /// claim about formatting and fires on `instruction`, `against`, and every
     /// other word containing those letters.
-    pub(in crate::cranelift_backend::planning::static_transition) fn b2r_code_identifier_occurrences(source: &str, needle: &str) -> usize {
+    pub(in crate::cranelift_backend::planning::static_transition) fn b2r_code_identifier_occurrences(
+        source: &str,
+        needle: &str,
+    ) -> usize {
         let mut code = String::with_capacity(source.len());
         let mut rest = source;
         let mut depth = 0usize;
@@ -6613,7 +6645,6 @@ mod tests {
             .filter(|token| *token == needle)
             .count()
     }
-
 
     /// Promise class: durable invariant — process mode changes only the
     /// explicitly recorded root scheduling entry's declared source ingress.
@@ -6776,7 +6807,8 @@ mod tests {
         );
     }
 
-    pub(in crate::cranelift_backend::planning::static_transition) fn substrate_case_fixture() -> RuntimeExpr {
+    pub(in crate::cranelift_backend::planning::static_transition) fn substrate_case_fixture(
+    ) -> RuntimeExpr {
         RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::If {
                 scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
@@ -6868,7 +6900,6 @@ mod tests {
         }));
     }
 
-
     /// D3 pin.
     ///
     /// MEASURED: D3 rejects a compile-valid mutation that changes the Absent
@@ -6901,7 +6932,6 @@ mod tests {
             planner_error("pre-allocation closure admits an unreachable case")
         );
     }
-
 
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D4b` — the admission partition is EXACTLY
     /// `interned = V` / `declined = R`, with no third modality.**
@@ -7032,7 +7062,6 @@ mod tests {
         );
     }
 
-
     // -- `D7` checkpoint `1c`: the matrix-omission law, in PLANNING ----------
     //
     // ⭐⭐ The law is that a real planned static-worker member which is omitted
@@ -7051,7 +7080,8 @@ mod tests {
     /// two closures differed in arity or capture count could satisfy the law by
     /// telling them apart on shape rather than on membership -- and would say
     /// nothing about the property.
-    pub(in crate::cranelift_backend::planning::static_transition) fn d7_1c_member_and_ordinary_twin_fixture() -> RuntimeExpr {
+    pub(in crate::cranelift_backend::planning::static_transition) fn d7_1c_member_and_ordinary_twin_fixture(
+    ) -> RuntimeExpr {
         let twin = || RuntimeExpr::LexicalClosure {
             captures: vec![unit()],
             params: vec!["twin".to_string()],
@@ -7093,7 +7123,9 @@ mod tests {
 
     /// The members a plan's specialization population names, and the
     /// `ClosureBody` units it does not.
-    pub(in crate::cranelift_backend::planning::static_transition) fn d7_1c_member_and_ordinary_body_counts(plan: &StaticTransitionPlan<'_>) -> (usize, usize) {
+    pub(in crate::cranelift_backend::planning::static_transition) fn d7_1c_member_and_ordinary_body_counts(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> (usize, usize) {
         let members = plan
             .continuation_specializations
             .iter()
@@ -7210,8 +7242,11 @@ mod tests {
             observation: crate::RuntimeObservation::Returned(crate::RuntimeGroundValue::Bool(true)),
         };
         let compile = || {
-            crate::run_example_with_seed_observation(&example, &crate::NativeSeedEnvironment::empty())
-                .err()
+            crate::run_example_with_seed_observation(
+                &example,
+                &crate::NativeSeedEnvironment::empty(),
+            )
+            .err()
         };
         let member_law = |error: &CraneliftBackendError| {
             matches!(
@@ -7226,11 +7261,9 @@ mod tests {
                 "the unmutated fixture must not trip the member law: {error:?}"
             );
         }
-        let error = with_static_worker_member_mutation(
-            StaticWorkerMemberMutation::OmitMember,
-            compile,
-        )
-        .expect("an omitted member must refuse the whole entry, not produce a run report");
+        let error =
+            with_static_worker_member_mutation(StaticWorkerMemberMutation::OmitMember, compile)
+                .expect("an omitted member must refuse the whole entry, not produce a run report");
         assert!(
             member_law(&error),
             "an omitted member must refuse in planning, never at the generic closure \

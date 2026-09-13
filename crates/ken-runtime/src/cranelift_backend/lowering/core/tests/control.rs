@@ -22,7 +22,6 @@ use crate::cranelift_backend::lowering::units::{
     srcbody_bind_order_take, SrcbodyBindHost, SrcbodyBindOrderObservation,
 };
 
-
 #[derive(Clone, Copy, Debug)]
 pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
     Delete,
@@ -35,7 +34,9 @@ pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
 /// exercises a ledger, authority, or frame validator and never lowers an
 /// expression through it, so no child origin is ever derived. A test that DOES
 /// lower a fixture builds its own `Lowering` with that fixture's plan.
-pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowering<'a> {
+pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(
+    seed_env: &'a NativeSeedEnvironment,
+) -> Lowering<'a> {
     Lowering {
         seed_env,
         declarations: BTreeMap::new(),
@@ -101,7 +102,11 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_function_result_contract: None,
+            generated_context_result_authorities: BTreeMap::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -273,7 +278,11 @@ fn run_px8j_malformed_recursor_consumer(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_function_result_contract: None,
+            generated_context_result_authorities: BTreeMap::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -398,9 +407,9 @@ fn run_px8j_malformed_recursor_consumer(
         selected_scope: None,
     };
     let active_frames = [EliminatorFrame::Active(active)];
-    let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-        recursor,
-    ))];
+    let env = [LoweringEnvironmentBinding::Value(
+        LoweringOperand::Specialized(recursor),
+    )];
     let mut function_context = FunctionBuilderContext::new();
     let mut builder = FunctionBuilder::new(&mut context.func, &mut function_context);
     let entry = builder.create_block();
@@ -533,10 +542,7 @@ fn oriented_same_depth_siblings_require_exact_dynamic_edges() {
 fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
     let mut plan = oriented_test_ih_plan();
     let origin = RecursorProducerOriginId(74);
-    let mut selection = oriented_test_layer(
-        0,
-        RecursorLayerRole::SelectsOccurrence { origin },
-    );
+    let mut selection = oriented_test_layer(0, RecursorLayerRole::SelectsOccurrence { origin });
     selection.checked_invocation_id = None;
     selection.checked_invocation_source = None;
     selection.checked_invocation_depth = 0;
@@ -545,11 +551,10 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
         .iter_mut()
         .find(|frame| frame.frame_id == 0)
         .expect("fixture carries frame 0");
-    frame.runtime_frame_fingerprint =
-        crate::compiler_private_computational_match_frame_fingerprint(
-            &selection.cases,
-            &selection.default,
-        );
+    frame.runtime_frame_fingerprint = crate::compiler_private_computational_match_frame_fingerprint(
+        &selection.cases,
+        &selection.default,
+    );
     frame.occurrence_binding_fingerprint =
         crate::compiler_private_oriented_occurrence_binding_fingerprint(frame);
     plan.validate().expect("updated fixture plan remains valid");
@@ -625,19 +630,18 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
             "{case}: frame 0 must stay qualified by nonzero child 12"
         );
     };
-    let refusal_reason = |
-        result: Result<InstalledOrientedSubcontinuationSegment, CraneliftBackendError>,
-        case: &str,
-    | {
-        match result {
-            Ok(_) => panic!("{case} must refuse"),
-            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct: "OrientedSubcontinuationPlanV1",
-                reason,
-            })) => reason,
-            Err(error) => panic!("{case} reached the wrong refusal: {error:?}"),
-        }
-    };
+    let refusal_reason =
+        |result: Result<InstalledOrientedSubcontinuationSegment, CraneliftBackendError>,
+         case: &str| {
+            match result {
+                Ok(_) => panic!("{case} must refuse"),
+                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "OrientedSubcontinuationPlanV1",
+                    reason,
+                })) => reason,
+                Err(error) => panic!("{case} reached the wrong refusal: {error:?}"),
+            }
+        };
 
     for (root, spelling) in [
         (canonical_root, "invocation-absent root"),
@@ -661,9 +665,8 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
         assert_child_only(installed, spelling);
     }
 
-    let (mutated_root, applications) = with_d5b_hs9_external_root_mutation(
-        D5bHs9ExternalRootMutation::RejectExactRoot,
-        || {
+    let (mutated_root, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
             compose_oriented_subcontinuation(
                 Some(&plan),
                 Some(invocation),
@@ -672,17 +675,15 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
                 vec![root_edge()],
                 Some(canonical_root),
             )
-        },
-    );
+        });
     assert_eq!(applications, 1, "one exact root and edge pair applies once");
     assert_eq!(
         refusal_reason(mutated_root, "exact-root causality mutation"),
         "an external source parent is not a non-root checked invocation"
     );
 
-    let (without_parent, applications) = with_d5b_hs9_external_root_mutation(
-        D5bHs9ExternalRootMutation::RejectExactRoot,
-        || {
+    let (without_parent, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
             compose_oriented_subcontinuation(
                 Some(&plan),
                 Some(invocation),
@@ -691,17 +692,15 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
                 vec![root_edge()],
                 None,
             )
-        },
-    );
+        });
     assert_eq!(applications, 0, "outer None must not be inferred as root");
     assert_child_only(
         without_parent.expect("an absent external parent remains distinct from explicit root"),
         "no external parent",
     );
 
-    let (nonroot, applications) = with_d5b_hs9_external_root_mutation(
-        D5bHs9ExternalRootMutation::RejectExactRoot,
-        || {
+    let (nonroot, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
             compose_oriented_subcontinuation(
                 Some(&plan),
                 Some(invocation),
@@ -710,17 +709,18 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
                 vec![edge()],
                 Some(parent),
             )
-        },
+        });
+    assert_eq!(
+        applications, 0,
+        "the root mutation must not fire for non-root"
     );
-    assert_eq!(applications, 0, "the root mutation must not fire for non-root");
     assert_child_only(
         nonroot.expect("the non-root row stays admissible under the root mutation"),
         "non-root parent",
     );
 
-    let (frame_mismatch, applications) = with_d5b_hs9_external_root_mutation(
-        D5bHs9ExternalRootMutation::RejectExactRoot,
-        || {
+    let (frame_mismatch, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
             compose_oriented_subcontinuation(
                 Some(&plan),
                 Some(invocation),
@@ -732,17 +732,18 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
                     ..canonical_root
                 }),
             )
-        },
+        });
+    assert_eq!(
+        applications, 0,
+        "a root frame mismatch refuses before mutation"
     );
-    assert_eq!(applications, 0, "a root frame mismatch refuses before mutation");
     assert_eq!(
         refusal_reason(frame_mismatch, "root frame mismatch"),
         "an external source parent does not match exactly one incoming dynamic edge"
     );
 
-    let (nonzero_edge, applications) = with_d5b_hs9_external_root_mutation(
-        D5bHs9ExternalRootMutation::RejectExactRoot,
-        || {
+    let (nonzero_edge, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
             compose_oriented_subcontinuation(
                 Some(&plan),
                 Some(invocation),
@@ -751,9 +752,11 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
                 vec![edge()],
                 Some(canonical_root),
             )
-        },
+        });
+    assert_eq!(
+        applications, 0,
+        "a nonzero parent edge refuses before mutation"
     );
-    assert_eq!(applications, 0, "a nonzero parent edge refuses before mutation");
     assert_eq!(
         refusal_reason(nonzero_edge, "nonzero edge parent"),
         "an external source parent does not match exactly one incoming dynamic edge"
@@ -763,9 +766,8 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
         invocation_source: Some(InvocationTemplateRef::ComputationalIHCall(100)),
         ..canonical_root
     };
-    let (partial, applications) = with_d5b_hs9_external_root_mutation(
-        D5bHs9ExternalRootMutation::RejectExactRoot,
-        || {
+    let (partial, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
             compose_oriented_subcontinuation(
                 Some(&plan),
                 Some(invocation),
@@ -774,8 +776,7 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
                 vec![root_edge()],
                 Some(partial_root),
             )
-        },
-    );
+        });
     assert_eq!(applications, 0, "a partial tuple refuses before mutation");
     assert_eq!(
         refusal_reason(partial, "partial root tuple"),
@@ -784,9 +785,8 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
 
     let mut duplicate = root_edge();
     duplicate.edge_id = DynamicSpliceEdgeId(78);
-    let (duplicated, applications) = with_d5b_hs9_external_root_mutation(
-        D5bHs9ExternalRootMutation::RejectExactRoot,
-        || {
+    let (duplicated, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
             compose_oriented_subcontinuation(
                 Some(&plan),
                 Some(invocation),
@@ -795,9 +795,11 @@ fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
                 vec![root_edge(), duplicate],
                 Some(canonical_root),
             )
-        },
+        });
+    assert_eq!(
+        applications, 0,
+        "two matching root edges refuse before mutation"
     );
-    assert_eq!(applications, 0, "two matching root edges refuse before mutation");
     assert_eq!(
         refusal_reason(duplicated, "duplicate root edge"),
         "an external source parent does not match exactly one incoming dynamic edge"
@@ -997,9 +999,9 @@ fn run_px8ds_edge_consumer(
         selected_scope: None,
     };
     let active_frames = [EliminatorFrame::Active(active)];
-    let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-        recursor,
-    ))];
+    let env = [LoweringEnvironmentBinding::Value(
+        LoweringOperand::Specialized(recursor),
+    )];
     let call = RuntimeExpr::Call {
         callee: Box::new(RuntimeExpr::Var(0)),
         args: Vec::new(),
@@ -1087,8 +1089,6 @@ fn oriented_edge_mutations_reject_in_all_three_direct_consumers() {
         }
     }
 }
-
-
 
 #[test]
 fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
@@ -1321,10 +1321,6 @@ fn px8j_release_validator_rejects_repeated_and_broken_scope_lineage() {
     }
 }
 
-
-
-
-
 #[test]
 fn oriented_open_control_obligations_are_affine_and_mint_exact() {
     let plan = oriented_test_ih_plan();
@@ -1491,11 +1487,14 @@ fn px8j_owned_scope_deletion_fails_closed_before_another_frame_is_emitted() {
     let expression = host_result_closure_match(px8j_layered_recursive_result(1, 1));
     let (exact_result, _exact_trace) =
         px8j_capture_source_trace(&expression, false, "ken_px8j_scope_exact");
-    assert!(matches!(
-        exact_result,
-        Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
-            if reason == "terminal answer has no affine checked-root authority"
-    ), "the owned-scope fixture must retain its measured checked-root refusal");
+    assert!(
+        matches!(
+            exact_result,
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
+                if reason == "terminal answer has no affine checked-root authority"
+        ),
+        "the owned-scope fixture must retain its measured checked-root refusal"
+    );
 }
 #[test]
 fn px8j_all_three_producer_paths_reach_real_consumers() {
@@ -1541,30 +1540,30 @@ fn px8j_all_three_producer_paths_reach_real_consumers() {
         event,
         Px8jSourceTraceEvent::Selection { origin: actual } if *actual == origin
     )));
-    assert!(!trace.iter().any(|event| matches!(
-        event,
-        Px8jSourceTraceEvent::Mint {
-            path: Px8jProducerPath::SourceMachine,
-            ..
-        }
-    )), "the corrected row-2 outcome has no SourceMachine mint: {trace:#?}");
+    assert!(
+        !trace.iter().any(|event| matches!(
+            event,
+            Px8jSourceTraceEvent::Mint {
+                path: Px8jProducerPath::SourceMachine,
+                ..
+            }
+        )),
+        "the corrected row-2 outcome has no SourceMachine mint: {trace:#?}"
+    );
 
     let deferred = RuntimeExpr::Match {
         scrutinee: Box::new(px8j_deferred_recursive_field_fixture()),
-        cases: [
-            "ctor:prelude::Result::Err",
-            "ctor:prelude::Result::Ok",
-        ]
-        .into_iter()
-        .map(|constructor| RuntimeMatchCase {
-            constructor: constructor.to_string(),
-            binders: 1,
-            body: RuntimeExpr::Construct {
-                constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
-                args: Vec::new(),
-            },
-        })
-        .collect(),
+        cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+            .into_iter()
+            .map(|constructor| RuntimeMatchCase {
+                constructor: constructor.to_string(),
+                binders: 1,
+                body: RuntimeExpr::Construct {
+                    constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+                    args: Vec::new(),
+                },
+            })
+            .collect(),
         default: RuntimeTrap {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: "direct deferred HostResult default".to_string(),
@@ -1730,13 +1729,16 @@ fn px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin() {
         host_result_closure_match(px8j_recursive_sibling_result(1, 2, px8j_aggregate_result()));
     let (result, _trace) =
         px8j_capture_source_trace(&expression, false, "ken_px8j_live_sibling_origins");
-    assert!(matches!(
-        result,
-        Err(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
-            if reason == "the selected case has a recursive position 1 that the continuation \
-                specialization projects no worker for, so its induction-hypothesis prefix \
-                cannot be built"
-    ), "the two-sibling fixture must retain its measured missing-worker outcome");
+    assert!(
+        matches!(
+            result,
+            Err(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
+                if reason == "the selected case has a recursive position 1 that the continuation \
+                    specialization projects no worker for, so its induction-hypothesis prefix \
+                    cannot be built"
+        ),
+        "the two-sibling fixture must retain its measured missing-worker outcome"
+    );
 }
 /// **`RT-LEXICAL-ROW2-MISSING-MINT` successor measurement — is the recursive IH
 /// installed and consumed on the functionized lane, or absent?**
@@ -1936,12 +1938,11 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
     // `Exact` is the identity perturbation, used for its other effect: it
     // clears the route trace on the way in, so what is read back is this
     // compile's events and not the baseline's residue.
-    let (result, trace, routes) =
-        with_d6a_route_mutation(D6aRouteMutation::Exact, || {
-            let (result, trace) =
-                px8j_capture_source_trace(&expression, false, "ken_row2_ih_functionized");
-            (result, trace, d6a_route_trace())
-        });
+    let (result, trace, routes) = with_d6a_route_mutation(D6aRouteMutation::Exact, || {
+        let (result, trace) =
+            px8j_capture_source_trace(&expression, false, "ken_row2_ih_functionized");
+        (result, trace, d6a_route_trace())
+    });
     result.expect("the surviving functionized lane must compile row 2");
 
     assert_eq!(
@@ -1949,10 +1950,7 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
             lifecycle(&trace, Px8jProducerPath::Composed),
             lifecycle(&trace, Px8jProducerPath::SourceMachine),
         ),
-        (
-            (true, true, true),
-            (false, false, false),
-        ),
+        ((true, true, true), (false, false, false),),
         "the surviving lane must mint, install, and consume the recursive IH \
          through Composed, never through SourceMachine: {trace:#?}"
     );
@@ -2237,7 +2235,10 @@ fn unmarked_equal_shape_frame_cannot_consume_retained_join_site() {
         }) if reason.contains("unconsumed or orphan site")
     ));
 }
-pub(in crate::cranelift_backend::lowering) fn px8j_scope_chain_observation_result(transform_layers: usize, input_depth: usize) -> RuntimeExpr {
+pub(in crate::cranelift_backend::lowering) fn px8j_scope_chain_observation_result(
+    transform_layers: usize,
+    input_depth: usize,
+) -> RuntimeExpr {
     let tree_constructor =
         |_layer: usize, constructor: &str| format!("ctor:fixture::PX8JScopeTree::{constructor}");
     fn child(depth: usize, node: &str, leaf: &str) -> RuntimeExpr {
@@ -2456,14 +2457,17 @@ fn px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind() {
             false,
             &format!("ken_px8j_live_scope_depth_{depth}"),
         );
-        assert!(matches!(
-            result,
-            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct: "StaticWorkerBinding",
-                reason,
-            })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
-                && reason.contains("has no runtime representation")
-        ), "scope depth {depth} must retain its measured conservation refusal");
+        assert!(
+            matches!(
+                result,
+                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "StaticWorkerBinding",
+                    reason,
+                })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
+                    && reason.contains("has no runtime representation")
+            ),
+            "scope depth {depth} must retain its measured conservation refusal"
+        );
     }
 }
 #[test]
@@ -2630,7 +2634,11 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_function_result_contract: None,
+            generated_context_result_authorities: BTreeMap::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -3837,7 +3845,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs` above: a production
     // source absent from this roster is invisible to every pin that
     // iterates it.
-    ("lowering/aggregates.rs", include_str!("../../aggregates.rs")),
+    (
+        "lowering/aggregates.rs",
+        include_str!("../../aggregates.rs"),
+    ),
     // `RT-EMITTER-EFFECTS-SPLIT` `D1` — the effects emitter. Registered here
     // the moment the module exists, for the same reason as
     // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs`/`aggregates.rs` above:
@@ -4349,7 +4360,6 @@ fn the_bare_source_term_detector_catches_the_shape_it_is_looking_for() {
     ));
 }
 
-
 // ─── RT-FNSPLIT-B2A-S AC-1/AC-6 — the retained-body carrier holds a NAME ──────
 //
 // ⛔ AC-1 asks for this structurally, not asserted. It reads the DECLARATIONS of
@@ -4395,7 +4405,6 @@ fn the_field_inventory_extractor_sees_an_added_term_field() {
          the inventory equality"
     );
 }
-
 
 /// **`RT-FNSPLIT-B2A-S` D2 — the plan cannot escape into the compiled artifact,
 /// shown by the type system rather than asserted in prose.**
@@ -5102,8 +5111,7 @@ fn a_retained_body_is_defined_once_even_when_called_twice() {
          test measures nothing, whatever the relation below reports."
     );
     assert_eq!(
-        twice,
-        once,
+        twice, once,
         "AC-6 -- one retained closure occurrence applied twice performed \
          {twice} origin->expression resolutions against {once} when applied \
          once. The selected functionized authority must define that retained \
@@ -5249,7 +5257,6 @@ fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
         }) if reason == expected_reason
     ));
 }
-
 
 // ── `RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1` — AC-1, the seam property ────────
 //

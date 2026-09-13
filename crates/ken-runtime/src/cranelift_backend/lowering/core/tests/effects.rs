@@ -12,9 +12,7 @@ use cranelift_module::default_libcall_names;
 
 use crate::cranelift_backend::artifact::native_isa_for_lowering_tests as native_isa;
 
-use super::constructors::{
-    ac_c7_bind_arena, c2_compile_edge_with_arg, c2_run_edge_with_arg,
-};
+use super::constructors::{ac_c7_bind_arena, c2_compile_edge_with_arg, c2_run_edge_with_arg};
 
 /// Exercise the checked-reply mint without involving any resource operation.
 /// The fixture deliberately enters through `mint_validated_progress_nat`, so
@@ -107,7 +105,11 @@ fn run_checked_bounded_nat_fixture(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_function_result_contract: None,
+            generated_context_result_authorities: BTreeMap::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -345,9 +347,7 @@ fn run_checked_bounded_nat_fixture(
         .define_function(func_id, &mut context)
         .map_err(|error| backend_module(error.to_string()))?;
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
-    let carrier_identity_catalog = compiler
-        .static_transition_plan
-        .carrier_identity_catalog()?;
+    let carrier_identity_catalog = compiler.static_transition_plan.carrier_identity_catalog()?;
     let compiled = CompiledModule::from_parts(
         module,
         func_id,
@@ -622,9 +622,7 @@ extern "C" fn b2f_host_context_probe(
             mismatches + usize::from(host_context as usize != expected),
         ));
     });
-    if host_context as usize != expected
-        || operation != ken_host::HostOpV1::ConsoleWrite as i64
-    {
+    if host_context as usize != expected || operation != ken_host::HostOpV1::ConsoleWrite as i64 {
         return -1;
     }
     let layout = ken_host::host_effect_wire_layout_v1(ken_host::HostOpV1::ConsoleWrite)
@@ -660,9 +658,7 @@ fn b2f_context_fixture() -> RuntimeExpr {
     }
 }
 
-fn run_b2f_context_fixture(
-    mutation: HostContextPropagationMutation,
-) -> (i64, (usize, usize)) {
+fn run_b2f_context_fixture(mutation: HostContextPropagationMutation) -> (i64, (usize, usize)) {
     struct Reset;
     impl Drop for Reset {
         fn drop(&mut self) {
@@ -675,10 +671,7 @@ fn run_b2f_context_fixture(
     set_host_context_propagation_mutation(mutation);
     let isa = native_isa().expect("native ISA");
     let mut jit = JITBuilder::with_isa(isa, default_libcall_names());
-    jit.symbol(
-        "ken_host_dispatch_v1",
-        b2f_host_context_probe as *const u8,
-    );
+    jit.symbol("ken_host_dispatch_v1", b2f_host_context_probe as *const u8);
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let expression = b2f_context_fixture();
     let compiled = compile_expr_into_module(
@@ -720,8 +713,15 @@ fn run_b2f_context_fixture(
 #[test]
 fn root_and_descendant_effects_share_only_the_direct_host_context() {
     let (status, exact) = run_b2f_context_fixture(HostContextPropagationMutation::Exact);
-    assert_eq!(status, 0, "the descendant process answer must reach the root");
-    assert_eq!(exact, (2, 0), "both host effects must see the direct context");
+    assert_eq!(
+        status, 0,
+        "the descendant process answer must reach the root"
+    );
+    assert_eq!(
+        exact,
+        (2, 0),
+        "both host effects must see the direct context"
+    );
 
     for mutation in [
         HostContextPropagationMutation::ServicesPointer,
@@ -838,10 +838,7 @@ extern "C" fn b2f_process_pair_probe(
     _request_size: i64,
     reply: *mut std::ffi::c_void,
 ) -> i64 {
-    if operation != ken_host::HostOpV1::FsReadFile as i64
-        || request.is_null()
-        || reply.is_null()
-    {
+    if operation != ken_host::HostOpV1::FsReadFile as i64 || request.is_null() || reply.is_null() {
         return -1;
     }
     let layout = ken_host::host_effect_wire_layout_v1(ken_host::HostOpV1::FsReadFile)
@@ -875,10 +872,7 @@ fn compile_b2f_fixture(
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let isa = native_isa().expect("native ISA");
     let mut jit = JITBuilder::with_isa(isa, default_libcall_names());
-    jit.symbol(
-        "ken_host_dispatch_v1",
-        b2f_process_pair_probe as *const u8,
-    );
+    jit.symbol("ken_host_dispatch_v1", b2f_process_pair_probe as *const u8);
     compile_expr_into_module(
         JITModule::new(jit),
         symbol,
@@ -921,10 +915,8 @@ extern "C" fn directory_reply_probe(
     if operation != ken_host::HostOpV1::FsReadDirectory as i64 || reply.is_null() {
         return -1;
     }
-    let layout = ken_host::host_effect_wire_layout_v1(
-        ken_host::HostOpV1::FsReadDirectory,
-    )
-    .expect("FsReadDirectory has a generated wire layout");
+    let layout = ken_host::host_effect_wire_layout_v1(ken_host::HostOpV1::FsReadDirectory)
+        .expect("FsReadDirectory has a generated wire layout");
     DIRECTORY_REPLY_PAYLOAD.with(|payload| {
         let payload = payload.borrow();
         unsafe {
@@ -966,14 +958,10 @@ fn directory_reply_fixture() -> RuntimeExpr {
     }
 }
 
-fn compile_directory_reply_fixture(
-) -> Result<CompiledModule<JITModule>, CraneliftBackendError> {
+fn compile_directory_reply_fixture() -> Result<CompiledModule<JITModule>, CraneliftBackendError> {
     let isa = native_isa().expect("native ISA");
     let mut jit = JITBuilder::with_isa(isa, default_libcall_names());
-    jit.symbol(
-        "ken_host_dispatch_v1",
-        directory_reply_probe as *const u8,
-    );
+    jit.symbol("ken_host_dispatch_v1", directory_reply_probe as *const u8);
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     compile_expr_into_module(
         JITModule::new(jit),
@@ -992,8 +980,8 @@ fn compile_directory_reply_fixture(
 
 fn run_directory_reply_fixture(payload: Vec<u8>) -> i64 {
     DIRECTORY_REPLY_PAYLOAD.with(|held| *held.borrow_mut() = payload);
-    let compiled = compile_directory_reply_fixture()
-        .expect("DirectoryEntries decoder fixture lowers");
+    let compiled =
+        compile_directory_reply_fixture().expect("DirectoryEntries decoder fixture lowers");
     let input = BorrowedFixtureValue {
         kind: 1,
         tag: 0,
@@ -1018,10 +1006,7 @@ fn run_directory_reply_fixture(payload: Vec<u8>) -> i64 {
 /// over-count, or invalid closed kind fails before the result is published.
 #[test]
 fn directory_entries_decoder_is_bounded_and_consumes_the_whole_payload() {
-    let valid = vec![
-        1, 0, 0, 0, 0, 0, 0, 0,
-        1, 0, 0, 0, 0, 0, 0, 0, b'a', 0,
-    ];
+    let valid = vec![1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, b'a', 0];
     assert_eq!(run_directory_reply_fixture(vec![0; 8]), 0);
     assert_eq!(run_directory_reply_fixture(valid.clone()), 0);
 
@@ -1056,16 +1041,13 @@ fn directory_entry_name_is_a_governed_host_response_referent() {
         }
     }
     let _reset = Reset;
-    set_effect_seat_dispatch_mutation(
-        EffectSeatDispatchMutation::HostResponseAsScalar,
-    );
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::HostResponseAsScalar);
     let error = match compile_directory_reply_fixture() {
         Ok(_) => panic!("a scalar inherited the response-name owner proof"),
         Err(error) => error.to_string(),
     };
     assert!(
-        error.contains("HostResponseReferent")
-            && error.contains("different node"),
+        error.contains("HostResponseReferent") && error.contains("different node"),
         "the refusal must come from exact response-name reconciliation: {error}"
     );
 }
@@ -1188,7 +1170,10 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
         .expect("the exact declared pair runs")
         .1
         .expect("the exact declared pair returns a status");
-    assert_eq!(exact, 0, "the descendant process answer must reach the root");
+    assert_eq!(
+        exact, 0,
+        "the descendant process answer must reach the root"
+    );
     let exact_observation = B2F_PROCESS_PAIR_OBSERVATION.with(std::cell::Cell::get);
     assert_eq!(exact_observation, (1, ingress.capability));
 
@@ -1221,11 +1206,7 @@ fn the_process_pair_reaches_a_retained_body_only_through_declared_slots() {
             .expect("the explicit launch-ingress recovery mutation runs")
             .1
             .expect("the explicit launch-ingress recovery mutation returns a status");
-        assert_eq!(
-            recovered,
-            0,
-            "{RECOVERY_ASSERTION}"
-        );
+        assert_eq!(recovered, 0, "{RECOVERY_ASSERTION}");
     })
     .expect_err("the reintroduced launch-ingress mutation must red");
     let recovery_message = recovery_red
@@ -1279,8 +1260,10 @@ fn borrowed_ingress_malformed_metadata_fails_closed() {
         len: 2,
     };
     assert_eq!(run_borrowed_fixture(&expr, &wrong_arity), -1);
-    assert!(crate::object_linker_packaging::process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile())
-        .contains("ken native trap: malformed borrowed process input"));
+    assert!(crate::object_linker_packaging::process_starter_c_stub(
+        &crate::boundary_resource_profile::starter_smoke_profile()
+    )
+    .contains("ken native trap: malformed borrowed process input"));
 }
 
 #[test]
@@ -1613,10 +1596,7 @@ fn abi_s6_mapping_kind_fixture(symbols: &crate::NativeProcessSymbols) -> Runtime
                 cases: vec![crate::RuntimeMatchCase {
                     constructor: symbols.resource_kind_mismatch.clone(),
                     binders: 2,
-                    body: px8n_failure(
-                        symbols,
-                        RuntimeExpr::Value(RuntimeValue::Int(91.into())),
-                    ),
+                    body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(91.into()))),
                 }],
                 default: trap(),
             },
@@ -1683,9 +1663,7 @@ extern "C" fn abi_s6_d5a_scripted_dispatch(
     if request_size != i64::from(wire.request_size) {
         return -1;
     }
-    let load = |offset: u32| unsafe {
-        *(request.cast::<u8>().add(offset as usize).cast::<u64>())
-    };
+    let load = |offset: u32| unsafe { *(request.cast::<u8>().add(offset as usize).cast::<u64>()) };
     if load(wire.request_offsets[0]) != 8 || load(wire.request_offsets[1]) != 0 {
         return -1;
     }
@@ -1718,17 +1696,11 @@ extern "C" fn abi_s6_d5a_scripted_dispatch(
 #[test]
 fn abi_s6_d5a_mapping_limit_and_mapping_kind_reify_without_trapping() {
     assert_eq!(
-        run_abi_s6_d5a_reifier_fixture(
-            ABI_S6_D5A_MAPPING_LIMIT,
-            abi_s6_mapping_limit_fixture,
-        ),
+        run_abi_s6_d5a_reifier_fixture(ABI_S6_D5A_MAPPING_LIMIT, abi_s6_mapping_limit_fixture,),
         90
     );
     assert_eq!(
-        run_abi_s6_d5a_reifier_fixture(
-            ABI_S6_D5A_KIND_MISMATCH,
-            abi_s6_mapping_kind_fixture,
-        ),
+        run_abi_s6_d5a_reifier_fixture(ABI_S6_D5A_KIND_MISMATCH, abi_s6_mapping_kind_fixture,),
         91
     );
 }
@@ -1848,9 +1820,7 @@ extern "C" fn abi_s6_d5a_view_dispatch(
         fixture.malformed = 2;
         return -1;
     }
-    let load = |offset: u32| unsafe {
-        *(request.cast::<u8>().add(offset as usize).cast::<u64>())
-    };
+    let load = |offset: u32| unsafe { *(request.cast::<u8>().add(offset as usize).cast::<u64>()) };
     let valid = match expected {
         ken_host::HostOpV1::MappingAllocate => {
             load(wire.request_offsets[0]) == 8 && load(wire.request_offsets[1]) == 1
@@ -1977,10 +1947,7 @@ fn px8_dynamic_read_residual_fixture(symbols: &crate::NativeProcessSymbols) -> R
             crate::RuntimeMatchCase {
                 constructor: symbols.result_err.clone(),
                 binders: 1,
-                body: px8n_failure(
-                    symbols,
-                    RuntimeExpr::Value(RuntimeValue::Int((81).into())),
-                ),
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int((81).into()))),
             },
             crate::RuntimeMatchCase {
                 constructor: symbols.result_ok.clone(),
@@ -1996,10 +1963,7 @@ fn px8_dynamic_read_residual_fixture(symbols: &crate::NativeProcessSymbols) -> R
             crate::RuntimeMatchCase {
                 constructor: symbols.result_err.clone(),
                 binders: 1,
-                body: px8n_failure(
-                    symbols,
-                    RuntimeExpr::Value(RuntimeValue::Int((80).into())),
-                ),
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int((80).into()))),
             },
             crate::RuntimeMatchCase {
                 constructor: symbols.result_ok.clone(),
@@ -2051,13 +2015,15 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
         .trap_identity(&malformed_dynamic_constructor_trap())
         .expect("the dynamic residual belongs to the plan's existing catalog")
         .abi_word();
-    let expected = -((identity
-        << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
+    let expected = -((identity << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)
         | crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_TAG);
 
     let (baseline, baseline_fixture) =
         run_px8n_arm_fixture(PX8N_SHORT_READ, px8_dynamic_read_residual_fixture);
-    assert_eq!(baseline_fixture.malformed_request, 0, "baseline request shape");
+    assert_eq!(
+        baseline_fixture.malformed_request, 0,
+        "baseline request shape"
+    );
     assert_eq!(baseline_fixture.call_index, 3, "baseline host dispatches");
     assert_eq!(baseline, 0, "the valid 0/1 producer domain reaches success");
 
@@ -2065,10 +2031,8 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
         EffectSeatDispatchMutation::ForceReadProgressOutsideAlternatives,
     );
     let _reset = Reset;
-    let (actual, fixture) = run_px8n_arm_fixture(
-        PX8N_SHORT_READ,
-        px8_dynamic_read_residual_fixture,
-    );
+    let (actual, fixture) =
+        run_px8n_arm_fixture(PX8N_SHORT_READ, px8_dynamic_read_residual_fixture);
     assert_eq!(fixture.malformed_request, 0, "production request shape");
     assert_eq!(fixture.call_index, 3, "three real host dispatches");
     assert_eq!(actual, expected);
@@ -2870,16 +2834,11 @@ extern "C" fn px8n_scripted_host_dispatch(
 ) -> i64 {
     // SAFETY: the direct context points to the live fixture for the duration
     // of the compiled call and is never retained by the dispatcher.
-    let fixture = unsafe {
-        &mut *(host_context
-            .cast_mut()
-            .cast::<Px8nHostReplyFixture>())
-    };
+    let fixture = unsafe { &mut *(host_context.cast_mut().cast::<Px8nHostReplyFixture>()) };
     let expected = if fixture.call_index == 0
         || (fixture.call_index == 1
             && fixture.scenario != PX8I_METADATA_BIG
-            && fixture.scenario & PX8_ERRPROJ_SCENARIO_MASK
-                != ABI_REVOKE_D2_ERRPROJ_REVOKED)
+            && fixture.scenario & PX8_ERRPROJ_SCENARIO_MASK != ABI_REVOKE_D2_ERRPROJ_REVOKED)
     {
         ken_host::HostOpV1::BufferAllocate
     } else if fixture.scenario == PX8I_METADATA_BIG
@@ -3402,11 +3361,8 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         ken_host::HostOpV1::FsOpen,
     ];
     assert_eq!(
-        host_effect_seat_contract_of(
-            ken_host::HostOpV1::ConsoleRead,
-            EffectSeatSlot::Argument(0),
-        )
-        .map(|(operation, need, _)| (operation, need)),
+        host_effect_seat_contract_of(ken_host::HostOpV1::ConsoleRead, EffectSeatSlot::Argument(0),)
+            .map(|(operation, need, _)| (operation, need)),
         Some((
             EffectSeatOperation::SelectClosedTag,
             EffectSeatNeed::ConstructorTag,
@@ -3414,11 +3370,8 @@ fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_ke
         "ConsoleRead.stream is the closed Stream tag seat"
     );
     assert_eq!(
-        host_effect_seat_contract_of(
-            ken_host::HostOpV1::ConsoleRead,
-            EffectSeatSlot::Argument(1),
-        )
-        .map(|(operation, need, _)| (operation, need)),
+        host_effect_seat_contract_of(ken_host::HostOpV1::ConsoleRead, EffectSeatSlot::Argument(1),)
+            .map(|(operation, need, _)| (operation, need)),
         Some((
             EffectSeatOperation::NarrowExactInt,
             EffectSeatNeed::ExactIntU64,
@@ -3558,7 +3511,10 @@ fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() 
         ken_host::HostOpV1::BufferAllocate,
         EffectSeatSlot::Argument(0),
     );
-    let freeze_length = contract(ken_host::HostOpV1::BufferFreeze, EffectSeatSlot::Argument(1));
+    let freeze_length = contract(
+        ken_host::HostOpV1::BufferFreeze,
+        EffectSeatSlot::Argument(1),
+    );
     assert_eq!(allocate.1, EffectSeatNeed::ExactIntU64);
     assert_eq!(freeze_length.1, EffectSeatNeed::ExactIntU64);
     assert_ne!(
@@ -3588,12 +3544,20 @@ fn seats_of_equal_structural_kind_stay_distinct_on_operation_ordinal_and_need() 
         EffectSeatOperation::ObserveCapabilityToken
     );
     assert_eq!(
-        contract(ken_host::HostOpV1::ResourceRelease, EffectSeatSlot::Argument(0)).0,
+        contract(
+            ken_host::HostOpV1::ResourceRelease,
+            EffectSeatSlot::Argument(0)
+        )
+        .0,
         EffectSeatOperation::ObserveResourceHandle
     );
     assert_ne!(
         open_capability.1,
-        contract(ken_host::HostOpV1::ResourceRelease, EffectSeatSlot::Argument(0)).1,
+        contract(
+            ken_host::HostOpV1::ResourceRelease,
+            EffectSeatSlot::Argument(0)
+        )
+        .1,
         "a capability token and a resource handle share one need"
     );
 }
@@ -3989,9 +3953,9 @@ fn complementary_omissions_across_two_visits_both_reject_though_their_union_is_c
         "the refusal is not the incomplete-visit one: {error}"
     );
     set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
-    compile_b2f_process_pair_fixture().expect("the fixture compiles again once the mutation clears");
+    compile_b2f_process_pair_fixture()
+        .expect("the fixture compiles again once the mutation clears");
 }
-
 
 // ---------------------------------------------------------------------------
 // `RT-DECL-CLOSURE-PORT` `D7` — the carried exact-`Int` capacity route
@@ -4299,10 +4263,7 @@ fn capacity_outcome_fixture(
             crate::RuntimeMatchCase {
                 constructor: symbols.result_ok.clone(),
                 binders: 1,
-                body: px8n_failure(
-                    symbols,
-                    RuntimeExpr::Value(RuntimeValue::Int(41.into())),
-                ),
+                body: px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(41.into()))),
             },
         ],
         default: RuntimeTrap {
@@ -4400,12 +4361,7 @@ fn framed_capacity_rows() -> Vec<(&'static str, RuntimeExpr, i64, u64)> {
             71,
             0,
         ),
-        (
-            "negative wide",
-            big(crate::Sign::Negative, &[0, 1]),
-            71,
-            0,
-        ),
+        ("negative wide", big(crate::Sign::Negative, &[0, 1]), 71, 0),
         // ⭐ **The row that isolates the VIEWED decoder's sign bit, and none of
         // the six framed values does.** `-1` is negative but within the
         // immediate range, so it exercises the immediate arm's sign test; both
@@ -4467,11 +4423,10 @@ fn a_carried_capacity_narrows_exactly_as_a_specialized_one_over_both_representat
     for (name, capacity, expected_code, expected_capacity) in framed_capacity_rows() {
         let specialized_capacity = capacity.clone();
         crate::cranelift_backend::lowering::units::reset_capacity_phase_dispatch();
-        let (specialized_code, specialized_probe) =
-            run_capacity_fixture(&move |symbols| {
-                capacity_outcome_fixture(symbols, specialized_capacity.clone())
-            })
-            .unwrap_or_else(|error| panic!("{name}: specialized capacity compiles: {error:?}"));
+        let (specialized_code, specialized_probe) = run_capacity_fixture(&move |symbols| {
+            capacity_outcome_fixture(symbols, specialized_capacity.clone())
+        })
+        .unwrap_or_else(|error| panic!("{name}: specialized capacity compiles: {error:?}"));
         let specialized_census =
             crate::cranelift_backend::lowering::units::capacity_phase_dispatch();
 
@@ -4564,10 +4519,9 @@ fn a_capacity_that_is_not_an_exact_int_fails_closed_and_is_never_invalid_bounds(
 
     let row = |what: &str, value: RuntimeExpr| {
         crate::cranelift_backend::lowering::units::reset_capacity_phase_dispatch();
-        let outcome = run_capacity_fixture(&move |symbols| {
-            carried_capacity_fixture(symbols, value.clone())
-        })
-        .unwrap_or_else(|error| panic!("{what}: the fixture compiles: {error:?}"));
+        let outcome =
+            run_capacity_fixture(&move |symbols| carried_capacity_fixture(symbols, value.clone()))
+                .unwrap_or_else(|error| panic!("{what}: the fixture compiles: {error:?}"));
         assert_eq!(
             crate::cranelift_backend::lowering::units::capacity_phase_dispatch(),
             (0, 1),
@@ -4577,15 +4531,24 @@ fn a_capacity_that_is_not_an_exact_int_fails_closed_and_is_never_invalid_bounds(
     };
 
     // The two positive rows. Without them the refusals below are unanchored.
-    let (allocated, allocated_probe) = row("a valid Int", RuntimeExpr::Value(RuntimeValue::Int(8.into())));
+    let (allocated, allocated_probe) = row(
+        "a valid Int",
+        RuntimeExpr::Value(RuntimeValue::Int(8.into())),
+    );
     assert_eq!(allocated, ALLOCATED, "a valid carried capacity allocates");
     assert_eq!(
         allocated_probe,
-        CapacityWireProbe { calls: 1, capacity: 8 },
+        CapacityWireProbe {
+            calls: 1,
+            capacity: 8
+        },
         "a valid carried capacity dispatches exactly once with its own magnitude"
     );
 
-    let (bounded, bounded_probe) = row("an out-of-range Int", big(crate::Sign::NonNegative, &[0, 1]));
+    let (bounded, bounded_probe) = row(
+        "an out-of-range Int",
+        big(crate::Sign::NonNegative, &[0, 1]),
+    );
     assert_eq!(
         bounded, INVALID_BOUNDS,
         "a well-formed Int that does not fit u64 takes the semantic InvalidBounds lane"
@@ -4595,7 +4558,10 @@ fn a_capacity_that_is_not_an_exact_int_fails_closed_and_is_never_invalid_bounds(
     // The taxonomy rows.
     for (what, value) in [
         ("a Bool", RuntimeExpr::Value(RuntimeValue::Bool(true))),
-        ("Bytes", RuntimeExpr::Value(RuntimeValue::Bytes(vec![1, 2, 3]))),
+        (
+            "Bytes",
+            RuntimeExpr::Value(RuntimeValue::Bytes(vec![1, 2, 3])),
+        ),
         (
             "a String",
             RuntimeExpr::Value(RuntimeValue::String("not a number".to_string())),
@@ -4889,7 +4855,13 @@ fn removing_the_carried_capacity_arm_or_restoring_the_bulk_conversion_refuses_at
     set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
     let (allocated, probe) = carried().expect("the unmutated carried capacity allocates");
     assert_eq!(allocated, 41);
-    assert_eq!(probe, CapacityWireProbe { calls: 1, capacity: 8 });
+    assert_eq!(
+        probe,
+        CapacityWireProbe {
+            calls: 1,
+            capacity: 8
+        }
+    );
 
     for (mutation, what) in [
         (
@@ -5086,16 +5058,14 @@ fn run_ac1_specialized_sibling(producer: &str) -> (i64, i64) {
 /// selection reddens one.
 #[test]
 fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
-    let (selected, selected_default) =
-        run_ac1_specialized_sibling(AC1_SIBLING_SELECTED);
+    let (selected, selected_default) = run_ac1_specialized_sibling(AC1_SIBLING_SELECTED);
     assert_eq!(
         selected, AC1_SIBLING_PAYLOAD,
         "the selecting producer must reach the case body and deliver the child \
          it bound"
     );
 
-    let (unselected, unselected_default) =
-        run_ac1_specialized_sibling(AC1_SIBLING_UNSELECTED);
+    let (unselected, unselected_default) = run_ac1_specialized_sibling(AC1_SIBLING_UNSELECTED);
     assert_eq!(
         selected_default, unselected_default,
         "changing only the producer must not change the planned default identity"
@@ -5165,9 +5135,15 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
     assert_eq!(
         either_phase,
         vec![
-            (ken_host::HostOpV1::ConsoleWrite, EffectSeatSlot::Argument(1)),
+            (
+                ken_host::HostOpV1::ConsoleWrite,
+                EffectSeatSlot::Argument(1)
+            ),
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(2)),
-            (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(1)),
+            (
+                ken_host::HostOpV1::FsAppendFile,
+                EffectSeatSlot::Argument(1)
+            ),
             (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(1)),
             (
                 ken_host::HostOpV1::MappingWriteView,
@@ -5181,14 +5157,32 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
         vec![
             (ken_host::HostOpV1::FsReadFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(0)),
+            (
+                ken_host::HostOpV1::FsAppendFile,
+                EffectSeatSlot::Argument(0)
+            ),
             (ken_host::HostOpV1::FsMetadata, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::FsReadDirectory, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::FsCreateDirectory, EffectSeatSlot::Argument(1)),
-            (ken_host::HostOpV1::FsRemoveFile, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::FsRemoveDirectory, EffectSeatSlot::Argument(1)),
+            (
+                ken_host::HostOpV1::FsReadDirectory,
+                EffectSeatSlot::Argument(0)
+            ),
+            (
+                ken_host::HostOpV1::FsCreateDirectory,
+                EffectSeatSlot::Argument(1)
+            ),
+            (
+                ken_host::HostOpV1::FsRemoveFile,
+                EffectSeatSlot::Argument(0)
+            ),
+            (
+                ken_host::HostOpV1::FsRemoveDirectory,
+                EffectSeatSlot::Argument(1)
+            ),
             (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::FsChangeMode, EffectSeatSlot::Argument(0)),
+            (
+                ken_host::HostOpV1::FsChangeMode,
+                EffectSeatSlot::Argument(0)
+            ),
             (ken_host::HostOpV1::FsOpen, EffectSeatSlot::Argument(0)),
         ],
         "a SPECIALIZED_ONLY byte-span seat lacks its evidence disposition"
@@ -5396,7 +5390,10 @@ fn d5_the_two_byte_span_refusals_are_distinct_typed_values_without_dispatch() {
     // wrong meanings would pass an inequality and be wrong.
     assert_eq!(
         (bounds, not_a_span),
-        (RESOURCE_ERROR_INVALID_BOUNDS, RESOURCE_ERROR_MALFORMED_RESOURCE),
+        (
+            RESOURCE_ERROR_INVALID_BOUNDS,
+            RESOURCE_ERROR_MALFORMED_RESOURCE
+        ),
         "outcome 1 must arrive as InvalidBounds and outcome 2 as MalformedResource"
     );
     // And neither is the generic compiled-function failure, which is what a
@@ -5566,9 +5563,7 @@ fn a_discarded_visit_refuses_before_its_body_is_defined() {
     );
 
     // The whole-pass backstop still rejects independently.
-    set_effect_seat_visit_mutation(
-        EffectSeatVisitMutation::DropCommittedGroupBeforeGlobalClose,
-    );
+    set_effect_seat_visit_mutation(EffectSeatVisitMutation::DropCommittedGroupBeforeGlobalClose);
     let refusal = recursive_port_process_compiles(&expr);
     set_effect_seat_visit_mutation(EffectSeatVisitMutation::Exact);
     let error = match refusal {
@@ -5611,16 +5606,13 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
     recursive_port_process_compiles(&expr)
         .expect("the correctly classified response child compiles");
 
-    set_effect_seat_dispatch_mutation(
-        EffectSeatDispatchMutation::HostResponseAsScalar,
-    );
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::HostResponseAsScalar);
     let error = recursive_port_process_compiles(&expr)
         .expect_err("a scalar must not inherit the response referent's owner proof")
         .to_string();
     set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
     assert!(
-        error.contains("HostResponseReferent")
-            && error.contains("different node"),
+        error.contains("HostResponseReferent") && error.contains("different node"),
         "the refusal must come from exact child reconciliation: {error}"
     );
 }

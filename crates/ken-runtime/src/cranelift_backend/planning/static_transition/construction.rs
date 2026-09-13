@@ -29,15 +29,6 @@ use super::abi::{
     build_abi_plane, install_continuation_context_abi, install_continuation_specialization_abi,
     AbiPlane, AbiRootIngress,
 };
-#[cfg(feature = "px8-ds-test-support")]
-use super::aggregates::{
-    apply_checked_ih_continuation_inheritance_mutation,
-    checked_ih_intervening_binder_population_control_is_active,
-    record_checked_ih_continuation_inheritances,
-    record_checked_ih_generated_entry_admissions,
-    record_checked_ih_generated_entry_confluences,
-    run_checked_ih_intervening_binder_population_control,
-};
 #[cfg(test)]
 #[allow(unused_imports)]
 use super::aggregates::{
@@ -45,19 +36,25 @@ use super::aggregates::{
     host_effect_recipe_tree, node_referent_owners, validate_aggregate_producers_are_unique,
     SynthesizedAggregateStep,
 };
+#[cfg(feature = "px8-ds-test-support")]
+use super::aggregates::{
+    apply_checked_ih_continuation_inheritance_mutation,
+    checked_ih_intervening_binder_population_control_is_active,
+    record_checked_ih_continuation_inheritances, record_checked_ih_generated_entry_admissions,
+    record_checked_ih_generated_entry_confluences,
+    run_checked_ih_intervening_binder_population_control,
+};
 #[allow(unused_imports)]
 use super::aggregates::{
     build_aggregate_ownership_plan, build_checked_ih_continuation_inheritances,
     build_checked_ih_environment_transports, build_checked_ih_generated_entry_accesses,
-    build_checked_ih_generated_entry_confluences,
-    lifetime_referent_affinity, validate_aggregate_ownership_plan,
-    validate_checked_ih_continuation_inheritances, validate_checked_ih_environment_transports,
-    validate_checked_ih_generated_entry_accesses,
+    build_checked_ih_generated_entry_confluences, lifetime_referent_affinity,
+    validate_aggregate_ownership_plan, validate_checked_ih_continuation_inheritances,
+    validate_checked_ih_environment_transports, validate_checked_ih_generated_entry_accesses,
     validate_checked_ih_generated_entry_confluences, AggregateOccurrenceId,
-    AggregateOccurrenceProducer,
-    PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
-    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
-    SynthesizedAggregateRoot, SynthesizedDynamicSet,
+    AggregateOccurrenceProducer, PlannedAggregateAllocation, PlannedAggregateOwnership,
+    PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
+    SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
 };
 #[cfg(test)]
 use super::closure::apply_static_worker_member_mutation;
@@ -104,13 +101,16 @@ use super::effects::{
     PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[allow(unused_imports)]
-use super::immediate_bridge::build_immediate_bridge_realization_plan;
+use super::immediate_bridge::publish_immediate_bridge_realization_plan;
 use super::joins_traps::{
     build_join_result_plan, planned_partiality_trap, JoinPlanToken, JoinResultRepresentation,
     PlannedJoinResult,
 };
 use super::occurrences::{
     build_occurrence_authority_plan, origin_of, validate_occurrence_authority_plan, StaticOriginId,
+};
+use super::responses::{
+    publish_checked_ih_post_call_consumers, validate_checked_ih_post_call_consumers,
 };
 use super::semantic_ir::{
     build_bool_constructor_inventory, build_semantic_plane,
@@ -294,6 +294,7 @@ impl<'src> Planner<'src> {
                 continuation_specializations: Vec::new(),
                 continuation_specialization_calls: Vec::new(),
                 required_consumer_projections: BTreeMap::new(),
+                checked_ih_post_call_consumers: Vec::new(),
                 immediate_bridge_realizations: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
                 static_response_continuations: Vec::new(),
@@ -422,7 +423,9 @@ impl<'src> Planner<'src> {
             RuntimeExpr::Effect {
                 family, operation, ..
             } => {
-                self.intern_trap(&super::joins_traps::dead_arm_effect_trap(family, *operation))?;
+                self.intern_trap(&super::joins_traps::dead_arm_effect_trap(
+                    family, *operation,
+                ))?;
             }
             _ => {}
         }
@@ -1153,14 +1156,12 @@ impl<'src> Planner<'src> {
                         arguments
                             .iter()
                             .filter(|argument| {
-                                sources
-                                    .get(argument.0 as usize)
-                                    .is_some_and(|source| {
-                                        source.source
-                                            == SemanticSourceKind::Expression(
-                                                RuntimeExprShape::CheckedComputationalIHInvocation,
-                                            )
-                                    })
+                                sources.get(argument.0 as usize).is_some_and(|source| {
+                                    source.source
+                                        == SemanticSourceKind::Expression(
+                                            RuntimeExprShape::CheckedComputationalIHInvocation,
+                                        )
+                                })
                             })
                             .count(),
                     )
@@ -1190,7 +1191,9 @@ impl<'src> Planner<'src> {
                     .source_children(*recursor)?
                     .first()
                     .copied()
-                    .ok_or_else(|| planner_error("checked-IH lexical recursor has no body child"))?;
+                    .ok_or_else(|| {
+                        planner_error("checked-IH lexical recursor has no body child")
+                    })?;
                 realized.push((callee, body));
                 callee = body;
             }
@@ -1207,9 +1210,11 @@ impl<'src> Planner<'src> {
             let from_node = StaticNodeId(from.0);
             let to_node = StaticNodeId(to.0);
             if self.plan.entries.contains(&to_node)
-                || self.plan.edges.iter().any(|edge| {
-                    edge.kind == EdgeKind::DeclarationCall && edge.to == to_node
-                })
+                || self
+                    .plan
+                    .edges
+                    .iter()
+                    .any(|edge| edge.kind == EdgeKind::DeclarationCall && edge.to == to_node)
             {
                 return Err(planner_error(
                     "checked-IH recursor transfer aliases a callable unit boundary",
@@ -1259,8 +1264,7 @@ impl<'src> Planner<'src> {
             evidence.kind = EdgeKind::RealizedRecursorTransfer;
 
             let old_helper = PlannedHelperKey::edge(EdgeKind::StaticBody, *edge_id);
-            let new_helper =
-                PlannedHelperKey::edge(EdgeKind::RealizedRecursorTransfer, *edge_id);
+            let new_helper = PlannedHelperKey::edge(EdgeKind::RealizedRecursorTransfer, *edge_id);
             let helpers = self
                 .plan
                 .planned_helpers
@@ -1457,7 +1461,7 @@ impl<'src> Planner<'src> {
         // now final. Classify the immediate bridge population once before
         // response phase B can decide whether an owner exists.
         self.plan.immediate_bridge_realizations =
-            build_immediate_bridge_realization_plan(&self.plan)?;
+            publish_immediate_bridge_realization_plan(&self.plan)?;
         self.plan.install_static_response_context_plan_phase_b()?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
@@ -1493,17 +1497,22 @@ impl<'src> Planner<'src> {
             &self.plan,
             &self.plan.checked_ih_continuation_inheritances,
         )?;
+        self.plan.checked_ih_post_call_consumers =
+            publish_checked_ih_post_call_consumers(&self.plan)?;
+        validate_checked_ih_post_call_consumers(
+            &self.plan,
+            &self.plan.checked_ih_post_call_consumers,
+        )?;
         self.plan.checked_ih_generated_entry_confluences =
             build_checked_ih_generated_entry_confluences(&self.plan)?;
         validate_checked_ih_generated_entry_confluences(
             &self.plan,
             &self.plan.checked_ih_generated_entry_confluences,
         )?;
-        self.plan.checked_ih_generated_entry_accesses =
-            build_checked_ih_generated_entry_accesses(
-                &self.plan,
-                &self.plan.checked_ih_generated_entry_confluences,
-            )?;
+        self.plan.checked_ih_generated_entry_accesses = build_checked_ih_generated_entry_accesses(
+            &self.plan,
+            &self.plan.checked_ih_generated_entry_confluences,
+        )?;
         validate_checked_ih_generated_entry_accesses(
             &self.plan,
             &self.plan.checked_ih_generated_entry_confluences,
@@ -1617,17 +1626,18 @@ fn runtime_expr_tag(expr: &RuntimeExpr) -> u32 {
 #[cfg(test)]
 mod tests {
 
-    use super::super::*;
-    use crate::RuntimeValue;
     use super::super::tests::{
         b2ac_topology_fixtures, b2o_transparent_declaration, d2_declaration_and_anonymous_closure,
     };
-
+    use super::super::*;
+    use crate::RuntimeValue;
 
     /// A canonical digest of the Boundary-A transfer graph: node transitions in
     /// order, then every edge as `(from, to, kind)` in order.
     #[cfg(test)]
-    pub(in crate::cranelift_backend::planning::static_transition) fn b2ac_topology_digest(expr: &RuntimeExpr) -> String {
+    pub(in crate::cranelift_backend::planning::static_transition) fn b2ac_topology_digest(
+        expr: &RuntimeExpr,
+    ) -> String {
         let plan = plan_static_transition_graph(expr, &BTreeMap::new()).expect("plannable");
         let mut digest = String::new();
         digest.push_str(&format!(
@@ -1753,7 +1763,6 @@ mod tests {
         );
     }
 
-
     /// Emit one fixture end to end, returning the failure text if it refuses.
     #[cfg(test)]
     pub(in crate::cranelift_backend::planning::static_transition) fn ac3_emit(
@@ -1766,8 +1775,7 @@ mod tests {
         };
         let seed_env = NativeSeedEnvironment::empty();
         compile_expr_into_object_module(
-            new_object_module_for_lowering_tests("ac3")
-                .map_err(|error| format!("{error:?}"))?,
+            new_object_module_for_lowering_tests("ac3").map_err(|error| format!("{error:?}"))?,
             "ac3_entry",
             cranelift_module::Linkage::Export,
             root,
@@ -1872,7 +1880,6 @@ mod tests {
              same closeout failure. got {collapsed_declaration:?}"
         );
     }
-
 
     /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-1b` — the `StaticBodyTarget` class
     /// takes its ISSUED pair, not its seed's own ordinal.**
@@ -2267,7 +2274,9 @@ mod tests {
 
     /// The definition arms of a `D2` plan, paired with each unit's declared
     /// `(parameters, captures)`.
-    pub(in crate::cranelift_backend::planning::static_transition) fn d2_units(plan: &StaticTransitionPlan<'_>) -> Vec<(AbiUnitDefinition, (u32, u32))> {
+    pub(in crate::cranelift_backend::planning::static_transition) fn d2_units(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> Vec<(AbiUnitDefinition, (u32, u32))> {
         plan.emittable_units()
             .expect("validated units")
             .into_iter()
@@ -2406,7 +2415,6 @@ mod tests {
         );
     }
 
-
     /// **`RT-DECL-CLOSURE-PORT` `D4` fixture — one program holding BOTH target
     /// classes, each actually referenced.**
     ///
@@ -2420,7 +2428,8 @@ mod tests {
     ///
     /// The two declarations carry different arities on purpose, so an assertion
     /// cannot be satisfied by reading the wrong unit's header and still agree.
-    pub(in crate::cranelift_backend::planning::static_transition) fn d4_both_target_classes() -> (RuntimeExpr, RuntimeDeclaration, RuntimeDeclaration) {
+    pub(in crate::cranelift_backend::planning::static_transition) fn d4_both_target_classes(
+    ) -> (RuntimeExpr, RuntimeDeclaration, RuntimeDeclaration) {
         let closure_seed = RuntimeDeclaration {
             symbol: "decl:fixture::d4::callable".to_string(),
             kind: RuntimeDeclarationKind::Transparent {
@@ -2474,11 +2483,7 @@ mod tests {
     /// record sit above an edge that went somewhere else entirely.
     pub(in crate::cranelift_backend::planning::static_transition) fn d4_declaration_calls(
         plan: &StaticTransitionPlan<'_>,
-    ) -> Vec<(
-        DeclarationCallTargetClass,
-        AbiUnitDefinition,
-        (u32, u32),
-    )> {
+    ) -> Vec<(DeclarationCallTargetClass, AbiUnitDefinition, (u32, u32))> {
         let units = plan.emittable_units().expect("validated units");
         let mut calls = plan
             .emittable_call_edges()
@@ -2563,7 +2568,8 @@ mod tests {
     /// both. A fixture carrying one closure cannot tell "the relation leaving
     /// THIS declaration" from "some relation".
     #[cfg(test)]
-    pub(in crate::cranelift_backend::planning::static_transition) fn d2a_every_partition_class() -> (RuntimeExpr, Vec<RuntimeDeclaration>) {
+    pub(in crate::cranelift_backend::planning::static_transition) fn d2a_every_partition_class(
+    ) -> (RuntimeExpr, Vec<RuntimeDeclaration>) {
         let lexical = RuntimeDeclaration {
             symbol: "decl:fixture::d2a::lexical".to_string(),
             kind: RuntimeDeclarationKind::Transparent {
@@ -2624,7 +2630,9 @@ mod tests {
     /// The unit population as a sorted class census, plus the count of emitted
     /// `StaticBody` **calls**.
     #[cfg(test)]
-    pub(in crate::cranelift_backend::planning::static_transition) fn d2a_population(plan: &StaticTransitionPlan<'_>) -> (Vec<&'static str>, usize) {
+    pub(in crate::cranelift_backend::planning::static_transition) fn d2a_population(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> (Vec<&'static str>, usize) {
         let mut classes = plan
             .emittable_units()
             .expect("validated units")
@@ -2640,9 +2648,7 @@ mod tests {
                 // TOTAL classification of the planned population. Absorbing the
                 // class into another label is how a new unit class becomes
                 // invisible to the very control that measures the population.
-                AbiUnitDefinition::StaticContinuationFusion { .. } => {
-                    "StaticContinuationFusion"
-                }
+                AbiUnitDefinition::StaticContinuationFusion { .. } => "StaticContinuationFusion",
             })
             .collect::<Vec<_>>();
         classes.sort_unstable();
@@ -2730,7 +2736,10 @@ mod tests {
         );
         let retained = retained.expect("the pre-D2a population still plans");
         assert_eq!(
-            retained.iter().filter(|class| **class == "SchedulingEntry").count(),
+            retained
+                .iter()
+                .filter(|class| **class == "SchedulingEntry")
+                .count(),
             4,
             "D2a: with the substitution suppressed, BOTH closure declarations \
              get their obsolete zero-input scheduling entry back — 4 entries \

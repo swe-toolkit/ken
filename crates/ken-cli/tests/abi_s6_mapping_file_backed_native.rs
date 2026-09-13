@@ -100,7 +100,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
       (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
       (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
       (withResource AFull Unit Unit cap (bytes_encode "mapped.bin")
-        (ResourceWriteCreate CreateOrKeep) file_body)
+        ResourceRead file_body)
       (\outcome. after_file_bracket cap outcome)
   }
 "#;
@@ -162,6 +162,27 @@ fn differential() -> Differential {
     }
 }
 
+fn interpreted_only() -> (ken_runtime::EffectObservation, Vec<u8>) {
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-d5b-file-source-rights-")
+        .tempdir()
+        .expect("creates temporary root");
+    let path = root.path().join("mapped.bin");
+    std::fs::write(&path, ORIGINAL).expect("writes interpreter backing fixture");
+    let mut host = ken_interp::PosixHost::new_at(root.path());
+    let observation = ken_cli::run_program_effect_observation(
+        SOURCE,
+        ken_cli::SourceFormat::Ken,
+        &[],
+        &[],
+        root.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("D5b interpreted file mapping executes");
+    let backing = std::fs::read(&path).expect("reads interpreter backing file");
+    (observation, backing)
+}
+
 fn operation_events(
     observation: &ken_runtime::EffectObservation,
     operation: ken_runtime::HostOpV1,
@@ -201,24 +222,28 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
                 )
             },
         );
-    assert_eq!(hs3_applications, 0, "the exact HS3 control applies no mutation");
-    assert_eq!(hs5_applications, 0, "the exact HS5 control applies no mutation");
-    let [first, second] = edges.as_slice() else {
-        panic!("the nested COW path must mint exactly two checked-IH edges: {edges:?}");
+    assert_eq!(
+        hs3_applications, 0,
+        "the exact HS3 control applies no mutation"
+    );
+    assert_eq!(
+        hs5_applications, 0,
+        "the exact HS5 control applies no mutation"
+    );
+    let [first, second, remaining @ ..] = edges.as_slice() else {
+        panic!("the successful nested COW path must mint multiple checked-IH edges: {edges:?}");
     };
     assert!(
         first.parent_is_distinguished_root(),
         "the first checked-IH edge begins at the distinguished root"
     );
     assert_eq!(
-        second.parent_invocation_instance_id,
-        first.child_invocation_instance_id,
-        "the second checked-IH edge's parent is the first edge's child"
+        second.parent_invocation_instance_id, first.child_invocation_instance_id,
+        "the first nested edge's parent is the root edge's child"
     );
     assert_ne!(
-        second.child_invocation_instance_id,
-        first.child_invocation_instance_id,
-        "the nested checked-IH edge mints a distinct child invocation"
+        second.child_invocation_instance_id, first.child_invocation_instance_id,
+        "the first nested edge mints a distinct child invocation"
     );
     assert_eq!(
         (
@@ -231,43 +256,45 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
             first.parent_frame_template_id,
             first.segment_site_id,
         ),
-        "both dynamic edges retain the same plan-named call, parent frame, and segment"
+        "the first nested edge retains the plan-named call, parent frame, and segment"
     );
-    let [composition] = compositions.as_slice() else {
-        panic!(
-            "the nested child must consume exactly one transient source parent: {compositions:?}"
+    assert_eq!(
+        compositions.len(),
+        remaining.len() + 1,
+        "every edge after the initial root edge consumes one exact transient source parent"
+    );
+    for (edge, composition) in edges[1..].iter().zip(&compositions) {
+        assert_eq!(
+            (
+                composition.external_parent_invocation_instance_id,
+                composition.external_parent_frame_template_id,
+            ),
+            (
+                edge.parent_invocation_instance_id,
+                edge.parent_frame_template_id,
+            ),
+            "composition admits exactly the invocation/frame parent key carried by its edge"
         );
-    };
-    assert_eq!(
-        (
-            composition.external_parent_invocation_instance_id,
-            composition.external_parent_frame_template_id,
-        ),
-        (
-            second.parent_invocation_instance_id,
-            second.parent_frame_template_id,
-        ),
-        "composition admits the exact invocation/frame parent key minted on edge 2"
-    );
-    assert_eq!(
-        composition.matching_edge_count, 1,
-        "the transient source parent must authorize exactly one incoming edge"
-    );
-    assert_eq!(
-        (
-            composition.child_invocation_instance_id,
-            composition.child_frame_template_id,
-        ),
-        (
-            second.child_invocation_instance_id,
-            second.parent_frame_template_id,
-        ),
-        "frame 0 is instantiated under edge 2's newly minted child"
-    );
-    assert!(
-        composition.child_key_present,
-        "the child invocation/frame key must exist after instantiation"
-    );
+        assert_eq!(
+            composition.matching_edge_count, 1,
+            "each transient source parent authorizes exactly one incoming edge"
+        );
+        assert_eq!(
+            (
+                composition.child_invocation_instance_id,
+                composition.child_frame_template_id,
+            ),
+            (
+                edge.child_invocation_instance_id,
+                edge.parent_frame_template_id,
+            ),
+            "each source parent instantiates the edge's child under the exact frame"
+        );
+        assert!(
+            composition.child_key_present,
+            "the child invocation/frame key exists after instantiation"
+        );
+    }
     assert_eq!(
         calls,
         vec![ken_runtime::D5bHs3CallObservation {
@@ -347,6 +374,307 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: the exact plan-owned immediate
+/// bridge and non-transport conjunction is reached once; promoting only that row
+/// recreates the forward-declared response owner with no verified selected call.
+/// CLAIMED: the bridge is honestly `InlineBridgeNoCall`, creates no response
+/// owner, and leaves ordinary effect lowering authoritative. THE GAP: plan-field
+/// and neighbour controls independently pin descriptor validation and prevent this
+/// mutation from broadening to transport or non-bridge callers.
+#[test]
+fn immediate_nontransport_bridge_creates_no_response_owner() {
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-d5b-hs10-inline-response-")
+        .tempdir()
+        .expect("creates temporary root");
+    let (exact, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        ken_cli::build_native_program(
+            SOURCE,
+            ken_cli::SourceFormat::Ken,
+            "abi_s6_d5b_hs10_exact_inline_bridge",
+            root.path(),
+        )
+    });
+    exact.expect("the exact response split must compile");
+    let [diagnostic] = diagnostics.as_slice() else {
+        panic!("one exact compile must publish one response diagnostic: {diagnostics:?}");
+    };
+    let inline = diagnostic
+        .static_response_deferred
+        .iter()
+        .filter(|row| row.sub_case == "InlineBridgeNoCall")
+        .collect::<Vec<_>>();
+    let [inline] = inline.as_slice() else {
+        panic!("the plan must classify one immediate bridge without an owner: {inline:?}");
+    };
+    assert_eq!(inline.operation, "MappingAcquireFile");
+    assert_eq!(
+        (
+            &inline.handler_owner,
+            inline.k_body_origin,
+            inline.response_uses,
+            inline.tail_ret_exits,
+            inline.tail_static_calls,
+            inline.tail_other_exits,
+        ),
+        (&None, None, None, None, None, None),
+        "InlineBridgeNoCall has neither an owner nor a deferred continuation route"
+    );
+    assert!(
+        diagnostic
+            .all_static_response_rows
+            .iter()
+            .all(|row| row.operation != "MappingAcquireFile"),
+        "the inline bridge must not also enter the Specialized owner population"
+    );
+
+    let (mutated, applications) = ken_runtime::with_d5b_hs10_inline_response_mutation(
+        ken_runtime::D5bHs10InlineResponseMutation::PromoteInlineBridge,
+        || {
+            ken_cli::build_native_program(
+                SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "abi_s6_d5b_hs10_promote_inline_bridge",
+                root.path(),
+            )
+        },
+    );
+    assert_eq!(
+        applications, 1,
+        "the response mutation must promote exactly one immediate non-transport bridge"
+    );
+    let refusal = match mutated {
+        Ok(_) => panic!("promoting the immediate bridge must recreate HS10"),
+        Err(error) => format!("{error:?}"),
+    };
+    assert!(
+        refusal
+            .contains("a forward-declared response owner has no verified selected incoming call")
+            && refusal.contains("disposition=Some(InlineNoCall)"),
+        "the mutation must restore the exact HS10 owner refusal: {refusal}"
+    );
+
+    let restored = differential();
+    assert_eq!(
+        (
+            restored.native.exit_status,
+            restored.interpreted.exit_status
+        ),
+        (0, 0),
+        "RAII restoration must recover both engines"
+    );
+    assert_eq!(restored.native_backing, ORIGINAL);
+    assert_eq!(restored.interpreted_backing, ORIGINAL);
+    assert_eq!(
+        restored.native.effect_trace,
+        restored.interpreted.effect_trace
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: after the plan publishes its
+/// exact bridge descriptor, changing only lowering's locally re-derived selected
+/// field reaches one bridge seat and refuses on descriptor disagreement before an
+/// artifact can execute or emit a host effect. CLAIMED: lowering borrows source
+/// cases/default but cannot decide a second bridge population or drift from plan
+/// coordinates. THE GAP: the plan mutations below independently prove every
+/// stored descriptor axis is covered by exact closeout re-derivation.
+#[test]
+fn immediate_bridge_lowering_refuses_a_postpublication_coordinate_change() {
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-d5b-hs10-lowering-control-")
+        .tempdir()
+        .expect("creates temporary root");
+    let (mutated, applications) = ken_runtime::with_d5b_hs10_bridge_lowering_mutation(
+        ken_runtime::D5bHs10BridgeLoweringMutation::ChangeSelectedField,
+        || {
+            ken_cli::build_native_program(
+                SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "abi_s6_d5b_hs10_change_lowering_field",
+                root.path(),
+            )
+        },
+    );
+    assert_eq!(
+        applications, 1,
+        "the lowering mutation must change one local bridge coordinate"
+    );
+    let refusal = match mutated {
+        Ok(_) => panic!("a post-publication lowering disagreement must refuse"),
+        Err(error) => format!("{error:?}"),
+    };
+    assert!(
+        refusal.contains(
+            "an immediate bridge lowering coordinate disagrees with its plan-owned descriptor"
+        ),
+        "the mutation must reach the exact lowering-coordinate refusal: {refusal}"
+    );
+
+    let restored = differential();
+    assert_eq!(
+        (
+            restored.native.exit_status,
+            restored.interpreted.exit_status
+        ),
+        (0, 0),
+        "RAII restoration must recover both engines"
+    );
+    assert_eq!(restored.native_backing, ORIGINAL);
+    assert_eq!(restored.interpreted_backing, ORIGINAL);
+    assert_eq!(
+        restored.native.effect_trace,
+        restored.interpreted.effect_trace
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: each plan-publication mutation
+/// changes exactly one descriptor axis (full identity, selected field, consumer,
+/// wrapper, cause, body origin, missing row, or duplicate row), and the unchanged
+/// COW source reaches the exact re-derivation or duplicate-key refusal before
+/// lowering. CLAIMED: the bounded immediate-bridge relation is complete, unique,
+/// and owns every coordinate lowering later checks. THE GAP: the separate lowering
+/// mutation varies a local post-publication coordinate, while the response-split
+/// control above proves the descriptor's owner-classification consequence.
+#[test]
+fn immediate_bridge_plan_rejects_each_descriptor_disagreement() {
+    use ken_runtime::D5bHs10BridgePlanMutation::{
+        ChangeBodyOrigin, ChangeCause, ChangeCheckedIhSlotsWrapper, ChangeConsumerKind,
+        ChangeFullIdentity, ChangeSelectedField, DropRow, DuplicateRow,
+    };
+
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-d5b-hs10-plan-controls-")
+        .tempdir()
+        .expect("creates temporary root");
+    for (ordinal, mutation) in [
+        ChangeFullIdentity,
+        ChangeSelectedField,
+        ChangeConsumerKind,
+        ChangeCheckedIhSlotsWrapper,
+        ChangeCause,
+        ChangeBodyOrigin,
+        DropRow,
+        DuplicateRow,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let ((result, diagnostics), applications) =
+            ken_runtime::with_d5b_hs10_bridge_plan_mutation(mutation, || {
+                ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                    ken_cli::build_native_program(
+                        SOURCE,
+                        ken_cli::SourceFormat::Ken,
+                        &format!("abi_s6_d5b_hs10_plan_control_{ordinal}"),
+                        root.path(),
+                    )
+                })
+            });
+        assert_eq!(
+            applications, 1,
+            "{mutation:?} must change exactly one published bridge row"
+        );
+        assert!(
+            diagnostics.is_empty(),
+            "{mutation:?} must refuse before a closed plan is published"
+        );
+        let refusal = match result {
+            Ok(_) => panic!("{mutation:?} must not survive exact plan validation"),
+            Err(error) => format!("{error:?}"),
+        };
+        let expected = if mutation == DuplicateRow {
+            "an immediate-bridge relation contains two rows for one complete call identity"
+        } else {
+            "the immediate-bridge relation is not its exact structural re-derivation"
+        };
+        assert!(
+            refusal.contains(expected),
+            "{mutation:?} reached the wrong plan refusal: {refusal}"
+        );
+    }
+}
+
+/// Promise class: durable invariant. MEASURED: the natural source-admission
+/// operand is reached exactly once by the ResourceRead writable-private witness;
+/// replacing only READ with destination protection rights restores the exact
+/// pre-acquisition required=READ|WRITE/held=READ refusal and three-op trace.
+/// CLAIMED: file snapshot authority is READ even when the minted private Mapping
+/// is Writable with READ|WRITE. THE GAP: the positive pair below and the main COW
+/// differential independently prove restored success, destination write admission,
+/// in-mapping visibility, and backing-file preservation.
+#[test]
+fn file_source_admission_uses_read_not_destination_protection_rights() {
+    use ken_runtime::HostOpV1::{FsOpen, MappingAcquireFile, ResourceRelease};
+
+    let ((mutated, mutated_backing), applications) =
+        ken_runtime::with_d5b_file_source_admission_mutation(
+            ken_runtime::D5bFileSourceAdmissionMutation::UseProtectionRightsForSource,
+            interpreted_only,
+        );
+    assert_eq!(
+        applications, 1,
+        "the natural source-admission mutation must reach one file acquisition"
+    );
+    assert_eq!(mutated.exit_status, 92);
+    assert_eq!(mutated.terminal_error, None);
+    assert_eq!(mutated_backing, ORIGINAL);
+    assert_eq!(
+        mutated
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect::<Vec<_>>(),
+        vec![FsOpen, MappingAcquireFile, ResourceRelease],
+        "source admission refuses before mapping, views, or ordinary file read"
+    );
+    let acquisitions = operation_events(&mutated, MappingAcquireFile);
+    let [acquisition] = acquisitions.as_slice() else {
+        panic!("the mutation must reach exactly one file acquisition: {acquisitions:?}");
+    };
+    assert!(matches!(
+        acquisition.outcome,
+        ken_runtime::CanonicalOutcomeV1::Error(
+            ken_runtime::SemanticErrorV1::Resource(
+                ken_runtime::ResourceErrorV1::RightNotHeld { required, held }
+            )
+        ) if required == 3 && held == 1
+    ));
+
+    let restored = differential();
+    assert_eq!(
+        (
+            restored.native.exit_status,
+            restored.interpreted.exit_status
+        ),
+        (0, 0),
+        "RAII restoration to exact READ admission restores both engines"
+    );
+    assert_eq!(restored.native_backing, ORIGINAL);
+    assert_eq!(restored.interpreted_backing, ORIGINAL);
+    assert_eq!(
+        restored.native.effect_trace,
+        restored.interpreted.effect_trace
+    );
+    assert_eq!(
+        restored
+            .native
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect::<Vec<_>>(),
+        vec![
+            ken_runtime::HostOpV1::FsOpen,
+            ken_runtime::HostOpV1::MappingAcquireFile,
+            ken_runtime::HostOpV1::MappingWriteView,
+            ken_runtime::HostOpV1::MappingReadView,
+            ken_runtime::HostOpV1::ResourceRelease,
+            ken_runtime::HostOpV1::ResourceRelease,
+            ken_runtime::HostOpV1::FsReadFile,
+        ],
+        "restoration must recover the complete successful COW trace"
+    );
+}
+
 /// Promise class: durable invariant. An explicit canonical source parent with
 /// one exact `(0, frame)` edge is admitted without becoming the child or being
 /// inferred from absence. Rejecting only that exact root must restore HS9 once;
@@ -383,13 +711,19 @@ fn exact_external_root_is_admitted_by_its_zero_frame_edge() {
 
     let restored = differential();
     assert_eq!(
-        (restored.native.exit_status, restored.interpreted.exit_status),
+        (
+            restored.native.exit_status,
+            restored.interpreted.exit_status
+        ),
         (0, 0),
         "RAII restoration to Exact must let the unchanged COW path complete"
     );
     assert_eq!(restored.native_backing, ORIGINAL);
     assert_eq!(restored.interpreted_backing, ORIGINAL);
-    assert_eq!(restored.native.effect_trace, restored.interpreted.effect_trace);
+    assert_eq!(
+        restored.native.effect_trace,
+        restored.interpreted.effect_trace
+    );
 }
 
 /// Promise class: durable invariant. An exact per-owner/per-Construct checked-IH
@@ -431,13 +765,19 @@ fn exact_transport_destination_does_not_bypass_producer_dispatch() {
 
     let restored = differential();
     assert_eq!(
-        (restored.native.exit_status, restored.interpreted.exit_status),
+        (
+            restored.native.exit_status,
+            restored.interpreted.exit_status
+        ),
         (0, 0),
         "RAII restoration to Exact must let the unchanged COW path complete"
     );
     assert_eq!(restored.native_backing, ORIGINAL);
     assert_eq!(restored.interpreted_backing, ORIGINAL);
-    assert_eq!(restored.native.effect_trace, restored.interpreted.effect_trace);
+    assert_eq!(
+        restored.native.effect_trace,
+        restored.interpreted.effect_trace
+    );
 }
 
 /// Promise class: durable invariant. An edge settled by its full identity as
@@ -450,18 +790,17 @@ fn inline_no_call_disposition_clears_only_its_exact_detached_residual() {
         .prefix("ken-abi-s6-d5b-hs7-inline-no-call-")
         .tempdir()
         .expect("creates temporary root");
-    let (mutated, applications) =
-        ken_runtime::with_d5b_hs7_detached_disposition_mutation(
-            ken_runtime::D5bHs7DetachedDispositionMutation::IgnoreInlineNoCall,
-            || {
-                ken_cli::build_native_program(
-                    SOURCE,
-                    ken_cli::SourceFormat::Ken,
-                    "abi_s6_d5b_hs7_ignore_inline_no_call",
-                    root.path(),
-                )
-            },
-        );
+    let (mutated, applications) = ken_runtime::with_d5b_hs7_detached_disposition_mutation(
+        ken_runtime::D5bHs7DetachedDispositionMutation::IgnoreInlineNoCall,
+        || {
+            ken_cli::build_native_program(
+                SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "abi_s6_d5b_hs7_ignore_inline_no_call",
+                root.path(),
+            )
+        },
+    );
     assert_eq!(
         applications, 1,
         "the mutation must act on exactly one full-identity InlineNoCall edge"
@@ -480,13 +819,19 @@ fn inline_no_call_disposition_clears_only_its_exact_detached_residual() {
 
     let restored = differential();
     assert_eq!(
-        (restored.native.exit_status, restored.interpreted.exit_status),
+        (
+            restored.native.exit_status,
+            restored.interpreted.exit_status
+        ),
         (0, 0),
         "RAII restoration to Exact must let the unchanged COW path complete"
     );
     assert_eq!(restored.native_backing, ORIGINAL);
     assert_eq!(restored.interpreted_backing, ORIGINAL);
-    assert_eq!(restored.native.effect_trace, restored.interpreted.effect_trace);
+    assert_eq!(
+        restored.native.effect_trace,
+        restored.interpreted.effect_trace
+    );
 }
 
 /// Promise class: durable invariant. Retaining the source parent's invocation
@@ -512,8 +857,15 @@ fn source_parent_is_not_retained_in_the_child_layer() {
             },
         );
     assert_eq!(applications, 1, "the retain-parent mutation applies once");
-    assert_eq!(edges.len(), 2, "the second edge is minted before instantiation");
-    assert!(compositions.is_empty(), "instantiation refuses before composition");
+    assert_eq!(
+        edges.len(),
+        2,
+        "the second edge is minted before instantiation"
+    );
+    assert!(
+        compositions.is_empty(),
+        "instantiation refuses before composition"
+    );
     let refusal = match result {
         Ok(_) => panic!("retaining the parent in the child layer must refuse"),
         Err(error) => format!("{error:?}"),
@@ -547,16 +899,22 @@ fn source_parent_is_required_at_mint() {
             },
         );
     assert_eq!(applications, 1, "the drop-at-mint mutation applies once");
-    assert_eq!(edges.len(), 2, "the malformed second edge is observed at mint");
-    assert!(compositions.is_empty(), "source validation refuses before composition");
+    assert_eq!(
+        edges.len(),
+        2,
+        "the malformed second edge is observed at mint"
+    );
+    assert!(
+        compositions.is_empty(),
+        "source validation refuses before composition"
+    );
     let refusal = match result {
         Ok(_) => panic!("withholding the source parent at mint must refuse"),
         Err(error) => format!("{error:?}"),
     };
     assert!(
-        refusal.contains(
-            "source open occurrence disagrees with the closure-selected dynamic parent"
-        ),
+        refusal
+            .contains("source open occurrence disagrees with the closure-selected dynamic parent"),
         "the mutation must restore the exact HS4 parent refusal: {refusal}"
     );
 }
@@ -583,8 +941,15 @@ fn source_parent_is_required_at_compose() {
             },
         );
     assert_eq!(applications, 1, "the drop-at-compose mutation applies once");
-    assert_eq!(edges.len(), 2, "mint and source-parent validation both complete");
-    assert!(compositions.is_empty(), "the external tuple is withheld at compose");
+    assert_eq!(
+        edges.len(),
+        2,
+        "mint and source-parent validation both complete"
+    );
+    assert!(
+        compositions.is_empty(),
+        "the external tuple is withheld at compose"
+    );
     let refusal = match result {
         Ok(_) => panic!("withholding the source parent at compose must refuse"),
         Err(error) => format!("{error:?}"),
@@ -626,8 +991,7 @@ fn complete_direct_worker_refuses_duplicate_frame_worker_captures() {
         Err(error) => format!("{error:?}"),
     };
     assert!(
-        refusal.contains("supplies 11 Parameter operands")
-            && refusal.contains("declares 6"),
+        refusal.contains("supplies 11 Parameter operands") && refusal.contains("declares 6"),
         "the mutation must reproduce the exact double-append cardinality failure: {refusal}"
     );
 }
