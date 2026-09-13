@@ -1520,6 +1520,7 @@ impl<'src> Planner<'src> {
         )?;
         #[cfg(feature = "px8-ds-test-support")]
         record_checked_ih_generated_entry_confluences(
+            &self.plan,
             &self.plan.checked_ih_generated_entry_confluences,
         );
         #[cfg(feature = "px8-ds-test-support")]

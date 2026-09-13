@@ -9,7 +9,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
-use super::aggregates::pair_detached_required_consumer;
+use super::aggregates::{
+    pair_detached_required_consumer, pair_required_consumer_incoming_edge,
+};
 use super::continuations::{
     checked_frame_for_consumer, continuation_call_selected_result_identity,
     continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
@@ -26,7 +28,7 @@ use super::{
     checked_ih_post_call_consumer_frames, occurrence_subtree_contains,
     planner_capacity_error, planner_error,
     CheckedIhEnvironmentTransport, CraneliftBackendError, RequiredConsumerCall,
-    StaticTransitionPlan,
+    RequiredConsumerIncomingEdge, StaticTransitionPlan,
 };
 use crate::{
     CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue,
@@ -315,6 +317,14 @@ impl CheckedIhStaticResponseReturnBoundary {
 
     pub(in crate::cranelift_backend) fn consumer(&self) -> &CheckedIhPostCallConsumer {
         &self.consumer
+    }
+
+    pub(in crate::cranelift_backend) fn required_consumer_incoming_edge(
+        &self,
+    ) -> Option<RequiredConsumerIncomingEdge<'_>> {
+        self.consumer.required_consumer().map(|call| {
+            pair_required_consumer_incoming_edge(call, self.caller_cut.selecting_call())
+        })
     }
 
     fn caller_exit_index(&self) -> Result<usize, CraneliftBackendError> {
