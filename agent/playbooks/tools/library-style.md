@@ -107,6 +107,46 @@ Keep implementation history, work-package history, review history, and merge
 state out of product exposition. Mention provenance only when it helps the
 reader assess authority, currency, compatibility, or behavior.
 
+## Prose Patterns
+
+These are revision and authoring heuristics, not an authorship or provenance
+test. No external signal reliably establishes who wrote a passage. Apply them
+to make the documentation useful to its human reader, consistent with
+[PRINCIPLES #2](../../../docs/PRINCIPLES.md#2-the-agent-writes--human-reads-asymmetry-is-a-design-axis).
+
+Lead with the mechanism or reader consequence. Remove an announcement that a
+subject is important, central, key, or worth noting unless it supplies a fact
+that the next sentence does not. Do not give a one-paragraph thought a heading
+or restate the heading as that paragraph's first sentence.
+
+State the positive fact before adding a contrast. Phrases such as “not
+merely,” “not just,” and “rather than” do not explain a mechanism by
+themselves. Do not manufacture balanced pairs, three-item lists, or a
+concluding summary merely for rhetorical shape. End the paragraph when its
+evidence has established the point.
+
+Name the component, operation, input, and result. Avoid vague connective
+phrases such as “at its core,” “in this landscape,” and “plays a vital role.”
+Reuse the exact specification or implementation term rather than varying it for
+style. A link identifies where to look; the surrounding prose should say only
+why that is the reader's next question.
+
+Do not smooth a pipeline into one broad success claim. Name the handoff and the
+stage that consumes or refuses its result. State a limitation once, at the
+boundary where it applies, with its source. Do not present an inventory as
+complete unless its completeness is established; otherwise bound it or write
+“for example.”
+
+Precise refusals and trust boundaries are required, not stylistic defects. Do
+not remove a negative merely to make prose more affirmative. Every negative
+must name the specific operation, condition, and consequence: `check` refuses a
+term when conversion fails, rather than “the system cannot handle it.” This is
+how the prose keeps
+[PRINCIPLES #8](../../../docs/PRINCIPLES.md#8-be-honest-about-the-boundary--over-claiming-is-itself-a-failure)
+and
+[#14](../../../docs/PRINCIPLES.md#14-nothing-required-lives-in-a-comment--express-it-in-the-language)
+visible in the reader-facing text.
+
 ## Learning Material
 
 Use the
@@ -160,6 +200,12 @@ Search status language in context. Flag rhetorical uses of `landed`, `real`,
 `honest`, `actually`, and redundant `current` or `now`; do not reject unrelated
 technical uses. Require precise implemented, partial, planned, or unavailable
 boundaries where the distinction matters.
+
+Read for prose patterns. Flag importance announcements, one-paragraph headings,
+empty contrast scaffolding, manufactured symmetry, summary restatement, vague
+connective language, unbounded inventories, and links used as explanation.
+Preserve a precise refusal: verify that every negative instead names its
+operation, condition, and consequence.
 
 For `library/learn/`, verify the audience and scope, dependency order, concrete
 examples, incremental explanation, and separation between tutorial and
