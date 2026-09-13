@@ -21,7 +21,7 @@ ken run: missing entrypoint 'main' in 'catalog/packages/Core/Logic/Transport.ken
 ```
 
 Choose a file with an executable entrypoint. The guide used above has one in
-its final fence; run that file again and expect `decomposition guide ok`.
+its final fence, and run that file again and expect `decomposition guide ok`.
 
 For the difference between checking and driving IO, follow
 [Check and run one program](../quickstart.md#2-check-and-run-one-program).

@@ -22,7 +22,7 @@ three this page walks through next: `check`, `run`, `fmt`.
 
 The program is `library/guide/decomposition-abstraction.ken.md` — a real,
 first-class library guide migrated from the catalog, not a page written for
-this exercise. It is primarily a design-notes guide; its final fenced block is
+this exercise. It is primarily a design-notes guide, and its final fenced block is
 a genuine, executable `proc main`, so it doubles honestly as this page's
 runnable example. During the guide migration, candidate-local verification
 conserved all 40 `ken example` and `ken reject` fences across the three guides
@@ -33,7 +33,7 @@ not a claim that a standing catalog or library fence gate exists.
 population from the `catalog/packages/` fragments in `learn/reading-ken/`. No
 `catalog/packages/` artifact is itself runnable today (nothing there has a
 `proc main`), while this step needs an executable demo. The cited guide is a
-maintained `library/guide/` artifact rather than an invented toy; its former
+maintained `library/guide/` artifact rather than an invented toy, and its former
 `catalog/guide/` path is now only a compatibility pointer.
 
 `ken check` elaborates every fence in a file (including the checked
@@ -55,7 +55,7 @@ $ cargo run -p ken-cli -- check library/guide/decomposition-abstraction.ken.md
 
 (exits 0, no output — `ken check` never drives IO even when a file happens
 to have a runnable shape, per the CLI's own documented `check`-vs-`run`
-contract (`docs/program/07-catalog-style-guide.md` §3); that is a property
+contract (`docs/program/07-catalog-style-guide.md` §3), and that is a property
 of the command, not this file.)
 
 ## 3. Format it
@@ -65,7 +65,7 @@ $ cargo run -p ken-cli -- fmt --check library/guide/decomposition-abstraction.ke
 ```
 
 This file is already in canonical form, so `--check` exits 0 with no
-diff. Drop `--check` to canonicalize a file you're editing yourself;
+diff. Drop `--check` to canonicalize a file you're editing yourself, and
 `fmt` is idempotent — formatting already-canonical source is a no-op.
 
 ## 4. A trust-aware reading exercise
@@ -97,7 +97,7 @@ declaration itself, not to take this paragraph's word for it:
   row* this `main` is checked against (`spec/30-surface/36-effects.md`
   §1), and the body — `print_line` through `host_program` — is exactly a
   Console write. The capability it requests (`FS`) and the effect it
-  performs (`Console`) are not the same thing; this file is small enough
+  performs (`Console`) are not the same thing, and this file is small enough
   to check that gap by eye.
 - **What class of claim is `main` itself?** Trick question — **there is no
   specification claim here to classify.** The four-way status
@@ -123,17 +123,17 @@ where the four-way distinction has something to bite on.
 
 ---
 
-**Grounds this page:** `README.md` §Build (toolchain install/use commands);
+**Grounds this page:** `README.md` §Build (toolchain install/use commands),
 `library/guide/decomposition-abstraction.ken.md` (the program checked, run,
-formatted, and read above — verbatim, not paraphrased); `spec/20-
+formatted, and read above — verbatim, not paraphrased), and `spec/20-
 verification/21-spec-syntax.md` §5.2-5.3 (the four-class verification-status
 vocabulary, and the exact `tested` disposition the reading exercise turns
-on); `spec/30-surface/33-declarations.md` §3.2.1 (`program capabilities`
+on), `spec/30-surface/33-declarations.md` §3.2.1 (`program capabilities`
 and `ProgramCaps` — what the authority manifest means, not just that the
-tokens occur); `spec/30-surface/36-effects.md` §1 (the `visits` effect-row
-declaration); `docs/program/07-catalog-style-guide.md` §3 (the `ken
+tokens occur), `spec/30-surface/36-effects.md` §1 (the `visits` effect-row
+declaration), and `docs/program/07-catalog-style-guide.md` §3 (the `ken
 check`-vs-`ken run` contract cited in step 2). Authority class: `tutorial`
-— this page walks a reader through a procedure; every claim about what a
+— this page walks a reader through a procedure, and every claim about what a
 declaration or a status label *means* is cited to the exact spec section
 that defines it, rather than asserted on this page's own authority.
 
@@ -146,6 +146,6 @@ of which tokens occur in the program's text is not, by itself, evidence for
 what those tokens *mean* — that distinction is why each meaning claim above
 now carries its own spec citation rather than resting on the program text
 alone. Grep for an unattributed "must"/"is required to"/"always" outside
-those two cases found none at authoring time; re-run that grep against this
+those two cases found none at authoring time, and re-run that grep against this
 file's current text before trusting this sentence, since it is a claim
 about the past, not a gate.

@@ -24,9 +24,9 @@ declared in [`manifest.toml`](manifest.toml).
 
 A route with no library page yet is **mapped**, not silently missing — see
 [the Waves table](../docs/program/12-documentation-program.md#4-waves).
-Waves 3–6 are a map, not a commitment; each is framed only after its
+Waves 3–6 are a map, not a commitment, and each is framed only after its
 predecessor's exit condition is met. This table gains real links only as
-pages land; it does not point at pages that do not exist.
+pages land, and it does not point at pages that do not exist.
 
 <a id="whats-here-today-wave-0"></a>
 
@@ -36,7 +36,7 @@ The library contains the **substrate**, the fragment-based reading curriculum
 and exercises, agent product-context packs, and checked conceptual guides.
 The substrate includes the manifest every page registers in and the generated
 status page. Manual and release-point tools make registration, links, and
-attested source revisions reviewable; no live library-validation runner
+attested source revisions reviewable, and no live library-validation runner
 currently enforces those properties.
 
 The checked literate guides are the
@@ -52,11 +52,11 @@ evidence, and closure protocols into a small calculus.
 
 ## Scope and authority
 
-- `library/` is explanatory and derived; `spec/` remains the sole normative
+- `library/` is explanatory and derived, and `spec/` remains the sole normative
   authority (D1).
 - Every page declares its authority class and sources in `manifest.toml`.
 - Every page labels its capability **current / partial / planned /
-  unavailable**; planned syntax never appears in a checked current example.
+  unavailable**, and planned syntax never appears in a checked current example.
 
 Full program frame:
 [`docs/program/12-documentation-program.md`](../docs/program/12-documentation-program.md).
