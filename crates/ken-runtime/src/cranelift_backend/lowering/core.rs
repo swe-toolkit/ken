@@ -2859,18 +2859,23 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         // `RT-CONTSPEC-ACTIVATE` `D2` — define each declared continuation
         // target from its own projected contract, after the ordinary
         // bodies and before the root adapter.
-        super::units::define_continuation_bodies(&mut module, &mut compiler, helpers, unit_bundle)?;
-        // `RT-DECL-CLOSURE-PORT` `D5a` — define each generated producer
-        // execution context, after the specializations that call them.
-        // Declaration already happened in the one up-front bundle pass, so
-        // this ordering is a readability choice, not a linking constraint.
-        super::units::define_continuation_context_bodies(
+        let mut staged_result_bodies = super::units::stage_continuation_bodies(
+            &mut module,
+            &mut compiler,
+            helpers,
+            unit_bundle,
+        )?;
+        // `HS18 Q2` stages every function that can participate in a
+        // generated Result dependency before publishing any of them.  A
+        // pending declaration is not a finished certificate; response owners
+        // must therefore exist as finalized CLIF before a caller can use one.
+        staged_result_bodies.extend(super::units::stage_continuation_context_bodies(
             &mut module,
             &mut compiler,
             helpers,
             unit_bundle,
             call_edges,
-        )?;
+        )?);
         let expected_response_owners = compiler
             .static_transition_plan
             .static_response_owner_specializations()?
@@ -2882,19 +2887,26 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 ))
             })?
             .len();
-        let defined_response_owners = super::units::define_static_response_owner_bodies(
+        let staged_response_owners = super::units::stage_static_response_owner_bodies(
             &mut module,
             &mut compiler,
             helpers,
             unit_bundle,
             call_edges,
         )?;
-        if defined_response_owners != expected_response_owners {
+        if staged_response_owners.len() != expected_response_owners {
             return Err(backend_module(format!(
                 "the response-owner body population is incomplete: expected \
-                     {expected_response_owners}, defined {defined_response_owners}",
+                     {expected_response_owners}, defined {}",
+                staged_response_owners.len(),
             )));
         }
+        staged_result_bodies.extend(staged_response_owners);
+        super::units::close_and_define_staged_result_bodies(
+            &mut module,
+            helpers,
+            staged_result_bodies,
+        )?;
         compiler.require_complete_join_plan_consumption()?;
         compiler.require_complete_dynamic_splice_edge_consumption()?;
         super::units::define_root_adapter(
@@ -9202,7 +9214,33 @@ impl<'a> Lowering<'a> {
                 )
             })?;
         Lowering::require_i64(builder, actual, expected);
-        self.register_generated_context_result_authority(consumer.demanded_result_identity(), word)
+        // Runtime shape validation is not finished compiler authority. It
+        // records a pending obligation on the exact call/load already emitted;
+        // the staged callee/body proof must discharge that obligation later.
+        let demanded = consumer.demanded_result_identity();
+        let obligation = self
+            .function_local
+            .pending_call_result_obligations
+            .iter_mut()
+            .find(|obligation| obligation.result_word == word.word)
+            .ok_or_else(|| {
+                unsupported(
+                    "CheckedIhDetachedCallerCut",
+                    "a detached return shape guard has no exact pending call/result obligation",
+                )
+            })?;
+        match obligation.identity {
+            Some(identity) if identity != demanded => {
+                return Err(unsupported(
+                    "CheckedIhDetachedCallerCut",
+                    "a detached return shape guard disagrees with the call's declared Result obligation",
+                ));
+            }
+            Some(_) => {}
+            None => obligation.identity = Some(demanded),
+        }
+        obligation.realization_required = true;
+        Ok(())
     }
 
     fn realize_checked_ih_post_call_steps(
@@ -13953,7 +13991,7 @@ impl<'a> Lowering<'a> {
             };
             self.emit_carrier_store_field(builder, word, position, child)?;
         }
-        self.register_generated_context_result_authority(constructor_identity, word)?;
+        self.register_generated_constructor_authority(constructor_identity, word)?;
         Ok(word)
     }
 
@@ -15586,7 +15624,7 @@ impl<'a> Lowering<'a> {
         let joined = CarriedBoundaryWord {
             word: builder.block_params(merge)[0],
         };
-        self.register_generated_context_result_join(&result_authority_predecessors, joined)?;
+        self.register_generated_constructor_join(&result_authority_predecessors, joined)?;
         Ok(LoweringOperand::Carried(joined))
     }
 
