@@ -374,6 +374,156 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: each compiler-only mutation
+/// corrupts one dependency of the Mapping function's certified non-Ret edge and
+/// the unchanged source refuses before object publication; the exact control
+/// still emits an object. CLAIMED: only a same-function, same-word proof through
+/// the audited helper/status/output and exact comparison edge can exclude the
+/// genuine Vis predecessor. THE GAP: response-owner postconditions are pinned
+/// independently by the existing finished-owner mutation grid; this test pins
+/// the caller/query/cut composition rather than restating that grid.
+#[test]
+fn generated_result_path_proof_rejects_each_certificate_corruption() {
+    use ken_runtime::GeneratedResultPathProofMutation::{
+        AddGenuineVisPredecessor, BootstrapCycle, ClobberHeader, ClobberOutput, ComparisonConstant,
+        ComparisonPolarity, DestinationOrdinal, DisableCutDetector, DropRootProof, Exact,
+        FunctionIdentity, OmitHelperStatusCheck, SubstituteArena, SubstituteOutputSlot,
+        SubstituteQueriedWord, SubstituteTagHelper,
+    };
+
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-hs18-q2-path-proof-")
+        .tempdir()
+        .expect("creates temporary root");
+    for (ordinal, mutation) in [
+        SubstituteTagHelper,
+        SubstituteQueriedWord,
+        SubstituteArena,
+        SubstituteOutputSlot,
+        OmitHelperStatusCheck,
+        ClobberHeader,
+        ClobberOutput,
+        AddGenuineVisPredecessor,
+        ComparisonConstant,
+        ComparisonPolarity,
+        DestinationOrdinal,
+        FunctionIdentity,
+        DropRootProof,
+        BootstrapCycle,
+        DisableCutDetector,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (result, applications) =
+            ken_runtime::with_generated_result_path_proof_mutation(mutation, || {
+                ken_cli::build_native_program(
+                    SOURCE,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("abi_s6_hs18_q2_path_control_{ordinal}"),
+                    root.path(),
+                )
+            });
+        assert_eq!(
+            applications, 1,
+            "{mutation:?} must reach exactly one certified Mapping cut"
+        );
+        let refusal = match result {
+            Ok(_) => panic!("{mutation:?} must not survive certificate replay"),
+            Err(error) => format!("{error:?}"),
+        };
+        assert!(
+            refusal.contains("certified carrier query")
+                || refusal.contains("finished generated-Result proof graph is not closed"),
+            "{mutation:?} reached the wrong pre-object refusal: {refusal}"
+        );
+    }
+
+    let (exact, applications) =
+        ken_runtime::with_generated_result_path_proof_mutation(Exact, || {
+            ken_cli::build_native_program(
+                SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "abi_s6_hs18_q2_path_control_exact",
+                root.path(),
+            )
+        });
+    assert_eq!(applications, 0, "the exact control applies no mutation");
+    exact.expect("the complete certificate graph emits the Mapping object");
+}
+
+/// Promise class: durable invariant. MEASURED: each response-owner mutation
+/// changes one actual finished-body publication or call protocol while leaving
+/// the Mapping plan intact; the independent verifier refuses it before object
+/// publication and RAII restoration returns to the exact build. CLAIMED: a
+/// response-owner certificate comes only from the exact K call, status/Trap
+/// protocol, Ret tag/arity validation, and same-word publication. THE GAP: the
+/// caller-side result-load/query/cut dependencies are controlled separately by
+/// `generated_result_path_proof_rejects_each_certificate_corruption`.
+#[test]
+fn generated_result_owner_certificate_rejects_each_finished_body_corruption() {
+    use ken_runtime::StaticResponseOwnerBodyMutation::{
+        BypassTrapBeforeResult, CallAfterAnswerCollapse, CallBeforeHostValidation, CallRawWorker,
+        DuplicateKCall, OmitKCall, RawHostResultEscape, VaryRet,
+    };
+
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-hs18-q2-owner-proof-")
+        .tempdir()
+        .expect("creates temporary root");
+    for (ordinal, (mutation, expected)) in [
+        (
+            CallRawWorker,
+            "called a context or raw worker other than its exact K context",
+        ),
+        (OmitKCall, "emitted 0 K calls instead of exactly one"),
+        (DuplicateKCall, "emitted 2 K calls instead of exactly one"),
+        (
+            CallBeforeHostValidation,
+            "called K before host response validation completed",
+        ),
+        (
+            CallAfterAnswerCollapse,
+            "called K after its answer was already collapsed",
+        ),
+        (
+            BypassTrapBeforeResult,
+            "without the status then Trap-before-Result branches",
+        ),
+        (RawHostResultEscape, "raw HostResult or non-K value escape"),
+        (
+            VaryRet,
+            "validated a Ret identity other than its exact K Ret",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (result, applications) =
+            ken_runtime::with_static_response_owner_body_mutation(mutation, || {
+                ken_cli::build_native_program(
+                    SOURCE,
+                    ken_cli::SourceFormat::Ken,
+                    &format!("abi_s6_hs18_q2_owner_control_{ordinal}"),
+                    root.path(),
+                )
+            });
+        assert_eq!(
+            applications, 1,
+            "{mutation:?} must reach one Mapping response-owner body"
+        );
+        let refusal = match result {
+            Ok(_) => panic!("{mutation:?} must not survive finished-owner verification"),
+            Err(error) => format!("{error:?}"),
+        };
+        assert!(
+            refusal.contains(expected),
+            "{mutation:?} reached the wrong finished-owner refusal: {refusal}"
+        );
+        assert!(ken_runtime::static_response_owner_body_mutation_is_exact());
+    }
+}
+
 /// Promise class: durable invariant. MEASURED: the exact plan-owned immediate
 /// bridge and non-transport conjunction is reached once; promoting only that row
 /// recreates the forward-declared response owner with no verified selected call.

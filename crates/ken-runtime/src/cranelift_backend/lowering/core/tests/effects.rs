@@ -106,7 +106,8 @@ fn run_checked_bounded_nat_fixture(
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             generated_function_result_contract: None,
-            generated_context_result_authorities: BTreeMap::new(),
+            generated_constructor_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
             seed_material:
                 crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
                 ),
