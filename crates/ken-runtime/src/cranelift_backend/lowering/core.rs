@@ -15162,7 +15162,6 @@ impl<'a> Lowering<'a> {
 
         let merge = builder.create_block();
         builder.append_block_param(merge, types::I64);
-        let mut result_authority_predecessors = Vec::new();
 
         // The strict existing topology, re-derived exactly as the specialized
         // arm derives it: one `Ret` case with one binder, one `Vis` case, two
@@ -15447,7 +15446,6 @@ impl<'a> Lowering<'a> {
                     None,
                     "a carried `ComputationalMatch` arm",
                 )?;
-                result_authority_predecessors.push(word);
                 builder.ins().jump(merge, &[word.word.into()]);
             }
 
@@ -15580,7 +15578,6 @@ impl<'a> Lowering<'a> {
                         None,
                         "a test-mutated separately lowered checked-answer arm",
                     )?;
-                    result_authority_predecessors.push(word);
                     builder.ins().jump(merge, &[word.word.into()]);
                 }
             }
@@ -15624,7 +15621,9 @@ impl<'a> Lowering<'a> {
         let joined = CarriedBoundaryWord {
             word: builder.block_params(merge)[0],
         };
-        self.register_generated_constructor_join(&result_authority_predecessors, joined)?;
+        // Finalized all-input replay in `prove_forwarded_value` is the only
+        // join authority. The emitter's predecessor list is deliberately not
+        // promoted into an independent constructor seed.
         Ok(LoweringOperand::Carried(joined))
     }
 

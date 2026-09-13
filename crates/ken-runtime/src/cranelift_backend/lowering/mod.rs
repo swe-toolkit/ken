@@ -1018,7 +1018,6 @@ impl ArtifactHelpers<'_> {
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            generated_function_result_contract: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             continuation_calls: BTreeMap::new(),
@@ -1310,9 +1309,6 @@ struct FunctionLocalRefs {
     /// context function. Source identities, retarget callers, transports, and
     /// derivation ancestry are absent from its type.
     checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
-    /// Compiler-only Result identity for the generated function currently
-    /// being defined. It is never reflected into a frame or runtime ABI.
-    generated_function_result_contract: Option<ConstructorIdentity>,
     /// Producer authorities keyed by their function-local SSA word.
     ///
     /// These record the identity the producer actually emitted, including an
@@ -4082,33 +4078,6 @@ impl Lowering<'_> {
         Ok(())
     }
 
-    fn generated_constructor_word_is_authorized(&self, word: CarriedBoundaryWord) -> bool {
-        let Some(contract) = self.function_local.generated_function_result_contract else {
-            return false;
-        };
-        self.function_local
-            .generated_constructor_authorities
-            .get(&word.word)
-            .is_some_and(|authority| authority.identity == contract && authority.word == word.word)
-    }
-
-    fn register_generated_constructor_join(
-        &mut self,
-        predecessors: &[CarriedBoundaryWord],
-        joined: CarriedBoundaryWord,
-    ) -> Result<(), CraneliftBackendError> {
-        let Some(contract) = self.function_local.generated_function_result_contract else {
-            return Ok(());
-        };
-        if predecessors.is_empty()
-            || predecessors
-                .iter()
-                .any(|word| !self.generated_constructor_word_is_authorized(*word))
-        {
-            return Ok(());
-        }
-        self.register_generated_constructor_authority(contract, joined)
-    }
 }
 
 /// **THE ONE BINDING AUTHORITY** for a lexical environment (`RT-WORKER-BIND`
