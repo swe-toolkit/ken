@@ -1,5 +1,14 @@
 # ABI-S6 HS18 — the consuming-occurrence closure mechanism
 
+> **SUPERSEDED AS A STATEMENT OF THE RULE by
+> [amendment 3](ABI-S6-HS18-closure-mechanism-amendment-3.md).** The rule here
+> requires a route destination DERIVED FROM the required-consumer projection.
+> That is insufficient: a chain-derived destination proves which consumer
+> belongs to a route class, never that a given word is the pre-consumption
+> result that consumer applies to. Amendment 3 pairs the destination with the
+> exact emitted call whose result is the before-value. This document is retained
+> as the record of how that was reached, not as current authority.
+
 Architect, 2026-09-13. This is the mechanism design the
 [recut frame](issues/ABI-S6.md) returns to me: the representation-level rule
 stating what transport edge the planner may and may not construct. It
