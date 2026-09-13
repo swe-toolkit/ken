@@ -417,8 +417,10 @@ caused kernel `TypeMismatch`, followed by a green byte-exact restoration:
   general suite;
 - returning the left child as `pop_min`'s remainder rejected general count
   conservation; and
-- replacing the recursive validity detector with constant `True` rejected the
-  unchanged malformed-value refutations.
+- replacing the recursive validity detector with constant `True` first
+  rejected the unchanged `valid_node_intro` constructor obligation; checking
+  stopped at that `TypeMismatch`, before the later malformed-value refutations
+  executed.
 
 The result reports separately:
 
