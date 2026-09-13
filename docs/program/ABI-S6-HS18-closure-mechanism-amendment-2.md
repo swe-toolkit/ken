@@ -1,5 +1,14 @@
 # ABI-S6 HS18 — closure mechanism, amendment 2
 
+> **SUPERSEDED AS A STATEMENT OF THE RULE by
+> [amendment 3](ABI-S6-HS18-closure-mechanism-amendment-3.md).** The rule here
+> requires a route destination DERIVED FROM the required-consumer projection.
+> That is insufficient: a chain-derived destination proves which consumer
+> belongs to a route class, never that a given word is the pre-consumption
+> result that consumer applies to. Amendment 3 pairs the destination with the
+> exact emitted call whose result is the before-value. This document is retained
+> as the record of how that was reached, not as current authority.
+
 Architect, 2026-09-13. Amends the
 [closure mechanism](ABI-S6-HS18-closure-mechanism.md) and
 [amendment 1](ABI-S6-HS18-closure-mechanism-amendment.md) on the ring's second

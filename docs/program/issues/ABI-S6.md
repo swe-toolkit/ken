@@ -302,6 +302,24 @@ M1-M4 -> lieutenant. Local gates targeted; full CI is separate.
    in parallel, gating nothing. Runtime stays held at `5d977ac79`;
    `37591f0019379fbd0bd6a64342673de12ba8e062` is NOT a candidate. Next §1a
    re-trigger is the 6th. See SYMPTOM INVENTORY entry 20.
+   AMENDED A THIRD TIME by
+   [amendment 3](../ABI-S6-HS18-closure-mechanism-amendment-3.md), issued after
+   the hold ran its course — advisory called and returned, observer-only A/B/C
+   pass returned arm B, rule stated with both in hand. It SUPERSEDES the rule in
+   the mechanism doc and amendments 1 and 2, which are retained as the record of
+   how it was reached and carry superseded banners. The rule: a required-consumer
+   destination must be MINTED FROM and permanently PAIRED WITH the exact emitted
+   call whose result is the before-value, never resolved by a class coordinate
+   and applied to whichever transport arrives there. Invariant: (exact
+   before-value, exact consumer occurrence, exact incoming edge) -> (exact
+   after-value, exact outgoing edge). A class holding two transport calls in one
+   body is not a choice to make and the quotient is NOT split — the discriminator
+   rides alongside it, per `CheckedIhGeneratedEntryProjection`'s own "it must
+   never create another class". Compiler-internal and ABI-inert; no phase
+   mechanism, runtime carrier or new payload tag. Amendment 1's application-seat
+   ruling is SUSPENDED, not re-ruled. Three review tells, the first live: a
+   repair that makes Context1 branch into `block89` would fix Mapping and would
+   be the withheld point repair.
 3. The Steward releases the recut to the runtime ring; runtime implements under the
    Architect's design; runtime-QA + Architect review; Steward M1-M4 -> lieutenant.
 4. Optional, in parallel, neither gating: the px8f observer-only measurement the
@@ -2625,6 +2643,27 @@ Architect inventory, 2026-09-11.
     arms — genuine reuse, wrong seat, and wrong datum at a correct seat — is
     authorized in parallel and gates nothing. The third arm would make the
     refutation above premature and is deliberately kept alive.
+    RESOLVED. The research advisory returned (`evt_1d8fk5nx7pbd9`,
+    `evt_19kh2r2fh4t7q`) and the observer-only pass returned
+    (`evt_7s1m3kc5fe0ws`): **arm B**, and the observation also refuted the hard
+    stop's own characterization — the selected seat carries `0x0205`, not
+    `0x0305`, and `0x0305` is not consumed there. `0x0f09` has no definition
+    reaching the selected `v81` instruction. Arms B and C proved not to be
+    independent: the seat is wrong BECAUSE the coordinate naming it
+    under-determines which definition it means.
+    [amendment 3](../ABI-S6-HS18-closure-mechanism-amendment-3.md) supersedes
+    the rule in the mechanism doc and both prior amendments. The destination was
+    always a class coordinate — `checked_ih_required_consumer_destination`
+    (`aggregates.rs:8596`) tests `class.members.contains(source_call_identity)`
+    for MEMBERSHIP and never selects a definition, exactly as
+    `CheckedIhGeneratedEntryCoordinate`'s own doc comment (`aggregates.rs:751`)
+    has stated in the tree since before amendment 1. Body 788 holds two
+    transport calls and the first to ask got the destination. NO phase
+    mechanism, runtime carrier or ABI change: the advisory is explicit that
+    under arm B or C one would solve the wrong problem, and the Architect's
+    "per-activation" hypothesis is withdrawn as having overshot into dynamism.
+    Amendment 1's application-seat ruling is SUSPENDED rather than re-ruled —
+    the seat is a consequence of the value/edge relation, not a declaration.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
