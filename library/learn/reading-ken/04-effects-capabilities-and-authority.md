@@ -13,7 +13,7 @@ A definition that may touch the world beyond its inputs and outputs declares
 an **effect row**: `proc … visits [E₁, …]`
 ([§1](../../../spec/30-surface/36-effects.md#1-effects-as-a-static-row)). You
 met the `proc` keyword itself in chapter [01](01-anatomy.md) as "a
-potentially impure definition carrying an explicit effect row"; this is what
+potentially impure definition carrying an explicit effect row", and this is what
 that row says. The selected
 [console fragment](../../../catalog/packages/Capability/Console/Text.ken.md)
 shows it in checked code:
@@ -44,7 +44,7 @@ row and be rejected. **Over-declaring is not an error** — a `proc` may
 name more in its row than its body performs, reserving
 headroom for a stable interface that grows later without a signature
 change. So the declared row is the complete list of what a definition is
-**permitted** to do, an upper bound a reader can trust; it is not, by
+**permitted** to do, an upper bound a reader can trust, and it is not, by
 itself, proof of what the body currently *does* do.
 
 A second, narrower check reads the row the other way, but only to police
@@ -78,17 +78,17 @@ trusted host/runner management complement that Ken code cannot call.
 
 - **No ambient authority.** A computation can act on the world only with an
   authority it was explicitly given, and only via an effect its type
-  declares; a definition with no effect row and no capability parameter is,
+  declares, and a definition with no effect row and no capability parameter is,
   by its type, inert
   ([§1](../../../spec/60-security/62-authority.md#1-no-ambient-authority)).
 - **A source-facing filesystem capability (`Cap a`) is an unforgeable
   authority token.** It is part of a function's type, so the signature *is*
-  the authority manifest; the default authority of any function is none
+  the authority manifest, and the default authority of any function is none
   ([§2](../../../spec/60-security/62-authority.md#2-capabilities-are-static-visible-and-least)).
 - **Attenuation derives a strictly weaker capability, never a stronger
   one — and it is not something Ken code calls.** A trusted runner/host
   action derives a child capability `c'` from a held `c` and a bound `w`
-  satisfying `authority c' ⊑ authority c ⊓ w`; this relation is **not a Ken
+  satisfying `authority c' ⊑ authority c ⊓ w`, and this relation is **not a Ken
   declaration or callable signature**
   ([§3](../../../spec/60-security/62-authority.md#3-attenuation--hand-a-child-a-strictly-weaker-token-the-headline)).
   Ken code never invokes `attenuate` — the name is deliberately absent
@@ -98,7 +98,7 @@ trusted host/runner management complement that Ken code cannot call.
   ([§2.2](../../../spec/60-security/62-authority.md#22-unforgeability-the-abstraction-boundary)):
   the current filesystem surface takes exact authority-indexed tokens such as
   `Cap AFull` and `Cap APartial`. It cannot yet state a lower-bounded
-  capability parameter or emit a use-site sufficiency obligation; that is the
+  capability parameter or emit a use-site sufficiency obligation, and that is the
   committed `AUTH-BOUNDED-SINK` target, not current Ken source.
 - **No amplifying or attenuating operation is bound in Ken at all.**
   `attenuate`, `revoke`, `strengthen`, and any public `Cap` constructor or
@@ -127,7 +127,7 @@ exemplar deliberately does not exhibit capability minting, attenuation,
 revocation, admission, settlement, or audit. That boundary is not a missing
 example: `attenuate`, `revoke`, and `strengthen` are, by design, never going
 to be operations a Ken program calls. Narrowing happens in a trusted
-runner/host outside Ken; Ken code only ever *receives* the narrowed result.
+runner/host outside Ken, and Ken code only ever *receives* the narrowed result.
 
 ## Corpus Boundary
 
@@ -137,7 +137,7 @@ speaks to authority through capability-typed declarations. It exhibits an
 explicit `Cap a` parameter beside `[FS]`, distinguishes `Cap AFull` from
 `Cap APartial`, and has paired controls showing that a program without the
 declared filesystem capability is rejected while its otherwise identical
-capability-bearing twin elaborates. It accepts capabilities as inputs; it
+capability-bearing twin elaborates. It accepts capabilities as inputs, and it
 does not define a constructor, producer, wrapper, or management binding for
 `Cap`, and it does not exercise a runtime capability identity.
 
@@ -161,11 +161,11 @@ model.
 ---
 
 **Sources:**
-[effect rows §§1, 1.4, 1.6.2](../../../spec/30-surface/36-effects.md#1-effects-as-a-static-row);
-[authority §§1–3.2, 7](../../../spec/60-security/62-authority.md#1-no-ambient-authority);
-[checked filesystem authority fragment](../../../catalog/packages/Capability/Filesystem/Authority.ken.md);
-[elaboration controls](../../../crates/ken-elaborator/tests/cat_capex_authority.rs);
-[availability record](../../../docs/program/issues/DOC-W1.md);
+[effect rows §§1, 1.4, 1.6.2](../../../spec/30-surface/36-effects.md#1-effects-as-a-static-row), and
+[authority §§1–3.2, 7](../../../spec/60-security/62-authority.md#1-no-ambient-authority), and
+[checked filesystem authority fragment](../../../catalog/packages/Capability/Filesystem/Authority.ken.md), and
+[elaboration controls](../../../crates/ken-elaborator/tests/cat_capex_authority.rs), and
+[availability record](../../../docs/program/issues/DOC-W1.md), and
 [registered fragments](fragments.md).
 This explanatory chapter distinguishes checked effect-row and
 capability-as-signature examples from host-side authority management, which

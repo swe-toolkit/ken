@@ -12,7 +12,7 @@ can do — so every claim below states which of the two it is.
 ## Execution Paths
 
 A kernel-admitted core term can go two ways: the **reference interpreter**
-(`X1`) walks it to a value directly; the **native backend** (`X3`) lowers it
+(`X1`) walks it to a value directly, and the **native backend** (`X3`) lowers it
 to machine code first. Neither types, elaborates, or decides anything about
 soundness — both consume a term the kernel has *already* checked, so a bug in
 either produces a **wrong result or behavior**, never a false `proved`
@@ -26,26 +26,26 @@ The backend earns its trust the same way: not by inspection, but by matching
 the interpreter over a differential corpus. Closure-free ground observations
 are compared directly. A result containing a callable is observed only through
 selected, well-typed projections or applications that produce closure-free
-ground observations; closure identity and representation are never compared.
+ground observations, and closure identity and representation are never compared.
 On any disagreement, the interpreter is right by definition, and the backend
 is the defect
 ([§4](../../../spec/40-runtime/45-native-backend.md#4-the-differential-equivalence-discipline--the-interpreter-is-the-oracle)).
-Neither is in the type-soundness TCB — the kernel already settled that; what
+Neither is in the type-soundness TCB — the kernel already settled that, and what
 both earn is **`tested`**, the same assurance word chapter
 [03](03-assurance-and-trust.md) taught you to read precisely, not `proved`.
 
 The `ken` binary has distinct subcommands for these distinct jobs, and they are
 not interchangeable: `ken check <file>` calls only the elaborator — it builds
-an `ElabEnv`, elaborates every declaration, and stops; `ken run <file>`
+an `ElabEnv`, elaborates every declaration, and stops, and `ken run <file>`
 elaborates, then also drives the result through the reference interpreter
-against a host or mock host; `ken native-build <file> <dir>` elaborates and
+against a host or mock host, and `ken native-build <file> <dir>` elaborates and
 lowers through the native backend to an executable
 ([CLI paths](../../../crates/ken-cli/src/main.rs), `check_file`/
 `elaborate_cli_file`, `run_file`, `native_build_file`). A pure-library entry
 (no `proc main`, the ordinary shape
 for a `catalog/packages/` component) is validated with `ken check` precisely
 because `ken run` rejects a pure library with no `main` entrypoint. That
-rejection is not evidence against the entry; it only shows that the file is
+rejection is not evidence against the entry, and it only shows that the file is
 not a runnable program
 ([§3](../../../docs/program/07-catalog-style-guide.md#3-code-block-roles-the-fence-taxonomy)).
 
@@ -68,7 +68,7 @@ The [System IO fragment](../../../catalog/packages/Capability/System/IO.ken.md)
 states, about its checked
 proof terms: "Exactly-once settlement and liveness remain runtime-enforced,
 delegated boundary properties." Chapter [03](03-assurance-and-trust.md)
-first showed you this sentence to teach `delegated`; read it for what it
+first showed you this sentence to teach `delegated`, and read it for what it
 says about *execution* specifically. The five lemmas above that sentence are
 kernel-checked proofs about the shape of `writeAll`'s recursion and its error
 handling — `ken check`-passing code. They do **not** claim that a single
@@ -87,7 +87,7 @@ the event
 For other closure-free values, durable behavior is separate from in-process
 storage. Values in the durably canonicalizable domain have deterministic
 bytes. Proved `Map` and `Set` package trees instead preserve extensional
-equality, ordered `to_list`, and durable round-trip; their internal bytes are
+equality, ordered `to_list`, and durable round-trip, and their internal bytes are
 not observable. The runtime may copy, share, intern, or directly embed either
 kind without changing those guarantees
 ([capacity §1](../../../spec/40-runtime/44-capacity.md#1-logical-values-are-separate-from-physical-storage)).
@@ -116,10 +116,10 @@ runtime behavior
 2. A **partial primitive** — division by zero, a non-wrapping overflow, an
    out-of-bounds index — either carries a refinement precondition that makes
    it total, returns `Option`/`Result`, or, unguarded, faults or yields
-   `unknown`; the obligation to avoid it is generated statically, so this is
+   `unknown`, and the obligation to avoid it is generated statically, so this is
    a visible, provable concern, never a silent trap.
 3. The **FFI/effect boundary** — a `foreign` call may diverge or fault outside
-   Ken's control; it is a listed, trusted postulate, not a default.
+   Ken's control, and it is a listed, trusted postulate, not a default.
 4. An **opaque, SCT-rejected definition** never δ-reduces in the kernel's
    conversion (so it cannot corrupt type-checking), but the interpreter still
    unfolds it to run the program — the one place a pure, admitted program may
@@ -148,7 +148,7 @@ None of the seven registered fragments contains an open hole, an opaque
 non-total definition, or an unguarded partial primitive — this is a
 statement about what this specific, small, deliberately-conservative
 teaching set contains, not a claim that these traps are rare in general Ken
-code; they are ordinary, named, and marked wherever they occur.
+code, and they are ordinary, named, and marked wherever they occur.
 
 ## Native Backend
 
@@ -202,7 +202,7 @@ shows that the dedicated job ran, that the live source-scope check passed, and
 that the interpreter and native backend agreed on the bounded-integer case. It
 carries no current evidence that they agree on the six narrowing cases. That
 narrowing differential is therefore **unavailable** while all six remain
-ignored. Re-arming one cause would make it partial; only re-arming every row
+ignored. Re-arming one cause would make it partial, and only re-arming every row
 makes it live.
 
 Chapter [04](04-effects-capabilities-and-authority.md) now shows a checked
@@ -232,17 +232,17 @@ instead of reconciling them.
 ---
 
 **Sources:**
-[evaluation §§1, 3.3–6](../../../spec/40-runtime/42-evaluation.md#1-relationship-to-the-kernels-reduction);
-[termination §§1–2](../../../spec/40-runtime/43-termination.md#1-the-total-core);
-[capacity §§1–2](../../../spec/40-runtime/44-capacity.md#1-logical-values-are-separate-from-physical-storage);
-[native backend §§1–5](../../../spec/40-runtime/45-native-backend.md#1-why-a-native-backend-and-where-it-sits);
-[open decisions](../../../spec/90-open-decisions.md);
-[CLI paths](../../../crates/ken-cli/src/main.rs);
-[runtime entry](../../../crates/ken-cli/src/lib.rs);
-[capacity producer](../../../crates/ken-interp/src/eval.rs);
-[native differential test](../../../crates/ken-cli/tests/rt_parity_native.rs);
-[native production tests](../../../crates/ken-cli/tests/px4b_native_production.rs);
-[CI routing](../../../.github/workflows/ci.yml);
+[evaluation §§1, 3.3–6](../../../spec/40-runtime/42-evaluation.md#1-relationship-to-the-kernels-reduction), and
+[termination §§1–2](../../../spec/40-runtime/43-termination.md#1-the-total-core), and
+[capacity §§1–2](../../../spec/40-runtime/44-capacity.md#1-logical-values-are-separate-from-physical-storage), and
+[native backend §§1–5](../../../spec/40-runtime/45-native-backend.md#1-why-a-native-backend-and-where-it-sits), and
+[open decisions](../../../spec/90-open-decisions.md), and
+[CLI paths](../../../crates/ken-cli/src/main.rs), and
+[runtime entry](../../../crates/ken-cli/src/lib.rs), and
+[capacity producer](../../../crates/ken-interp/src/eval.rs), and
+[native differential test](../../../crates/ken-cli/tests/rt_parity_native.rs), and
+[native production tests](../../../crates/ken-cli/tests/px4b_native_production.rs), and
+[CI routing](../../../.github/workflows/ci.yml), and
 [registered fragments](fragments.md).
 This explanatory chapter keeps specification, implementation, tests, and
 corpus coverage distinct. It does not resolve their recorded backend

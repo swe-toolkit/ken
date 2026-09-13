@@ -54,7 +54,7 @@ $ ./target/debug/ken check <path>
    Effects, capabilities, authority.
 5. **`Capability/Filesystem/Errors.ken.md`** — per-operation authority through
    seven named rights. `Full` retains every right, including write and delete,
-   but only within its `FsScope`; downstream filesystem resolution enforces
+   but only within its `FsScope`, and downstream filesystem resolution enforces
    confinement. Useful for reading rights separately from scope and for seeing
    the boundary between the runtime authority check and path resolution.
 6. **`Capability/System/IO.ken.md`** — proof terms over buffer I/O whose own
@@ -85,9 +85,9 @@ name defined in a *different* package file:
 | `Core/Classes/EffectfulClasses.ken.md` | `Functor` |
 | `Data/Numeric/Nat/Arithmetic.ken.md` | `cong` |
 
-This is not those four entries being broken; it is a corpus-coverage gap,
+This is not those four entries being broken, and it is a corpus-coverage gap,
 not a loader capability one. The loader itself resolves cross-file `import`
-(`spec/30-surface/33-declarations.md#32-importing-and-exporting`); what's
+(`spec/30-surface/33-declarations.md#32-importing-and-exporting`), and what's
 still true is
 narrower — no landed catalog entry yet exercises the cross-file case, so "a
 catalog entry that needs another package's helper today still inlines
@@ -113,10 +113,10 @@ This file's own manifest record cites all seven fragment paths above as its
 `sources`. Its currency claim rests on the **content-currency** predicate
 (`source-currency` in `manifest.toml`): the committed ledger,
 `library/SOURCE-ATTESTATIONS`, binds each cited path to its exact tracked
-git blob OID as of the commit a Librarian review last attested it; the
+git blob OID as of the commit a Librarian review last attested it, and the
 check (`scripts/gen-doc-status.sh`) compares the current tracked blob for
 every cited path against that ledger, on exact population as well as exact
-OID. That predicate proves the cited *bytes* match what was reviewed; it
+OID. That predicate proves the cited *bytes* match what was reviewed, and it
 does not, by itself, re-run `ken check` — the exit-code table above is the
 separate, explicit record of that mechanism, current as of the SHA stated
 there. A cited source's bytes changing requires both a fresh Librarian

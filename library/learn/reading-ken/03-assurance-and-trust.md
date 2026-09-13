@@ -15,7 +15,7 @@ pass/fail
 ([§5.2](../../../spec/20-verification/21-spec-syntax.md#52-the-epistemic-status-per-claim-export-facing--oq-spec-decided)):
 
 - **`proved`** — the obligation was discharged and the kernel re-checked the
-  certificate. The default for a contract that goes through; no annotation,
+  certificate. The default for a contract that goes through, and no annotation,
   it simply holds.
 - **`tested`** — a property that cannot yet be proved, asserted instead with
   a runtime/test obligation. Visible as such: a reader knows this guarantee
@@ -25,14 +25,14 @@ pass/fail
   so the kernel cannot close it. Ken states it and hands it to a runtime
   sibling to model-check and monitor.
 - **`unknown`** — not discharged, and no test or delegation given either: an
-  admitted typed hole. The program still runs; the result carries `unknown`
+  admitted typed hole. The program still runs, and the result carries `unknown`
   wherever the unproven property is observed.
 
 This four-way status is a different classification from the three-way
 **verdict** (`proved`/`disproved`/`unknown`) a single obligation gets when
 you attempt it
 ([§5.1](../../../spec/20-verification/21-spec-syntax.md#51-the-verdict-per-obligation-operational)) —
-the verdict is the operational outcome of one attempt; the epistemic status
+the verdict is the operational outcome of one attempt, and the epistemic status
 is the label the claim carries afterward, and it is the one worth reading
 for. The rest of this chapter walks all four against catalog fragments.
 
@@ -64,7 +64,7 @@ For these two `EmptyDec` claims, the `proved` certificates add no new trust
 category: each is a closed term that `check` validates, and a wrong certificate
 simply fails to validate. The producer separately establishes zero
 `declare_primitive`/`declare_postulate` delta for the two new inductives. That
-is the grounded boundary here; a `proved` certificate in another artifact may
+is the grounded boundary here, and a `proved` certificate in another artifact may
 still inherit primitive or postulate entries already present in its
 environment.
 
@@ -106,7 +106,7 @@ settle? exactly once?), not a static proposition a pure function's body can
 close, so it is stated and hands off to the runtime rather than proved here
 ([§5.2](../../../spec/20-verification/21-spec-syntax.md#52-the-epistemic-status-per-claim-export-facing--oq-spec-decided)).
 The file marks
-the line: five proofs are proved; settlement and liveness are not, and it
+the line: five proofs are proved, and settlement and liveness are not, and it
 says so in its own text rather than leaving a reader to assume the whole
 file carries one uniform guarantee.
 
@@ -163,13 +163,13 @@ examples show, what
 it does not: the sentence in a fragment's prose is only as trustworthy as
 the producer that computed it. The kernel's `trusted_base()`
 enumerates, on demand, every postulate and primitive declaration an
-artifact rests on; it is complete by construction — the only two ways an
+artifact rests on, and it is complete by construction — the only two ways an
 unchecked assumption can enter the program are `declare_postulate` and
 `declare_primitive`, and both land exactly the declarations the enumerator
 lists, so no assumption can hide
 ([§1.1](../../../spec/60-security/64-trust-model.md#11-the-enumeration-contract-soundness-landed-producer),
 [§1.2](../../../spec/60-security/64-trust-model.md#12-the-completeness-net-no-hidden-assumption-by-construction)).
-An **empty** delta is the "fully verified, nothing assumed" signal; a
+An **empty** delta is the "fully verified, nothing assumed" signal, and a
 **non-empty** one lists exactly what you inherit. Crucially, this is
 decidable from the kernel's own state, not from a label a file's prose
 chooses to print: a claim is `proved` **iff** its certificate checks *and*
@@ -199,7 +199,7 @@ a verified system that over-claims is itself a security risk, so stated limits
 are first-class, not buried
 ([§4](../../../spec/60-security/64-trust-model.md#4-the-honest-limits-what-a-language-cannot-fix-normative)).
 This entry's rights, scopes, and division of enforcement are chapter
-[04](04-effects-capabilities-and-authority.md)'s subject; here, notice only
+[04](04-effects-capabilities-and-authority.md)'s subject, and here, notice only
 that stating a boundary is a discipline the fragments themselves practice,
 not just a rule stated about them from outside.
 
@@ -213,9 +213,9 @@ constructs remain unavailable in these fragments.
 ---
 
 **Sources:**
-[verification status §§5.1–5.5](../../../spec/20-verification/21-spec-syntax.md#51-the-verdict-per-obligation-operational);
-[trust model §§1–1.2, 4](../../../spec/60-security/64-trust-model.md#1-the-trusted-computing-base-tcb-precisely);
-[Transport acceptance](../../../crates/ken-elaborator/tests/surface_transport_acceptance.rs);
+[verification status §§5.1–5.5](../../../spec/20-verification/21-spec-syntax.md#51-the-verdict-per-obligation-operational), and
+[trust model §§1–1.2, 4](../../../spec/60-security/64-trust-model.md#1-the-trusted-computing-base-tcb-precisely), and
+[Transport acceptance](../../../crates/ken-elaborator/tests/surface_transport_acceptance.rs), and
 [EmptyDec acceptance](../../../crates/ken-elaborator/tests/ds1_empty_dec_acceptance.rs).
 This explanatory chapter interprets those sources and the registered
-[fragments](fragments.md); it adds no language rule.
+[fragments](fragments.md), and it adds no language rule.
