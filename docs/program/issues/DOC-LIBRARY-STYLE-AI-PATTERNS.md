@@ -1,7 +1,7 @@
 ---
 id: DOC-LIBRARY-STYLE-AI-PATTERNS
 title: "Draft AI-pattern prose-quality guidance for library/ documentation into the library-style authoring skill plus a doc-author review checklist -- judgment heuristics (never an authorship test) that require every negative to name the specific operation, condition, and consequence, oriented to BOTH revising current docs and future authoring. Grounded in PRINCIPLES #2/#8/#14. Librarian-authored per operator ruling."
-status: ready
+status: merged
 owner: doc
 size: S
 gate: none
