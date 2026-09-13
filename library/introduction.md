@@ -51,9 +51,9 @@ defect regardless of whether the rule happens to be correct.
 
 Ken is not:
 
-- a general-purpose scripting language optimized for terse, throwaway code;
+- a general-purpose scripting language optimized for terse, throwaway code, and
 - a proof assistant whose primary audience is proof engineers rather than
-  software reviewers;
+  software reviewers, and
 - a restatement of everything its specification covers and excludes — that
   scope is fixed in `spec/00-overview.md` §5, and this page does not
   reproduce it.
@@ -73,9 +73,9 @@ packages and provenance, and execution — is available under
 
 ---
 
-**Grounds this page:** `docs/PRINCIPLES.md` §§1, 5, 8;
-`spec/00-overview.md` §§1, 5; `spec/60-security/64-trust-model.md` §1;
+**Grounds this page:** `docs/PRINCIPLES.md` §§1, 5, 8, and
+`spec/00-overview.md` §§1, 5, and `spec/60-security/64-trust-model.md` §1, and
 `spec/20-verification/21-spec-syntax.md` §5. Authority class:
 `explanatory` — this page orders and interprets those sections for a new
-reader; it does not assert a rule the cited spec sections do not already
+reader, and it does not assert a rule the cited spec sections do not already
 state.
