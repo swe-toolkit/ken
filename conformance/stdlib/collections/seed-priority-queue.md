@@ -391,20 +391,20 @@ population-side mutation above.
 `CAT-PRIORITY-QUEUE` landed the named finite observations above. Its historical
 evidence pairs original producer blob
 `1eec578603cdef349af21d944ac174af5919705c`, original acceptance-test blob
-`9853d43fa4e3c1c66ce4d00ce2c600a38e4e65a9`, and the shared, unchanged
-owner-local resolver-test blob
-`eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7`. The original thirty
-compile-preserving population-side and detector-side mutations ran against that
-historical producer/acceptance pair; the original-name and renamed-reexport
-mutations also use the shared resolver oracle. They retain their named failures
-and byte-exact restorations.
+`9853d43fa4e3c1c66ce4d00ce2c600a38e4e65a9`, and historical owner-local
+resolver-test blob `eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7`. The original
+thirty compile-preserving population-side and detector-side mutations ran
+against that historical producer/acceptance pair; the original-name and
+renamed-reexport mutations also use that historical resolver oracle. They
+retain their named failures and byte-exact restorations.
 
 The current baseline instead pairs provider blob
-`b9408697beca6a8d6ca7df30d9a3b3e808125358` with current acceptance-test blob
-`9eb73ac5546485a28f9f509dee601cf7d2b21700`. Together with the same resolver
-artifact, they execute nine passing acceptance tests, including exactly 4,216
-bounded traces, plus two passing export-table closure tests. The historical
-mutation results are not attributed to this current provider/acceptance pair.
+`b9408697beca6a8d6ca7df30d9a3b3e808125358`, current acceptance-test blob
+`9eb73ac5546485a28f9f509dee601cf7d2b21700`, and current strict-resolution-test
+blob `cbbf096623ab94a97a7ce0770c1b3276b46cde02`. These current artifacts execute
+nine passing acceptance tests, including exactly 4,216 bounded traces, and four
+passing strict-resolution tests. The historical mutation results are not
+attributed to this current provider/acceptance pair.
 
 `CAT-PRIORITY-QUEUE-LAWS` adds the private checked general suite. It proves
 representation validity and actual right-spine cache shape,
