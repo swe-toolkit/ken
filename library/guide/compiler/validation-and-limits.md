@@ -64,7 +64,7 @@ recomputes facts from one concrete `RuntimeProgram` and compares them with a
 certificate bound to that program's package identity, core semantic hash, and
 artifact hash. Its supported-artifact report covers a bounded subset: package
 and declaration effects, capabilities, runtime checks, and trust metadata, and
-reachable unsupported entries and lowerability, and and foreign or effectful
+reachable unsupported entries and lowerability, and foreign or effectful
 boundaries. A missing claim, identity mismatch, or recomputed fact mismatch is
 an error rather than a successful validation with weakened meaning.
 
