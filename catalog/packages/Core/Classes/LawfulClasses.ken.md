@@ -445,6 +445,17 @@ instance DecEq Bool {
 ```
 
 ```ken
+pub theorem bool_cases
+      (b : Bool)
+      (motive : Bool → Prop)
+      (yes : motive True)
+      (no : motive False)
+    : motive b =
+  match b {
+    True ↦ yes;
+    False ↦ no
+  }
+
 fn compare_bool_cases (b : Bool) : Or (Equal Bool b True) (Equal Bool b False) =
   match b {
     True ↦ Inl (Equal Bool True True) (Equal Bool True False) Proved;
@@ -573,12 +584,17 @@ pub proof eq_true_of_or for bool_or
     Inr hq ↦ proof right_true_intro for bool_or p q hq
   }
 
+pub proof total for leq_nat
+      (x : Nat) (y : Nat)
+    : IsTrue (bool_or (leq_nat x y) (leq_nat y x)) =
+  proof eq_true_of_or for bool_or (leq_nat x y) (leq_nat y x) (total_leq_nat x y)
+
 instance Ord Nat {
   leq = leq_nat;
   refl = proof refl for leq_nat;
   antisym = proof antisym for leq_nat;
   trans = proof trans for leq_nat;
-  total = λx.λy.proof eq_true_of_or for bool_or (leq_nat x y) (leq_nat y x) (total_leq_nat x y)
+  total = proof total for leq_nat
 }
 ```
 
@@ -941,7 +957,7 @@ proof lt_reverse_false for compare_raw
       λp. absurd (J (λb _. Equal OrdResult (compare_result_of b (leq y x)) ord_lt) p hxy)
   }
 
-proof left_false_elim for bool_or
+pub proof left_false_elim for bool_or
       (a : Bool) (b : Bool) (ha : Equal Bool a False) (hor : Equal Bool (bool_or a b) True)
     : Equal Bool b True =
   J (λw _. Equal Bool (bool_or w b) True) hor ha
