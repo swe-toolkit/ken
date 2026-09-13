@@ -3034,10 +3034,15 @@ pub fn expand_and_elaborate(
 
 #[cfg(test)]
 mod namespace_effect_tests {
+    use std::collections::BTreeSet;
+    use std::fs;
+    use std::path::PathBuf;
+
     use super::{decl_namespace_effect, ConstructorNameSource, DeclNamespaceEffect};
     use crate::ast::{Decl, ExplicitDataCtor};
     use crate::error::Span;
     use crate::parser::parse_decls;
+    use crate::ElabEnv;
 
     #[derive(Debug, PartialEq, Eq)]
     enum OwnedNamespaceEffect {
@@ -3121,6 +3126,73 @@ mod namespace_effect_tests {
             DeclNamespaceEffect::ReferenceOnly => OwnedNamespaceEffect::ReferenceOnly,
             DeclNamespaceEffect::NoBinding => OwnedNamespaceEffect::NoBinding,
         }
+    }
+
+    /// Promise class: normative compatibility vector.
+    ///
+    /// MEASURED: the actual private resolver export table after roots-loading
+    /// the catalog package. CLAIMED: PriorityQueue has exactly its specified
+    /// six-name public API, including every direct export and re-export. THE
+    /// GAP: integration tests separately prove those identities are usable and
+    /// the selected private names refuse at the client boundary.
+    #[test]
+    fn priority_queue_actual_export_table_is_exactly_the_six_name_api() {
+        let mut env = ElabEnv::new().expect("base environment");
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+        env.elaborate_module_from_roots(&[root], "Data.Collections.PriorityQueue")
+            .expect("PriorityQueue must elaborate from its catalog roots");
+        let exports = env
+            .module_state
+            .exports
+            .get("Data.Collections.PriorityQueue")
+            .expect("loaded module must have its actual resolver export table");
+        let observed = exports.keys().map(String::as_str).collect::<BTreeSet<_>>();
+        assert_eq!(
+            observed,
+            BTreeSet::from([
+                "PriorityQueue",
+                "empty",
+                "find_min",
+                "insert",
+                "merge",
+                "pop_min",
+            ])
+        );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: a real facade module's private export table records a renamed
+    /// re-export under its public alias. CLAIMED: the owner-local closure seam
+    /// observes renamed re-exports rather than only direct declarations or
+    /// original spellings. THE GAP: the catalog assertion above applies that
+    /// seam to PriorityQueue's authoritative package.
+    #[test]
+    fn actual_export_table_includes_renamed_reexports() {
+        let root = tempfile::tempdir().expect("temporary module root");
+        fs::write(
+            root.path().join("ExportSource.ken"),
+            "pub const original : Nat = Zero\n",
+        )
+        .expect("write export source");
+        fs::write(
+            root.path().join("RenamedFacade.ken"),
+            "export ExportSource (original as renamed)\n",
+        )
+        .expect("write renamed facade");
+
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots(&[root.path().to_path_buf()], "RenamedFacade")
+            .expect("renamed facade must elaborate");
+        let exports = env
+            .module_state
+            .exports
+            .get("RenamedFacade")
+            .expect("loaded facade must have its actual resolver export table");
+        assert_eq!(
+            exports.keys().map(String::as_str).collect::<BTreeSet<_>>(),
+            BTreeSet::from(["renamed"])
+        );
     }
 
     /// `Pub` is a transparent namespace-effect wrapper for the complete

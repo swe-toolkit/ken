@@ -215,8 +215,10 @@ fn reify_checked_record(term: &Term, env: &ElabEnv, store: &mut EvalStore) -> Ev
 fn runtime_ord_dictionary(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
     // `Ord` is proof-carrying. Strict evaluation of its proposition-valued
     // record terminator makes the whole ordinary record `Unknown`. Reify the
-    // already kernel-checked transparent record field-by-field so all five real
-    // fields remain present and only the unused terminal stays opaque.
+    // already kernel-checked transparent record field-by-field so the real
+    // `leq` field plus all four laws remain present and only the unused record
+    // terminal stays opaque. This is a disclosed test-value bridge, not native
+    // full-pipeline evaluation of proposition-valued records.
     let (_, body) = env
         .env
         .transparent_body(id)
@@ -234,7 +236,7 @@ fn runtime_ord_dictionary(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) ->
     }
     assert_eq!(
         fields, 5,
-        "Ord runtime view must retain all five law fields"
+        "Ord runtime view must retain `leq` plus four law fields"
     );
     dictionary
 }
@@ -658,44 +660,1105 @@ fn rewrite_root(api: &Api, queue: &EvalVal, rewrite: impl FnOnce(&mut Vec<EvalVa
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ComparatorOrigin {
+    Parameter,
+    ProjectedDictionary,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+enum QueueOrigin {
+    Parameter(&'static str),
+    Left(Box<QueueOrigin>),
+    Right(Box<QueueOrigin>),
+}
+
+impl QueueOrigin {
+    fn left(&self) -> Self {
+        Self::Left(Box::new(self.clone()))
+    }
+
+    fn right(&self) -> Self {
+        Self::Right(Box::new(self.clone()))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum PriorityOrigin {
+    Parameter,
+    Root(QueueOrigin),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum PayloadOrigin {
+    Parameter,
+    Root(QueueOrigin),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum NatExpr {
+    Zero,
+    CachedRank(QueueOrigin),
+    Rank(Box<QueueExpr>),
+    Suc(Box<NatExpr>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum QueueExpr {
+    Origin(QueueOrigin),
+    Empty(ComparatorOrigin),
+    Node {
+        comparator: ComparatorOrigin,
+        rank: NatExpr,
+        priority: PriorityOrigin,
+        payload: PayloadOrigin,
+        left: Box<QueueExpr>,
+        right: Box<QueueExpr>,
+    },
+    MadeNode {
+        comparator: ComparatorOrigin,
+        priority: PriorityOrigin,
+        payload: PayloadOrigin,
+        left: Box<QueueExpr>,
+        right: Box<QueueExpr>,
+    },
+    Meld {
+        comparator: ComparatorOrigin,
+        first: Box<QueueExpr>,
+        second: Box<QueueExpr>,
+    },
+    Merge {
+        dictionary: bool,
+        first: Box<QueueExpr>,
+        second: Box<QueueExpr>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum CallKind {
+    OrdLeqAt,
+    LeqNat,
+    Rank,
+    MakeNode,
+    Meld,
+    Merge,
+    PairType,
+    PairValue,
+    QueueType,
+    EmptyCtor,
+    NodeCtor,
+    ZeroCtor,
+    SucCtor,
+    NoneCtor,
+    SomeCtor,
+    PriorityCompare(ComparatorOrigin),
+}
+
+impl CallKind {
+    fn arity(&self) -> usize {
+        match self {
+            Self::OrdLeqAt | Self::LeqNat | Self::PairType | Self::PriorityCompare(_) => 2,
+            Self::Rank | Self::PairValue => 4,
+            Self::Meld | Self::Merge => 5,
+            Self::MakeNode => 7,
+            Self::QueueType | Self::EmptyCtor => 3,
+            Self::NodeCtor => 8,
+            Self::ZeroCtor => 0,
+            Self::SucCtor | Self::NoneCtor => 1,
+            Self::SomeCtor => 2,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum SemanticValue {
+    KeyType,
+    PayloadType,
+    Dictionary,
+    Comparator(ComparatorOrigin),
+    QueueType(ComparatorOrigin),
+    PairType(Box<SemanticValue>, Box<SemanticValue>),
+    Queue(QueueExpr),
+    Priority(PriorityOrigin),
+    Payload(PayloadOrigin),
+    Nat(NatExpr),
+    BoolMetadata(NatExpr, NatExpr),
+    BoolPriority(PriorityOrigin, PriorityOrigin),
+    Pair(Box<SemanticValue>, Box<SemanticValue>),
+    None,
+    Some(Box<SemanticValue>),
+    InductionHypothesis,
+    Callable {
+        kind: CallKind,
+        args: Vec<SemanticValue>,
+    },
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct StructuralTrace {
+    rank_reads: Vec<QueueExpr>,
+    metadata_comparisons: Vec<(NatExpr, NatExpr)>,
+    priority_comparisons: Vec<(PriorityOrigin, PriorityOrigin)>,
+    make_node_calls: Vec<(QueueExpr, QueueExpr)>,
+    meld_calls: Vec<(QueueExpr, QueueExpr)>,
+    merge_calls: Vec<(QueueExpr, QueueExpr)>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MeldAdvance {
+    FirstRight,
+    SecondRight,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct MeldProgramCertificate {
+    true_advance: MeldAdvance,
+    false_advance: MeldAdvance,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PriorityQueueProgramCertificate {
+    meld: MeldProgramCertificate,
+}
+
+struct SemanticStructuralVerifier<'a> {
+    env: &'a ElabEnv,
+    api: &'a Api,
+    ord_leq_at: GlobalId,
+    leq_nat: GlobalId,
+    pair_type: GlobalId,
+    pair_value: GlobalId,
+}
+
+impl<'a> SemanticStructuralVerifier<'a> {
+    fn new(env: &'a ElabEnv, api: &'a Api) -> Self {
+        Self {
+            env,
+            api,
+            ord_leq_at: env.globals[&format!("{LAWFUL}.ord_leq_at")],
+            leq_nat: env.globals[&format!("{LAWFUL}.leq_nat")],
+            pair_type: env.globals["Pair"],
+            pair_value: env.globals["mk_pair"],
+        }
+    }
+
+    fn verify_program(&self) -> Result<PriorityQueueProgramCertificate, String> {
+        self.verify_rank(&transparent_body(self.env, self.api.rank))?;
+        self.verify_empty(&transparent_body(self.env, self.api.empty))?;
+        self.verify_make_node(&transparent_body(self.env, self.api.make_node))?;
+        let meld = self.verify_meld(&transparent_body(self.env, self.api.meld))?;
+        self.verify_merge(&transparent_body(self.env, self.api.merge))?;
+        self.verify_insert(&transparent_body(self.env, self.api.insert))?;
+        self.verify_find_min(&transparent_body(self.env, self.api.find_min))?;
+        self.verify_pop_min(&transparent_body(self.env, self.api.pop_min))?;
+        Ok(PriorityQueueProgramCertificate { meld })
+    }
+
+    fn bind_lambdas<'t>(
+        &self,
+        term: &'t Term,
+        mut context: Vec<SemanticValue>,
+        bindings: impl IntoIterator<Item = SemanticValue>,
+        label: &str,
+    ) -> Result<(&'t Term, Vec<SemanticValue>), String> {
+        let mut current = term;
+        for binding in bindings {
+            let Term::Lam(_, body) = current else {
+                return Err(format!(
+                    "{label}: expected another checked lambda, got {current:?}"
+                ));
+            };
+            context.push(binding);
+            current = body;
+        }
+        Ok((current, context))
+    }
+
+    fn peel_runtime_aliases<'t>(
+        &self,
+        mut term: &'t Term,
+        context: &mut Vec<SemanticValue>,
+        trace: &mut StructuralTrace,
+        label: &str,
+    ) -> Result<&'t Term, String> {
+        loop {
+            match term {
+                Term::Ascript(inner, _) => term = inner,
+                Term::Let { val, body, .. } => {
+                    let value = self.eval_runtime(val, context, trace, label)?;
+                    context.push(value);
+                    term = body;
+                }
+                _ => return Ok(term),
+            }
+        }
+    }
+
+    fn eval_runtime(
+        &self,
+        term: &Term,
+        context: &[SemanticValue],
+        trace: &mut StructuralTrace,
+        label: &str,
+    ) -> Result<SemanticValue, String> {
+        match term {
+            Term::Var(index) => context
+                .get(context.len().checked_sub(index + 1).ok_or_else(|| {
+                    format!("{label}: de Bruijn index @{index} escapes semantic context")
+                })?)
+                .cloned()
+                .ok_or_else(|| format!("{label}: missing semantic value for @{index}")),
+            Term::Const { id, .. } => {
+                let kind = if *id == self.ord_leq_at {
+                    CallKind::OrdLeqAt
+                } else if *id == self.leq_nat {
+                    CallKind::LeqNat
+                } else if *id == self.api.rank {
+                    CallKind::Rank
+                } else if *id == self.api.make_node {
+                    CallKind::MakeNode
+                } else if *id == self.api.meld {
+                    CallKind::Meld
+                } else if *id == self.api.merge {
+                    CallKind::Merge
+                } else if *id == self.pair_type {
+                    CallKind::PairType
+                } else if *id == self.pair_value {
+                    CallKind::PairValue
+                } else {
+                    return Err(format!("{label}: unsupported executable constant {id:?}"));
+                };
+                Ok(SemanticValue::Callable {
+                    kind,
+                    args: Vec::new(),
+                })
+            }
+            Term::IndFormer { id, .. } if *id == self.api.carrier => {
+                Ok(SemanticValue::Callable {
+                    kind: CallKind::QueueType,
+                    args: Vec::new(),
+                })
+            }
+            Term::IndFormer { id, .. } => {
+                Err(format!("{label}: unsupported executable inductive former {id:?}"))
+            }
+            Term::Constructor { id, .. } => {
+                let kind = if *id == self.api.empty_ctor {
+                    CallKind::EmptyCtor
+                } else if *id == self.api.node_ctor {
+                    CallKind::NodeCtor
+                } else if *id == self.env.prelude_env.zero_id {
+                    CallKind::ZeroCtor
+                } else if *id == self.env.prelude_env.suc_id {
+                    CallKind::SucCtor
+                } else if *id == self.env.prelude_env.none_id {
+                    CallKind::NoneCtor
+                } else if *id == self.env.prelude_env.some_id {
+                    CallKind::SomeCtor
+                } else {
+                    return Err(format!("{label}: unsupported executable constructor {id:?}"));
+                };
+                if kind.arity() == 0 {
+                    self.finish_call(kind, Vec::new(), trace, label)
+                } else {
+                    Ok(SemanticValue::Callable {
+                        kind,
+                        args: Vec::new(),
+                    })
+                }
+            }
+            Term::App(function, argument) => {
+                let function = self.eval_runtime(function, context, trace, label)?;
+                let argument = self.eval_runtime(argument, context, trace, label)?;
+                self.apply_semantic(function, argument, trace, label)
+            }
+            Term::Let { val, body, .. } => {
+                let value = self.eval_runtime(val, context, trace, label)?;
+                let mut body_context = context.to_vec();
+                body_context.push(value);
+                self.eval_runtime(body, &body_context, trace, label)
+            }
+            Term::Ascript(inner, _) => self.eval_runtime(inner, context, trace, label),
+            Term::Elim { fam, .. } => Err(format!(
+                "{label}: unsupported nested eliminator over {fam:?}; executable eliminators must be certified at their owning operation"
+            )),
+            other => Err(format!("{label}: unsupported executable term {other:?}")),
+        }
+    }
+
+    fn apply_semantic(
+        &self,
+        function: SemanticValue,
+        argument: SemanticValue,
+        trace: &mut StructuralTrace,
+        label: &str,
+    ) -> Result<SemanticValue, String> {
+        let (kind, mut args) = match function {
+            SemanticValue::Comparator(origin) => (CallKind::PriorityCompare(origin), Vec::new()),
+            SemanticValue::Callable { kind, args } => (kind, args),
+            other => return Err(format!("{label}: attempted to call non-function {other:?}")),
+        };
+        args.push(argument);
+        let arity = kind.arity();
+        if args.len() < arity {
+            Ok(SemanticValue::Callable { kind, args })
+        } else if args.len() == arity {
+            self.finish_call(kind, args, trace, label)
+        } else {
+            Err(format!("{label}: over-saturated semantic call"))
+        }
+    }
+
+    fn finish_call(
+        &self,
+        kind: CallKind,
+        args: Vec<SemanticValue>,
+        trace: &mut StructuralTrace,
+        label: &str,
+    ) -> Result<SemanticValue, String> {
+        use SemanticValue as S;
+        match (kind, args.as_slice()) {
+            (CallKind::OrdLeqAt, [S::KeyType, S::Dictionary]) => {
+                Ok(S::Comparator(ComparatorOrigin::ProjectedDictionary))
+            }
+            (CallKind::LeqNat, [S::Nat(left), S::Nat(right)]) => {
+                trace
+                    .metadata_comparisons
+                    .push((left.clone(), right.clone()));
+                Ok(S::BoolMetadata(left.clone(), right.clone()))
+            }
+            (CallKind::PriorityCompare(_), [S::Priority(left), S::Priority(right)]) => {
+                trace
+                    .priority_comparisons
+                    .push((left.clone(), right.clone()));
+                Ok(S::BoolPriority(left.clone(), right.clone()))
+            }
+            (CallKind::Rank, [S::KeyType, S::PayloadType, S::Comparator(_), S::Queue(queue)]) => {
+                trace.rank_reads.push(queue.clone());
+                Ok(S::Nat(NatExpr::Rank(Box::new(queue.clone()))))
+            }
+            (
+                CallKind::MakeNode,
+                [S::KeyType, S::PayloadType, S::Comparator(comparator), S::Priority(priority), S::Payload(payload), S::Queue(left), S::Queue(right)],
+            ) => {
+                trace.make_node_calls.push((left.clone(), right.clone()));
+                Ok(S::Queue(QueueExpr::MadeNode {
+                    comparator: comparator.clone(),
+                    priority: priority.clone(),
+                    payload: payload.clone(),
+                    left: Box::new(left.clone()),
+                    right: Box::new(right.clone()),
+                }))
+            }
+            (
+                CallKind::Meld,
+                [S::KeyType, S::PayloadType, S::Comparator(comparator), S::Queue(first), S::Queue(second)],
+            ) => {
+                trace.meld_calls.push((first.clone(), second.clone()));
+                Ok(S::Queue(QueueExpr::Meld {
+                    comparator: comparator.clone(),
+                    first: Box::new(first.clone()),
+                    second: Box::new(second.clone()),
+                }))
+            }
+            (
+                CallKind::Merge,
+                [S::KeyType, S::PayloadType, S::Dictionary, S::Queue(first), S::Queue(second)],
+            ) => {
+                trace.merge_calls.push((first.clone(), second.clone()));
+                Ok(S::Queue(QueueExpr::Merge {
+                    dictionary: true,
+                    first: Box::new(first.clone()),
+                    second: Box::new(second.clone()),
+                }))
+            }
+            (CallKind::PairType, [left, right]) => {
+                Ok(S::PairType(Box::new(left.clone()), Box::new(right.clone())))
+            }
+            (CallKind::PairValue, [_left_type, _right_type, left, right]) => {
+                Ok(S::Pair(Box::new(left.clone()), Box::new(right.clone())))
+            }
+            (CallKind::QueueType, [S::KeyType, S::PayloadType, S::Comparator(comparator)]) => {
+                Ok(S::QueueType(comparator.clone()))
+            }
+            (CallKind::EmptyCtor, [S::KeyType, S::PayloadType, S::Comparator(comparator)]) => {
+                Ok(S::Queue(QueueExpr::Empty(comparator.clone())))
+            }
+            (
+                CallKind::NodeCtor,
+                [S::KeyType, S::PayloadType, S::Comparator(comparator), S::Nat(rank), S::Priority(priority), S::Payload(payload), S::Queue(left), S::Queue(right)],
+            ) => Ok(S::Queue(QueueExpr::Node {
+                comparator: comparator.clone(),
+                rank: rank.clone(),
+                priority: priority.clone(),
+                payload: payload.clone(),
+                left: Box::new(left.clone()),
+                right: Box::new(right.clone()),
+            })),
+            (CallKind::ZeroCtor, []) => Ok(S::Nat(NatExpr::Zero)),
+            (CallKind::SucCtor, [S::Nat(predecessor)]) => {
+                Ok(S::Nat(NatExpr::Suc(Box::new(predecessor.clone()))))
+            }
+            (CallKind::NoneCtor, [_element_type]) => Ok(S::None),
+            (CallKind::SomeCtor, [_element_type, value]) => Ok(S::Some(Box::new(value.clone()))),
+            (kind, args) => Err(format!(
+                "{label}: unsupported argument roles for {kind:?}: {args:?}"
+            )),
+        }
+    }
+
+    fn function_context<'t>(
+        &self,
+        term: &'t Term,
+        queue_parameters: &[&'static str],
+        extra: &[SemanticValue],
+        label: &str,
+    ) -> Result<(&'t Term, Vec<SemanticValue>), String> {
+        let mut roles = vec![
+            SemanticValue::KeyType,
+            SemanticValue::PayloadType,
+            SemanticValue::Comparator(ComparatorOrigin::Parameter),
+        ];
+        roles.extend(extra.iter().cloned());
+        roles.extend(
+            queue_parameters
+                .iter()
+                .map(|name| SemanticValue::Queue(QueueExpr::Origin(QueueOrigin::Parameter(name)))),
+        );
+        self.bind_lambdas(term, Vec::new(), roles, label)
+    }
+
+    fn public_function_context<'t>(
+        &self,
+        term: &'t Term,
+        extra: &[SemanticValue],
+        queues: &[&'static str],
+        label: &str,
+    ) -> Result<(&'t Term, Vec<SemanticValue>), String> {
+        let mut roles = vec![
+            SemanticValue::KeyType,
+            SemanticValue::PayloadType,
+            SemanticValue::Dictionary,
+        ];
+        roles.extend(extra.iter().cloned());
+        roles.extend(
+            queues
+                .iter()
+                .map(|name| SemanticValue::Queue(QueueExpr::Origin(QueueOrigin::Parameter(name)))),
+        );
+        self.bind_lambdas(term, Vec::new(), roles, label)
+    }
+
+    fn node_method_context<'t>(
+        &self,
+        method: &'t Term,
+        context: Vec<SemanticValue>,
+        root: QueueOrigin,
+        label: &str,
+    ) -> Result<(&'t Term, Vec<SemanticValue>), String> {
+        let left = root.left();
+        let right = root.right();
+        self.bind_lambdas(
+            method,
+            context,
+            [
+                SemanticValue::Nat(NatExpr::CachedRank(root.clone())),
+                SemanticValue::Priority(PriorityOrigin::Root(root.clone())),
+                SemanticValue::Payload(PayloadOrigin::Root(root)),
+                SemanticValue::Queue(QueueExpr::Origin(left)),
+                SemanticValue::Queue(QueueExpr::Origin(right)),
+                SemanticValue::InductionHypothesis,
+                SemanticValue::InductionHypothesis,
+            ],
+            label,
+        )
+    }
+
+    fn expect_elim<'t>(
+        &self,
+        term: &'t Term,
+        context: &mut Vec<SemanticValue>,
+        trace: &mut StructuralTrace,
+        family: GlobalId,
+        expected_params: &[SemanticValue],
+        expected_scrutinee: &SemanticValue,
+        label: &str,
+    ) -> Result<&'t [Term], String> {
+        let term = self.peel_runtime_aliases(term, context, trace, label)?;
+        let Term::Elim {
+            fam,
+            params,
+            methods,
+            indices,
+            scrut,
+            ..
+        } = term
+        else {
+            return Err(format!(
+                "{label}: expected checked eliminator, got {term:?}"
+            ));
+        };
+        if *fam != family || !indices.is_empty() || methods.len() != 2 {
+            return Err(format!(
+                "{label}: unsupported eliminator family/indices/method count"
+            ));
+        }
+        let actual_params = params
+            .iter()
+            .map(|param| self.eval_runtime(param, context, trace, label))
+            .collect::<Result<Vec<_>, _>>()?;
+        if actual_params != expected_params {
+            return Err(format!(
+                "{label}: eliminator parameter roles {actual_params:?} != {expected_params:?}"
+            ));
+        }
+        let actual_scrutinee = self.eval_runtime(scrut, context, trace, label)?;
+        if &actual_scrutinee != expected_scrutinee {
+            return Err(format!(
+                "{label}: eliminator scrutinee {actual_scrutinee:?} != {expected_scrutinee:?}"
+            ));
+        }
+        Ok(methods)
+    }
+
+    fn expect_trace(
+        &self,
+        actual: &StructuralTrace,
+        expected: StructuralTrace,
+        label: &str,
+    ) -> Result<(), String> {
+        if *actual == expected {
+            Ok(())
+        } else {
+            Err(format!(
+                "{label}: structural trace {actual:#?} != {expected:#?}"
+            ))
+        }
+    }
+
+    fn verify_rank(&self, term: &Term) -> Result<(), String> {
+        let input = QueueOrigin::Parameter("rank input");
+        let (body, mut context) = self.function_context(term, &["rank input"], &[], "rank")?;
+        let mut control_trace = StructuralTrace::default();
+        let methods = self.expect_elim(
+            body,
+            &mut context,
+            &mut control_trace,
+            self.api.carrier,
+            &[
+                SemanticValue::KeyType,
+                SemanticValue::PayloadType,
+                SemanticValue::Comparator(ComparatorOrigin::Parameter),
+            ],
+            &SemanticValue::Queue(QueueExpr::Origin(input.clone())),
+            "rank root",
+        )?;
+        self.expect_trace(&control_trace, StructuralTrace::default(), "rank root")?;
+        let mut empty_trace = StructuralTrace::default();
+        let empty = self.eval_runtime(&methods[0], &context, &mut empty_trace, "rank Empty")?;
+        if empty != SemanticValue::Nat(NatExpr::Zero) {
+            return Err(format!("rank Empty: expected Zero, got {empty:?}"));
+        }
+        self.expect_trace(&empty_trace, StructuralTrace::default(), "rank Empty")?;
+        let (node_body, node_context) =
+            self.node_method_context(&methods[1], context, input.clone(), "rank Node")?;
+        let mut node_trace = StructuralTrace::default();
+        let node = self.eval_runtime(node_body, &node_context, &mut node_trace, "rank Node")?;
+        if node != SemanticValue::Nat(NatExpr::CachedRank(input)) {
+            return Err(format!(
+                "rank Node: expected cached root rank, got {node:?}"
+            ));
+        }
+        self.expect_trace(&node_trace, StructuralTrace::default(), "rank Node")
+    }
+
+    fn verify_empty(&self, term: &Term) -> Result<(), String> {
+        let (body, context) = self.public_function_context(term, &[], &[], "empty")?;
+        let mut trace = StructuralTrace::default();
+        let value = self.eval_runtime(body, &context, &mut trace, "empty body")?;
+        if value != SemanticValue::Queue(QueueExpr::Empty(ComparatorOrigin::ProjectedDictionary)) {
+            return Err(format!("empty: wrong constant queue form {value:?}"));
+        }
+        self.expect_trace(&trace, StructuralTrace::default(), "empty")
+    }
+
+    fn verify_make_node(&self, term: &Term) -> Result<(), String> {
+        let left = QueueExpr::Origin(QueueOrigin::Parameter("make_node left"));
+        let right = QueueExpr::Origin(QueueOrigin::Parameter("make_node right"));
+        let (body, mut context) = self.function_context(
+            term,
+            &["make_node left", "make_node right"],
+            &[
+                SemanticValue::Priority(PriorityOrigin::Parameter),
+                SemanticValue::Payload(PayloadOrigin::Parameter),
+            ],
+            "make_node",
+        )?;
+        let left_rank = NatExpr::Rank(Box::new(left.clone()));
+        let right_rank = NatExpr::Rank(Box::new(right.clone()));
+        let mut control_trace = StructuralTrace::default();
+        let methods = self.expect_elim(
+            body,
+            &mut context,
+            &mut control_trace,
+            self.env.numeric_env.bool_id,
+            &[],
+            &SemanticValue::BoolMetadata(left_rank.clone(), right_rank.clone()),
+            "make_node rank choice",
+        )?;
+        self.expect_trace(
+            &control_trace,
+            StructuralTrace {
+                rank_reads: vec![left.clone(), right.clone()],
+                metadata_comparisons: vec![(left_rank.clone(), right_rank.clone())],
+                ..StructuralTrace::default()
+            },
+            "make_node rank choice",
+        )?;
+        for (index, (final_left, final_right, final_right_rank)) in [
+            (right.clone(), left.clone(), left_rank),
+            (left.clone(), right.clone(), right_rank),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut branch_trace = StructuralTrace::default();
+            let value = self.eval_runtime(
+                &methods[index],
+                &context,
+                &mut branch_trace,
+                "make_node branch",
+            )?;
+            let expected = SemanticValue::Queue(QueueExpr::Node {
+                comparator: ComparatorOrigin::Parameter,
+                rank: NatExpr::Suc(Box::new(final_right_rank.clone())),
+                priority: PriorityOrigin::Parameter,
+                payload: PayloadOrigin::Parameter,
+                left: Box::new(final_left),
+                right: Box::new(final_right.clone()),
+            });
+            if value != expected {
+                return Err(format!(
+                    "make_node branch {index}: wrong children/final-right cache {value:#?}"
+                ));
+            }
+            self.expect_trace(
+                &branch_trace,
+                StructuralTrace {
+                    rank_reads: vec![final_right],
+                    ..StructuralTrace::default()
+                },
+                "make_node bounded reconstruction",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn verify_meld(&self, term: &Term) -> Result<MeldProgramCertificate, String> {
+        let first_origin = QueueOrigin::Parameter("meld first");
+        let second_origin = QueueOrigin::Parameter("meld second");
+        let first = QueueExpr::Origin(first_origin.clone());
+        let second = QueueExpr::Origin(second_origin.clone());
+        let (body, mut context) =
+            self.function_context(term, &["meld first", "meld second"], &[], "meld")?;
+        let mut outer_trace = StructuralTrace::default();
+        let outer_methods = self.expect_elim(
+            body,
+            &mut context,
+            &mut outer_trace,
+            self.api.carrier,
+            &[
+                SemanticValue::KeyType,
+                SemanticValue::PayloadType,
+                SemanticValue::Comparator(ComparatorOrigin::Parameter),
+            ],
+            &SemanticValue::Queue(first.clone()),
+            "meld first root",
+        )?;
+        self.expect_trace(&outer_trace, StructuralTrace::default(), "meld first root")?;
+        let mut first_empty_trace = StructuralTrace::default();
+        let first_empty = self.eval_runtime(
+            &outer_methods[0],
+            &context,
+            &mut first_empty_trace,
+            "meld first-empty terminal",
+        )?;
+        if first_empty != SemanticValue::Queue(second.clone()) {
+            return Err(format!(
+                "meld first-empty must return second, got {first_empty:?}"
+            ));
+        }
+        self.expect_trace(
+            &first_empty_trace,
+            StructuralTrace::default(),
+            "meld first-empty terminal",
+        )?;
+
+        let (first_node_body, mut first_node_context) = self.node_method_context(
+            &outer_methods[1],
+            context,
+            first_origin.clone(),
+            "meld first Node",
+        )?;
+        let mut second_control_trace = StructuralTrace::default();
+        let second_methods = self.expect_elim(
+            first_node_body,
+            &mut first_node_context,
+            &mut second_control_trace,
+            self.api.carrier,
+            &[
+                SemanticValue::KeyType,
+                SemanticValue::PayloadType,
+                SemanticValue::Comparator(ComparatorOrigin::Parameter),
+            ],
+            &SemanticValue::Queue(second.clone()),
+            "meld second root",
+        )?;
+        self.expect_trace(
+            &second_control_trace,
+            StructuralTrace::default(),
+            "meld second root",
+        )?;
+        let mut second_empty_trace = StructuralTrace::default();
+        let second_empty = self.eval_runtime(
+            &second_methods[0],
+            &first_node_context,
+            &mut second_empty_trace,
+            "meld second-empty terminal",
+        )?;
+        if second_empty != SemanticValue::Queue(first.clone()) {
+            return Err(format!(
+                "meld second-empty must return first, got {second_empty:?}"
+            ));
+        }
+        self.expect_trace(
+            &second_empty_trace,
+            StructuralTrace::default(),
+            "meld second-empty terminal",
+        )?;
+
+        let (second_node_body, mut both_context) = self.node_method_context(
+            &second_methods[1],
+            first_node_context,
+            second_origin.clone(),
+            "meld second Node",
+        )?;
+        let first_priority = PriorityOrigin::Root(first_origin.clone());
+        let second_priority = PriorityOrigin::Root(second_origin.clone());
+        let mut compare_trace = StructuralTrace::default();
+        let compare_methods = self.expect_elim(
+            second_node_body,
+            &mut both_context,
+            &mut compare_trace,
+            self.env.numeric_env.bool_id,
+            &[],
+            &SemanticValue::BoolPriority(first_priority.clone(), second_priority.clone()),
+            "meld root priority choice",
+        )?;
+        self.expect_trace(
+            &compare_trace,
+            StructuralTrace {
+                priority_comparisons: vec![(first_priority.clone(), second_priority.clone())],
+                ..StructuralTrace::default()
+            },
+            "meld one priority comparison",
+        )?;
+
+        let expected_branches = [
+            (
+                first_priority.clone(),
+                PayloadOrigin::Root(first_origin.clone()),
+                QueueExpr::Origin(first_origin.left()),
+                QueueExpr::Meld {
+                    comparator: ComparatorOrigin::Parameter,
+                    first: Box::new(QueueExpr::Origin(first_origin.right())),
+                    second: Box::new(second.clone()),
+                },
+                MeldAdvance::FirstRight,
+            ),
+            (
+                second_priority,
+                PayloadOrigin::Root(second_origin.clone()),
+                QueueExpr::Origin(second_origin.left()),
+                QueueExpr::Meld {
+                    comparator: ComparatorOrigin::Parameter,
+                    first: Box::new(first.clone()),
+                    second: Box::new(QueueExpr::Origin(second_origin.right())),
+                },
+                MeldAdvance::SecondRight,
+            ),
+        ];
+        let mut advances = Vec::new();
+        for (index, (priority, payload, left, recursive, advance)) in
+            expected_branches.into_iter().enumerate()
+        {
+            let mut branch_trace = StructuralTrace::default();
+            let value = self.eval_runtime(
+                &compare_methods[index],
+                &both_context,
+                &mut branch_trace,
+                "meld two-root branch",
+            )?;
+            let expected = SemanticValue::Queue(QueueExpr::MadeNode {
+                comparator: ComparatorOrigin::Parameter,
+                priority,
+                payload,
+                left: Box::new(left.clone()),
+                right: Box::new(recursive.clone()),
+            });
+            if value != expected {
+                return Err(format!(
+                    "meld two-root branch {index}: wrong root/child/recursive roles {value:#?}"
+                ));
+            }
+            let QueueExpr::Meld { first, second, .. } = recursive else {
+                unreachable!()
+            };
+            self.expect_trace(
+                &branch_trace,
+                StructuralTrace {
+                    make_node_calls: vec![(
+                        left,
+                        QueueExpr::Meld {
+                            comparator: ComparatorOrigin::Parameter,
+                            first: first.clone(),
+                            second: second.clone(),
+                        },
+                    )],
+                    meld_calls: vec![((*first).clone(), (*second).clone())],
+                    ..StructuralTrace::default()
+                },
+                "meld bounded branch reconstruction",
+            )?;
+            advances.push(advance);
+        }
+        Ok(MeldProgramCertificate {
+            true_advance: advances[0],
+            false_advance: advances[1],
+        })
+    }
+
+    fn verify_merge(&self, term: &Term) -> Result<(), String> {
+        let first = QueueExpr::Origin(QueueOrigin::Parameter("merge first"));
+        let second = QueueExpr::Origin(QueueOrigin::Parameter("merge second"));
+        let (body, context) =
+            self.public_function_context(term, &[], &["merge first", "merge second"], "merge")?;
+        let mut trace = StructuralTrace::default();
+        let value = self.eval_runtime(body, &context, &mut trace, "merge body")?;
+        let expected = SemanticValue::Queue(QueueExpr::Meld {
+            comparator: ComparatorOrigin::ProjectedDictionary,
+            first: Box::new(first.clone()),
+            second: Box::new(second.clone()),
+        });
+        if value != expected {
+            return Err(format!("merge: wrong certified meld operands {value:#?}"));
+        }
+        self.expect_trace(
+            &trace,
+            StructuralTrace {
+                meld_calls: vec![(first, second)],
+                ..StructuralTrace::default()
+            },
+            "merge direct body",
+        )
+    }
+
+    fn singleton(&self) -> QueueExpr {
+        let comparator = ComparatorOrigin::ProjectedDictionary;
+        QueueExpr::Node {
+            comparator: comparator.clone(),
+            rank: NatExpr::Suc(Box::new(NatExpr::Zero)),
+            priority: PriorityOrigin::Parameter,
+            payload: PayloadOrigin::Parameter,
+            left: Box::new(QueueExpr::Empty(comparator.clone())),
+            right: Box::new(QueueExpr::Empty(comparator)),
+        }
+    }
+
+    fn verify_insert(&self, term: &Term) -> Result<(), String> {
+        let input = QueueExpr::Origin(QueueOrigin::Parameter("insert input"));
+        let (body, context) = self.public_function_context(
+            term,
+            &[
+                SemanticValue::Priority(PriorityOrigin::Parameter),
+                SemanticValue::Payload(PayloadOrigin::Parameter),
+            ],
+            &["insert input"],
+            "insert",
+        )?;
+        let singleton = self.singleton();
+        let mut trace = StructuralTrace::default();
+        let value = self.eval_runtime(body, &context, &mut trace, "insert body")?;
+        let expected = SemanticValue::Queue(QueueExpr::Merge {
+            dictionary: true,
+            first: Box::new(singleton.clone()),
+            second: Box::new(input.clone()),
+        });
+        if value != expected {
+            return Err(format!(
+                "insert: wrong singleton/input merge roles {value:#?}"
+            ));
+        }
+        self.expect_trace(
+            &trace,
+            StructuralTrace {
+                merge_calls: vec![(singleton, input)],
+                ..StructuralTrace::default()
+            },
+            "insert direct body",
+        )
+    }
+
+    fn verify_find_min(&self, term: &Term) -> Result<(), String> {
+        let input_origin = QueueOrigin::Parameter("find_min input");
+        let input = QueueExpr::Origin(input_origin.clone());
+        let (body, mut context) =
+            self.public_function_context(term, &[], &["find_min input"], "find_min")?;
+        let mut control_trace = StructuralTrace::default();
+        let methods = self.expect_elim(
+            body,
+            &mut context,
+            &mut control_trace,
+            self.api.carrier,
+            &[
+                SemanticValue::KeyType,
+                SemanticValue::PayloadType,
+                SemanticValue::Comparator(ComparatorOrigin::ProjectedDictionary),
+            ],
+            &SemanticValue::Queue(input),
+            "find_min root",
+        )?;
+        self.expect_trace(&control_trace, StructuralTrace::default(), "find_min root")?;
+        let mut empty_trace = StructuralTrace::default();
+        let empty = self.eval_runtime(&methods[0], &context, &mut empty_trace, "find_min Empty")?;
+        if empty != SemanticValue::None {
+            return Err(format!("find_min Empty: expected None, got {empty:?}"));
+        }
+        self.expect_trace(&empty_trace, StructuralTrace::default(), "find_min Empty")?;
+        let (node_body, node_context) =
+            self.node_method_context(&methods[1], context, input_origin.clone(), "find_min Node")?;
+        let mut node_trace = StructuralTrace::default();
+        let node = self.eval_runtime(node_body, &node_context, &mut node_trace, "find_min Node")?;
+        let expected = SemanticValue::Some(Box::new(SemanticValue::Pair(
+            Box::new(SemanticValue::Priority(PriorityOrigin::Root(
+                input_origin.clone(),
+            ))),
+            Box::new(SemanticValue::Payload(PayloadOrigin::Root(input_origin))),
+        )));
+        if node != expected {
+            return Err(format!("find_min Node: wrong root entry {node:#?}"));
+        }
+        self.expect_trace(&node_trace, StructuralTrace::default(), "find_min Node")
+    }
+
+    fn verify_pop_min(&self, term: &Term) -> Result<(), String> {
+        let input_origin = QueueOrigin::Parameter("pop_min input");
+        let input = QueueExpr::Origin(input_origin.clone());
+        let (body, mut context) =
+            self.public_function_context(term, &[], &["pop_min input"], "pop_min")?;
+        let mut control_trace = StructuralTrace::default();
+        let methods = self.expect_elim(
+            body,
+            &mut context,
+            &mut control_trace,
+            self.api.carrier,
+            &[
+                SemanticValue::KeyType,
+                SemanticValue::PayloadType,
+                SemanticValue::Comparator(ComparatorOrigin::ProjectedDictionary),
+            ],
+            &SemanticValue::Queue(input),
+            "pop_min root",
+        )?;
+        self.expect_trace(&control_trace, StructuralTrace::default(), "pop_min root")?;
+        let mut empty_trace = StructuralTrace::default();
+        let empty = self.eval_runtime(&methods[0], &context, &mut empty_trace, "pop_min Empty")?;
+        if empty != SemanticValue::None {
+            return Err(format!("pop_min Empty: expected None, got {empty:?}"));
+        }
+        self.expect_trace(&empty_trace, StructuralTrace::default(), "pop_min Empty")?;
+        let (node_body, node_context) =
+            self.node_method_context(&methods[1], context, input_origin.clone(), "pop_min Node")?;
+        let mut node_trace = StructuralTrace::default();
+        let node = self.eval_runtime(node_body, &node_context, &mut node_trace, "pop_min Node")?;
+        let left = QueueExpr::Origin(input_origin.left());
+        let right = QueueExpr::Origin(input_origin.right());
+        let entry = SemanticValue::Pair(
+            Box::new(SemanticValue::Priority(PriorityOrigin::Root(
+                input_origin.clone(),
+            ))),
+            Box::new(SemanticValue::Payload(PayloadOrigin::Root(input_origin))),
+        );
+        let remainder = QueueExpr::Merge {
+            dictionary: true,
+            first: Box::new(left.clone()),
+            second: Box::new(right.clone()),
+        };
+        let expected = SemanticValue::Some(Box::new(SemanticValue::Pair(
+            Box::new(entry),
+            Box::new(SemanticValue::Queue(remainder)),
+        )));
+        if node != expected {
+            return Err(format!(
+                "pop_min Node: wrong entry/child meld roles {node:#?}"
+            ));
+        }
+        self.expect_trace(
+            &node_trace,
+            StructuralTrace {
+                merge_calls: vec![(left, right)],
+                ..StructuralTrace::default()
+            },
+            "pop_min Node",
+        )
+    }
+}
+
 #[derive(Clone, Debug, Default)]
-struct MeldCharge {
+struct CertifiedMeldCost {
     two_nonempty: usize,
     worker_invocations: usize,
     priority_comparisons: usize,
     visited_roots: BTreeSet<usize>,
 }
 
-fn meld_charge(
-    env: &ElabEnv,
-    api: &Api,
-    values: &Values,
-    order: Order,
-    first: &EvalVal,
-    second: &EvalVal,
-) -> MeldCharge {
-    let mut current_first = first;
-    let mut current_second = second;
-    let mut charge = MeldCharge::default();
-    loop {
-        charge.worker_invocations += 1;
-        let first_node = node_view(env, api, values, current_first);
-        let second_node = node_view(env, api, values, current_second);
-        if let Some(node) = &first_node {
-            charge.visited_roots.insert(node.identity);
-        }
-        if let Some(node) = &second_node {
-            charge.visited_roots.insert(node.identity);
-        }
-        let (Some(first_node), Some(second_node)) = (first_node, second_node) else {
-            return charge;
-        };
-        charge.two_nonempty += 1;
-        charge.priority_comparisons += 1;
-        if order.allows(first_node.priority, second_node.priority) {
-            current_first = first_node.right;
-        } else {
-            current_second = second_node.right;
+impl MeldProgramCertificate {
+    fn derive_cost(
+        &self,
+        env: &ElabEnv,
+        api: &Api,
+        values: &Values,
+        order: Order,
+        first: &EvalVal,
+        second: &EvalVal,
+    ) -> CertifiedMeldCost {
+        let mut current_first = first;
+        let mut current_second = second;
+        let mut cost = CertifiedMeldCost::default();
+        loop {
+            cost.worker_invocations += 1;
+            let first_node = node_view(env, api, values, current_first);
+            let second_node = node_view(env, api, values, current_second);
+            if let Some(node) = &first_node {
+                cost.visited_roots.insert(node.identity);
+            }
+            if let Some(node) = &second_node {
+                cost.visited_roots.insert(node.identity);
+            }
+            let (Some(first_node), Some(second_node)) = (first_node, second_node) else {
+                return cost;
+            };
+            cost.two_nonempty += 1;
+            cost.priority_comparisons += 1;
+            let advance = if order.allows(first_node.priority, second_node.priority) {
+                self.true_advance
+            } else {
+                self.false_advance
+            };
+            match advance {
+                MeldAdvance::FirstRight => current_first = first_node.right,
+                MeldAdvance::SecondRight => current_second = second_node.right,
+            }
         }
     }
 }
@@ -715,42 +1778,11 @@ fn right_spine_identities(
     result
 }
 
-fn term_reference_count(term: &Term, target: GlobalId) -> usize {
-    usize::from(matches!(term, Term::Const { id, .. } if *id == target))
-        + term
-            .children()
-            .into_iter()
-            .map(|child| term_reference_count(child, target))
-            .sum::<usize>()
-}
-
-fn elim_family_count(term: &Term, target: GlobalId) -> usize {
-    usize::from(matches!(term, Term::Elim { fam, .. } if *fam == target))
-        + term
-            .children()
-            .into_iter()
-            .map(|child| elim_family_count(child, target))
-            .sum::<usize>()
-}
-
 fn transparent_body(env: &ElabEnv, id: GlobalId) -> Term {
     env.env
         .transparent_body(id)
         .unwrap_or_else(|| panic!("{id:?} must be transparent"))
         .1
-}
-
-fn module_transparent_references(env: &ElabEnv, term: &Term) -> BTreeSet<String> {
-    let prefix = format!("{MODULE}.");
-    env.globals
-        .iter()
-        .filter_map(|(name, id)| {
-            let local = name.strip_prefix(&prefix)?;
-            (matches!(env.env.lookup(*id), Some(Decl::Transparent { .. }))
-                && term_mentions(term, *id))
-            .then_some(local.to_owned())
-        })
-        .collect()
 }
 
 /// Promise class: normative compatibility vector.
@@ -888,12 +1920,13 @@ fn package_adds_zero_trusted_declarations() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: every direct declaration is classified by the real selective-
-/// import resolver; exactly the six pinned names accept. CLAIMED: this is the
-/// complete public inventory. THE GAP: the separate qualified-use and positive
-/// public-client controls distinguish interface privacy from artifact absence.
+/// MEASURED: every direct declaration is classified and the named public and
+/// private identities reach the real selective-import resolver. CLAIMED: the
+/// six specified identities are usable while the selected constructors and
+/// workers remain private. THE GAP: actual export-map closure, including all
+/// re-exports, is asserted at the private owner seam in `modules.rs`.
 #[test]
-fn exact_six_name_export_inventory_and_private_names_refuse() {
+fn direct_declarations_and_private_names_reach_the_import_boundary() {
     let (mut env, direct_ids) = load_module();
     let direct_ids: BTreeSet<_> = direct_ids.into_iter().collect();
     let mut direct_names = env
@@ -1796,70 +2829,46 @@ fn recursive_leftist_validity_and_isolated_malformed_fixtures() {
 
 /// Promise class: durable invariant for the selected realization.
 ///
-/// MEASURED: exact core call/elim structure plus independently charged traces
-/// over actual private children. CLAIMED: merge, insert, pop, empty, and find
-/// follow the right-spine cost account without a hidden whole-tree helper. THE
-/// GAP: this is a structural review measure, not native timing and not a
-/// machine-checked asymptotic theorem.
+/// MEASURED: a fail-closed semantic verifier checks the complete executable
+/// queue-touching closure of the actual kernel-checked producer bodies, then
+/// derives fixture costs from the certified meld relation and actual private
+/// children. CLAIMED: merge, insert, pop, empty, find_min, rank, and make_node
+/// have the bounded roles required by the selected right-spine account. THE
+/// GAP: this is a checked-program structural observation plus finite derived
+/// cases, not native timing or a machine-checked asymptotic theorem.
 #[test]
-fn meld_charge_and_direct_operation_structure_follow_right_spines() {
+fn kernel_checked_program_structure_derives_right_spine_costs() {
     let (mut env, _) = load_module();
     let api = Api::from_env(&env);
+    let verifier = SemanticStructuralVerifier::new(&env, &api);
+    let certificate = verifier
+        .verify_program()
+        .expect("actual checked queue program must satisfy the closed structural verifier");
+
+    // Every operation-specific detector has a checked-body negative control.
+    // Replacing any detector with constant success makes its paired assertion
+    // fail even if the real producer remains unchanged.
+    let bodies = [
+        transparent_body(&env, api.rank),
+        transparent_body(&env, api.empty),
+        transparent_body(&env, api.make_node),
+        transparent_body(&env, api.meld),
+        transparent_body(&env, api.merge),
+        transparent_body(&env, api.insert),
+        transparent_body(&env, api.find_min),
+        transparent_body(&env, api.pop_min),
+    ];
+    assert!(verifier.verify_rank(&bodies[6]).is_err());
+    assert!(verifier.verify_empty(&bodies[4]).is_err());
+    assert!(verifier.verify_make_node(&bodies[3]).is_err());
+    assert!(verifier.verify_meld(&bodies[2]).is_err());
+    assert!(verifier.verify_merge(&bodies[5]).is_err());
+    assert!(verifier.verify_insert(&bodies[4]).is_err());
+    assert!(verifier.verify_find_min(&bodies[0]).is_err());
+    assert!(verifier.verify_pop_min(&bodies[6]).is_err());
+
     let mut store = EvalStore::new();
     let values = install_test_values(&mut env, &mut store);
-
-    let meld_body = transparent_body(&env, api.meld);
-    assert_eq!(
-        module_transparent_references(&env, &meld_body),
-        BTreeSet::from(["make_node".to_owned(), "meld".to_owned()])
-    );
-    assert_eq!(term_reference_count(&meld_body, api.meld), 2);
-    assert_eq!(term_reference_count(&meld_body, api.make_node), 2);
-    assert_eq!(elim_family_count(&meld_body, api.carrier), 2);
-    assert_eq!(elim_family_count(&meld_body, env.numeric_env.bool_id), 1);
-
-    let make_node_body = transparent_body(&env, api.make_node);
-    assert_eq!(
-        module_transparent_references(&env, &make_node_body),
-        BTreeSet::from(["rank".to_owned()])
-    );
-    assert_eq!(term_reference_count(&make_node_body, api.rank), 4);
-    assert_eq!(
-        term_reference_count(&make_node_body, env.globals[&format!("{LAWFUL}.leq_nat")]),
-        1
-    );
-    assert_eq!(elim_family_count(&make_node_body, api.carrier), 0);
-    assert_eq!(
-        elim_family_count(&make_node_body, env.numeric_env.bool_id),
-        1
-    );
-
-    let merge_body = transparent_body(&env, api.merge);
-    assert_eq!(
-        module_transparent_references(&env, &merge_body),
-        BTreeSet::from(["meld".to_owned()])
-    );
-    assert_eq!(term_reference_count(&merge_body, api.meld), 1);
-    assert_eq!(elim_family_count(&merge_body, api.carrier), 0);
-    let insert_body = transparent_body(&env, api.insert);
-    assert_eq!(
-        module_transparent_references(&env, &insert_body),
-        BTreeSet::from(["merge".to_owned()])
-    );
-    assert_eq!(term_reference_count(&insert_body, api.merge), 1);
-    assert_eq!(elim_family_count(&insert_body, api.carrier), 0);
-    let find_body = transparent_body(&env, api.find_min);
-    assert!(module_transparent_references(&env, &find_body).is_empty());
-    assert_eq!(term_reference_count(&find_body, api.meld), 0);
-    assert_eq!(elim_family_count(&find_body, api.carrier), 1);
-    let pop_body = transparent_body(&env, api.pop_min);
-    assert_eq!(
-        module_transparent_references(&env, &pop_body),
-        BTreeSet::from(["merge".to_owned()])
-    );
-    assert_eq!(term_reference_count(&pop_body, api.merge), 1);
-    assert_eq!(elim_family_count(&pop_body, api.carrier), 1);
-
     let empty = empty_queue(&env, &mut store, &api, &values, Order::Up);
     let singleton = build_queue(
         &env,
@@ -1873,10 +2882,12 @@ fn meld_charge_and_direct_operation_structure_follow_right_spines() {
         }],
     );
     for (left, right) in [(&empty, &empty), (&empty, &singleton), (&singleton, &empty)] {
-        let charge = meld_charge(&env, &api, &values, Order::Up, left, right);
-        assert_eq!(charge.two_nonempty, 0);
-        assert_eq!(charge.priority_comparisons, 0);
-        assert_eq!(charge.worker_invocations, 1);
+        let cost = certificate
+            .meld
+            .derive_cost(&env, &api, &values, Order::Up, left, right);
+        assert_eq!(cost.two_nonempty, 0);
+        assert_eq!(cost.priority_comparisons, 0);
+        assert_eq!(cost.worker_invocations, 1);
     }
 
     let left = build_queue(
@@ -1925,18 +2936,20 @@ fn meld_charge_and_direct_operation_structure_follow_right_spines() {
             },
         ],
     );
-    let charge = meld_charge(&env, &api, &values, Order::Up, &left, &right);
-    assert_eq!(charge.priority_comparisons, charge.two_nonempty);
-    assert_eq!(charge.worker_invocations, charge.two_nonempty + 1);
+    let cost = certificate
+        .meld
+        .derive_cost(&env, &api, &values, Order::Up, &left, &right);
+    assert_eq!(cost.priority_comparisons, cost.two_nonempty);
+    assert_eq!(cost.worker_invocations, cost.two_nonempty + 1);
     let left_spine = right_spine_identities(&env, &api, &values, &left);
     let right_spine = right_spine_identities(&env, &api, &values, &right);
     let permitted = left_spine
         .union(&right_spine)
         .copied()
         .collect::<BTreeSet<_>>();
-    assert!(charge.visited_roots.is_subset(&permitted));
+    assert!(cost.visited_roots.is_subset(&permitted));
     assert!(
-        charge.two_nonempty
+        cost.two_nonempty
             <= inspect_shape(&env, &api, &values, Order::Up, &left).right_spine as usize
                 + inspect_shape(&env, &api, &values, Order::Up, &right).right_spine as usize
     );
@@ -1965,17 +2978,14 @@ fn meld_charge_and_direct_operation_structure_follow_right_spines() {
         Order::Up,
         &[inserted_entry],
     );
-    let insert_charge = meld_charge(&env, &api, &values, Order::Up, &singleton_for_insert, &left);
-    assert_eq!(
-        insert_charge.priority_comparisons,
-        insert_charge.two_nonempty
-    );
-    assert_eq!(
-        insert_charge.worker_invocations,
-        insert_charge.two_nonempty + 1
-    );
+    let insert_cost =
+        certificate
+            .meld
+            .derive_cost(&env, &api, &values, Order::Up, &singleton_for_insert, &left);
+    assert_eq!(insert_cost.priority_comparisons, insert_cost.two_nonempty);
+    assert_eq!(insert_cost.worker_invocations, insert_cost.two_nonempty + 1);
     assert!(
-        insert_charge.two_nonempty
+        insert_cost.two_nonempty
             <= 1 + inspect_shape(&env, &api, &values, Order::Up, &left).right_spine as usize
     );
     let inserted = insert_entry(
@@ -1994,11 +3004,14 @@ fn meld_charge_and_direct_operation_structure_follow_right_spines() {
     let root = node_view(&env, &api, &values, &merged).expect("nonempty merged queue");
     assert!(node_view(&env, &api, &values, root.left).is_some());
     assert!(node_view(&env, &api, &values, root.right).is_some());
-    let pop_charge = meld_charge(&env, &api, &values, Order::Up, root.left, root.right);
-    assert_eq!(pop_charge.priority_comparisons, pop_charge.two_nonempty);
-    assert_eq!(pop_charge.worker_invocations, pop_charge.two_nonempty + 1);
+    let pop_cost =
+        certificate
+            .meld
+            .derive_cost(&env, &api, &values, Order::Up, root.left, root.right);
+    assert_eq!(pop_cost.priority_comparisons, pop_cost.two_nonempty);
+    assert_eq!(pop_cost.worker_invocations, pop_cost.two_nonempty + 1);
     assert!(
-        pop_charge.two_nonempty
+        pop_cost.two_nonempty
             <= inspect_shape(&env, &api, &values, Order::Up, root.left).right_spine as usize
                 + inspect_shape(&env, &api, &values, Order::Up, root.right).right_spine as usize
     );
@@ -2007,7 +3020,6 @@ fn meld_charge_and_direct_operation_structure_follow_right_spines() {
         .faults
         .is_empty());
 }
-
 fn alphabet() -> [Entry; 6] {
     [
         Entry {

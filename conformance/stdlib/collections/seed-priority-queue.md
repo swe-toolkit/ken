@@ -327,13 +327,16 @@ representation uses cached ranks.
 - given: valid fixtures with independently counted right-spine lengths,
   including both-empty, one-empty, singleton, balanced unequal-size,
   equal-priority roots, and successful pops whose roots have two nonempty
-  children. Through a private test boundary, count `M(q1,q2)` as zero at either
-  empty base and one for each two-nonempty call before following its selected
-  recursive call. Record that trace separately for direct public `merge`, the
-  singleton meld reached by direct public `insert`, and the two-child meld
-  reached by direct public `pop_min`. Separately count priority comparisons,
-  private meld-worker invocations, and structural accesses; do not use
-  wall-clock thresholds or add a public counter.
+  children. A test-local fail-closed semantic verifier consumes the actual
+  kernel-checked producer terms, follows aliases and call arguments, and closes
+  every reachable queue-touching helper. It certifies both empty terminals,
+  each two-root branch's one saturated priority comparison and one recursive
+  edge, bounded reconstruction, root-only rank/empty/find behavior, make-node
+  metadata roles, and the exact meld operands used by public merge, insert, and
+  pop. Unknown executable calls, eliminators, or operand roles reject. Fixture
+  `M`, comparison, worker-invocation, and structural-access accounts are then
+  derived from that certified relation and actual private children; no
+  wall-clock threshold or public counter is used.
 - expect: `empty` returns the selected constant-size single-constructor empty
   form with no subtree visit or priority comparison. Both-empty and one-empty
   merges have `M = 0`, zero priority comparisons, and one terminal meld-worker
@@ -350,9 +353,10 @@ representation uses cached ranks.
   zero meld charges, priority comparisons, and meld-worker invocations.
   Unary-`Nat` metadata comparison work and each priority comparator's internal
   cost are reported separately.
-- why: uses the contract's exact charged population and zero/base convention on
-  every directly specified operation. Direct insert/pop traces reject an extra
-  traversal that merge-only evidence cannot see.
+- why: binds the contract's exact charged population and zero/base convention
+  to the checked program rather than a second recurrence. Direct insert/pop
+  certification rejects an extra traversal that merge-only evidence cannot
+  see.
 
 ## PQ7 — required mutation provenance
 
@@ -372,8 +376,8 @@ not evidence for an execution property.
 | make tied `find_min` choose a different payload than `pop_min` | `equal-priority-payloads-survive-and-peek-pop-agree` matches neither permitted literal row | tied-minimum two-row observation |
 | shortcut equal-identity merge to one operand | `self-merge-doubles-entry-multiplicity` returns the original rather than doubled multiset | original and doubled literal multisets |
 | detach priority from payload | `interleaved-shared-priority-merge-persists` returns an entry outside the fixed multiset | independent left/right drains |
-| traverse an untouched subtree before `insert` returns | `meld-charge-count-follows-right-spines` records an off-spine direct-insert access | direct-insert trace after restoration |
-| traverse an untouched subtree before successful `pop_min` returns | `meld-charge-count-follows-right-spines` records an off-spine direct-pop access | direct-pop trace after restoration |
+| traverse an untouched subtree before `insert` returns | `meld-charge-count-follows-right-spines` rejects the extra direct-insert eliminator/callback outside the certified meld operands | direct-insert certification after restoration |
+| traverse an untouched subtree before successful `pop_min` returns | `meld-charge-count-follows-right-spines` rejects the extra direct-pop eliminator/callback outside the certified child meld | direct-pop certification after restoration |
 
 If a production validity detector is the sole mechanism for one recursive
 clause, mutate that detector to constant success while keeping the malformed
