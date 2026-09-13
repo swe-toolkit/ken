@@ -63,7 +63,7 @@ identity must agree with the catalog convention.
 
 Path/module mismatch indicates identity drift, and a fence error names the
 authoring layer, and a law without a proof term is an assurance gap, and an unexplained
-trusted-base delta is a hard stop, and and an already-existing equivalent package
+trusted-base delta is a hard stop, and an already-existing equivalent package
 indicates proliferation.
 
 ## 8. Validation

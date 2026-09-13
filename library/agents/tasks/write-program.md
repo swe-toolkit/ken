@@ -52,7 +52,7 @@ whose `visits` row and capability supply are explicit.
 
 A parse error points to the probe spelling, and a type mismatch points to the
 contract/body boundary, and an escaping effect points to the row, and a missing
-capability points to authority supply, and and an unclosed proof points to the
+capability points to authority supply, and an unclosed proof points to the
 stated law. Diagnose the earliest failing layer.
 
 ## 8. Validation
