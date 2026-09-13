@@ -29,7 +29,7 @@ pub fn mul (a : Nat) (b : Nat) : Nat =
 
 proof zero_r for add (a : Nat) : Equal Nat (add a Zero) a = Refl
 
-proof zero_l for add (a : Nat) : Equal Nat (add Zero a) a =
+pub proof zero_l for add (a : Nat) : Equal Nat (add Zero a) a =
   match a {
     Zero ↦ Proved;
     Suc a2 ↦ cong Nat Nat (add Zero a2) a2 Suc ((proof zero_l for add) a2)
@@ -37,13 +37,13 @@ proof zero_l for add (a : Nat) : Equal Nat (add Zero a) a =
 
 proof suc_r for add (a : Nat) (b : Nat) : Equal Nat (add a (Suc b)) (Suc (add a b)) = Refl
 
-proof suc_l for add (a : Nat) (b : Nat) : Equal Nat (add (Suc a) b) (Suc (add a b)) =
+pub proof suc_l for add (a : Nat) (b : Nat) : Equal Nat (add (Suc a) b) (Suc (add a b)) =
   match b {
     Zero ↦ Refl;
     Suc b2 ↦ cong Nat Nat (add (Suc a) b2) (Suc (add a b2)) Suc ((proof suc_l for add) a b2)
   }
 
-proof assoc for add
+pub proof assoc for add
       (a : Nat) (b : Nat) (c : Nat)
     : Equal Nat (add a (add b c)) (add (add a b) c) =
   match c {
@@ -52,7 +52,7 @@ proof assoc for add
       cong Nat Nat (add a (add b c2)) (add (add a b) c2) Suc ((proof assoc for add) a b c2)
   }
 
-proof comm for add (a : Nat) (b : Nat) : Equal Nat (add a b) (add b a) =
+pub proof comm for add (a : Nat) (b : Nat) : Equal Nat (add a b) (add b a) =
   match b {
     Zero ↦ sym Nat (add Zero a) a ((proof zero_l for add) a);
     Suc b2 ↦

@@ -1,11 +1,12 @@
 # Persistent priority queue — conformance seed
 
 Format: `../../README.md`. These cases pin the contract in
-`spec/50-stdlib/58a-priority-queues.md`. This seed now accompanies the landed
-`CAT-PRIORITY-QUEUE` computational implementation. Every case is **GREEN for
-that tested finite population**; the closing evidence record names the exact
-producer and test blobs and the executed case population. This is not evidence
-for the deferred general laws.
+`spec/50-stdlib/58a-priority-queues.md`. This seed accompanies the landed
+`CAT-PRIORITY-QUEUE` computation and its `CAT-PRIORITY-QUEUE-LAWS` proof
+completion. Every case is **GREEN for that tested finite population**; the
+closing evidence record names the exact producer and test blobs and the
+executed case population. These finite observations do not themselves prove
+the general laws; the provider's private Ken proof terms do.
 
 The cases use the public module `Data.Collections.PriorityQueue`, the canonical
 Axiom-free `Ord Nat` provider, and a finite payload with no order or equality
@@ -385,28 +386,57 @@ fixture unchanged; the corresponding case must fail because its independent
 recomputation disagrees. This detector-side mutation is separate from each
 population-side mutation above.
 
-## Evidence and deferral record
+## Evidence and proof-completion record
 
-`CAT-PRIORITY-QUEUE` lands the named finite observations above. Producer blob
-`1eec578603cdef349af21d944ac174af5919705c`, acceptance-test blob
-`9853d43fa4e3c1c66ce4d00ce2c600a38e4e65a9`, and owner-local resolver-test blob
-`eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7` execute nine passing acceptance
-tests, including exactly 4,216 bounded traces, plus two passing export-table
-closure tests. Thirty compile-preserving population-side and detector-side
-mutations reddened their named observations. They include recursive rank
-descent, an extra find comparison, extra meld comparison/worker calls, direct
-insert/pop traversal, operation-specific constant-success structural detectors,
-the shared trace detector's constant-success neighbour, and original-name and
-renamed re-exports. All mutated files were restored byte-identically. The
-result reports separately:
+`CAT-PRIORITY-QUEUE` landed the named finite observations above. Its historical
+evidence pairs original producer blob
+`1eec578603cdef349af21d944ac174af5919705c`, original acceptance-test blob
+`9853d43fa4e3c1c66ce4d00ce2c600a38e4e65a9`, and historical owner-local
+resolver-test blob `eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7`. The original
+thirty compile-preserving population-side and detector-side mutations ran
+against that historical producer/acceptance pair; the original-name and
+renamed-reexport mutations also use that historical resolver oracle. They
+retain their named failures and byte-exact restorations.
+
+The current baseline instead pairs provider blob
+`b9408697beca6a8d6ca7df30d9a3b3e808125358`, current acceptance-test blob
+`9eb73ac5546485a28f9f509dee601cf7d2b21700`, and current strict-resolution-test
+blob `cbbf096623ab94a97a7ce0770c1b3276b46cde02`. These current artifacts execute
+nine passing acceptance tests, including exactly 4,216 bounded traces, and four
+passing strict-resolution tests. The historical mutation results are not
+attributed to this current provider/acceptance pair.
+
+`CAT-PRIORITY-QUEUE-LAWS` adds the private checked general suite. It proves
+representation validity and actual right-spine cache shape,
+arbitrary-predicate count conservation, actual find/pop global minimality, both
+empty equivalences, and total nondecreasing repeated extraction through the
+real `pop_min`. It includes a nontrivial constructed validity witness and
+separate checked malformed-cache, balance, and heap-order refutations.
+
+Five additional compile-preserving controls held those proof statements and
+bodies fixed. At the actual production or detector site, each independently
+caused kernel `TypeMismatch`, followed by a green byte-exact restoration:
+
+- duplicating the right child in `make_node` rejected its unchanged
+  worker-bound general suite;
+- miscomputing `make_node`'s cached rank independently rejected that
+  unchanged suite;
+- reversing `meld`'s root comparison rejected its unchanged worker-bound
+  general suite;
+- returning the left child as `pop_min`'s remainder rejected general count
+  conservation; and
+- replacing the recursive validity detector with constant `True` first
+  rejected the unchanged `valid_node_intro` constructor obligation; checking
+  stopped at that `TypeMismatch`, before the later malformed-value refutations
+  executed.
+
+The result reports separately:
 
 1. real public computation and the exact named finite observations it executes;
 2. private abstraction/validity and structural-charge observations;
 3. production-side and detector-side mutation failures with restoration;
-4. the still-deferred general kernel proofs.
+4. private general kernel proofs over arbitrary valid queues and predicates.
 
-`CAT-PRIORITY-QUEUE-LAWS` owns the general validity-preservation,
-`count_by`-conservation, global-minimum, and nondecreasing-drain proofs over
-arbitrary valid queues under one fixed lawful order. Machine-checked complexity
-bounds remain a separate residual. A successful aggregate test run proves only
-its executed observations and is not evidence that those general laws exist.
+Machine-checked complexity bounds remain a separate residual. A successful
+aggregate test run proves only its executed observations; the checked provider
+terms, not the aggregate, carry the general laws.
