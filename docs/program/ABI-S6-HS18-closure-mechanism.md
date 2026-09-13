@@ -70,6 +70,15 @@ not proof that no equivalent consultation happens under a different spelling.
 projection.** If one does, this design is wrong about the gap and I want that
 back before the work starts, not after.
 
+> **AMENDED 2026-09-13 — read
+> [amendment 1](ABI-S6-HS18-closure-mechanism-amendment.md) with this document.**
+> The rule below keys on the producer's OWN required-consumer projection. That
+> is WRONG and inert on the Mapping witness, whose Tail producer has no own-key
+> projection: the interposed authority is a `DetachedReturnContext` that
+> SELECTS the producer, so the query is a reverse lookup. The amendment also
+> names the application seat and withdraws the `source.rs` blob criterion.
+> Everything else here stands.
+
 ## The rule
 
 **A fresh-result route's destination must be derived from the required-consumer
