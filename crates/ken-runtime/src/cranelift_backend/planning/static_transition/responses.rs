@@ -9,9 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
-use super::aggregates::{
-    pair_detached_required_consumer, pair_required_consumer_incoming_edge,
-};
+use super::aggregates::pair_detached_required_consumer;
 use super::continuations::{
     checked_frame_for_consumer, continuation_call_selected_result_identity,
     continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
@@ -28,7 +26,7 @@ use super::{
     checked_ih_post_call_consumer_frames, occurrence_subtree_contains,
     planner_capacity_error, planner_error,
     CheckedIhEnvironmentTransport, CraneliftBackendError, RequiredConsumerCall,
-    RequiredConsumerIncomingEdge, StaticTransitionPlan,
+    StaticTransitionPlan,
 };
 use crate::{
     CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue,
@@ -289,6 +287,28 @@ impl CheckedIhDetachedCallerCut {
     }
 }
 
+/// The exact before-value call paired with the distinct selected response edge
+/// that carries its Result into the verified consumer boundary. Construction is
+/// private to that already-validated boundary.
+pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge<'a> {
+    call: &'a RequiredConsumerCall,
+    incoming_call_identity: &'a ContinuationCallIdentity,
+}
+
+impl RequiredConsumerIncomingEdge<'_> {
+    pub(in crate::cranelift_backend) fn destination(
+        &self,
+    ) -> &super::aggregates::RequiredConsumerDestination {
+        self.call.destination()
+    }
+
+    pub(in crate::cranelift_backend) fn incoming_call_identity(
+        &self,
+    ) -> &ContinuationCallIdentity {
+        self.incoming_call_identity
+    }
+}
+
 /// Closed compiler proof joining one detached checked-IH return context to the
 /// existing static-response row, owner, complete selected caller and K context.
 /// The response owner forwards the same Result word; this record says which
@@ -322,9 +342,12 @@ impl CheckedIhStaticResponseReturnBoundary {
     pub(in crate::cranelift_backend) fn required_consumer_incoming_edge(
         &self,
     ) -> Option<RequiredConsumerIncomingEdge<'_>> {
-        self.consumer.required_consumer().map(|call| {
-            pair_required_consumer_incoming_edge(call, self.caller_cut.selecting_call())
-        })
+        self.consumer
+            .required_consumer()
+            .map(|call| RequiredConsumerIncomingEdge {
+                call,
+                incoming_call_identity: self.caller_cut.selecting_call(),
+            })
     }
 
     fn caller_exit_index(&self) -> Result<usize, CraneliftBackendError> {
