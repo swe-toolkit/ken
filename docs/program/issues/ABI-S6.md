@@ -269,6 +269,14 @@ M1-M4 -> lieutenant. Local gates targeted; full CI is separate.
    constructible only when that projection is absent. The closure REUSES the
    privacy discipline `RequiredConsumerProjection` already carries. Read the
    census caveat there before building.]
+   AMENDED by [amendment 1](../ABI-S6-HS18-closure-mechanism-amendment.md) on the
+   ring's first hard stop: the projection query is a REVERSE lookup over
+   `DetachedReturnContext` boundaries that select the producer (the producer's
+   own key is absent on the Mapping witness, so the original rule was inert
+   there); the application seat is the generated context that owns the detached
+   projection, reached by the existing context invocation, never relocated; and
+   the `source.rs` blob criterion is withdrawn in favour of Q1 site preservation
+   plus an addition-only, no-wildcard match-arm discipline.
 3. The Steward releases the recut to the runtime ring; runtime implements under the
    Architect's design; runtime-QA + Architect review; Steward M1-M4 -> lieutenant.
 4. Optional, in parallel, neither gating: the px8f observer-only measurement the
