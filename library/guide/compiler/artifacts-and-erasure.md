@@ -20,7 +20,7 @@ file or its spelling, is the consumer input.
 The compiler driver's target selection records the package identity, semantic
 and artifact hashes, selected targets, lowerability, unsupported lanes,
 obligations, assumptions, and trusted-base delta in `TargetSelectionReport`.
-This report shapes target metadata; it is not runtime lowering, native-artifact
+This report shapes target metadata, and it is not runtime lowering, native-artifact
 production, or a validation result about a later backend.
 
 Before erasure exposes a `RuntimeProgram`,
@@ -45,7 +45,7 @@ This is not proof irrelevance by informal convention. Unsupported checked-core
 expression lowering, missing runtime metadata, malformed runtime-role authority,
 and inconsistent proof-erasure witnesses return `ErasureError`. A rejected route
 does not silently become executable runtime IR. Conversely, successful erasure
-says that this checked package has crossed the stated erasure boundary; it does
+says that this checked package has crossed the stated erasure boundary, and it does
 not establish native lowering or a machine artifact.
 
 ## Runtime and native boundaries

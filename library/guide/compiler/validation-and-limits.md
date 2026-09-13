@@ -16,7 +16,7 @@ is the normative authority for the boundary below checked core.
 The [kernel checker](../../../crates/ken-kernel/src/check.rs) is the admission
 point for explicit core terms and declarations. Its bidirectional `check` and
 `infer` operations establish typing relative to a context and global
-environment; declaration admission also rechecks inputs and applies the
+environment, and declaration admission also rechecks inputs and applies the
 inductive positivity gate. That is a claim about the kernel's core language.
 It is not a claim that a package can be serialized, erased, evaluated, or
 lowered to native code.
@@ -27,7 +27,7 @@ forms a package-facing boundary before erasure and runtime IR. It replaces
 producer-local kernel identifiers with stable package symbols and canonically
 encodes the semantic inputs used for the package hashes. Module-path atoms are
 therefore package data rather than new kernel features. Its package validation
-checks the header, semantic contract, and dependency-hash lane coherence; a
+checks the header, semantic contract, and dependency-hash lane coherence, and a
 consumer that wants a target closure also checks the recorded lowerability
 metadata.
 
@@ -63,8 +63,8 @@ The [runtime artifact validator](../../../crates/ken-runtime/src/artifact_valida
 recomputes facts from one concrete `RuntimeProgram` and compares them with a
 certificate bound to that program's package identity, core semantic hash, and
 artifact hash. Its supported-artifact report covers a bounded subset: package
-and declaration effects, capabilities, runtime checks, and trust metadata;
-reachable unsupported entries and lowerability; and foreign or effectful
+and declaration effects, capabilities, runtime checks, and trust metadata, and
+reachable unsupported entries and lowerability, and foreign or effectful
 boundaries. A missing claim, identity mismatch, or recomputed fact mismatch is
 an error rather than a successful validation with weakened meaning.
 
@@ -99,7 +99,7 @@ uses the bounded certificate before its validated seed route, then performs
 program admission and rejects remaining blockers before native execution. This
 order preserves the distinction between admitting an artifact to the bounded
 lane and determining whether its reachable target subset can proceed. Native
-comparison reports can be useful evidence for their identified inputs; they do
+comparison reports can be useful evidence for their identified inputs, and they do
 not extend the evaluator's comparison relation into a proof of lowering.
 
 ## Packaging evidence

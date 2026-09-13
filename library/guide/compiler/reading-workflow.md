@@ -51,7 +51,7 @@ For interpreter behavior and runtime values, continue to
 [Interpreter and runtime values](interpreter-and-values.md). That chapter
 connects the reference-interpreter API, evaluator, environment, and store. It
 is the appropriate route for an observation made by interpreting a supported
-term. An interpreter observation is useful evidence about that run; it does
+term. An interpreter observation is useful evidence about that run, and it does
 not by itself validate runtime IR, native lowering, object emission, or linker
 behavior.
 
@@ -80,7 +80,7 @@ package validation, bounded runtime-artifact validation, a proof-erasure
 witness, evaluator observation, differential comparison, native report, emitted
 object, or linked-artifact smoke evidence. The categories share artifacts but
 not authority. In particular, object and linker facts demonstrate properties of
-a selected build route; they are not Ken semantic authority.
+a selected build route, and they are not Ken semantic authority.
 
 If a route reports an unsupported construct, missing lowerability metadata, or
 a blocked target, preserve that refusal in the investigation. Do not substitute

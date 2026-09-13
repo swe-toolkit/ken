@@ -7,7 +7,7 @@ to the implemented route from source text through checked core and runtime IR
 toward a narrow native starter path. The
 [specification](../../../spec/00-overview.md) remains the language and runtime
 authority. These pages identify the responsible implementation seams and the
-limits attached to each observation; they do not specify the compiler or prove
+limits attached to each observation, and they do not specify the compiler or prove
 that all of its stages agree.
 
 The broad route is `lex → parse → resolve → elaborate → kernel-check →
@@ -31,14 +31,14 @@ Continue to [the kernel](kernel.md) for a question about the trusted core:
 term representation, contexts and global declarations, bidirectional checking,
 conversion, and inductive admission. The kernel is the place to follow an
 explicit core term submitted for checking. It is not the package producer or a
-backend; use the next chapter when the question concerns what a later consumer
+backend, and use the next chapter when the question concerns what a later consumer
 receives.
 
 Read [artifacts and erasure](artifacts-and-erasure.md) for the checked-core
 package, its identity and metadata, and the transition to runtime IR. This is
 the route for questions about which package is being consumed, semantic versus
 artifact identity, preserved metadata, proof erasure, or lowerability records.
-The linked runtime specification carries the normative erasure boundary; the
+The linked runtime specification carries the normative erasure boundary, and the
 chapter explains the implementation route to it.
 
 ## Execution routes
@@ -54,7 +54,7 @@ evaluating checked terms.
 Cranelift lowering, native artifact identity, and the starter executable lane.
 It separates the runtime-IR subset accepted for lowering from source fallback,
 and it separates object or smoke evidence from semantic authority. Use it only
-after locating the consumed runtime artifact; native output is not inferred
+after locating the consumed runtime artifact, and native output is not inferred
 from kernel admission or from a successful interpreter run.
 
 [Validation and limits](validation-and-limits.md) is the cross-cutting route

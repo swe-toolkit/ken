@@ -137,6 +137,14 @@ boundary where it applies, with its source. Do not present an inventory as
 complete unless its completeness is established; otherwise bound it or write
 “for example.”
 
+Avoid semicolons in prose. Use a conjunction when the clauses have one
+continuous relation, or begin a new sentence with a relational phrase when the
+second clause qualifies or contrasts with the first. Preserve the relation,
+and do not replace a semicolon with a period that leaves the reader to infer it.
+This applies to prose only: do not alter code fences, inline code, Ken
+examples, literal grammar, or quoted diagnostic text merely to remove a
+semicolon.
+
 Precise refusals and trust boundaries are required, not stylistic defects. Do
 not remove a negative merely to make prose more affirmative. Every negative
 must name the specific operation, condition, and consequence: `check` refuses a
