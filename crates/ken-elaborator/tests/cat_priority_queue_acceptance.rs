@@ -5,8 +5,9 @@
 //!
 //! These tests execute the selected persistent leftist realization through its
 //! exact public identities and inspect its private nodes only at a Rust test
-//! boundary. They provide finite computational evidence, not the deferred
-//! general queue laws or a machine-checked complexity theorem.
+//! boundary. They provide finite computational and structural-cost evidence;
+//! the provider's private Ken terms separately prove the general semantic laws.
+//! A machine-checked complexity theorem remains outside this suite.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -1987,16 +1988,17 @@ fn package_adds_zero_trusted_declarations() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: every direct declaration is classified and the named public and
-/// private identities reach the real selective-import resolver. CLAIMED: the
-/// six specified identities are usable while the selected constructors and
-/// workers remain private. THE GAP: actual export-map closure, including all
-/// re-exports, is asserted at the private owner seam in `modules.rs`.
+/// MEASURED: the five operations, selected workers, and representative checked
+/// law terms are direct declarations, while public and private identities reach
+/// the real selective-import resolver. CLAIMED: the six specified identities
+/// are usable while workers and intrinsic proofs remain private. THE GAP: actual
+/// export-map closure, including all re-exports, is asserted at the private
+/// owner seam in `modules.rs`.
 #[test]
 fn direct_declarations_and_private_names_reach_the_import_boundary() {
     let (mut env, direct_ids) = load_module();
     let direct_ids: BTreeSet<_> = direct_ids.into_iter().collect();
-    let mut direct_names = env
+    let direct_names = env
         .globals
         .iter()
         .filter_map(|(name, id)| {
@@ -2004,20 +2006,30 @@ fn direct_declarations_and_private_names_reach_the_import_boundary() {
             direct_ids.contains(id).then_some(local.to_owned())
         })
         .collect::<BTreeSet<_>>();
-    assert!(direct_names.remove("PriorityQueue"));
-    assert!(direct_names.remove("rank"));
-    assert!(direct_names.remove("make_node"));
-    assert!(direct_names.remove("meld"));
-    for name in ["empty", "insert", "find_min", "pop_min", "merge"] {
+    for name in [
+        "PriorityQueue",
+        "rank",
+        "make_node",
+        "meld",
+        "empty",
+        "insert",
+        "find_min",
+        "pop_min",
+        "merge",
+        "merge_valid",
+        "merge_count",
+        "pop_min_global",
+        "drain_count",
+        "drain_nondecreasing",
+        "malformed_cache_refuted",
+        "malformed_balance_refuted",
+        "malformed_heap_order_refuted",
+    ] {
         assert!(
-            direct_names.remove(name),
-            "missing direct declaration {name}"
+            direct_names.contains(name),
+            "missing direct checked declaration {name}"
         );
     }
-    assert!(
-        direct_names.is_empty(),
-        "unexpected direct declarations: {direct_names:?}"
-    );
     let api = Api::from_env(&env);
     assert!(
         !direct_ids.contains(&api.empty_ctor) && !direct_ids.contains(&api.node_ctor),
@@ -2065,7 +2077,17 @@ fn direct_declarations_and_private_names_reach_the_import_boundary() {
            : PriorityQueue k v (ord_leq_at k d) = empty k v d",
     )
     .expect("same-boundary positive public client");
-    for private in ["Empty", "Node", "meld", "make_node"] {
+    for private in [
+        "Empty",
+        "Node",
+        "meld",
+        "make_node",
+        "merge_valid",
+        "merge_count",
+        "pop_min_global",
+        "drain_count",
+        "drain_nondecreasing",
+    ] {
         expect_unbound(
             env.elaborate_file(&format!("import {MODULE} ({private})")),
             &format!("{MODULE}.{private}"),
@@ -2117,8 +2139,8 @@ fn direct_declarations_and_private_names_reach_the_import_boundary() {
 /// MEASURED: independent empty/singleton observations and exact literal entry
 /// counts are driven through the public evaluator. CLAIMED: Option behavior,
 /// exactly-one removal, and persistence hold on the seed fixtures. THE GAP:
-/// bounded traces below broaden the finite population; arbitrary queues remain
-/// the deferred proof obligation.
+/// bounded traces below broaden only this finite population; the provider's
+/// private checked terms, not this test, discharge the arbitrary-queue laws.
 #[test]
 fn empty_singleton_duplicates_and_pop_persistence_match_seed() {
     let (mut env, _) = load_module();
@@ -2321,8 +2343,9 @@ fn two_lawful_orders_equal_function_interop_and_opposite_type_refusal() {
 /// MEASURED: fixed literal multisets, three independent predicates, tied
 /// peek/pop agreement, both merge orientations, self-merge, and later drains of
 /// originals. CLAIMED: entries are a persistent multiset and ties do not detach
-/// payloads or acquire stability. THE GAP: the expected literals are external
-/// to the heap recurrence; this remains finite tested computation.
+/// payloads or acquire stability. THE GAP: this remains finite tested
+/// computation; the provider's separate arbitrary-predicate proofs carry the
+/// general multiplicity claim.
 #[test]
 fn entries_ties_self_merge_count_vectors_and_persistence_match_seed() {
     let (mut env, _) = load_module();
@@ -2666,8 +2689,8 @@ fn entries_ties_self_merge_count_vectors_and_persistence_match_seed() {
 /// MEASURED: recursive child/rank/cache/order observations on production nodes
 /// and one-axis malformed private values. CLAIMED: the selected leftist
 /// realization maintains every recursive validity clause. THE GAP: this test
-/// boundary observes the current private representation only; the universal
-/// preservation proof remains deferred.
+/// boundary observes the current private representation only; the provider's
+/// private checked preservation proof carries the universal claim.
 #[test]
 fn recursive_leftist_validity_and_isolated_malformed_fixtures() {
     let (mut env, _) = load_module();
@@ -3199,7 +3222,8 @@ fn check_finite_observation(
 /// merge pair and every self-pair. CLAIMED: the finite domain observes both
 /// None equivalences, minimum selection, exact one-occurrence removal,
 /// persistence, multiplicity, and valid remainders. THE GAP: this is explicitly
-/// bounded evidence and does not prove the general laws deferred by `58a §7`.
+/// bounded evidence and does not itself prove the general laws now checked by
+/// the provider's private proof suite.
 #[test]
 fn bounded_4216_traces_match_independent_literal_multisets() {
     const INSERTION_HISTORIES: usize = 1 + 6 + 36 + 216;

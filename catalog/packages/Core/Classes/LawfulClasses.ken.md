@@ -589,7 +589,7 @@ instance Ord Nat {
   refl = proof refl for leq_nat;
   antisym = proof antisym for leq_nat;
   trans = proof trans for leq_nat;
-  total = proof total for leq_nat
+  total = λx.λy.proof eq_true_of_or for bool_or (leq_nat x y) (leq_nat y x) (total_leq_nat x y)
 }
 ```
 

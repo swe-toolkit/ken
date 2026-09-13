@@ -1,10 +1,10 @@
 # Persistent priority queues
 
-> Status: **LANDED COMPUTATION (CAT-PRIORITY-QUEUE).** This chapter is
-> normative for the abstract carrier, its five public operations, and their
-> behavioral and structural-cost contract. The complete interface is present as
-> a tested computational implementation; the general kernel proofs remain
-> separately deferred to `CAT-PRIORITY-QUEUE-LAWS`. This is ordinary
+> Status: **LANDED COMPUTATION + GENERAL LAWS (CAT-PRIORITY-QUEUE and
+> CAT-PRIORITY-QUEUE-LAWS).** This chapter is normative for the abstract carrier,
+> its five public operations, and their behavioral and structural-cost contract.
+> The complete interface and its private general kernel proof suite are present.
+> Machine-checked complexity remains a separate residual. This is ordinary
 > standard-package Ken: no new kernel rule, primitive, postulate, or trusted-base
 > entry.
 
@@ -14,10 +14,10 @@ is not part of that order, duplicate entries are retained, and equal-priority
 entries have no stable order.
 
 This is a dedicated collection contract rather than an addition to chapter 57.
-Chapter 57's collection-law template expects a different proof posture, while
-this abstraction deliberately lands computation and discriminating tests before
-its general proofs. Detailed leftist representation choices belong to the
-component design, not to this public contract.
+Chapter 57's collection-law template expects a different proof posture. This
+abstraction was staged through computation and discriminating tests before its
+general proofs; both stages have now landed. Detailed leftist representation
+choices belong to the component design, not to this public contract.
 
 ## 1. Derivation and trust boundary
 
@@ -26,7 +26,7 @@ The package is `Data.Collections.PriorityQueue`. It derives from:
 - the prelude `Nat`, `Bool`, `Option`, and canonical compiler-origin `Pair`;
 - `Ord` and `ord_leq_at` from `Core.Classes.LawfulClasses` (`51 §2.3`);
 - ordinary inductive declarations, structural recursion, and checked functions;
-- ordinary `Equal`/`IsTrue` propositions for the later law proofs.
+- ordinary `Equal`/`IsTrue` propositions for the private law proofs.
 
 The carrier lives in `Type`: it contains priorities, payloads, and private
 structural data. Validity and the later laws live in `Omega` through `Equal` and
@@ -34,11 +34,11 @@ structural data. Validity and the later laws live in `Omega` through `Equal` and
 no `Axiom`, primitive operation, kernel declaration form, runtime comparator
 registry, or `trusted_base()` entry.
 
-A checked abstract `data` declaration establishes that carrier values are
-well-typed. It does **not** establish that the queue algorithms preserve their
-representation invariant. Similarly, an `Ord k` dictionary certifies the laws
-of the supplied priority order; it does not certify the queue algorithms. The
-proof-status boundary is stated in §7.
+A checked abstract `data` declaration by itself establishes only that carrier
+values are well-typed, and an `Ord k` dictionary certifies only the supplied
+priority order. The private package proof suite separately establishes that the
+actual queue algorithms preserve their representation invariant and satisfy the
+general laws. The proof-status boundary is stated in §7.
 
 ## 2. The six-name abstract interface
 
@@ -129,9 +129,9 @@ cost bound.
 
 ## 4. Computational behavior
 
-The equations in this section state required behavior. The build must exercise
-them through real public values. Their general proofs remain obligations, not
-preconditions smuggled into the five result types.
+The equations in this section state required behavior. The build exercises them
+through real public values, and the private package suite proves them generally.
+They are not preconditions smuggled into the five result types.
 
 ### 4.1 Empty, insertion, and merge
 
@@ -231,9 +231,9 @@ fixtures. Draining in sorted order is not evidence for the cached-structure or
 balance clauses: a degenerate sorted representation can return correct values
 and still violate the structural bound.
 
-No public signature returns `Valid_d(q)` or a refinement containing it in the
-computational tranche. Such a result would require its proof at construction
-time and could not honestly be called deferred.
+No public signature returns `Valid_d(q)` or a refinement containing it. The
+validity evidence is intrinsic private package proof rather than a seventh
+public operation or a proof-bearing result wrapper.
 
 ## 6. Structural cost account
 
@@ -300,18 +300,16 @@ The three stages are deliberately separate:
    implementation of the carrier and all five operations. It executes the
    public construction, extraction, multiplicity, order, persistence,
    validity, abstraction, and structural-cost discriminators in the paired
-   seed. The result is **tested**,
-   not a verified priority queue or type-certified invariant.
-3. **`CAT-PRIORITY-QUEUE-LAWS`:** proves, for arbitrary valid queues under the
-   same fixed lawful order, the §4 count equations, §4.2 minimum/extraction
-   statements, §5 validity preservation, and nondecreasing repeated extraction.
-   It introduces no second queue. Machine-checked complexity is a separate
-   residual.
+   seed. Those finite observations remain tested evidence.
+3. **`CAT-PRIORITY-QUEUE-LAWS` (landed):** proves, for arbitrary valid queues
+   under the same fixed lawful order, the §4 count equations, §4.2
+   minimum/extraction statements, §5 validity preservation, and total
+   nondecreasing repeated extraction through the actual `pop_min`. It introduces
+   no second queue and keeps all proof observations private.
 
-The semantic requirements are not deferred: a build that loses an occurrence,
-returns a non-minimum entry, mutates an operand, or produces an invalid
-remainder is nonconforming even before the general proofs land. What is deferred
-is general kernel evidence for those already-fixed propositions.
+The semantic and validity laws now have general kernel evidence. The structural
+cost account retains its independent tested evidence; a machine-checked general
+complexity theorem remains a separate residual.
 
 ## 8. Acceptance boundary
 
@@ -330,7 +328,8 @@ A conforming computational build must satisfy all of these together:
    structural faults from correct sorted output;
 6. the implementation is kernel-untouched and `Axiom`-free, and its measured
    cost claims use the structural account in §6;
-7. tested observations and deferred general proofs are reported separately.
+7. tested structural-cost observations and completed general semantic proofs
+   are reported separately; machine-checked complexity remains deferred.
 
 Reaching cases are in
 `../../conformance/stdlib/collections/seed-priority-queue.md`.

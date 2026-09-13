@@ -2865,13 +2865,22 @@ theorem pop_min_global
                     same))
   }
 
+fn pop_is_none
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Prop =
+  Equal
+    (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+    (pop_min k v d q)
+    (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+
+fn queue_is_empty
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Prop =
+  Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d))
+
 theorem pop_none_implies_empty
       (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
-    : Equal
-        (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-        (pop_min k v d q)
-        (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      → Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d)) =
+    : pop_is_none k v d q → queue_is_empty k v d q =
   match q {
     Empty ↦ λsame. Proved;
     Node cached priority payload left right ↦ λsame. absurd same
@@ -2879,11 +2888,7 @@ theorem pop_none_implies_empty
 
 theorem empty_implies_pop_none
       (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
-    : Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d))
-      → Equal
-        (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-        (pop_min k v d q)
-        (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))) =
+    : queue_is_empty k v d q → pop_is_none k v d q =
   match q {
     Empty ↦ λsame. Proved;
     Node cached priority payload left right ↦ λsame. absurd same
@@ -2892,33 +2897,11 @@ theorem empty_implies_pop_none
 theorem pop_none_iff_empty
       (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : And
-        (Equal
-          (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-          (pop_min k v d q)
-          (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-          → Equal
-          (PriorityQueue k v (ord_leq_at k d))
-          q
-          (Empty k v (ord_leq_at k d)))
-        (Equal
-          (PriorityQueue k v (ord_leq_at k d))
-          q
-          (Empty k v (ord_leq_at k d))
-          → Equal
-          (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-          (pop_min k v d q)
-          (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))) =
+        (pop_is_none k v d q → queue_is_empty k v d q)
+        (queue_is_empty k v d q → pop_is_none k v d q) =
   and_intro
-    (Equal
-      (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      (pop_min k v d q)
-      (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-    → Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d)))
-    (Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d))
-    → Equal
-      (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      (pop_min k v d q)
-      (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))))
+    (pop_is_none k v d q → queue_is_empty k v d q)
+    (queue_is_empty k v d q → pop_is_none k v d q)
     (pop_none_implies_empty k v d q)
     (empty_implies_pop_none k v d q)
 
@@ -3512,8 +3495,7 @@ theorem nat_sub_self (n : Nat) : Equal Nat (nat_sub n n) Zero =
     Suc previous ↦ nat_sub_self previous
   }
 
-theorem equal_self (a : Type) (value : a) : Equal a value value =
-  cong Nat a Zero Zero (λignored. value) (nat_sub_self Zero)
+theorem equal_self (a : Type) (value : a) : Equal a value value = Refl
 
 theorem observe_remainder_zero
       (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
@@ -3792,14 +3774,19 @@ corresponding lawful order.
 The public operations implement the behavioral equations in
 `spec/50-stdlib/58a-priority-queues.md`: insertion adds one occurrence, merge
 adds both multisets, and a successful pop removes exactly the returned minimum
-occurrence. The accompanying acceptance suite checks those equations on fixed
-examples and bounded exhaustive traces, and independently checks the selected
-leftist representation on every produced node.
+occurrence. The private proof suite establishes these equations for every
+predicate, proves that `meld`, `insert`, and successful `pop_min` preserve the
+leftist invariant, and proves that an actual root bounds every descendant under
+the supplied lawful order.
 
-These results are **tested computation**, not general kernel proofs. General
-multiplicity conservation, minimum extraction, validity preservation, and
-nondecreasing drain proofs remain deferred. No public result type carries an
-unproved validity or conservation obligation.
+The private `observe_pops` proof observation calls the actual `pop_min`. For
+every finite prefix it preserves validity and predicate counts, returns a
+nondecreasing list, and has length `min n (size q)`. At `n = size q`, the
+remainder is empty, the list has exactly `size q` entries, and every predicate
+count is conserved. The observer and every theorem remain private, so the
+six-name public interface is unchanged. The acceptance suite independently
+retains its finite computational, privacy, persistence, and structural-cost
+evidence.
 
 ## Design notes
 
@@ -3837,5 +3824,7 @@ assumptions without duplicating them.
 
 `conformance/stdlib/collections/seed-priority-queue.md` defines the public,
 multiset, order, persistence, private-validity, structural-charge, and mutation
-observations used to validate this computational implementation. General law
-proofs and machine-checked complexity remain separate residuals.
+observations used to validate the computational implementation independently.
+The provider's private checked suite supplies the general validity,
+multiplicity, minimum, and total-drain proofs. Machine-checked complexity
+remains a separate residual.

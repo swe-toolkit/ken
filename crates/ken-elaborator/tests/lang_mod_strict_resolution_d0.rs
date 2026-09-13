@@ -1079,9 +1079,10 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            // PriorityQueue declares its exact LawfulClasses dependency. Its
-            // ordinary package boundary loads while this transition sentinel
-            // still records the provider's compiler-convenience proof aliases.
+            // PriorityQueue declares LawfulClasses plus the Derived length and
+            // canonical Nat min/sub dependencies used by its private law suite.
+            // Its ordinary package boundary loads while this transition
+            // sentinel records the providers' compiler-convenience aliases.
             "Data.Collections.PriorityQueue".to_string(),
             [
                 "And",
@@ -1089,9 +1090,15 @@ fn catalog_ambient_passthrough_migration_census() {
                 "Equal",
                 "Prop",
                 "Proved",
+                "Top",
+                "Unit",
                 "and_fst",
                 "and_intro",
                 "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+                "map",
             ]
             .into_iter()
             .map(str::to_string)
