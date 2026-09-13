@@ -27,6 +27,21 @@ sentence that describes it. Prose that is merely consistent with the code is
 not grounded in it. Where you cannot ground a claim, write the narrower claim
 you can ground — an honest small statement beats a confident broad one.
 
+Before handing off a draft, run the
+[Library Style](../../playbooks/tools/library-style.md) prose-pattern review:
+
+- Cut importance announcements, one-paragraph headings, vague transitions,
+  manufactured symmetry, and summary-only sentences.
+- Give every paragraph one reader question, a grounded mechanism, and its
+  consequence; do not use a link or contrast phrase in place of that account.
+- Name the actual producer, consumer, or refuser. A limitation appears once at
+  its sourced boundary; inventories state their bound.
+- Preserve precise refusal and trust-boundary prose. Each negative names its
+  operation, condition, and consequence.
+
+These are prose-quality heuristics, not an authorship test. They do not license
+removing a precise refusal merely because it is negative.
+
 Label capability **current / partial / planned / unavailable** on every page.
 **Planned syntax may never appear in a checked current example.** Fail closed:
 where a feature is absent, say so rather than describing the shape it will
