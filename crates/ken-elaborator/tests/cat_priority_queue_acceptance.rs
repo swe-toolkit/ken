@@ -1236,6 +1236,69 @@ impl<'a> SemanticStructuralVerifier<'a> {
         }
     }
 
+    fn verify_expect_trace_control(&self) -> Result<(), String> {
+        let first_origin = QueueOrigin::Parameter("expect_trace first");
+        let second_origin = QueueOrigin::Parameter("expect_trace second");
+        let first = QueueExpr::Origin(first_origin.clone());
+        let second = QueueExpr::Origin(second_origin.clone());
+        let first_rank = NatExpr::Rank(Box::new(first.clone()));
+        let second_rank = NatExpr::Rank(Box::new(second.clone()));
+        let first_priority = PriorityOrigin::Root(first_origin);
+        let second_priority = PriorityOrigin::Root(second_origin);
+        let expected = StructuralTrace {
+            rank_reads: vec![first.clone()],
+            metadata_comparisons: vec![(first_rank.clone(), second_rank.clone())],
+            priority_comparisons: vec![(first_priority.clone(), second_priority.clone())],
+            make_node_calls: vec![(first.clone(), second.clone())],
+            meld_calls: vec![(first.clone(), second.clone())],
+            merge_calls: vec![(first.clone(), second.clone())],
+        };
+        self.expect_trace(&expected, expected.clone(), "expect_trace matching control")?;
+
+        let mismatches = [
+            ("expect_trace extra rank read", {
+                let mut trace = expected.clone();
+                trace.rank_reads.push(second.clone());
+                trace
+            }),
+            ("expect_trace extra metadata comparison", {
+                let mut trace = expected.clone();
+                trace.metadata_comparisons.push((second_rank, first_rank));
+                trace
+            }),
+            ("expect_trace extra priority comparison", {
+                let mut trace = expected.clone();
+                trace
+                    .priority_comparisons
+                    .push((second_priority, first_priority));
+                trace
+            }),
+            ("expect_trace extra make_node call", {
+                let mut trace = expected.clone();
+                trace.make_node_calls.push((second.clone(), first.clone()));
+                trace
+            }),
+            ("expect_trace extra meld call", {
+                let mut trace = expected.clone();
+                trace.meld_calls.push((second.clone(), second.clone()));
+                trace
+            }),
+            ("expect_trace extra merge call", {
+                let mut trace = expected.clone();
+                trace.merge_calls.push((first.clone(), first));
+                trace
+            }),
+        ];
+        for (label, actual) in mismatches {
+            if self.expect_trace(&actual, expected.clone(), label).is_ok() {
+                return Err(format!(
+                    "{label}: shared trace detector accepted a one-axis mismatch"
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn verify_rank(&self, term: &Term) -> Result<(), String> {
         let input = QueueOrigin::Parameter("rank input");
         let (body, mut context) = self.function_context(term, &["rank input"], &[], "rank")?;
@@ -2836,15 +2899,20 @@ fn recursive_leftist_validity_and_isolated_malformed_fixtures() {
 /// MEASURED: a fail-closed semantic verifier checks the complete executable
 /// queue-touching closure of the actual kernel-checked producer bodies, then
 /// derives fixture costs from the certified meld relation and actual private
-/// children. CLAIMED: merge, insert, pop, empty, find_min, rank, and make_node
-/// have the bounded roles required by the selected right-spine account. THE
-/// GAP: this is a checked-program structural observation plus finite derived
-/// cases, not native timing or a machine-checked asymptotic theorem.
+/// children. Its shared trace comparison accepts a fully populated matching
+/// trace and rejects one-axis additions of every trace-event class. CLAIMED:
+/// merge, insert, pop, empty, find_min, rank, and make_node have the bounded
+/// roles required by the selected right-spine account. THE GAP: this is a
+/// checked-program structural observation plus finite derived cases, not native
+/// timing or a machine-checked asymptotic theorem.
 #[test]
 fn kernel_checked_program_structure_derives_right_spine_costs() {
     let (mut env, _) = load_module();
     let api = Api::from_env(&env);
     let verifier = SemanticStructuralVerifier::new(&env, &api);
+    verifier
+        .verify_expect_trace_control()
+        .expect("shared trace detector must distinguish every one-axis extra event");
     let certificate = verifier
         .verify_program()
         .expect("actual checked queue program must satisfy the closed structural verifier");
