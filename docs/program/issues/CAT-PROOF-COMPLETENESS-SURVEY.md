@@ -1,7 +1,7 @@
 ---
 id: CAT-PROOF-COMPLETENESS-SURVEY
 title: "Survey every catalog package for incomplete proofs and dependence on computational tests: classify each package as fully-proven, tested-only-with-deferred-proofs, or no-proof-obligation, citing the exact intrinsics vs tests per package; produce the ledger from which the Steward frames the missing *-LAWS follow-ons. Grounded in PRINCIPLES #16 (a package is finished only when proven)."
-status: draft
+status: ready
 owner: foundation
 size: L
 gate: none
@@ -12,15 +12,15 @@ tier: T1
 origin: "Operator directive (Pat, this session): 'Once that is done, we need a catalog survey to determine if other packages suffer from incomplete proofs and a dependence on computational tests. Note that computational tests are not part of the package, so a reader cannot trust them as intrinsics, but must believe that the implementation of both the package and its tests was done correctly. This is inherently inferior and weakens the promise ken strives to make.' Recorded as docs/PRINCIPLES.md #16. Steward-framed this session; sequenced by Pat AFTER the CAT-PRIORITY-QUEUE proof follow-on (CAT-PRIORITY-QUEUE-LAWS) so the completed exemplar establishes the pattern the survey applies. Released (flip ready) once CAT-PRIORITY-QUEUE-LAWS lands, or on operator re-sequencing."
 ---
 
-> # DRAFT — sequenced behind CAT-PRIORITY-QUEUE-LAWS (operator ordering).
+> # RELEASED 2026-09-13 (Steward) — CAT-PRIORITY-QUEUE-LAWS has landed.
 >
 > Pat directed this survey to run AFTER the priority-queue proof follow-on:
 > "Once that is done, we need a catalog survey ...". CAT-PRIORITY-QUEUE-LAWS is
 > the exemplar — completing it establishes what "complete proofs" looks like for
 > a tested-only catalog package, which is the classification standard this survey
-> then applies across the corpus. Released (flip ready) when
-> CAT-PRIORITY-QUEUE-LAWS lands, or on operator re-sequencing. This node does not
-> gate that one.
+> then applies across the corpus. That precondition is now met:
+> CAT-PRIORITY-QUEUE-LAWS merged (main 7663ad9b9, closed 4335e95c4), so this node
+> is released to the foundation ring. Re-measure every input at the cut SHA.
 
 # Objective
 
