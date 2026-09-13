@@ -12,16 +12,24 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# ABI-S6 HS18 — Q2 PROTOCOL REPAIR AND SEMANTIC LOCALIZATION. READ FIRST.
+# ABI-S6 HS18 — Q2 SOURCE-ROUTING OBSERVATION. READ FIRST.
 
-> Current return: checkpoint `01d2ccb117151c468cb8a7f06f6e3a5fd8667e33`
-> preserves Q1 but is not merge-ready. Follow
-> [the protocol audit](../ABI-S6-HS18-Q2-protocol-audit.md) before treating
-> Mapping object emission as certified. Independent valid-CLIF probes exposed
-> helper/unit guard bypasses and a foreign-frame call accepted by the finished
-> protocol verifier. Repair the all-path guard and actual-frame relation,
-> rather than adding fixture-specific checks. The original Q2 obligations below
-> remain binding.
+> Current return: checkpoint `5d977ac7968dff3763d330690a9b4df530925d79`
+> preserves Q1 and is not merge-ready. The verifier repair required by the
+> protocol audit has landed and meets its floor; follow
+> [the source-routing determination](../ABI-S6-HS18-Q2-source-routing.md) for
+> what happens next. The reported nested-bracket transport classification is
+> NOT adopted: the returned ledger has the inner settlement observing
+> `ResourceBodyOk` and publishing `ResourceBracketBodyAndReleaseError`, which
+> places the first wrong value potentially inside that settlement rather than
+> in the transport. A bounded three-question observation is authorized; a
+> source repair is not. The original Q2 obligations below remain binding.
+>
+> Superseded as READ-FIRST: the
+> [protocol audit](../ABI-S6-HS18-Q2-protocol-audit.md) banner for checkpoint
+> `01d2ccb117151c468cb8a7f06f6e3a5fd8667e33`. Its repair floor STANDS and was
+> the basis for the review above; its "not merge-ready" and refusal fences also
+> stand.
 >
 > px8f's f55/v77 is a genuine two-field Vis3380/38; retain refusal against the
 > six Ret4442/38 demands. One diagnostic cut excludes only one of six call
@@ -2430,6 +2438,20 @@ Architect inventory, 2026-09-11.
     contract and requires actual finished certificates plus proof-carrying
     infeasible edges, not declaration-based pruning or local relabeling.
     No stack, bound, identity, ABI or pre-object-refusal weakening is authorized.
+19. The entry-18 verifier repair lands and holds: all-path product-state
+    guards, CFG reaching-memory over stack locations, conservative unknown
+    writes, and deletion of the emitter's join authority. With locators no
+    longer standing in for execution facts, the Mapping failure resolves to a
+    first-wrong-value question rather than a proof-completeness one. The
+    returned localization names the `Context4` `Ret` ->
+    `Context1`/`ResponseOwner2` -> `Context3` transport, but its own ledger has
+    `Context4` observing `ResourceBodyOk` and publishing
+    `ResourceBracketBodyAndReleaseError`, which no release outcome makes
+    derivable. The
+    [source-routing determination](../ABI-S6-HS18-Q2-source-routing.md)
+    therefore does not adopt the transport classification and authorizes a
+    bounded observation over three arms — mis-feed, omitted continuation, and
+    wrong arm published inside the settlement (`evt_3ed519g6r01ex`).
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
@@ -2437,6 +2459,15 @@ Entry 6 and the localized Q1 part of entry 18 share the physical-frame-retention
 predicate: a synchronous lowering edge bypasses the existing large-frame exit
 protocol. The new exit applies that protocol to outer resume. Q2 is a distinct
 identity/finished-proof obligation, not repaired by moving a Rust call.
+
+Entry 19 is the first entry on this node whose subject is the source program's
+own routing rather than the compiler's proof apparatus. Entries 13–18 share one
+predicate — a locator, declaration or layout position was being read as an
+execution fact — and the entry-18 repair closes that predicate structurally.
+Entry 19 does not share it: nothing in it turns on a fabricated certificate.
+That is why it is a new entry and not a further follow-up, and why the
+entry-18 source-routing fence is narrowed to a bounded observation rather than
+carried forward unchanged.
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization

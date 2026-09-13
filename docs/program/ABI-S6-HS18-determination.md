@@ -5,6 +5,13 @@ The Steward owns the diagnostic-first recut and release to the runtime ring.
 
 ## Current Q2 follow-up
 
+The [source-routing determination](ABI-S6-HS18-Q2-source-routing.md) is the
+current Q2 instruction. The verifier repair required by the
+[protocol audit](ABI-S6-HS18-Q2-protocol-audit.md) has landed at `5d977ac79`
+and meets its floor. The reported nested-bracket transport classification is
+not adopted; a bounded three-question observation is authorized and a source
+repair is not. Everything below still binds.
+
 The [Q2 path-proof ruling](ABI-S6-HS18-Q2-path-proof.md) supersedes the
 binding-only hold for bounded authoring. Keep the whole-function Ret contract;
 use independently certified infeasible edges, not Vis relabeling or contract
