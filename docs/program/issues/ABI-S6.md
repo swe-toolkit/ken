@@ -184,6 +184,91 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # applies) -> Steward M1-M4 -> lieutenant. Local gates targeted; full CI is
 > # separate. No release/CI-green claim is made by the determination.
 
+# ABI-S6 HS18 — CONSUMING-OCCURRENCE CLOSURE: RECUT FRAME (Steward, 2026-09-13)
+
+The [consuming-occurrence ruling](../ABI-S6-HS18-consuming-occurrence.md) hands
+the recut scope to the Steward ("the Steward owns the recut scope; this ruling
+supplies the predicate and the closure requirement, not the frame"). This is that
+frame. It scopes the WP and does NOT specify the closure mechanism — design
+authority for the mechanism returns to the Architect once this frame lands (see
+"Design authority" below). FENCED: a compiler-internal, ABI-preserving
+native-lowering-planner recut, not a §3 operator escalation.
+
+## Objective
+
+Build the structural closure the ruling names: a producer-to-sink transport edge
+must be DERIVED FROM the consuming-occurrence chain, never minted independently and
+then certified. Make the skip-a-consuming-occurrence edge UNREPRESENTABLE in the
+planner — not detectable/refusable downstream. This retires the shared predicate
+across inventory entries 12-17 and 19 with one rule about what the planner may
+emit, replacing the withheld seventh point repair.
+
+## Retained — this is a recut of the repair TARGET, not the banked work
+
+Everything already proved stands and is NOT reworked or reverted:
+
+- the entry-18 verifier repair in checkpoint `5d977ac79` — load-bearing; it is
+  what makes the predicate refusable rather than certifiable;
+- the Q1 resume-exit repair (`source.rs` blob `38ec787d`, unchanged);
+- every grid and mutation control standing at `01d2ccb11` and `5d977ac79`;
+- identity domains, stack and bound provisions, the pre-object refusal.
+
+## Design authority — the Architect owns the mechanism
+
+The ruling supplies the predicate and the closure REQUIREMENT; it does not specify
+the planner rule. Per the ruling, design authority for the closure mechanism
+returns to the Architect once this frame lands. The Architect authors the specific
+representation-level rule (what edge the planner may and may not construct); the
+runtime ring implements it. Runtime does NOT begin the closure implementation until
+that mechanism design lands.
+
+## Deliverables
+
+- The native-lowering-planner change that makes a producer-to-sink transport edge
+  skipping an interposed consuming occurrence UNCONSTRUCTIBLE, per the Architect's
+  mechanism design.
+- The two residuals on the retained verifier repair, addressed on the eventual
+  candidate (should-fix on the candidate, per the prior ruling — not new work):
+  - R1: convert `generated_result_path_proof_..._certificate_corruption` from the
+    widened four-way disjunction to the per-mutation-substring pairing already used
+    by `generated_result_owner_certificate_rejects_each_finished_body_corruption`.
+  - R2: close the `location_access` escaped-via-call-argument gap (a later write
+    through a pointer an earlier callee retained), or argue it unreachable, before
+    landing.
+
+## Acceptance criteria (each with its control)
+
+- The skip-edge is UNREPRESENTABLE, not merely refused: a control demonstrates the
+  planner cannot construct the producer-to-sink edge that bypasses an interposed
+  consuming occurrence — the closure is structural, so the edge does not exist to
+  be certified. A test that only shows the verifier REFUSES the edge does NOT
+  satisfy this criterion; the edge must be unconstructible.
+- The witness advances past entry 19's failing `Context3` query for the mapping
+  case BY the consuming occurrence being applied, never by wiring around it.
+- Every retained grid and mutation control stays green; Q1 `source.rs` blob
+  unchanged; the px8f pre-object refusal stays honest (actual `3380/38` against
+  demanded `4442/38`).
+- px8f prediction (from the ruling): state whether the built closure retires the
+  px8f witness too (the ruling predicts px8f is the same defect). A recorded
+  finding, not a gate.
+
+## Tier / size / gate / reviewers
+
+Tier T1 (soundness-bearing representation-level invention). Size L. Gate none.
+Reviewers: Architect (required soundness reviewer) + runtime-QA; the standing
+Adversary hunt is independent and crates/ is touched, so M8 applies -> Steward
+M1-M4 -> lieutenant. Local gates targeted; full CI is separate.
+
+## Sequencing
+
+1. This frame lands (Steward editorial fold). [in progress]
+2. The Architect authors the closure mechanism design (authority returned here).
+3. The Steward releases the recut to the runtime ring; runtime implements under the
+   Architect's design; runtime-QA + Architect review; Steward M1-M4 -> lieutenant.
+4. Optional, in parallel, neither gating: the px8f observer-only measurement the
+   ruling offered (runtime-leader's call), and the research prior-art scan on the
+   closure mechanism (dispatched, non-blocking).
+
 # D5b NATIVE HARD-STOP 15 — RECUT AUTHORIZED (FENCED; operator confirmed no sign-off needed) — RUNTIME KICKED. AMENDED IN PLACE 2026-09-12 (Steward). SUPERSEDED as READ-FIRST by the HS18 banner above; its HS15 production classification, code location, ruled-out repairs, RECOMMENDED RECUT and REPAIR GATE STAND for HS15 scope.
 
 > # OPERATOR RULING (Pat, 2026-09-12, this session): the HS15 production repair
