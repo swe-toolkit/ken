@@ -18,7 +18,7 @@ names `CheckedCorePackage v0` as the durable boundary between admitted source
 and later execution stages. Each chapter begins where the preceding artifact
 ends, and each preserves its own supported subset and refusal boundary.
 
-## Choose a question
+## Questions
 
 Start with [the front end](front-end.md) for a question about source text:
 which tokens and declarations are accepted, how names are resolved, and where
@@ -41,7 +41,7 @@ artifact identity, preserved metadata, proof erasure, or lowerability records.
 The linked runtime specification carries the normative erasure boundary; the
 chapter explains the implementation route to it.
 
-## Choose an execution route
+## Execution routes
 
 [Interpreter and values](interpreter-and-values.md) is the route for the
 reference interpreter, call-by-value evaluation, environments, and stored
@@ -65,7 +65,7 @@ preflight, and object/linker packaging evidence. Its refusal paths are part of
 the map: an unavailable target should remain unavailable rather than being
 silently redirected to a nearby successful stage.
 
-## Follow source anchors
+## Source anchors
 
 The [reading workflow](reading-workflow.md) turns these choices into a
 repeatable source-navigation sequence. It starts from the reader's question,

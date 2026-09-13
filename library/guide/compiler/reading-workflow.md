@@ -9,7 +9,7 @@ command or report is not evidence that every later stage ran, and this workflow
 is not a proof that the stages agree. Start from the question you have, then
 stop at the chapter whose boundary owns the answer.
 
-## Start with source admission
+## Source admission
 
 For lexical, grammar, declaration, or name-resolution questions, begin with
 [Source to checked core](front-end.md). Its route begins at the
@@ -26,7 +26,7 @@ produces core input, while the kernel checks core input against its context and
 global environment. Neither result implies that a checked-core package exists,
 that erasure can consume it, or that a native target is available.
 
-## Cross the package boundary
+## Package boundary
 
 For a question about what later stages consume, turn to
 [Artifacts and erasure](artifacts-and-erasure.md). Follow
@@ -45,7 +45,7 @@ may refuse a particular route. For the normative meaning of erasure and runtime
 IR, follow the specification link in that chapter rather than treating this
 workflow as a second statement of the rule.
 
-## Select an observation route
+## Observation routes
 
 For interpreter behavior and runtime values, continue to
 [Interpreter and runtime values](interpreter-and-values.md). That chapter
@@ -72,7 +72,7 @@ function. This ordering shows whether the runtime artifact and its reachable
 target are accepted for the narrow backend lane. It does not make a fallback
 path available: an explicit rejection remains the result for that target.
 
-## Identify the evidence boundary
+## Evidence boundary
 
 Finish at [Validation and limits](validation-and-limits.md) whenever the
 question is what a result establishes. Classify the result as kernel admission,
