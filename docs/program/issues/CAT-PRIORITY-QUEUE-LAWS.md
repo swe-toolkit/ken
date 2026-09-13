@@ -1,7 +1,7 @@
 ---
 id: CAT-PRIORITY-QUEUE-LAWS
 title: "the deferred proof follow-on to CAT-PRIORITY-QUEUE: discharge the general kernel proofs the computational build ships as tested-only -- meld/insert/pop_min representation validity, entry multiplicity conservation (count_by p), and extract-min (global-minimum + nondecreasing drain) under the same fixed lawful order; introduce NO second queue, no Omega path carrier/postulate/new primitive; operator-released proof completion"
-status: ready
+status: merged
 owner: foundation
 size: L
 gate: none
