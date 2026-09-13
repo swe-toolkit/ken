@@ -44,5 +44,5 @@ of exactly this trap).
 
 **Grounds this page:** `library/learn/reading-ken/fragments.md`. Authority
 class: `tutorial` — this page organizes practice against material chapters
-01–06 already ground; it introduces no new source claim. Content-currency
+01–06 already ground, and it introduces no new source claim. Content-currency
 predicate, as elsewhere.
