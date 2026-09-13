@@ -50,9 +50,9 @@ enum ContinuationOperandEnvironment {
 
 /// The sole projection from an exact call/destination pair to the destination
 /// consumed by lowering. No application path accepts a loose destination.
-fn required_consumer_destination_for_edge(
-    edge: &RequiredConsumerIncomingEdge,
-) -> &RequiredConsumerDestination {
+fn required_consumer_destination_for_edge<'edge>(
+    edge: &'edge RequiredConsumerIncomingEdge<'_>,
+) -> &'edge RequiredConsumerDestination {
     edge.destination()
 }
 
@@ -63,6 +63,108 @@ fn required_consumer_destination_for_edge(
 #[cfg(hs18_amend3_wrong_call_control)]
 fn hs18_amend3_wrong_call_compile_fail(destination: &RequiredConsumerDestination) {
     let _ = required_consumer_destination_for_edge(destination);
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RequiredConsumerQueryMutation {
+    Exact,
+    ReplaceFirstCaseIdentity {
+        defining_function: u32,
+        consumer_origin: u32,
+        expected: u64,
+    },
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RequiredConsumerQueryObservation {
+    pub defining_function: u32,
+    pub consumer_origin: u32,
+    pub case_index: usize,
+    pub expected_identity: u64,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static REQUIRED_CONSUMER_QUERY_MUTATION:
+        std::cell::Cell<RequiredConsumerQueryMutation> =
+            const { std::cell::Cell::new(RequiredConsumerQueryMutation::Exact) };
+    static REQUIRED_CONSUMER_QUERY_ACTIVE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static REQUIRED_CONSUMER_QUERY_OBSERVATIONS:
+        std::cell::RefCell<Vec<RequiredConsumerQueryObservation>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    static REQUIRED_CONSUMER_QUERY_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_required_consumer_query_mutation<T>(
+    mutation: RequiredConsumerQueryMutation,
+    f: impl FnOnce() -> T,
+) -> (T, Vec<RequiredConsumerQueryObservation>, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_QUERY_MUTATION
+                .with(|cell| cell.set(RequiredConsumerQueryMutation::Exact));
+            REQUIRED_CONSUMER_QUERY_ACTIVE.with(|cell| cell.set(false));
+        }
+    }
+    REQUIRED_CONSUMER_QUERY_MUTATION.with(|cell| cell.set(mutation));
+    REQUIRED_CONSUMER_QUERY_ACTIVE.with(|cell| cell.set(true));
+    REQUIRED_CONSUMER_QUERY_OBSERVATIONS.with(|rows| rows.borrow_mut().clear());
+    REQUIRED_CONSUMER_QUERY_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let restore = Restore;
+    let result = f();
+    let rows = REQUIRED_CONSUMER_QUERY_OBSERVATIONS
+        .with(|rows| std::mem::take(&mut *rows.borrow_mut()));
+    let applications =
+        REQUIRED_CONSUMER_QUERY_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, rows, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn required_consumer_query_identity(
+    defining_function: Option<u32>,
+    consumer_origin: StaticOriginId,
+    case_index: usize,
+    expected_identity: u64,
+    replacement_identity: Option<u64>,
+) -> u64 {
+    if !REQUIRED_CONSUMER_QUERY_ACTIVE.with(std::cell::Cell::get) {
+        return expected_identity;
+    }
+    let RequiredConsumerQueryMutation::ReplaceFirstCaseIdentity {
+        defining_function: expected_function,
+        consumer_origin: expected_origin,
+        expected,
+    } = REQUIRED_CONSUMER_QUERY_MUTATION.with(std::cell::Cell::get)
+    else {
+        return expected_identity;
+    };
+    if defining_function != Some(expected_function)
+        || consumer_origin.observation_ordinal() != expected_origin
+    {
+        return expected_identity;
+    }
+    REQUIRED_CONSUMER_QUERY_OBSERVATIONS.with(|rows| {
+        rows.borrow_mut().push(RequiredConsumerQueryObservation {
+            defining_function: expected_function,
+            consumer_origin: expected_origin,
+            case_index,
+            expected_identity,
+        });
+    });
+    if case_index == 0 && expected == expected_identity {
+        REQUIRED_CONSUMER_QUERY_MUTATION_APPLICATIONS
+            .with(|count| count.set(count.get().saturating_add(1)));
+        replacement_identity.unwrap_or(expected_identity)
+    } else {
+        expected_identity
+    }
 }
 
 // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D2` -- `source::tests` (a sibling
@@ -4249,17 +4351,13 @@ impl<'a> Lowering<'a> {
                         "a static-response return receipt's Result load does not follow its exact selected-owner call",
                     ));
                 }
-                let required_consumer_edge = match
-                    receipt.boundary.consumer().required_consumer()
-                {
-                    Some(call) => self
-                        .static_transition_plan
-                        .checked_ih_required_consumer_incoming_edge(
-                            call,
-                            &receipt.selected_caller,
-                        )?,
-                    None => None,
-                };
+                let required_consumer_edge =
+                    receipt.boundary.required_consumer_incoming_edge();
+                #[cfg(feature = "px8-ds-test-support")]
+                if let Some(edge) = required_consumer_edge.as_ref() {
+                    self.static_transition_plan
+                        .record_required_consumer_call_selection(edge)?;
+                }
                 #[cfg(feature = "px8-ds-test-support")]
                 let replayed;
                 #[cfg(feature = "px8-ds-test-support")]
@@ -4271,7 +4369,11 @@ impl<'a> Lowering<'a> {
                     replayed = receipt.boundary.consumer().selected_case_exits().to_vec();
                     self.checked_ih_post_call_residual(replayed.as_slice(), eliminators)?
                 } else if let Some(edge) = required_consumer_edge.as_ref() {
-                    self.apply_required_consumer_incoming_edge(edge, eliminators)
+                    self.apply_required_consumer_incoming_edge(
+                        edge,
+                        receipt.boundary.caller_completed_exits()?,
+                        eliminators,
+                    )?
                 } else {
                     self.checked_ih_post_call_residual(
                         receipt.boundary.caller_completed_exits()?,
@@ -4280,7 +4382,11 @@ impl<'a> Lowering<'a> {
                 };
                 #[cfg(not(feature = "px8-ds-test-support"))]
                 let remaining = if let Some(edge) = required_consumer_edge.as_ref() {
-                    self.apply_required_consumer_incoming_edge(edge, eliminators)
+                    self.apply_required_consumer_incoming_edge(
+                        edge,
+                        receipt.boundary.caller_completed_exits()?,
+                        eliminators,
+                    )?
                 } else {
                     self.checked_ih_post_call_residual(
                         receipt.boundary.caller_completed_exits()?,
@@ -9146,11 +9252,14 @@ impl<'a> Lowering<'a> {
     fn apply_required_consumer_incoming_edge<'frame, 'src>(
         &self,
         edge: &RequiredConsumerIncomingEdge,
+        completed_caller_exits: &[CheckedIhPostCallConsumerStep],
         eliminators: &'frame [EliminatorFrame<'src>],
-    ) -> &'frame [EliminatorFrame<'src>] {
+    ) -> Result<&'frame [EliminatorFrame<'src>], CraneliftBackendError> {
         let _destination = required_consumer_destination_for_edge(edge);
         let _incoming_call = edge.incoming_call_identity();
-        eliminators
+        let _residual =
+            self.checked_ih_post_call_residual(completed_caller_exits, eliminators)?;
+        Ok(eliminators)
     }
 
     fn checked_ih_post_call_residual<'frame, 'src>(
