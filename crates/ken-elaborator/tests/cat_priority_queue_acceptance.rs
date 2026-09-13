@@ -783,7 +783,7 @@ enum SemanticValue {
     Payload(PayloadOrigin),
     Nat(NatExpr),
     BoolMetadata(NatExpr, NatExpr),
-    BoolPriority(PriorityOrigin, PriorityOrigin),
+    BoolPriority(ComparatorOrigin, PriorityOrigin, PriorityOrigin),
     Pair(Box<SemanticValue>, Box<SemanticValue>),
     None,
     Some(Box<SemanticValue>),
@@ -1027,11 +1027,11 @@ impl<'a> SemanticStructuralVerifier<'a> {
                     .push((left.clone(), right.clone()));
                 Ok(S::BoolMetadata(left.clone(), right.clone()))
             }
-            (CallKind::PriorityCompare(_), [S::Priority(left), S::Priority(right)]) => {
+            (CallKind::PriorityCompare(comparator), [S::Priority(left), S::Priority(right)]) => {
                 trace
                     .priority_comparisons
                     .push((left.clone(), right.clone()));
-                Ok(S::BoolPriority(left.clone(), right.clone()))
+                Ok(S::BoolPriority(comparator, left.clone(), right.clone()))
             }
             (CallKind::Rank, [S::KeyType, S::PayloadType, S::Comparator(_), S::Queue(queue)]) => {
                 trace.rank_reads.push(queue.clone());
@@ -1452,7 +1452,11 @@ impl<'a> SemanticStructuralVerifier<'a> {
             &mut compare_trace,
             self.env.numeric_env.bool_id,
             &[],
-            &SemanticValue::BoolPriority(first_priority.clone(), second_priority.clone()),
+            &SemanticValue::BoolPriority(
+                ComparatorOrigin::Parameter,
+                first_priority.clone(),
+                second_priority.clone(),
+            ),
             "meld root priority choice",
         )?;
         self.expect_trace(
