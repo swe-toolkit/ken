@@ -97,7 +97,7 @@ pub use responses::{
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
     CheckedIhDetachedCallerCut, CheckedIhPostCallConsumer, CheckedIhStaticResponseReturnBoundary,
-    DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
+    DeferredResponseRow, RequiredConsumerIncomingEdge, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
@@ -238,7 +238,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     CheckedIhGeneratedEntryAccess, CheckedIhGeneratedEntryAdmission,
     CheckedIhGeneratedEntryCallCoordinate, CheckedIhGeneratedEntryProjection,
     CheckedIhImmediateKBindingLocator, CheckedIhKAvailabilityDomain, RequiredConsumerCall,
-    RequiredConsumerDestination, RequiredConsumerIncomingEdge,
+    RequiredConsumerDestination,
     CheckedIhTransportInputDestination, PlannedAggregateAllocation, PlannedAggregateOwnership,
     PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
