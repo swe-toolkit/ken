@@ -12,7 +12,128 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# D5b NATIVE HARD-STOP 15 — RECUT AUTHORIZED (FENCED; operator confirmed no sign-off needed) — RUNTIME KICKED. AMENDED IN PLACE 2026-09-12 (Steward). READ FIRST.
+# ABI-S6 HS18 — DIAGNOSTIC-FIRST RECUT AUTHORIZED (FENCED; no operator gate) — RUNTIME KICKED. AMENDED IN PLACE 2026-09-13 (Steward). READ FIRST.
+
+> # HS18 is the current live hard stop on this node, superseding the HS15
+> # banner below as READ-FIRST. The full Architect ruling is the durable
+> # determination `docs/program/ABI-S6-HS18-determination.md` (landed this PR;
+> # authored by the Architect, evt_6t5mq9sp7ywyw + part 1, thr_74x9hxa6tpf0q).
+> # This banner is the Steward's fold + diagnostic-first release; the
+> # determination is authoritative where the two differ. Runtime works the SAME
+> # WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf` (held dirty: 24
+> # paths, diff hash c3e86a76…, summary hash 3b8b4745…). Node stays active.
+> #
+> # THE HARD STOP: `HS18_FINITE_RETURN_CONTEXT_AND_CROSS_PROGRAM_RESULT_-
+> # CONTRACT_NOT_CLOSED` (runtime-leader evt_2ejempmx2489y). HS17 reaches px8f
+> # 7/7 + 122 host tests; recursive owned templates overflow the ordinary
+> # fixture stack, and Mapping COW stays pre-object refused at v26
+> # (valid=false, grounded=true). Mandatory Research is COMPLETE (advisory
+> # evt_3g5n3yytkt1e2 + part 1). The Architect ruling is delivered. Runtime
+> # holds the pre-object refusal; no stack or contract suppression.
+> #
+> # THIS IS DIAGNOSTIC-FIRST. Do NOT release the proposed rational
+> # return-context arena as the repair — its finite-identity premise and its
+> # causal relevance to this failure are NOT established, and the initial
+> # advisory's causal claim was WITHDRAWN. Frame the corrected ruling: recursive
+> # owned contexts are a real representation hazard but are NOT the established
+> # localized cause of this fixture's overflow. Do not preserve that causal
+> # claim in the work or its acceptance criteria.
+> #
+> # Q1 — BOUNDED OBSERVATION, RETURN EVIDENCE FIRST. Targeted runs only through
+> # `scripts/ken-cargo`, with the existing fixture, flags and stack UNCHANGED;
+> # preserve the ordinary failure. Locate the last completed phase and active
+> # call chain across planning, context validation/projection, lowering,
+> # finished verification and destruction. A permitted debugger or minimal
+> # test-only phase markers are acceptable; record their effect. No recursive
+> # Debug printing, no recursive depth measurement. Measure the context chain
+> # iteratively; report admitted discoveries, exact units, call occurrences,
+> # max retained context depth and unresolved frontier. Regenerate the CURRENT
+> # predecessor census (the seven-leaf equivalent of the preserved u3:60 CLIF)
+> # and JOIN the external module FuncId (displayed `u0:55`) to its actual typed
+> # unit and definition through `UnitBundle` — a displayed target is not proof
+> # of a source-function class or context ID. Pair every newly installed call
+> # with its actual finite emission occurrence; distinct generated IDs cannot be
+> # merged by body, constructor, local head, or truncated caller history. Bound
+> # exhaustion remains refusal. RETURN the localized cause + population ledger
+> # BEFORE changing any Q1 production representation. If the cause is a large
+> # lowering frame or another recursion, repair THAT measured cause; do not
+> # install an unrelated arena. Any later-authorized return-context graph is the
+> # conditional plan-owned nonrecursive-handle family in the determination — not
+> # authorized as the repair here.
+> #
+> # Q2 — BIND THE CALLER/CALLEE FIRST, THEN COMPOSE. Adopt modular
+> # finished-Result verification and predecessor-indexed proof composition over
+> # the EXISTING emitted-function population (add no function class). Bind the
+> # current failing caller and its actual callee definitions first; a MISSING
+> # certificate is not evidence the required certificate exists. Private Rust
+> # roles are distinct types (names illustrative): `DeclaredResultContract` (an
+> # obligation, never finished proof merely because `Some`);
+> # `FinishedUnitResultContract` (issued only by an independent verifier of the
+> # finalized body); `CallResultObligation` vs `CallResultSeed` (pending
+> # reference vs discharged proof at one exact call/success-edge/Result-load/SSA
+> # word); `ResultForwardingProof` (a function-scoped predecessor proof graph,
+> # not the old `(valid, grounded)` pair). Postcondition: status==0 AND that
+> # frame's Trap==0 IMPLIES its Result is initialized with the exact certified
+> # ConstructorIdentity — status-zero alone is NOT success (preserve the
+> # Trap-propagation non-Result path). Seed only the exact decoded direct call,
+> # success edge, both status/Trap checks and exact Result load; check dominance
+> # and memory-reaching, not slot spelling or offset. Compose ALL reachable
+> # incoming edges `(predecessor Inst, destination ordinal, target block, arg
+> # index, incoming word)`; Union requires both inputs; unsupported edges/
+> # producers refuse. Use iterative dataflow/SCC, NOT recursive SSA unfolding;
+> # pure cycles, foreign-identity inputs and uncontracted external calls stay
+> # unproved; one local ground does not excuse six missing call-result proofs.
+> # Close the ENTIRE function/SSA contract dependency graph (incl. recursive
+> # SCCs) before object finalization; missing/circular bodies cannot
+> # self-certify; clearing a contract to `None` is not closure. Production may
+> # proceed WHEN the binding shows the intended relation; a counterexample or
+> # missing definition returns a BOUNDED SEAM QUESTION instead — if a callee
+> # returns identity 3380 where 4442 is required, report that exact
+> # counterexample, do not annotate it 4442.
+> #
+> # AUTHORITY SEPARATION IS ABSOLUTE. A terminal Result proof says what a
+> # successful exact callee/frame load denotes; an HS17 source-stage receipt
+> # says which selected caller/response-owner/checked-IH transport crossed which
+> # exits with which residual. NO conversion in either direction. A tag guard
+> # may refine an existing terminal proof; it cannot establish either authority
+> # from outer shape alone.
+> #
+> # ACCEPTANCE = the determination's seven reaching differentials (§"Authority
+> # separation and acceptance", 1–7): (1) Q1 phase/population evidence +
+> # unchanged-stack recovery, real repeated-config reuse not owner-key dropping;
+> # (2) equal local heads with different caller edges stay distinct or refuse,
+> # deleting/transplanting each source-child/call/transport/response-owner edge
+> # fails the exact proof; (3) recompute all seven leaves individually, withhold
+> # each callee proof in turn (that predecessor refuses, others + local ground
+> # stay visible); (4) seeded identity-preserving loop closes, pure/foreign/
+> # uncontracted cycles refuse, same discipline across recursive summaries; (5)
+> # same-tag foreign callee, wrong frame/offset/word, omitted status/Trap check,
+> # intervening clobber all refuse, status-zero Trap propagation stays a valid
+> # non-Result path; (6) Result closure neither mints nor replays an HS17 source
+> # cut — retain all six HS17 receipt controls, non-emitting Tail `None`,
+> # residual483, disjoint Active1097/check6, completed699 not replayed, only
+> # selected exit661/check2 consumed; (7) preserve px8f parity, bytes, all ten
+> # ordered effects and the existing 256 MiB Builder stack, restore the frozen
+> # Mapping COW differential with no file/source-semantic change. The frame
+> # distinguishes these acceptance properties from conditional future
+> # representation options; older library-control reds and the aborted library
+> # run are NOT discharged by px8f 7/7.
+> #
+> # FENCED ENVELOPE (absolute): no new ABI, schema, frame, owner key, runtime
+> # field, tag, route, function class, runtime allocation site, generic decoder,
+> # stack provision or bound increase; no weakening of the pre-object refusal.
+> # Both Q1 and Q2 are compiler-internal. No operator gate.
+> #
+> # ROUTING: Tier T1. Runtime returns Q1 localization/population and Q2 current
+> # caller/callee binding FIRST — not an assumed arena fix or a fabricated
+> # postcondition. Production proceeds only on the shown binding, else a bounded
+> # seam question. Same WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf`.
+> # Reviewers: Architect (required soundness reviewer for this class) +
+> # runtime-QA; standing Adversary hunt independent (crates/ touched -> M8
+> # applies) -> Steward M1-M4 -> lieutenant. Local gates targeted; full CI is
+> # separate. No release/CI-green claim is made by the determination.
+
+# D5b NATIVE HARD-STOP 15 — RECUT AUTHORIZED (FENCED; operator confirmed no sign-off needed) — RUNTIME KICKED. AMENDED IN PLACE 2026-09-12 (Steward). SUPERSEDED as READ-FIRST by the HS18 banner above; its HS15 production classification, code location, ruled-out repairs, RECOMMENDED RECUT and REPAIR GATE STAND for HS15 scope.
 
 > # OPERATOR RULING (Pat, 2026-09-12, this session): the HS15 production repair
 > # does NOT rise to operator scope. It is FENCED — compiler-only, ABI-preserving,
