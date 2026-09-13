@@ -3,6 +3,16 @@
 Architect, 2026-09-13. This is a component-design ruling, not a release vote.
 The Steward owns the diagnostic-first recut and release to the runtime ring.
 
+## Current Q2 follow-up
+
+The [Q2 path-proof ruling](ABI-S6-HS18-Q2-path-proof.md) supersedes the
+binding-only hold for bounded authoring. Keep the whole-function Ret contract;
+use independently certified infeasible edges, not Vis relabeling or contract
+relocation. Finalized-body staging, real call/Result proofs and a small
+well-founded tag-observation analysis are part of that scope. Current declared
+metadata is not a finished certificate. All no-conversion and refusal conditions
+remain; object acceptance still requires the complete proof graph.
+
 ## Current Q1 follow-up
 
 The diagnostic prerequisite has returned. The
@@ -10,9 +20,9 @@ The diagnostic prerequisite has returned. The
 Q1 observation hold below: it authorizes only popping the existing large source
 inner frame before its outer-resume call. Architect independently checked that
 change green and the restored baseline stack-overflow red. It does not authorize
-an arena, a general identity representation change, or Q2 production. The
-current Mapping three-leaf binding question remains distinct from px8f's seven
-leaves. All Q2 authority conditions below still bind.
+an arena or a general identity representation change. Mapping's three-leaf
+population remains distinct from px8f's seven leaves. Q2 now follows the
+successor ruling above; all Q2 authority conditions below still bind.
 
 ## Initial decision
 
