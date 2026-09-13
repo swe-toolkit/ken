@@ -3,6 +3,11 @@
 Architect, 2026-09-13. This follows the diagnostic-first HS18 determination.
 It is a bounded repair ruling, not candidate approval or HS18 completion.
 
+The subsequent [Q2 path-proof ruling](ABI-S6-HS18-Q2-path-proof.md) resolves
+the binding-only hold recorded below and governs bounded Q2 authoring. The Q1
+repair and its preservation constraints are unchanged. Historical Q2 questions
+below are not a renewed hold or permission to relabel the Vis.
+
 ## Decision
 
 Authorize the compiler-private `ResumeOuter` exit below. Return from

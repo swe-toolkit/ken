@@ -12,18 +12,18 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# ABI-S6 HS18 — Q1 RESUME EXIT; Q2 BINDING HOLD. READ FIRST.
+# ABI-S6 HS18 — Q1 PRESERVED; Q2 CERTIFIED PATH PROOF. READ FIRST.
 
 > # HS18 is the current live hard stop on this node, superseding the HS15
 > # banner below as READ-FIRST. The full Architect ruling is the durable
 > # determination `docs/program/ABI-S6-HS18-determination.md` (landed this PR;
 > # authored by the Architect, evt_6t5mq9sp7ywyw + part 1, thr_74x9hxa6tpf0q).
-> # The Q1 diagnostic return is now ruled by the successor determination
-> # `docs/program/ABI-S6-HS18-Q1-resume-exit.md`. Steward owns folding this
-> # bounded production recut; Q2 stays binding-first. The determinations are
-> # authoritative where this banner differs. Runtime works the SAME
-> # WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf` (held dirty: 24
-> # paths, diff hash c3e86a76…, summary hash 3b8b4745…). Node stays active.
+> # Q1 follows `docs/program/ABI-S6-HS18-Q1-resume-exit.md`. The binding return
+> # now selects `docs/program/ABI-S6-HS18-Q2-path-proof.md` for bounded Q2
+> # authoring after Steward folds this recut. These determinations are
+> # authoritative where this banner differs. Runtime preserves checkpoint
+> # `30d35f6256421a0b86cf772c739794365b3402be` on the same
+> # `wp/ABI-S6-d5b-file-backed` branch. Node stays active; no candidate approval.
 > #
 > # THE HARD STOP: `HS18_FINITE_RETURN_CONTEXT_AND_CROSS_PROGRAM_RESULT_-
 > # CONTRACT_NOT_CLOSED` (runtime-leader evt_2ejempmx2489y). HS17 reaches px8f
@@ -56,17 +56,30 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # CURRENT POPULATIONS: px8f u3:60 is 29 values/28 edges/seven leaves; its six
 > # fn56 calls resolve to one EXACT UnitBundle specialization3, not an owner
 > # quotient. Mapping u3:52 is five values/four edges/three leaves and emits
-> # NO u0:55 call. Its ungoverned v219 is a local allocation path with a
-> # potential actual2580/demanded3606 identity conflict. Bind helper roles,
-> # writes, source constructor and demanded contract before any Q2 production;
-> # do not relabel it or transplant the px8f proof. Both current dumps precede
-> # finished Result closure and are NOT finished-unit certificates.
+> # NO u0:55 call. Binding confirms v219 is a genuine two-field Vis2580/36,
+> # not Ret3606/36. Its path follows the non-Ret discriminator of v87, whose
+> # sole input v86 comes from response owner1/funcid49. That owner calls
+> # context2/funcid54 and emits Ret tag/arity validation. Current v86 authority
+> # is still declaration-derived, and the failing run has not emitted those
+> # owner bodies. The dumps/map entries are NOT finished-unit certificates.
+> # Keep the whole-function Ret obligation; do not relocate it to inner v211.
 > #
-> # Q2 — BIND THE CALLER/CALLEE FIRST, THEN COMPOSE. Adopt modular
-> # finished-Result verification and predecessor-indexed proof composition over
-> # the EXISTING emitted-function population (add no function class). Bind the
-> # current failing caller and its actual callee definitions first; a MISSING
-> # certificate is not evidence the required certificate exists. Private Rust
+> # Q2 — BOUNDED CERTIFIED FEASIBILITY. The successor path-proof ruling and
+> # its acceptance controls are load-bearing. Stage finalized CLIF and pending
+> # obligations for affected EXISTING units, including the not-yet-emitted
+> # owners; independently verify actual successful Result publications before
+> # issuing call facts. Current branch counts/emitter Booleans/layout order
+> # are not the required finished proof. No provisional fact deletes a codegen
+> # branch or grants authority. Close dependencies before object emission.
+> # From a certified same-word input, audited tag/field-count helpers, checked
+> # status and unclobbered memory, prove the exact tag observation and guard
+> # polarity. The block39 ordinal1 non-Ret edge may then receive a private
+> # infeasibility certificate. Every other edge stays possible. Final Result
+> # closure consumes that proof, not a Ret annotation on the genuine Vis.
+> # No generic symbolic executor/decoder, self-supporting fact/prune cycle,
+> # ANY-input join, missing-body assumption or owner quotient is allowed.
+> # Preserve complete source identities and the original whole-function Ret.
+> # A MISSING certificate remains distinct from a discharged proof. Private Rust
 > # roles are distinct types (names illustrative): `DeclaredResultContract` (an
 > # obligation, never finished proof merely because `Some`);
 > # `FinishedUnitResultContract` (issued only by an independent verifier of the
@@ -78,7 +91,9 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # ConstructorIdentity — status-zero alone is NOT success (preserve the
 > # Trap-propagation non-Result path). Seed only the exact decoded direct call,
 > # success edge, both status/Trap checks and exact Result load; check dominance
-> # and memory-reaching, not slot spelling or offset. Compose ALL reachable
+> # and memory-reaching, not slot spelling or offset. Compose ALL possibly
+> # reachable inputs; exclusions require independently checked edge proofs.
+> # Retain the full predecessor tuple for each included or excluded
 > # incoming edges `(predecessor Inst, destination ordinal, target block, arg
 > # index, incoming word)`; Union requires both inputs; unsupported edges/
 > # producers refuse. Use iterative dataflow/SCC, NOT recursive SSA unfolding;
@@ -125,10 +140,11 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # stack provision or bound increase; no weakening of the pre-object refusal.
 > # Both Q1 and Q2 are compiler-internal. No operator gate.
 > #
-> # ROUTING: Tier T1. Steward folds the Q1 resume-exit recut, then Runtime
-> # returns its exact bounded repair and targeted results. Q2 current Mapping
-> # bindings return FIRST, before Q2 production — no fabricated postcondition.
-> # A conflict or missing binding returns a bounded seam question. Same WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf`.
+> # ROUTING: Tier T1. Steward folds this Q2 path-proof recut, then Runtime
+> # authors the bounded finished-proof/feasibility machinery and returns its
+> # exact candidate with targeted evidence. Q1 remains unchanged. A new
+> # unsupported dependency or genuine reachable foreign Result returns a
+> # bounded seam question, never a fabricated postcondition. Same WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf`.
 > # Reviewers: Architect (required soundness reviewer for this class) +
 > # runtime-QA; standing Adversary hunt independent (crates/ touched -> M8
 > # applies) -> Steward M1-M4 -> lieutenant. Local gates targeted; full CI is
@@ -2381,8 +2397,12 @@ Architect inventory, 2026-09-11.
     The initial preserved seven-leaf graph was misattributed to Mapping: current
     px8f has those seven leaves and six exact specialization3 calls, whereas
     current Mapping has three leaves and no u0:55 call. Mapping's ungoverned local
-    allocation carries a potential actual2580/demanded3606 identity conflict;
-    bind the actual roles and source before Q2 production, never relabel it.
+    allocation was a potential actual2580/demanded3606 identity conflict.
+    Q2 binding confirms a real Vis on a path that an independently certified
+    upstream Ret would exclude; the
+    [path-proof ruling](../ABI-S6-HS18-Q2-path-proof.md) keeps the whole-function
+    contract and requires actual finished certificates plus proof-carrying
+    infeasible edges, not declaration-based pruning or local relabeling.
     No stack, bound, identity, ABI or pre-object-refusal weakening is authorized.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
