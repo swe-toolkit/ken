@@ -5,8 +5,12 @@ The Steward owns the diagnostic-first recut and release to the runtime ring.
 
 ## Current Q2 follow-up
 
-The [source-routing determination](ABI-S6-HS18-Q2-source-routing.md) is the
-current Q2 instruction. The verifier repair required by the
+The [detached-consuming-occurrence ruling](ABI-S6-HS18-consuming-occurrence.md)
+is the current Q2 instruction: entries 12-17 and 19 share one predicate, the
+fix is a structural closure over it, and the bounded continuation-seat repair
+is withheld. The
+[source-routing determination](ABI-S6-HS18-Q2-source-routing.md) whose
+observation produced it still binds. The verifier repair required by the
 [protocol audit](ABI-S6-HS18-Q2-protocol-audit.md) has landed at `5d977ac79`
 and meets its floor. The reported nested-bracket transport classification is
 not adopted; a bounded three-question observation is authorized and a source
