@@ -242,11 +242,11 @@ mod required_consumer_destination {
         destination: RequiredConsumerDestination,
     }
 
-    /// The exact before-value call paired with the distinct incoming transport
-    /// edge that carries its Result into the shared generated-entry class.
-    pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge {
-        call: RequiredConsumerCall,
-        incoming_call_identity: ContinuationCallIdentity,
+    /// The exact before-value call paired with the distinct selected response
+    /// edge that carries its Result into the verified consumer boundary.
+    pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge<'a> {
+        call: &'a RequiredConsumerCall,
+        incoming_call_identity: &'a ContinuationCallIdentity,
     }
 
     pub(in crate::cranelift_backend::planning::static_transition) fn
@@ -286,13 +286,14 @@ mod required_consumer_destination {
         Ok(RequiredConsumerCall { destination })
     }
 
-    pub(super) fn pair_required_consumer_incoming_edge(
-        call: &RequiredConsumerCall,
-        incoming_call_identity: &ContinuationCallIdentity,
-    ) -> RequiredConsumerIncomingEdge {
+    pub(in crate::cranelift_backend::planning::static_transition) fn
+    pair_required_consumer_incoming_edge<'a>(
+        call: &'a RequiredConsumerCall,
+        incoming_call_identity: &'a ContinuationCallIdentity,
+    ) -> RequiredConsumerIncomingEdge<'a> {
         RequiredConsumerIncomingEdge {
-            call: call.clone(),
-            incoming_call_identity: incoming_call_identity.clone(),
+            call,
+            incoming_call_identity,
         }
     }
 
@@ -304,7 +305,7 @@ mod required_consumer_destination {
         }
     }
 
-    impl RequiredConsumerIncomingEdge {
+    impl RequiredConsumerIncomingEdge<'_> {
         pub(in crate::cranelift_backend) fn destination(
             &self,
         ) -> &RequiredConsumerDestination {
@@ -314,7 +315,7 @@ mod required_consumer_destination {
         pub(in crate::cranelift_backend) fn incoming_call_identity(
             &self,
         ) -> &ContinuationCallIdentity {
-            &self.incoming_call_identity
+            self.incoming_call_identity
         }
     }
 
@@ -347,8 +348,9 @@ mod required_consumer_destination {
     }
 }
 
-pub(super) use required_consumer_destination::pair_detached_required_consumer;
-use required_consumer_destination::pair_required_consumer_incoming_edge;
+pub(super) use required_consumer_destination::{
+    pair_detached_required_consumer, pair_required_consumer_incoming_edge,
+};
 pub(in crate::cranelift_backend) use required_consumer_destination::{
     RequiredConsumerCall, RequiredConsumerDestination, RequiredConsumerIncomingEdge,
 };
@@ -1356,6 +1358,8 @@ pub struct CheckedIhGeneratedEntryObservation {
     pub locator_domain: String,
     pub locator_index: u32,
     pub fresh_result_route: String,
+    pub required_consumer_present_members: Vec<String>,
+    pub required_consumer_absent_members: Vec<String>,
     pub forward_ret_coordinates: Vec<ComposedReturnForwardRetCoordinateObservation>,
     pub installed: bool,
     pub reached_count: usize,
@@ -2035,6 +2039,7 @@ pub fn with_checked_ih_generated_entry_admission_observations<T>(
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(super) fn record_checked_ih_generated_entry_confluences(
+    plan: &StaticTransitionPlan<'_>,
     confluences: &BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
 ) {
     if !GENERATED_ENTRY_OBSERVATION_ACTIVE.with(Cell::get) {
@@ -2043,6 +2048,17 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
     GENERATED_ENTRY_OBSERVATIONS.with(|observations| {
         let mut observations = observations.borrow_mut();
         for (coordinate, confluence) in confluences {
+            let (required_consumer_present_members, required_consumer_absent_members) =
+                confluence.members.iter().partition::<Vec<_>, _>(|member| {
+                    plan.checked_ih_post_call_consumers.iter().any(|consumer| {
+                        consumer.transport().source_call_identity() == *member
+                            && consumer.transport().destination_owner()
+                                == confluence.projection.destination_owner
+                            && consumer.transport().destination_body_origin()
+                                == confluence.projection.destination_body_origin
+                            && consumer.required_consumer().is_some()
+                    })
+                });
             observations.push(CheckedIhGeneratedEntryObservation {
                 context: coordinate.context.0,
                 enclosing_specialization: coordinate.enclosing_specialization.0,
@@ -2086,6 +2102,14 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                     .immediate_k_locator
                     .environment_index,
                 fresh_result_route: format!("{:?}", confluence.projection.fresh_result_route),
+                required_consumer_present_members: required_consumer_present_members
+                    .into_iter()
+                    .map(|member| format!("{member:?}"))
+                    .collect(),
+                required_consumer_absent_members: required_consumer_absent_members
+                    .into_iter()
+                    .map(|member| format!("{member:?}"))
+                    .collect(),
                 forward_ret_coordinates: match &confluence.projection.fresh_result_route {
                     CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => Vec::new(),
                     CheckedIhFreshResultRoute::TailProducerToRet {
@@ -8378,18 +8402,14 @@ impl StaticTransitionPlan<'_> {
         Ok(true)
     }
 
-    /// Bind the exact before-value call to the selected response caller that
-    /// carries its Result across the validated incoming edge. The discriminator
-    /// remains separate from, and never splits, the generated-entry quotient.
-    pub(in crate::cranelift_backend) fn checked_ih_required_consumer_incoming_edge(
+    /// Record which exact defining call accompanies the unchanged quotient.
+    /// This diagnostic observes the already-minted pair; it never selects one.
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) fn record_required_consumer_call_selection(
         &self,
-        call: &RequiredConsumerCall,
-        incoming_call_identity: &ContinuationCallIdentity,
-    ) -> Result<Option<RequiredConsumerIncomingEdge>, CraneliftBackendError> {
-        let destination = call.destination();
-        if incoming_call_identity == destination.defining_call_identity() {
-            return Ok(None);
-        }
+        edge: &RequiredConsumerIncomingEdge,
+    ) -> Result<(), CraneliftBackendError> {
+        let destination = edge.destination();
         let ContinuationEmissionOwner::Specialization(enclosing) =
             destination.defining_owner()
         else {
@@ -8402,39 +8422,31 @@ impl StaticTransitionPlan<'_> {
             .ok_or_else(|| {
                 planner_error("a detached required consumer has no exact generated context")
             })?;
-        #[cfg(feature = "px8-ds-test-support")]
-        {
-            let transports = self
-                .checked_ih_environment_transports
-                .iter()
-                .filter(|candidate| {
-                    candidate.destination_owner == destination.defining_owner()
-                        && candidate.destination_body_origin
-                            == destination.defining_body_origin()
-                })
-                .collect::<Vec<_>>();
-            let selected = transports
-                .iter()
-                .copied()
-                .find(|transport| {
-                    transport.source_call_identity() == destination.defining_call_identity()
-                        && transport.source_result_origin
-                            == destination.defining_result_origin()
-                })
-                .ok_or_else(|| {
-                    planner_error("the observed required-consumer call has no exact transport")
-                })?;
-            record_required_consumer_call_selection(
-                context.id(),
-                destination.defining_body_origin(),
-                &transports,
-                selected,
-            );
-        }
-        Ok(Some(pair_required_consumer_incoming_edge(
-            call,
-            incoming_call_identity,
-        )))
+        let transports = self
+            .checked_ih_environment_transports
+            .iter()
+            .filter(|candidate| {
+                candidate.destination_owner == destination.defining_owner()
+                    && candidate.destination_body_origin == destination.defining_body_origin()
+            })
+            .collect::<Vec<_>>();
+        let selected = transports
+            .iter()
+            .copied()
+            .find(|transport| {
+                transport.source_call_identity() == destination.defining_call_identity()
+                    && transport.source_result_origin == destination.defining_result_origin()
+            })
+            .ok_or_else(|| {
+                planner_error("the observed required-consumer call has no exact transport")
+            })?;
+        record_required_consumer_call_selection(
+            context.id(),
+            destination.defining_body_origin(),
+            &transports,
+            selected,
+        );
+        Ok(())
     }
 
     /// Form the D2 move-only Tail producer-to-Ret proof after one exact

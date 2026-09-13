@@ -142,7 +142,8 @@ pub use planning::{
     with_composed_return_forward_ret_role_witnesses, with_d5b_hs10_bridge_plan_mutation,
     with_d5b_hs10_inline_response_mutation, with_d5b_hs17_post_call_consumer_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
-    with_retained_result_closure_proof_mutation, with_static_response_context_demand_mutation,
+    with_required_consumer_call_observations, with_retained_result_closure_proof_mutation,
+    with_static_response_context_demand_mutation,
     with_static_response_feasibility_diagnostics, with_suppressed_execute_then_resume_response,
     with_worker_prefix_deferrals, CheckedIhContinuationInheritanceMutation,
     CheckedIhContinuationInheritanceObservation, CheckedIhGeneratedEntryAdmissionMutation,
@@ -152,7 +153,8 @@ pub use planning::{
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
     ComposedReturnForwardRetRoleWitnessObservation, D5bHs10BridgePlanMutation,
     D5bHs10InlineResponseMutation, D5bHs17PostCallConsumerMutation, DeferredResponseObservation,
-    RetainedResultClosureProofMutation, StaticResponseCaptureObservation,
+    RequiredConsumerCallObservation, RetainedResultClosureProofMutation,
+    StaticResponseCaptureObservation,
     StaticResponseContextDemandMutation, StaticResponseFeasibilityDiagnostic,
     StaticResponseFeasibilityObservation, StaticResponseInfeasibleObservation,
     StaticResponseOwnerObservation, WorkerPrefixDeferral,
@@ -164,8 +166,9 @@ pub use lowering::core::{
     with_branched_scrutinee_unit_body_match_branch_entry_suppressed,
     with_branched_scrutinee_unit_body_route1, with_d5b_hs10_bridge_lowering_mutation,
     with_handler_owned_deferred_response_mutation, with_match_recursor_census,
-    BranchedScrutineeUnitBodyRoute1, D5bHs10BridgeLoweringMutation,
-    HandlerOwnedDeferredResponseMutation, MatchRecursorCensusRow,
+    with_required_consumer_query_mutation, BranchedScrutineeUnitBodyRoute1,
+    D5bHs10BridgeLoweringMutation, HandlerOwnedDeferredResponseMutation, MatchRecursorCensusRow,
+    RequiredConsumerQueryMutation, RequiredConsumerQueryObservation,
 };
 
 // `RT-4B-OBSERVATION-FEATURE-GATE`: the existing D2f observer, reachable by

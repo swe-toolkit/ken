@@ -162,6 +162,55 @@ fn differential() -> Differential {
     }
 }
 
+/// Promise class: durable invariant. MEASURED: Mapping's two governed
+/// generated-entry classes retain one Direct and one Tail route, and every
+/// member of both classes has an absent detached required-consumer disposition.
+/// CLAIMED: exact-call pairing does not divert a legitimate absent disposition
+/// from the existing Direct/Tail fork. THE GAP: this fixed source covers one
+/// class of each route kind; the separately observed target-2 detached call and
+/// reached four-arm query pin the present disposition.
+#[test]
+fn absent_required_consumer_disposition_preserves_direct_and_tail_routes() {
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-am3-disposition-")
+        .tempdir()
+        .expect("creates temporary root");
+    let (result, rows) = ken_runtime::with_checked_ih_generated_entry_observations(|| {
+        ken_cli::build_native_program(
+            SOURCE,
+            ken_cli::SourceFormat::Ken,
+            "abi_s6_am3_disposition",
+            root.path(),
+        )
+    });
+    result.expect("the exact disposition observer source compiles");
+    assert_eq!(rows.len(), 2, "Mapping has two governed entry classes");
+    for row in &rows {
+        assert!(
+            row.required_consumer_present_members.is_empty(),
+            "an absent class must not acquire a detached consumer: {row:?}",
+        );
+        assert_eq!(
+            row.required_consumer_absent_members, row.members,
+            "the absent/present partition must cover every exact class member",
+        );
+    }
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.fresh_result_route.starts_with("DirectInvocationReturn"))
+            .count(),
+        1,
+        "the absent Direct route remains constructible",
+    );
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.fresh_result_route.starts_with("TailProducerToRet"))
+            .count(),
+        1,
+        "the absent Tail route remains constructible",
+    );
+}
+
 fn interpreted_only() -> (ken_runtime::EffectObservation, Vec<u8>) {
     let root = tempfile::Builder::new()
         .prefix("ken-abi-s6-d5b-file-source-rights-")
@@ -212,16 +261,22 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
         FsOpen, FsReadFile, MappingAcquireFile, MappingReadView, MappingWriteView, ResourceRelease,
     };
 
-    let ((result, calls, hs3_applications), edges, compositions, hs5_applications) =
-        ken_runtime::with_d5b_hs5_source_parent_mutation(
-            ken_runtime::D5bHs5SourceParentMutation::Exact,
-            || {
+    let (
+        ((result, calls, hs3_applications), required_calls),
+        edges,
+        compositions,
+        hs5_applications,
+    ) = ken_runtime::with_d5b_hs5_source_parent_mutation(
+        ken_runtime::D5bHs5SourceParentMutation::Exact,
+        || {
+            ken_runtime::with_required_consumer_call_observations(|| {
                 ken_runtime::with_d5b_hs3_call_mutation(
                     ken_runtime::D5bHs3CallMutation::Exact,
                     differential,
                 )
-            },
-        );
+            })
+        },
+    );
     assert_eq!(
         hs3_applications, 0,
         "the exact HS3 control applies no mutation"
@@ -230,6 +285,30 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
         hs5_applications, 0,
         "the exact HS5 control applies no mutation"
     );
+    // Transition sentinel for HS18 amendment 3. MEASURED: body 788 owns two
+    // emitted transport identities and exact-call resolution selects target 2,
+    // result origin 788 -- the observed v284 call -- rather than target 0,
+    // result origin 787 -- v81. CLAIMED: the required consumer is keyed by the
+    // defining call alongside the unsplit generated-entry quotient. THE GAP:
+    // SSA display numbers are emitter-local, so the durable oracle is the call
+    // identity's target/result-origin pair, not the textual `v284` spelling.
+    let body_788 = required_calls
+        .iter()
+        .filter(|row| row.context == 0 && row.worker_body_origin == 788)
+        .collect::<Vec<_>>();
+    assert!(
+        !body_788.is_empty(),
+        "body 788 must resolve its exact producer call"
+    );
+    for row in body_788 {
+        assert_eq!(row.transport_call_count, 2);
+        assert_eq!(row.candidate_targets, vec![0, 2]);
+        assert_eq!(row.candidate_result_origins, vec![787, 788]);
+        assert_eq!(
+            (row.selected_target, row.selected_result_origin),
+            (2, 788)
+        );
+    }
     let [first, second, remaining @ ..] = edges.as_slice() else {
         panic!("the successful nested COW path must mint multiple checked-IH edges: {edges:?}");
     };
@@ -371,6 +450,52 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
     assert_eq!(
         result.native.terminal_exit,
         result.interpreted.terminal_exit
+    );
+}
+
+/// Promise class: transition sentinel for HS18 amendment 3. MEASURED: the
+/// exact-call edge emits the four ResourceBracketResult alternatives at consumer
+/// origin 560 with `ResourceBracketOk` first and ABI identity
+/// `0x08ea_0000_0043`; replacing that first comparison in every emitted copy
+/// with the second real alternative changes native success to failure while the
+/// interpreter remains green. CLAIMED: the previously omitted four-arm consumer
+/// block is reached on the exact producer edge and queries the live
+/// ResourceBracketOk value. THE GAP: the carrier handle `0x0f09` is
+/// allocation-order evidence from the bounded observer, while constructor
+/// identity is the durable program contract.
+#[test]
+fn exact_required_consumer_edge_queries_resource_bracket_ok() {
+    let (result, queries, applications) = ken_runtime::with_required_consumer_query_mutation(
+        ken_runtime::RequiredConsumerQueryMutation::ReplaceFirstCaseIdentity {
+            defining_function: 53,
+            consumer_origin: 560,
+            expected: 0x08ea_0000_0043,
+        },
+        differential,
+    );
+    assert_ne!(
+        applications, 0,
+        "the query-identity mutation must reach an emitted copy: {queries:?}",
+    );
+    assert_eq!(
+        queries.len(),
+        applications * 4,
+        "each mutated copy must emit the exact four-arm consumer",
+    );
+    for emitted_query in queries.chunks_exact(4) {
+        assert_eq!(
+            emitted_query
+                .iter()
+                .map(|row| (row.defining_function, row.consumer_origin, row.case_index))
+                .collect::<Vec<_>>(),
+            vec![(53, 560, 0), (53, 560, 1), (53, 560, 2), (53, 560, 3)],
+        );
+        assert_eq!(emitted_query[0].expected_identity, 0x08ea_0000_0043);
+    }
+    assert_eq!(
+        (result.native.exit_status, result.interpreted.exit_status),
+        (1, 0),
+        "mutating the reached ResourceBracketOk query must red native only",
     );
 }
 
