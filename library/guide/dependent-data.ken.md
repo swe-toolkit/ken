@@ -2,7 +2,7 @@
 
 > **Availability:** current for the checked `Vec` and `Fin` declarations and
 > total `head` below. `zip` and `lookup` are unavailable pending `DS-5c`.
-> **Authority:** explanatory; the normative contract is the
+> **Authority:** explanatory, and the normative contract is the
 > [length-indexed-vector specification](../../spec/50-stdlib/60-length-indexed-vectors.md).
 
 Dependent data lets a type record a fact about a value. For a vector, that fact
@@ -27,7 +27,7 @@ data Vec (A : Type) : Nat → Type where {
 
 This is the brace/`where` declaration form the current parser accepts.
 The normative specification displays the canonical constructors as lowercase
-`vnil` and `vcons`; copying that display literally does not parse today, so this
+`vnil` and `vcons`, and copying that display literally does not parse today, so this
 checked page names the accepted surface form instead of silently presenting it
 as the canonical spelling. The same constructor-name rule is why the checked
 `Fin` declaration below uses `FZero` and `FSuc` rather than the specification's
@@ -84,7 +84,7 @@ kernel a total eliminator. These declarations and `head` are the
 [normative specification](../../spec/50-stdlib/60-length-indexed-vectors.md#6-dependent-match-refinement--tail-landed-ziplookup-on-ds-5c).
 It is distinct from
 [`KERNEL-NESTED-IND`](../../docs/program/issues/KERNEL-NESTED-IND.md), which
-tracks nested strictly-positive inductives; indexed families elaborate without
+tracks nested strictly-positive inductives, and indexed families elaborate without
 that separate capability.
 
 The equational theory remains deferred with the specification: this page does
