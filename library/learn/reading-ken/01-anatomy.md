@@ -8,7 +8,7 @@ without reaching for its body.
 Catalog entries are literate `.ken.md` documents. Prose and checked Ken share
 one source file, while exact `ken` fences tangle into the module
 ([§1](../../../docs/program/07-catalog-style-guide.md#1-the-entry-is-a-literate-kenmd-document)).
-The prose prepares you to read the checked material; it does not replace or
+The prose prepares you to read the checked material, and it does not replace or
 redefine it.
 
 ## Catalog Format
@@ -29,7 +29,7 @@ records the assumptions and derivation path.
 
 This curriculum draws from a fixed [fragment
 set](fragments.md#why-these-seven-and-what-each-is-for). The fragment set
-records a successful `ken check` for each selected pure-library entry; the
+records a successful `ken check` for each selected pure-library entry, and the
 selection therefore teaches from registered package sources rather than
 invented snippets.
 
@@ -93,7 +93,7 @@ fn get_or_else (a : Type) (d : a) (x : Option a) : a = ...
 ```
 
 The keyword says the declaration is a pure function. The parameter `a` makes
-it polymorphic over a type; `d` supplies a value of that type; and `x` supplies
+it polymorphic over a type, and `d` supplies a value of that type, and `x` supplies
 an optional value of the same type. The result must be an `a`.
 
 The signature does not say whether the result is `d` or the value inside `x`.
@@ -107,7 +107,7 @@ Consult the body to learn the computation and the attached proofs to learn
 which equations the package exposes as its checked contract.
 
 After this chapter, you can locate an entry's narrative, definitions, laws,
-examples, and trust accounting; classify `const`, `fn`, `proc`, and `def`; and
+examples, and trust accounting, and classify `const`, `fn`, `proc`, and `def`, and
 distinguish what a signature establishes from what remains for its body and
 proofs.
 

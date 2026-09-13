@@ -83,7 +83,7 @@ proof some for get_or_else (a : Type) (d : a) (v : a) : Equal a (get_or_else a d
 The signature promises only "pure function, `(a : Type) → a → Option a →
 a`." The
 two attached proofs are the actual contract a reader wants: at `None`, the
-result is exactly the default `d`; at `Some v`, the result is exactly `v`.
+result is exactly the default `d`, and at `Some v`, the result is exactly `v`.
 Each is proved by `Refl` — the equation holds by computation alone, because
 `get_or_else` is a direct structural case-split with no further machinery
 in the way
@@ -105,7 +105,7 @@ not, by itself, tell you *which closing term* discharged each one, and
 that closing term is itself informative. The normative rule is stated
 directly, not merely illustrated by occurrence: a claim closes by `Refl`
 when its two endpoints reduce to a **neutral** term — stuck, still open —
-so the goal stays `Eq`-shaped; it closes by `Proved` when both endpoints
+so the goal stays `Eq`-shaped, and it closes by `Proved` when both endpoints
 instead reduce to the **same constructor head**, which observationally
 collapses the equality itself to `Top`, a shape `Refl` (which requires a
 live `Eq` goal) no longer applies to
@@ -122,7 +122,7 @@ concrete `Bool` constructor. Reading which closing term a proof
 uses, and whether the terms it relates are still open or already fully
 closed, tells you something `ken check`'s bare exit code does not: this
 is the discipline chapter 03 builds on directly. A checked proof tells
-you its stated equation was proved; it does not classify every other
+you its stated equation was proved, and it does not classify every other
 guarantee the file discusses, which may be tested, delegated, or unknown.
 
 You can now distinguish the effect promise in a signature from the
@@ -134,9 +134,9 @@ reduced to `Top` for `Proved`.
 ---
 
 **Sources:**
-[effect checking §1.6.2](../../../spec/30-surface/36-effects.md#162-the-bidirectional-check--the-keyword-cannot-lie);
-[proof claims §§8–8.3](../../../spec/30-surface/33-declarations.md#8-named-proof-claims--prop-theorem-and-attached-proof);
-[proof presentation §6](../../../docs/program/07-catalog-style-guide.md#6-proof-presentation);
+[effect checking §1.6.2](../../../spec/30-surface/36-effects.md#162-the-bidirectional-check--the-keyword-cannot-lie), and
+[proof claims §§8–8.3](../../../spec/30-surface/33-declarations.md#8-named-proof-claims--prop-theorem-and-attached-proof), and
+[proof presentation §6](../../../docs/program/07-catalog-style-guide.md#6-proof-presentation), and
 [closing terms §3.2](../../../spec/50-stdlib/55-lawful-functors.md#32-the-proved-vs-refl-discrimination-a-load-bearing-k7-subtlety).
 This explanatory chapter orders those rules and the registered
-[fragments](fragments.md); it adds no language rule.
+[fragments](fragments.md), and it adds no language rule.

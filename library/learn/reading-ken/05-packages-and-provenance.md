@@ -18,12 +18,12 @@ Catalog package files follow
 and a package's dotted import path is the *same* path spelled with dots
 instead of slashes — a mechanical, total identity: an `N`-component dotted
 path names the unique leaf file reached through `N − 1` directories
-([catalog](../../../catalog/packages/README.md);
+([catalog](../../../catalog/packages/README.md), and
 [§13](../../../docs/program/07-catalog-style-guide.md#13-path--import--the-normative-rule)).
 The [EmptyDec fragment](../../../catalog/packages/Core/Logic/EmptyDec.ken.md)
 — the fragment chapter
 [03](03-assurance-and-trust.md) grounds `proved` in — sits at
-`Core/Logic/EmptyDec`, so its import path is `Core.Logic.EmptyDec`; no
+`Core/Logic/EmptyDec`, so its import path is `Core.Logic.EmptyDec`, and no
 lookup table is needed to go from one spelling to the other. A file is an
 implicit module named by its own path — there is no in-file `module
 Core.Logic.EmptyDec` header to check against, the directory structure *is*
@@ -37,7 +37,7 @@ derivation section without asking what "derivation" meant there. Read it
 for what a fragment stands on. The
 [sums combinators](../../../catalog/packages/Data/Sums/Combinators.ken.md)
 states it plainly: "`Either` is a checked `data` inductive (kernel-admitted
-by positivity) — the only new carrier this package introduces;
+by positivity) — the only new carrier this package introduces, and
 `Option`/`Result` are reused from the prelude unchanged." That sentence
 names two different kinds of inheritance in one breath — a brand-new
 inductive this file itself declares, and two carriers it takes, unchanged,
@@ -53,7 +53,7 @@ the *same* zero. `Core/Logic/EmptyDec.ken.md` reports something narrower —
 "**Zero new trust category**" — and immediately qualifies it: "Instantiating
 `dec_eq_decides` at a carrier whose `DecEq` instance has an audited
 assumption retains that instance's declared delta." That is not a literal
-zero; it is a statement that *this entry itself* adds no new postulate or
+zero, and it is a statement that *this entry itself* adds no new postulate or
 primitive, while explicitly preserving whatever delta a caller's own choice
 of carrier already carries. Provenance, read this way, is not a vague
 pedigree claim, and it is not always the same claim twice — it is each
@@ -64,7 +64,7 @@ depending on what the fragment says.
 The built-ins/prelude/package distinction those fragments each
 draw on is itself a specified, closed structure, not an informal habit. A
 type is **built-in** only if no more primitive Ken could define it — the
-surface's own irreducible floor; the built-in set explicitly names
+surface's own irreducible floor, and the built-in set explicitly names
 `Int`/`Float`/`Char`/`String`/`Bytes` as the primitively-provided types
 ([§2](../../../spec/30-surface/30-taxonomy.md#2-the-three-tiers),
 [§3](../../../spec/30-surface/30-taxonomy.md#3-the-built-in-set--the-surface-tcb-irreducible)).
@@ -82,11 +82,11 @@ taking their own wording as the classification: Property's prose calls
 `List`, `Result`, `Unit`, `Nat`, `Bytes`, and `UInt8` all "the prelude's" —
 but that is the fragment's own informal shorthand for "the ambient
 environment," not the taxonomy's technical membership test. Checked
-against the closed set above, `List` genuinely is prelude; `Bytes` is
+against the closed set above, `List` genuinely is prelude, and `Bytes` is
 **built-in**, not prelude — it is one of the five primitively-provided
 types named in §3. `Result`, `Unit`, `Nat`, and `UInt8` are not named in
 either closed list this taxonomy chapter states, so this page does not
-classify them; that is a gap in what the cited spec section pins,
+classify them, and that is a gap in what the cited spec section pins,
 not a fact this chapter can derive by itself. Read a fragment's own
 vocabulary as its author's
 convenience, and check any technical-sounding word — "prelude" included —
@@ -97,18 +97,18 @@ before repeating it as fact.
 
 `import`, `module`, and `export` are supported, checked constructs.
 `import M` brings
-`M`'s exported names into scope under `M.foo`; `import M as N` aliases the
-qualifier; `import M (foo, Bar)` brings exactly those names in unqualified,
+`M`'s exported names into scope under `M.foo`, and `import M as N` aliases the
+qualifier, and `import M (foo, Bar)` brings exactly those names in unqualified,
 each optionally renamed
 ([§3.2](../../../spec/30-surface/33-declarations.md#32-importing-and-exporting)).
 A `program` header may declare which packages it `admits` and which
-authority it `capabilities`; these are two independent manifests, one for
+authority it `capabilities`, and these are two independent manifests, one for
 instance-dictionary coherence, one for effect authority — a change to one
 cannot alter the other
 ([§3.2.1](../../../spec/30-surface/33-declarations.md#321-admission-boundary-headers)).
 A colliding unqualified name — between a local definition, an import, and
 the prelude — is rejected as `AmbiguousReference` before any expression
-references it; that check is order-independent and fail-closed
+references it, and that check is order-independent and fail-closed
 ([§3.3](../../../spec/30-surface/33-declarations.md#33-name-resolution-surface-only-never-reaches-the-kernel)).
 And none of it costs anything: a module/import program and its fully
 flattened, single-namespace equivalent elaborate to the identical
@@ -126,7 +126,7 @@ elaborator's `elaborate_module_from_roots` resolves `A`'s reference to
 syntax is never touched, because nothing imports it) and with a cache, so
 loading the same module twice reuses the first result rather than
 re-elaborating it
-([§3.2](../../../spec/30-surface/33-declarations.md#32-importing-and-exporting);
+([§3.2](../../../spec/30-surface/33-declarations.md#32-importing-and-exporting), and
 [loader acceptance](../../../crates/ken-elaborator/tests/n2_in_repo_loader.rs),
 `cross_file_import_resolves_lazily_through_plural_root_api_and_caches`).
 Cross-file import is not an unimplemented language feature.
@@ -137,7 +137,7 @@ or underclaiming it: **no fragment in `catalog/packages/` uses `import`,
 and the
 command this curriculum's fragments are checked with — `ken check`, which
 every "still checks" claim in [`fragments.md`](fragments.md) rests on —
-elaborates a single file at a time; it does not call the roots-based
+elaborates a single file at a time, and it does not call the roots-based
 loader this section just cited. So a catalog fragment run through `ken
 check` alone does not follow a cross-file `import` even though
 the underlying mechanism is supported and tested. That is a
@@ -186,13 +186,13 @@ implying that imports are unsupported.
 ---
 
 **Sources:**
-[package catalog](../../../catalog/packages/README.md);
-[path rule §13](../../../docs/program/07-catalog-style-guide.md#13-path--import--the-normative-rule);
-[taxonomy §§2–5](../../../spec/30-surface/30-taxonomy.md#2-the-three-tiers);
-[module declarations §§3.1–3.3](../../../spec/30-surface/33-declarations.md#31-declaring-modules);
-[module acceptance](../../../crates/ken-elaborator/tests/es3_modules_acceptance.rs);
-[loader acceptance](../../../crates/ken-elaborator/tests/n2_in_repo_loader.rs);
-[single-file check path](../../../crates/ken-cli/src/main.rs);
+[package catalog](../../../catalog/packages/README.md), and
+[path rule §13](../../../docs/program/07-catalog-style-guide.md#13-path--import--the-normative-rule), and
+[taxonomy §§2–5](../../../spec/30-surface/30-taxonomy.md#2-the-three-tiers), and
+[module declarations §§3.1–3.3](../../../spec/30-surface/33-declarations.md#31-declaring-modules), and
+[module acceptance](../../../crates/ken-elaborator/tests/es3_modules_acceptance.rs), and
+[loader acceptance](../../../crates/ken-elaborator/tests/n2_in_repo_loader.rs), and
+[single-file check path](../../../crates/ken-cli/src/main.rs), and
 [registered fragments](fragments.md).
 The path sources establish addressing, while the producer tests establish
 cross-file resolution. The absence claim is limited to the catalog corpus
