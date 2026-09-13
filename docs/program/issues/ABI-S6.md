@@ -261,8 +261,14 @@ M1-M4 -> lieutenant. Local gates targeted; full CI is separate.
 
 ## Sequencing
 
-1. This frame lands (Steward editorial fold). [in progress]
+1. This frame lands (Steward editorial fold). [DONE `070de9b25`]
 2. The Architect authors the closure mechanism design (authority returned here).
+   [DONE — [closure mechanism](../ABI-S6-HS18-closure-mechanism.md). The rule: a
+   fresh-result route's destination must be derived from the required-consumer
+   projection, never from an independent Ret-sink search; `TailProducerToRet` is
+   constructible only when that projection is absent. The closure REUSES the
+   privacy discipline `RequiredConsumerProjection` already carries. Read the
+   census caveat there before building.]
 3. The Steward releases the recut to the runtime ring; runtime implements under the
    Architect's design; runtime-QA + Architect review; Steward M1-M4 -> lieutenant.
 4. Optional, in parallel, neither gating: the px8f observer-only measurement the
