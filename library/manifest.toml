@@ -678,6 +678,7 @@ sources = [
   "spec/30-surface/32-grammar.md#3-expressions",
   "catalog/packages/Core/Logic/Transport.ken.md",
   "catalog/packages/Core/Classes/LawfulClasses.ken.md",
+  "docs/PRINCIPLES.md#16-a-package-is-finished-only-when-proven--tests-are-not-part-of-it",
 ]
 validation = [
   "manifest-coverage",

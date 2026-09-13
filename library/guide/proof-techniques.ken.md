@@ -24,6 +24,7 @@ reader recognizes it when they hit it themselves.
 5. [Non-termination hazards](#5-non-termination-hazards)
 6. [Name endpoints and evidence in proof
    chains](#6-name-endpoints-and-evidence-in-proof-chains)
+7. [Proof completion and acceptance](#7-proof-completion-and-acceptance)
 
 Shared definitions for this strand's examples. `cong`, `sym`, and `trans` are
 `catalog/packages/Core/Logic/Transport.ken`'s equality idioms, inlined here so this
@@ -422,6 +423,22 @@ reconstruct. There is no binding quota, depth threshold, or minimum count. When
 an intermediate is reusable or recursive, promote it to a
 top-level `theorem` instead; when many unrelated bindings accumulate, split the
 proof rather than creating a local namespace.
+
+## 7. Proof completion and acceptance
+
+A package law is complete when its proof is complete. The proof is an
+intrinsic part of the package: the kernel re-checks the ordinary term against
+its `Omega`-proposition, so a reader can verify the stated guarantee by
+checking the package. A test remains useful evidence about a computation, but
+it is external to that guarantee: accepting it requires trust that both the
+package and the test were implemented correctly. It is therefore strictly
+inferior to a kernel-checked proof for a law that can be proved.
+
+Treat proof completion as the acceptance condition, not as a quality pass to
+schedule after a test is green. If a proof is genuinely deferred, record an
+explicit follow-on that owns completion rather than letting the test stand in
+for it. A visible `Axiom` remains an audited trust delta (§3), not a completed
+proof. This follows the project's [proof-completeness principle](../../../docs/PRINCIPLES.md#16-a-package-is-finished-only-when-proven--tests-are-not-part-of-it).
 
 ## Design notes
 
