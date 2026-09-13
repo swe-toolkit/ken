@@ -21,9 +21,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::closure::{derive_case_producer_fact, CaseProducerSet};
 use super::continuations::{
-    build_checked_binder_provenance, CheckedBinderProvenance, CheckedBinderResolution,
-    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
-    ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource,
+    build_checked_binder_provenance, checked_frame_for_consumer, CheckedBinderProvenance,
+    CheckedBinderResolution, CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
+    ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource, SourceReturnContextRole,
 };
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority, occurrence_subtree_contains,
@@ -221,6 +221,137 @@ pub(in crate::cranelift_backend) struct CheckedIhEnvironmentTransport {
         CheckedIhTransportInputDestination,
     )>,
 }
+
+/// Construction authority for a required consumer paired with the exact
+/// emitted call whose Result is its before-value. The generated-entry quotient
+/// remains unchanged; this discriminator is carried beside it.
+mod required_consumer_destination {
+    use super::*;
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub(in crate::cranelift_backend) struct RequiredConsumerDestination {
+        defining_call_identity: ContinuationCallIdentity,
+        defining_owner: ContinuationEmissionOwner,
+        defining_body_origin: StaticOriginId,
+        defining_result_origin: StaticOriginId,
+        consumer_frames: Vec<(StaticOriginId, Option<u64>)>,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub(in crate::cranelift_backend) struct RequiredConsumerCall {
+        destination: RequiredConsumerDestination,
+    }
+
+    /// The exact before-value call paired with the distinct incoming transport
+    /// edge that carries its Result into the shared generated-entry class.
+    pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge {
+        call: RequiredConsumerCall,
+        incoming_call_identity: ContinuationCallIdentity,
+    }
+
+    pub(in crate::cranelift_backend::planning::static_transition) fn
+    pair_detached_required_consumer(
+        plan: &StaticTransitionPlan<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        projection: &super::super::continuations::SourceReturnContextTemplate,
+    ) -> Result<RequiredConsumerCall, CraneliftBackendError> {
+        let consumer_origins = projection
+            .steps()
+            .iter()
+            .rev()
+            .filter_map(|step| {
+                matches!(
+                    step.role(),
+                    SourceReturnContextRole::ComputationalMatchCase(_)
+                )
+                .then_some(step.parent_origin())
+            })
+            .collect::<Vec<_>>();
+        if consumer_origins.is_empty() {
+            return Err(planner_error(
+                "an exact detached required consumer has no computational occurrence",
+            ));
+        }
+        let consumer_frames = consumer_origins
+            .into_iter()
+            .map(|origin| checked_frame_for_consumer(plan, origin).map(|frame| (origin, frame)))
+            .collect::<Result<Vec<_>, _>>()?;
+        let destination = RequiredConsumerDestination {
+            defining_call_identity: transport.source_call_identity.clone(),
+            defining_owner: transport.destination_owner,
+            defining_body_origin: transport.destination_body_origin,
+            defining_result_origin: transport.source_result_origin,
+            consumer_frames,
+        };
+        Ok(RequiredConsumerCall { destination })
+    }
+
+    pub(super) fn pair_required_consumer_incoming_edge(
+        call: &RequiredConsumerCall,
+        incoming_call_identity: &ContinuationCallIdentity,
+    ) -> RequiredConsumerIncomingEdge {
+        RequiredConsumerIncomingEdge {
+            call: call.clone(),
+            incoming_call_identity: incoming_call_identity.clone(),
+        }
+    }
+
+    impl RequiredConsumerCall {
+        pub(in crate::cranelift_backend) fn destination(
+            &self,
+        ) -> &RequiredConsumerDestination {
+            &self.destination
+        }
+    }
+
+    impl RequiredConsumerIncomingEdge {
+        pub(in crate::cranelift_backend) fn destination(
+            &self,
+        ) -> &RequiredConsumerDestination {
+            self.call.destination()
+        }
+
+        pub(in crate::cranelift_backend) fn incoming_call_identity(
+            &self,
+        ) -> &ContinuationCallIdentity {
+            &self.incoming_call_identity
+        }
+    }
+
+    impl RequiredConsumerDestination {
+        pub(in crate::cranelift_backend) fn defining_call_identity(
+            &self,
+        ) -> &ContinuationCallIdentity {
+            &self.defining_call_identity
+        }
+
+        pub(in crate::cranelift_backend) fn defining_owner(
+            &self,
+        ) -> ContinuationEmissionOwner {
+            self.defining_owner
+        }
+
+        pub(in crate::cranelift_backend) fn defining_body_origin(&self) -> StaticOriginId {
+            self.defining_body_origin
+        }
+
+        pub(in crate::cranelift_backend) fn defining_result_origin(&self) -> StaticOriginId {
+            self.defining_result_origin
+        }
+
+        pub(in crate::cranelift_backend) fn consumer_frames(
+            &self,
+        ) -> &[(StaticOriginId, Option<u64>)] {
+            &self.consumer_frames
+        }
+    }
+}
+
+pub(super) use required_consumer_destination::pair_detached_required_consumer;
+use required_consumer_destination::pair_required_consumer_incoming_edge;
+pub(in crate::cranelift_backend) use required_consumer_destination::{
+    RequiredConsumerCall, RequiredConsumerDestination, RequiredConsumerIncomingEdge,
+};
 
 /// Which destination environment one transported continuation input indexes.
 /// The domain tag is part of the morphism; the same integer in these two
@@ -1484,8 +1615,25 @@ pub struct ComposedReturnForwardEdgeCollapsibilityObservation {
     pub candidate_body_purities: Vec<bool>,
 }
 
+/// Exact-call selection report for the discriminator carried alongside the
+/// unchanged generated-entry quotient.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RequiredConsumerCallObservation {
+    pub context: u32,
+    pub worker_body_origin: u32,
+    pub transport_call_count: usize,
+    pub candidate_targets: Vec<u32>,
+    pub candidate_result_origins: Vec<u32>,
+    pub selected_target: u32,
+    pub selected_result_origin: u32,
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
+    static REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static REQUIRED_CONSUMER_CALL_OBSERVATIONS:
+        RefCell<Vec<RequiredConsumerCallObservation>> = const { RefCell::new(Vec::new()) };
     static GENERATED_ENTRY_CONFLUENCE_MUTATION:
         Cell<CheckedIhGeneratedEntryConfluenceMutation> =
             const { Cell::new(CheckedIhGeneratedEntryConfluenceMutation::Exact) };
@@ -1506,6 +1654,55 @@ thread_local! {
     static FORWARD_EDGE_COLLAPSIBILITY_OBSERVATIONS:
         RefCell<Vec<ComposedReturnForwardEdgeCollapsibilityObservation>> =
             const { RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_required_consumer_call_observations<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<RequiredConsumerCallObservation>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(false));
+        }
+    }
+    REQUIRED_CONSUMER_CALL_OBSERVATIONS.with(|rows| rows.borrow_mut().clear());
+    REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(true));
+    let restore = Restore;
+    let result = f();
+    let rows = REQUIRED_CONSUMER_CALL_OBSERVATIONS
+        .with(|rows| std::mem::take(&mut *rows.borrow_mut()));
+    drop(restore);
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_required_consumer_call_selection(
+    context: super::ContinuationContextId,
+    worker_body_origin: StaticOriginId,
+    transports: &[&CheckedIhEnvironmentTransport],
+    selected: &CheckedIhEnvironmentTransport,
+) {
+    if !REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    REQUIRED_CONSUMER_CALL_OBSERVATIONS.with(|rows| {
+        rows.borrow_mut().push(RequiredConsumerCallObservation {
+            context: context.0,
+            worker_body_origin: worker_body_origin.0,
+            transport_call_count: transports.len(),
+            candidate_targets: transports
+                .iter()
+                .map(|transport| transport.source_call_identity.target().0)
+                .collect(),
+            candidate_result_origins: transports
+                .iter()
+                .map(|transport| transport.source_result_origin.0)
+                .collect(),
+            selected_target: selected.source_call_identity.target().0,
+            selected_result_origin: selected.source_result_origin.0,
+        });
+    });
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -8179,6 +8376,65 @@ impl StaticTransitionPlan<'_> {
             }
         }
         Ok(true)
+    }
+
+    /// Bind the exact before-value call to the selected response caller that
+    /// carries its Result across the validated incoming edge. The discriminator
+    /// remains separate from, and never splits, the generated-entry quotient.
+    pub(in crate::cranelift_backend) fn checked_ih_required_consumer_incoming_edge(
+        &self,
+        call: &RequiredConsumerCall,
+        incoming_call_identity: &ContinuationCallIdentity,
+    ) -> Result<Option<RequiredConsumerIncomingEdge>, CraneliftBackendError> {
+        let destination = call.destination();
+        if incoming_call_identity == destination.defining_call_identity() {
+            return Ok(None);
+        }
+        let ContinuationEmissionOwner::Specialization(enclosing) =
+            destination.defining_owner()
+        else {
+            return Err(planner_error(
+                "a detached required consumer has no generated destination owner",
+            ));
+        };
+        let context = self
+            .continuation_context_for(enclosing, destination.defining_body_origin())?
+            .ok_or_else(|| {
+                planner_error("a detached required consumer has no exact generated context")
+            })?;
+        #[cfg(feature = "px8-ds-test-support")]
+        {
+            let transports = self
+                .checked_ih_environment_transports
+                .iter()
+                .filter(|candidate| {
+                    candidate.destination_owner == destination.defining_owner()
+                        && candidate.destination_body_origin
+                            == destination.defining_body_origin()
+                })
+                .collect::<Vec<_>>();
+            let selected = transports
+                .iter()
+                .copied()
+                .find(|transport| {
+                    transport.source_call_identity() == destination.defining_call_identity()
+                        && transport.source_result_origin
+                            == destination.defining_result_origin()
+                })
+                .ok_or_else(|| {
+                    planner_error("the observed required-consumer call has no exact transport")
+                })?;
+            record_required_consumer_call_selection(
+                context.id(),
+                destination.defining_body_origin(),
+                &transports,
+                selected,
+            );
+        }
+        Ok(Some(pair_required_consumer_incoming_edge(
+            call,
+            incoming_call_identity,
+        )))
     }
 
     /// Form the D2 move-only Tail producer-to-Ret proof after one exact
