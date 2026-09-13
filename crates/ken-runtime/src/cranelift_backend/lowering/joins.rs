@@ -32,6 +32,8 @@
 //! Any further widening this D1 required beyond what was traced here is
 //! named in the handback, not silently introduced.
 
+#[cfg(feature = "px8-ds-test-support")]
+use super::core::required_consumer_query_identity;
 use super::*;
 
 #[cfg(test)]
@@ -1122,6 +1124,21 @@ impl<'a> Lowering<'a> {
                     .static_transition_plan
                     .case_constructor_identity(static_origin, index)?
                     .tag_abi_word()?;
+                #[cfg(feature = "px8-ds-test-support")]
+                let identity = required_consumer_query_identity(
+                    self.defining_function_id.map(FuncId::as_u32),
+                    static_origin,
+                    index,
+                    identity,
+                    cases
+                        .get(1)
+                        .map(|_| {
+                            self.static_transition_plan
+                                .case_constructor_identity(static_origin, 1)?
+                                .tag_abi_word()
+                        })
+                        .transpose()?,
+                );
                 let identity = Self::carrier_identity_immediate(builder, identity);
                 let selected = builder.create_block();
                 let next = builder.create_block();
