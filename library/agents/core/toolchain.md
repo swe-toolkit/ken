@@ -32,7 +32,7 @@ ken run path/to/program.ken -- first-argument
 ken native-build path/to/program.ken build/native-output
 ```
 
-Use the command matching the file's role; do not treat a deliberately
+Use the command matching the file's role, and do not treat a deliberately
 non-runnable library as a failed program.
 
 ## 5. Invariants and prohibitions
@@ -70,7 +70,7 @@ Capture the exact command and exit status. For documentation fences, run `ken
 check` on the containing Markdown file. For execution claims, record observable
 output. For native claims, compare closure-free ground observations with the
 reference interpreter on the same checked input. Observe a callable-bearing
-result only through selected, well-typed projections or applications; never
+result only through selected, well-typed projections or applications, and never
 compare closure identity or representation.
 
 ## 9. Authority and sources

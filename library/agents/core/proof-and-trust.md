@@ -14,7 +14,7 @@ Load `read-ken.md`. Load `write-ken.md` before editing proof source and
 ## 3. Current capability
 
 Ken checks proof terms in the kernel. Claims can be proved, tested, delegated,
-or unknown; these labels are not interchangeable. `Axiom` and registered
+or unknown, and these labels are not interchangeable. `Axiom` and registered
 primitives extend the trusted base and must remain visible in the trusted-base
 ledger.
 
@@ -26,7 +26,7 @@ For an equality goal, first normalize both endpoints:
 |---|---|
 | both endpoints collapse to the same constructor and the goal becomes `Top` | `Proved` |
 | the goal remains a reflexive `Equal` because an endpoint is stuck | `Refl` |
-| endpoints differ or proof requires a missing premise | neither; continue or stop |
+| endpoints differ or proof requires a missing premise | neither, and continue or stop |
 
 For larger proofs, expose one case split or induction step at a time, then
 re-run the checker on the resulting local goals.
@@ -34,7 +34,7 @@ re-run the checker on the resulting local goals.
 ## 5. Invariants and prohibitions
 
 - `tested`, `delegated`, and `unknown` never mean `proved`.
-- A proof ending in `Proved` is not weaker than one ending in `Refl`; the
+- A proof ending in `Proved` is not weaker than one ending in `Refl`, and the
   reduced goal shapes differ.
 - Do not add `Axiom`, `foreign`, a primitive, or an open hole merely to make a
   proof compile.
@@ -77,7 +77,7 @@ load the applicable sections of `spec/10-kernel/16-observational.md` and
 `spec/10-kernel/17-conversion.md` first. If asserting that a declaration adds
 no trust, inherits trust, or changes the trusted base, load
 `spec/60-security/64-trust-model.md` first. Verification-status authority is
-`spec/20-verification/21-spec-syntax.md`; checked techniques come from
+`spec/20-verification/21-spec-syntax.md`, and checked techniques come from
 `library/guide/proof-techniques.ken.md`. The verified revision is in
 `library/agents/manifest.toml`.
 
@@ -88,6 +88,6 @@ delegated claim. Some runtime properties remain delegated even when structural
 properties of the program are proved. If the only apparent closure adds trust,
 assumes an unproved lemma, or relies on execution evidence, stop and state that
 boundary instead of returning a fabricated proof. Kernel internals and older
-prose may call the `Top` inhabitant `tt`; the writable surface name is
+prose may call the `Top` inhabitant `tt`, and the writable surface name is
 `Proved`. Do not copy internal `tt` into Ken source as if it were an alternate
 surface spelling.

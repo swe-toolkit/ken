@@ -43,9 +43,9 @@ the as-built behavior they exercise.
 
 When a module, checked artifact, and spec appear to disagree:
 
-1. do not reconcile them by invention;
-2. record the exact conflicting claims;
-3. prefer no capability claim over an unsupported capability claim; and
+1. do not reconcile them by invention, and
+2. record the exact conflicting claims, and
+3. prefer no capability claim over an unsupported capability claim, and and
 4. request review of the discrepancy.
 
 ## Product context versus workflow
@@ -53,7 +53,7 @@ When a module, checked artifact, and spec appear to disagree:
 Product context includes syntax, proof boundaries, CLI behavior, packages,
 effects, capabilities, and diagnostics. Workflow instructions include who
 reviews a change, how a branch is published, or which agent acts next. The
-former belongs here; the latter does not.
+former belongs here, and the latter does not.
 
 The thin in-repository workflow trigger remains
 `agent/playbooks/tools/write-ken.md`. It selects these packs for Ken product
@@ -66,9 +66,9 @@ only schemas, because those are the two controlled manifest formats. The test
 target exercises detector behavior through planted fixtures. It:
 
 - exercises the shipped schema constraint classes and fails on an unsupported
-  schema keyword;
+  schema keyword, and
 - rejects a planted pack include whose module is absent and a planted circular
-  pack dependency; and
+  pack dependency, and and
 - rejects planted duplicate pack and task IDs and repository-escaping paths.
 
 The test target does not currently apply the agent-manifest, source,
