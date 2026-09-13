@@ -205,6 +205,34 @@ here because it cannot be done before the computation exists and must land in
 the same increment that makes the cases green. It is not a licence to edit the
 normative contract, the seed's expected values, or any other SPEC-PROGRESS row.
 
+## Re-spin review findings (Architect evt_425wrrf1dtntf, CV evt_3p481kdbtavwq)
+
+The 5cb9288ed candidate was REQUEST-CHANGES on two mechanical-boundary gaps
+(the production queue itself is coherent). The unified re-spin must close both;
+full repair routes are in the Architect verdict:
+
+- **R1 -- cost evidence must observe the ACTUAL kernel-checked work,** not a
+  standalone Rust recurrence (`meld_charge`) whose counts are true by
+  construction. Two compile-preserving mutations (a recursive off-spine `rank`,
+  an extra `find_min` comparison) pass the current cost test. Repair with a
+  test-local, fail-closed semantic structural verifier over the actual producer
+  terms (certify the bounded computation graph + argument roles per operation);
+  NOT `rank-self-ref-count == 0` plus one more scalar count. Unknown
+  calls/eliminators/forms must FAIL, not be assumed constant-cost. Stay inside
+  the no-runtime-instrumentation fence; hard-stop with the exact unsupported
+  term/role if the representation cannot support the closed verifier.
+- **R2 -- the export inventory must assert the actual export MAP closure,** not
+  an enumeration of chosen names (an added `export leq_nat` re-export passes the
+  current test). Use the `cfg(test)` owner-local assertion authorized above; test
+  a renamed re-export too; retire the false whole-inventory claim.
+- **Honesty:** the status artifacts must report the REPAIRED observations and
+  refreshed exact blobs, not carry "all 22 cases GREEN" from the incomplete pins.
+  The `Ord` runtime reification is a disclosed test-value bridge over already
+  kernel-checked records (call its fields `leq + four laws`, not five law
+  fields), not a native/full-pipeline execution result.
+
+New exact SHA requires fresh review from all reviewers; no verdict carries.
+
 ## Acceptance criteria
 
 - `Data.Collections.PriorityQueue` lands the carrier + five public ops per the
@@ -250,10 +278,20 @@ Foundation ring. Files this build touches:
   `conformance/stdlib/collections/seed-priority-queue.md`,
   `spec/50-stdlib/58a-priority-queues.md`, and the `58a` row of
   `spec/SPEC-PROGRESS.md`.
+- ONE `cfg(test)`-only addition to `crates/ken-elaborator/src/modules.rs`
+  (inside the existing `#[cfg(test)] mod namespace_effect_tests`): the R2 repair,
+  an owner-local export-table closure assertion (Architect authorization
+  evt_425wrrf1dtntf). `cfg(test)` ONLY -- no production resolver behavior, public
+  getter, export schema, or kernel change. This is the sound design (assert
+  closure at the private owner seam, which is proven usable) rather than widening
+  ModuleState's API with an export-map getter.
 
-No cross-lane contention (L1 runtime on `crates/ken-lowering`/`crates/ken-runtime`;
-L2 language on `crates/ken-elaborator/src`; the spec enclave has no released node
-on these three files -- SPEC-PRIORITY-QUEUE-CONTRACT is merged/closed). The new
+No cross-lane contention: L1 runtime on `crates/ken-lowering`/`crates/ken-runtime`;
+the spec enclave has no released node on the three fold files
+(SPEC-PRIORITY-QUEUE-CONTRACT is merged/closed). The `modules.rs` addition is in
+L2 language's crate (`crates/ken-elaborator/src`), but it is `cfg(test)`-only and
+touches no production resolver code, and L2's reserved-infix-glyph work has no
+candidate yet, so it does not contend with L2 production or merge order. The new
 test files are under `crates/`, so a candidate touching them is a CODE merge ->
 full CI, M8/M8a Adversary. Re-measure provider spellings (`ord_leq_at`,
 `leq_nat`, `Pair`, `Option`) and the seed/chapter fold anchors at the cut.
