@@ -12,18 +12,27 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# ABI-S6 HS18 — Q2 SOURCE-ROUTING OBSERVATION. READ FIRST.
+# ABI-S6 HS18 — DETACHED CONSUMING OCCURRENCE. READ FIRST.
 
-> Current return: checkpoint `5d977ac7968dff3763d330690a9b4df530925d79`
-> preserves Q1 and is not merge-ready. The verifier repair required by the
-> protocol audit has landed and meets its floor; follow
-> [the source-routing determination](../ABI-S6-HS18-Q2-source-routing.md) for
-> what happens next. The reported nested-bracket transport classification is
-> NOT adopted: the returned ledger has the inner settlement observing
-> `ResourceBodyOk` and publishing `ResourceBracketBodyAndReleaseError`, which
-> places the first wrong value potentially inside that settlement rather than
-> in the transport. A bounded three-question observation is authorized; a
-> source repair is not. The original Q2 obligations below remain binding.
+> Current instruction: the
+> [detached-consuming-occurrence ruling](../ABI-S6-HS18-consuming-occurrence.md).
+> Entries 12–17 and 19 share one predicate — a value is transported from its
+> producer to a downstream sink while the consuming occurrence the source
+> places between them is emitted but never applied. The fix is a structural
+> closure over that predicate, not a seventh point repair, and the bounded
+> continuation-seat repair for entry 19 is WITHHELD. The Steward owns the recut
+> scope; design authority for the closure returns to the Architect.
+>
+> Checkpoint `5d977ac7968dff3763d330690a9b4df530925d79` stays held and intact.
+> Its verifier repair meets the protocol-audit floor and is load-bearing — it
+> is what makes the predicate refusable rather than certifiable — and should
+> land on its own merits once its two named residuals are addressed. No revert.
+> The original Q2 obligations below remain binding.
+>
+> Superseded as READ-FIRST: the
+> [source-routing determination](../ABI-S6-HS18-Q2-source-routing.md), whose
+> three-question observation produced this ruling. Its holds and refusal fences
+> stand.
 >
 > Superseded as READ-FIRST: the
 > [protocol audit](../ABI-S6-HS18-Q2-protocol-audit.md) banner for checkpoint
@@ -2452,6 +2461,13 @@ Architect inventory, 2026-09-11.
     therefore does not adopt the transport classification and authorizes a
     bounded observation over three arms — mis-feed, omitted continuation, and
     wrong arm published inside the settlement (`evt_3ed519g6r01ex`).
+    RESOLVED by that observation (`evt_41qndyf0vc71f`): mis-feed and
+    wrong-arm are refuted, `2497/83` is withdrawn as a static unselected arm,
+    the executed settlement publishes `ResourceBracketOk` `2282/66` correctly,
+    and the four-arm match is emitted at `funcid53`/`Context1`/`origin560` with
+    its tag query never executing. The continuation is OMITTED. The bounded
+    repair that finding would have earned is withheld — see the shared
+    predicate below.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
@@ -2460,14 +2476,33 @@ predicate: a synchronous lowering edge bypasses the existing large-frame exit
 protocol. The new exit applies that protocol to outer resume. Q2 is a distinct
 identity/finished-proof obligation, not repaired by moving a Rust call.
 
-Entry 19 is the first entry on this node whose subject is the source program's
-own routing rather than the compiler's proof apparatus. Entries 13–18 share one
-predicate — a locator, declaration or layout position was being read as an
-execution fact — and the entry-18 repair closes that predicate structurally.
-Entry 19 does not share it: nothing in it turns on a fabricated certificate.
-That is why it is a new entry and not a further follow-up, and why the
-entry-18 source-routing fence is narrowed to a bounded observation rather than
-carried forward unchanged.
+Entries 12–17 and 19 share one predicate, named in the
+[detached-consuming-occurrence ruling](../ABI-S6-HS18-consuming-occurrence.md):
+a value is transported from its producer to a downstream sink while the
+consuming occurrence the source places between them is emitted but never
+applied, so the sink receives a pre-consumption value and refuses it. Entry 16
+states it outright — "neither a live consuming occurrence"; entries 14 and 19
+are the same sentence about two different consumers; entries 17 and 19 run
+through the same static response-owner machinery. The fix is a structural
+closure over that predicate — a producer-to-sink transport edge must be derived
+from the consuming-occurrence chain, never minted independently and then
+certified — not a seventh point repair. The bounded continuation-seat repair
+entry 19 would otherwise have received is WITHHELD.
+
+Entry 18 is a separate predicate and is re-partitioned out of that group: a
+locator, declaration or layout position read as an execution fact. That one is
+about the verifier rather than the lowering, and the entry-18 repair at
+`5d977ac79` closes it structurally. That repair is load-bearing, not wasted —
+it is what makes the shared predicate above visible and refusable instead of
+certifiable, which is what entry 13 records being tempted into.
+
+An earlier revision of this paragraph called entry 19 the first entry whose
+subject was the source program's own routing, and said it shared no predicate
+with the entries before it. Both halves were wrong and are withdrawn: the
+source program is correct, the consumer is emitted and the compiler routes
+around it, and that is the same predicate as entries 12–17. The observation
+that established this is the three-question pass authorized by the
+[source-routing determination](../ABI-S6-HS18-Q2-source-routing.md).
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
