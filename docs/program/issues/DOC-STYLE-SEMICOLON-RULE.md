@@ -1,7 +1,7 @@
 ---
 id: DOC-STYLE-SEMICOLON-RULE
 title: "Add a semicolon-restraint heuristic to the library-style AI-pattern guidance (agent/playbooks/tools/library-style.md), then apply a semicolon-only revision to the compiler guide (library/guide/compiler/). Operator finding: semicolons are overused (kernel.md has 8, all prose). Standard doc-ring workflow (doc-author revises, Librarian QA)."
-status: ready
+status: merged
 owner: doc
 size: M
 gate: none
