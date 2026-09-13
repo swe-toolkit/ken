@@ -311,6 +311,8 @@ pub(in crate::cranelift_backend) use super::planning::{
     PlannedEffectSeat,
     PlannedReferentLifetime,
     PredeclaredFunctionId,
+    RequiredConsumerDestination,
+    RequiredConsumerIncomingEdge,
     RequiredConsumerProjection,
     StaticContinuationFusionId,
     StaticContinuationFusionView,

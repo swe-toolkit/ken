@@ -9,6 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
+use super::aggregates::pair_detached_required_consumer;
 use super::continuations::{
     checked_frame_for_consumer, continuation_call_selected_result_identity,
     continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
@@ -22,8 +23,10 @@ use super::continuations::{
 use super::occurrences::StaticOriginId;
 use super::semantic_ir::ConstructorIdentity;
 use super::{
-    checked_ih_post_call_consumer_frames, occurrence_subtree_contains, planner_capacity_error,
-    planner_error, CheckedIhEnvironmentTransport, CraneliftBackendError, StaticTransitionPlan,
+    checked_ih_post_call_consumer_frames, occurrence_subtree_contains,
+    planner_capacity_error, planner_error,
+    CheckedIhEnvironmentTransport, CraneliftBackendError, RequiredConsumerCall,
+    StaticTransitionPlan,
 };
 use crate::{
     CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue,
@@ -359,6 +362,7 @@ pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumer {
     consumers: Vec<CheckedIhPostCallConsumerStep>,
     selected_case_exits: Vec<CheckedIhPostCallConsumerStep>,
     detached_return_context: Option<SourceReturnContextTemplate>,
+    required_consumer: Option<RequiredConsumerCall>,
 }
 
 impl CheckedIhPostCallConsumer {
@@ -388,6 +392,12 @@ impl CheckedIhPostCallConsumer {
         &self,
     ) -> Option<&SourceReturnContextTemplate> {
         self.detached_return_context.as_ref()
+    }
+
+    pub(in crate::cranelift_backend) fn required_consumer(
+        &self,
+    ) -> Option<&RequiredConsumerCall> {
+        self.required_consumer.as_ref()
     }
 }
 
@@ -1964,6 +1974,10 @@ pub(super) fn build_checked_ih_post_call_consumers(
                 "a mismatched checked-IH transport Result produced no source return steps",
             ));
         }
+        let required_consumer = detached_return_context
+            .as_ref()
+            .map(|context| pair_detached_required_consumer(plan, transport, context))
+            .transpose()?;
         let (consumers, selected_case_exits) = if detached_return_context.is_some() {
             (Vec::new(), derived_steps)
         } else {
@@ -1976,6 +1990,7 @@ pub(super) fn build_checked_ih_post_call_consumers(
             consumers,
             selected_case_exits,
             detached_return_context,
+            required_consumer,
         });
     }
     result.sort_by(|left, right| left.transport.cmp(&right.transport));
