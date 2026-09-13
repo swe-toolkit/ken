@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-13 14:41:55Z — from 603 issue file(s) in `docs/program/issues/`.
+2026-09-13 21:26:20Z — from 605 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -160,8 +160,10 @@ the committed file matches the generator's output.
 | `DOC-GATE-WIRE-BINDING` | validation-gate registry: bind the kind-vocabulary RULE to its GATE by registering it as a VALIDATION_GATES row | merged | verify | XS | none | https://github.com/swe-toolkit/ken/pull/933 |
 | `DOC-GUIDE-PROOF-COMPLETENESS` | The proof-techniques guide does not state that a catalog package is finished only when its proofs are complete, and that computational tests are external to the package (a reader must trust them, not verify them) — the operator principle recorded as PRINCIPLES #16. Weave it into library/guide/proof-techniques.ken.md. | merged | doc | S | none | — |
 | `DOC-LIBRARY-STYLE-AI-PATTERNS` | Draft AI-pattern prose-quality guidance for library/ documentation into the library-style authoring skill plus a doc-author review checklist -- judgment heuristics (never an authorship test) that require every negative to name the specific operation, condition, and consequence, oriented to BOTH revising current docs and future authoring. Grounded in PRINCIPLES #2/#8/#14. Librarian-authored per operator ruling. | merged | doc | S | none | — |
+| `DOC-LIBRARY-STYLE-ROLLOUT` | Apply the revised library-style AI-pattern guidance (including the new semicolon-restraint rule) to the rest of the library prose beyond the compiler guide. Standard doc-ring workflow (doc-author revises, Librarian QA), sliced into one-turn increments by the doc-leader. | draft | doc | L | none | — |
 | `DOC-PROGRAM-SELF-REFUTE` | three sites of current program law assert assurances the same corpus has already measured as absent, and 12-documentation-program.md now carries both a drift-gate claim and the measurement refuting it | merged | doc | M | none | — |
 | `DOC-PROGRAM-WAVE-RECONCILE` | Reconcile the documentation program's wave status against the landed corpus — the status line, the wave table, and the section 4b headers all say map only over bodies that measured otherwise, and produce the residual register that says what the doc ring owes next | merged | doc | M | none | — |
+| `DOC-STYLE-SEMICOLON-RULE` | Add a semicolon-restraint heuristic to the library-style AI-pattern guidance (agent/playbooks/tools/library-style.md), then apply a semicolon-only revision to the compiler guide (library/guide/compiler/). Operator finding: semicolons are overused (kernel.md has 8, all prose). Standard doc-ring workflow (doc-author revises, Librarian QA). | ready | doc | M | none | — |
 | `DOC-VALIDATION-BINDING` | validation vocabulary claims a 1:1 binding to the gates; nothing binds it | merged | verify | S | none | — |
 | `DOC-W0` | documentation Wave 0 — library/ charter and currency substrate | closed | doc | M | none | 830 |
 | `DOC-W1` | documentation Wave 1 — the read-Ken spine, taught from checked fragments | closed | doc | L | none | — |
@@ -649,6 +651,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CAT-PROOF-COMPLETENESS-SURVEY` — Survey every catalog package for incomplete proofs and dependence on computational tests: classify each package as fully-proven, tested-only-with-deferred-proofs, or no-proof-obligation, citing the exact intrinsics vs tests per package; produce the ledger from which the Steward frames the missing *-LAWS follow-ons. Grounded in PRINCIPLES #16 (a package is finished only when proven).
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
+- `DOC-STYLE-SEMICOLON-RULE` — Add a semicolon-restraint heuristic to the library-style AI-pattern guidance (agent/playbooks/tools/library-style.md), then apply a semicolon-only revision to the compiler guide (library/guide/compiler/). Operator finding: semicolons are overused (kernel.md has 8, all prose). Standard doc-ring workflow (doc-author revises, Librarian QA).
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
@@ -672,6 +675,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
+- `DOC-LIBRARY-STYLE-ROLLOUT` blocked by `DOC-STYLE-SEMICOLON-RULE` (status: ready)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: draft)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `LANG-RESERVED-INFIX-NAMES` (status: draft)
