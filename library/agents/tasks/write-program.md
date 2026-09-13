@@ -35,7 +35,7 @@ whose `visits` row and capability supply are explicit.
 - Keep required facts in types or proof declarations, not only comments.
 - Do not hide effects in a pure helper.
 - Do not add assumptions to satisfy an implementation deadline.
-- Do not guess a library name; discover packages from `catalog/packages/README.md`
+- Do not guess a library name, and discover packages from `catalog/packages/README.md`
   and verify the selected entry.
 
 ## 6. Decision procedure
@@ -50,9 +50,9 @@ whose `visits` row and capability supply are explicit.
 
 ## 7. Failure signatures
 
-A parse error points to the probe spelling; a type mismatch points to the
-contract/body boundary; an escaping effect points to the row; a missing
-capability points to authority supply; and an unclosed proof points to the
+A parse error points to the probe spelling, and a type mismatch points to the
+contract/body boundary, and an escaping effect points to the row, and a missing
+capability points to authority supply, and an unclosed proof points to the
 stated law. Diagnose the earliest failing layer.
 
 ## 8. Validation
@@ -63,8 +63,8 @@ law separately and record any trusted-base delta.
 
 ## 9. Authority and sources
 
-Language forms come from `spec/30-surface/`; proof status from
-`spec/20-verification/`; execution from `spec/40-runtime/`. Current authoring
+Language forms come from `spec/30-surface/`, and proof status from
+`spec/20-verification/`, and execution from `spec/40-runtime/`. Current authoring
 practice is in `library/guide/`. Revision: `library/agents/manifest.toml`.
 
 ## 10. Known unavailable or partial behavior

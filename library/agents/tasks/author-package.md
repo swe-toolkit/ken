@@ -43,7 +43,7 @@ identity must agree with the catalog convention.
 ## 5. Invariants and prohibitions
 
 - The literate entry is canonical source, not commentary beside another source.
-- Checked fences contain code; surrounding prose explains it.
+- Checked fences contain code, and surrounding prose explains it.
 - Public laws require checked proof terms or an explicit non-proved status.
 - Trust accounting names new and inherited assumptions.
 - Do not guess a package name or create a parallel package that an existing
@@ -61,9 +61,9 @@ identity must agree with the catalog convention.
 
 ## 7. Failure signatures
 
-Path/module mismatch indicates identity drift; a fence error names the
-authoring layer; a law without a proof term is an assurance gap; an unexplained
-trusted-base delta is a hard stop; and an already-existing equivalent package
+Path/module mismatch indicates identity drift, and a fence error names the
+authoring layer, and a law without a proof term is an assurance gap, and an unexplained
+trusted-base delta is a hard stop, and an already-existing equivalent package
 indicates proliferation.
 
 ## 8. Validation
@@ -75,8 +75,8 @@ Run only the package's targeted acceptance tests.
 ## 9. Authority and sources
 
 Package structure and naming come from
-`docs/program/07-catalog-style-guide.md` §2, with `Findings` omitted per §5;
-language rules come from `spec/`; checked practice comes from `library/guide/`
+`docs/program/07-catalog-style-guide.md` §2, with `Findings` omitted per §5, and
+language rules come from `spec/`, and checked practice comes from `library/guide/`
 and neighboring entries. Revision: `library/agents/manifest.toml`.
 
 ## 10. Known unavailable or partial behavior
