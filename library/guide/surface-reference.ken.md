@@ -574,7 +574,7 @@ type signature, a snippet missing its surrounding declarations).
 - **Reserved sugar identifiers — three names you cannot declare, two you
   usually can.** `Refl`, `Axiom`, `absurd`, `J`, and `Eq` are all
   checked-mode surface sugar, but they don't all reserve their name the same
-  way (`elab.rs`'s special forms; `resolve::RESERVED_SUGAR`/`SUGAR_*`):
+  way (`elab.rs`'s special forms and `resolve::RESERVED_SUGAR`/`SUGAR_*`):
   - `Refl` and `Axiom` intercept a bare occurrence of their own name
     unconditionally, at any arity — a declared global under either name is
     wholly unreachable.
