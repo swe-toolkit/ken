@@ -1863,7 +1863,7 @@ impl<'a> Lowering<'a> {
             self.transfer_represented_boundary_value(builder, origin, value)?
         };
         if let Some(identity) = result_identity {
-            self.register_generated_context_result_authority(identity, word)?;
+            self.register_generated_constructor_authority(identity, word)?;
         }
         Ok(word)
     }
@@ -2360,7 +2360,7 @@ impl<'a> Lowering<'a> {
         );
         let failure_block = builder.create_block();
         let trap_check_block = builder.create_block();
-        builder
+        let status_branch = builder
             .ins()
             .brif(failed, failure_block, &[], trap_check_block, &[]);
         builder.switch_to_block(failure_block);
@@ -2387,7 +2387,7 @@ impl<'a> Lowering<'a> {
         );
         let trap_block = builder.create_block();
         let result_block = builder.create_block();
-        builder
+        let trap_branch = builder
             .ins()
             .brif(trapped, trap_block, &[], result_block, &[]);
         builder.switch_to_block(trap_block);
@@ -2445,12 +2445,26 @@ impl<'a> Lowering<'a> {
         builder.switch_to_block(result_block);
         builder.seal_block(result_block);
         let word = builder.ins().stack_load(types::I64, payload, result_offset);
-        if let Some(contract) = target.result_contract {
-            self.register_generated_context_result_authority(
-                contract,
-                CarriedBoundaryWord { word },
-            )?;
-        }
+        self.function_local
+            .pending_call_result_obligations
+            .push(PendingCallResultObligation {
+                identity: target
+                    .result_contract
+                    .map(units::DeclaredResultContract::identity),
+                realization_required: target.result_contract.is_some(),
+                call,
+                payload,
+                status: unit_status,
+                status_compare: failed,
+                status_branch,
+                trap_word,
+                trap_compare: trapped,
+                trap_branch,
+                result_word: word,
+                frame_bytes: target.header.frame_bytes,
+                trap_offset,
+                result_offset,
+            });
         if let Some(environment) = boundary_closure {
             let environment_word = CarriedBoundaryWord { word };
             let captures = (0..environment.capture_origins().len())

@@ -1019,7 +1019,8 @@ impl ArtifactHelpers<'_> {
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             generated_function_result_contract: None,
-            generated_context_result_authorities: BTreeMap::new(),
+            generated_constructor_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
@@ -1312,9 +1313,18 @@ struct FunctionLocalRefs {
     /// Compiler-only Result identity for the generated function currently
     /// being defined. It is never reflected into a frame or runtime ABI.
     generated_function_result_contract: Option<ConstructorIdentity>,
-    /// Move-only producer authorities keyed by their function-local SSA word.
-    generated_context_result_authorities:
-        BTreeMap<cranelift_codegen::ir::Value, GeneratedContextResultAuthority>,
+    /// Producer authorities keyed by their function-local SSA word.
+    ///
+    /// These record the identity the producer actually emitted, including an
+    /// identity different from a generated function's demanded Result.  The
+    /// latter is not silently dropped: the finished proof must either exclude
+    /// its path or refuse, and it must never relabel the word.
+    generated_constructor_authorities:
+        BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
+    /// Declared call-result obligations emitted in this function.  A record is
+    /// pending until the callee's finished body and this exact status/Trap/load
+    /// protocol have both been verified.
+    pending_call_result_obligations: Vec<PendingCallResultObligation>,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- this Function's own `FuncRef` per
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.
@@ -3842,9 +3852,32 @@ struct CarriedBoundaryWord {
 ///
 /// The identity comes from the context plan and the value from an exact
 /// governed producer. Neither field is serialized or added to the carrier.
-struct GeneratedContextResultAuthority {
+#[derive(Clone, Copy)]
+struct GeneratedConstructorAuthority {
     identity: ConstructorIdentity,
     word: cranelift_codegen::ir::Value,
+}
+
+/// One declared call-result obligation, located in a single finished CLIF
+/// function.  Every instruction/value/slot here is only a locator: the
+/// finished verifier reads the actual instruction data, direct callee,
+/// comparisons, branches, and memory operands before issuing a seed.
+#[derive(Clone)]
+struct PendingCallResultObligation {
+    identity: Option<ConstructorIdentity>,
+    realization_required: bool,
+    call: cranelift_codegen::ir::Inst,
+    payload: cranelift_codegen::ir::StackSlot,
+    status: cranelift_codegen::ir::Value,
+    status_compare: cranelift_codegen::ir::Value,
+    status_branch: cranelift_codegen::ir::Inst,
+    trap_word: cranelift_codegen::ir::Value,
+    trap_compare: cranelift_codegen::ir::Value,
+    trap_branch: cranelift_codegen::ir::Inst,
+    result_word: cranelift_codegen::ir::Value,
+    frame_bytes: u32,
+    trap_offset: i32,
+    result_offset: i32,
 }
 
 /// The capture-only runtime aggregate produced for a checked-IH application.
@@ -4021,21 +4054,18 @@ enum LoweringOperand {
 }
 
 impl Lowering<'_> {
-    fn register_generated_context_result_authority(
+    fn register_generated_constructor_authority(
         &mut self,
         identity: ConstructorIdentity,
         word: CarriedBoundaryWord,
     ) -> Result<(), CraneliftBackendError> {
-        if self.function_local.generated_function_result_contract != Some(identity) {
-            return Ok(());
-        }
-        let authority = GeneratedContextResultAuthority {
+        let authority = GeneratedConstructorAuthority {
             identity,
             word: word.word,
         };
         if let Some(existing) = self
             .function_local
-            .generated_context_result_authorities
+            .generated_constructor_authorities
             .get(&word.word)
         {
             if existing.identity == authority.identity && existing.word == authority.word {
@@ -4047,22 +4077,22 @@ impl Lowering<'_> {
             ));
         }
         self.function_local
-            .generated_context_result_authorities
+            .generated_constructor_authorities
             .insert(word.word, authority);
         Ok(())
     }
 
-    fn generated_context_result_word_is_authorized(&self, word: CarriedBoundaryWord) -> bool {
+    fn generated_constructor_word_is_authorized(&self, word: CarriedBoundaryWord) -> bool {
         let Some(contract) = self.function_local.generated_function_result_contract else {
             return false;
         };
         self.function_local
-            .generated_context_result_authorities
+            .generated_constructor_authorities
             .get(&word.word)
             .is_some_and(|authority| authority.identity == contract && authority.word == word.word)
     }
 
-    fn register_generated_context_result_join(
+    fn register_generated_constructor_join(
         &mut self,
         predecessors: &[CarriedBoundaryWord],
         joined: CarriedBoundaryWord,
@@ -4073,186 +4103,11 @@ impl Lowering<'_> {
         if predecessors.is_empty()
             || predecessors
                 .iter()
-                .any(|word| !self.generated_context_result_word_is_authorized(*word))
+                .any(|word| !self.generated_constructor_word_is_authorized(*word))
         {
             return Ok(());
         }
-        self.register_generated_context_result_authority(contract, joined)
-    }
-
-    fn close_generated_context_result_forwarding(
-        &mut self,
-        func: &Function,
-        word: CarriedBoundaryWord,
-    ) -> Result<(), CraneliftBackendError> {
-        if self.generated_context_result_word_is_authorized(word) {
-            return Ok(());
-        }
-        let Some(contract) = self.function_local.generated_function_result_contract else {
-            return Ok(());
-        };
-        fn incoming_arguments(
-            func: &Function,
-            inst: cranelift_codegen::ir::Inst,
-            target: Block,
-            index: usize,
-        ) -> Result<Vec<cranelift_codegen::ir::Value>, CraneliftBackendError> {
-            let mut incoming = Vec::new();
-            let mut append = |destination: &cranelift_codegen::ir::BlockCall| {
-                if destination.block(&func.dfg.value_lists) == target {
-                    incoming.push(
-                        destination
-                            .args_slice(&func.dfg.value_lists)
-                            .get(index)
-                            .copied()
-                            .ok_or_else(|| {
-                                backend_module(
-                                    "a generated-context Result forwarding edge omits its block argument"
-                                        .to_string(),
-                                )
-                            })?,
-                    );
-                }
-                Ok::<_, CraneliftBackendError>(())
-            };
-            match &func.dfg.insts[inst] {
-                cranelift_codegen::ir::InstructionData::Jump { destination, .. } => {
-                    append(destination)?
-                }
-                cranelift_codegen::ir::InstructionData::Brif { blocks, .. } => {
-                    append(&blocks[0])?;
-                    append(&blocks[1])?;
-                }
-                _ => {
-                    return Err(backend_module(
-                        "a generated-context Result block parameter has an unsupported incoming control edge"
-                            .to_string(),
-                    ));
-                }
-            }
-            if incoming.is_empty() {
-                return Err(backend_module(
-                    "a generated-context Result predecessor does not target its claimed block"
-                        .to_string(),
-                ));
-            }
-            Ok(incoming)
-        }
-        fn proven(
-            lowering: &Lowering<'_>,
-            func: &Function,
-            cfg: &ControlFlowGraph,
-            reachable: &BTreeSet<Block>,
-            value: cranelift_codegen::ir::Value,
-            visiting: &mut BTreeSet<cranelift_codegen::ir::Value>,
-        ) -> Result<(bool, bool), CraneliftBackendError> {
-            if lowering
-                .generated_context_result_word_is_authorized(CarriedBoundaryWord { word: value })
-            {
-                return Ok((true, true));
-            }
-            if !visiting.insert(value) {
-                return Ok((true, false));
-            }
-            let result = match func.dfg.value_def(value) {
-                cranelift_codegen::ir::ValueDef::Param(block, index) => {
-                    let predecessors = cfg
-                        .pred_iter(block)
-                        .filter(|predecessor| reachable.contains(&predecessor.block))
-                        .collect::<Vec<_>>();
-                    if predecessors.is_empty() {
-                        (false, false)
-                    } else {
-                        let mut all = true;
-                        let mut grounded = false;
-                        for predecessor in predecessors {
-                            for incoming in
-                                incoming_arguments(func, predecessor.inst, block, index)?
-                            {
-                                let (valid, has_ground) =
-                                    proven(lowering, func, cfg, reachable, incoming, visiting)?;
-                                all &= valid;
-                                grounded |= has_ground;
-                            }
-                        }
-                        (all, grounded)
-                    }
-                }
-                cranelift_codegen::ir::ValueDef::Union(left, right) => {
-                    let (left_valid, left_grounded) =
-                        proven(lowering, func, cfg, reachable, left, visiting)?;
-                    let (right_valid, right_grounded) =
-                        proven(lowering, func, cfg, reachable, right, visiting)?;
-                    (left_valid && right_valid, left_grounded || right_grounded)
-                }
-                cranelift_codegen::ir::ValueDef::Result(inst, result_index) => (false, false),
-            };
-            visiting.remove(&value);
-            Ok(result)
-        }
-        let cfg = ControlFlowGraph::with_function(func);
-        let entry = func
-            .layout
-            .entry_block()
-            .ok_or_else(|| backend_module("generated context has no entry block".to_string()))?;
-        let mut reachable = BTreeSet::from([entry]);
-        let mut pending = vec![entry];
-        while let Some(block) = pending.pop() {
-            for successor in cfg.succ_iter(block) {
-                if reachable.insert(successor) {
-                    pending.push(successor);
-                }
-            }
-        }
-        let (valid, grounded) = proven(
-            self,
-            func,
-            &cfg,
-            &reachable,
-            word.word,
-            &mut BTreeSet::new(),
-        )?;
-        if valid && grounded {
-            self.register_generated_context_result_authority(contract, word)?;
-            return Ok(());
-        }
-        Err(backend_module(format!(
-            "a generated-context Result forwarding closure is not fully governed: word={:?}, definition={:?}, valid={valid}, grounded={grounded}",
-            word.word,
-            func.dfg.value_def(word.word),
-        )))
-    }
-
-    fn consume_generated_context_result_authority(
-        &mut self,
-        word: CarriedBoundaryWord,
-    ) -> Result<GeneratedContextResultAuthority, CraneliftBackendError> {
-        let contract = self
-            .function_local
-            .generated_function_result_contract
-            .ok_or_else(|| {
-                backend_module(
-                    "an uncontracted generated context attempted to consume Result authority"
-                        .to_string(),
-                )
-            })?;
-        let authority = self
-            .function_local
-            .generated_context_result_authorities
-            .remove(&word.word)
-            .ok_or_else(|| {
-                backend_module(format!(
-                    "a contracted generated context reached its terminal without exact Result authority for {:?}",
-                    word.word,
-                ))
-            })?;
-        if authority.identity != contract || authority.word != word.word {
-            return Err(backend_module(
-                "a generated-context Result authority disagrees with its contract or SSA word"
-                    .to_string(),
-            ));
-        }
-        Ok(authority)
+        self.register_generated_constructor_authority(contract, joined)
     }
 }
 
