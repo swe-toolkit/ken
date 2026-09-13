@@ -47,9 +47,9 @@ pub(in crate::cranelift_backend) mod boundary;
 // matching how `units.rs` imports `AmbientBodyAuthority`/
 // `CheckedFrameFunctionScope` from `core` rather than through a blanket
 // re-export here.
-pub(in crate::cranelift_backend) use boundary::{BoundaryDisposition, LoweredVariant};
 #[cfg(test)]
 pub(in crate::cranelift_backend) use boundary::BoundaryTransferInvokingSite;
+pub(in crate::cranelift_backend) use boundary::{BoundaryDisposition, LoweredVariant};
 
 // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — the source machine's own state types
 // and dispatch control. A sibling of `core`/`units`/`seed_material`/`boundary`
@@ -70,7 +70,9 @@ use source::SourceContinuation;
 // alternative is a scattered per-test-file import for every direct
 // construction site, which the boundary.rs precedent avoids.
 #[cfg(test)]
-use source::{SourceCarriedControlMutation, SourceContinuationTerminal, with_source_carried_control_mutation};
+use source::{
+    with_source_carried_control_mutation, SourceCarriedControlMutation, SourceContinuationTerminal,
+};
 
 // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — the calls and returns emitter:
 // declared-call emission, residual and recursor call lowering, return
@@ -220,77 +222,137 @@ pub(in crate::cranelift_backend) use crate::{
 // (Architect `evt_8vhe6rd6r80c`; the landed §10.3 line said support -> surface
 // only, which these four imports and two production bodies refute.)
 pub(in crate::cranelift_backend) use super::compiled::{CompiledModule, ResultDecoder};
-#[cfg(any(test, feature = "r3-4b-observation"))]
 pub(in crate::cranelift_backend) use super::planning::{
-    StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
-};
-#[cfg(feature = "px8-ds-test-support")]
-use super::planning::{
-    checked_ih_generated_entry_arrival_mutation,
-    composed_return_forward_ret_authority_mutation,
-    discharge_forward_edge_sealed_observations,
-    record_composed_return_forward_edge_collapsibility,
-    record_composed_return_forward_ret_authority,
-    record_composed_return_forward_ret_role_witness,
-    record_checked_ih_generated_entry_governed_validation,
-    record_checked_ih_generated_entry_installed,
-    record_checked_ih_generated_entry_ordinary_continuation,
-    record_checked_ih_generated_entry_raw_arrival,
-    record_checked_ih_generated_entry_reached,
-    take_composed_return_forward_ret_population_mutation,
-    CheckedIhGeneratedEntryArrivalMutation, ComposedReturnForwardRetAuthorityMutation,
-};
-pub(in crate::cranelift_backend) use super::planning::{
-    collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
-    build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
-    FusionCompositionLayer, FusionRegionClaim, FusionRegionClaimLedger,
-    StaticContinuationFusionId, StaticContinuationFusionView,
-    validate_oriented_subcontinuation_transport,
-    AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
-    AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
+    build_static_continuation_fusion_plan,
+    classify_immediate_bridge,
+    collect_checked_oriented_markers,
+    collect_checked_subcontinuation_frames,
+    dead_arm_effect_trap,
     expected_capture_slot,
+    host_effect_seat_contract_of,
+    malformed_dynamic_constructor_trap,
+    plan_static_transition_graph_with_symbols,
+    produces_deforestable_aggregate_with_ih,
+    requires_heterogeneous_deforestation,
+    validate_oriented_subcontinuation_transport,
+    verify_current_lexical_availability,
+    verify_predeclared_entry_frame_membership,
+    AbiCaptureProvenance,
+    AbiCarrier,
+    AbiFrameHeader,
+    AbiOwnership,
+    AbiProcessParameter,
+    AbiRootIngress,
+    AbiSlot,
+    AbiSlotKind,
+    AbiStorageOwner,
+    AbiUnitDefinition,
+    AggregateOccurrenceId,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout, now
     // reaching PRODUCTION rather than only lowering's test targets: the composed
     // eliminator checks its assembled run against it. ⛔ Ungated here and in
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
-    BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
-    CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
+    BoolMatchCaseOrdinals,
+    BoundaryClosureEnvironment,
+    CaseEmissionStatus,
+    CheckedCaseBinderLayout,
+    CheckedCaseBinderRole,
+    CheckedIhBinding,
+    CheckedIhEnvironmentTransport,
     CheckedIhForwardRetPlanProof,
-    CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
-    CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
+    CheckedIhFreshResultRoute,
+    CheckedIhGeneratedEntryAccess,
+    CheckedIhGeneratedEntryAdmission,
+    CheckedIhGeneratedEntryProjection,
     CheckedIhKAvailabilityDomain,
+    CheckedIhPostCallConsumer,
+    CheckedIhPostCallConsumerStep,
+    CheckedIhStaticResponseReturnBoundary,
     CheckedIhTransportInputDestination,
-    CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
-    DeclarationCallTargetClass,
-    ContinuationContextId, ContinuationEmissionOwner,
-    ContinuationInputView, ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
-    ContinuationWorkerCaptureSource,
-    ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
+    CheckedOrientedMarkerSets,
+    ConstructorIdentity,
+    ContinuationAvailabilityViews,
+    ContinuationCallIdentity,
+    ContinuationCallView,
+    ContinuationContextId,
+    ContinuationEmissionOwner,
+    ContinuationEnvironmentClaim,
+    ContinuationFrameIdentity,
+    ContinuationInputView,
+    ContinuationOrdinaryEnvelopeRole,
+    ContinuationResultEdge,
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
     ContinuationSpecializationId,
-    ContinuationUnitView, RequiredConsumerProjection, EmittableCallKind,
-    FieldIdentity, ImmediateBridgeCause, ImmediateBridgeConsumer,
-    ImmediateBridgeConsumerKind, ImmediateBridgeRealization, ImmediateBridgeSelection,
-    JoinPlanToken, classify_immediate_bridge, produces_deforestable_aggregate_with_ih,
-    requires_heterogeneous_deforestation,
-    CaseEmissionStatus, PlannedReferentLifetime,
-    host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
-    EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
-    AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
-    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap,
-    JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
-    StaticResponseContinuation, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
-    StaticResponseFrameSource, StaticResponseOwnerId,
-    StaticResponseOwnerSpecialization, StaticTransitionPlan,
-    verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
-    SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
+    ContinuationUnitView,
+    ContinuationWorkerCaptureSource,
+    DeclarationCallTargetClass,
+    EffectSeatConstructorPath,
+    EffectSeatNeed,
+    EffectSeatOperation,
+    EffectSeatPhase,
+    EffectSeatSlot,
+    EmittableCallKind,
+    FieldIdentity,
+    FusionCompositionLayer,
+    FusionRegionClaim,
+    FusionRegionClaimLedger,
+    ImmediateBridgeCause,
+    ImmediateBridgeConsumer,
+    ImmediateBridgeConsumerKind,
+    ImmediateBridgeRealization,
+    ImmediateBridgeSelection,
+    JoinPlanToken,
+    JoinResultRepresentation,
+    PlannedAggregateAllocation,
+    PlannedAggregateOwnership,
+    PlannedAggregateShape,
+    PlannedEffectSeat,
+    PlannedReferentLifetime,
+    PredeclaredFunctionId,
+    RequiredConsumerProjection,
+    StaticContinuationFusionId,
+    StaticContinuationFusionView,
+    StaticOriginId,
+    StaticResponseContinuation,
+    StaticResponseEffectInput,
+    StaticResponseEnvironmentBinding,
+    StaticResponseFrameSource,
+    StaticResponseOwnerId,
+    StaticResponseOwnerSpecialization,
+    StaticTransitionPlan,
+    SynthesizedAggregateNode,
+    SynthesizedAggregatePath,
+    SynthesizedAggregateRoot,
+    SynthesizedConstructorRole,
+    SynthesizedFixedConstructorRole,
+};
+#[cfg(feature = "px8-ds-test-support")]
+use super::planning::{
+    checked_ih_generated_entry_arrival_mutation, composed_return_forward_ret_authority_mutation,
+    discharge_forward_edge_sealed_observations,
+    record_checked_ih_generated_entry_governed_validation,
+    record_checked_ih_generated_entry_installed,
+    record_checked_ih_generated_entry_ordinary_continuation,
+    record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
+    record_composed_return_forward_edge_collapsibility,
+    record_composed_return_forward_ret_authority, record_composed_return_forward_ret_role_witness,
+    take_composed_return_forward_ret_population_mutation, CheckedIhGeneratedEntryArrivalMutation,
+    ComposedReturnForwardRetAuthorityMutation,
+};
+#[cfg(feature = "px8-ds-test-support")]
+use super::planning::{
+    d5b_hs17_post_call_consumer_mutation, record_d5b_hs17_post_call_consumer_application,
+    D5bHs17PostCallConsumerMutation,
 };
 #[cfg(test)]
 pub(in crate::cranelift_backend) use super::planning::{
     plan_static_transition_graph, with_last_io_error_role_omitted, ScaleBPlanCensus,
+};
+#[cfg(any(test, feature = "r3-4b-observation"))]
+pub(in crate::cranelift_backend) use super::planning::{
+    StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
 };
 pub(in crate::cranelift_backend) use super::surface::{
     backend, backend_module, unsupported, BackendFailure, CraneliftBackendError,
@@ -454,14 +516,6 @@ fn scale_b_record_unit_body(function: &Function) {
 // the emitter's admission check and the planner's population read the same
 // list; a local copy could disagree with it silently.
 use crate::cranelift_backend::planning::CRANELIFT_HOST_EFFECT_CONSUMERS_V1;
-
-
-
-
-
-
-
-
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -833,7 +887,6 @@ impl OwnedSourceOccurrence {
     }
 }
 
-
 /// **Everything that is resolved into ONE generated `Function` and is
 /// meaningless in any other.**
 ///
@@ -965,6 +1018,8 @@ impl ArtifactHelpers<'_> {
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
+            generated_function_result_contract: None,
+            generated_context_result_authorities: BTreeMap::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
@@ -1011,8 +1066,7 @@ impl ArtifactHelpers<'_> {
                     .declare_func_in_func(self.boundary_value_abi.store_int_limb, func),
                 seal_int: module.declare_func_in_func(self.boundary_value_abi.seal_int, func),
                 int_view: module.declare_func_in_func(self.boundary_value_abi.int_view, func),
-                bytes_view: module
-                    .declare_func_in_func(self.boundary_value_abi.bytes_view, func),
+                bytes_view: module.declare_func_in_func(self.boundary_value_abi.bytes_view, func),
             }),
         }
     }
@@ -1255,6 +1309,12 @@ struct FunctionLocalRefs {
     /// context function. Source identities, retarget callers, transports, and
     /// derivation ancestry are absent from its type.
     checked_ih_generated_entry_access: Option<CheckedIhGeneratedEntryAccess>,
+    /// Compiler-only Result identity for the generated function currently
+    /// being defined. It is never reflected into a frame or runtime ABI.
+    generated_function_result_contract: Option<ConstructorIdentity>,
+    /// Move-only producer authorities keyed by their function-local SSA word.
+    generated_context_result_authorities:
+        BTreeMap<cranelift_codegen::ir::Value, GeneratedContextResultAuthority>,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- this Function's own `FuncRef` per
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.
@@ -1345,7 +1405,6 @@ struct FunctionLocalRefs {
     /// rather than treating the first observed constructor as globally final.
     emission_reachable_match_cases: BTreeMap<StaticOriginId, BTreeSet<usize>>,
 }
-
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1464,8 +1523,6 @@ enum TrapFrameBindingMutation {
     DeleteUnitLane,
     MisclassifyUnitAsRoot,
 }
-
-
 
 /// **`RT-CONTSPEC-ACTIVATE` `D4` — the three executable controls for the
 /// continuation emission seam.**
@@ -1795,10 +1852,7 @@ pub(in crate::cranelift_backend) fn d4a_take_seam() -> Vec<D4aSeamObservation> {
 /// the only point at which the operand and the occurrence that creates it are
 /// both in hand without consulting an environment index.
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn d4a_record_created(
-    origin: StaticOriginId,
-    operand: String,
-) {
+pub(in crate::cranelift_backend) fn d4a_record_created(origin: StaticOriginId, operand: String) {
     if !d4a_armed() {
         return;
     }
@@ -1848,7 +1902,9 @@ pub(in crate::cranelift_backend) fn d4a_describe_binding(
                     ok_constructor,
                     err_constructor,
                     ..
-                } => format!("specialized-hostresult({success:?},{ok_constructor},{err_constructor})"),
+                } => format!(
+                    "specialized-hostresult({success:?},{ok_constructor},{err_constructor})"
+                ),
                 Lowered::ResponseBytes(span) => {
                     let (pointer, len) = (span.pointer(), span.len());
                     format!("specialized-responsebytes({pointer:?},{len:?})")
@@ -2064,8 +2120,6 @@ thread_local! {
     static TRAP_FRAME_BINDING_MUTATION: std::cell::Cell<TrapFrameBindingMutation> =
         const { std::cell::Cell::new(TrapFrameBindingMutation::Exact) };
 }
-
-
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the outcome-complete localization trace.**
 ///
@@ -2393,9 +2447,7 @@ pub(in crate::cranelift_backend) enum D6aRouteEvent {
     /// provenance so that one ordered sequence carries the whole edge —
     /// producer, consumer, emission — and a row does not have to correlate two
     /// traces to say which consumer acted.
-    CarriedFallbackEmitted {
-        static_origin: StaticOriginId,
-    },
+    CarriedFallbackEmitted { static_origin: StaticOriginId },
     /// The carried consumer emitted its closed default successor. Under the
     /// two-parameter header this is recorded beside the checked successor; it
     /// says the fail-closed CFG arm exists, not that runtime selected it.
@@ -2683,9 +2735,7 @@ struct BoundaryTransferInvokingSiteGuard {
 #[cfg(test)]
 impl BoundaryTransferInvokingSiteGuard {
     fn enter(site: BoundaryTransferInvokingSite) -> Self {
-        let previous = D2K_BOUNDARY_TRANSFER_INVOKING_SITE.with(|current| {
-            current.replace(site)
-        });
+        let previous = D2K_BOUNDARY_TRANSFER_INVOKING_SITE.with(|current| current.replace(site));
         Self { previous }
     }
 }
@@ -2765,8 +2815,6 @@ pub(in crate::cranelift_backend) fn take_d5a_trace() -> Vec<String> {
     D5A_TRACE.with(|trace| trace.borrow().clone())
 }
 
-
-
 #[cfg(test)]
 fn set_trap_frame_binding_mutation(mutation: TrapFrameBindingMutation) {
     TRAP_FRAME_BINDING_MUTATION.with(|cell| cell.set(mutation));
@@ -2782,6 +2830,7 @@ struct ActiveCarriedComputationalRetSink {
     active_frame_origin: StaticOriginId,
     ret_case_body_origin: StaticOriginId,
     ret_input_field_position: u32,
+    result_identity: ConstructorIdentity,
     return_body: Block,
 }
 
@@ -3789,6 +3838,15 @@ struct CarriedBoundaryWord {
     word: cranelift_codegen::ir::Value,
 }
 
+/// Move-only compiler authority for publishing one generated-context Result.
+///
+/// The identity comes from the context plan and the value from an exact
+/// governed producer. Neither field is serialized or added to the carrier.
+struct GeneratedContextResultAuthority {
+    identity: ConstructorIdentity,
+    word: cranelift_codegen::ir::Value,
+}
+
 /// The capture-only runtime aggregate produced for a checked-IH application.
 ///
 /// This private role type deliberately has no conversion to
@@ -3960,6 +4018,242 @@ enum LoweringOperand {
     Specialized(Lowered),
     /// A runtime boundary word, eliminated only by emitted helpers.
     Carried(CarriedBoundaryWord),
+}
+
+impl Lowering<'_> {
+    fn register_generated_context_result_authority(
+        &mut self,
+        identity: ConstructorIdentity,
+        word: CarriedBoundaryWord,
+    ) -> Result<(), CraneliftBackendError> {
+        if self.function_local.generated_function_result_contract != Some(identity) {
+            return Ok(());
+        }
+        let authority = GeneratedContextResultAuthority {
+            identity,
+            word: word.word,
+        };
+        if let Some(existing) = self
+            .function_local
+            .generated_context_result_authorities
+            .get(&word.word)
+        {
+            if existing.identity == authority.identity && existing.word == authority.word {
+                return Ok(());
+            }
+            return Err(backend_module(
+                "one generated-context Result word acquired incompatible terminal authorities"
+                    .to_string(),
+            ));
+        }
+        self.function_local
+            .generated_context_result_authorities
+            .insert(word.word, authority);
+        Ok(())
+    }
+
+    fn generated_context_result_word_is_authorized(&self, word: CarriedBoundaryWord) -> bool {
+        let Some(contract) = self.function_local.generated_function_result_contract else {
+            return false;
+        };
+        self.function_local
+            .generated_context_result_authorities
+            .get(&word.word)
+            .is_some_and(|authority| authority.identity == contract && authority.word == word.word)
+    }
+
+    fn register_generated_context_result_join(
+        &mut self,
+        predecessors: &[CarriedBoundaryWord],
+        joined: CarriedBoundaryWord,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(contract) = self.function_local.generated_function_result_contract else {
+            return Ok(());
+        };
+        if predecessors.is_empty()
+            || predecessors
+                .iter()
+                .any(|word| !self.generated_context_result_word_is_authorized(*word))
+        {
+            return Ok(());
+        }
+        self.register_generated_context_result_authority(contract, joined)
+    }
+
+    fn close_generated_context_result_forwarding(
+        &mut self,
+        func: &Function,
+        word: CarriedBoundaryWord,
+    ) -> Result<(), CraneliftBackendError> {
+        if self.generated_context_result_word_is_authorized(word) {
+            return Ok(());
+        }
+        let Some(contract) = self.function_local.generated_function_result_contract else {
+            return Ok(());
+        };
+        fn incoming_arguments(
+            func: &Function,
+            inst: cranelift_codegen::ir::Inst,
+            target: Block,
+            index: usize,
+        ) -> Result<Vec<cranelift_codegen::ir::Value>, CraneliftBackendError> {
+            let mut incoming = Vec::new();
+            let mut append = |destination: &cranelift_codegen::ir::BlockCall| {
+                if destination.block(&func.dfg.value_lists) == target {
+                    incoming.push(
+                        destination
+                            .args_slice(&func.dfg.value_lists)
+                            .get(index)
+                            .copied()
+                            .ok_or_else(|| {
+                                backend_module(
+                                    "a generated-context Result forwarding edge omits its block argument"
+                                        .to_string(),
+                                )
+                            })?,
+                    );
+                }
+                Ok::<_, CraneliftBackendError>(())
+            };
+            match &func.dfg.insts[inst] {
+                cranelift_codegen::ir::InstructionData::Jump { destination, .. } => {
+                    append(destination)?
+                }
+                cranelift_codegen::ir::InstructionData::Brif { blocks, .. } => {
+                    append(&blocks[0])?;
+                    append(&blocks[1])?;
+                }
+                _ => {
+                    return Err(backend_module(
+                        "a generated-context Result block parameter has an unsupported incoming control edge"
+                            .to_string(),
+                    ));
+                }
+            }
+            if incoming.is_empty() {
+                return Err(backend_module(
+                    "a generated-context Result predecessor does not target its claimed block"
+                        .to_string(),
+                ));
+            }
+            Ok(incoming)
+        }
+        fn proven(
+            lowering: &Lowering<'_>,
+            func: &Function,
+            cfg: &ControlFlowGraph,
+            reachable: &BTreeSet<Block>,
+            value: cranelift_codegen::ir::Value,
+            visiting: &mut BTreeSet<cranelift_codegen::ir::Value>,
+        ) -> Result<(bool, bool), CraneliftBackendError> {
+            if lowering
+                .generated_context_result_word_is_authorized(CarriedBoundaryWord { word: value })
+            {
+                return Ok((true, true));
+            }
+            if !visiting.insert(value) {
+                return Ok((true, false));
+            }
+            let result = match func.dfg.value_def(value) {
+                cranelift_codegen::ir::ValueDef::Param(block, index) => {
+                    let predecessors = cfg
+                        .pred_iter(block)
+                        .filter(|predecessor| reachable.contains(&predecessor.block))
+                        .collect::<Vec<_>>();
+                    if predecessors.is_empty() {
+                        (false, false)
+                    } else {
+                        let mut all = true;
+                        let mut grounded = false;
+                        for predecessor in predecessors {
+                            for incoming in
+                                incoming_arguments(func, predecessor.inst, block, index)?
+                            {
+                                let (valid, has_ground) =
+                                    proven(lowering, func, cfg, reachable, incoming, visiting)?;
+                                all &= valid;
+                                grounded |= has_ground;
+                            }
+                        }
+                        (all, grounded)
+                    }
+                }
+                cranelift_codegen::ir::ValueDef::Union(left, right) => {
+                    let (left_valid, left_grounded) =
+                        proven(lowering, func, cfg, reachable, left, visiting)?;
+                    let (right_valid, right_grounded) =
+                        proven(lowering, func, cfg, reachable, right, visiting)?;
+                    (left_valid && right_valid, left_grounded || right_grounded)
+                }
+                cranelift_codegen::ir::ValueDef::Result(inst, result_index) => (false, false),
+            };
+            visiting.remove(&value);
+            Ok(result)
+        }
+        let cfg = ControlFlowGraph::with_function(func);
+        let entry = func
+            .layout
+            .entry_block()
+            .ok_or_else(|| backend_module("generated context has no entry block".to_string()))?;
+        let mut reachable = BTreeSet::from([entry]);
+        let mut pending = vec![entry];
+        while let Some(block) = pending.pop() {
+            for successor in cfg.succ_iter(block) {
+                if reachable.insert(successor) {
+                    pending.push(successor);
+                }
+            }
+        }
+        let (valid, grounded) = proven(
+            self,
+            func,
+            &cfg,
+            &reachable,
+            word.word,
+            &mut BTreeSet::new(),
+        )?;
+        if valid && grounded {
+            self.register_generated_context_result_authority(contract, word)?;
+            return Ok(());
+        }
+        Err(backend_module(format!(
+            "a generated-context Result forwarding closure is not fully governed: word={:?}, definition={:?}, valid={valid}, grounded={grounded}",
+            word.word,
+            func.dfg.value_def(word.word),
+        )))
+    }
+
+    fn consume_generated_context_result_authority(
+        &mut self,
+        word: CarriedBoundaryWord,
+    ) -> Result<GeneratedContextResultAuthority, CraneliftBackendError> {
+        let contract = self
+            .function_local
+            .generated_function_result_contract
+            .ok_or_else(|| {
+                backend_module(
+                    "an uncontracted generated context attempted to consume Result authority"
+                        .to_string(),
+                )
+            })?;
+        let authority = self
+            .function_local
+            .generated_context_result_authorities
+            .remove(&word.word)
+            .ok_or_else(|| {
+                backend_module(format!(
+                    "a contracted generated context reached its terminal without exact Result authority for {:?}",
+                    word.word,
+                ))
+            })?;
+        if authority.identity != contract || authority.word != word.word {
+            return Err(backend_module(
+                "a generated-context Result authority disagrees with its contract or SSA word"
+                    .to_string(),
+            ));
+        }
+        Ok(authority)
+    }
 }
 
 /// **THE ONE BINDING AUTHORITY** for a lexical environment (`RT-WORKER-BIND`
@@ -4254,6 +4548,102 @@ pub fn checked_ih_realization_observation_scope() -> CheckedIhRealizationObserva
     }
 }
 
+/// Test-only perturbations at HS11's shared deferred-constructor decision.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs11MaterializerMutation {
+    Exact,
+    DropWholeBoundCompletion,
+    MaterializeImmediateShell,
+    UseCurrentFrameOrigin,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs11MaterializerCompletion {
+    WholeTransferred,
+    WholeSpecialized,
+    ImmediateFields,
+    WholeDropped,
+}
+
+/// One phase-preserving deferred-constructor materializer decision.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct D5bHs11MaterializerObservation {
+    pub shell_origin: u32,
+    pub selected_origin: u32,
+    pub occurrence: u32,
+    pub whole_bound: bool,
+    pub contains_carried: bool,
+    pub completion: D5bHs11MaterializerCompletion,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static D5B_HS11_MATERIALIZER_MUTATION: std::cell::Cell<D5bHs11MaterializerMutation> =
+        const { std::cell::Cell::new(D5bHs11MaterializerMutation::Exact) };
+    static D5B_HS11_MATERIALIZER_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static D5B_HS11_MATERIALIZER_OBSERVATIONS:
+        std::cell::RefCell<Vec<D5bHs11MaterializerObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn d5b_hs11_materializer_mutation() -> D5bHs11MaterializerMutation {
+    D5B_HS11_MATERIALIZER_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_d5b_hs11_materializer_application() {
+    D5B_HS11_MATERIALIZER_MUTATION_APPLICATIONS
+        .with(|applications| applications.set(applications.get() + 1));
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_d5b_hs11_materializer_observation(observation: D5bHs11MaterializerObservation) {
+    D5B_HS11_MATERIALIZER_OBSERVATIONS
+        .with(|observations| observations.borrow_mut().push(observation));
+}
+
+/// Run one compile under an HS11 materializer mutation and return its exact
+/// decision ledger plus the number of mutated production decisions.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_d5b_hs11_materializer_mutation<T>(
+    mutation: D5bHs11MaterializerMutation,
+    body: impl FnOnce() -> T,
+) -> (T, Vec<D5bHs11MaterializerObservation>, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D5B_HS11_MATERIALIZER_MUTATION
+                .with(|cell| cell.set(D5bHs11MaterializerMutation::Exact));
+        }
+    }
+
+    D5B_HS11_MATERIALIZER_MUTATION.with(|cell| cell.set(mutation));
+    D5B_HS11_MATERIALIZER_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    D5B_HS11_MATERIALIZER_OBSERVATIONS.with(|observations| observations.borrow_mut().clear());
+    let restore = Restore;
+    let result = body();
+    let observations = D5B_HS11_MATERIALIZER_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()));
+    let applications = D5B_HS11_MATERIALIZER_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, observations, applications)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn d5b_hs11_materializer_mutation_is_exact() -> bool {
+    d5b_hs11_materializer_mutation() == D5bHs11MaterializerMutation::Exact
+}
+
 /// Test-only perturbations of ABI-S6 D5b's exact external-root admission.
 #[cfg(any(test, feature = "px8-ds-test-support"))]
 #[doc(hidden)]
@@ -4299,8 +4689,7 @@ pub fn with_d5b_hs9_external_root_mutation<T>(
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            D5B_HS9_EXTERNAL_ROOT_MUTATION
-                .with(|cell| cell.set(D5bHs9ExternalRootMutation::Exact));
+            D5B_HS9_EXTERNAL_ROOT_MUTATION.with(|cell| cell.set(D5bHs9ExternalRootMutation::Exact));
         }
     }
 
@@ -4308,8 +4697,7 @@ pub fn with_d5b_hs9_external_root_mutation<T>(
     D5B_HS9_EXTERNAL_ROOT_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
     let restore = Restore;
     let result = body();
-    let applications =
-        D5B_HS9_EXTERNAL_ROOT_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    let applications = D5B_HS9_EXTERNAL_ROOT_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
     drop(restore);
     (result, applications)
 }
@@ -4370,8 +4758,7 @@ pub fn with_d5b_hs8_transport_ingress_mutation<T>(
     D5B_HS8_TRANSPORT_INGRESS_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
     let restore = Restore;
     let result = body();
-    let applications =
-        D5B_HS8_TRANSPORT_INGRESS_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    let applications = D5B_HS8_TRANSPORT_INGRESS_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
     drop(restore);
     (result, applications)
 }
@@ -4430,8 +4817,8 @@ pub fn with_d5b_hs7_detached_disposition_mutation<T>(
     D5B_HS7_DETACHED_DISPOSITION_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
     let restore = Restore;
     let result = body();
-    let applications = D5B_HS7_DETACHED_DISPOSITION_MUTATION_APPLICATIONS
-        .with(std::cell::Cell::get);
+    let applications =
+        D5B_HS7_DETACHED_DISPOSITION_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
     drop(restore);
     (result, applications)
 }
@@ -4547,8 +4934,7 @@ pub fn with_d5b_hs5_source_parent_mutation<T>(
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            D5B_HS5_SOURCE_PARENT_MUTATION
-                .with(|cell| cell.set(D5bHs5SourceParentMutation::Exact));
+            D5B_HS5_SOURCE_PARENT_MUTATION.with(|cell| cell.set(D5bHs5SourceParentMutation::Exact));
         }
     }
 
@@ -4562,8 +4948,7 @@ pub fn with_d5b_hs5_source_parent_mutation<T>(
         D5B_HS5_DYNAMIC_EDGE_OBSERVATIONS.with(|observations| observations.borrow().clone());
     let compositions =
         D5B_HS5_COMPOSITION_OBSERVATIONS.with(|observations| observations.borrow().clone());
-    let applications =
-        D5B_HS5_SOURCE_PARENT_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    let applications = D5B_HS5_SOURCE_PARENT_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
     drop(restore);
     (result, edges, compositions, applications)
 }
@@ -4585,9 +4970,6 @@ struct PendingCheckedIhCall {
     /// lowered AT this occurrence may consume the marker.
     application_origin: StaticOriginId,
 }
-
-
-
 
 // `RT-EMITTER-CALLS-RETURNS-SPLIT` `D1` — RETAINED at the hub, not moved to
 // `calls`. The D0 ledger traced these as "exclusive to `call_static_worker`/
@@ -4642,8 +5024,7 @@ impl StaticWorkerCallOutcome {
             Self::Emitted(operand, emission) => Ok((operand, emission)),
             #[cfg(test)]
             Self::DeferredPostField(_) => Err(backend_module(
-                "a deferred post-field fused call reached a source-machine consumer"
-                    .to_string(),
+                "a deferred post-field fused call reached a source-machine consumer".to_string(),
             )),
         }
     }
@@ -4898,7 +5279,6 @@ impl LoweringOperand {
         }
     }
 
-
     /// [`Self::specialized_at`] without consuming the operand — same ruling,
     /// same prohibitions, for a callee that borrows its template.
     fn specialized_ref_at(&self, edge: &'static str) -> Result<&Lowered, CraneliftBackendError> {
@@ -4997,7 +5377,6 @@ fn specialized_fields_at(
         .map(|field| field.specialized_at(edge).cloned())
         .collect()
 }
-
 
 /// [`specialized_fields_at`] without the clone, for readers that only borrow
 /// the fields — a preflight walk, a shape comparison, a tag read.
@@ -6516,9 +6895,7 @@ pub(in crate::cranelift_backend) fn d9_perturb_envelope(
     let capture_positions = envelope
         .iter()
         .enumerate()
-        .filter(|(_, role)| {
-            matches!(role, ContinuationOrdinaryEnvelopeRole::WorkerCapture { .. })
-        })
+        .filter(|(_, role)| matches!(role, ContinuationOrdinaryEnvelopeRole::WorkerCapture { .. }))
         .map(|(position, _)| position)
         .collect::<Vec<_>>();
     let mut perturbed = envelope;
@@ -6559,9 +6936,8 @@ pub(in crate::cranelift_backend) fn d9_perturb_envelope(
         }
         D9EnvelopeMutation::ForeignCaptureClosure => {
             if let Some(position) = capture_positions.first().copied() {
-                if let ContinuationOrdinaryEnvelopeRole::WorkerCapture {
-                    closure_origin, ..
-                } = &mut perturbed[position]
+                if let ContinuationOrdinaryEnvelopeRole::WorkerCapture { closure_origin, .. } =
+                    &mut perturbed[position]
                 {
                     // A REAL origin naming the wrong role, not a fabricated id:
                     // an unknown id could be refused merely for being unknown.
@@ -6646,10 +7022,7 @@ pub(in crate::cranelift_backend) fn with_d9_envelope_mutation<T>(
     D9_ENVELOPE_APPLICATIONS.with(|cell| cell.set(0));
     let _restore = Restore;
     let result = body();
-    (
-        result,
-        D9_ENVELOPE_APPLICATIONS.with(std::cell::Cell::get),
-    )
+    (result, D9_ENVELOPE_APPLICATIONS.with(std::cell::Cell::get))
 }
 
 /// **`RT-CONTSRC-PRODUCER-LOCAL` `D6c` — the pre-emission SELECTION refusal set.**
@@ -6849,8 +7222,10 @@ pub(in crate::cranelift_backend) fn record_d8n_frame_consumption(
     invocation_id: u64,
     frame_id: u64,
 ) {
-    D8N_FRAME_CONSUMPTIONS
-        .with(|log| log.borrow_mut().push((defining_function, invocation_id, frame_id)));
+    D8N_FRAME_CONSUMPTIONS.with(|log| {
+        log.borrow_mut()
+            .push((defining_function, invocation_id, frame_id))
+    });
 }
 
 #[cfg(test)]
@@ -6913,8 +7288,11 @@ pub(in crate::cranelift_backend) fn record_d8f_disposition(
 
 #[cfg(test)]
 #[allow(clippy::type_complexity)]
-pub(in crate::cranelift_backend) fn d8f_dispositions(
-) -> Vec<(Option<FuncId>, StaticOriginId, CheckedApplicationDisposition)> {
+pub(in crate::cranelift_backend) fn d8f_dispositions() -> Vec<(
+    Option<FuncId>,
+    StaticOriginId,
+    CheckedApplicationDisposition,
+)> {
     D8F_DISPOSITIONS.with(|log| log.borrow().clone())
 }
 
@@ -7041,8 +7419,8 @@ pub(in crate::cranelift_backend) fn record_r3_local_composition(
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn r3_local_compositions()
--> Vec<(ContinuationSpecializationId, FusionCompositionLayer)> {
+pub(in crate::cranelift_backend) fn r3_local_compositions(
+) -> Vec<(ContinuationSpecializationId, FusionCompositionLayer)> {
     R3_LOCAL_COMPOSITIONS.with(|cell| cell.borrow().clone())
 }
 
@@ -7063,8 +7441,8 @@ pub(in crate::cranelift_backend) fn record_r3_outer_dispatch(
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn r3_outer_dispatches()
--> Vec<(StaticContinuationFusionId, ContinuationSpecializationId)> {
+pub(in crate::cranelift_backend) fn r3_outer_dispatches(
+) -> Vec<(StaticContinuationFusionId, ContinuationSpecializationId)> {
     R3_OUTER_DISPATCHES.with(|cell| cell.borrow().clone())
 }
 
@@ -7104,8 +7482,8 @@ pub(in crate::cranelift_backend) fn record_r3_run_worker_members(
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn r3_run_worker_members()
--> Vec<Vec<(usize, Option<StaticWorkerTransportId>)>> {
+pub(in crate::cranelift_backend) fn r3_run_worker_members(
+) -> Vec<Vec<(usize, Option<StaticWorkerTransportId>)>> {
     R3_RUN_WORKER_MEMBERS.with(|cell| cell.borrow().clone())
 }
 
@@ -7131,8 +7509,8 @@ pub(in crate::cranelift_backend) fn record_r3_fused_invocation(
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn r3_fused_invocations()
--> Vec<(StaticContinuationFusionId, StaticOriginId)> {
+pub(in crate::cranelift_backend) fn r3_fused_invocations(
+) -> Vec<(StaticContinuationFusionId, StaticOriginId)> {
     R3_FUSED_INVOCATIONS.with(|cell| cell.borrow().clone())
 }
 
@@ -7158,10 +7536,7 @@ thread_local! {
 }
 
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn record_d8o_body_key(
-    function: Option<FuncId>,
-    key: D8oBodyKey,
-) {
+pub(in crate::cranelift_backend) fn record_d8o_body_key(function: Option<FuncId>, key: D8oBodyKey) {
     D8O_BODY_KEYS.with(|log| log.borrow_mut().push((function, key)));
 }
 
@@ -7297,9 +7672,9 @@ fn extend_specialized(
     bindings: impl IntoIterator<Item = Lowered>,
 ) {
     env.extend(
-        bindings
-            .into_iter()
-            .map(|lowered| LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(lowered))),
+        bindings.into_iter().map(|lowered| {
+            LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(lowered))
+        }),
     );
 }
 
@@ -7365,33 +7740,18 @@ impl<'a> Lowering<'a> {
             origin,
             root_kind: lowered_value_kind(value),
             closure_path: value.first_boundary_closure_path(),
-            invoking_site: D2K_BOUNDARY_TRANSFER_INVOKING_SITE
-                .with(std::cell::Cell::get),
+            invoking_site: D2K_BOUNDARY_TRANSFER_INVOKING_SITE.with(std::cell::Cell::get),
         });
         // The test-only retired flat-order control intentionally receives no
         // M4 representation: it is a rejection witness, not another bind edge.
         // The switch is absent from ordinary artifacts by cfg construction.
-        if value.contains_boundary_closure_environment()?
-            && !px8ds_retired_flat_order_enabled()
-        {
+        if value.contains_boundary_closure_environment()? && !px8ds_retired_flat_order_enabled() {
             return self.transfer_bind_continuation_boundary_value(builder, origin, value);
         }
         value.boundary_transfer_admissibility()?;
         self.source_aggregate_preflight(value)?;
         self.emit_carrier_transfer(builder, origin, value)
     }
-
-
-
-
-
-
-
-
-
-
-
-
 
     /// Enter one planned source occurrence on any lowering traversal.
     ///
@@ -7420,11 +7780,6 @@ impl<'a> Lowering<'a> {
         }
         Ok(())
     }
-
-
-
-
-
 
     /// Carry one generated-unit call input across the boundary.
     ///
@@ -7469,7 +7824,6 @@ impl<'a> Lowering<'a> {
             }
         }
     }
-
 
     /// Resolve the body-level identity used only by the call-input diagnostic.
     ///
@@ -7541,10 +7895,6 @@ impl<'a> Lowering<'a> {
             GeneratedUnitCallInputCallee::Body,
         )
     }
-
-
-
-
 
     /// **`D2f` — the ordered continuation-input operands one redirected
     /// invocation must append, resolved in the caller being defined.**
@@ -7647,9 +7997,6 @@ impl<'a> Lowering<'a> {
         Ok(Some(resolved))
     }
 
-
-
-
     /// **`RT-CONTSPEC-ACTIVATE` `4b` — the emission-seam equality gate for one
     /// generated function.**
     ///
@@ -7743,7 +8090,10 @@ impl<'a> Lowering<'a> {
         // name a callee this set no longer contains, and the reverse direction
         // above catches it.
         let mut specialization_callees = BTreeSet::new();
-        for unit in self.static_transition_plan.ordinary_continuation_targets()? {
+        for unit in self
+            .static_transition_plan
+            .ordinary_continuation_targets()?
+        {
             let id = bundle.continuation(unit).ok_or_else(|| {
                 backend_module(
                     "a planned ordinary continuation specialization was never forward-declared"
@@ -8027,12 +8377,6 @@ impl<'a> Lowering<'a> {
         Ok(())
     }
 
-
-
-
-
-
-
     /// The carrier helpers, as refs callable inside **this** generated function.
     fn carrier_refs(&self) -> Result<BoundaryCarrierRefs, CraneliftBackendError> {
         self.function_local.boundary_carrier.ok_or_else(|| {
@@ -8131,15 +8475,6 @@ impl<'a> Lowering<'a> {
         Ok(builder.ins().iconst(types::I64, position))
     }
 
-
-
-
-
-
-
-
-
-
     /// `make_immediate(tag, payload, out) -> status`. ⚠ No arena: an immediate
     /// names no referent.
     fn emit_carrier_immediate(
@@ -8162,11 +8497,6 @@ impl<'a> Lowering<'a> {
         })
     }
 
-
-
-
-
-
     /// The `NativeIntV1` marker for a spillable immediate whose magnitude **is**
     /// its payload word.
     ///
@@ -8181,11 +8511,6 @@ impl<'a> Lowering<'a> {
             .ins()
             .iconst(types::I64, crate::NATIVE_INT_SMALL_TAG_V1 as i64)
     }
-
-
-
-
-
 
     // ── the CONSUMER half of the carrier ABI (`D3` / `D4`) ──────────────
     //
@@ -8307,10 +8632,9 @@ impl<'a> Lowering<'a> {
             .ok_or_else(|| unsupported("NativeResult", "carried Int has no export function"))?;
         let pointer_type = builder.func.dfg.value_type(boundary_arena);
 
-        let tag = builder.ins().band_imm(
-            target.word,
-            crate::boundary_value::BOUNDARY_TAG_MASK as i64,
-        );
+        let tag = builder
+            .ins()
+            .band_imm(target.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
         let persistent = builder.ins().icmp_imm(
             cranelift_codegen::ir::condcodes::IntCC::Equal,
             tag,
@@ -8325,13 +8649,11 @@ impl<'a> Lowering<'a> {
             .brif(persistent, exact_int, &[], immediate, &[]);
 
         builder.switch_to_block(exact_int);
-        let view_slot = builder.create_sized_stack_slot(
-            cranelift_codegen::ir::StackSlotData::new(
-                cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-                24,
-                3,
-            ),
-        );
+        let view_slot = builder.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+            24,
+            3,
+        ));
         let view = builder.ins().stack_addr(pointer_type, view_slot, 0);
         let call = builder
             .ins()
@@ -8407,8 +8729,6 @@ impl<'a> Lowering<'a> {
             word: builder.ins().stack_load(types::I64, slot, 0),
         })
     }
-
-
 }
 
 impl Lowered {
@@ -8460,11 +8780,10 @@ impl Lowered {
                     }
                     None
                 }
-                Lowered::HostResult { error, ok, .. } => descend(
-                    error,
-                    format!("{path}.error.{}", lowered_value_kind(error)),
-                )
-                .or_else(|| descend(ok, format!("{path}.ok.{}", lowered_value_kind(ok)))),
+                Lowered::HostResult { error, ok, .. } => {
+                    descend(error, format!("{path}.error.{}", lowered_value_kind(error)))
+                        .or_else(|| descend(ok, format!("{path}.ok.{}", lowered_value_kind(ok))))
+                }
                 Lowered::DynamicConstructor(dynamic) => {
                     for (alternative, branch) in dynamic.alternatives.iter().enumerate() {
                         for (position, field) in branch.fields.iter().enumerate() {
@@ -8502,8 +8821,7 @@ impl Lowered {
 
         descend(self, lowered_value_kind(self).to_string())
     }
-
-    }
+}
 
 #[derive(Clone, Copy)]
 struct StructuralNatV1 {
@@ -8773,33 +9091,6 @@ struct DynamicConstructorAlternativeV1 {
     fields: Vec<Lowered>,
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /// **`RT-DECL-CLOSURE-PORT` `D7` — the seats of ONE visit, bound to the operands
 /// they were claimed from.**
 ///
@@ -8859,7 +9150,11 @@ impl<'a> ClaimedEffectSeats<'a> {
     /// which is every tree these tests build — asks it for nothing.
     fn none() -> ClaimedEffectSeats<'static> {
         static NONE: BTreeMap<EffectSeatSlot, PlannedEffectSeat> = BTreeMap::new();
-        ClaimedEffectSeats { claimed: &NONE, capability: None, arguments: &[] }
+        ClaimedEffectSeats {
+            claimed: &NONE,
+            capability: None,
+            arguments: &[],
+        }
     }
 
     /// Read one seat's compile-time template.
@@ -8884,10 +9179,6 @@ impl<'a> ClaimedEffectSeats<'a> {
         }
     }
 }
-
-
-
-
 
 /// What makes one lowered value distinguishable from another at a site.
 ///
@@ -8925,7 +9216,6 @@ fn site_operand_witness(value: &Lowered) -> Option<SiteOperandWitness> {
         _ => None,
     }
 }
-
 
 const MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS: i64 = -3;
 
@@ -9046,8 +9336,7 @@ fn console_stream_tag(value: &Lowered) -> Option<i64> {
 }
 fn bool_tag(value: &Lowered) -> Option<i64> {
     if let Lowered::Bool {
-        known: Some(value),
-        ..
+        known: Some(value), ..
     } = value
     {
         return Some(i64::from(*value));
@@ -9803,7 +10092,10 @@ fn compose_oriented_subcontinuation(
             let matching = dynamic_splice_edges
                 .iter()
                 .filter(|edge| {
-                    (edge.parent_invocation_instance_id, edge.parent_frame_template_id) == key
+                    (
+                        edge.parent_invocation_instance_id,
+                        edge.parent_frame_template_id,
+                    ) == key
                 })
                 .collect::<Vec<_>>();
             if matching.len() != 1 {
@@ -9825,8 +10117,7 @@ fn compose_oriented_subcontinuation(
                 let child_key_present = std::iter::once(&segment.selection)
                     .chain(segment.unwind.later_wrappers_in_construction_order.iter())
                     .any(|layer| {
-                        layer.checked_invocation_id
-                            == Some(edge.child_invocation_instance_id)
+                        layer.checked_invocation_id == Some(edge.child_invocation_instance_id)
                             && layer.checked_frame_id == Some(edge.parent_frame_template_id)
                     });
                 record_d5b_hs5_composition_observation(D5bHs5CompositionObservation {
@@ -10927,8 +11218,7 @@ fn carried_computational_loop_control_word(
         Ok("active-checked-to-direct")
             if checked_frame_id == Some(1)
                 && edge == CarriedComputationalLoopEdge::ActiveSelfResumption
-                && authored_route
-                    == SourceComputationalAnswerRoute::CheckedSelectedRecursor =>
+                && authored_route == SourceComputationalAnswerRoute::CheckedSelectedRecursor =>
         {
             eprintln!(
                 "RT_ITREE_D1_CONTROL_APPLIED mode=active-checked-to-direct frame=1 edge=active"
@@ -10948,8 +11238,7 @@ fn carried_computational_loop_control_word(
         Ok("active-checked-to-unknown")
             if checked_frame_id == Some(1)
                 && edge == CarriedComputationalLoopEdge::ActiveSelfResumption
-                && authored_route
-                    == SourceComputationalAnswerRoute::CheckedSelectedRecursor =>
+                && authored_route == SourceComputationalAnswerRoute::CheckedSelectedRecursor =>
         {
             eprintln!(
                 "RT_ITREE_D1_CONTROL_APPLIED mode=active-checked-to-unknown frame=1 edge=active"
@@ -11047,7 +11336,29 @@ struct ContinuationCallOperands {
 /// ⛔ **This is not a phase and never converts one.** A `Specialized` operand
 /// stays specialized and a `Carried` one stays carried across the whole
 /// disposition; what changes is which frame consumes it.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// A Tail transport returns its emitted `Inst` directly with the operand.
+/// `None` is the exact InlineNoCall case; no caller may recover a call from a
+/// last-emission side channel.
+#[derive(Clone)]
+struct TailCheckedIhTransportResult {
+    operand: LoweringOperand,
+    call: Option<cranelift_codegen::ir::Inst>,
+}
+
+/// Compiler-only proof that an exact selected response-owner call returned its
+/// exact Result-frame load across the plan's identity-preserving forwarding
+/// boundary. It contains no runtime bit and cannot be reconstructed from the
+/// returned constructor shape.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CheckedIhStaticResponseReturnReceipt {
+    boundary: CheckedIhStaticResponseReturnBoundary,
+    selected_caller: ContinuationCallIdentity,
+    call: cranelift_codegen::ir::Inst,
+    emission_transport: Option<CheckedIhEnvironmentTransport>,
+    returned_word: cranelift_codegen::ir::Value,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum EliminatorRole {
     /// The ordinary role: the receiving eliminator eliminates this value.
     /// **Every value and every call result is this**, and the exhaustive match
@@ -11063,6 +11374,12 @@ enum EliminatorRole {
     /// continuation. Nothing else may mint it, and it is never inferred from
     /// the operand's shape.
     AnswerAfterComputationalFrame { continuation_origin: StaticOriginId },
+    /// The selected response K-context has completed the boundary's ruled
+    /// source exits. The shared driver verifies the exact local prefix and
+    /// removes it once; ordinary calls never acquire this role.
+    StaticResponseReturn {
+        receipt: CheckedIhStaticResponseReturnReceipt,
+    },
 }
 
 #[derive(Clone)]
@@ -11100,6 +11417,17 @@ impl RoutedAnswer {
         }
     }
 
+    fn checked_static_response_return(
+        value: LoweringOperand,
+        receipt: CheckedIhStaticResponseReturnReceipt,
+    ) -> Self {
+        Self {
+            value,
+            route: SourceComputationalAnswerRoute::CheckedSelectedRecursor,
+            role: EliminatorRole::StaticResponseReturn { receipt },
+        }
+    }
+
     /// **`D3` — the Inner composition's answer, and the ONLY producer of the
     /// non-`Scrutinee` role.** The continuation origin is the composed edge's
     /// planner-authored consumer continuation, supplied by the seat that
@@ -11108,7 +11436,9 @@ impl RoutedAnswer {
         Self {
             value,
             route: SourceComputationalAnswerRoute::CheckedSelectedRecursor,
-            role: EliminatorRole::AnswerAfterComputationalFrame { continuation_origin },
+            role: EliminatorRole::AnswerAfterComputationalFrame {
+                continuation_origin,
+            },
         }
     }
 
@@ -11167,12 +11497,9 @@ impl SourceComputationalAnswerRoute {
                 panic!("KEN_RT_ITREE_D1_RECURSOR_ROUTE must be Unicode")
             }
             Ok("drop-checked-frame-1")
-                if layer.checked_frame_id == Some(1)
-                    && route == Self::CheckedSelectedRecursor =>
+                if layer.checked_frame_id == Some(1) && route == Self::CheckedSelectedRecursor =>
             {
-                eprintln!(
-                    "RT_ITREE_D1_RECURSOR_APPLIED mode=drop-checked-frame-1 frame=1"
-                );
+                eprintln!("RT_ITREE_D1_RECURSOR_APPLIED mode=drop-checked-frame-1 frame=1");
                 Self::DirectScrutinee
             }
             Ok("drop-checked-frame-1") => route,
@@ -11474,7 +11801,6 @@ enum ScalarMergeKind {
     RecursiveBackedge,
 }
 
-
 /// Proof token for the legacy closed-expression merge sites. It can only be
 /// minted when source evaluation has no live continuation. Checked source joins
 /// use their explicit `SourceJoinTarget.required_kind` instead.
@@ -11490,7 +11816,7 @@ struct RootTerminalAnswerAuthority {
 struct TerminalAnswerAuthority;
 struct DeferredConstructorCaseEnvironment<'a> {
     constructor: &'a str,
-    lowered_prefix: &'a [Lowered],
+    lowered_prefix: &'a [LoweringOperand],
     selected_field: usize,
     trailing_fields: &'a [RuntimeExpr],
     /// The origin of the `Construct` occurrence the fields belong to. Field *i*
@@ -11522,9 +11848,9 @@ impl CheckedComputationalFrame {
             self.invocation_source,
             self.invocation_depth,
         ) {
-            (None, None, None, 0)
-            | (Some(_), None, None, 0)
-            | (Some(_), Some(0), None, 0) => Ok(None),
+            (None, None, None, 0) | (Some(_), None, None, 0) | (Some(_), Some(0), None, 0) => {
+                Ok(None)
+            }
             (Some(_), Some(id), Some(source), depth) if id != 0 && depth != 0 => {
                 Ok(Some((id, source, depth)))
             }
@@ -12545,6 +12871,50 @@ impl<'a> Lowering<'a> {
         })
     }
 
+    fn checked_post_call_consumer_frame(
+        &self,
+        planned_id: Option<u64>,
+        cases: &[crate::RuntimeComputationalMatchCase],
+        default: &RuntimeTrap,
+    ) -> Result<CheckedComputationalFrame, CraneliftBackendError> {
+        if let Some(frame_id) = planned_id {
+            let frame = self
+                .oriented_subcontinuation_plan
+                .as_ref()
+                .and_then(|plan| plan.frame(frame_id))
+                .ok_or_else(|| {
+                    unsupported(
+                        "OrientedSubcontinuationPlanV1",
+                        "a planned post-call consumer has no checked frame entry",
+                    )
+                })?;
+            if frame.runtime_frame_fingerprint
+                != crate::compiler_private_computational_match_frame_fingerprint(cases, default)
+            {
+                return Err(unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "a planned post-call consumer no longer denotes its exact checked frame",
+                ));
+            }
+        }
+        Ok(CheckedComputationalFrame {
+            id: planned_id,
+            invocation_id: planned_id.map(|_| {
+                self.active_recursive_invocations
+                    .last()
+                    .map_or(0, |instance| instance.invocation_instance_id)
+            }),
+            invocation_source: self
+                .active_recursive_invocations
+                .last()
+                .map(|instance| instance.source),
+            invocation_depth: self
+                .active_recursive_invocations
+                .last()
+                .map_or(0, |instance| instance.semantic_depth),
+        })
+    }
+
     fn computational_ih_slots_for_case(
         &self,
         case: &crate::RuntimeComputationalMatchCase,
@@ -12880,8 +13250,6 @@ impl<'a> Lowering<'a> {
         ))
     }
 
-
-
     fn restore_root_terminal_authority(
         &mut self,
         authority: Option<RootTerminalAnswerAuthority>,
@@ -12892,8 +13260,7 @@ impl<'a> Lowering<'a> {
         };
         if authority.outer_cursor != Some(expected_outer) {
             return Err(backend(BackendFailure::PlannerInvariant(
-                "checked root answer authority returned through the wrong outer cursor"
-                    .to_string(),
+                "checked root answer authority returned through the wrong outer cursor".to_string(),
             )));
         }
         // The exact source-machine delimiter consumes this cursor binding.
@@ -12973,7 +13340,6 @@ impl<'a> Lowering<'a> {
         Ok(TerminalAnswerAuthority)
     }
 
-
     /// Scalarize only under the answer kind carried by an already-consumed
     /// checked join site. In particular, process-object mode is not evidence
     /// that an arbitrary constructor is terminal: only an `ExitCode` plan may
@@ -13027,7 +13393,6 @@ impl<'a> Lowering<'a> {
             }
         }
     }
-
 
     fn planned_join_site_for_frame(
         &mut self,
@@ -13253,25 +13618,6 @@ impl<'a> Lowering<'a> {
         produces_recursive_deforestable_aggregate(declaration_body, symbol)
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     fn require_i64(
         builder: &mut FunctionBuilder<'_>,
         actual: cranelift_codegen::ir::Value,
@@ -13331,12 +13677,6 @@ impl<'a> Lowering<'a> {
         builder.ins().return_(&[failure]);
         builder.switch_to_block(valid);
     }
-
-
-
-
-
-
 
     fn lower_value(
         &mut self,
@@ -13648,9 +13988,6 @@ impl<'a> Lowering<'a> {
         ))
     }
 
-
-
-
     /// ⛔ **A typed boundary: raw [`Lowered`] only, and STRUCTURALLY so**
     /// (`RT-FNSPLIT-C1` frame `§2h` ¶2).
     ///
@@ -13723,11 +14060,9 @@ impl<'a> Lowering<'a> {
                 args: args
                     .into_iter()
                     .map(|arg| {
-                        self.ground_value(
-                            arg.into_specialized_at(
-                                "a constructor field escaping to a ground value",
-                            )?,
-                        )
+                        self.ground_value(arg.into_specialized_at(
+                            "a constructor field escaping to a ground value",
+                        )?)
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             }),
@@ -13853,7 +14188,6 @@ thread_local! {
     static PX8DS_RETIRED_FLAT_ORDER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-
 /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — OBSERVATION ONLY.
 ///
 /// ⛔ Recorders, never deciders. Each is written at a seam and read by a
@@ -13898,8 +14232,11 @@ pub(in crate::cranelift_backend) fn lrc_d2b_reset_observation() {
 /// closeout ran" and "one ran and saw nothing" are readings a control must not
 /// conflate.
 #[cfg(test)]
-pub(in crate::cranelift_backend) fn lrc_d2b_join_observation(
-) -> Vec<(BTreeSet<StaticOriginId>, BTreeSet<StaticOriginId>, BTreeSet<StaticOriginId>)> {
+pub(in crate::cranelift_backend) fn lrc_d2b_join_observation() -> Vec<(
+    BTreeSet<StaticOriginId>,
+    BTreeSet<StaticOriginId>,
+    BTreeSet<StaticOriginId>,
+)> {
     LRC_D2B_JOIN_OBSERVATION.with(|cell| cell.borrow().clone())
 }
 

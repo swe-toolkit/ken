@@ -79,40 +79,35 @@ pub(crate) use artifact::api::{
 // into the private `lowering` module severs that path, and neither
 // `-p ken-runtime` build config can observe the break — only the consumer can.
 #[cfg(feature = "px8-ds-test-support")]
-pub use lowering::units::{
-    retained_unit_call_target_mutation_is_exact,
-    static_response_caller_retarget_mutation_is_exact,
-    static_response_owner_body_mutation_is_exact,
-    with_retained_unit_call_target_mutation, with_static_response_caller_retarget_mutation,
-    with_static_response_owner_body_mutation, RetainedUnitCallTargetMutation,
-    StaticResponseCallerRetargetMutation, StaticResponseOwnerBodyMutation,
-};
-#[cfg(feature = "px8-ds-test-support")]
-pub use lowering::{
-    checked_ih_direct_application_mutation_is_exact,
-    composed_return_ret_sink_mutation_is_exact,
-    with_checked_ih_direct_application_mutation,
-    with_checked_ih_fresh_result_route_emission_observations,
-    with_composed_return_ret_sink_mutation, with_d5b_hs5_source_parent_mutation,
-    with_d5b_hs7_detached_disposition_mutation, with_d5b_hs8_transport_ingress_mutation,
-    with_d5b_hs9_external_root_mutation, with_px8ds_retired_flat_order,
-    CheckedIhDirectApplicationMutation,
-    CheckedIhDirectApplicationObservation, CheckedIhFreshResultRouteEmissionObservation,
-    CheckedIhFreshResultRouteObservationMutation, CheckedIhFreshResultRoutePairingLeg,
-    ComposedReturnRetSinkMutation, ComposedReturnRetSinkObservation,
-    D5bHs5CompositionObservation, D5bHs5DynamicEdgeObservation,
-    D5bHs5SourceParentMutation, D5bHs7DetachedDispositionMutation,
-    D5bHs8TransportIngressMutation, D5bHs9ExternalRootMutation,
-};
-#[cfg(feature = "px8-ds-test-support")]
-pub use lowering::calls::{
-    with_d5b_hs3_call_mutation, D5bHs3CallMutation, D5bHs3CallObservation,
-};
+pub use lowering::calls::{with_d5b_hs3_call_mutation, D5bHs3CallMutation, D5bHs3CallObservation};
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::source::{
     checked_ih_generated_entry_capsule_mutation_is_exact,
-    with_checked_ih_generated_entry_capsule_mutation,
-    CheckedIhGeneratedEntryCapsuleMutation,
+    with_checked_ih_generated_entry_capsule_mutation, CheckedIhGeneratedEntryCapsuleMutation,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::units::{
+    retained_unit_call_target_mutation_is_exact, static_response_caller_retarget_mutation_is_exact,
+    static_response_owner_body_mutation_is_exact, with_retained_unit_call_target_mutation,
+    with_static_response_caller_retarget_mutation, with_static_response_owner_body_mutation,
+    RetainedUnitCallTargetMutation, StaticResponseCallerRetargetMutation,
+    StaticResponseOwnerBodyMutation,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::{
+    checked_ih_direct_application_mutation_is_exact, composed_return_ret_sink_mutation_is_exact,
+    d5b_hs11_materializer_mutation_is_exact, with_checked_ih_direct_application_mutation,
+    with_checked_ih_fresh_result_route_emission_observations,
+    with_composed_return_ret_sink_mutation, with_d5b_hs11_materializer_mutation,
+    with_d5b_hs5_source_parent_mutation, with_d5b_hs7_detached_disposition_mutation,
+    with_d5b_hs8_transport_ingress_mutation, with_d5b_hs9_external_root_mutation,
+    with_px8ds_retired_flat_order, CheckedIhDirectApplicationMutation,
+    CheckedIhDirectApplicationObservation, CheckedIhFreshResultRouteEmissionObservation,
+    CheckedIhFreshResultRouteObservationMutation, CheckedIhFreshResultRoutePairingLeg,
+    ComposedReturnRetSinkMutation, ComposedReturnRetSinkObservation, D5bHs11MaterializerCompletion,
+    D5bHs11MaterializerMutation, D5bHs11MaterializerObservation, D5bHs5CompositionObservation,
+    D5bHs5DynamicEdgeObservation, D5bHs5SourceParentMutation, D5bHs7DetachedDispositionMutation,
+    D5bHs8TransportIngressMutation, D5bHs9ExternalRootMutation,
 };
 
 // `RT-MATCH-RECURSOR-CONSUMERS` 4a: the cross-crate census surface, reached as
@@ -128,9 +123,10 @@ pub use planning::{
     checked_ih_generated_entry_arrival_mutation_is_exact,
     checked_ih_generated_entry_confluence_mutation_is_exact,
     composed_return_forward_ret_authority_mutation_is_exact,
+    d5b_hs17_post_call_consumer_mutation_is_exact,
+    mixed_owner_execute_then_resume_overpromotion_is_exact,
     retained_result_closure_proof_mutation_applied,
     retained_result_closure_proof_mutation_is_exact,
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
     static_response_context_demand_mutation_is_exact,
     suppressed_execute_then_resume_response_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
@@ -142,31 +138,32 @@ pub use planning::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
-    with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
-    with_d5b_hs10_inline_response_mutation,
+    with_composed_return_forward_ret_role_witnesses, with_d5b_hs10_bridge_plan_mutation,
+    with_d5b_hs10_inline_response_mutation, with_d5b_hs17_post_call_consumer_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
-    with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
-    with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals,
-    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
-    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
-    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
-    CheckedIhGeneratedEntryObservation, ComposedReturnForwardEdgeCollapsibilityObservation,
-    ComposedReturnForwardRetAuthorityMutation,
+    with_retained_result_closure_proof_mutation, with_static_response_context_demand_mutation,
+    with_static_response_feasibility_diagnostics, with_suppressed_execute_then_resume_response,
+    with_worker_prefix_deferrals, CheckedIhContinuationInheritanceMutation,
+    CheckedIhContinuationInheritanceObservation, CheckedIhGeneratedEntryAdmissionMutation,
+    CheckedIhGeneratedEntryAdmissionObservation, CheckedIhGeneratedEntryArrivalMutation,
+    CheckedIhGeneratedEntryConfluenceMutation, CheckedIhGeneratedEntryObservation,
+    ComposedReturnForwardEdgeCollapsibilityObservation, ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
-    ComposedReturnForwardRetRoleWitnessObservation,
-    D5bHs10InlineResponseMutation, DeferredResponseObservation,
-    RetainedResultClosureProofMutation,
-    StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
-    StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
-    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
+    ComposedReturnForwardRetRoleWitnessObservation, D5bHs10BridgePlanMutation,
+    D5bHs10InlineResponseMutation, D5bHs17PostCallConsumerMutation, DeferredResponseObservation,
+    RetainedResultClosureProofMutation, StaticResponseCaptureObservation,
+    StaticResponseContextDemandMutation, StaticResponseFeasibilityDiagnostic,
+    StaticResponseFeasibilityObservation, StaticResponseInfeasibleObservation,
+    StaticResponseOwnerObservation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{
     handler_owned_deferred_response_mutation_is_exact,
     with_branched_scrutinee_unit_body_match_branch_entry_suppressed,
-    with_branched_scrutinee_unit_body_route1, with_handler_owned_deferred_response_mutation,
-    with_match_recursor_census, BranchedScrutineeUnitBodyRoute1,
+    with_branched_scrutinee_unit_body_route1, with_d5b_hs10_bridge_lowering_mutation,
+    with_handler_owned_deferred_response_mutation, with_match_recursor_census,
+    BranchedScrutineeUnitBodyRoute1, D5bHs10BridgeLoweringMutation,
     HandlerOwnedDeferredResponseMutation, MatchRecursorCensusRow,
 };
 
@@ -175,9 +172,7 @@ pub use lowering::core::{
 // enabled. These items are doc-hidden and explicitly unsupported as production
 // API at their declarations.
 #[cfg(feature = "r3-4b-observation")]
-pub use lowering::core::{
-    d2f_gate_observation_scope, D2fGateArrival, D2fGateObservationScope,
-};
+pub use lowering::core::{d2f_gate_observation_scope, D2fGateArrival, D2fGateObservationScope};
 
 // `RT-DYNAMIC-ARM-SCALAR-MERGE` `c2`: the real D5 package control's isolated,
 // default-off view of general scalar-merge decisions. The declarations are

@@ -20,9 +20,10 @@ pub use static_transition::{
     checked_ih_generated_entry_arrival_mutation_is_exact,
     checked_ih_generated_entry_confluence_mutation_is_exact,
     composed_return_forward_ret_authority_mutation_is_exact,
+    d5b_hs17_post_call_consumer_mutation_is_exact,
+    mixed_owner_execute_then_resume_overpromotion_is_exact,
     retained_result_closure_proof_mutation_applied,
     retained_result_closure_proof_mutation_is_exact,
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
     static_response_context_demand_mutation_is_exact,
     suppressed_execute_then_resume_response_is_exact,
     with_checked_ih_continuation_inheritance_mutation,
@@ -34,36 +35,36 @@ pub use static_transition::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
-    with_composed_return_forward_ret_role_witnesses, with_retained_result_closure_proof_mutation,
-    with_d5b_hs10_inline_response_mutation,
+    with_composed_return_forward_ret_role_witnesses, with_d5b_hs10_bridge_plan_mutation,
+    with_d5b_hs10_inline_response_mutation, with_d5b_hs17_post_call_consumer_mutation,
     with_mixed_owner_execute_then_resume_overpromotion,
-    with_static_response_context_demand_mutation, with_static_response_feasibility_diagnostics,
-    with_suppressed_execute_then_resume_response, with_worker_prefix_deferrals,
-    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
-    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
-    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
-    CheckedIhGeneratedEntryObservation, ComposedReturnForwardEdgeCollapsibilityObservation,
-    ComposedReturnForwardRetAuthorityMutation,
+    with_retained_result_closure_proof_mutation, with_static_response_context_demand_mutation,
+    with_static_response_feasibility_diagnostics, with_suppressed_execute_then_resume_response,
+    with_worker_prefix_deferrals, CheckedIhContinuationInheritanceMutation,
+    CheckedIhContinuationInheritanceObservation, CheckedIhGeneratedEntryAdmissionMutation,
+    CheckedIhGeneratedEntryAdmissionObservation, CheckedIhGeneratedEntryArrivalMutation,
+    CheckedIhGeneratedEntryConfluenceMutation, CheckedIhGeneratedEntryObservation,
+    ComposedReturnForwardEdgeCollapsibilityObservation, ComposedReturnForwardRetAuthorityMutation,
     ComposedReturnForwardRetAuthorityObservation, ComposedReturnForwardRetCoordinateObservation,
-    ComposedReturnForwardRetRoleWitnessObservation,
-    D5bHs10InlineResponseMutation, DeferredResponseObservation,
-    RetainedResultClosureProofMutation,
-    StaticResponseCaptureObservation, StaticResponseContextDemandMutation,
-    StaticResponseFeasibilityDiagnostic, StaticResponseFeasibilityObservation,
-    StaticResponseOwnerObservation, StaticResponseInfeasibleObservation, WorkerPrefixDeferral,
+    ComposedReturnForwardRetRoleWitnessObservation, D5bHs10BridgePlanMutation,
+    D5bHs10InlineResponseMutation, D5bHs17PostCallConsumerMutation, DeferredResponseObservation,
+    RetainedResultClosureProofMutation, StaticResponseCaptureObservation,
+    StaticResponseContextDemandMutation, StaticResponseFeasibilityDiagnostic,
+    StaticResponseFeasibilityObservation, StaticResponseInfeasibleObservation,
+    StaticResponseOwnerObservation, WorkerPrefixDeferral,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) use static_transition::{
     checked_ih_generated_entry_arrival_mutation, composed_return_forward_ret_authority_mutation,
-    discharge_forward_edge_sealed_observations,
+    d5b_hs17_post_call_consumer_mutation, discharge_forward_edge_sealed_observations,
     record_checked_ih_generated_entry_governed_validation,
     record_checked_ih_generated_entry_installed,
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
     record_composed_return_forward_edge_collapsibility,
-    record_composed_return_forward_ret_authority,
-    record_composed_return_forward_ret_role_witness,
+    record_composed_return_forward_ret_authority, record_composed_return_forward_ret_role_witness,
+    record_d5b_hs17_post_call_consumer_application,
     take_composed_return_forward_ret_population_mutation,
 };
 
@@ -72,9 +73,39 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 /// checked-IH captured environment instead of duplicating its fixture.
 #[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
+pub(super) use static_transition::plan_static_transition_graph_with_symbols;
+pub(super) use static_transition::{
+    classify_immediate_bridge, dead_arm_effect_trap, malformed_dynamic_constructor_trap,
+    planned_partiality_trap, produces_deforestable_aggregate_with_ih,
+    requires_heterogeneous_deforestation, BoolMatchCaseOrdinals, CaseEmissionStatus,
+    ConstructorIdentity, DeclarationCallTargetClass, ImmediateBridgeCause, ImmediateBridgeConsumer,
+    ImmediateBridgeConsumerKind, ImmediateBridgeRealization, ImmediateBridgeSelection,
+    JoinPlanToken, JoinResultRepresentation, StaticOriginId, StaticTransitionPlan,
+    SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
+};
+#[cfg(test)]
+pub(super) use static_transition::{
+    contspec_nested_fixture, governed_nested_resource_bracket, plan_static_transition_graph,
+    take_continuation_required_consumer_observations, with_c4_disabled_for_independent_control,
+    PlannedResultFieldKindForTest, RequiredConsumerProjectionDisposition, ScaleBPlanCensus,
+};
+/// `D2f` Deliverable 0 — THE shared checked-witness fixture constructor.
+#[cfg(test)]
+pub(in crate::cranelift_backend) use static_transition::{
+    d2j_checked_fixture_under, d2j_installed_plan_under, r3_fusion_claim_consumptions,
+    reset_r3_fusion_claim_consumptions, with_fusion_claim_parameter_mutation,
+    with_fusion_producer_capture_mutation, D2jCause, FusionClaimParameterMutation,
+    FusionProducerCaptureMutation, D2J_DECLARATION,
+};
 pub(in crate::cranelift_backend) use static_transition::{
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
     FusionRegionClaimLedger,
+};
+/// `D2f` Deliverable 0 — the resolved plane's observation types, so a control
+/// downstream of a production compile can state which key resolved.
+#[cfg(any(test, feature = "r3-4b-observation"))]
+pub(in crate::cranelift_backend) use static_transition::{
+    StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///
@@ -88,37 +119,6 @@ pub(in crate::cranelift_backend) use static_transition::{
 pub(in crate::cranelift_backend) use static_transition::{
     StaticContinuationFusionId, StaticContinuationFusionView,
 };
-/// `D2f` Deliverable 0 — the resolved plane's observation types, so a control
-/// downstream of a production compile can state which key resolved.
-#[cfg(any(test, feature = "r3-4b-observation"))]
-pub(in crate::cranelift_backend) use static_transition::{
-    StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
-};
-/// `D2f` Deliverable 0 — THE shared checked-witness fixture constructor.
-#[cfg(test)]
-pub(in crate::cranelift_backend) use static_transition::{
-    d2j_checked_fixture_under, d2j_installed_plan_under, r3_fusion_claim_consumptions,
-    reset_r3_fusion_claim_consumptions, with_fusion_claim_parameter_mutation,
-    with_fusion_producer_capture_mutation, D2jCause, FusionClaimParameterMutation,
-    FusionProducerCaptureMutation, D2J_DECLARATION,
-};
-pub(super) use static_transition::plan_static_transition_graph_with_symbols;
-#[cfg(test)]
-pub(super) use static_transition::{
-    contspec_nested_fixture, governed_nested_resource_bracket, plan_static_transition_graph,
-    take_continuation_required_consumer_observations, with_c4_disabled_for_independent_control,
-    PlannedResultFieldKindForTest,
-    RequiredConsumerProjectionDisposition, ScaleBPlanCensus,
-};
-pub(super) use static_transition::{
-    classify_immediate_bridge, dead_arm_effect_trap, malformed_dynamic_constructor_trap,
-    planned_partiality_trap, produces_deforestable_aggregate_with_ih,
-    requires_heterogeneous_deforestation, BoolMatchCaseOrdinals, CaseEmissionStatus,
-    ConstructorIdentity, DeclarationCallTargetClass, ImmediateBridgeCause,
-    ImmediateBridgeConsumer, ImmediateBridgeConsumerKind, ImmediateBridgeRealization,
-    ImmediateBridgeSelection, JoinPlanToken, JoinResultRepresentation, StaticOriginId,
-    StaticTransitionPlan, SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
-};
 // `RT-CONTSPEC-ACTIVATE` `D1` — the activation projection's facade route.
 // Namespace re-exports only: no wrapper, no derivation, no second authority.
 // `RT-DECL-CLOSURE-PORT` `D7` — the aggregate ownership lane, read by the
@@ -126,54 +126,68 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     AggregateOccurrenceId, BoundaryClosureEnvironment, CheckedIhCapabilityInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
-    CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
-    CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
-    CheckedIhImmediateKBindingLocator,
-    CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
-    FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
-    PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
-    SynthesizedAggregateRoot,
+    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination, CheckedIhFreshResultRoute,
+    CheckedIhGeneratedEntryAccess, CheckedIhGeneratedEntryAdmission,
+    CheckedIhGeneratedEntryProjection, CheckedIhImmediateKBindingLocator,
+    CheckedIhKAvailabilityDomain, CheckedIhPostCallConsumer, CheckedIhStaticResponseReturnBoundary,
+    CheckedIhTransportInputDestination, FieldIdentity, PlannedAggregateAllocation,
+    PlannedAggregateOwnership, PlannedAggregateShape, PlannedReferentLifetime,
+    SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot,
 };
 // `RT-DECL-CLOSURE-PORT` `D7` — the host-effect semantic-seat authority, read
 // by the effect emitter. Namespace re-export only.
 pub(super) use static_transition::{
-    host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
-    EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
-    CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
+    host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed, EffectSeatOperation,
+    EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]
 pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
 pub(super) use static_transition::{
-    ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
-    ContinuationConsumingOccurrence, ContinuationEmissionOwner,
-    ContinuationInputView, RequiredConsumerProjection,
-    ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
-    ContinuationWorkerCaptureSource,
-    // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches
-    // lowering because the emission resolver must MATCH on it; there is no
-    // accessor that answers "which ABI position" without the domain.
-    ContinuationAvailabilityViews, ContinuationEnvironmentClaim, ContinuationFrameIdentity,
-    ContinuationSourceCoordinate,
-    ContinuationSourceSlotAuthority,
-    ContinuationSpecializationId, DeferredResponseRow, DeferredResponseSubCase,
-    ResponseDisposition, StaticResponseContinuation, StaticResponseEffectInput,
-    StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
-    StaticResponseOwnerSpecialization,
-    // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
-    // lowering's test targets so its control can compare the authority against
-    // the prefix production actually assembled, rather than against its own
-    // recomputation of the same rule. Namespace re-export only.
-    CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D3b` — the emission consumer's fail-closed
     // check that it is indexing where the coordinate actually sits.
     verify_current_lexical_availability,
     verify_predeclared_entry_frame_membership,
-    ContinuationUnitView,
+    // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
+    // lowering's test targets so its control can compare the authority against
+    // the prefix production actually assembled, rather than against its own
+    // recomputation of the same rule. Namespace re-export only.
+    CheckedCaseBinderLayout,
+    CheckedCaseBinderRole,
+    CheckedIhBinding,
+    CheckedIhPostCallConsumerStep,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D7a` — the planner-issued composed worker
     // view, reached from a computational frame's own coordinates. Namespace
     // re-export only: no wrapper, no derivation, no second authority.
     ComposedWorkerRouteEligibility,
+    // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches
+    // lowering because the emission resolver must MATCH on it; there is no
+    // accessor that answers "which ABI position" without the domain.
+    ContinuationAvailabilityViews,
+    ContinuationCallIdentity,
+    ContinuationCallView,
+    ContinuationConsumingOccurrence,
+    ContinuationContextId,
+    ContinuationEmissionOwner,
+    ContinuationEnvironmentClaim,
+    ContinuationFrameIdentity,
+    ContinuationInputView,
+    ContinuationOrdinaryEnvelopeRole,
+    ContinuationResultEdge,
+    ContinuationSourceCoordinate,
+    ContinuationSourceSlotAuthority,
+    ContinuationSpecializationId,
+    ContinuationUnitView,
+    ContinuationWorkerCaptureSource,
+    DeferredResponseRow,
+    DeferredResponseSubCase,
+    RequiredConsumerProjection,
+    ResponseDisposition,
+    StaticResponseContinuation,
+    StaticResponseEffectInput,
+    StaticResponseEnvironmentBinding,
+    StaticResponseFrameSource,
+    StaticResponseOwnerId,
+    StaticResponseOwnerSpecialization,
 };
 // `RT-CONTSRC-PRODUCER-LOCAL` `D7a2` reconciliation controls. ⛔ `#[cfg(test)]`
 // on the RE-EXPORT as well as on the items: an ungated re-export of a
@@ -181,10 +195,10 @@ pub(super) use static_transition::{
 // test profile cannot see.
 #[cfg(test)]
 pub(super) use static_transition::{
-    set_composed_call_target_defect, set_continuation_descent_owner_duplication, set_envelope_defect, EnvelopeDefect,
-    with_continuation_consuming_eliminator_seed_mutated,
+    set_composed_call_target_defect, set_continuation_descent_owner_duplication,
+    set_envelope_defect, with_continuation_consuming_eliminator_seed_mutated,
     with_continuation_consuming_occurrence_seed_mutated,
-    with_required_consumer_projection_mutation, ComposedCallTargetDefect,
+    with_required_consumer_projection_mutation, ComposedCallTargetDefect, EnvelopeDefect,
     RequiredConsumerProjectionMutation,
 };
 
@@ -193,11 +207,11 @@ pub(super) use static_transition::{
 // import in the PRODUCTION build, which the test profile cannot see. Caught by
 // checking `-p ken-runtime` separately from `--profile test`.
 #[cfg(test)]
+pub(super) use static_transition::with_last_io_error_role_omitted;
+#[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::{
     d3b_publish_without_finalization, d3b_refinalize, D3bFinalizationPerturbation,
 };
-#[cfg(test)]
-pub(super) use static_transition::with_last_io_error_role_omitted;
 // `RT-FNSPLIT-B2A-S` `AC-4` — the route counters behind
 // `every_origin_to_expression_resolution_goes_through_the_single_route`.
 // ⛔ `#[cfg(test)]`: these are probe infrastructure and must not be reachable
@@ -213,9 +227,9 @@ pub(super) use static_transition::{
 // are deliberately NOT re-exported: the emitter reads a unit, and can neither
 // construct the plane nor reach the pre-emission validator to bypass it.
 pub(super) use static_transition::{
-    AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
-    AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
-    expected_capture_slot, EmittableCallKind, PredeclaredFunctionId,
+    expected_capture_slot, AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership,
+    AbiProcessParameter, AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
+    EmittableCallKind, PredeclaredFunctionId,
 };
 
 pub(super) fn native_join_plan_for_program(
