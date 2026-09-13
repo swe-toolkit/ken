@@ -44,7 +44,7 @@ import Data.Collections.Derived (length)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
-import Data.Numeric.Nat.Order (min as nat_min)
+import Data.Numeric.Nat.Order (min as nat_min, sub as nat_sub)
 
 pub data PriorityQueue (k : Type) (v : Type) (leq : k → k → Bool) : Type where {
   Empty : PriorityQueue k v leq;
@@ -172,11 +172,7 @@ fn contribution (b : Bool) : Nat =
   }
 
 fn count_by
-      (k : Type)
-      (v : Type)
-      (leq : k → k → Bool)
-      (p : k → v → Bool)
-      (q : PriorityQueue k v leq)
+      (k : Type) (v : Type) (leq : k → k → Bool) (p : k → v → Bool) (q : PriorityQueue k v leq)
     : Nat =
   match q {
     Empty ↦ Zero;
@@ -186,17 +182,11 @@ fn count_by
         (add (count_by k v leq p left) (count_by k v leq p right))
   }
 
-fn size
-      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
-    : Nat =
+fn size (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq) : Nat =
   count_by k v leq (λpriority. λpayload. True) q
 
 fn root_bound
-      (k : Type)
-      (v : Type)
-      (leq : k → k → Bool)
-      (bound : k)
-      (q : PriorityQueue k v leq)
+      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k) (q : PriorityQueue k v leq)
     : Bool =
   match q {
     Empty ↦ True;
@@ -204,25 +194,17 @@ fn root_bound
   }
 
 fn all_above
-      (k : Type)
-      (v : Type)
-      (leq : k → k → Bool)
-      (bound : k)
-      (q : PriorityQueue k v leq)
+      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k) (q : PriorityQueue k v leq)
     : Bool =
   match q {
     Empty ↦ True;
     Node cached priority payload left right ↦
       bool_and
         (leq bound priority)
-        (bool_and
-          (all_above k v leq bound left)
-          (all_above k v leq bound right))
+        (bool_and (all_above k v leq bound left) (all_above k v leq bound right))
   }
 
-fn valid_bool
-      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
-    : Bool =
+fn valid_bool (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq) : Bool =
   match q {
     Empty ↦ True;
     Node cached priority payload left right ↦
@@ -241,9 +223,7 @@ fn valid_bool
                   (leq_nat (Suc (rank k v leq right)) cached))))))
   }
 
-fn Valid
-      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
-    : Prop =
+fn Valid (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq) : Prop =
   IsTrue (valid_bool k v leq q)
 
 fn right_spine_length
@@ -255,62 +235,36 @@ fn right_spine_length
   }
 
 fn observe_pops
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (n : Nat)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (n : Nat) (q : PriorityQueue k v (ord_leq_at k d))
     : Pair (List (Pair k v)) (PriorityQueue k v (ord_leq_at k d)) =
   match n {
-    Zero ↦
-      mk_pair
-        (List (Pair k v))
-        (PriorityQueue k v (ord_leq_at k d))
-        (Nil (Pair k v))
-        q;
+    Zero ↦ mk_pair (List (Pair k v)) (PriorityQueue k v (ord_leq_at k d)) (Nil (Pair k v)) q;
     Suc remaining ↦
       match pop_min k v d q {
         None ↦
-          mk_pair
-            (List (Pair k v))
-            (PriorityQueue k v (ord_leq_at k d))
-            (Nil (Pair k v))
-            q;
+          mk_pair (List (Pair k v)) (PriorityQueue k v (ord_leq_at k d)) (Nil (Pair k v)) q;
         Some step ↦
-          let entry =
-                pair_fst
-                  (Pair k v)
-                  (PriorityQueue k v (ord_leq_at k d))
-                  step;
-              next =
-                pair_snd
-                  (Pair k v)
-                  (PriorityQueue k v (ord_leq_at k d))
-                  step;
-              observed = observe_pops k v d remaining next
-          in mk_pair
-            (List (Pair k v))
-            (PriorityQueue k v (ord_leq_at k d))
-            (Cons
-              (Pair k v)
-              entry
-              (pair_fst
-                (List (Pair k v))
-                (PriorityQueue k v (ord_leq_at k d))
-                observed))
-            (pair_snd
+          let
+            entry = pair_fst (Pair k v) (PriorityQueue k v (ord_leq_at k d)) step;
+            next = pair_snd (Pair k v) (PriorityQueue k v (ord_leq_at k d)) step;
+            observed = observe_pops k v d remaining next
+          in
+            mk_pair
               (List (Pair k v))
               (PriorityQueue k v (ord_leq_at k d))
-              observed)
+              (Cons
+                (Pair k v)
+                entry
+                (pair_fst (List (Pair k v)) (PriorityQueue k v (ord_leq_at k d)) observed))
+              (pair_snd (List (Pair k v)) (PriorityQueue k v (ord_leq_at k d)) observed)
       }
   }
 
 theorem add_selected_first
       (root : Nat) (left : Nat) (right : Nat) (other : Nat)
-    : Equal
-      Nat
-      (add root (add left (add right other)))
-      (add (add root (add left right)) other) =
+    : Equal Nat
+        (add root (add left (add right other)))
+        (add (add root (add left right)) other) =
   trans
     Nat
     (add root (add left (add right other)))
@@ -327,10 +281,9 @@ theorem add_selected_first
 
 theorem add_selected_second
       (first : Nat) (root : Nat) (left : Nat) (right : Nat)
-    : Equal
-      Nat
-      (add root (add left (add first right)))
-      (add first (add root (add left right))) =
+    : Equal Nat
+        (add root (add left (add first right)))
+        (add first (add root (add left right))) =
   trans
     Nat
     (add root (add left (add first right)))
@@ -404,12 +357,11 @@ theorem make_node_count
       (payload : v)
       (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
-    : Equal
-      Nat
-      (count_by k v leq p (make_node k v leq priority payload left right))
-      (add
-        (contribution (p priority payload))
-        (add (count_by k v leq p left) (count_by k v leq p right))) =
+    : Equal Nat
+        (count_by k v leq p (make_node k v leq priority payload left right))
+        (add
+          (contribution (p priority payload))
+          (add (count_by k v leq p left) (count_by k v leq p right))) =
   bool_cases
     (leq_nat (rank k v leq left) (rank k v leq right))
     (λb.
@@ -421,26 +373,8 @@ theorem make_node_count
           leq
           p
           (match b {
-            True ↦
-              Node
-                k
-                v
-                leq
-                (Suc (rank k v leq left))
-                priority
-                payload
-                right
-                left;
-            False ↦
-              Node
-                k
-                v
-                leq
-                (Suc (rank k v leq right))
-                priority
-                payload
-                left
-                right
+            True ↦ Node k v leq (Suc (rank k v leq left)) priority payload right left;
+            False ↦ Node k v leq (Suc (rank k v leq right)) priority payload left right
           }))
         (add
           (contribution (p priority payload))
@@ -451,9 +385,7 @@ theorem make_node_count
       (add (count_by k v leq p right) (count_by k v leq p left))
       (add (count_by k v leq p left) (count_by k v leq p right))
       (λn. add (contribution (p priority payload)) n)
-      ((proof comm for add)
-        (count_by k v leq p right)
-        (count_by k v leq p left)))
+      ((proof comm for add) (count_by k v leq p right) (count_by k v leq p left)))
     Refl
 
 theorem meld_count_selected_first
@@ -471,37 +403,28 @@ theorem meld_count_selected_first
         Nat
         (count_by k v leq p (meld k v leq first_right second))
         (add (count_by k v leq p first_right) (count_by k v leq p second)))
-    : Equal
-      Nat
-      (count_by
-        k
-        v
-        leq
-        p
-        (make_node
-          k
-          v
-          leq
-          first_priority
-          first_payload
-          first_left
-          (meld k v leq first_right second)))
-      (add
+    : Equal Nat
         (count_by
           k
           v
           leq
           p
-          (Node
+          (make_node
             k
             v
             leq
-            first_rank
             first_priority
             first_payload
             first_left
-            first_right))
-        (count_by k v leq p second)) =
+            (meld k v leq first_right second)))
+        (add
+          (count_by
+            k
+            v
+            leq
+            p
+            (Node k v leq first_rank first_priority first_payload first_left first_right))
+          (count_by k v leq p second)) =
   trans
     Nat
     (count_by
@@ -528,15 +451,7 @@ theorem meld_count_selected_first
         v
         leq
         p
-        (Node
-          k
-          v
-          leq
-          first_rank
-          first_priority
-          first_payload
-          first_left
-          first_right))
+        (Node k v leq first_rank first_priority first_payload first_left first_right))
       (count_by k v leq p second))
     (make_node_count
       k
@@ -558,24 +473,14 @@ theorem meld_count_selected_first
         (contribution (p first_priority first_payload))
         (add
           (count_by k v leq p first_left)
-          (add
-            (count_by k v leq p first_right)
-            (count_by k v leq p second))))
+          (add (count_by k v leq p first_right) (count_by k v leq p second))))
       (add
         (count_by
           k
           v
           leq
           p
-          (Node
-            k
-            v
-            leq
-            first_rank
-            first_priority
-            first_payload
-            first_left
-            first_right))
+          (Node k v leq first_rank first_priority first_payload first_left first_right))
         (count_by k v leq p second))
       (cong
         Nat
@@ -608,37 +513,36 @@ theorem meld_count_selected_second
         Nat
         (count_by k v leq p (meld k v leq first second_right))
         (add (count_by k v leq p first) (count_by k v leq p second_right)))
-    : Equal
-      Nat
-      (count_by
-        k
-        v
-        leq
-        p
-        (make_node
-          k
-          v
-          leq
-          second_priority
-          second_payload
-          second_left
-          (meld k v leq first second_right)))
-      (add
-        (count_by k v leq p first)
+    : Equal Nat
         (count_by
           k
           v
           leq
           p
-          (Node
+          (make_node
             k
             v
             leq
-            second_rank
             second_priority
             second_payload
             second_left
-            second_right))) =
+            (meld k v leq first second_right)))
+        (add
+          (count_by k v leq p first)
+          (count_by
+            k
+            v
+            leq
+            p
+            (Node
+              k
+              v
+              leq
+              second_rank
+              second_priority
+              second_payload
+              second_left
+              second_right))) =
   trans
     Nat
     (count_by
@@ -666,15 +570,7 @@ theorem meld_count_selected_second
         v
         leq
         p
-        (Node
-          k
-          v
-          leq
-          second_rank
-          second_priority
-          second_payload
-          second_left
-          second_right)))
+        (Node k v leq second_rank second_priority second_payload second_left second_right)))
     (make_node_count
       k
       v
@@ -695,9 +591,7 @@ theorem meld_count_selected_second
         (contribution (p second_priority second_payload))
         (add
           (count_by k v leq p second_left)
-          (add
-            (count_by k v leq p first)
-            (count_by k v leq p second_right))))
+          (add (count_by k v leq p first) (count_by k v leq p second_right))))
       (add
         (count_by k v leq p first)
         (count_by
@@ -705,15 +599,7 @@ theorem meld_count_selected_second
           v
           leq
           p
-          (Node
-            k
-            v
-            leq
-            second_rank
-            second_priority
-            second_payload
-            second_left
-            second_right)))
+          (Node k v leq second_rank second_priority second_payload second_left second_right)))
       (cong
         Nat
         Nat
@@ -742,47 +628,30 @@ theorem meld_count_node
       (first_right : PriorityQueue k v leq)
       (first_right_ih : (second : PriorityQueue k v leq)
         → Equal
-          Nat
-          (count_by k v leq p (meld k v leq first_right second))
-          (add (count_by k v leq p first_right) (count_by k v leq p second)))
+        Nat
+        (count_by k v leq p (meld k v leq first_right second))
+        (add (count_by k v leq p first_right) (count_by k v leq p second)))
       (second : PriorityQueue k v leq)
-    : Equal
-      Nat
-      (count_by
-        k
-        v
-        leq
-        p
-        (meld
-          k
-          v
-          leq
-          (Node
-            k
-            v
-            leq
-            first_rank
-            first_priority
-            first_payload
-            first_left
-            first_right)
-          second))
-      (add
+    : Equal Nat
         (count_by
           k
           v
           leq
           p
-          (Node
+          (meld
             k
             v
             leq
-            first_rank
-            first_priority
-            first_payload
-            first_left
-            first_right))
-        (count_by k v leq p second)) =
+            (Node k v leq first_rank first_priority first_payload first_left first_right)
+            second))
+        (add
+          (count_by
+            k
+            v
+            leq
+            p
+            (Node k v leq first_rank first_priority first_payload first_left first_right))
+          (count_by k v leq p second)) =
   match second {
     Empty ↦ Refl;
     Node second_rank second_priority second_payload second_left second_right ↦
@@ -848,15 +717,7 @@ theorem meld_count_node
                 v
                 leq
                 p
-                (Node
-                  k
-                  v
-                  leq
-                  first_rank
-                  first_priority
-                  first_payload
-                  first_left
-                  first_right))
+                (Node k v leq first_rank first_priority first_payload first_left first_right))
               (count_by
                 k
                 v
@@ -881,39 +742,15 @@ theorem meld_count_node
           first_payload
           first_left
           first_right
-          (Node
-            k
-            v
-            leq
-            second_rank
-            second_priority
-            second_payload
-            second_left
-            second_right)
+          (Node k v leq second_rank second_priority second_payload second_left second_right)
           (first_right_ih
-            (Node
-              k
-              v
-              leq
-              second_rank
-              second_priority
-              second_payload
-              second_left
-              second_right)))
+            (Node k v leq second_rank second_priority second_payload second_left second_right)))
         (meld_count_selected_second
           k
           v
           leq
           p
-          (Node
-            k
-            v
-            leq
-            first_rank
-            first_priority
-            first_payload
-            first_left
-            first_right)
+          (Node k v leq first_rank first_priority first_payload first_left first_right)
           second_rank
           second_priority
           second_payload
@@ -940,8 +777,7 @@ theorem meld_count
       (p : k → v → Bool)
       (first : PriorityQueue k v leq)
     : (second : PriorityQueue k v leq)
-      → Equal
-        Nat
+      → Equal Nat
         (count_by k v leq p (meld k v leq first second))
         (add (count_by k v leq p first) (count_by k v leq p second)) =
   match first {
@@ -978,19 +814,13 @@ theorem none_not_some
   same
 
 theorem some_injective
-      (a : Type)
-      (left : a)
-      (right : a)
-      (same : Equal (Option a) (Some a left) (Some a right))
+      (a : Type) (left : a) (right : a) (same : Equal (Option a) (Some a left) (Some a right))
     : Equal a left right =
   same
 
 theorem empty_count
       (k : Type) (v : Type) (d : Ord k) (p : k → v → Bool)
-    : Equal
-      Nat
-      (count_by k v (ord_leq_at k d) p (empty k v d))
-      Zero =
+    : Equal Nat (count_by k v (ord_leq_at k d) p (empty k v d)) Zero =
   Proved
 
 theorem merge_count
@@ -1000,12 +830,9 @@ theorem merge_count
       (p : k → v → Bool)
       (left : PriorityQueue k v (ord_leq_at k d))
       (right : PriorityQueue k v (ord_leq_at k d))
-    : Equal
-      Nat
-      (count_by k v (ord_leq_at k d) p (merge k v d left right))
-      (add
-        (count_by k v (ord_leq_at k d) p left)
-        (count_by k v (ord_leq_at k d) p right)) =
+    : Equal Nat
+        (count_by k v (ord_leq_at k d) p (merge k v d left right))
+        (add (count_by k v (ord_leq_at k d) p left) (count_by k v (ord_leq_at k d) p right)) =
   meld_count k v (ord_leq_at k d) p left right
 
 theorem insert_count
@@ -1016,12 +843,9 @@ theorem insert_count
       (priority : k)
       (payload : v)
       (q : PriorityQueue k v (ord_leq_at k d))
-    : Equal
-      Nat
-      (count_by k v (ord_leq_at k d) p (insert k v d priority payload q))
-      (add
-        (contribution (p priority payload))
-        (count_by k v (ord_leq_at k d) p q)) =
+    : Equal Nat
+        (count_by k v (ord_leq_at k d) p (insert k v d priority payload q))
+        (add (contribution (p priority payload)) (count_by k v (ord_leq_at k d) p q)) =
   merge_count
     k
     v
@@ -1053,10 +877,7 @@ theorem pop_count_transport
       (remainder : PriorityQueue k v (ord_leq_at k d))
       (priority_same : Equal k priority (pair_fst k v entry))
       (payload_same : Equal v payload (pair_snd k v entry))
-      (remainder_same : Equal
-        (PriorityQueue k v (ord_leq_at k d))
-        actual_remainder
-        remainder)
+      (remainder_same : Equal (PriorityQueue k v (ord_leq_at k d)) actual_remainder remainder)
       (base : Equal
         Nat
         (count_by
@@ -1064,37 +885,20 @@ theorem pop_count_transport
           v
           (ord_leq_at k d)
           p
-          (Node
-            k
-            v
-            (ord_leq_at k d)
-            cached
-            priority
-            payload
-            left
-            right))
+          (Node k v (ord_leq_at k d) cached priority payload left right))
         (add
           (contribution (p priority payload))
           (count_by k v (ord_leq_at k d) p actual_remainder)))
-    : Equal
-      Nat
-      (count_by
-        k
-        v
-        (ord_leq_at k d)
-        p
-        (Node
+    : Equal Nat
+        (count_by
           k
           v
           (ord_leq_at k d)
-          cached
-          priority
-          payload
-          left
-          right))
-      (add
-        (contribution (p (pair_fst k v entry) (pair_snd k v entry)))
-        (count_by k v (ord_leq_at k d) p remainder)) =
+          p
+          (Node k v (ord_leq_at k d) cached priority payload left right))
+        (add
+          (contribution (p (pair_fst k v entry) (pair_snd k v entry)))
+          (count_by k v (ord_leq_at k d) p remainder)) =
   J
     (λout_priority _.
       Equal
@@ -1104,15 +908,7 @@ theorem pop_count_transport
           v
           (ord_leq_at k d)
           p
-          (Node
-            k
-            v
-            (ord_leq_at k d)
-            cached
-            priority
-            payload
-            left
-            right))
+          (Node k v (ord_leq_at k d) cached priority payload left right))
         (add
           (contribution (p out_priority (pair_snd k v entry)))
           (count_by k v (ord_leq_at k d) p remainder)))
@@ -1125,15 +921,7 @@ theorem pop_count_transport
             v
             (ord_leq_at k d)
             p
-            (Node
-              k
-              v
-              (ord_leq_at k d)
-              cached
-              priority
-              payload
-              left
-              right))
+            (Node k v (ord_leq_at k d) cached priority payload left right))
           (add
             (contribution (p priority out_payload))
             (count_by k v (ord_leq_at k d) p remainder)))
@@ -1146,15 +934,7 @@ theorem pop_count_transport
               v
               (ord_leq_at k d)
               p
-              (Node
-                k
-                v
-                (ord_leq_at k d)
-                cached
-                priority
-                payload
-                left
-                right))
+              (Node k v (ord_leq_at k d) cached priority payload left right))
             (add
               (contribution (p priority payload))
               (count_by k v (ord_leq_at k d) p out_remainder)))
@@ -1176,29 +956,22 @@ theorem pop_min_count
         (pop_min k v d q)
         (Some
           (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-          (mk_pair
-            (Pair k v)
-            (PriorityQueue k v (ord_leq_at k d))
-            entry
-            remainder))
-      → Equal
-        Nat
+          (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder))
+      → Equal Nat
         (count_by k v (ord_leq_at k d) p q)
         (add
           (contribution (p (pair_fst k v entry) (pair_snd k v entry)))
           (count_by k v (ord_leq_at k d) p remainder)) =
   match q {
     Empty ↦
-      λentry. λremainder. λsame.
-        absurd
-          (none_not_some
-            (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-            (mk_pair
-              (Pair k v)
-              (PriorityQueue k v (ord_leq_at k d))
-              entry
-              remainder)
-            same);
+      λentry.
+        λremainder.
+          λsame.
+            absurd
+              (none_not_some
+                (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
+                (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder)
+                same);
     Node cached priority payload left right ↦
       λentry.
         λremainder.
@@ -1238,10 +1011,7 @@ theorem pop_min_count
                   same))
               (and_snd
                 (Equal (Pair k v) (mk_pair k v priority payload) entry)
-                (Equal
-                  (PriorityQueue k v (ord_leq_at k d))
-                  (merge k v d left right)
-                  remainder)
+                (Equal (PriorityQueue k v (ord_leq_at k d)) (merge k v d left right) remainder)
                 same)
               (cong
                 Nat
@@ -1249,21 +1019,11 @@ theorem pop_min_count
                 (add
                   (count_by k v (ord_leq_at k d) p left)
                   (count_by k v (ord_leq_at k d) p right))
-                (count_by
-                  k
-                  v
-                  (ord_leq_at k d)
-                  p
-                  (merge k v d left right))
+                (count_by k v (ord_leq_at k d) p (merge k v d left right))
                 (λn. add (contribution (p priority payload)) n)
                 (sym
                   Nat
-                  (count_by
-                    k
-                    v
-                    (ord_leq_at k d)
-                    p
-                    (merge k v d left right))
+                  (count_by k v (ord_leq_at k d) p (merge k v d left right))
                   (add
                     (count_by k v (ord_leq_at k d) p left)
                     (count_by k v (ord_leq_at k d) p right))
@@ -1380,17 +1140,17 @@ theorem valid_node_tail
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue
-      (bool_and
-        (valid_bool k v leq right)
         (bool_and
-          (root_bound k v leq priority left)
+          (valid_bool k v leq right)
           (bool_and
-            (root_bound k v leq priority right)
+            (root_bound k v leq priority left)
             (bool_and
-              (leq_nat (rank k v leq right) (rank k v leq left))
+              (root_bound k v leq priority right)
               (bool_and
-                (leq_nat cached (Suc (rank k v leq right)))
-                (leq_nat (Suc (rank k v leq right)) cached)))))) =
+                (leq_nat (rank k v leq right) (rank k v leq left))
+                (bool_and
+                  (leq_nat cached (Suc (rank k v leq right)))
+                  (leq_nat (Suc (rank k v leq right)) cached)))))) =
   (proof right for bool_and)
     (valid_bool k v leq left)
     (bool_and
@@ -1407,8 +1167,13 @@ theorem valid_node_tail
     valid
 
 theorem valid_node_right
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : Valid k v leq right =
@@ -1426,20 +1191,25 @@ theorem valid_node_right
     (valid_node_tail k v leq cached priority payload left right valid)
 
 theorem valid_node_after_right
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue
-      (bool_and
-        (root_bound k v leq priority left)
         (bool_and
-          (root_bound k v leq priority right)
+          (root_bound k v leq priority left)
           (bool_and
-            (leq_nat (rank k v leq right) (rank k v leq left))
+            (root_bound k v leq priority right)
             (bool_and
-              (leq_nat cached (Suc (rank k v leq right)))
-              (leq_nat (Suc (rank k v leq right)) cached))))) =
+              (leq_nat (rank k v leq right) (rank k v leq left))
+              (bool_and
+                (leq_nat cached (Suc (rank k v leq right)))
+                (leq_nat (Suc (rank k v leq right)) cached))))) =
   (proof right for bool_and)
     (valid_bool k v leq right)
     (bool_and
@@ -1454,8 +1224,13 @@ theorem valid_node_after_right
     (valid_node_tail k v leq cached priority payload left right valid)
 
 theorem valid_node_left_bound
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue (root_bound k v leq priority left) =
@@ -1471,18 +1246,23 @@ theorem valid_node_left_bound
     (valid_node_after_right k v leq cached priority payload left right valid)
 
 theorem valid_node_after_left_bound
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue
-      (bool_and
-        (root_bound k v leq priority right)
         (bool_and
-          (leq_nat (rank k v leq right) (rank k v leq left))
+          (root_bound k v leq priority right)
           (bool_and
-            (leq_nat cached (Suc (rank k v leq right)))
-            (leq_nat (Suc (rank k v leq right)) cached)))) =
+            (leq_nat (rank k v leq right) (rank k v leq left))
+            (bool_and
+              (leq_nat cached (Suc (rank k v leq right)))
+              (leq_nat (Suc (rank k v leq right)) cached)))) =
   (proof right for bool_and)
     (root_bound k v leq priority left)
     (bool_and
@@ -1495,8 +1275,13 @@ theorem valid_node_after_left_bound
     (valid_node_after_right k v leq cached priority payload left right valid)
 
 theorem valid_node_right_bound
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue (root_bound k v leq priority right) =
@@ -1510,16 +1295,21 @@ theorem valid_node_right_bound
     (valid_node_after_left_bound k v leq cached priority payload left right valid)
 
 theorem valid_node_rank_tail
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue
-      (bool_and
-        (leq_nat (rank k v leq right) (rank k v leq left))
         (bool_and
-          (leq_nat cached (Suc (rank k v leq right)))
-          (leq_nat (Suc (rank k v leq right)) cached))) =
+          (leq_nat (rank k v leq right) (rank k v leq left))
+          (bool_and
+            (leq_nat cached (Suc (rank k v leq right)))
+            (leq_nat (Suc (rank k v leq right)) cached))) =
   (proof right for bool_and)
     (root_bound k v leq priority right)
     (bool_and
@@ -1530,8 +1320,13 @@ theorem valid_node_rank_tail
     (valid_node_after_left_bound k v leq cached priority payload left right valid)
 
 theorem valid_node_balance
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue (leq_nat (rank k v leq right) (rank k v leq left)) =
@@ -1543,14 +1338,19 @@ theorem valid_node_balance
     (valid_node_rank_tail k v leq cached priority payload left right valid)
 
 theorem valid_node_cache_pair
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : IsTrue
-      (bool_and
-        (leq_nat cached (Suc (rank k v leq right)))
-        (leq_nat (Suc (rank k v leq right)) cached)) =
+        (bool_and
+          (leq_nat cached (Suc (rank k v leq right)))
+          (leq_nat (Suc (rank k v leq right)) cached)) =
   (proof right for bool_and)
     (leq_nat (rank k v leq right) (rank k v leq left))
     (bool_and
@@ -1559,8 +1359,13 @@ theorem valid_node_cache_pair
     (valid_node_rank_tail k v leq cached priority payload left right valid)
 
 theorem valid_node_cache_equal
-      (k : Type) (v : Type) (leq : k → k → Bool) (cached : Nat)
-      (priority : k) (payload : v) (left : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
       (right : PriorityQueue k v leq)
       (valid : Valid k v leq (Node k v leq cached priority payload left right))
     : Equal Nat cached (Suc (rank k v leq right)) =
@@ -1577,9 +1382,7 @@ theorem valid_node_cache_equal
       (valid_node_cache_pair k v leq cached priority payload left right valid))
 
 theorem reverse_leq_nat_of_false
-      (left : Nat)
-      (right : Nat)
-      (forward_false : Equal Bool (leq_nat left right) False)
+      (left : Nat) (right : Nat) (forward_false : Equal Bool (leq_nat left right) False)
     : IsTrue (leq_nat right left) =
   (proof left_false_elim for bool_or)
     (leq_nat left right)
@@ -1603,35 +1406,14 @@ theorem make_node_valid
   bool_cases
     (leq_nat (rank k v leq left) (rank k v leq right))
     (λchoice.
-      Equal
-        Bool
-        (leq_nat (rank k v leq left) (rank k v leq right))
-        choice
+      Equal Bool (leq_nat (rank k v leq left) (rank k v leq right)) choice
       → Valid
         k
         v
         leq
         (match choice {
-          True ↦
-            Node
-              k
-              v
-              leq
-              (Suc (rank k v leq left))
-              priority
-              payload
-              right
-              left;
-          False ↦
-            Node
-              k
-              v
-              leq
-              (Suc (rank k v leq right))
-              priority
-              payload
-              left
-              right
+          True ↦ Node k v leq (Suc (rank k v leq left)) priority payload right left;
+          False ↦ Node k v leq (Suc (rank k v leq right)) priority payload left right
         }))
     (λcompared.
       valid_node_intro
@@ -1664,39 +1446,33 @@ theorem make_node_valid
         right_valid
         left_bound
         right_bound
-        (reverse_leq_nat_of_false
-          (rank k v leq left)
-          (rank k v leq right)
-          compared)
+        (reverse_leq_nat_of_false (rank k v leq left) (rank k v leq right) compared)
         ((proof refl for leq_nat) (Suc (rank k v leq right)))
         ((proof refl for leq_nat) (Suc (rank k v leq right))))
     Refl
-theorem empty_valid (k : Type) (v : Type) (d : Ord k)
+
+theorem empty_valid
+      (k : Type) (v : Type) (d : Ord k)
     : Valid k v (ord_leq_at k d) (empty k v d) =
   Proved
 
 theorem singleton_valid
       (k : Type) (v : Type) (d : Ord k) (priority : k) (payload : v)
-    : Valid
-      k
-      v
-      (ord_leq_at k d)
-      (Node
-        k
-        v
+    : Valid k v
         (ord_leq_at k d)
-        (Suc Zero)
-        priority
-        payload
-        (Empty k v (ord_leq_at k d))
-        (Empty k v (ord_leq_at k d))) =
+        (Node
+          k
+          v
+          (ord_leq_at k d)
+          (Suc Zero)
+          priority
+          payload
+          (Empty k v (ord_leq_at k d))
+          (Empty k v (ord_leq_at k d))) =
   Proved
 
 theorem valid_rank_shape
-      (k : Type)
-      (v : Type)
-      (leq : k → k → Bool)
-      (q : PriorityQueue k v leq)
+      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
     : Valid k v leq q → Equal Nat (rank k v leq q) (right_spine_length k v leq q) =
   match q {
     Empty ↦ λvalid. Proved;
@@ -1723,19 +1499,22 @@ theorem valid_rank_shape
   }
 
 theorem all_above_node_intro
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (cached : Nat) (priority : k) (payload : v)
-      (left : PriorityQueue k v leq) (right : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (bound : k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
+      (right : PriorityQueue k v leq)
       (root : IsTrue (leq bound priority))
       (left_above : IsTrue (all_above k v leq bound left))
       (right_above : IsTrue (all_above k v leq bound right))
-    : IsTrue
-      (all_above k v leq bound (Node k v leq cached priority payload left right)) =
+    : IsTrue (all_above k v leq bound (Node k v leq cached priority payload left right)) =
   (proof intro for bool_and)
     (leq bound priority)
-    (bool_and
-      (all_above k v leq bound left)
-      (all_above k v leq bound right))
+    (bool_and (all_above k v leq bound left) (all_above k v leq bound right))
     root
     ((proof intro for bool_and)
       (all_above k v leq bound left)
@@ -1744,40 +1523,51 @@ theorem all_above_node_intro
       right_above)
 
 theorem all_above_node_root
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (cached : Nat) (priority : k) (payload : v)
-      (left : PriorityQueue k v leq) (right : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (bound : k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
+      (right : PriorityQueue k v leq)
       (above : IsTrue
         (all_above k v leq bound (Node k v leq cached priority payload left right)))
     : IsTrue (leq bound priority) =
   (proof left for bool_and)
     (leq bound priority)
-    (bool_and
-      (all_above k v leq bound left)
-      (all_above k v leq bound right))
+    (bool_and (all_above k v leq bound left) (all_above k v leq bound right))
     above
 
 theorem all_above_node_children
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (cached : Nat) (priority : k) (payload : v)
-      (left : PriorityQueue k v leq) (right : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (bound : k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
+      (right : PriorityQueue k v leq)
       (above : IsTrue
         (all_above k v leq bound (Node k v leq cached priority payload left right)))
-    : IsTrue
-      (bool_and
-        (all_above k v leq bound left)
-        (all_above k v leq bound right)) =
+    : IsTrue (bool_and (all_above k v leq bound left) (all_above k v leq bound right)) =
   (proof right for bool_and)
     (leq bound priority)
-    (bool_and
-      (all_above k v leq bound left)
-      (all_above k v leq bound right))
+    (bool_and (all_above k v leq bound left) (all_above k v leq bound right))
     above
 
 theorem all_above_node_left
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (cached : Nat) (priority : k) (payload : v)
-      (left : PriorityQueue k v leq) (right : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (bound : k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
+      (right : PriorityQueue k v leq)
       (above : IsTrue
         (all_above k v leq bound (Node k v leq cached priority payload left right)))
     : IsTrue (all_above k v leq bound left) =
@@ -1787,9 +1577,15 @@ theorem all_above_node_left
     (all_above_node_children k v leq bound cached priority payload left right above)
 
 theorem all_above_node_right
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (cached : Nat) (priority : k) (payload : v)
-      (left : PriorityQueue k v leq) (right : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (bound : k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
+      (right : PriorityQueue k v leq)
       (above : IsTrue
         (all_above k v leq bound (Node k v leq cached priority payload left right)))
     : IsTrue (all_above k v leq bound right) =
@@ -1799,15 +1595,12 @@ theorem all_above_node_right
     (all_above_node_children k v leq bound cached priority payload left right above)
 
 theorem all_above_root_bound
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (q : PriorityQueue k v leq)
-    : IsTrue (all_above k v leq bound q)
-      → IsTrue (root_bound k v leq bound q) =
+      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k) (q : PriorityQueue k v leq)
+    : IsTrue (all_above k v leq bound q) → IsTrue (root_bound k v leq bound q) =
   match q {
     Empty ↦ λabove. Proved;
     Node cached priority payload left right ↦
-      λabove.
-        all_above_node_root k v leq bound cached priority payload left right above
+      λabove. all_above_node_root k v leq bound cached priority payload left right above
   }
 
 theorem root_bound_trans
@@ -1827,11 +1620,7 @@ theorem root_bound_trans
   }
 
 theorem valid_root_global
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (bound : k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (bound : k) (q : PriorityQueue k v (ord_leq_at k d))
     : Valid k v (ord_leq_at k d) q
       → IsTrue (root_bound k v (ord_leq_at k d) bound q)
       → IsTrue (all_above k v (ord_leq_at k d) bound q) =
@@ -1857,16 +1646,7 @@ theorem valid_root_global
               d
               bound
               left
-              (valid_node_left
-                k
-                v
-                (ord_leq_at k d)
-                cached
-                priority
-                payload
-                left
-                right
-                valid)
+              (valid_node_left k v (ord_leq_at k d) cached priority payload left right valid)
               (root_bound_trans
                 k
                 v
@@ -1891,16 +1671,7 @@ theorem valid_root_global
               d
               bound
               right
-              (valid_node_right
-                k
-                v
-                (ord_leq_at k d)
-                cached
-                priority
-                payload
-                left
-                right
-                valid)
+              (valid_node_right k v (ord_leq_at k d) cached priority payload left right valid)
               (root_bound_trans
                 k
                 v
@@ -1922,8 +1693,12 @@ theorem valid_root_global
   }
 
 theorem valid_all_above_root
-      (k : Type) (v : Type) (d : Ord k) (cached : Nat)
-      (priority : k) (payload : v)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
       (left : PriorityQueue k v (ord_leq_at k d))
       (right : PriorityQueue k v (ord_leq_at k d))
       (valid : Valid
@@ -1932,12 +1707,12 @@ theorem valid_all_above_root
         (ord_leq_at k d)
         (Node k v (ord_leq_at k d) cached priority payload left right))
     : IsTrue
-      (all_above
-        k
-        v
-        (ord_leq_at k d)
-        priority
-        (Node k v (ord_leq_at k d) cached priority payload left right)) =
+        (all_above
+          k
+          v
+          (ord_leq_at k d)
+          priority
+          (Node k v (ord_leq_at k d) cached priority payload left right)) =
   valid_root_global
     k
     v
@@ -1948,14 +1723,18 @@ theorem valid_all_above_root
     (d.refl priority)
 
 theorem make_node_all_above
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (priority : k) (payload : v)
-      (left : PriorityQueue k v leq) (right : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (bound : k)
+      (priority : k)
+      (payload : v)
+      (left : PriorityQueue k v leq)
+      (right : PriorityQueue k v leq)
       (root : IsTrue (leq bound priority))
       (left_above : IsTrue (all_above k v leq bound left))
       (right_above : IsTrue (all_above k v leq bound right))
-    : IsTrue
-      (all_above k v leq bound (make_node k v leq priority payload left right)) =
+    : IsTrue (all_above k v leq bound (make_node k v leq priority payload left right)) =
   bool_cases
     (leq_nat (rank k v leq left) (rank k v leq right))
     (λchoice.
@@ -1966,45 +1745,58 @@ theorem make_node_all_above
           leq
           bound
           (match choice {
-            True ↦
-              Node
-                k
-                v
-                leq
-                (Suc (rank k v leq left))
-                priority
-                payload
-                right
-                left;
-            False ↦
-              Node
-                k
-                v
-                leq
-                (Suc (rank k v leq right))
-                priority
-                payload
-                left
-                right
+            True ↦ Node k v leq (Suc (rank k v leq left)) priority payload right left;
+            False ↦ Node k v leq (Suc (rank k v leq right)) priority payload left right
           })))
     (all_above_node_intro
-      k v leq bound (Suc (rank k v leq left)) priority payload right left
-      root right_above left_above)
+      k
+      v
+      leq
+      bound
+      (Suc (rank k v leq left))
+      priority
+      payload
+      right
+      left
+      root
+      right_above
+      left_above)
     (all_above_node_intro
-      k v leq bound (Suc (rank k v leq right)) priority payload left right
-      root left_above right_above)
+      k
+      v
+      leq
+      bound
+      (Suc (rank k v leq right))
+      priority
+      payload
+      left
+      right
+      root
+      left_above
+      right_above)
 
 theorem meld_all_above_node
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (first_rank : Nat) (first_priority : k) (first_payload : v)
-      (first_left : PriorityQueue k v leq) (first_right : PriorityQueue k v leq)
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (bound : k)
+      (first_rank : Nat)
+      (first_priority : k)
+      (first_payload : v)
+      (first_left : PriorityQueue k v leq)
+      (first_right : PriorityQueue k v leq)
       (first_above : IsTrue
         (all_above
-          k v leq bound
+          k
+          v
+          leq
+          bound
           (Node k v leq first_rank first_priority first_payload first_left first_right)))
       (first_right_ih : (second : PriorityQueue k v leq)
-        → IsTrue (all_above k v leq bound second)
-        → IsTrue (all_above k v leq bound (meld k v leq first_right second)))
+        → IsTrue
+        (all_above k v leq bound second)
+        → IsTrue
+        (all_above k v leq bound (meld k v leq first_right second)))
       (second : PriorityQueue k v leq)
     : IsTrue (all_above k v leq bound second)
       → IsTrue
@@ -2101,14 +1893,29 @@ theorem meld_all_above_node
                 second_left
                 second_right))
             (all_above_node_root
-              k v leq bound first_rank first_priority first_payload first_left first_right
+              k
+              v
+              leq
+              bound
+              first_rank
+              first_priority
+              first_payload
+              first_left
+              first_right
               first_above)
             (all_above_node_left
-              k v leq bound first_rank first_priority first_payload first_left first_right
+              k
+              v
+              leq
+              bound
+              first_rank
+              first_priority
+              first_payload
+              first_left
+              first_right
               first_above)
             (first_right_ih
-              (Node
-                k v leq second_rank second_priority second_payload second_left second_right)
+              (Node k v leq second_rank second_priority second_payload second_left second_right)
               second_above))
           (make_node_all_above
             k
@@ -2125,10 +1932,26 @@ theorem meld_all_above_node
               (Node k v leq first_rank first_priority first_payload first_left first_right)
               second_right)
             (all_above_node_root
-              k v leq bound second_rank second_priority second_payload second_left second_right
+              k
+              v
+              leq
+              bound
+              second_rank
+              second_priority
+              second_payload
+              second_left
+              second_right
               second_above)
             (all_above_node_left
-              k v leq bound second_rank second_priority second_payload second_left second_right
+              k
+              v
+              leq
+              bound
+              second_rank
+              second_priority
+              second_payload
+              second_left
+              second_right
               second_above)
             (meld_all_above_node
               k
@@ -2144,13 +1967,20 @@ theorem meld_all_above_node
               first_right_ih
               second_right
               (all_above_node_right
-                k v leq bound second_rank second_priority second_payload second_left second_right
+                k
+                v
+                leq
+                bound
+                second_rank
+                second_priority
+                second_payload
+                second_left
+                second_right
                 second_above)))
   }
 
 theorem meld_all_above
-      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k)
-      (first : PriorityQueue k v leq)
+      (k : Type) (v : Type) (leq : k → k → Bool) (bound : k) (first : PriorityQueue k v leq)
     : IsTrue (all_above k v leq bound first)
       → (second : PriorityQueue k v leq)
       → IsTrue (all_above k v leq bound second)
@@ -2170,31 +2000,66 @@ theorem meld_all_above
           first_left
           first_right
           first_above
-          (meld_all_above k v leq bound first_right
+          (meld_all_above
+            k
+            v
+            leq
+            bound
+            first_right
             (all_above_node_right
-              k v leq bound first_rank first_priority first_payload first_left first_right
+              k
+              v
+              leq
+              bound
+              first_rank
+              first_priority
+              first_payload
+              first_left
+              first_right
               first_above))
   }
 
 theorem meld_valid_selected_first
-      (k : Type) (v : Type) (d : Ord k)
-      (first_rank : Nat) (first_priority : k) (first_payload : v)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (first_rank : Nat)
+      (first_priority : k)
+      (first_payload : v)
       (first_left : PriorityQueue k v (ord_leq_at k d))
       (first_right : PriorityQueue k v (ord_leq_at k d))
-      (second_rank : Nat) (second_priority : k) (second_payload : v)
+      (second_rank : Nat)
+      (second_priority : k)
+      (second_payload : v)
       (second_left : PriorityQueue k v (ord_leq_at k d))
       (second_right : PriorityQueue k v (ord_leq_at k d))
       (compared : IsTrue (ord_leq_at k d first_priority second_priority))
       (first_valid : Valid
-        k v (ord_leq_at k d)
+        k
+        v
+        (ord_leq_at k d)
         (Node
-          k v (ord_leq_at k d)
-          first_rank first_priority first_payload first_left first_right))
+          k
+          v
+          (ord_leq_at k d)
+          first_rank
+          first_priority
+          first_payload
+          first_left
+          first_right))
       (second_valid : Valid
-        k v (ord_leq_at k d)
+        k
+        v
+        (ord_leq_at k d)
         (Node
-          k v (ord_leq_at k d)
-          second_rank second_priority second_payload second_left second_right))
+          k
+          v
+          (ord_leq_at k d)
+          second_rank
+          second_priority
+          second_payload
+          second_left
+          second_right))
       (recursive_valid : Valid
         k
         v
@@ -2205,27 +2070,37 @@ theorem meld_valid_selected_first
           (ord_leq_at k d)
           first_right
           (Node
-            k v (ord_leq_at k d)
-            second_rank second_priority second_payload second_left second_right)))
-    : Valid
-      k
-      v
-      (ord_leq_at k d)
-      (make_node
-        k
-        v
+            k
+            v
+            (ord_leq_at k d)
+            second_rank
+            second_priority
+            second_payload
+            second_left
+            second_right)))
+    : Valid k v
         (ord_leq_at k d)
-        first_priority
-        first_payload
-        first_left
-        (meld
+        (make_node
           k
           v
           (ord_leq_at k d)
-          first_right
-          (Node
-            k v (ord_leq_at k d)
-            second_rank second_priority second_payload second_left second_right))) =
+          first_priority
+          first_payload
+          first_left
+          (meld
+            k
+            v
+            (ord_leq_at k d)
+            first_right
+            (Node
+              k
+              v
+              (ord_leq_at k d)
+              second_rank
+              second_priority
+              second_payload
+              second_left
+              second_right))) =
   make_node_valid
     k
     v
@@ -2239,15 +2114,35 @@ theorem meld_valid_selected_first
       (ord_leq_at k d)
       first_right
       (Node
-        k v (ord_leq_at k d)
-        second_rank second_priority second_payload second_left second_right))
+        k
+        v
+        (ord_leq_at k d)
+        second_rank
+        second_priority
+        second_payload
+        second_left
+        second_right))
     (valid_node_left
-      k v (ord_leq_at k d)
-      first_rank first_priority first_payload first_left first_right first_valid)
+      k
+      v
+      (ord_leq_at k d)
+      first_rank
+      first_priority
+      first_payload
+      first_left
+      first_right
+      first_valid)
     recursive_valid
     (valid_node_left_bound
-      k v (ord_leq_at k d)
-      first_rank first_priority first_payload first_left first_right first_valid)
+      k
+      v
+      (ord_leq_at k d)
+      first_rank
+      first_priority
+      first_payload
+      first_left
+      first_right
+      first_valid)
     (all_above_root_bound
       k
       v
@@ -2259,8 +2154,14 @@ theorem meld_valid_selected_first
         (ord_leq_at k d)
         first_right
         (Node
-          k v (ord_leq_at k d)
-          second_rank second_priority second_payload second_left second_right))
+          k
+          v
+          (ord_leq_at k d)
+          second_rank
+          second_priority
+          second_payload
+          second_left
+          second_right))
       (meld_all_above
         k
         v
@@ -2268,43 +2169,92 @@ theorem meld_valid_selected_first
         first_priority
         first_right
         (all_above_node_right
-          k v (ord_leq_at k d) first_priority
-          first_rank first_priority first_payload first_left first_right
+          k
+          v
+          (ord_leq_at k d)
+          first_priority
+          first_rank
+          first_priority
+          first_payload
+          first_left
+          first_right
           (valid_all_above_root
-            k v d first_rank first_priority first_payload first_left first_right first_valid))
+            k
+            v
+            d
+            first_rank
+            first_priority
+            first_payload
+            first_left
+            first_right
+            first_valid))
         (Node
-          k v (ord_leq_at k d)
-          second_rank second_priority second_payload second_left second_right)
+          k
+          v
+          (ord_leq_at k d)
+          second_rank
+          second_priority
+          second_payload
+          second_left
+          second_right)
         (valid_root_global
           k
           v
           d
           first_priority
           (Node
-            k v (ord_leq_at k d)
-            second_rank second_priority second_payload second_left second_right)
+            k
+            v
+            (ord_leq_at k d)
+            second_rank
+            second_priority
+            second_payload
+            second_left
+            second_right)
           second_valid
           compared)))
 
 theorem meld_valid_selected_second
-      (k : Type) (v : Type) (d : Ord k)
-      (first_rank : Nat) (first_priority : k) (first_payload : v)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (first_rank : Nat)
+      (first_priority : k)
+      (first_payload : v)
       (first_left : PriorityQueue k v (ord_leq_at k d))
       (first_right : PriorityQueue k v (ord_leq_at k d))
-      (second_rank : Nat) (second_priority : k) (second_payload : v)
+      (second_rank : Nat)
+      (second_priority : k)
+      (second_payload : v)
       (second_left : PriorityQueue k v (ord_leq_at k d))
       (second_right : PriorityQueue k v (ord_leq_at k d))
       (compared : Equal Bool (ord_leq_at k d first_priority second_priority) False)
       (first_valid : Valid
-        k v (ord_leq_at k d)
+        k
+        v
+        (ord_leq_at k d)
         (Node
-          k v (ord_leq_at k d)
-          first_rank first_priority first_payload first_left first_right))
+          k
+          v
+          (ord_leq_at k d)
+          first_rank
+          first_priority
+          first_payload
+          first_left
+          first_right))
       (second_valid : Valid
-        k v (ord_leq_at k d)
+        k
+        v
+        (ord_leq_at k d)
         (Node
-          k v (ord_leq_at k d)
-          second_rank second_priority second_payload second_left second_right))
+          k
+          v
+          (ord_leq_at k d)
+          second_rank
+          second_priority
+          second_payload
+          second_left
+          second_right))
       (recursive_valid : Valid
         k
         v
@@ -2314,28 +2264,38 @@ theorem meld_valid_selected_second
           v
           (ord_leq_at k d)
           (Node
-            k v (ord_leq_at k d)
-            first_rank first_priority first_payload first_left first_right)
+            k
+            v
+            (ord_leq_at k d)
+            first_rank
+            first_priority
+            first_payload
+            first_left
+            first_right)
           second_right))
-    : Valid
-      k
-      v
-      (ord_leq_at k d)
-      (make_node
-        k
-        v
+    : Valid k v
         (ord_leq_at k d)
-        second_priority
-        second_payload
-        second_left
-        (meld
+        (make_node
           k
           v
           (ord_leq_at k d)
-          (Node
-            k v (ord_leq_at k d)
-            first_rank first_priority first_payload first_left first_right)
-          second_right)) =
+          second_priority
+          second_payload
+          second_left
+          (meld
+            k
+            v
+            (ord_leq_at k d)
+            (Node
+              k
+              v
+              (ord_leq_at k d)
+              first_rank
+              first_priority
+              first_payload
+              first_left
+              first_right)
+            second_right)) =
   make_node_valid
     k
     v
@@ -2347,17 +2307,29 @@ theorem meld_valid_selected_second
       k
       v
       (ord_leq_at k d)
-      (Node
-        k v (ord_leq_at k d)
-        first_rank first_priority first_payload first_left first_right)
+      (Node k v (ord_leq_at k d) first_rank first_priority first_payload first_left first_right)
       second_right)
     (valid_node_left
-      k v (ord_leq_at k d)
-      second_rank second_priority second_payload second_left second_right second_valid)
+      k
+      v
+      (ord_leq_at k d)
+      second_rank
+      second_priority
+      second_payload
+      second_left
+      second_right
+      second_valid)
     recursive_valid
     (valid_node_left_bound
-      k v (ord_leq_at k d)
-      second_rank second_priority second_payload second_left second_right second_valid)
+      k
+      v
+      (ord_leq_at k d)
+      second_rank
+      second_priority
+      second_payload
+      second_left
+      second_right
+      second_valid)
     (all_above_root_bound
       k
       v
@@ -2368,8 +2340,14 @@ theorem meld_valid_selected_second
         v
         (ord_leq_at k d)
         (Node
-          k v (ord_leq_at k d)
-          first_rank first_priority first_payload first_left first_right)
+          k
+          v
+          (ord_leq_at k d)
+          first_rank
+          first_priority
+          first_payload
+          first_left
+          first_right)
         second_right)
       (meld_all_above
         k
@@ -2377,16 +2355,28 @@ theorem meld_valid_selected_second
         (ord_leq_at k d)
         second_priority
         (Node
-          k v (ord_leq_at k d)
-          first_rank first_priority first_payload first_left first_right)
+          k
+          v
+          (ord_leq_at k d)
+          first_rank
+          first_priority
+          first_payload
+          first_left
+          first_right)
         (valid_root_global
           k
           v
           d
           second_priority
           (Node
-            k v (ord_leq_at k d)
-            first_rank first_priority first_payload first_left first_right)
+            k
+            v
+            (ord_leq_at k d)
+            first_rank
+            first_priority
+            first_payload
+            first_left
+            first_right)
           first_valid
           ((proof left_false_elim for bool_or)
             (ord_leq_at k d first_priority second_priority)
@@ -2395,37 +2385,76 @@ theorem meld_valid_selected_second
             (d.total first_priority second_priority)))
         second_right
         (all_above_node_right
-          k v (ord_leq_at k d) second_priority
-          second_rank second_priority second_payload second_left second_right
+          k
+          v
+          (ord_leq_at k d)
+          second_priority
+          second_rank
+          second_priority
+          second_payload
+          second_left
+          second_right
           (valid_all_above_root
-            k v d second_rank second_priority second_payload second_left second_right second_valid))))
+            k
+            v
+            d
+            second_rank
+            second_priority
+            second_payload
+            second_left
+            second_right
+            second_valid))))
 
 theorem meld_valid_node
-      (k : Type) (v : Type) (d : Ord k)
-      (first_rank : Nat) (first_priority : k) (first_payload : v)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (first_rank : Nat)
+      (first_priority : k)
+      (first_payload : v)
       (first_left : PriorityQueue k v (ord_leq_at k d))
       (first_right : PriorityQueue k v (ord_leq_at k d))
       (first_valid : Valid
-        k v (ord_leq_at k d)
-        (Node
-          k v (ord_leq_at k d)
-          first_rank first_priority first_payload first_left first_right))
-      (first_right_ih : (second : PriorityQueue k v (ord_leq_at k d))
-        → Valid k v (ord_leq_at k d) second
-        → Valid k v (ord_leq_at k d) (meld k v (ord_leq_at k d) first_right second))
-      (second : PriorityQueue k v (ord_leq_at k d))
-    : Valid k v (ord_leq_at k d) second
-      → Valid
         k
         v
+        (ord_leq_at k d)
+        (Node
+          k
+          v
+          (ord_leq_at k d)
+          first_rank
+          first_priority
+          first_payload
+          first_left
+          first_right))
+      (first_right_ih : (second : PriorityQueue k v (ord_leq_at k d))
+        → Valid
+        k
+        v
+        (ord_leq_at k d)
+        second
+        → Valid
+        k
+        v
+        (ord_leq_at k d)
+        (meld k v (ord_leq_at k d) first_right second))
+      (second : PriorityQueue k v (ord_leq_at k d))
+    : Valid k v (ord_leq_at k d) second
+      → Valid k v
         (ord_leq_at k d)
         (meld
           k
           v
           (ord_leq_at k d)
           (Node
-            k v (ord_leq_at k d)
-            first_rank first_priority first_payload first_left first_right)
+            k
+            v
+            (ord_leq_at k d)
+            first_rank
+            first_priority
+            first_payload
+            first_left
+            first_right)
           second) =
   match second {
     Empty ↦ λsecond_valid. first_valid;
@@ -2454,8 +2483,14 @@ theorem meld_valid_node
                       (ord_leq_at k d)
                       first_right
                       (Node
-                        k v (ord_leq_at k d)
-                        second_rank second_priority second_payload second_left second_right));
+                        k
+                        v
+                        (ord_leq_at k d)
+                        second_rank
+                        second_priority
+                        second_payload
+                        second_left
+                        second_right));
                 False ↦
                   make_node
                     k
@@ -2469,49 +2504,90 @@ theorem meld_valid_node
                       v
                       (ord_leq_at k d)
                       (Node
-                        k v (ord_leq_at k d)
-                        first_rank first_priority first_payload first_left first_right)
+                        k
+                        v
+                        (ord_leq_at k d)
+                        first_rank
+                        first_priority
+                        first_payload
+                        first_left
+                        first_right)
                       second_right)
               }))
           (λcompared.
             meld_valid_selected_first
-              k v d
-              first_rank first_priority first_payload first_left first_right
-              second_rank second_priority second_payload second_left second_right
+              k
+              v
+              d
+              first_rank
+              first_priority
+              first_payload
+              first_left
+              first_right
+              second_rank
+              second_priority
+              second_payload
+              second_left
+              second_right
               compared
               first_valid
               second_valid
               (first_right_ih
                 (Node
-                  k v (ord_leq_at k d)
-                  second_rank second_priority second_payload second_left second_right)
+                  k
+                  v
+                  (ord_leq_at k d)
+                  second_rank
+                  second_priority
+                  second_payload
+                  second_left
+                  second_right)
                 second_valid))
           (λcompared.
             meld_valid_selected_second
-              k v d
-              first_rank first_priority first_payload first_left first_right
-              second_rank second_priority second_payload second_left second_right
+              k
+              v
+              d
+              first_rank
+              first_priority
+              first_payload
+              first_left
+              first_right
+              second_rank
+              second_priority
+              second_payload
+              second_left
+              second_right
               compared
               first_valid
               second_valid
               (meld_valid_node
-                k v d
-                first_rank first_priority first_payload first_left first_right
+                k
+                v
+                d
+                first_rank
+                first_priority
+                first_payload
+                first_left
+                first_right
                 first_valid
                 first_right_ih
                 second_right
                 (valid_node_right
-                  k v (ord_leq_at k d)
-                  second_rank second_priority second_payload second_left second_right
+                  k
+                  v
+                  (ord_leq_at k d)
+                  second_rank
+                  second_priority
+                  second_payload
+                  second_left
+                  second_right
                   second_valid)))
           Refl
   }
 
 theorem meld_valid
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (first : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (first : PriorityQueue k v (ord_leq_at k d))
     : Valid k v (ord_leq_at k d) first
       → (second : PriorityQueue k v (ord_leq_at k d))
       → Valid k v (ord_leq_at k d) second
@@ -2536,22 +2612,34 @@ theorem meld_valid
             d
             first_right
             (valid_node_right
-              k v (ord_leq_at k d)
-              first_rank first_priority first_payload first_left first_right first_valid))
+              k
+              v
+              (ord_leq_at k d)
+              first_rank
+              first_priority
+              first_payload
+              first_left
+              first_right
+              first_valid))
   }
 
 theorem merge_valid
-      (k : Type) (v : Type) (d : Ord k)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
       (left : PriorityQueue k v (ord_leq_at k d))
       (right : PriorityQueue k v (ord_leq_at k d))
     : Valid k v (ord_leq_at k d) left
       → Valid k v (ord_leq_at k d) right
       → Valid k v (ord_leq_at k d) (merge k v d left right) =
-  λleft_valid. λright_valid.
-    meld_valid k v d left left_valid right right_valid
+  λleft_valid. λright_valid. meld_valid k v d left left_valid right right_valid
 
 theorem insert_valid
-      (k : Type) (v : Type) (d : Ord k) (priority : k) (payload : v)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (priority : k)
+      (payload : v)
       (q : PriorityQueue k v (ord_leq_at k d))
     : Valid k v (ord_leq_at k d) q
       → Valid k v (ord_leq_at k d) (insert k v d priority payload q) =
@@ -2561,14 +2649,17 @@ theorem insert_valid
       v
       d
       (Node
-        k v (ord_leq_at k d) (Suc Zero) priority payload
+        k
+        v
+        (ord_leq_at k d)
+        (Suc Zero)
+        priority
+        payload
         (Empty k v (ord_leq_at k d))
         (Empty k v (ord_leq_at k d)))
       q
       (singleton_valid k v d priority payload)
       q_valid
-
-
 
 theorem some_not_none
       (a : Type) (item : a) (same : Equal (Option a) (Some a item) (None a))
@@ -2576,10 +2667,7 @@ theorem some_not_none
   same
 
 theorem pop_min_valid
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : (entry : Pair k v)
       → (remainder : PriorityQueue k v (ord_leq_at k d))
       → Equal
@@ -2587,33 +2675,27 @@ theorem pop_min_valid
         (pop_min k v d q)
         (Some
           (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-          (mk_pair
-            (Pair k v)
-            (PriorityQueue k v (ord_leq_at k d))
-            entry
-            remainder))
+          (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder))
       → Valid k v (ord_leq_at k d) q
       → Valid k v (ord_leq_at k d) remainder =
   match q {
     Empty ↦
-      λentry. λremainder. λsame. λvalid.
-        absurd
-          (none_not_some
-            (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-            (mk_pair
-              (Pair k v)
-              (PriorityQueue k v (ord_leq_at k d))
-              entry
-              remainder)
-            same);
+      λentry.
+        λremainder.
+          λsame.
+            λvalid.
+              absurd
+                (none_not_some
+                  (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
+                  (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder)
+                  same);
     Node cached priority payload left right ↦
       λentry.
         λremainder.
           λsame.
             λvalid.
               J
-                (λout _.
-                  Valid k v (ord_leq_at k d) out)
+                (λout _. Valid k v (ord_leq_at k d) out)
                 (merge_valid
                   k
                   v
@@ -2621,11 +2703,25 @@ theorem pop_min_valid
                   left
                   right
                   (valid_node_left
-                    k v (ord_leq_at k d)
-                    cached priority payload left right valid)
+                    k
+                    v
+                    (ord_leq_at k d)
+                    cached
+                    priority
+                    payload
+                    left
+                    right
+                    valid)
                   (valid_node_right
-                    k v (ord_leq_at k d)
-                    cached priority payload left right valid))
+                    k
+                    v
+                    (ord_leq_at k d)
+                    cached
+                    priority
+                    payload
+                    left
+                    right
+                    valid))
                 (and_snd
                   (Equal (Pair k v) (mk_pair k v priority payload) entry)
                   (Equal
@@ -2635,84 +2731,70 @@ theorem pop_min_valid
                   same)
   }
 
-theorem find_min_empty_equation (k : Type) (v : Type) (d : Ord k)
-    : Equal
-      (Option (Pair k v))
-      (find_min k v d (empty k v d))
-      (None (Pair k v)) =
+theorem find_min_empty_equation
+      (k : Type) (v : Type) (d : Ord k)
+    : Equal (Option (Pair k v)) (find_min k v d (empty k v d)) (None (Pair k v)) =
   Proved
 
 theorem find_min_node_equation
-      (k : Type) (v : Type) (d : Ord k) (cached : Nat)
-      (priority : k) (payload : v)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
       (left : PriorityQueue k v (ord_leq_at k d))
       (right : PriorityQueue k v (ord_leq_at k d))
     : Equal
-      (Option (Pair k v))
-      (find_min
-        k v d
-        (Node k v (ord_leq_at k d) cached priority payload left right))
-      (Some (Pair k v) (mk_pair k v priority payload)) =
-  and_intro
-    (Equal k priority priority)
-    (Equal v payload payload)
-    Refl
-    Refl
+        (Option (Pair k v))
+        (find_min k v d (Node k v (ord_leq_at k d) cached priority payload left right))
+        (Some (Pair k v) (mk_pair k v priority payload)) =
+  and_intro (Equal k priority priority) (Equal v payload payload) Refl Refl
 
-theorem pop_min_empty_equation (k : Type) (v : Type) (d : Ord k)
+theorem pop_min_empty_equation
+      (k : Type) (v : Type) (d : Ord k)
     : Equal
-      (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      (pop_min k v d (empty k v d))
-      (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))) =
+        (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+        (pop_min k v d (empty k v d))
+        (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))) =
   Proved
 
 theorem pop_min_node_equation
-      (k : Type) (v : Type) (d : Ord k) (cached : Nat)
-      (priority : k) (payload : v)
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (cached : Nat)
+      (priority : k)
+      (payload : v)
       (left : PriorityQueue k v (ord_leq_at k d))
       (right : PriorityQueue k v (ord_leq_at k d))
     : Equal
-      (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      (pop_min
-        k v d
-        (Node k v (ord_leq_at k d) cached priority payload left right))
-      (Some
-        (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-        (mk_pair
-          (Pair k v)
-          (PriorityQueue k v (ord_leq_at k d))
-          (mk_pair k v priority payload)
-          (merge k v d left right))) =
+        (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+        (pop_min k v d (Node k v (ord_leq_at k d) cached priority payload left right))
+        (Some
+          (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
+          (mk_pair
+            (Pair k v)
+            (PriorityQueue k v (ord_leq_at k d))
+            (mk_pair k v priority payload)
+            (merge k v d left right))) =
   and_intro
     (Equal (Pair k v) (mk_pair k v priority payload) (mk_pair k v priority payload))
     (Equal
       (PriorityQueue k v (ord_leq_at k d))
       (merge k v d left right)
       (merge k v d left right))
-    (and_intro
-      (Equal k priority priority)
-      (Equal v payload payload)
-      Refl
-      Refl)
+    (and_intro (Equal k priority priority) (Equal v payload payload) Refl Refl)
     Refl
 
 theorem find_min_global
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : (entry : Pair k v)
-      → Equal
-        (Option (Pair k v))
-        (find_min k v d q)
-        (Some (Pair k v) entry)
+      → Equal (Option (Pair k v)) (find_min k v d q) (Some (Pair k v) entry)
       → Valid k v (ord_leq_at k d) q
-      → IsTrue
-        (all_above k v (ord_leq_at k d) (pair_fst k v entry) q) =
+      → IsTrue (all_above k v (ord_leq_at k d) (pair_fst k v entry) q) =
   match q {
-    Empty ↦
-      λentry. λsame. λvalid.
-        absurd (none_not_some (Pair k v) entry same);
+    Empty ↦ λentry. λsame. λvalid. absurd (none_not_some (Pair k v) entry same);
     Node cached priority payload left right ↦
       λentry.
         λsame.
@@ -2725,11 +2807,8 @@ theorem find_min_global
                     v
                     (ord_leq_at k d)
                     out_priority
-                    (Node
-                      k v (ord_leq_at k d)
-                      cached priority payload left right)))
-              (valid_all_above_root
-                k v d cached priority payload left right valid)
+                    (Node k v (ord_leq_at k d) cached priority payload left right)))
+              (valid_all_above_root k v d cached priority payload left right valid)
               (and_fst
                 (Equal k priority (pair_fst k v entry))
                 (Equal v payload (pair_snd k v entry))
@@ -2737,10 +2816,7 @@ theorem find_min_global
   }
 
 theorem pop_min_global
-      (k : Type)
-      (v : Type)
-      (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : (entry : Pair k v)
       → (remainder : PriorityQueue k v (ord_leq_at k d))
       → Equal
@@ -2748,26 +2824,20 @@ theorem pop_min_global
         (pop_min k v d q)
         (Some
           (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-          (mk_pair
-            (Pair k v)
-            (PriorityQueue k v (ord_leq_at k d))
-            entry
-            remainder))
+          (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder))
       → Valid k v (ord_leq_at k d) q
-      → IsTrue
-        (all_above k v (ord_leq_at k d) (pair_fst k v entry) q) =
+      → IsTrue (all_above k v (ord_leq_at k d) (pair_fst k v entry) q) =
   match q {
     Empty ↦
-      λentry. λremainder. λsame. λvalid.
-        absurd
-          (none_not_some
-            (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-            (mk_pair
-              (Pair k v)
-              (PriorityQueue k v (ord_leq_at k d))
-              entry
-              remainder)
-            same);
+      λentry.
+        λremainder.
+          λsame.
+            λvalid.
+              absurd
+                (none_not_some
+                  (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
+                  (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder)
+                  same);
     Node cached priority payload left right ↦
       λentry.
         λremainder.
@@ -2781,11 +2851,8 @@ theorem pop_min_global
                       v
                       (ord_leq_at k d)
                       out_priority
-                      (Node
-                        k v (ord_leq_at k d)
-                        cached priority payload left right)))
-                (valid_all_above_root
-                  k v d cached priority payload left right valid)
+                      (Node k v (ord_leq_at k d) cached priority payload left right)))
+                (valid_all_above_root k v d cached priority payload left right valid)
                 (and_fst
                   (Equal k priority (pair_fst k v entry))
                   (Equal v payload (pair_snd k v entry))
@@ -2799,28 +2866,20 @@ theorem pop_min_global
   }
 
 theorem pop_none_implies_empty
-      (k : Type) (v : Type) (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : Equal
-      (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      (pop_min k v d q)
-      (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      → Equal
-        (PriorityQueue k v (ord_leq_at k d))
-        q
-        (Empty k v (ord_leq_at k d)) =
+        (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+        (pop_min k v d q)
+        (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+      → Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d)) =
   match q {
     Empty ↦ λsame. Proved;
     Node cached priority payload left right ↦ λsame. absurd same
   }
 
 theorem empty_implies_pop_none
-      (k : Type) (v : Type) (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
-    : Equal
-      (PriorityQueue k v (ord_leq_at k d))
-      q
-      (Empty k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d))
       → Equal
         (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
         (pop_min k v d q)
@@ -2831,22 +2890,21 @@ theorem empty_implies_pop_none
   }
 
 theorem pop_none_iff_empty
-      (k : Type) (v : Type) (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : And
-      (Equal
-        (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-        (pop_min k v d q)
-        (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-        → Equal
+        (Equal
+          (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+          (pop_min k v d q)
+          (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+          → Equal
           (PriorityQueue k v (ord_leq_at k d))
           q
           (Empty k v (ord_leq_at k d)))
-      (Equal
-        (PriorityQueue k v (ord_leq_at k d))
-        q
-        (Empty k v (ord_leq_at k d))
-        → Equal
+        (Equal
+          (PriorityQueue k v (ord_leq_at k d))
+          q
+          (Empty k v (ord_leq_at k d))
+          → Equal
           (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
           (pop_min k v d q)
           (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))) =
@@ -2855,23 +2913,16 @@ theorem pop_none_iff_empty
       (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
       (pop_min k v d q)
       (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-      → Equal
-        (PriorityQueue k v (ord_leq_at k d))
-        q
-        (Empty k v (ord_leq_at k d)))
-    (Equal
-      (PriorityQueue k v (ord_leq_at k d))
-      q
-      (Empty k v (ord_leq_at k d))
-      → Equal
-        (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
-        (pop_min k v d q)
-        (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))))
+    → Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d)))
+    (Equal (PriorityQueue k v (ord_leq_at k d)) q (Empty k v (ord_leq_at k d))
+    → Equal
+      (Option (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d))))
+      (pop_min k v d q)
+      (None (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))))
     (pop_none_implies_empty k v d q)
     (empty_implies_pop_none k v d q)
 
-theorem add_one_left (n : Nat)
-    : Equal Nat (add (Suc Zero) n) (Suc n) =
+theorem add_one_left (n : Nat) : Equal Nat (add (Suc Zero) n) (Suc n) =
   trans
     Nat
     (add (Suc Zero) n)
@@ -2881,10 +2932,8 @@ theorem add_one_left (n : Nat)
     ((proof zero_l for add) n)
 
 theorem size_zero_implies_empty
-      (k : Type) (v : Type) (leq : k → k → Bool)
-      (q : PriorityQueue k v leq)
-    : Equal Nat (size k v leq q) Zero
-      → Equal (PriorityQueue k v leq) q (Empty k v leq) =
+      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
+    : Equal Nat (size k v leq q) Zero → Equal (PriorityQueue k v leq) q (Empty k v leq) =
   match q {
     Empty ↦ λsame. Proved;
     Node cached priority payload left right ↦
@@ -2920,37 +2969,27 @@ theorem size_zero_implies_empty
             same)
   }
 
-
-
 theorem empty_implies_size_zero
-      (k : Type) (v : Type) (leq : k → k → Bool)
-      (q : PriorityQueue k v leq)
-    : Equal (PriorityQueue k v leq) q (Empty k v leq)
-      → Equal Nat (size k v leq q) Zero =
+      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
+    : Equal (PriorityQueue k v leq) q (Empty k v leq) → Equal Nat (size k v leq q) Zero =
   match q {
     Empty ↦ λsame. Proved;
     Node cached priority payload left right ↦ λsame. absurd same
   }
 
 theorem size_zero_iff_empty
-      (k : Type) (v : Type) (leq : k → k → Bool)
-      (q : PriorityQueue k v leq)
+      (k : Type) (v : Type) (leq : k → k → Bool) (q : PriorityQueue k v leq)
     : And
-      (Equal Nat (size k v leq q) Zero
-        → Equal (PriorityQueue k v leq) q (Empty k v leq))
-      (Equal (PriorityQueue k v leq) q (Empty k v leq)
-        → Equal Nat (size k v leq q) Zero) =
+        (Equal Nat (size k v leq q) Zero → Equal (PriorityQueue k v leq) q (Empty k v leq))
+        (Equal (PriorityQueue k v leq) q (Empty k v leq) → Equal Nat (size k v leq q) Zero) =
   and_intro
-    (Equal Nat (size k v leq q) Zero
-      → Equal (PriorityQueue k v leq) q (Empty k v leq))
-    (Equal (PriorityQueue k v leq) q (Empty k v leq)
-      → Equal Nat (size k v leq q) Zero)
+    (Equal Nat (size k v leq q) Zero → Equal (PriorityQueue k v leq) q (Empty k v leq))
+    (Equal (PriorityQueue k v leq) q (Empty k v leq) → Equal Nat (size k v leq q) Zero)
     (size_zero_implies_empty k v leq q)
     (empty_implies_size_zero k v leq q)
 
 theorem pop_min_size_step
-      (k : Type) (v : Type) (d : Ord k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
     : (entry : Pair k v)
       → (remainder : PriorityQueue k v (ord_leq_at k d))
       → Equal
@@ -2958,35 +2997,20 @@ theorem pop_min_size_step
         (pop_min k v d q)
         (Some
           (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-          (mk_pair
-            (Pair k v)
-            (PriorityQueue k v (ord_leq_at k d))
-            entry
-            remainder))
-      → Equal
-        Nat
-        (size k v (ord_leq_at k d) q)
-        (Suc (size k v (ord_leq_at k d) remainder)) =
-  λentry. λremainder. λsame.
-    trans
-      Nat
-      (size k v (ord_leq_at k d) q)
-      (add (Suc Zero) (size k v (ord_leq_at k d) remainder))
-      (Suc (size k v (ord_leq_at k d) remainder))
-      (pop_min_count
-        k
-        v
-        d
-        (λpriority. λpayload. True)
-        q
-        entry
-        remainder
-        same)
-      (add_one_left (size k v (ord_leq_at k d) remainder))
+          (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder))
+      → Equal Nat (size k v (ord_leq_at k d) q) (Suc (size k v (ord_leq_at k d) remainder)) =
+  λentry.
+    λremainder.
+      λsame.
+        trans
+          Nat
+          (size k v (ord_leq_at k d) q)
+          (add (Suc Zero) (size k v (ord_leq_at k d) remainder))
+          (Suc (size k v (ord_leq_at k d) remainder))
+          (pop_min_count k v d (λpriority. λpayload. True) q entry remainder same)
+          (add_one_left (size k v (ord_leq_at k d) remainder))
 
-fn list_count_by
-      (k : Type) (v : Type) (p : k → v → Bool) (entries : List (Pair k v))
-    : Nat =
+fn list_count_by (k : Type) (v : Type) (p : k → v → Bool) (entries : List (Pair k v)) : Nat =
   match entries {
     Nil ↦ Zero;
     Cons entry rest ↦
@@ -3001,43 +3025,28 @@ fn entries_all_above
   match entries {
     Nil ↦ True;
     Cons entry rest ↦
-      bool_and
-        (ord_leq_at k d bound (pair_fst k v entry))
-        (entries_all_above k v d bound rest)
+      bool_and (ord_leq_at k d bound (pair_fst k v entry)) (entries_all_above k v d bound rest)
   }
 
-fn nondecreasing
-      (k : Type) (v : Type) (d : Ord k) (entries : List (Pair k v))
-    : Bool =
+fn nondecreasing (k : Type) (v : Type) (d : Ord k) (entries : List (Pair k v)) : Bool =
   match entries {
     Nil ↦ True;
     Cons entry rest ↦
-      bool_and
-        (entries_all_above k v d (pair_fst k v entry) rest)
-        (nondecreasing k v d rest)
+      bool_and (entries_all_above k v d (pair_fst k v entry) rest) (nondecreasing k v d rest)
   }
 
 fn observed_entries
-      (k : Type) (v : Type) (d : Ord k) (n : Nat)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (n : Nat) (q : PriorityQueue k v (ord_leq_at k d))
     : List (Pair k v) =
-  pair_fst
-    (List (Pair k v))
-    (PriorityQueue k v (ord_leq_at k d))
-    (observe_pops k v d n q)
+  pair_fst (List (Pair k v)) (PriorityQueue k v (ord_leq_at k d)) (observe_pops k v d n q)
 
 fn observed_remainder
-      (k : Type) (v : Type) (d : Ord k) (n : Nat)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (n : Nat) (q : PriorityQueue k v (ord_leq_at k d))
     : PriorityQueue k v (ord_leq_at k d) =
-  pair_snd
-    (List (Pair k v))
-    (PriorityQueue k v (ord_leq_at k d))
-    (observe_pops k v d n q)
+  pair_snd (List (Pair k v)) (PriorityQueue k v (ord_leq_at k d)) (observe_pops k v d n q)
 
 theorem pop_min_all_above
-      (k : Type) (v : Type) (d : Ord k) (bound : k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (bound : k) (q : PriorityQueue k v (ord_leq_at k d))
     : (entry : Pair k v)
       → (remainder : PriorityQueue k v (ord_leq_at k d))
       → Equal
@@ -3045,33 +3054,27 @@ theorem pop_min_all_above
         (pop_min k v d q)
         (Some
           (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-          (mk_pair
-            (Pair k v)
-            (PriorityQueue k v (ord_leq_at k d))
-            entry
-            remainder))
+          (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder))
       → IsTrue (all_above k v (ord_leq_at k d) bound q)
       → IsTrue (all_above k v (ord_leq_at k d) bound remainder) =
   match q {
     Empty ↦
-      λentry. λremainder. λsame. λabove.
-        absurd
-          (none_not_some
-            (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-            (mk_pair
-              (Pair k v)
-              (PriorityQueue k v (ord_leq_at k d))
-              entry
-              remainder)
-            same);
+      λentry.
+        λremainder.
+          λsame.
+            λabove.
+              absurd
+                (none_not_some
+                  (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
+                  (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder)
+                  same);
     Node cached priority payload left right ↦
       λentry.
         λremainder.
           λsame.
             λabove.
               J
-                (λout _.
-                  IsTrue (all_above k v (ord_leq_at k d) bound out))
+                (λout _. IsTrue (all_above k v (ord_leq_at k d) bound out))
                 (meld_all_above
                   k
                   v
@@ -3079,12 +3082,28 @@ theorem pop_min_all_above
                   bound
                   left
                   (all_above_node_left
-                    k v (ord_leq_at k d) bound
-                    cached priority payload left right above)
+                    k
+                    v
+                    (ord_leq_at k d)
+                    bound
+                    cached
+                    priority
+                    payload
+                    left
+                    right
+                    above)
                   right
                   (all_above_node_right
-                    k v (ord_leq_at k d) bound
-                    cached priority payload left right above))
+                    k
+                    v
+                    (ord_leq_at k d)
+                    bound
+                    cached
+                    priority
+                    payload
+                    left
+                    right
+                    above))
                 (and_snd
                   (Equal (Pair k v) (mk_pair k v priority payload) entry)
                   (Equal
@@ -3095,8 +3114,7 @@ theorem pop_min_all_above
   }
 
 theorem pop_min_entry_bound
-      (k : Type) (v : Type) (d : Ord k) (bound : k)
-      (q : PriorityQueue k v (ord_leq_at k d))
+      (k : Type) (v : Type) (d : Ord k) (bound : k) (q : PriorityQueue k v (ord_leq_at k d))
     : (entry : Pair k v)
       → (remainder : PriorityQueue k v (ord_leq_at k d))
       → Equal
@@ -3104,36 +3122,38 @@ theorem pop_min_entry_bound
         (pop_min k v d q)
         (Some
           (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-          (mk_pair
-            (Pair k v)
-            (PriorityQueue k v (ord_leq_at k d))
-            entry
-            remainder))
+          (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder))
       → IsTrue (all_above k v (ord_leq_at k d) bound q)
       → IsTrue (ord_leq_at k d bound (pair_fst k v entry)) =
   match q {
     Empty ↦
-      λentry. λremainder. λsame. λabove.
-        absurd
-          (none_not_some
-            (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
-            (mk_pair
-              (Pair k v)
-              (PriorityQueue k v (ord_leq_at k d))
-              entry
-              remainder)
-            same);
+      λentry.
+        λremainder.
+          λsame.
+            λabove.
+              absurd
+                (none_not_some
+                  (Pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)))
+                  (mk_pair (Pair k v) (PriorityQueue k v (ord_leq_at k d)) entry remainder)
+                  same);
     Node cached priority payload left right ↦
       λentry.
         λremainder.
           λsame.
             λabove.
               J
-                (λout_priority _.
-                  IsTrue (ord_leq_at k d bound out_priority))
+                (λout_priority _. IsTrue (ord_leq_at k d bound out_priority))
                 (all_above_node_root
-                  k v (ord_leq_at k d) bound
-                  cached priority payload left right above)
+                  k
+                  v
+                  (ord_leq_at k d)
+                  bound
+                  cached
+                  priority
+                  payload
+                  left
+                  right
+                  above)
                 (and_fst
                   (Equal k priority (pair_fst k v entry))
                   (Equal v payload (pair_snd k v entry))
@@ -3146,7 +3166,613 @@ theorem pop_min_entry_bound
                     same))
   }
 
+theorem observe_valid
+      (k : Type) (v : Type) (d : Ord k) (n : Nat) (q : PriorityQueue k v (ord_leq_at k d))
+    : Valid k v (ord_leq_at k d) q → Valid k v (ord_leq_at k d) (observed_remainder k v d n q) =
+  match n {
+    Zero ↦ λvalid. valid;
+    Suc remaining ↦
+      match q {
+        Empty ↦ λvalid. valid;
+        Node cached priority payload left right ↦
+          λvalid.
+            observe_valid
+              k
+              v
+              d
+              remaining
+              (merge k v d left right)
+              (pop_min_valid
+                k
+                v
+                d
+                (Node k v (ord_leq_at k d) cached priority payload left right)
+                (mk_pair k v priority payload)
+                (merge k v d left right)
+                Refl
+                valid)
+      }
+  }
 
+theorem observe_remainder_above
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (bound : k)
+      (n : Nat)
+      (q : PriorityQueue k v (ord_leq_at k d))
+    : IsTrue (all_above k v (ord_leq_at k d) bound q)
+      → IsTrue (all_above k v (ord_leq_at k d) bound (observed_remainder k v d n q)) =
+  match n {
+    Zero ↦ λabove. above;
+    Suc remaining ↦
+      match q {
+        Empty ↦ λabove. above;
+        Node cached priority payload left right ↦
+          λabove.
+            observe_remainder_above
+              k
+              v
+              d
+              bound
+              remaining
+              (merge k v d left right)
+              (pop_min_all_above
+                k
+                v
+                d
+                bound
+                (Node k v (ord_leq_at k d) cached priority payload left right)
+                (mk_pair k v priority payload)
+                (merge k v d left right)
+                Refl
+                above)
+      }
+  }
+
+theorem observe_entries_above
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (bound : k)
+      (n : Nat)
+      (q : PriorityQueue k v (ord_leq_at k d))
+    : IsTrue (all_above k v (ord_leq_at k d) bound q)
+      → IsTrue (entries_all_above k v d bound (observed_entries k v d n q)) =
+  match n {
+    Zero ↦ λabove. Proved;
+    Suc remaining ↦
+      match q {
+        Empty ↦ λabove. Proved;
+        Node cached priority payload left right ↦
+          λabove.
+            (proof intro for bool_and)
+              (ord_leq_at k d bound priority)
+              (entries_all_above
+                k
+                v
+                d
+                bound
+                (observed_entries k v d remaining (merge k v d left right)))
+              (pop_min_entry_bound
+                k
+                v
+                d
+                bound
+                (Node k v (ord_leq_at k d) cached priority payload left right)
+                (mk_pair k v priority payload)
+                (merge k v d left right)
+                Refl
+                above)
+              (observe_entries_above
+                k
+                v
+                d
+                bound
+                remaining
+                (merge k v d left right)
+                (pop_min_all_above
+                  k
+                  v
+                  d
+                  bound
+                  (Node k v (ord_leq_at k d) cached priority payload left right)
+                  (mk_pair k v priority payload)
+                  (merge k v d left right)
+                  Refl
+                  above))
+      }
+  }
+
+theorem observe_nondecreasing
+      (k : Type) (v : Type) (d : Ord k) (n : Nat) (q : PriorityQueue k v (ord_leq_at k d))
+    : Valid k v (ord_leq_at k d) q → IsTrue (nondecreasing k v d (observed_entries k v d n q)) =
+  match n {
+    Zero ↦ λvalid. Proved;
+    Suc remaining ↦
+      match q {
+        Empty ↦ λvalid. Proved;
+        Node cached priority payload left right ↦
+          λvalid.
+            (proof intro for bool_and)
+              (entries_all_above
+                k
+                v
+                d
+                priority
+                (observed_entries k v d remaining (merge k v d left right)))
+              (nondecreasing k v d (observed_entries k v d remaining (merge k v d left right)))
+              (observe_entries_above
+                k
+                v
+                d
+                priority
+                remaining
+                (merge k v d left right)
+                (pop_min_all_above
+                  k
+                  v
+                  d
+                  priority
+                  (Node k v (ord_leq_at k d) cached priority payload left right)
+                  (mk_pair k v priority payload)
+                  (merge k v d left right)
+                  Refl
+                  (pop_min_global
+                    k
+                    v
+                    d
+                    (Node k v (ord_leq_at k d) cached priority payload left right)
+                    (mk_pair k v priority payload)
+                    (merge k v d left right)
+                    Refl
+                    valid)))
+              (observe_nondecreasing
+                k
+                v
+                d
+                remaining
+                (merge k v d left right)
+                (pop_min_valid
+                  k
+                  v
+                  d
+                  (Node k v (ord_leq_at k d) cached priority payload left right)
+                  (mk_pair k v priority payload)
+                  (merge k v d left right)
+                  Refl
+                  valid))
+      }
+  }
+
+theorem observe_count
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (p : k → v → Bool)
+      (n : Nat)
+      (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal Nat
+        (count_by k v (ord_leq_at k d) p q)
+        (add
+          (list_count_by k v p (observed_entries k v d n q))
+          (count_by k v (ord_leq_at k d) p (observed_remainder k v d n q))) =
+  match n {
+    Zero ↦
+      sym
+        Nat
+        (add Zero (count_by k v (ord_leq_at k d) p q))
+        (count_by k v (ord_leq_at k d) p q)
+        ((proof zero_l for add) (count_by k v (ord_leq_at k d) p q));
+    Suc remaining ↦
+      match q {
+        Empty ↦ sym Nat (add Zero Zero) Zero ((proof zero_l for add) Zero);
+        Node cached priority payload left right ↦
+          let
+            entry = mk_pair k v priority payload;
+            next = merge k v d left right;
+            item_count = contribution (p priority payload);
+            tail_entries = observed_entries k v d remaining next;
+            tail_remainder = observed_remainder k v d remaining next;
+            next_count = count_by k v (ord_leq_at k d) p next;
+            tail_list_count = list_count_by k v p tail_entries;
+            tail_remainder_count = count_by k v (ord_leq_at k d) p tail_remainder
+          in
+            trans
+              Nat
+              (count_by
+                k
+                v
+                (ord_leq_at k d)
+                p
+                (Node k v (ord_leq_at k d) cached priority payload left right))
+              (add item_count next_count)
+              (add (add item_count tail_list_count) tail_remainder_count)
+              (pop_min_count
+                k
+                v
+                d
+                p
+                (Node k v (ord_leq_at k d) cached priority payload left right)
+                (mk_pair k v priority payload)
+                (merge k v d left right)
+                Refl)
+              (trans
+                Nat
+                (add item_count next_count)
+                (add item_count (add tail_list_count tail_remainder_count))
+                (add (add item_count tail_list_count) tail_remainder_count)
+                (cong
+                  Nat
+                  Nat
+                  next_count
+                  (add tail_list_count tail_remainder_count)
+                  (λvalue. add item_count value)
+                  (observe_count k v d p remaining next))
+                ((proof assoc for add) item_count tail_list_count tail_remainder_count))
+      }
+  }
+
+theorem queue_cases
+      (k : Type)
+      (v : Type)
+      (leq : k → k → Bool)
+      (q : PriorityQueue k v leq)
+      (motive : PriorityQueue k v leq → Prop)
+      (empty_case : motive (Empty k v leq))
+      (node_case : (cached : Nat)
+        → (priority : k)
+        → (payload : v)
+        → (left : PriorityQueue k v leq)
+        → (right : PriorityQueue k v leq)
+        → motive
+        (Node k v leq cached priority payload left right))
+    : motive q =
+  match q {
+    Empty ↦ empty_case;
+    Node cached priority payload left right ↦ node_case cached priority payload left right
+  }
+
+theorem observe_length
+      (k : Type) (v : Type) (d : Ord k) (n : Nat) (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal Nat
+        (length (Pair k v) (observed_entries k v d n q))
+        (nat_min n (size k v (ord_leq_at k d) q)) =
+  match n {
+    Zero ↦ ((proof zero_l for add) Zero);
+    Suc remaining ↦
+      queue_cases
+        k
+        v
+        (ord_leq_at k d)
+        q
+        (λqueue.
+          Equal
+            Nat
+            (length (Pair k v) (observed_entries k v d (Suc remaining) queue))
+            (nat_min (Suc remaining) (size k v (ord_leq_at k d) queue)))
+        ((proof zero_l for add) Zero)
+        (λcached.
+          λpriority.
+            λpayload.
+              λleft.
+                λright.
+                  let
+                    next = merge k v d left right;
+                    tail_length = length (Pair k v) (observed_entries k v d remaining next);
+                    next_size = size k v (ord_leq_at k d) next;
+                    queue_size =
+                      size
+                        k
+                        v
+                        (ord_leq_at k d)
+                        (Node k v (ord_leq_at k d) cached priority payload left right)
+                  in
+                    trans
+                      Nat
+                      (Suc tail_length)
+                      (Suc (nat_min remaining next_size))
+                      (nat_min (Suc remaining) queue_size)
+                      (cong
+                        Nat
+                        Nat
+                        tail_length
+                        (nat_min remaining next_size)
+                        Suc
+                        (observe_length k v d remaining next))
+                      (sym
+                        Nat
+                        (nat_min (Suc remaining) queue_size)
+                        (nat_min (Suc remaining) (Suc next_size))
+                        (cong
+                          Nat
+                          Nat
+                          queue_size
+                          (Suc next_size)
+                          (λamount. nat_min (Suc remaining) amount)
+                          (pop_min_size_step
+                            k
+                            v
+                            d
+                            (Node k v (ord_leq_at k d) cached priority payload left right)
+                            (mk_pair k v priority payload)
+                            (merge k v d left right)
+                            (pop_min_node_equation k v d cached priority payload left right)))))
+  }
+
+theorem nat_min_self (n : Nat) : Equal Nat (nat_min n n) n =
+  match n {
+    Zero ↦ Proved;
+    Suc previous ↦ cong Nat Nat (nat_min previous previous) previous Suc (nat_min_self previous)
+  }
+
+theorem nat_sub_self (n : Nat) : Equal Nat (nat_sub n n) Zero =
+  match n {
+    Zero ↦ Proved;
+    Suc previous ↦ nat_sub_self previous
+  }
+
+theorem equal_self (a : Type) (value : a) : Equal a value value =
+  cong Nat a Zero Zero (λignored. value) (nat_sub_self Zero)
+
+theorem observe_remainder_zero
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal (PriorityQueue k v (ord_leq_at k d)) (observed_remainder k v d Zero q) q =
+  equal_self (PriorityQueue k v (ord_leq_at k d)) q
+
+theorem observe_remainder_size
+      (k : Type) (v : Type) (d : Ord k) (n : Nat) (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal Nat
+        (size k v (ord_leq_at k d) (observed_remainder k v d n q))
+        (nat_sub (size k v (ord_leq_at k d) q) n) =
+  match n {
+    Zero ↦
+      cong
+        (PriorityQueue k v (ord_leq_at k d))
+        Nat
+        (observed_remainder k v d Zero q)
+        q
+        (size k v (ord_leq_at k d))
+        (observe_remainder_zero k v d q);
+    Suc remaining ↦
+      queue_cases
+        k
+        v
+        (ord_leq_at k d)
+        q
+        (λqueue.
+          Equal
+            Nat
+            (size k v (ord_leq_at k d) (observed_remainder k v d (Suc remaining) queue))
+            (nat_sub (size k v (ord_leq_at k d) queue) (Suc remaining)))
+        (nat_sub_self Zero)
+        (λcached.
+          λpriority.
+            λpayload.
+              λleft.
+                λright.
+                  let
+                    next = merge k v d left right;
+                    next_size = size k v (ord_leq_at k d) next;
+                    queue_size =
+                      size
+                        k
+                        v
+                        (ord_leq_at k d)
+                        (Node k v (ord_leq_at k d) cached priority payload left right)
+                  in
+                    trans
+                      Nat
+                      (size k v (ord_leq_at k d) (observed_remainder k v d remaining next))
+                      (nat_sub next_size remaining)
+                      (nat_sub queue_size (Suc remaining))
+                      (observe_remainder_size k v d remaining next)
+                      (sym
+                        Nat
+                        (nat_sub queue_size (Suc remaining))
+                        (nat_sub (Suc next_size) (Suc remaining))
+                        (cong
+                          Nat
+                          Nat
+                          queue_size
+                          (Suc next_size)
+                          (λamount. nat_sub amount (Suc remaining))
+                          (pop_min_size_step
+                            k
+                            v
+                            d
+                            (Node k v (ord_leq_at k d) cached priority payload left right)
+                            (mk_pair k v priority payload)
+                            (merge k v d left right)
+                            (pop_min_node_equation k v d cached priority payload left right)))))
+  }
+
+theorem drain_remainder_empty
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal
+        (PriorityQueue k v (ord_leq_at k d))
+        (observed_remainder k v d (size k v (ord_leq_at k d) q) q)
+        (Empty k v (ord_leq_at k d)) =
+  let
+    remainder = observed_remainder k v d (size k v (ord_leq_at k d) q) q;
+    queue_size = size k v (ord_leq_at k d) q
+  in
+    size_zero_implies_empty
+      k
+      v
+      (ord_leq_at k d)
+      remainder
+      (trans
+        Nat
+        (size k v (ord_leq_at k d) remainder)
+        (nat_sub queue_size queue_size)
+        Zero
+        (observe_remainder_size k v d queue_size q)
+        (nat_sub_self queue_size))
+
+theorem drain_length
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal Nat
+        (length (Pair k v) (observed_entries k v d (size k v (ord_leq_at k d) q) q))
+        (size k v (ord_leq_at k d) q) =
+  let queue_size =
+    size k v (ord_leq_at k d) q
+  in
+    trans
+      Nat
+      (length (Pair k v) (observed_entries k v d queue_size q))
+      (nat_min queue_size queue_size)
+      queue_size
+      (observe_length k v d queue_size q)
+      (nat_min_self queue_size)
+
+theorem drain_count
+      (k : Type)
+      (v : Type)
+      (d : Ord k)
+      (p : k → v → Bool)
+      (q : PriorityQueue k v (ord_leq_at k d))
+    : Equal Nat
+        (count_by k v (ord_leq_at k d) p q)
+        (list_count_by k v p (observed_entries k v d (size k v (ord_leq_at k d) q) q)) =
+  let
+    queue_size = size k v (ord_leq_at k d) q;
+    entries = observed_entries k v d queue_size q;
+    remainder = observed_remainder k v d queue_size q;
+    entry_count = list_count_by k v p entries;
+    remainder_count = count_by k v (ord_leq_at k d) p remainder
+  in
+    trans
+      Nat
+      (count_by k v (ord_leq_at k d) p q)
+      (add entry_count remainder_count)
+      entry_count
+      (observe_count k v d p queue_size q)
+      (trans
+        Nat
+        (add entry_count remainder_count)
+        (add entry_count Zero)
+        entry_count
+        (cong
+          Nat
+          Nat
+          remainder_count
+          Zero
+          (λamount. add entry_count amount)
+          (cong
+            (PriorityQueue k v (ord_leq_at k d))
+            Nat
+            remainder
+            (Empty k v (ord_leq_at k d))
+            (count_by k v (ord_leq_at k d) p)
+            (drain_remainder_empty k v d q)))
+        (equal_self Nat entry_count))
+
+theorem drain_valid
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Valid k v (ord_leq_at k d) q
+      → Valid k v (ord_leq_at k d) (observed_remainder k v d (size k v (ord_leq_at k d) q) q) =
+  observe_valid k v d (size k v (ord_leq_at k d) q) q
+
+theorem drain_nondecreasing
+      (k : Type) (v : Type) (d : Ord k) (q : PriorityQueue k v (ord_leq_at k d))
+    : Valid k v (ord_leq_at k d) q
+      → IsTrue (nondecreasing k v d (observed_entries k v d (size k v (ord_leq_at k d) q) q)) =
+  observe_nondecreasing k v d (size k v (ord_leq_at k d) q) q
+
+theorem nontrivial_validity_witness
+      (d : Ord Nat)
+    : Valid Nat Nat
+        (ord_leq_at Nat d)
+        (insert
+          Nat
+          Nat
+          d
+          (Suc Zero)
+          (Suc (Suc (Suc Zero)))
+          (insert
+            Nat
+            Nat
+            d
+            Zero
+            (Suc (Suc Zero))
+            (insert Nat Nat d (Suc (Suc Zero)) (Suc Zero) (empty Nat Nat d)))) =
+  insert_valid
+    Nat
+    Nat
+    d
+    (Suc Zero)
+    (Suc (Suc (Suc Zero)))
+    (insert
+      Nat
+      Nat
+      d
+      Zero
+      (Suc (Suc Zero))
+      (insert Nat Nat d (Suc (Suc Zero)) (Suc Zero) (empty Nat Nat d)))
+    (insert_valid
+      Nat
+      Nat
+      d
+      Zero
+      (Suc (Suc Zero))
+      (insert Nat Nat d (Suc (Suc Zero)) (Suc Zero) (empty Nat Nat d))
+      (insert_valid
+        Nat
+        Nat
+        d
+        (Suc (Suc Zero))
+        (Suc Zero)
+        (empty Nat Nat d)
+        (empty_valid Nat Nat d)))
+
+const malformed_cache_witness : PriorityQueue Nat Nat leq_nat =
+  Node Nat Nat leq_nat Zero Zero Zero (Empty Nat Nat leq_nat) (Empty Nat Nat leq_nat)
+
+theorem malformed_cache_refuted
+    : Equal Bool (valid_bool Nat Nat leq_nat malformed_cache_witness) False =
+  Proved
+
+fn valid_leaf_witness (priority : Nat) (payload : Nat) : PriorityQueue Nat Nat leq_nat =
+  Node
+    Nat
+    Nat
+    leq_nat
+    (Suc Zero)
+    priority
+    payload
+    (Empty Nat Nat leq_nat)
+    (Empty Nat Nat leq_nat)
+
+const malformed_balance_witness : PriorityQueue Nat Nat leq_nat =
+  Node
+    Nat
+    Nat
+    leq_nat
+    (Suc (Suc Zero))
+    Zero
+    Zero
+    (Empty Nat Nat leq_nat)
+    (valid_leaf_witness Zero (Suc Zero))
+
+theorem malformed_balance_refuted
+    : Equal Bool (valid_bool Nat Nat leq_nat malformed_balance_witness) False =
+  Proved
+
+const malformed_heap_order_witness : PriorityQueue Nat Nat leq_nat =
+  Node
+    Nat
+    Nat
+    leq_nat
+    (Suc Zero)
+    (Suc Zero)
+    Zero
+    (valid_leaf_witness Zero (Suc Zero))
+    (Empty Nat Nat leq_nat)
+
+theorem malformed_heap_order_refuted
+    : Equal Bool (valid_bool Nat Nat leq_nat malformed_heap_order_witness) False =
+  Proved
 ```
 
 ## Using it
