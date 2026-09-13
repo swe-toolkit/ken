@@ -167,11 +167,12 @@ asymptotic claim, local-workspace run, or runtime-instrumentation expansion.
 
 ## Lifecycle fold (in scope for this build)
 
-The contract shipped two artifacts pinned to the *pre-implementation* state,
+The contract shipped three artifacts pinned to the *pre-implementation* state,
 which this build must carry forward as it lands the computation -- otherwise
 stale "no implementation" / "every case RED" prose stands on `main` after the
 computation is real (the same lifecycle-fold obligation the `CAT-REL` build
-discharged; CV non-blocking note evt_26wmnb18v7sm5, evt_5zyckhdms59nc):
+discharged; CV notes evt_26wmnb18v7sm5, evt_5zyckhdms59nc, and the SPEC-PROGRESS
+gap evt_3p481kdbtavwq that added item 3):
 
 1. `conformance/stdlib/collections/seed-priority-queue.md` -- the reaching seed
    currently declares "every case is **RED-UNTIL-CAT-PRIORITY-QUEUE**" (its
@@ -189,10 +190,20 @@ discharged; CV non-blocking note evt_26wmnb18v7sm5, evt_5zyckhdms59nc):
    or the deferred-laws boundary -- that stays the enclave's contract; this is a
    status fold, not a spec rewrite.
 
-This is a narrow lifecycle-status fold on two enclave-owned files, authorized
+3. `spec/SPEC-PROGRESS.md` -- the spec status backbone's `58a` row (`:112` at
+   the cut) still reads `DRAFT v0 (SPEC-PRIORITY-QUEUE-CONTRACT); contract-pinned
+   for CAT-PRIORITY-QUEUE` and "implementation and general proofs remain staged".
+   Since SPEC-PROGRESS is the human-readable reconciliation index / status
+   backbone, that row would contradict the folded chapter on `main`. Fold ONLY
+   that row to landed tested computation, retaining the general-proofs deferral.
+   `:112` is the sole `58a` row (audited: the other `contract-pinned`/`staged`
+   occurrences are the status-vocabulary legend and unrelated chapters). Touch
+   no other row and no legend text.
+
+This is a narrow lifecycle-status fold on three enclave-owned files, authorized
 here because it cannot be done before the computation exists and must land in
 the same increment that makes the cases green. It is not a licence to edit the
-normative contract or the seed's expected values.
+normative contract, the seed's expected values, or any other SPEC-PROGRESS row.
 
 ## Acceptance criteria
 
@@ -208,10 +219,11 @@ normative contract or the seed's expected values.
   type carries an unproved obligation; the cost account is structural and matches
   the code.
 - Conforms to the reaching seed in `SPEC-PRIORITY-QUEUE-CONTRACT`.
-- The lifecycle fold lands in the same increment: the seed's RED-until posture
-  and the chapter's DRAFT-v0 status/§7 are folded to the landed state, with no
-  change to any expected observation, normative behavior, or the deferred-laws
-  boundary.
+- The lifecycle fold lands in the same increment across all three status
+  artifacts: the seed's RED-until posture, the chapter's DRAFT-v0 status/§7, and
+  the SPEC-PROGRESS `58a` row are folded to the landed state, with no change to
+  any expected observation, normative behavior, the deferred-laws boundary, or
+  any other SPEC-PROGRESS row/legend.
 
 ## Not this node
 
@@ -234,13 +246,14 @@ reviewer.
 Foundation ring. Files this build touches:
 - `catalog/packages/Data/Collections/PriorityQueue.ken.md` (new file) + its
   acceptance tests under `crates/ken-elaborator/tests/`.
-- The lifecycle fold (above), two enclave-owned files, status-only:
-  `conformance/stdlib/collections/seed-priority-queue.md` and
-  `spec/50-stdlib/58a-priority-queues.md`.
+- The lifecycle fold (above), three enclave-owned files, status-only:
+  `conformance/stdlib/collections/seed-priority-queue.md`,
+  `spec/50-stdlib/58a-priority-queues.md`, and the `58a` row of
+  `spec/SPEC-PROGRESS.md`.
 
 No cross-lane contention (L1 runtime on `crates/ken-lowering`/`crates/ken-runtime`;
 L2 language on `crates/ken-elaborator/src`; the spec enclave has no released node
-on these two files -- SPEC-PRIORITY-QUEUE-CONTRACT is merged/closed). The new
+on these three files -- SPEC-PRIORITY-QUEUE-CONTRACT is merged/closed). The new
 test files are under `crates/`, so a candidate touching them is a CODE merge ->
 full CI, M8/M8a Adversary. Re-measure provider spellings (`ord_leq_at`,
 `leq_nat`, `Pair`, `Option`) and the seed/chapter fold anchors at the cut.
