@@ -12,7 +12,24 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# ABI-S6 HS18 — Q1 PRESERVED; Q2 CERTIFIED PATH PROOF. READ FIRST.
+# ABI-S6 HS18 — Q2 PROTOCOL REPAIR AND SEMANTIC LOCALIZATION. READ FIRST.
+
+> Current return: checkpoint `01d2ccb117151c468cb8a7f06f6e3a5fd8667e33`
+> preserves Q1 but is not merge-ready. Follow
+> [the protocol audit](../ABI-S6-HS18-Q2-protocol-audit.md) before treating
+> Mapping object emission as certified. Independent valid-CLIF probes exposed
+> helper/unit guard bypasses and a foreign-frame call accepted by the finished
+> protocol verifier. Repair the all-path guard and actual-frame relation,
+> rather than adding fixture-specific checks. The original Q2 obligations below
+> remain binding.
+>
+> px8f's f55/v77 is a genuine two-field Vis3380/38; retain refusal against the
+> six Ret4442/38 demands. One diagnostic cut excludes only one of six call
+> sites. Mapping's native ResourceBodyResult trap requires the first wrong
+> value/source-stage ledger, not blind wrapper peeling. Runtime is authorized
+> for bounded verifier repair and observer-only semantic localization, not a
+> new source-return route or candidate/merge handoff. Q1, stack provisions,
+> effects, identity domains and source-stage receipt separation are unchanged.
 
 > # HS18 is the current live hard stop on this node, superseding the HS15
 > # banner below as READ-FIRST. The full Architect ruling is the durable
@@ -2398,6 +2415,15 @@ Architect inventory, 2026-09-11.
     px8f has those seven leaves and six exact specialization3 calls, whereas
     current Mapping has three leaves and no u0:55 call. Mapping's ungoverned local
     allocation was a potential actual2580/demanded3606 identity conflict.
+    Follow-up at `01d2ccb11`: independent verifier probes accept bypasses of
+    helper status, unit status and Trap, and accept a header pointing to a
+    different payload frame. These share the same incomplete finished-proof
+    predicate: locators/layout positions are being treated as all-path
+    execution and memory facts. The
+    [protocol audit](../ABI-S6-HS18-Q2-protocol-audit.md) requires structural
+    repair plus bounded semantic localization, not fabricated certificates.
+    This is an entry18 follow-up; no new source-routing design is authorized.
+
     Q2 binding confirms a real Vis on a path that an independently certified
     upstream Ret would exclude; the
     [path-proof ruling](../ABI-S6-HS18-Q2-path-proof.md) keeps the whole-function
