@@ -363,6 +363,37 @@ the package's promise is not kept until it lands. The tell that a package is
 unfinished: **its correctness rests on acceptance tests a reader cannot check as
 Ken, only re-run and trust.**
 
+### 17. An axiom over a TCB export's property is the proper expression of it
+
+The trust root is the TCB (#5). Its exports — the primitives the prelude
+registers, kernel-`Neutral` and not reducible in Ken by construction — carry
+properties that Ken source needs but cannot prove, because there is no Ken-level
+structure to reduce against. **An `Axiom` stating a tested property of a
+TCB-implemented function is the correct way to express that property, not an
+incomplete proof.** The TCB is the trust root, and such axioms are the means of
+communicating the properties of its exports up to the Ken source level — the
+in-language statement of what the trusted layer promises about each export (#14:
+nothing required lives in a comment).
+
+This **bounds #16.** "Tested is inferior to proven" governs properties that
+*are* provable over Ken structure — a package's own semantic requirements, where
+an axiom would launder an unproved obligation and a test would substitute
+trust-the-author for a kernel-checked proof. It does **not** condemn a
+primitive-contract axiom: there the property belongs to a TCB export, the axiom
+is its proper home, and there is no Ken proof it is standing in for. The
+discriminator is exactly this — **is the property provable over Ken structure,
+or is it a property of a `Neutral`/primitive TCB export?** The first is
+proof-backfill work; the second is a trust-surface statement, correctly an
+axiom.
+
+Because these axioms are the trust-surface delta beyond the kernel, keeping them
+few, explicit, and correctly quantified is itself the audit (#5, the de Bruijn
+criterion): the set of primitive-contract axioms should read as a complete
+manifest of what Ken trusts about its own implementation. Whether their proper
+home is a catalog `axiom` declaration or prelude-issuance alongside the
+primitive they characterize is an open design question; the principle here is
+that they are proper wherever they live.
+
 ---
 
 ## Working constraints (process, not philosophy)
