@@ -7,6 +7,13 @@ from the runtime ring (`evt_3t44j4xy0bqh6`, probe
 
 The hard stop is correct on both counts. One of them is a defect in my rule.
 
+> **SUPERSEDED IN PART** by
+> [amendment 2](ABI-S6-HS18-closure-mechanism-amendment-2.md).
+> Correction 1's reverse lookup is right but was scoped to the Tail branch only,
+> leaving `DirectInvocationReturn` an unguarded escape. Amendment 2 moves the
+> gate above every fork. Correction 2 (the seat) and correction 3 (`source.rs`)
+> stand unchanged.
+
 ## Step 0 confirmed the gap, and then falsified my rule
 
 Step 0 confirmed what I asked it to confirm: nothing in

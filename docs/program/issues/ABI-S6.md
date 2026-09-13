@@ -277,6 +277,14 @@ M1-M4 -> lieutenant. Local gates targeted; full CI is separate.
    projection, reached by the existing context invocation, never relocated; and
    the `source.rs` blob criterion is withdrawn in favour of Q1 site preservation
    plus an addition-only, no-wildcard match-arm discipline.
+   AMENDED AGAIN by [amendment 2](../ABI-S6-HS18-closure-mechanism-amendment-2.md)
+   on the ring's second hard stop: `DirectInvocationReturn` is a producer-to-sink
+   route too and was an unguarded escape, so the required-consumer disposition is
+   now computed BEFORE any fork and gates BOTH existing variants, with the
+   destination newtype minted only from that disposition. Production construction
+   is a CLOSED set of two sites (`aggregates.rs:6722` and `:6777`), measured. Both
+   Architect stops so far were scoping defects in the rule's statement; the 3rd
+   triggers a research prior-art hold before any further amendment.
 3. The Steward releases the recut to the runtime ring; runtime implements under the
    Architect's design; runtime-QA + Architect review; Steward M1-M4 -> lieutenant.
 4. Optional, in parallel, neither gating: the px8f observer-only measurement the

@@ -70,8 +70,13 @@ not proof that no equivalent consultation happens under a different spelling.
 projection.** If one does, this design is wrong about the gap and I want that
 back before the work starts, not after.
 
-> **AMENDED 2026-09-13 — read
-> [amendment 1](ABI-S6-HS18-closure-mechanism-amendment.md) with this document.**
+> **AMENDED TWICE 2026-09-13 — read
+> [amendment 1](ABI-S6-HS18-closure-mechanism-amendment.md) and
+> [amendment 2](ABI-S6-HS18-closure-mechanism-amendment-2.md) with this
+> document. Amendment 2 supersedes the rule's POSITION: the disposition is
+> computed before any fork and gates BOTH existing variants, because
+> `DirectInvocationReturn` is a producer-to-sink route too and was an unguarded
+> escape.**
 > The rule below keys on the producer's OWN required-consumer projection. That
 > is WRONG and inert on the Mapping witness, whose Tail producer has no own-key
 > projection: the interposed authority is a `DetachedReturnContext` that
