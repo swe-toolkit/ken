@@ -102,7 +102,6 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            generated_function_result_contract: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             seed_material:
@@ -279,7 +278,6 @@ fn run_px8j_malformed_recursor_consumer(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            generated_function_result_contract: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             seed_material:
@@ -2636,7 +2634,6 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            generated_function_result_contract: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             seed_material:

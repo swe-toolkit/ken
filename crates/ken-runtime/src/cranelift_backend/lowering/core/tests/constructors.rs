@@ -252,7 +252,6 @@ fn run_dynamic_constructor_dispatch_fixture(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            generated_function_result_contract: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             seed_material:
@@ -1983,7 +1982,6 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            generated_function_result_contract: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             seed_material:
