@@ -7,7 +7,7 @@ write X") — for the exhaustive grammar and the normative contract, see
 `../../spec/30-surface/`, chapter-linked throughout.
 
 Every ` ```ken example ` block below elaborates against the real toolchain
-(`ken run` over this file); every ` ```ken reject ` block is checked to
+(`ken run` over this file), and every ` ```ken reject ` block is checked to
 actually fail. Nothing here is aspirational syntax — where the spec allows a
 form that no landed catalog code actually uses (implicit `{A : Type}`
 parameters, most visibly), this strand says so and shows the form that is
@@ -33,7 +33,7 @@ the signature and the body, not a comment
 
 - **`const`** — a pure value, zero explicit value parameters.
 - **`fn`** — a pure function, one or more explicit value parameters.
-- **`proc … visits ρ`** — potentially impure/imperative; the *only* keyword
+- **`proc … visits ρ`** — potentially impure/imperative, and the *only* keyword
   that may carry an effect row (§6).
 
 All three keywords in one runnable block. A literate entry's compiled fences
@@ -90,7 +90,7 @@ fn announce_wrong (c : Color) : IO Unit = print_line "not allowed in fn"
 `def T … = …` is a **definition**: a base type narrowed by conditions (a
 refinement/`Σ`/Π-type abbreviation), or the zero-condition case — a plain
 alias (`spec/30-surface/33-declarations.md §1`). `def` was spelled `type`
-before `SURF-def-refinement`; `type` is now reserved, not a declaration
+before `SURF-def-refinement`, and `type` is now reserved, not a declaration
 keyword.
 
 The load-bearing surface fact is that `def` is **transparent** — it unfolds
@@ -148,7 +148,7 @@ generated eliminator, and `match` compiles to that eliminator with a
 **checked exhaustiveness** requirement
 (`spec/30-surface/34-data-match.md §1, §4`). Every constructor must be
 covered — but a final `_`/variable arm is the sanctioned way to cover the
-remaining constructors (`34 §4.1`, `§4.2`); there is no way to *skip* a
+remaining constructors (`34 §4.1`, `§4.2`), and there is no way to *skip* a
 case, not a ban on wildcards.
 
 ```ken example
@@ -220,11 +220,11 @@ fn project_true (x : {b : Bool | Equal Bool b True}) : Bool = x
 ## 5. `class` and `instance`
 
 A `class` is an ordinary record of operations (and, when the class states
-laws, of proof obligations); `instance` is an ordinary record value — no new
+laws, of proof obligations), and `instance` is an ordinary record value — no new
 kernel feature, a `class` is a right-nested `Σ` exactly like `record`
 (`spec/50-stdlib/51-lawful-classes.md`, and every `lawful-classes`/
 `lawful-functors` package instance). Reach for a `class` only when you
-genuinely need dispatch on a type; if there is exactly one carrier, an
+genuinely need dispatch on a type, and if there is exactly one carrier, an
 explicit dictionary or a bare top-level `fn` is simpler and equally lawful
 (the decomposition strand's §1 covers the choice).
 
@@ -254,7 +254,7 @@ const wrong : String = (Describe Bool).describe True
 
 A class field's own type may itself carry a law — the shape every entry in
 `catalog/packages/Core/` follows, covered in depth by the proof techniques
-strand. `Eq` below elides `sym`/`trans` for brevity; see
+strand. `Eq` below elides `sym`/`trans` for brevity, and see
 `catalog/packages/Core/Classes/LawfulClasses.ken` for the full class:
 
 ```ken ignore
@@ -309,7 +309,7 @@ seed shape"**: every intro's conclusion must reapply the family to exactly
 its own bound parameters, in order — it cannot introduce extra premises or
 construct a new argument value (a real inductive relation like "list
 append" needs that). Know this going in: a `where` block is not yet a
-general way to define an inductive relation; for that, state the property
+general way to define an inductive relation, and for that, state the property
 as a `theorem`'s result type instead (the proof-techniques strand's induction
 and motive-construction section covers this) and prove it directly.
 
@@ -340,7 +340,7 @@ prop AppendsTo (a : Type) (xs : List a) (ys : List a) (zs : List a) : Ω where {
 
 `proof <name> for <subject>` attaches a checked proof to a subject that is
 already resolved. The subject must occur applied somewhere in the claim, in a
-hypothesis or conclusion; attachment records membership, not a required
+hypothesis or conclusion, and attachment records membership, not a required
 telescope shape. The canonical path to use it is `subject::proof_name`:
 
 ```ken example
@@ -364,7 +364,7 @@ theorem theorem_sample : Trivial Int sample_int = trivial_any Int sample_int
 **A `theorem` or attached `proof` may recurse, including mutual recursion with
 other proof declarations, only when the shared size-change termination gate
 accepts the proof component** (`33 §8.3–8.4`). A recursive proof component is
-signatures-first, kernel-checked, and committed only after SCT accepts; a
+signatures-first, kernel-checked, and committed only after SCT accepts, and a
 non-decreasing proof loop fails closed. A recursive cycle that mixes a proof
 declaration with a computational `const`/`fn` is rejected in this round.
 
@@ -399,12 +399,12 @@ for the right keyword line by line. The rule of thumb:
 
 **The load-bearing rule: `theorem` and `proof` require an `Omega` statement.**
 Their elaboration checks that the stated `φ` classifies at `Omega`
-(proof-irrelevant); a term whose type lands in `Type` is rejected there, not
+(proof-irrelevant), and a term whose type lands in `Type` is rejected there, not
 silently accepted. So the choice between `theorem`/`proof` and `const`/`fn` is
 not stylistic — it follows the `Omega`/`Type` line:
 
 - **`Equal`-typed and `IsTrue`-typed statements are `Omega`** (`Equal : Π(A :
-  Type). A → A → Omega`; `IsTrue b` unfolds to `Equal Bool b True`), and so is
+  Type). A → A → Omega`, and `IsTrue b` unfolds to `Equal Bool b True`), and so is
   an `And` of two `Omega`s. These are the bread-and-butter law statements —
   refl/antisym/trans/totality, reduction equations — and each goes in a
   `theorem` or `proof` cleanly.
@@ -413,13 +413,13 @@ not stylistic — it follows the `Omega`/`Type` line:
   eliminator-helper terms that carry a chosen branch *as data*. These are
   genuine computation, so they stay `const`/`fn`. Promoting one to a `theorem`
   is not fighting a bug — it is landing on the wrong side of the
-  proof-irrelevance boundary; `ensure_omega_type` is doing its job.
+  proof-irrelevance boundary, and `ensure_omega_type` is doing its job.
 
-In one line: `theorem`/`proof` = irrelevant propositions you *prove*;
+In one line: `theorem`/`proof` = irrelevant propositions you *prove*, and
 `const`/`fn` = data you *compute*. The vocabulary tracks the `Omega`/`Type`
 line on purpose.
 
-**`theorem` vs `proof … for <subject>`.** Same checked-theorem elaboration; the
+**`theorem` vs `proof … for <subject>`.** Same checked-theorem elaboration, and the
 difference is *ownership*. A `theorem` lives in the ordinary module namespace
 and is applied by name. A `proof p for s` is exported only as `s::p`, its
 telescope follows the theorem being stated, and its claim must mention `s`
@@ -427,7 +427,7 @@ applied. Same-subject attached proofs are ordinary dependencies: an acyclic
 sibling reference resolves in dependency order, and a recursive sibling group
 is admitted only when SCT accepts it.
 Reach for `proof … for` when the fact is *about* one definition and should
-travel with it; reach for `theorem` when it is a reusable stepping-stone in its
+travel with it, and reach for `theorem` when it is a reusable stepping-stone in its
 own right.
 
 **Declaration order is dependency-driven, with recursive groups checked
@@ -436,7 +436,7 @@ lede-first reads come from the prose, not the code order.** The elaborator
 forms a call graph and processes strongly connected components in dependency
 order (`33 §1`, §8.4), so an acyclic dependency may appear later in source and a
 recursive component is checked signatures-first. Recursive `const`/`fn` groups
-and recursive `theorem`/`proof` groups are SCT-gated; mixed computational/proof
+and recursive `theorem`/`proof` groups are SCT-gated, and mixed computational/proof
 cycles reject. Prose should still introduce the result before the code when
 that gives the reader a clearer top-down path.
 
@@ -450,13 +450,13 @@ lede-first even though the code still elaborates dependencies-first.
 
 A local `let` introduces one or more bindings before its final body. Separate
 bindings in a group with `;`, as in
-`let first = start; second = finish first in second`; do not put a trailing
+`let first = start; second = finish first in second`, and do not put a trailing
 `;` before `in`. Add a type after a name when it improves the contract or
 guides elaboration: `let name : Type = rhs in body`. A one-binding `let` is the
 same production with no separator.
 
 Bindings in a group are sequential and non-recursive. Each right-hand side can
-use earlier names, but not its own name or any later one; every name is in scope
+use earlier names, but not its own name or any later one, and every name is in scope
 in the final body. Duplicate names in one group are rejected. The formatter
 coalesces a maximal directly nested chain of at least two sequential lets into
 one binding group, while leaving a one-binding `let` as a one-binding `let`
@@ -479,7 +479,7 @@ fn let_annotated (c : Color) : Bool = let selected_red : Bool = is_red c in sele
 ```
 
 A short pipeline can name stages without hiding the final control flow. The
-group below separates its two bindings with `;`; `confirmed_red` can use the
+group below separates its two bindings with `;`, and `confirmed_red` can use the
 earlier `selected_red`, and both names are available after `in`. If the list of
 unrelated stages grows long, extract a helper rather than building a local
 namespace:
@@ -527,7 +527,7 @@ const let_rhs_zero : Nat = let bound_value : Nat = Zero in bound_value
 ```
 
 This declaration is rejected with
-`UnresolvedCon { name = "self_rhs_probe" }` at the right-hand-side occurrence;
+`UnresolvedCon { name = "self_rhs_probe" }` at the right-hand-side occurrence, and
 the binder is not recursive and does not scope over its own definition:
 
 ```ken reject
@@ -543,7 +543,7 @@ or share it. A style refactor must preserve branch placement and effect order.
 
 This guide (and every catalog package) is itself written in `.ken.md`: an
 ordinary Markdown file whose fenced code blocks carry a checked role. Only
-an exact ` ```ken ` fence tangles into the compiled module; the fence
+an exact ` ```ken ` fence tangles into the compiled module, and the fence
 taxonomy is `07-catalog-style-guide.md §3`:
 
 | Fence | Tangles? | CI checks | Use |
@@ -564,7 +564,7 @@ type signature, a snippet missing its surrounding declarations).
 
 - **Why explicit type parameters over implicit ones**: the elaborator's
   `instance_search`/unification story for implicit-argument inference is
-  still developing; explicit parameters are unambiguous today and cost the
+  still developing, and explicit parameters are unambiguous today and cost the
   caller one extra argument at each call site. Prefer them until the guide
   says otherwise.
 - **Why refinements over a separate assertion mechanism**: a refinement is
@@ -574,7 +574,7 @@ type signature, a snippet missing its surrounding declarations).
 - **Reserved sugar identifiers — three names you cannot declare, two you
   usually can.** `Refl`, `Axiom`, `absurd`, `J`, and `Eq` are all
   checked-mode surface sugar, but they don't all reserve their name the same
-  way (`elab.rs`'s special forms; `resolve::RESERVED_SUGAR`/`SUGAR_*`):
+  way (`elab.rs`'s special forms and `resolve::RESERVED_SUGAR`/`SUGAR_*`):
   - `Refl` and `Axiom` intercept a bare occurrence of their own name
     unconditionally, at any arity — a declared global under either name is
     wholly unreachable.
@@ -620,6 +620,6 @@ type signature, a snippet missing its surrounding declarations).
   orientation on the pure/effectful split this strand's §1 checks
   structurally.
 - Wikipedia — [Refinement type](https://en.wikipedia.org/wiki/Refinement_type) —
-  orientation on §4's `{x:A|φ}` form; Ken's own encoding (carrier plus
+  orientation on §4's `{x:A|φ}` form, and Ken's own encoding (carrier plus
   obligation) is stated in `spec/30-surface/34-data-match.md §5`, not
   derived from any particular implementation.

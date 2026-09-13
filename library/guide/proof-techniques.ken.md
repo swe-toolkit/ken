@@ -8,7 +8,7 @@ hypothesis stays usable, decidable equality via `sound`/`complete`, why
 `funext` needs no lemma, and the non-termination hazards a proof author
 needs to see coming before the kernel rejects the definition outright.
 
-Every example below is checked against the real elaborator; every reject
+Every example below is checked against the real elaborator, and every reject
 example is checked to actually fail, with the real error message quoted so a
 reader recognizes it when they hit it themselves.
 
@@ -179,12 +179,12 @@ reduced endpoints and what kind of operation they're stuck on, every time.
 Ken has no separate induction tactic: an inductive proof is an ordinary
 **structurally recursive `fn`**, SCT-checked exactly like any other
 recursive definition (§5). The base case typically closes with `Proved`
-(constructor endpoints collapse); the step case typically needs `cong` to
+(constructor endpoints collapse), and the step case typically needs `cong` to
 lift the induction hypothesis under the outer constructor, because the two
 sides of the step's goal are **neutral** (an abstract tail `t` never
 reduces further) and so never collapse on their own. Below is the right unit
 for `list_append`: the base case has both sides reduce to the constructor
-`Nil a` → `Proved`; the step case's goal is `Cons x (list_append t Nil)` vs.
+`Nil a` → `Proved`, and the step case's goal is `Cons x (list_append t Nil)` vs.
 `Cons x t` — neutral in the abstract tail `t`, so the recursive call's
 result (the induction hypothesis) is lifted under `Cons x` by `cong`:
 
@@ -275,7 +275,7 @@ computation rule for `Π`). Function extensionality therefore needs **no
 axiom and no lemma** — a bare pointwise proof checks directly against a
 function-equality goal, because the goal *is* that pointwise type after one
 reduction step. `not_bool` and `flip_bool` below are two syntactically
-different functions; proving them equal AS FUNCTIONS needs no `funext`
+different functions, and proving them equal AS FUNCTIONS needs no `funext`
 call, only a pointwise proof, because `Equal (Bool -> Bool) f g`
 whnf-reduces to exactly that pointwise Pi type:
 
@@ -299,7 +299,7 @@ call site and treat the other as free.
 Every transparent (δ-unfoldable) recursive definition is admitted only if
 it passes the kernel's **size-change termination (SCT)** gate at definition
 time (`spec/10-kernel/17-conversion.md §4`) — this is the *sole*
-termination guarantee; there is no fuel or cycle guard on δ-unfolding
+termination guarantee, and there is no fuel or cycle guard on δ-unfolding
 itself, so a definition that slips past SCT does not merely run slowly, it
 makes conversion (and therefore type-checking) **loop**. `list_right_unit`
 above passes because its recursive call is on the strictly smaller tail
@@ -335,18 +335,18 @@ When a proof needs at least two sequential local bindings, write one binding
 group and separate the bindings with `;`, with no trailing separator before
 `in`. A binding can use earlier names but not itself or later names, and a
 duplicate name in the same group is rejected. The formatter coalesces a maximal
-directly nested chain of at least two lets into this group form; a one-binding
+directly nested chain of at least two lets into this group form, and a one-binding
 `let` remains the same one-binding production
 (`spec/30-surface/32-grammar.md:200-221`,
 `spec/30-surface/31-lexical.md:228-231`).
 
 The String certificate is a compact example. `left_chars` and `right_chars`
-name the representation-level endpoints; `left_round_trip` and
-`right_round_trip` name the String endpoints; the two evidence bindings say
+name the representation-level endpoints, and `left_round_trip` and
+`right_round_trip` name the String endpoints, and the two evidence bindings say
 which bridge each proof crosses. Their binding group follows the proof's
 dependency order, so each later right-hand side can use the earlier aliases.
 The local aliases are definitionally equal to the original expressions, so
-`same_chars` is accepted directly by `cong`; no transport lemma is needed.
+`same_chars` is accepted directly by `cong`, and no transport lemma is needed.
 
 ```ken example
 axiom string_to_list_char_retraction
@@ -383,7 +383,7 @@ theorem string_to_list_char_injective_with_lets
 ```
 
 A reduced Map bridge has the same shape. The operation-specific proof supplies
-the three endpoints and two facts; the bridge names the facts by their roles and
+the three endpoints and two facts, and the bridge names the facts by their roles and
 leaves the final `trans` visible. Its two-binding group makes the dependency
 order explicit before `in`. In a real Map proof, names such as `inserted`,
 `selected_branch`, and `ordered_result` are more useful than `step1`, `tmp`,
@@ -421,7 +421,7 @@ matches and direct structural recursion. Bind only when the name states a proof
 endpoint, evidence role, invariant, or stage the reader would otherwise have to
 reconstruct. There is no binding quota, depth threshold, or minimum count. When
 an intermediate is reusable or recursive, promote it to a
-top-level `theorem` instead; when many unrelated bindings accumulate, split the
+top-level `theorem` instead, and when many unrelated bindings accumulate, split the
 proof rather than creating a local namespace.
 
 ## 7. Proof completion and acceptance
@@ -445,7 +445,7 @@ proof. This follows the project's [proof-completeness principle](../../../docs/P
 - **Why no `sorry`/postponed goals exist**: every hole in a Ken proof is
   either a real term or the honest, visible `Axiom` postulate (§3) — never
   a silent gap. A law field that "will be proved later" is not merged with
-  a placeholder; it is either proved now or the catalog entry's Trust
+  a placeholder, and it is either proved now or the catalog entry's Trust
   section discloses the delta.
 - **Why the restructuring discipline in §2 matters more than it looks**: it
   is the difference between a law that is provable *today* and one that
@@ -467,13 +467,13 @@ proof. This follows the project's [proof-completeness principle](../../../docs/P
 ## References
 
 - Lee, Jones & Ben-Amram, *"The Size-Change Principle for Program
-  Termination"*, POPL 2001 — the general theory §5's SCT gate implements;
+  Termination"*, POPL 2001 — the general theory §5's SCT gate implements, and
   Ken's own gate and its call-graph-completeness invariant are stated in
   `spec/10-kernel/17-conversion.md §4`, not derived from any particular
   implementation.
 - Wikipedia — [Function
   extensionality](https://en.wikipedia.org/wiki/Function_extensionality) —
-  orientation on §4; Ken's own definitional treatment is
+  orientation on §4, and Ken's own definitional treatment is
   `spec/10-kernel/16-observational.md §2.2`, distinct from the axiomatic
   treatment common in other proof assistants (Lean/Agda/Idris), where
   `funext` is a postulate applied explicitly rather than a reduction rule.

@@ -62,7 +62,7 @@ The unbundled form is not a lesser fallback — it is **semantically
 identical** to a bundled dictionary (`Ord a` is exactly the Σ-record of the
 same fields), and it sidesteps a real elaborator gap: a class-typed
 parameter's fields are only projectable by ordinary Σ-projection when the
-dictionary is bound as a plain term (`(d).leq`); projecting one *inside a
+dictionary is bound as a plain term (`(d).leq`), and projecting one *inside a
 type position* (a law field's own signature referencing another field) does
 not parse yet. So when a report says "generic-over-an-abstract-type-var is
 unbuildable, we need a bundled `where`-constraint first," check the actual
@@ -125,7 +125,7 @@ fn cap_level_reusing_int (level : Int) : Int = level
 This is not a blanket "wrap everything" rule — it costs a real constructor
 and a projection, so reserve it for the value that is genuinely the sole
 net for a trust-relevant property. A value with no such role gets no
-special treatment; reach for a dedicated wrapper only where the collision
+special treatment, and reach for a dedicated wrapper only where the collision
 you're avoiding — "this ordinary-looking value is secretly load-bearing for
 authority" — is real.
 
@@ -146,14 +146,14 @@ review checklist while reading one:
 ## Findings
 
 None yet. The reusable-moves table above is deliberately short (four moves),
-not exhaustive; it covers only choices for which Ken has a concrete,
+not exhaustive, and it covers only choices for which Ken has a concrete,
 repeatable design rule.
 
 ## References
 
 - Wikipedia — [Type
   class](https://en.wikipedia.org/wiki/Type_class) — orientation on §1's
-  dispatch mechanism; Ken's own encoding (a class is an ordinary Σ-record,
+  dispatch mechanism, and Ken's own encoding (a class is an ordinary Σ-record,
   no separate kind of declaration) is `spec/50-stdlib/51-lawful-classes.md`.
 
 ```ken
