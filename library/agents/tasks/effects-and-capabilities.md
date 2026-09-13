@@ -16,7 +16,7 @@ Load `../core/toolchain.md` before claiming an effect was executed.
 The landed surface uses `proc` for effectful declarations and `visits [...]`
 for explicit effect rows. The checker infers used effects and rejects an
 omitted escaping effect. Capabilities are value-level authority supplied to
-perform effects; handlers interpret effect trees and may provide authority.
+perform effects, and handlers interpret effect trees and may provide authority.
 
 ## 4. Canonical forms
 
@@ -52,14 +52,14 @@ them from this summary.
 6. Stop if a current artifact establishes that an effect lacks a landed label,
    capability path, or supported driver. If the loaded context does not settle
    presence or absence, report that execution support is **not established by
-   the loaded evidence**; do not convert missing evidence into an unavailable
+   the loaded evidence**, and do not convert missing evidence into an unavailable
    capability claim.
 
 ## 7. Failure signatures
 
-An escaping-effect diagnostic indicates an incomplete row; a missing-capability
-diagnostic indicates absent authority; a pure-keyword mismatch indicates
-`fn`/`const` was used where `proc` is required; an unknown effect at runtime
+An escaping-effect diagnostic indicates an incomplete row, and a missing-capability
+diagnostic indicates absent authority, and a pure-keyword mismatch indicates
+`fn`/`const` was used where `proc` is required, and an unknown effect at runtime
 indicates a driver/handler gap after checking.
 
 ## 8. Validation

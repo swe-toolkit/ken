@@ -61,7 +61,7 @@ layer. Keep the successful preceding artifact as the control.
 
 Record a minimal reproducer, the exact failing command, the named signature,
 and a nearby control that passes. After a repair, rerun the reproducer and the
-targeted regression test; do not substitute a broad green count for the
+targeted regression test, and do not substitute a broad green count for the
 original symptom.
 
 ## 9. Authority and sources

@@ -52,9 +52,9 @@ remaining binders in the order required by each branch.
 
 ## 7. Failure signatures
 
-`Refl expects an Eq-shaped goal` means the goal reduced away from equality;
-`Proved` rejected means it did not reduce to `Top`; binder/type mismatches
-usually mean a case introduced arguments in the wrong order; a new trust entry
+`Refl expects an Eq-shaped goal` means the goal reduced away from equality, and
+`Proved` rejected means it did not reduce to `Top`, and binder/type mismatches
+usually mean a case introduced arguments in the wrong order, and a new trust entry
 means the repair crossed the boundary.
 
 ## 8. Validation
@@ -66,7 +66,7 @@ restore byte-identically, re-run green, and record the trusted-base comparison.
 ## 9. Authority and sources
 
 Proof rules come from `spec/10-kernel/` and
-`spec/20-verification/21-spec-syntax.md`; checked techniques come from
+`spec/20-verification/21-spec-syntax.md`, and checked techniques come from
 `library/guide/proof-techniques.ken.md`. Revision:
 `library/agents/manifest.toml`.
 

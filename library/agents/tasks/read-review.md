@@ -8,7 +8,7 @@ silently repair the source or certify behavior that was not checked.
 
 ## 2. Prerequisites
 
-Load `../core/read-ken.md`; add `../core/proof-and-trust.md` for claims and
+Load `../core/read-ken.md`, and add `../core/proof-and-trust.md` for claims and
 `../core/toolchain.md` for execution evidence.
 
 ## 3. Current capability
@@ -55,8 +55,8 @@ Every statement should identify the declaration or artifact that supports it.
 
 ## 7. Failure signatures
 
-Conflicting prose and signatures indicate a documentation defect; trust prose
-without a ledger indicates missing evidence; a check-only artifact attached to
+Conflicting prose and signatures indicate a documentation defect, and trust prose
+without a ledger indicates missing evidence, and a check-only artifact attached to
 a runtime claim indicates an execution-evidence gap. Inspect the cited spec,
 package validation section, or current test rather than choosing the friendlier
 interpretation.
