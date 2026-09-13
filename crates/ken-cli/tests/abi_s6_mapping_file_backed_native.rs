@@ -434,6 +434,8 @@ fn generated_result_path_proof_rejects_each_certificate_corruption() {
         };
         assert!(
             refusal.contains("certified carrier query")
+                || refusal.contains("protocol guard")
+                || refusal.contains("certified cut")
                 || refusal.contains("finished generated-Result proof graph is not closed"),
             "{mutation:?} reached the wrong pre-object refusal: {refusal}"
         );
