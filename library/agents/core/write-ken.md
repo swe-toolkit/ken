@@ -60,13 +60,13 @@ ken check <file>
   bindings as one `;`-separated binding group before `in`.
 - Keep a familiar one-step expression, small exhaustive match, direct
   recursion, or single constructor assembly inline when a local name would
-  merely repeat its syntax. Expression length is evidence, never the decision;
+  merely repeat its syntax. Expression length is evidence, never the decision, and
   there is no binding quota or depth threshold.
 - `(C T)` is a class applied to its head: the dictionary's type, not an
   instance value. Outside a resolved `where` call, use the synthesized global
   `C_instance_T` as the value and project its fields like an ordinary record.
   Projecting a field from `(C T)` is invalid.
-- New type-like names use PascalCase; new functions and fields use snake_case.
+- New type-like names use PascalCase, and new functions and fields use snake_case.
 - Do not invent imports, primitives, effects, capabilities, or proof tactics.
 
 ## 6. Decision procedure
@@ -83,8 +83,8 @@ ken check <file>
 | Signature | Likely cause | Next action |
 |---|---|---|
 | parse error | unsupported or misplaced syntax | reduce to a one-declaration probe |
-| `Refl expects an Eq-shaped goal` | goal reduced to `Top` | inspect endpoints; try `Proved` only if both collapse |
-| `Proved` type mismatch | equality remains stuck | inspect endpoints; use `Refl` only for reflexive equality |
+| `Refl expects an Eq-shaped goal` | goal reduced to `Top` | inspect endpoints, and try `Proved` only if both collapse |
+| `Proved` type mismatch | equality remains stuck | inspect endpoints, and use `Refl` only for reflexive equality |
 | pure library has no `main` entrypoint | `ken run` used on a library | use `ken check` |
 | effect escapes declared row | omitted or wrong `visits` row | load `effects-and-capabilities.md` |
 
@@ -116,4 +116,4 @@ The catalog does not yet provide a standalone checked example for every landed
 surface feature, and `ken check` does not prove runtime or native behavior.
 Cross-package reuse may require a loader-aware test rather than a single-file
 catalog check. When the guide lacks a form or the probe rejects it, stop and
-report the gap; do not synthesize plausible Ken syntax.
+report the gap, and do not synthesize plausible Ken syntax.

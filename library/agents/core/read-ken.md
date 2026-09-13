@@ -36,7 +36,7 @@ shape.
 
 ## 5. Invariants and prohibitions
 
-- A signature states the contract; prose does not replace it.
+- A signature states the contract, and prose does not replace it.
 - `proc` signals an effectful declaration. Do not report a `fn` as effectful
   merely because its name suggests I/O.
 - A proof term establishes only its stated result type.
@@ -51,7 +51,7 @@ shape.
 2. Inventory declarations and their keywords.
 3. Record each public input, result, effect row, capability, and proof claim.
 4. Trace cited trust and validation artifacts.
-5. Stop when a required dependency or generated artifact is missing; report
+5. Stop when a required dependency or generated artifact is missing, and report
    the missing evidence instead of filling it in.
 
 ## 7. Failure signatures
@@ -90,5 +90,5 @@ The verified revision is in `library/agents/manifest.toml`.
 roots-based loader supports cross-file imports, but the ordinary catalog
 fragment check path does not demonstrate them. If a review depends on
 cross-file loading, runtime effects, native execution, or an unstated package,
-stop and request the relevant test or artifact; do not infer success from a
+stop and request the relevant test or artifact, and do not infer success from a
 single-file check.

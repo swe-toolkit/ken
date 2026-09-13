@@ -5,11 +5,11 @@
 `agent_core_ready(run)` holds when a genuinely cold coding agent, given only
 the selected pack and task fixture:
 
-1. produces a correct, reviewable result for every supported task;
-2. refuses every unsupported or unproved request at the named boundary;
+1. produces a correct, reviewable result for every supported task, and
+2. refuses every unsupported or unproved request at the named boundary, and
 3. loads no file outside the selected pack unless a module prerequisite or
-   cited authority requires it;
-4. invents no syntax, capability, package, command, or proof; and
+   cited authority requires it, and
+4. invents no syntax, capability, package, command, or proof, and
 5. cites the authority used for each language or capability claim.
 
 Any invented syntax or capability makes `agent_core_ready(run)` false,
@@ -19,7 +19,7 @@ regardless of correctness on the other tasks.
 
 `cold(seat, run)` means the seat has not seen the task fixture, expected result,
 or any earlier result from this suite in its current context. Record the seat
-identifier and fresh-context evidence. A seat is cold only once for a fixture;
+identifier and fresh-context evidence. A seat is cold only once for a fixture, and
 after a module fix, use a semantically equivalent held-back variant with a new
 identifier.
 
@@ -33,7 +33,7 @@ identifier.
 5. Preserve the full answer and cited paths.
 6. Record all four axes independently in the run artifact, using the fields
    `correctness`, `unnecessary_loads`, `inventions`, and `cited_authority`.
-7. Evaluate `agent_core_ready(run)`; never summarize the run as a pass rate.
+7. Evaluate `agent_core_ready(run)`, and never summarize the run as a pass rate.
 
 ## The seven tasks
 
@@ -57,7 +57,7 @@ the answer.
   task-specific evidence.
 - **Unnecessary file loads:** an integer count plus the exact paths and why
   each was unnecessary.
-- **Invented syntax or capabilities:** a list. It must be empty; any item fails
+- **Invented syntax or capabilities:** a list. It must be empty, and any item fails
   the whole suite.
 - **Cited authority:** `complete`, `partial`, or `missing`, with exact cited
   paths.
