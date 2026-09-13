@@ -388,18 +388,23 @@ population-side mutation above.
 
 ## Evidence and proof-completion record
 
-`CAT-PRIORITY-QUEUE` landed the named finite observations above. Its original
-producer blob `1eec578603cdef349af21d944ac174af5919705c`, owner-local
-resolver-test blob `eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7`, and the current
-acceptance-test blob `9eb73ac5546485a28f9f509dee601cf7d2b21700` execute nine
-passing acceptance tests, including exactly 4,216 bounded traces, plus two
-passing export-table closure tests. The original thirty compile-preserving
-population-side and detector-side mutations retain their named failures and
-byte-exact restorations.
+`CAT-PRIORITY-QUEUE` landed the named finite observations above. Its historical
+evidence pairs original producer blob
+`1eec578603cdef349af21d944ac174af5919705c` with original acceptance-test blob
+`9853d43fa4e3c1c66ce4d00ce2c600a38e4e65a9`. The original thirty
+compile-preserving population-side and detector-side mutations ran against
+those original artifacts and retain their named failures and byte-exact
+restorations.
 
-`CAT-PRIORITY-QUEUE-LAWS` provider blob
-`b9408697beca6a8d6ca7df30d9a3b3e808125358` adds the private checked general
-suite. It proves representation validity and actual right-spine cache shape,
+The current evidence instead pairs provider blob
+`b9408697beca6a8d6ca7df30d9a3b3e808125358` with current acceptance-test blob
+`9eb73ac5546485a28f9f509dee601cf7d2b21700` and owner-local resolver-test blob
+`eb7b16c92c3c2d4c2de788117139aa51fd6ec6e7`. Those current artifacts execute
+nine passing acceptance tests, including exactly 4,216 bounded traces, plus two
+passing export-table closure tests. The historical mutation results are not
+attributed to these current artifacts.
+
+`CAT-PRIORITY-QUEUE-LAWS` adds the private checked general suite. It proves representation validity and actual right-spine cache shape,
 arbitrary-predicate count conservation, actual find/pop global minimality, both
 empty equivalences, and total nondecreasing repeated extraction through the
 real `pop_min`. It includes a nontrivial constructed validity witness and
