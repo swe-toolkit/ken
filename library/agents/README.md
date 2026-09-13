@@ -45,7 +45,7 @@ When a module, checked artifact, and spec appear to disagree:
 
 1. do not reconcile them by invention, and
 2. record the exact conflicting claims, and
-3. prefer no capability claim over an unsupported capability claim, and and
+3. prefer no capability claim over an unsupported capability claim, and
 4. request review of the discrepancy.
 
 ## Product context versus workflow
@@ -68,7 +68,7 @@ target exercises detector behavior through planted fixtures. It:
 - exercises the shipped schema constraint classes and fails on an unsupported
   schema keyword, and
 - rejects a planted pack include whose module is absent and a planted circular
-  pack dependency, and and
+  pack dependency, and
 - rejects planted duplicate pack and task IDs and repository-escaping paths.
 
 The test target does not currently apply the agent-manifest, source,

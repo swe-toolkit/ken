@@ -9,7 +9,7 @@ the selected pack and task fixture:
 2. refuses every unsupported or unproved request at the named boundary, and
 3. loads no file outside the selected pack unless a module prerequisite or
    cited authority requires it, and
-4. invents no syntax, capability, package, command, or proof, and and
+4. invents no syntax, capability, package, command, or proof, and
 5. cites the authority used for each language or capability claim.
 
 Any invented syntax or capability makes `agent_core_ready(run)` false,
