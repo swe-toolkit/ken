@@ -1,7 +1,7 @@
 ---
 id: CAT-PRIORITY-QUEUE
 title: "the Band-A frontier-harvest priority-queue node: land Data.Collections.PriorityQueue as one complete computational persistent LEFTIST priority queue -- abstract carrier PriorityQueue k v leq with private ranked nodes, five public ops (empty/insert/find_min/pop_min/merge) over an explicit Ord k with payload separate, one private make_node + one private meld worker reusing leq_nat; a TESTED computational implementation (semantics load-bearing and covered, general kernel proof deferred to CAT-PRIORITY-QUEUE-LAWS), kernel-untouched and Axiom-free; do NOT split carrier/insert from meld/pop"
-status: ready
+status: merged
 owner: foundation
 size: L
 gate: none

@@ -339,6 +339,30 @@ cache agreed with the real length (CAT-5's `Source`, CC3's `ArgBytes`). **Four
 consumers paid that tax before the asymmetry was recognized as a defect rather
 than a fact of life.** The fix is the parallel view, not a fifth carrier.
 
+### 16. A package is finished only when proven — tests are not part of it
+
+Ken's promise is **proven-correct behavior**, and a proof is an **intrinsic** of
+the package: the kernel re-checks it, so a reader **verifies** rather than
+trusts (#5, #6). A computational **test is external** — it is not part of the
+package, and it asks the reader to *believe* that both the implementation **and
+the test** were written correctly. That substitutes trust-the-author for
+kernel-checked proof, and it is **inherently inferior**: it weakens the exact
+guarantee Ken exists to make.
+
+So **a catalog package is not finished until its proofs are complete.** Shipping
+a tested computation with its general proofs deferred is an **increment, never a
+completion** — and its status must say exactly that, never read as done.
+"Tested" is a way-point on #12's ladder (opaque → tested → proved), not a
+resting place for anything that *can* be proved. Declaring a provable package
+"tested" is the over-claim #8 forbids, seen from the completeness side.
+
+*In practice:* every catalog package carries **proof completion as an acceptance
+criterion, not a deferrable follow-on**. A deferred-laws node is a scheduling
+convenience for reaching a proven end state sooner, never a substitute for it;
+the package's promise is not kept until it lands. The tell that a package is
+unfinished: **its correctness rests on acceptance tests a reader cannot check as
+Ken, only re-run and trust.**
+
 ---
 
 ## Working constraints (process, not philosophy)
