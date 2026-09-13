@@ -9,46 +9,48 @@
 //! parent; the impls here read ancestor-private root state under the standing
 //! child-module pattern (item 4's `units.rs` precedent).
 
-use std::collections::{BTreeMap, BTreeSet};
 #[cfg(test)]
 use std::cell::Cell;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi;
-#[cfg(feature = "px8-ds-test-support")]
-use super::aggregates::checked_ih_generated_entry_context_permutation_is_active;
 use super::abi::{
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiSlot, AbiSlotKind,
     AbiStorageOwner, AbiUnitDefinition,
 };
+#[cfg(feature = "px8-ds-test-support")]
+use super::aggregates::checked_ih_generated_entry_context_permutation_is_active;
+#[cfg(test)]
+use super::closure::{D4bVerdict, D4B_ADMISSION, D4B_ADMISSION_ARMED};
 use super::occurrences::{occurrence_authority, origin_of, StaticOriginId};
 use super::semantic_ir::{RuntimeExprShape, SemanticSourceKind};
 use super::units::{EmittableCallEdge, EmittableCallKind};
 use super::{
+    dense_slice, lifetime_referent_affinity, planner_capacity_error, planner_error,
     CaseEmissionStatus, ConstructorIdentity, CraneliftBackendError, EdgeKind,
     PlannedReferentLifetime, PredeclaredFunctionId, RuntimeDeclaration, StaticTransitionPlan,
-    dense_slice, lifetime_referent_affinity, planner_capacity_error, planner_error,
 };
 use crate::boundary_value::BoundaryReferentOwner;
-#[cfg(test)]
-use super::closure::{D4B_ADMISSION, D4B_ADMISSION_ARMED, D4bVerdict};
 use crate::RuntimeExpr;
 
 mod fusion;
 
 pub(in crate::cranelift_backend) use fusion::{
-    FusionClaimRefusal, FusionComposedEdge, FusionCompositionLayer, FusionOwnedBody,
-    FusionOwnedOuterRealization, FusionRegionClaim, FusionRegionClaimLedger,
-    StaticContinuationFusionCandidate, StaticContinuationFusionDescriptor,
-    StaticContinuationFusionId, StaticContinuationFusionKey, StaticContinuationFusionPlan,
-    StaticContinuationFusionView, build_static_continuation_fusion_plan, fusion_redirect_target,
+    build_static_continuation_fusion_plan, fusion_redirect_target, FusionClaimRefusal,
+    FusionComposedEdge, FusionCompositionLayer, FusionOwnedBody, FusionOwnedOuterRealization,
+    FusionRegionClaim, FusionRegionClaimLedger, StaticContinuationFusionCandidate,
+    StaticContinuationFusionDescriptor, StaticContinuationFusionId, StaticContinuationFusionKey,
+    StaticContinuationFusionPlan, StaticContinuationFusionView,
 };
-#[cfg(test)]
-pub(in crate::cranelift_backend) use fusion::{FusionClaimParameterMutation, FusionProducerCaptureMutation};
 #[cfg(test)]
 pub(in crate::cranelift_backend) use fusion::{
     r3_fusion_claim_consumptions, reset_r3_fusion_claim_consumptions,
     set_primary_fusion_key_derivation_mutated, with_fusion_claim_parameter_mutation,
     with_fusion_producer_capture_mutation,
+};
+#[cfg(test)]
+pub(in crate::cranelift_backend) use fusion::{
+    FusionClaimParameterMutation, FusionProducerCaptureMutation,
 };
 
 /// Dense identity of one planner-interned continuation specialization.
@@ -58,6 +60,13 @@ pub(in crate::cranelift_backend) use fusion::{
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub(in crate::cranelift_backend) struct ContinuationSpecializationId(pub(super) u32);
+
+impl ContinuationSpecializationId {
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
+        self.0
+    }
+}
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the generalized emission-owner domain.**
 ///
@@ -447,7 +456,6 @@ pub(in crate::cranelift_backend) enum ContinuationSourceCoordinate {
 }
 
 impl ContinuationSourceCoordinate {
-
     /// A producer-local coordinate for a control that must **reach** one.
     ///
     /// ⛔ Test-only, and it exists because `D1` represents this domain while
@@ -554,7 +562,8 @@ impl ContinuationAvailabilityViews {
     pub(in crate::cranelift_backend) fn expect_direct_emission_slot(self) -> u32 {
         match self.direct_emission {
             Some(ContinuationEnvironmentClaim::CurrentLexical {
-                nearest_alias_index, ..
+                nearest_alias_index,
+                ..
             }) => nearest_alias_index,
             Some(ContinuationEnvironmentClaim::EntryFrame { declared_slot, .. }) => declared_slot,
             None => panic!("expected a direct-emission availability claim, found none"),
@@ -651,10 +660,7 @@ pub(in crate::cranelift_backend) enum ContinuationEnvironmentClaimOver<Frame> {
     /// *kind* of environment — a declared operand run — differing only in which
     /// frame declares it. Two names for one environment class is what let the
     /// old law read a frame identity off a root domain.
-    EntryFrame {
-        frame: Frame,
-        declared_slot: u32,
-    },
+    EntryFrame { frame: Frame, declared_slot: u32 },
 }
 
 /// **Stage 2** — a claim whose frame is an exact, resolved identity. This is the
@@ -925,7 +931,10 @@ pub(in crate::cranelift_backend) fn d3b_refinalize(
     let mut generated = 0;
     let mut total = 0;
     let mut count = |draft: ContinuationAvailabilityDraft| {
-        for claim in [draft.direct_emission, draft.context_capture].into_iter().flatten() {
+        for claim in [draft.direct_emission, draft.context_capture]
+            .into_iter()
+            .flatten()
+        {
             total += 1;
             if matches!(
                 claim,
@@ -1188,6 +1197,111 @@ impl ContinuationConsumingOccurrence {
     }
 }
 
+/// One exact forward edge from a result-flow root toward a result position.
+///
+/// The role is closed because lowering must be able to reject a template whose
+/// recorded source child no longer has the semantics under which it was issued.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum SourceReturnContextRole {
+    CheckedBody,
+    LetBody,
+    IfThen,
+    IfElse,
+    MatchCase(u32),
+    ComputationalMatchCase(u32),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceReturnContextStep {
+    parent_origin: StaticOriginId,
+    child_origin: StaticOriginId,
+    child_position: u32,
+    role: SourceReturnContextRole,
+}
+
+impl SourceReturnContextStep {
+    pub(in crate::cranelift_backend) fn parent_origin(self) -> StaticOriginId {
+        self.parent_origin
+    }
+
+    pub(in crate::cranelift_backend) fn child_origin(self) -> StaticOriginId {
+        self.child_origin
+    }
+
+    pub(in crate::cranelift_backend) fn child_position(self) -> u32 {
+        self.child_position
+    }
+
+    pub(in crate::cranelift_backend) fn role(self) -> SourceReturnContextRole {
+        self.role
+    }
+}
+
+/// A generated worker's result returns through the exact call that selected it
+/// before it reaches the caller-owned suffix. This is a symbolic boundary: it
+/// contains no lowering activation, cursor, selected scope, or runtime value.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceWorkerReturnBoundary {
+    selecting_call: ContinuationCallIdentity,
+    caller_context: Box<SourceReturnContextTemplate>,
+}
+
+impl SourceWorkerReturnBoundary {
+    pub(in crate::cranelift_backend) fn selecting_call(&self) -> &ContinuationCallIdentity {
+        &self.selecting_call
+    }
+
+    pub(in crate::cranelift_backend) fn caller_context(&self) -> &SourceReturnContextTemplate {
+        &self.caller_context
+    }
+}
+
+/// The exact static result-position-to-return-boundary path retained by the
+/// common forward result traversal. `steps` run root-to-result; lowering binds
+/// their reverse against the continuation it actually owns. The optional
+/// worker boundary composes one generated result domain with its exact caller
+/// without inventing a concrete source-machine continuation.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceReturnContextTemplate {
+    root_origin: StaticOriginId,
+    result_origin: StaticOriginId,
+    steps: Vec<SourceReturnContextStep>,
+    /// Computational consumers already pending outside this result root, in
+    /// exact inner-to-outer return order.
+    caller_suffix: Vec<StaticOriginId>,
+    worker_return: Option<Box<SourceWorkerReturnBoundary>>,
+}
+
+impl SourceReturnContextTemplate {
+    pub(in crate::cranelift_backend) fn root_origin(&self) -> StaticOriginId {
+        self.root_origin
+    }
+
+    pub(in crate::cranelift_backend) fn result_origin(&self) -> StaticOriginId {
+        self.result_origin
+    }
+
+    pub(in crate::cranelift_backend) fn steps(&self) -> &[SourceReturnContextStep] {
+        &self.steps
+    }
+
+    pub(in crate::cranelift_backend) fn caller_suffix(&self) -> &[StaticOriginId] {
+        &self.caller_suffix
+    }
+
+    pub(in crate::cranelift_backend) fn worker_return(
+        &self,
+    ) -> Option<&SourceWorkerReturnBoundary> {
+        self.worker_return.as_deref()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ContinuationResultPositionWitness {
+    origin: StaticOriginId,
+    return_context: SourceReturnContextTemplate,
+}
+
 /// A continuation call's independently derived consumer-level occurrence.
 ///
 /// This is deliberately separate from
@@ -1200,23 +1314,80 @@ impl ContinuationConsumingOccurrence {
 /// The fields are private and there is no constructor outside planning.
 /// Lowering can only receive a value that the whole-plan validator has matched
 /// against [`derive_required_consumer_occurrence`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) struct RequiredConsumerProjection {
-    pub(super) source: ContinuationConsumingOccurrence,
-    pub(super) required: ContinuationConsumingOccurrence,
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum RequiredConsumerProjection {
+    DirectOuter {
+        source: ContinuationConsumingOccurrence,
+        required: ContinuationConsumingOccurrence,
+    },
+    DetachedReturnContext(SourceReturnContextTemplate),
 }
 
 impl RequiredConsumerProjection {
-    pub(in crate::cranelift_backend) fn source(self) -> ContinuationConsumingOccurrence {
-        self.source
+    pub(in crate::cranelift_backend) fn direct_outer(
+        &self,
+    ) -> Option<(
+        ContinuationConsumingOccurrence,
+        ContinuationConsumingOccurrence,
+    )> {
+        match self {
+            Self::DirectOuter { source, required } => Some((*source, *required)),
+            Self::DetachedReturnContext(_) => None,
+        }
     }
 
-    pub(in crate::cranelift_backend) fn body_origin(self) -> StaticOriginId {
-        self.required.body_origin
+    pub(in crate::cranelift_backend) fn detached_return_context(
+        &self,
+    ) -> Option<&SourceReturnContextTemplate> {
+        match self {
+            Self::DirectOuter { .. } => None,
+            Self::DetachedReturnContext(context) => Some(context),
+        }
     }
 
-    pub(in crate::cranelift_backend) fn eliminator_origin(self) -> StaticOriginId {
-        self.required.eliminator_origin
+    pub(in crate::cranelift_backend) fn source(&self) -> ContinuationConsumingOccurrence {
+        self.direct_outer()
+            .expect("a direct required-consumer route has direct-outer authority")
+            .0
+    }
+
+    pub(in crate::cranelift_backend) fn body_origin(&self) -> StaticOriginId {
+        self.direct_outer()
+            .expect("a direct required-consumer route has direct-outer authority")
+            .1
+            .body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn eliminator_origin(&self) -> StaticOriginId {
+        self.direct_outer()
+            .expect("a direct required-consumer route has direct-outer authority")
+            .1
+            .eliminator_origin
+    }
+}
+
+/// One exact source computational consumer in a checked-IH transport result
+/// chain. The optional frame marker is derived from the source wrapper whose
+/// sole body is this occurrence; lowering re-enters that existing marker rather
+/// than minting a new checked frame.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumerStep {
+    occurrence: ContinuationConsumingOccurrence,
+    demanded_body_origin: StaticOriginId,
+    checked_frame_id: Option<u64>,
+}
+
+impl CheckedIhPostCallConsumerStep {
+    pub(in crate::cranelift_backend) fn occurrence(self) -> ContinuationConsumingOccurrence {
+        self.occurrence
+    }
+
+    pub(in crate::cranelift_backend) fn demanded_body_origin(self) -> StaticOriginId {
+        self.demanded_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn checked_frame_id(self) -> Option<u64> {
+        self.checked_frame_id
     }
 }
 
@@ -1320,6 +1491,14 @@ impl ContinuationCallIdentity {
     pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
         self.token.emission_owner
     }
+
+    pub(in crate::cranelift_backend) fn producer_result_origin(&self) -> StaticOriginId {
+        self.token.producer_result_origin
+    }
+
+    pub(in crate::cranelift_backend) fn producer_construct_origin(&self) -> StaticOriginId {
+        self.token.producer_construct_origin
+    }
 }
 
 /// `D1` — a read-only view of one already-validated continuation
@@ -1387,7 +1566,9 @@ impl<'plan> ContinuationUnitView<'plan> {
     pub(in crate::cranelift_backend) fn slots(&self) -> &'plan [AbiSlot] {
         self.slots
     }
-    pub(in crate::cranelift_backend) fn inputs(&self) -> &'plan [abi::AbiContinuationInputAuthority] {
+    pub(in crate::cranelift_backend) fn inputs(
+        &self,
+    ) -> &'plan [abi::AbiContinuationInputAuthority] {
         self.inputs
     }
 
@@ -1428,9 +1609,8 @@ impl<'plan> ContinuationUnitView<'plan> {
     pub(in crate::cranelift_backend) fn ruled_ordinary_envelope(
         &self,
     ) -> Result<Option<Vec<ContinuationOrdinaryEnvelopeRole>>, CraneliftBackendError> {
-        let captures = u32::try_from(self.key.worker.captures.len()).map_err(|_| {
-            planner_error("worker capture count exceeds addressable range")
-        })?;
+        let captures = u32::try_from(self.key.worker.captures.len())
+            .map_err(|_| planner_error("worker capture count exceeds addressable range"))?;
         let Some(nonrecursive_field_count) = self.key.ordinary_parameters.checked_sub(captures)
         else {
             return Ok(None);
@@ -1595,9 +1775,9 @@ impl<'plan> ContinuationUnitView<'plan> {
             EnvelopeDefect::WrongOrder => nonrecursive.reverse(),
         }
         for source_position in nonrecursive {
-            envelope.push(ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
-                source_position,
-            });
+            envelope.push(
+                ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField { source_position },
+            );
         }
         for capture in &self.key.worker.captures {
             let position = nonrecursive_field_count
@@ -2186,7 +2366,6 @@ pub(in crate::cranelift_backend) struct ContinuationResultEdge {
     pub(in crate::cranelift_backend) identity: ContinuationCallIdentity,
 }
 
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct PlannedContinuationSpecialization {
     pub(super) id: ContinuationSpecializationId,
@@ -2220,7 +2399,6 @@ pub(super) struct ContinuationSpecializationCallToken {
 pub(super) struct PlannedContinuationSpecializationCall {
     pub(super) token: ContinuationSpecializationCallToken,
 }
-
 
 /// The exact result-position population below `root`, bounded to its source
 /// owner. Ordinary `Match` branches are selected only through Slice 0's D1
@@ -2310,7 +2488,6 @@ fn producer_binder_depth(
     }
 }
 
-
 /// **`RT-CAPTURE-PROJECTION-GROW` `D1` — one edge whose worker prefix was NOT
 /// joined, with the numbers that explain why.**
 ///
@@ -2381,36 +2558,67 @@ fn record_worker_prefix_deferral(row: WorkerPrefixDeferral) {
     });
 }
 
-pub(super) fn continuation_result_origins(
+fn continuation_result_positions(
     plan: &StaticTransitionPlan<'_>,
-    root: StaticOriginId,
-) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+    root_context: &SourceReturnContextTemplate,
+) -> Result<Vec<ContinuationResultPositionWitness>, CraneliftBackendError> {
+    if root_context.root_origin != root_context.result_origin || !root_context.steps.is_empty() {
+        return Err(planner_error(
+            "a continuation result-flow seed is not the empty context at its exact root",
+        ));
+    }
+    let root = root_context.root_origin;
     let owner = occurrence_authority(plan, root)?.owner;
-    let mut pending = vec![root];
-    let mut results = BTreeSet::new();
-    while let Some(origin) = pending.pop() {
-        if results.contains(&origin) {
-            continue;
-        }
+    let mut pending = vec![(root, Vec::<SourceReturnContextStep>::new())];
+    let mut results = BTreeMap::<StaticOriginId, SourceReturnContextTemplate>::new();
+    while let Some((origin, steps)) = pending.pop() {
         let authority = occurrence_authority(plan, origin)?;
         if authority.owner != owner {
             continue;
         }
-        results.insert(origin);
+        let context = SourceReturnContextTemplate {
+            root_origin: root,
+            result_origin: origin,
+            steps: steps.clone(),
+            caller_suffix: root_context.caller_suffix.clone(),
+            worker_return: root_context.worker_return.clone(),
+        };
+        if let Some(prior) = results.insert(origin, context.clone()) {
+            if prior != context {
+                return Err(planner_error(
+                    "one continuation result position has two incompatible source return contexts",
+                ));
+            }
+            continue;
+        }
         let expr = plan.planned_occurrence_expr(origin)?;
-        let child = |position| plan.semantic.child_origin(origin, position);
+        let mut push =
+            |position: usize, role: SourceReturnContextRole| -> Result<(), CraneliftBackendError> {
+                let child_origin = plan.semantic.child_origin(origin, position)?;
+                let mut child_steps = steps.clone();
+                child_steps.push(SourceReturnContextStep {
+                    parent_origin: origin,
+                    child_origin,
+                    child_position: u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("source return-context child position exhausted")
+                    })?,
+                    role,
+                });
+                pending.push((child_origin, child_steps));
+                Ok(())
+            };
         match expr {
             RuntimeExpr::CheckedJoinSite { .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedRecursiveInvocation { .. }
             | RuntimeExpr::CheckedComputationalIHSlots { .. }
             | RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
-                pending.push(child(0)?);
+                push(0, SourceReturnContextRole::CheckedBody)?;
             }
-            RuntimeExpr::Let { .. } => pending.push(child(1)?),
+            RuntimeExpr::Let { .. } => push(1, SourceReturnContextRole::LetBody)?,
             RuntimeExpr::If { .. } => {
-                pending.push(child(1)?);
-                pending.push(child(2)?);
+                push(1, SourceReturnContextRole::IfThen)?;
+                push(2, SourceReturnContextRole::IfElse)?;
             }
             RuntimeExpr::Match { cases, .. } => {
                 let records = plan
@@ -2423,15 +2631,39 @@ pub(super) fn continuation_result_origins(
                         "continuation result flow has no exact D1 case population",
                     ));
                 }
-                for record in records {
+                for (index, record) in records.into_iter().enumerate() {
                     if record.status == CaseEmissionStatus::Reachable {
-                        pending.push(record.body_origin);
+                        let position = 1 + index;
+                        if plan.semantic.child_origin(origin, position)? != record.body_origin {
+                            return Err(planner_error(
+                                "a continuation result-flow case record disagrees with source child authority",
+                            ));
+                        }
+                        push(
+                            position,
+                            SourceReturnContextRole::MatchCase(u32::try_from(index).map_err(
+                                |_| {
+                                    planner_capacity_error(
+                                        "source return-context match alternative exhausted",
+                                    )
+                                },
+                            )?),
+                        )?;
                     }
                 }
             }
             RuntimeExpr::ComputationalMatch { cases, .. } => {
                 for index in 0..cases.len() {
-                    pending.push(child(1 + index)?);
+                    push(
+                        1 + index,
+                        SourceReturnContextRole::ComputationalMatchCase(
+                            u32::try_from(index).map_err(|_| {
+                                planner_capacity_error(
+                                    "source return-context computational alternative exhausted",
+                                )
+                            })?,
+                        ),
+                    )?;
                 }
             }
             RuntimeExpr::Value(_)
@@ -2449,7 +2681,32 @@ pub(super) fn continuation_result_origins(
             | RuntimeExpr::Trap(_) => {}
         }
     }
-    Ok(results)
+    Ok(results
+        .into_iter()
+        .map(
+            |(origin, return_context)| ContinuationResultPositionWitness {
+                origin,
+                return_context,
+            },
+        )
+        .collect())
+}
+
+pub(super) fn continuation_result_origins(
+    plan: &StaticTransitionPlan<'_>,
+    root: StaticOriginId,
+) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+    let root_context = SourceReturnContextTemplate {
+        root_origin: root,
+        result_origin: root,
+        steps: Vec::new(),
+        caller_suffix: Vec::new(),
+        worker_return: None,
+    };
+    Ok(continuation_result_positions(plan, &root_context)?
+        .into_iter()
+        .map(|witness| witness.origin)
+        .collect())
 }
 
 pub(super) fn build_continuation_worker_provenance(
@@ -2502,9 +2759,7 @@ pub(super) fn build_continuation_worker_provenance(
                         .iter()
                         .find(|child| child.position == position)
                         .ok_or_else(|| {
-                            planner_error(
-                                "continuation worker capture has no exact D2 authority",
-                            )
+                            planner_error("continuation worker capture has no exact D2 authority")
                         })?;
                     Ok(ContinuationWorkerCaptureProvenance {
                         ordinal: u32::try_from(ordinal).map_err(|_| {
@@ -2559,7 +2814,6 @@ pub(super) fn slot_referent_affinity(
         )),
     }
 }
-
 
 pub(super) fn continuation_owner_entry_sources(
     plan: &StaticTransitionPlan<'_>,
@@ -2623,18 +2877,14 @@ pub(super) fn continuation_owner_entry_sources(
                     } => {
                         let defining = occurrence_authority(plan, defining_origin)?;
                         let child_position = slot.ordinal.checked_add(1).ok_or_else(|| {
-                            planner_capacity_error(
-                                "continuation capture source position exhausted",
-                            )
+                            planner_capacity_error("continuation capture source position exhausted")
                         })?;
                         let child = defining
                             .children
                             .iter()
                             .find(|child| child.position == child_position)
                             .ok_or_else(|| {
-                                planner_error(
-                                    "lexical continuation capture has no D2 source",
-                                )
+                                planner_error("lexical continuation capture has no D2 source")
                             })?;
                         (
                             source_abi_position,
@@ -2656,9 +2906,7 @@ pub(super) fn continuation_owner_entry_sources(
                         (
                             source_abi_position,
                             ContinuationInputSource::SeedCapture { defining_origin },
-                            lifetime_referent_affinity(
-                                PlannedReferentLifetime::Persistent,
-                            ),
+                            lifetime_referent_affinity(PlannedReferentLifetime::Persistent),
                         )
                     }
                     AbiUnitDefinition::SchedulingEntry { .. } => {
@@ -2685,10 +2933,7 @@ pub(super) fn continuation_owner_entry_sources(
                     }
                 }
             }
-            AbiSlotKind::Result
-            | AbiSlotKind::Control
-            | AbiSlotKind::Trap
-            | AbiSlotKind::Store => {
+            AbiSlotKind::Result | AbiSlotKind::Control | AbiSlotKind::Trap | AbiSlotKind::Store => {
                 return Err(planner_error(
                     "continuation source environment names a convention slot",
                 ));
@@ -2712,7 +2957,8 @@ pub(super) fn continuation_owner_entry_sources(
     }
     let entry_position = |source: &ContinuationSourceSlotAuthority| match source.coordinate {
         ContinuationSourceCoordinate::EntryAbi {
-            source_abi_position, ..
+            source_abi_position,
+            ..
         } => source_abi_position,
         // ⛔ Unreachable by construction — every push above is `EntryAbi` — and
         // deliberately mapped to a position no exact run can hold, so a future
@@ -3328,11 +3574,9 @@ pub(super) fn required_surrounding_environment_prefix(
     local_binders: usize,
 ) -> Result<usize, CraneliftBackendError> {
     let with_binders = |additional: usize| {
-        local_binders
-            .checked_add(additional)
-            .ok_or_else(|| {
-                planner_capacity_error("continuation environment binder count exhausted")
-            })
+        local_binders.checked_add(additional).ok_or_else(|| {
+            planner_capacity_error("continuation environment binder count exhausted")
+        })
     };
     let mut maximum = 0usize;
     let mut include = |required: usize| maximum = maximum.max(required);
@@ -3482,7 +3726,6 @@ pub(super) fn required_surrounding_environment_prefix(
     Ok(maximum)
 }
 
-
 pub(super) fn exact_continuation_source_environment(
     plan: &StaticTransitionPlan<'_>,
     producer_owner: PredeclaredFunctionId,
@@ -3538,8 +3781,7 @@ pub(super) fn exact_continuation_source_environment(
                 planner_capacity_error("continuation environment case binder count exhausted")
             })?;
         required_input_count = required_input_count.max(required_surrounding_environment_prefix(
-            &case.body,
-            binders,
+            &case.body, binders,
         )?);
     }
     // ⭐⭐ `RT-CAPTURE-PROJECTION-GROW` `D1` — THE WORKER CLOSURE'S OWN PREFIX,
@@ -4036,7 +4278,10 @@ pub(super) fn nearest_exact_alias(
             // ⭐ Exactly `Closed([S])`, compared as the WHOLE record.
             [only] if only == requested => eligible.push(index),
             [only] if only.coordinate == requested.coordinate => contract_mismatch = true,
-            many if many.iter().any(|source| source.coordinate == requested.coordinate) => {
+            many if many
+                .iter()
+                .any(|source| source.coordinate == requested.coordinate) =>
+            {
                 ambiguous = true;
             }
             _ => {}
@@ -4121,9 +4366,8 @@ pub(super) fn exact_continuation_projection(
         .iter()
         .enumerate()
         .map(|(ordinal, input)| {
-            let ordinal = u32::try_from(ordinal).map_err(|_| {
-                planner_capacity_error("continuation projection ordinal exhausted")
-            })?;
+            let ordinal = u32::try_from(ordinal)
+                .map_err(|_| planner_capacity_error("continuation projection ordinal exhausted"))?;
             let availability = match emitter {
                 // ⭐⭐ **The `D3c` correction, and the whole point of the re-cut.**
                 // A predeclared emitter's direct-emission consumer reads the
@@ -4135,9 +4379,8 @@ pub(super) fn exact_continuation_projection(
                 ContinuationEmitterFrame::Predeclared(emission_owner) => {
                     let (lexical_environment_origin, seat) = match &seat_environment {
                         Some(seat) => seat,
-                        None => seat_environment.insert(
-                            continuation_emission_seat_environment(plan, environment)?,
-                        ),
+                        None => seat_environment
+                            .insert(continuation_emission_seat_environment(plan, environment)?),
                     };
                     let claim = current_lexical_availability(
                         input,
@@ -4164,15 +4407,13 @@ pub(super) fn exact_continuation_projection(
                     // ⛔ `None` when the frame declares no member: fails closed.
                     // Nothing invents a position, and no fallback reads the
                     // direct-emission index as a frame slot.
-                    let capture = predeclared_entry_frame_slot(
-                        plan,
-                        *emission_owner,
-                        input.coordinate,
-                    )?
-                    .map(|declared_slot| ContinuationEnvironmentDraft::EntryFrame {
-                        frame: ContinuationFrameRequirement::Predeclared(*emission_owner),
-                        declared_slot,
-                    });
+                    let capture =
+                        predeclared_entry_frame_slot(plan, *emission_owner, input.coordinate)?.map(
+                            |declared_slot| ContinuationEnvironmentDraft::EntryFrame {
+                                frame: ContinuationFrameRequirement::Predeclared(*emission_owner),
+                                declared_slot,
+                            },
+                        );
                     ContinuationAvailabilityDraft {
                         direct_emission: Some(claim),
                         context_capture: capture,
@@ -4221,9 +4462,7 @@ pub(super) fn exact_continuation_projection(
                     })?;
                     let declared_slot =
                         context_parameters.checked_add(position).ok_or_else(|| {
-                            planner_capacity_error(
-                                "continuation immediate slot position exhausted",
-                            )
+                            planner_capacity_error("continuation immediate slot position exhausted")
                         })?;
                     let claim = ContinuationEnvironmentDraft::EntryFrame {
                         frame: ContinuationFrameRequirement::GeneratedContext {
@@ -4254,13 +4493,9 @@ pub(super) fn exact_continuation_projection(
                 ownership: input.ownership,
                 storage_owner: input.storage_owner,
                 referent_affinity: input.referent_affinity.clone(),
-                ordinary_abi_position: ordinary_parameters
-                    .checked_add(ordinal)
-                    .ok_or_else(|| {
-                        planner_capacity_error(
-                            "continuation projection ABI position exhausted",
-                        )
-                    })?,
+                ordinary_abi_position: ordinary_parameters.checked_add(ordinal).ok_or_else(
+                    || planner_capacity_error("continuation projection ABI position exhausted"),
+                )?,
             })
         })
         .collect()
@@ -4404,13 +4639,11 @@ fn continuation_keys_equal_under_mutation(
                     // while having applied no mutation at all.
                     ContinuationProjectionOmission::SourceOwner
                     | ContinuationProjectionOmission::SourceAbiPosition
-                    | ContinuationProjectionOmission::Source => {
-                        copy_entry_coordinate_component(
-                            &mut target.coordinate,
-                            &source.coordinate,
-                            field,
-                        )
-                    }
+                    | ContinuationProjectionOmission::Source => copy_entry_coordinate_component(
+                        &mut target.coordinate,
+                        &source.coordinate,
+                        field,
+                    ),
                     ContinuationProjectionOmission::Ordinal => target.ordinal = source.ordinal,
                     ContinuationProjectionOmission::Carrier => target.carrier = source.carrier,
                     ContinuationProjectionOmission::Ownership => {
@@ -4431,7 +4664,6 @@ fn continuation_keys_equal_under_mutation(
         }
     }
 }
-
 
 pub(super) fn intern_specialization(
     interned: &mut BTreeMap<ContinuationSpecializationKey, ContinuationSpecializationId>,
@@ -4461,11 +4693,10 @@ pub(super) fn intern_specialization(
         }
         return Ok((id, false));
     }
-    let id = ContinuationSpecializationId(
-        u32::try_from(units.len()).map_err(|_| {
+    let id =
+        ContinuationSpecializationId(u32::try_from(units.len()).map_err(|_| {
             planner_capacity_error("continuation specialization identity exhausted")
-        })?,
-    );
+        })?);
     // The immutable key is installed before the caller performs any recursive
     // discovery. This ordering is the fixed point's decreasing measure.
     interned.insert(key.clone(), id);
@@ -4548,6 +4779,9 @@ pub(super) enum ContinuationRequiredConsumingOccurrence {
 pub(super) struct ContinuationDiscovery {
     pub(super) continuation_origin: StaticOriginId,
     pub(super) result_root: StaticOriginId,
+    /// Symbolic result-root-to-caller return context retained from the forward
+    /// traversal that still owned the exact source child relation.
+    pub(super) return_context: SourceReturnContextTemplate,
     /// **`D5a` — the enclosing generated emission context, retained across
     /// descent.**
     ///
@@ -4610,9 +4844,7 @@ impl ContinuationRequiredConsumerObservation {
         self.result_root
     }
 
-    pub(in crate::cranelift_backend) fn required(
-        self,
-    ) -> Option<ContinuationConsumingOccurrence> {
+    pub(in crate::cranelift_backend) fn required(self) -> Option<ContinuationConsumingOccurrence> {
         self.required
     }
 
@@ -4682,13 +4914,11 @@ pub(in crate::cranelift_backend) fn with_required_consumer_projection_mutation<T
             REQUIRED_CONSUMER_PROJECTION_MUTATION.with(|cell| cell.set(self.0));
         }
     }
-    let previous = REQUIRED_CONSUMER_PROJECTION_MUTATION
-        .with(|cell| cell.replace(Some(mutation)));
+    let previous = REQUIRED_CONSUMER_PROJECTION_MUTATION.with(|cell| cell.replace(Some(mutation)));
     REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
     let restore = Restore(previous);
     let result = run();
-    let applications =
-        REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS.with(Cell::get);
+    let applications = REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS.with(Cell::get);
     drop(restore);
     (result, applications)
 }
@@ -4696,9 +4926,8 @@ pub(in crate::cranelift_backend) fn with_required_consumer_projection_mutation<T
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn take_continuation_required_consumer_observations(
 ) -> Vec<ContinuationRequiredConsumerObservation> {
-    CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
-        std::mem::take(&mut *observations.borrow_mut())
-    })
+    CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS
+        .with(|observations| std::mem::take(&mut *observations.borrow_mut()))
 }
 
 #[cfg(test)]
@@ -4713,8 +4942,8 @@ fn with_continuation_consuming_occurrence_seed_mutation<T>(
         }
     }
 
-    let previous = MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED
-        .with(|cell| cell.replace(Some(mutation)));
+    let previous =
+        MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(|cell| cell.replace(Some(mutation)));
     let _restore = Restore(previous);
     run()
 }
@@ -5528,15 +5757,17 @@ pub(super) fn initial_continuation_discoveries(
         .declaration_occurrences
         .values()
         .copied()
-        .map(|origin| (origin, None, None))
+        .map(|origin| (origin, None, None, Vec::<StaticOriginId>::new()))
         .collect::<Vec<_>>();
     if let Some(root) = plan.root_occurrence {
-        roots.push((root, None, None));
+        roots.push((root, None, None, Vec::new()));
     }
 
     let mut walked = BTreeSet::new();
     let mut pending = Vec::new();
-    while let Some((origin, consuming_occurrences, required_consuming_occurrence)) = roots.pop() {
+    while let Some((origin, consuming_occurrences, required_consuming_occurrence, caller_suffix)) =
+        roots.pop()
+    {
         if !walked.insert(origin) {
             return Err(planner_error(
                 "the forward continuation seed walk reached one source occurrence twice",
@@ -5555,6 +5786,13 @@ pub(super) fn initial_continuation_discoveries(
             pending.push(ContinuationDiscovery {
                 continuation_origin: origin,
                 result_root: scrutinee,
+                return_context: SourceReturnContextTemplate {
+                    root_origin: scrutinee,
+                    result_origin: scrutinee,
+                    steps: Vec::new(),
+                    caller_suffix: caller_suffix.clone(),
+                    worker_return: None,
+                },
                 enclosing_specialization: None,
                 consuming_occurrences: consuming_occurrences.clone(),
                 required_consuming_occurrence,
@@ -5564,8 +5802,7 @@ pub(super) fn initial_continuation_discoveries(
             for alternative in 0..cases.len() {
                 let body_origin = plan.semantic.child_origin(origin, 1 + alternative)?;
                 #[cfg(test)]
-                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED
-                    .with(Cell::get)
+                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(Cell::get)
                     == Some(ContinuationConsumingOccurrenceSeedMutation::BodyOrigin)
                 {
                     // The exact wrong relation from AC-2: the continuation's
@@ -5597,16 +5834,47 @@ pub(super) fn initial_continuation_discoveries(
                         },
                     ))
                 });
+            let mut scrutinee_suffix = Vec::with_capacity(1 + caller_suffix.len());
+            scrutinee_suffix.push(origin);
+            scrutinee_suffix.extend(caller_suffix.iter().copied());
             roots.push((
                 scrutinee,
                 Some(ContinuationConsumingOccurrenceSeeds { candidates }),
                 required_consuming_occurrence,
+                scrutinee_suffix,
             ));
             for child in children.into_iter().skip(1) {
-                roots.push((child, None, None));
+                roots.push((child, None, None, caller_suffix.clone()));
             }
         } else {
-            roots.extend(children.into_iter().map(|child| (child, None, None)));
+            match expr {
+                RuntimeExpr::CheckedComputationalIHInvocation { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. } => {
+                    for (position, child) in children.into_iter().enumerate() {
+                        let suffix = if position == 0 {
+                            Vec::new()
+                        } else {
+                            caller_suffix.clone()
+                        };
+                        roots.push((child, None, None, suffix));
+                    }
+                }
+                RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {
+                    for (position, child) in children.into_iter().enumerate() {
+                        let suffix = if position == 0 {
+                            Vec::new()
+                        } else {
+                            caller_suffix.clone()
+                        };
+                        roots.push((child, None, None, suffix));
+                    }
+                }
+                _ => roots.extend(
+                    children
+                        .into_iter()
+                        .map(|child| (child, None, None, caller_suffix.clone())),
+                ),
+            }
         }
     }
 
@@ -5782,6 +6050,179 @@ pub(super) fn derive_required_consumer_occurrence(
     })
 }
 
+fn exact_result_identity(
+    plan: &StaticTransitionPlan<'_>,
+    body: StaticOriginId,
+    context: &'static str,
+) -> Result<ConstructorIdentity, CraneliftBackendError> {
+    let identities = continuation_result_constructor_identities(plan, body)?;
+    match identities.as_slice() {
+        [identity] => Ok(*identity),
+        [] => Err(planner_error(format!(
+            "{context} has no successful constructor result identity"
+        ))),
+        _ => Err(planner_error(format!(
+            "{context} has more than one successful constructor result identity"
+        ))),
+    }
+}
+
+/// Derive the successful identity actually produced by a continuation target's
+/// selected source case. This is the source half of the post-call contract; it
+/// does not inspect the demanded response identity.
+pub(super) fn continuation_call_selected_result_identity(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+) -> Result<ConstructorIdentity, CraneliftBackendError> {
+    let unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == identity.target())
+        .ok_or_else(|| {
+            planner_error("a checked-IH post-call consumer names no target specialization")
+        })?;
+    let body = plan.semantic.child_origin(
+        unit.continuation_origin(),
+        1 + unit.producer_alternative() as usize,
+    )?;
+    exact_result_identity(plan, body, "a continuation target's selected source case")
+}
+
+pub(super) fn checked_frame_for_consumer(
+    plan: &StaticTransitionPlan<'_>,
+    consumer: StaticOriginId,
+) -> Result<Option<u64>, CraneliftBackendError> {
+    let mut frames = Vec::new();
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        let RuntimeExpr::CheckedSubcontinuationFrame { frame_id, .. } = occurrence.expr else {
+            continue;
+        };
+        if plan.semantic.child_origin(occurrence.static_origin, 0)? == consumer {
+            frames.push(*frame_id);
+        }
+    }
+    frames.sort_unstable();
+    frames.dedup();
+    match frames.as_slice() {
+        [] => Ok(None),
+        [frame] => Ok(Some(*frame)),
+        _ => Err(planner_error(
+            "one post-call computational consumer is wrapped by more than one checked frame",
+        )),
+    }
+}
+
+fn post_call_consumer_in_frame(
+    plan: &StaticTransitionPlan<'_>,
+    frame_origin: StaticOriginId,
+    result_identity: ConstructorIdentity,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(frame_origin)?
+    else {
+        return Ok(None);
+    };
+    let mut matching = Vec::new();
+    for alternative in 0..cases.len() {
+        let case_identity = plan.case_constructor_identity(frame_origin, alternative)?;
+        if case_identity != result_identity {
+            continue;
+        }
+        matching.push(ContinuationConsumingOccurrence {
+            body_origin: plan.semantic.child_origin(frame_origin, 1 + alternative)?,
+            eliminator_origin: frame_origin,
+        });
+    }
+    match matching.as_slice() {
+        [] => Ok(None),
+        [consumer] => Ok(Some(*consumer)),
+        _ => Err(planner_error(
+            "one checked-IH transport result selects more than one case in its source consumer",
+        )),
+    }
+}
+
+fn next_post_call_consumer(
+    plan: &StaticTransitionPlan<'_>,
+    scrutinee_origin: StaticOriginId,
+    result_identity: ConstructorIdentity,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    let mut matching = Vec::new();
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        let RuntimeExpr::ComputationalMatch { cases, .. } = occurrence.expr else {
+            continue;
+        };
+        if forward_match_scrutinee(plan, occurrence.static_origin)? != scrutinee_origin {
+            continue;
+        }
+        for alternative in 0..cases.len() {
+            if plan.case_constructor_identity(occurrence.static_origin, alternative)?
+                != result_identity
+            {
+                continue;
+            }
+            let candidate = ContinuationConsumingOccurrence {
+                body_origin: plan
+                    .semantic
+                    .child_origin(occurrence.static_origin, 1 + alternative)?,
+                eliminator_origin: occurrence.static_origin,
+            };
+            if !matching.contains(&candidate) {
+                matching.push(candidate);
+            }
+        }
+    }
+    match matching.as_slice() {
+        [] => Ok(None),
+        [consumer] => Ok(Some(*consumer)),
+        _ => Err(planner_error(
+            "one checked-IH transport result has more than one exact next source consumer",
+        )),
+    }
+}
+
+/// Derive the complete ordered source-consumer chain from one continuation
+/// target's actual selected-case Result to the independently demanded context
+/// Result. Every hop is a position-zero computational consumer selected by the
+/// prior hop's exact constructor identity. Absence or ambiguity refuses.
+pub(super) fn derive_checked_ih_post_call_consumer_chain(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+    frame_origins: &[StaticOriginId],
+    actual: ConstructorIdentity,
+    demanded: ConstructorIdentity,
+) -> Result<Option<Vec<CheckedIhPostCallConsumerStep>>, CraneliftBackendError> {
+    let rederived_actual = continuation_call_selected_result_identity(plan, identity)?;
+    if rederived_actual != actual {
+        return Err(planner_error(
+            "a checked-IH post-call consumer's actual Result identity disagrees with its target's selected source case",
+        ));
+    }
+    if actual == demanded {
+        return Ok(Some(Vec::new()));
+    }
+
+    if frame_origins.is_empty() {
+        return Ok(None);
+    }
+    let mut consumers = Vec::with_capacity(frame_origins.len());
+    for frame_origin in frame_origins {
+        let Some(consumer) = post_call_consumer_in_frame(plan, *frame_origin, actual)? else {
+            return Ok(None);
+        };
+        let Some(demanded_case) = post_call_consumer_in_frame(plan, *frame_origin, demanded)?
+        else {
+            return Ok(None);
+        };
+        consumers.push(CheckedIhPostCallConsumerStep {
+            occurrence: consumer,
+            demanded_body_origin: demanded_case.body_origin,
+            checked_frame_id: checked_frame_for_consumer(plan, *frame_origin)?,
+        });
+    }
+    Ok(Some(consumers))
+}
+
 /// Re-derive a claimed consuming occurrence without reading the forward seed.
 ///
 /// The claim supplies only the outer eliminator coordinate. Its position-zero
@@ -5813,8 +6254,7 @@ pub(super) fn rederive_consuming_occurrence(
     };
     let mut matching = Vec::new();
     for alternative in 0..cases.len() {
-        let identity =
-            plan.case_constructor_identity(claimed.eliminator_origin, alternative)?;
+        let identity = plan.case_constructor_identity(claimed.eliminator_origin, alternative)?;
         if produced.contains(&identity) {
             let occurrence = ContinuationConsumingOccurrence {
                 body_origin: plan
@@ -5895,10 +6335,9 @@ pub(super) fn build_continuation_specialization_plan(
     let mut calls = BTreeSet::new();
     let mut required_consumer_projections = BTreeMap::new();
     let mut pending_required_consumer_projections = Vec::new();
-    let mut sequences = BTreeMap::<
-        (PredeclaredFunctionId, StaticOriginId, StaticOriginId),
-        u32,
-    >::new();
+    let mut pending_detached_return_contexts = BTreeMap::new();
+    let mut sequences =
+        BTreeMap::<(PredeclaredFunctionId, StaticOriginId, StaticOriginId), u32>::new();
     while let Some(discovery) = pending.pop() {
         steps = steps
             .checked_add(1)
@@ -5935,9 +6374,8 @@ pub(super) fn build_continuation_specialization_plan(
             ));
         };
         let consumer_owner = occurrence_authority(plan, discovery.continuation_origin)?.owner;
-        for producer_construct_origin in
-            continuation_result_origins(plan, discovery.result_root)?
-        {
+        for result_position in continuation_result_positions(plan, &discovery.return_context)? {
+            let producer_construct_origin = result_position.origin;
             let producer = plan.planned_occurrence_expr(producer_construct_origin)?;
             let RuntimeExpr::Construct { args, .. } = producer else {
                 continue;
@@ -6136,8 +6574,7 @@ pub(super) fn build_continuation_specialization_plan(
                             &emitter,
                         )?,
                     };
-                    let (target, inserted) =
-                        intern_specialization(&mut interned, &mut units, key)?;
+                    let (target, inserted) = intern_specialization(&mut interned, &mut units, key)?;
                     let sequence_key = (
                         producer_owner,
                         discovery.result_root,
@@ -6165,28 +6602,37 @@ pub(super) fn build_continuation_specialization_plan(
                     #[cfg(test)]
                     if required_consuming_occurrence.is_none() {
                         CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
-                            observations.borrow_mut().push(
-                                ContinuationRequiredConsumerObservation {
-                                    continuation_origin: discovery.continuation_origin,
-                                    result_root: discovery.result_root,
-                                    required: None,
-                                    derived_at_consumer: None,
-                                    child_push: false,
-                                    projection_disposition: Some(
-                                        RequiredConsumerProjectionDisposition::
-                                            AbsentNoRequiredConsumer,
-                                    ),
-                                },
-                            );
+                            observations
+                                .borrow_mut()
+                                .push(ContinuationRequiredConsumerObservation {
+                                continuation_origin: discovery.continuation_origin,
+                                result_root: discovery.result_root,
+                                required: None,
+                                derived_at_consumer: None,
+                                child_push: false,
+                                projection_disposition: Some(
+                                    RequiredConsumerProjectionDisposition::AbsentNoRequiredConsumer,
+                                ),
+                            });
                         });
                     }
                     if let Some(required) = required_consuming_occurrence {
                         pending_required_consumer_projections.push((
-                            identity,
+                            identity.clone(),
                             required,
                             discovery.continuation_origin,
                             discovery.result_root,
                         ));
+                    } else if result_position.return_context.worker_return.is_some() {
+                        let detached = result_position.return_context.clone();
+                        if pending_detached_return_contexts
+                            .insert(identity.clone(), detached.clone())
+                            .is_some_and(|prior| prior != detached)
+                        {
+                            return Err(planner_error(
+                                "one continuation call identity has two incompatible detached source return contexts",
+                            ));
+                        }
                     }
                     let call = PlannedContinuationSpecializationCall { token };
                     if calls.insert(call) {
@@ -6223,9 +6669,7 @@ pub(super) fn build_continuation_specialization_plan(
                             // interner; they protect only a future writer change
                             // that breaks that construction contract.
                             let target_unit = units.get(target.0 as usize).ok_or_else(|| {
-                                planner_error(
-                                    "a descent target was not installed before its child",
-                                )
+                                planner_error("a descent target was not installed before its child")
                             })?;
                             if target_unit.key.worker != worker {
                                 return Err(planner_error(
@@ -6240,24 +6684,34 @@ pub(super) fn build_continuation_specialization_plan(
                             if let Some(ContinuationRequiredConsumingOccurrence::Exact(required)) =
                                 required_consuming_occurrence.as_ref()
                             {
-                                CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(
-                                    |observations| {
-                                        observations.borrow_mut().push(
-                                            ContinuationRequiredConsumerObservation {
-                                                continuation_origin: discovery.continuation_origin,
-                                                result_root: worker.body_origin,
-                                                required: Some(*required),
-                                                derived_at_consumer: None,
-                                                child_push: true,
-                                                projection_disposition: None,
-                                            },
-                                        );
-                                    },
-                                );
+                                CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
+                                    observations.borrow_mut().push(
+                                        ContinuationRequiredConsumerObservation {
+                                            continuation_origin: discovery.continuation_origin,
+                                            result_root: worker.body_origin,
+                                            required: Some(*required),
+                                            derived_at_consumer: None,
+                                            child_push: true,
+                                            projection_disposition: None,
+                                        },
+                                    );
+                                });
                             }
                             pending.push(ContinuationDiscovery {
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
+                                return_context: SourceReturnContextTemplate {
+                                    root_origin: worker.body_origin,
+                                    result_origin: worker.body_origin,
+                                    steps: Vec::new(),
+                                    caller_suffix: Vec::new(),
+                                    worker_return: Some(Box::new(SourceWorkerReturnBoundary {
+                                        selecting_call: identity.clone(),
+                                        caller_context: Box::new(
+                                            result_position.return_context.clone(),
+                                        ),
+                                    })),
+                                },
                                 enclosing_specialization: Some(target),
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
                                 required_consuming_occurrence,
@@ -6278,6 +6732,13 @@ pub(super) fn build_continuation_specialization_plan(
                             pending.push(ContinuationDiscovery {
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
+                                return_context: SourceReturnContextTemplate {
+                                    root_origin: worker.body_origin,
+                                    result_origin: worker.body_origin,
+                                    steps: Vec::new(),
+                                    caller_suffix: Vec::new(),
+                                    worker_return: None,
+                                },
                                 enclosing_specialization: None,
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
                                 required_consuming_occurrence: discovery
@@ -6318,9 +6779,9 @@ pub(super) fn build_continuation_specialization_plan(
         #[cfg(test)]
         let projection_minted = required != source;
         if required != source {
-            let projection = RequiredConsumerProjection { source, required };
+            let projection = RequiredConsumerProjection::DirectOuter { source, required };
             if required_consumer_projections
-                .insert(identity, projection)
+                .insert(identity, projection.clone())
                 .is_some_and(|prior| prior != projection)
             {
                 return Err(planner_error(
@@ -6347,27 +6808,39 @@ pub(super) fn build_continuation_specialization_plan(
                 });
         });
     }
+    for (identity, context) in pending_detached_return_contexts {
+        let projection = RequiredConsumerProjection::DetachedReturnContext(context);
+        if required_consumer_projections
+            .insert(identity, projection.clone())
+            .is_some_and(|prior| prior != projection)
+        {
+            return Err(planner_error(
+                "one continuation call identity claims incompatible direct and detached consumer proofs",
+            ));
+        }
+    }
     #[cfg(test)]
     if let Some(mutation) = REQUIRED_CONSUMER_PROJECTION_MUTATION.with(Cell::get) {
-        if let Some(projection) = required_consumer_projections.values_mut().next() {
+        if let Some(RequiredConsumerProjection::DirectOuter { source, required }) =
+            required_consumer_projections
+                .values_mut()
+                .find(|projection| {
+                    matches!(projection, RequiredConsumerProjection::DirectOuter { .. })
+                })
+        {
             match mutation {
                 RequiredConsumerProjectionMutation::BodyOrigin => {
-                    projection.required.body_origin = projection.source.body_origin;
+                    required.body_origin = source.body_origin;
                 }
                 RequiredConsumerProjectionMutation::EliminatorOrigin => {
-                    projection.required.eliminator_origin = projection.source.eliminator_origin;
+                    required.eliminator_origin = source.eliminator_origin;
                 }
             }
             REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS
                 .with(|applications| applications.set(applications.get() + 1));
         }
     }
-    validate_required_consumer_projections(
-        plan,
-        &units,
-        &calls,
-        &required_consumer_projections,
-    )?;
+    validate_required_consumer_projections(plan, &units, &calls, &required_consumer_projections)?;
     #[cfg(feature = "px8-ds-test-support")]
     let contexts = if checked_ih_generated_entry_context_permutation_is_active() {
         let mut context_calls = calls.clone();
@@ -6427,8 +6900,7 @@ pub(super) fn intern_generated_contexts(
     let mut contexts: Vec<PlannedContinuationContext> = Vec::new();
     let mut interned = BTreeMap::new();
     for call in calls {
-        let ContinuationEmissionOwner::Specialization(enclosing) = call.token.emission_owner
-        else {
+        let ContinuationEmissionOwner::Specialization(enclosing) = call.token.emission_owner else {
             continue;
         };
         let worker_body_origin = call.token.producer_result_origin;
@@ -6541,6 +7013,86 @@ pub(super) fn validate_continuation_specialization_closure(
     Ok(())
 }
 
+fn validate_source_return_context(
+    plan: &StaticTransitionPlan<'_>,
+    context: &SourceReturnContextTemplate,
+    call_identities: &BTreeSet<ContinuationCallIdentity>,
+) -> Result<(), CraneliftBackendError> {
+    let mut current = context.root_origin;
+    for step in &context.steps {
+        if step.parent_origin != current
+            || plan
+                .semantic
+                .child_origin(step.parent_origin, step.child_position as usize)?
+                != step.child_origin
+        {
+            return Err(planner_error(
+                "a detached source return context does not follow its exact forward source child",
+            ));
+        }
+        let expr = plan.planned_occurrence_expr(step.parent_origin)?;
+        let role_matches = match (step.role, expr) {
+            (
+                SourceReturnContextRole::CheckedBody,
+                RuntimeExpr::CheckedJoinSite { .. }
+                | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. }
+                | RuntimeExpr::CheckedComputationalIHSlots { .. }
+                | RuntimeExpr::CheckedComputationalIHInvocation { .. },
+            ) => step.child_position == 0,
+            (SourceReturnContextRole::LetBody, RuntimeExpr::Let { .. }) => step.child_position == 1,
+            (SourceReturnContextRole::IfThen, RuntimeExpr::If { .. }) => step.child_position == 1,
+            (SourceReturnContextRole::IfElse, RuntimeExpr::If { .. }) => step.child_position == 2,
+            (SourceReturnContextRole::MatchCase(index), RuntimeExpr::Match { cases, .. }) => {
+                (index as usize) < cases.len() && step.child_position as usize == 1 + index as usize
+            }
+            (
+                SourceReturnContextRole::ComputationalMatchCase(index),
+                RuntimeExpr::ComputationalMatch { cases, .. },
+            ) => {
+                (index as usize) < cases.len() && step.child_position as usize == 1 + index as usize
+            }
+            _ => false,
+        };
+        if !role_matches {
+            return Err(planner_error(
+                "a detached source return context role disagrees with its source expression",
+            ));
+        }
+        current = step.child_origin;
+    }
+    if current != context.result_origin {
+        return Err(planner_error(
+            "a detached source return context does not end at its claimed result position",
+        ));
+    }
+    let mut suffix_seen = BTreeSet::new();
+    for origin in &context.caller_suffix {
+        if !suffix_seen.insert(*origin)
+            || !matches!(
+                plan.planned_occurrence_expr(*origin)?,
+                RuntimeExpr::ComputationalMatch { .. }
+            )
+        {
+            return Err(planner_error(
+                "a detached source return context has a duplicate or non-computational caller suffix",
+            ));
+        }
+    }
+    if let Some(boundary) = context.worker_return.as_deref() {
+        if !call_identities.contains(&boundary.selecting_call)
+            || boundary.caller_context.result_origin
+                != boundary.selecting_call.producer_construct_origin()
+        {
+            return Err(planner_error(
+                "a detached worker return boundary is not bound to its exact selecting call",
+            ));
+        }
+        validate_source_return_context(plan, &boundary.caller_context, call_identities)?;
+    }
+    Ok(())
+}
+
 pub(super) fn validate_required_consumer_projections(
     plan: &StaticTransitionPlan<'_>,
     units: &[PlannedContinuationSpecialization],
@@ -6571,48 +7123,73 @@ pub(super) fn validate_required_consumer_projections(
                 "a required-consumer projection's call position disagrees with its target",
             ));
         }
-        let derived = derive_required_consumer_occurrence(plan, &target.key)?;
-        let source = rederive_consuming_occurrence(plan, &target.key, projection.source)?;
-        if source != Some(projection.source) {
-            return Err(planner_error(
-                "a required-consumer projection's source occurrence does not match the exact \
-                 source-level occurrence independently derived from its target",
-            ));
-        }
-        if derived != Some(projection.required) {
-            #[cfg(test)]
-            {
-                let reason = match derived {
-                    Some(expected)
-                        if expected.eliminator_origin != projection.required.eliminator_origin =>
+        match projection {
+            RequiredConsumerProjection::DirectOuter { source, required } => {
+                let derived = derive_required_consumer_occurrence(plan, &target.key)?;
+                let rederived = rederive_consuming_occurrence(plan, &target.key, *source)?;
+                if rederived != Some(*source) {
+                    return Err(planner_error(
+                        "a required-consumer projection's source occurrence does not match the exact \
+                         source-level occurrence independently derived from its target",
+                    ));
+                }
+                if derived != Some(*required) {
+                    #[cfg(test)]
                     {
-                        "a required-consumer projection has a mismatched eliminator_origin"
+                        let reason = match derived {
+                            Some(expected)
+                                if expected.eliminator_origin != required.eliminator_origin =>
+                            {
+                                "a required-consumer projection has a mismatched eliminator_origin"
+                            }
+                            _ => "a required-consumer projection has a mismatched body_origin",
+                        };
+                        return Err(planner_error(reason));
                     }
-                    _ => "a required-consumer projection has a mismatched body_origin",
-                };
-                return Err(planner_error(reason));
+                    #[cfg(not(test))]
+                    return Err(planner_error(
+                        "a required-consumer projection is not the exact consumer-level occurrence \
+                         independently derived from its target",
+                    ));
+                }
             }
-            #[cfg(not(test))]
-            return Err(planner_error(
-                "a required-consumer projection is not the exact consumer-level occurrence \
-                 independently derived from its target",
-            ));
+            RequiredConsumerProjection::DetachedReturnContext(context) => {
+                if target.key.consuming_occurrence.is_some()
+                    || context.root_origin != identity.token.producer_result_origin
+                    || context.result_origin != identity.token.producer_construct_origin
+                {
+                    return Err(planner_error(
+                        "a detached return-context proof is not bound to an absent source consumer and its exact call result position",
+                    ));
+                }
+                let ContinuationEmissionOwner::Specialization(enclosing) =
+                    identity.token.emission_owner
+                else {
+                    return Err(planner_error(
+                        "a detached return-context proof was issued outside a generated context",
+                    ));
+                };
+                let Some(boundary) = context.worker_return.as_deref() else {
+                    return Err(planner_error(
+                        "a detached return-context proof has no generated-worker return boundary",
+                    ));
+                };
+                if boundary.selecting_call.target() != enclosing {
+                    return Err(planner_error(
+                        "a detached return-context proof's selecting call does not own its generated context",
+                    ));
+                }
+                validate_source_return_context(plan, context, &call_identities)?;
+            }
         }
     }
     Ok(())
 }
 
-
 pub(super) fn validate_continuation_specialization_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<(), CraneliftBackendError> {
-    let (
-        expected_units,
-        expected_calls,
-        expected_required_consumers,
-        expected_contexts,
-        _admitted,
-    ) =
+    let (expected_units, expected_calls, expected_required_consumers, expected_contexts, _admitted) =
         build_continuation_specialization_plan(plan)?;
     // ⛔⛔ **The comparison is against the DERIVATION, and `D3b`'s stage-2
     // finalization is not part of it.**
@@ -6659,7 +7236,6 @@ pub(super) fn validate_continuation_specialization_plan(
     }
     Ok(())
 }
-
 
 impl<'src> StaticTransitionPlan<'src> {
     /// **`D2f` — the closed body-emission disposition, keyed by body occurrence.**
@@ -6759,9 +7335,7 @@ impl<'src> StaticTransitionPlan<'src> {
     ) -> BTreeSet<ContinuationCallIdentity> {
         planned
             .iter()
-            .filter(|identity| {
-                !inner.contains_key(*identity) && !outer.contains_key(*identity)
-            })
+            .filter(|identity| !inner.contains_key(*identity) && !outer.contains_key(*identity))
             .cloned()
             .collect()
     }
@@ -6821,8 +7395,7 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
         unit: &ContinuationUnitView<'_>,
     ) -> Result<bool, CraneliftBackendError> {
-        Ok(occurrence_authority(self, unit.continuation_origin())?.owner
-            == unit.consumer_owner())
+        Ok(occurrence_authority(self, unit.continuation_origin())?.owner == unit.consumer_owner())
     }
 
     /// Every already-validated continuation specialization, with its exact
@@ -6878,9 +7451,7 @@ impl<'src> StaticTransitionPlan<'src> {
                     )
                 })?;
                 let slots = dense_slice(&self.abi.continuation_slots, descriptor.slots)
-                    .ok_or_else(|| {
-                        planner_error("continuation slot range is outside the plane")
-                    })?;
+                    .ok_or_else(|| planner_error("continuation slot range is outside the plane"))?;
                 let inputs = dense_slice(&self.abi.continuation_inputs, descriptor.inputs)
                     .ok_or_else(|| {
                         planner_error("continuation input range is outside the plane")
@@ -6918,10 +7489,8 @@ impl<'src> StaticTransitionPlan<'src> {
                  population",
             ));
         }
-        let mut by_id: BTreeMap<
-            ContinuationContextId,
-            &abi::AbiContinuationContextDescriptor,
-        > = BTreeMap::new();
+        let mut by_id: BTreeMap<ContinuationContextId, &abi::AbiContinuationContextDescriptor> =
+            BTreeMap::new();
         for descriptor in &self.abi.context_descriptors {
             if by_id.insert(descriptor.context, descriptor).is_some() {
                 return Err(planner_error(
@@ -6937,12 +7506,12 @@ impl<'src> StaticTransitionPlan<'src> {
                         "a planned generated context has no ABI descriptor declaring its identity",
                     )
                 })?;
-                let slots = dense_slice(&self.abi.context_slots, descriptor.slots)
-                    .ok_or_else(|| {
+                let slots =
+                    dense_slice(&self.abi.context_slots, descriptor.slots).ok_or_else(|| {
                         planner_error("generated context slot range is outside the plane")
                     })?;
-                let inputs = dense_slice(&self.abi.context_inputs, descriptor.inputs)
-                    .ok_or_else(|| {
+                let inputs =
+                    dense_slice(&self.abi.context_inputs, descriptor.inputs).ok_or_else(|| {
                         planner_error("generated context input range is outside the plane")
                     })?;
                 if inputs.len() != planned.captures.len() {
@@ -7108,7 +7677,19 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
         identity: &ContinuationCallIdentity,
     ) -> Option<RequiredConsumerProjection> {
-        self.required_consumer_projections.get(identity).copied()
+        self.required_consumer_projections
+            .get(identity)
+            .filter(|projection| projection.direct_outer().is_some())
+            .cloned()
+    }
+
+    pub(in crate::cranelift_backend) fn detached_return_context_for(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<&SourceReturnContextTemplate> {
+        self.required_consumer_projections
+            .get(identity)
+            .and_then(RequiredConsumerProjection::detached_return_context)
     }
 
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D7a` — the planner-issued composed worker
@@ -7624,7 +8205,9 @@ impl<'src> StaticTransitionPlan<'src> {
             }
         }
 
-        let route_eligibility = match self.continuation_context_for(unit.id(), worker.body_origin)? {
+        let route_eligibility = match self
+            .continuation_context_for(unit.id(), worker.body_origin)?
+        {
             Some(context) => ComposedWorkerRouteEligibility::GeneratedContextIssued(context.id()),
             None => ComposedWorkerRouteEligibility::RawOnly,
         };
@@ -7706,7 +8289,6 @@ impl<'src> StaticTransitionPlan<'src> {
         }
         Ok(edges)
     }
-
 }
 
 #[cfg(test)]
@@ -7716,7 +8298,9 @@ pub(in crate::cranelift_backend) mod tests {
     use super::super::*;
     use super::*;
     #[allow(unused_imports)]
-    use crate::{RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
+    use crate::{
+        RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue,
+    };
 
     /// Supplementary local resolution law. The governing discriminator is the
     /// population-side `Let` insertion exercised through the full planner.
@@ -7746,7 +8330,8 @@ pub(in crate::cranelift_backend) mod tests {
         assert_eq!(shifted.immediate_environment_index, 1);
     }
 
-pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_seed_capture_worker_fixture() -> RuntimeExpr {
+    pub(in crate::cranelift_backend::planning::static_transition) fn contspec_seed_capture_worker_fixture(
+    ) -> RuntimeExpr {
         // `Closure` rather than `LexicalClosure`: its captures are SYMBOLS, so
         // the ruled run's capture sources are `Seed`, not `Lexical`. That is the
         // one arm of the run derivation that refuses rather than admitting, and
@@ -7779,7 +8364,8 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_se
         }
     }
 
-pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_capture_free_worker_fixture() -> RuntimeExpr {
+    pub(in crate::cranelift_backend::planning::static_transition) fn contspec_capture_free_worker_fixture(
+    ) -> RuntimeExpr {
         // Identical to the captured fixtures EXCEPT the worker captures
         // nothing. This is the negative half of the discriminating pair, and it
         // is non-degenerate on purpose: it still builds a continuation unit with
@@ -7813,7 +8399,8 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_ca
         }
     }
 
-pub(in crate::cranelift_backend)     fn contspec_activation_owned_worker_captures_fixture() -> RuntimeExpr {
+    pub(in crate::cranelift_backend) fn contspec_activation_owned_worker_captures_fixture(
+    ) -> RuntimeExpr {
         // ⛔ The captures are `Construct`s WITH A FIELD, not `unit()`, and that
         // is the entire point of this fixture existing beside
         // `contspec_multiple_worker_captures_fixture`. A `unit()` capture is a
@@ -7867,7 +8454,8 @@ pub(in crate::cranelift_backend)     fn contspec_activation_owned_worker_capture
         }
     }
 
-pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_multiple_worker_captures_fixture() -> RuntimeExpr {
+    pub(in crate::cranelift_backend::planning::static_transition) fn contspec_multiple_worker_captures_fixture(
+    ) -> RuntimeExpr {
         let worker = RuntimeExpr::LexicalClosure {
             captures: vec![unit(), unit()],
             params: vec!["worker".to_string()],
@@ -8040,7 +8628,11 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
 
     fn contsrc_d2_local(
         value: &ContinuationValueSourceAuthority,
-    ) -> (&ContinuationSourceSlotAuthority, ProducerLocalBinding, ProducerLocalLocator) {
+    ) -> (
+        &ContinuationSourceSlotAuthority,
+        ProducerLocalBinding,
+        ProducerLocalLocator,
+    ) {
         let ContinuationValueSourceAuthority::Closed(sources) = value else {
             panic!("expected an exactly-sourced value, got {value:?}");
         };
@@ -8049,7 +8641,10 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         };
         let ContinuationSourceCoordinate::ProducerLocal { binding, locator } = source.coordinate
         else {
-            panic!("expected a producer-local coordinate, got {:?}", source.coordinate);
+            panic!(
+                "expected a producer-local coordinate, got {:?}",
+                source.coordinate
+            );
         };
         (source, binding, locator)
     }
@@ -8197,8 +8792,12 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         // store, would be a different transport with the same slot kinds.
         for slot in unit.slots() {
             let expected = match slot.kind {
-                AbiSlotKind::Parameter | AbiSlotKind::Capture | AbiSlotKind::Control
-                | AbiSlotKind::Trap => (AbiOwnership::OwnedByFrame, AbiStorageOwner::ActivationFrame),
+                AbiSlotKind::Parameter
+                | AbiSlotKind::Capture
+                | AbiSlotKind::Control
+                | AbiSlotKind::Trap => {
+                    (AbiOwnership::OwnedByFrame, AbiStorageOwner::ActivationFrame)
+                }
                 AbiSlotKind::Result => (
                     AbiOwnership::TransferredToCaller,
                     AbiStorageOwner::ActivationFrame,
@@ -8241,8 +8840,11 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         };
         let mut declarations = BTreeMap::new();
         declarations.insert("decl:fixture::d3seed", &declaration);
-        let plan = plan_static_transition_graph(&RuntimeExpr::Value(RuntimeValue::Bool(true)), &declarations)
-            .expect("plannable");
+        let plan = plan_static_transition_graph(
+            &RuntimeExpr::Value(RuntimeValue::Bool(true)),
+            &declarations,
+        )
+        .expect("plannable");
         let declaration_origin = plan
             .declaration_occurrence_origin("decl:fixture::d3seed")
             .expect("occurrence");
@@ -8324,13 +8926,12 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         // the SAME program is accepted -- so the assertion above is caused by
         // the shared predicate reaching the new arm, not by some other refusal
         // that would have fired anyway.
-        let accepted_under_mutation =
-            super::abi::D3_C4_MATCHES_CLOSURE_BODY_ONLY.with(|flag| {
-                flag.set(true);
-                let outcome = plan_static_transition_graph(&root, &declarations).is_ok();
-                flag.set(false);
-                outcome
-            });
+        let accepted_under_mutation = super::abi::D3_C4_MATCHES_CLOSURE_BODY_ONLY.with(|flag| {
+            flag.set(true);
+            let outcome = plan_static_transition_graph(&root, &declarations).is_ok();
+            flag.set(false);
+            outcome
+        });
         assert!(
             accepted_under_mutation,
             "D3/C4: the refusal must be CAUSED by C4 reaching the declaration-owned \
@@ -8567,7 +9168,11 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         };
 
         // Control 1's shape, as a unit: two exact aliases, the nearer wins.
-        let both = vec![closed(vec![s.clone()]), closed(vec![t.clone()]), closed(vec![s.clone()])];
+        let both = vec![
+            closed(vec![s.clone()]),
+            closed(vec![t.clone()]),
+            closed(vec![s.clone()]),
+        ];
         assert_eq!(
             nearest_exact_alias(&s, &both).expect("two exact aliases are eligible"),
             0,
@@ -8601,7 +9206,10 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         let mut narrowed = s.clone();
         narrowed.referent_affinity = Vec::new();
         assert_ne!(narrowed, s, "the narrowing must actually change the record");
-        assert_eq!(narrowed.coordinate, s.coordinate, "and must keep the coordinate");
+        assert_eq!(
+            narrowed.coordinate, s.coordinate,
+            "and must keep the coordinate"
+        );
         let mismatched = vec![closed(vec![narrowed])];
         let refusal = nearest_exact_alias(&s, &mismatched)
             .expect_err("a different contract under the same coordinate must refuse");
@@ -8778,7 +9386,10 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
                 vec![(unit.key.consumer_owner, 0), (unit.key.consumer_owner, 1)]
             );
             assert!(matches!(
-                unit.key.continuation_inputs[1].coordinate.expect_entry_abi().2,
+                unit.key.continuation_inputs[1]
+                    .coordinate
+                    .expect_entry_abi()
+                    .2,
                 ContinuationInputSource::LexicalCapture { .. }
             ));
             assert_eq!(
@@ -8838,9 +9449,7 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     /// call is emitted in Slice 1.
     #[test]
     fn contspec_locally_forwarded_parameter_retains_exact_source_position() {
-        let expr = Box::leak(Box::new(
-            contspec_complete_environment_fixture(),
-        ));
+        let expr = Box::leak(Box::new(contspec_complete_environment_fixture()));
         let symbols = crate::NativeProcessSymbols::legacy_prelude();
         let plan = plan_static_transition_graph_with_symbols(
             expr,
@@ -8962,9 +9571,7 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
             then_expr: Box::new(RuntimeExpr::Var(0)),
             else_expr: Box::new(RuntimeExpr::Var(1)),
         };
-        let ambiguous = Box::leak(Box::new(contspec_required_tail_fixture(
-            ambiguous_tail,
-        )));
+        let ambiguous = Box::leak(Box::new(contspec_required_tail_fixture(ambiguous_tail)));
         let ambiguous_plan = plan_static_transition_graph_with_symbols(
             ambiguous,
             &BTreeMap::new(),
@@ -9363,14 +9970,13 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     #[test]
     fn contsrc_d2_populates_both_producer_local_binding_kinds() {
         let expr = Box::leak(Box::new(contsrc_d2_both_binding_kinds_fixture()));
-        let plan = plan_static_transition_graph(expr, &BTreeMap::new())
-            .expect("the D2 fixture plans");
+        let plan =
+            plan_static_transition_graph(expr, &BTreeMap::new()).expect("the D2 fixture plans");
         let target = contsrc_d2_first_origin(&plan, |expr| {
             matches!(expr, RuntimeExpr::ComputationalMatch { .. })
         });
-        let effect_origin = contsrc_d2_first_origin(&plan, |expr| {
-            matches!(expr, RuntimeExpr::Effect { .. })
-        });
+        let effect_origin =
+            contsrc_d2_first_origin(&plan, |expr| matches!(expr, RuntimeExpr::Effect { .. }));
         let reached = contsrc_d2_reached_environment(&plan, target);
         assert!(
             reached.len() >= 2,
@@ -9411,10 +10017,9 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         // authority that supplies it, never against a literal: on this fixture
         // both authorities answer `ValueWord`, and writing that constant here
         // would state a blanket rule the derivation deliberately does not have.
-        let expected_argument_carrier = abi::result_carrier(SemanticSourceKind::Expression(
-            RuntimeExprShape::Construct,
-        ))
-        .expect("the fixture's Match scrutinee is a Construct");
+        let expected_argument_carrier =
+            abi::result_carrier(SemanticSourceKind::Expression(RuntimeExprShape::Construct))
+                .expect("the fixture's Match scrutinee is a Construct");
         let expected_effect_carrier =
             abi::result_carrier(SemanticSourceKind::Expression(RuntimeExprShape::Effect))
                 .expect("the Effect shape has a result carrier");
@@ -9771,14 +10376,23 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         // The three numbers are pairwise distinct, which is what makes the
         // lookup answerable rather than a coincidence of index.
         assert_ne!(CONTEXT_PARAMETERS + 1, introduction_index);
-        assert_ne!(CONTEXT_PARAMETERS + 1, 1, "the capture position is not the slot");
+        assert_ne!(
+            CONTEXT_PARAMETERS + 1,
+            1,
+            "the capture position is not the slot"
+        );
 
         // ⛔ Fail-closed 3 of 5 — missing full-coordinate capture membership.
         let refusal = exact_continuation_projection(
             &plan,
             &environment,
             0,
-            &resolution(context, &enclosing_inputs[..1], body_origin, CONTEXT_PARAMETERS),
+            &resolution(
+                context,
+                &enclosing_inputs[..1],
+                body_origin,
+                CONTEXT_PARAMETERS,
+            ),
         )
         .expect_err("a value absent from the capture projection must refuse");
         assert!(
@@ -9801,7 +10415,12 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
             &plan,
             &environment,
             0,
-            &resolution(context, &enclosing_inputs, other_body_origin, CONTEXT_PARAMETERS),
+            &resolution(
+                context,
+                &enclosing_inputs,
+                other_body_origin,
+                CONTEXT_PARAMETERS,
+            ),
         )
         .expect("a different worker body is still a well-formed emitting frame")[0]
             .availability;
@@ -10007,8 +10626,14 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         // measured the bounds guard.
         let (binder_source, _, binder_locator) = contsrc_d2_local(&reached[0]);
         assert_ne!(
-            (binder_locator.environment_origin, binder_locator.environment_index),
-            (effect_locator.environment_origin, effect_locator.environment_index),
+            (
+                binder_locator.environment_origin,
+                binder_locator.environment_index
+            ),
+            (
+                effect_locator.environment_origin,
+                effect_locator.environment_index
+            ),
             "the two fixture bindings must occupy different positions, or the decoy is the seat"
         );
         let mut relocated = effect_source.clone();
@@ -10130,15 +10755,14 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     #[test]
     fn contsrc_d3a_abi_provenance_separates_the_domains_at_one_owner() {
         let owner = PredeclaredFunctionId(11);
-        let entry = abi::AbiContinuationInputProvenance::of(
-            ContinuationSourceCoordinate::EntryAbi {
+        let entry =
+            abi::AbiContinuationInputProvenance::of(ContinuationSourceCoordinate::EntryAbi {
                 source_owner: owner,
                 source_abi_position: 0,
                 source: ContinuationInputSource::Parameter,
-            },
-        );
-        let local = abi::AbiContinuationInputProvenance::of(
-            ContinuationSourceCoordinate::ProducerLocal {
+            });
+        let local =
+            abi::AbiContinuationInputProvenance::of(ContinuationSourceCoordinate::ProducerLocal {
                 binding: ProducerLocalBinding {
                     binding_owner: owner,
                     binding_origin: StaticOriginId(4),
@@ -10148,8 +10772,7 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
                     environment_origin: StaticOriginId(4),
                     environment_index: 0,
                 },
-            },
-        );
+            });
         assert_eq!(
             entry,
             abi::AbiContinuationInputProvenance::EntryAbi {
@@ -10198,14 +10821,9 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
 
             let mut interned = BTreeMap::new();
             let mut units = Vec::new();
-            let (left, _) = intern_specialization(
-                &mut interned,
-                &mut units,
-                base_key.clone(),
-            )
-            .unwrap();
-            let (right, _) =
-                intern_specialization(&mut interned, &mut units, distinct).unwrap();
+            let (left, _) =
+                intern_specialization(&mut interned, &mut units, base_key.clone()).unwrap();
+            let (right, _) = intern_specialization(&mut interned, &mut units, distinct).unwrap();
             assert_ne!(
                 left, right,
                 "AC-2 {field:?}: two units differing only in this field conflated"
@@ -10213,25 +10831,18 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
 
             let mut mutated_interned = BTreeMap::new();
             let mut mutated_units = Vec::new();
-            CONTINUATION_INTERN_MUTATION.with(|mutation| {
-                mutation.set(ContinuationInternMutation::OmitProjection(field))
-            });
-            let (wrong_left, _) = intern_specialization(
-                &mut mutated_interned,
-                &mut mutated_units,
-                base_key.clone(),
-            )
-            .unwrap();
-            let (wrong_right, _) = intern_specialization(
-                &mut mutated_interned,
-                &mut mutated_units,
-                {
+            CONTINUATION_INTERN_MUTATION
+                .with(|mutation| mutation.set(ContinuationInternMutation::OmitProjection(field)));
+            let (wrong_left, _) =
+                intern_specialization(&mut mutated_interned, &mut mutated_units, base_key.clone())
+                    .unwrap();
+            let (wrong_right, _) =
+                intern_specialization(&mut mutated_interned, &mut mutated_units, {
                     let mut key = base_key.clone();
                     mutate_projection_field(&mut key.continuation_inputs[0], field);
                     key
-                },
-            )
-            .unwrap();
+                })
+                .unwrap();
             CONTINUATION_INTERN_MUTATION
                 .with(|mutation| mutation.set(ContinuationInternMutation::Exact));
             assert_eq!(
@@ -10256,12 +10867,15 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
                 key.continuation_origin,
             )
         };
-        assert_eq!(prefix(&left), prefix(&right), "fixture has no prefix collision");
+        assert_eq!(
+            prefix(&left),
+            prefix(&right),
+            "fixture has no prefix collision"
+        );
         assert_ne!(left, right, "fixture has no exact-key discriminator");
         let mut interned = BTreeMap::new();
         let mut units = Vec::new();
-        let (left_id, _) =
-            intern_specialization(&mut interned, &mut units, left.clone()).unwrap();
+        let (left_id, _) = intern_specialization(&mut interned, &mut units, left.clone()).unwrap();
         let (right_id, _) =
             intern_specialization(&mut interned, &mut units, right.clone()).unwrap();
         assert_ne!(

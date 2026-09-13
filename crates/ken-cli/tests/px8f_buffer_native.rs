@@ -195,6 +195,9 @@ const RETAINED_RESULT_CLOSURE_PROOF_MUTATION_CHILD: &str =
 #[cfg(target_os = "linux")]
 const HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD: &str =
     "KEN_RT_HANDLER_OWNED_DEFERRED_RESPONSE_MUTATION_CHILD";
+#[cfg(target_os = "linux")]
+const HS17_STATIC_RESPONSE_RETURN_MUTATION_CHILD: &str =
+    "KEN_RT_HS17_STATIC_RESPONSE_RETURN_MUTATION_CHILD";
 
 #[cfg(target_os = "linux")]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -606,6 +609,99 @@ fn assert_handler_owned_deferred_response_mutation_child() {
 }
 
 #[cfg(target_os = "linux")]
+fn assert_hs17_static_response_return_mutation_child() {
+    let mode = std::env::var(HS17_STATIC_RESPONSE_RETURN_MUTATION_CHILD)
+        .expect("HS17 mutation child mode");
+    let mutation = match mode.as_str() {
+        "delete-boundary" => {
+            ken_runtime::D5bHs17PostCallConsumerMutation::DeleteStaticResponseBoundary
+        }
+        "transplant-boundary" => {
+            ken_runtime::D5bHs17PostCallConsumerMutation::TransplantStaticResponseBoundary
+        }
+        "wrong-forwarded-word" => {
+            ken_runtime::D5bHs17PostCallConsumerMutation::SubstituteForwardedResultWord
+        }
+        "replay-selected-exit" => {
+            ken_runtime::D5bHs17PostCallConsumerMutation::ReplayCompletedSelectedExit
+        }
+        "drop-residual-suffix" => ken_runtime::D5bHs17PostCallConsumerMutation::DropResidualSuffix,
+        "mint-at-tail" => {
+            ken_runtime::D5bHs17PostCallConsumerMutation::MintReceiptAtNonEmittingTail
+        }
+        other => panic!("unknown HS17 mutation child mode {other}"),
+    };
+    let dir = tempfile::Builder::new()
+        .prefix("ken-px8f-hs17-control-")
+        .tempdir()
+        .unwrap();
+    std::fs::write(dir.path().join("input.bin"), b"abcdef").unwrap();
+    let preload = build_short_pwrite_preload(dir.path());
+    let (built, applications) =
+        ken_runtime::with_d5b_hs17_post_call_consumer_mutation(mutation, || {
+            ken_cli::build_native_program(
+                WRITE_ALL,
+                ken_cli::SourceFormat::Ken,
+                "px8f_write_all_hs17_control",
+                dir.path(),
+            )
+        });
+    assert!(
+        applications > 0,
+        "{mode}: mutation did not reach production"
+    );
+    match mode.as_str() {
+        "transplant-boundary"
+        | "wrong-forwarded-word"
+        | "replay-selected-exit"
+        | "mint-at-tail" => {
+            let error = built.expect_err("malformed HS17 proof must refuse before an object");
+            let text = format!("{error:?}");
+            assert!(
+                text.contains("static-response")
+                    || text.contains("detached caller cut")
+                    || text.contains("post-call consumer receipt")
+                    || text.contains("non-emitting Tail"),
+                "{mode}: wrong refusal: {text}"
+            );
+        }
+        "delete-boundary" | "drop-residual-suffix" => {
+            let built = built.expect("control keeps the outer ABI shape buildable");
+            let observation = ken_runtime::run_bound_process_effect_observation(
+                &built.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: Vec::new(),
+                    environment: vec![("LD_PRELOAD".into(), preload.into_os_string())],
+                    cwd: dir.path().to_owned(),
+                    plan_hash: built.plan_transport_hash,
+                },
+            )
+            .expect("HS17 wrong-stage control executes to its fail-closed frontier");
+            assert_ne!(
+                observation.exit_status, 0,
+                "{mode}: wrong cut reached success"
+            );
+            let frontier = format!("{:?}", observation.terminal_error);
+            assert!(
+                frontier.contains("PatternMatchFailure"),
+                "{mode}: dropped proof obligation was not rejected: {frontier}"
+            );
+            if mode == "delete-boundary" {
+                assert!(
+                    frontier.contains("Result"),
+                    "{mode}: outer-tag-equal wrong stage was not rejected: {frontier}"
+                );
+            }
+        }
+        _ => unreachable!(),
+    }
+    assert!(
+        ken_runtime::d5b_hs17_post_call_consumer_mutation_is_exact(),
+        "{mode}: scoped HS17 mutation did not restore"
+    );
+}
+
+#[cfg(target_os = "linux")]
 /// Promise class: durable invariant. The native run and interpreter must agree
 /// on the ordered short-write observations required by runtime evaluation
 /// (`spec/40-runtime/42-evaluation.md` section 6.2 and
@@ -619,6 +715,39 @@ fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
         .expect("spawn large-stack PX8-F fixture")
         .join()
         .expect("PX8-F fixture thread");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable invariant. The static-response return receipt is
+/// issued only by the exact selected-owner call and removes only its completed
+/// source cut; equal outer shape never substitutes for that proof.
+#[test]
+fn static_response_return_boundary_controls_are_reaching() {
+    for mode in [
+        "delete-boundary",
+        "transplant-boundary",
+        "wrong-forwarded-word",
+        "replay-selected-exit",
+        "drop-residual-suffix",
+        "mint-at-tail",
+    ] {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "linked_checked_write_all_observes_short_progress_and_matches_interpreter",
+                "--nocapture",
+            ])
+            .env(HS17_STATIC_RESPONSE_RETURN_MUTATION_CHILD, mode)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn isolated HS17 static-response mutation child");
+        assert!(
+            output.status.success(),
+            "{mode}: mutation child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -769,20 +898,19 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
 }
 
 #[cfg(target_os = "linux")]
-/// Promise class: durable mutation proof. Both halves of the single-owner recut
-/// are load-bearing on the real WRITE_ALL compile: dropping P1 execution restores
-/// the inert no-write path, while dropping handler-local K consumption restores
-/// the existing closure-boundary refusal.
+/// Promise class: durable mutation proof. Dropping the remaining handler-owned
+/// P1 execution restores the inert no-write path on the real WRITE_ALL compile.
+/// The former local-K control was subsumed when that route became the exact
+/// static-response return boundary; its reaching controls are the HS17 test.
 ///
-/// MEASURED: each isolated child mutates one natural production consumer, reports
-/// a nonzero application count, and observes its distinct pre-recut failure.
-/// CLAIMED: executable P1 dispatch and handler-local continuation consumption are
-/// both necessary to return the carried success value without a durable closure.
-/// THE GAP: the unchanged positive row above proves the same fixture reaches exit
-/// zero with the exact three writes; these negative children prove causality.
+/// MEASURED: the isolated child mutates the natural P1 production consumer,
+/// reports one application, and observes its pre-recut failure.
+/// CLAIMED: executable P1 dispatch remains necessary for the carried success
+/// value. THE GAP: the unchanged positive row proves the same fixture reaches
+/// exit zero with the exact three writes; the child proves causality.
 #[test]
 fn handler_owned_deferred_response_controls_are_load_bearing() {
-    for mode in ["suppress-unitless-drive", "suppress-local-continuation"] {
+    for mode in ["suppress-unitless-drive"] {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
@@ -818,6 +946,10 @@ fn run_linked_checked_write_all() {
         assert_handler_owned_deferred_response_mutation_child();
         return;
     }
+    if std::env::var_os(HS17_STATIC_RESPONSE_RETURN_MUTATION_CHILD).is_some() {
+        assert_hs17_static_response_return_mutation_child();
+        return;
+    }
 
     let dir = tempfile::Builder::new()
         .prefix("ken-px8f-write-all-")
@@ -846,7 +978,6 @@ fn run_linked_checked_write_all() {
     )
     .expect("linked checked writeAll runs");
     eprintln!("PX8-F: running interpreter fixture");
-
     if observation.exit_status != 0 {
         let frontier = format!(
             "{:?}",
@@ -914,7 +1045,11 @@ fn run_linked_checked_write_all() {
         .iter()
         .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
         .collect();
-    assert_eq!(releases.len(), 3, "every acquired resource must be released");
+    assert_eq!(
+        releases.len(),
+        3,
+        "every acquired resource must be released"
+    );
     assert!(releases.iter().all(|event| matches!(
         &event.outcome,
         ken_runtime::CanonicalOutcomeV1::Success(
@@ -1012,8 +1147,44 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 })
             };
 
-            let (result, diagnostics) = compile("px8f_write_all_plane_closed");
+            let ((result, diagnostics), hs11_observations, hs11_applications) =
+                ken_runtime::with_d5b_hs11_materializer_mutation(
+                    ken_runtime::D5bHs11MaterializerMutation::Exact,
+                    || compile("px8f_write_all_plane_closed"),
+                );
             result.expect("the sound mixed response plane compiles without owner escape");
+            assert_eq!(hs11_applications, 0, "the exact HS11 arm mutates nothing");
+            assert!(
+                ken_runtime::d5b_hs11_materializer_mutation_is_exact(),
+                "the exact HS11 scope must restore before assertions"
+            );
+            let carried = hs11_observations
+                .iter()
+                .filter(|row| row.contains_carried)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                carried,
+                vec![
+                    &ken_runtime::D5bHs11MaterializerObservation {
+                        shell_origin: 1639,
+                        selected_origin: 1638,
+                        occurrence: 343,
+                        whole_bound: true,
+                        contains_carried: true,
+                        completion: ken_runtime::D5bHs11MaterializerCompletion::WholeTransferred,
+                    },
+                    &ken_runtime::D5bHs11MaterializerObservation {
+                        shell_origin: 1640,
+                        selected_origin: 1639,
+                        occurrence: 344,
+                        whole_bound: false,
+                        contains_carried: true,
+                        completion: ken_runtime::D5bHs11MaterializerCompletion::ImmediateFields,
+                    },
+                ],
+                "the carried source completes shell 1639 exactly once at occurrence 343, while \
+                 immediate Vis shell 1640 installs fields without whole construction"
+            );
             assert_eq!(diagnostics.len(), 1, "one compile publishes one plan");
             let diagnostic = diagnostics.into_iter().next().unwrap();
             assert_eq!(diagnostic.static_response_infeasible, None);
@@ -1024,11 +1195,11 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .iter()
                 .map(|row| row.operation.as_str())
                 .collect::<std::collections::BTreeSet<_>>();
-            assert_eq!(diagnostic.all_static_response_rows.len(), 3);
+            assert_eq!(diagnostic.all_static_response_rows.len(), 2);
             assert_eq!(
                 specialized,
-                std::collections::BTreeSet::from(["FsReadAt", "BufferAllocate", "FsOpen",]),
-                "only the two exclusively-predeclared groups join the preexisting open row"
+                std::collections::BTreeSet::from(["FsReadAt", "BufferAllocate"]),
+                "only the two exclusively-predeclared groups acquire response owners"
             );
             let deferred = diagnostic.static_response_deferred.iter().fold(
                 std::collections::BTreeMap::new(),
@@ -1042,10 +1213,11 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
             assert_eq!(
                 deferred,
                 std::collections::BTreeMap::from([
+                    (("FsOpen", "InlineBridgeNoCall"), 1),
                     (("FsWriteAt", "NoContinuationUnit"), 1),
                     (("ResourceRelease", "UnconsumedTransportCaller"), 3),
                 ]),
-                "P1 stays main-lowered and the mixed-owner group stays P2"
+                "the immediate bridge stays owner-free, P1 stays main-lowered, and the mixed-owner group stays P2"
             );
 
             // Gate 0, on continuation structure rather than the RecursiveBackedge
@@ -1066,11 +1238,18 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .expect("the P1 response remains in the Deferred population");
             assert_eq!(p1.handler_owner.as_deref(), Some(buffer_handler.as_str()));
             for row in &diagnostic.static_response_deferred {
-                assert!(
-                    row.handler_owner.is_some() && row.k_body_origin.is_some(),
-                    "Deferred response {} has no single static handler or lexical K body",
-                    row.vis_origin
-                );
+                if row.sub_case == "InlineBridgeNoCall" {
+                    assert_eq!(row.handler_owner, None, "an immediate bridge has no response owner");
+                    continue;
+                }
+                if row.handler_owner.is_none() || row.k_body_origin.is_none() {
+                    assert_eq!(
+                        (row.operation.as_str(), row.sub_case.as_str()),
+                        ("ResourceRelease", "UnconsumedTransportCaller"),
+                        "only a mixed-owner release residual may lack one static handler"
+                    );
+                    continue;
+                }
                 assert_eq!(
                     row.response_uses,
                     Some(1),
@@ -1098,7 +1277,7 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 diagnostic
                     .static_response_deferred
                     .iter()
-                    .filter(|row| row.operation != "FsWriteAt")
+                    .filter(|row| row.operation == "ResourceRelease")
                     .all(|row| row.tail_static_calls == Some(0)),
                 "resource-release continuations must return directly rather than recurse"
             );
@@ -1121,8 +1300,8 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .collect::<Vec<_>>();
             assert_eq!(
                 suppressed_specialized,
-                vec!["FsOpen"],
-                "suppression must remove both execute-then-resume owners"
+                Vec::<&str>::new(),
+                "suppression must remove both execute-then-resume owners while the immediate bridge remains owner-free"
             );
             let suppressed_p2 = suppressed
                 .static_response_deferred
@@ -1152,10 +1331,13 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 });
             let error =
                 overpromoted_result.expect_err("over-promoting the mixed-owner group compiled");
+            let rendered = format!("{error:?}");
             assert!(
-                format!("{error:?}").contains(
+                rendered.contains(
                     "a deferred host response is compiler control and can only enter its exact \
                      response owner"
+                ) || rendered.contains(
+                    "one generated-context Result word acquired terminal authority more than once"
                 ),
                 "over-promotion reached the wrong refusal: {error:?}"
             );
@@ -1177,4 +1359,107 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
         .expect("spawn large-stack classify-mixed probe")
         .join()
         .expect("classify-mixed probe thread");
+}
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable mutation proof. The phase-preserving materializer
+/// completes only the real whole-bound shell, leaves the immediate Vis as
+/// direct fields, and uses the deferred constructor's stored producer origin.
+#[test]
+fn deferred_constructor_materializer_completion_is_exact() {
+    std::thread::Builder::new()
+        .name("px8f-hs11-materializer".to_string())
+        .stack_size(WRITE_ALL_CLASSIFIER_STACK_BYTES)
+        .spawn(|| {
+            let dir = tempfile::Builder::new()
+                .prefix("ken-px8f-hs11-materializer-")
+                .tempdir()
+                .unwrap();
+            let compile = |package: &str| {
+                ken_cli::build_native_program(
+                    WRITE_ALL,
+                    ken_cli::SourceFormat::Ken,
+                    package,
+                    dir.path(),
+                )
+            };
+
+            let (dropped, dropped_rows, dropped_applications) =
+                ken_runtime::with_d5b_hs11_materializer_mutation(
+                    ken_runtime::D5bHs11MaterializerMutation::DropWholeBoundCompletion,
+                    || compile("px8f_hs11_drop_whole_bound"),
+                );
+            assert_eq!(dropped_applications, 1);
+            let dropped_error = dropped.expect_err(
+                "dropping the whole-bound Coproduct completion must redden the witness",
+            );
+            assert!(
+                format!("{dropped_error:?}")
+                    .contains("a deferred constructor field requires its selected operand"),
+                "the missing whole shell must refuse at the next real deferred edge: \
+                 {dropped_error:?}"
+            );
+            assert!(dropped_rows.iter().any(|row| {
+                row.shell_origin == 1639
+                    && row.selected_origin == 1638
+                    && row.occurrence == 343
+                    && row.completion == ken_runtime::D5bHs11MaterializerCompletion::WholeDropped
+            }));
+            assert!(ken_runtime::d5b_hs11_materializer_mutation_is_exact());
+
+            let (overbuilt, overbuilt_rows, overbuilt_applications) =
+                ken_runtime::with_d5b_hs11_materializer_mutation(
+                    ken_runtime::D5bHs11MaterializerMutation::MaterializeImmediateShell,
+                    || compile("px8f_hs11_materialize_immediate"),
+                );
+            let _ = overbuilt;
+            assert_eq!(overbuilt_applications, 1);
+            assert!(overbuilt_rows.iter().any(|row| {
+                row.shell_origin == 1640
+                    && row.selected_origin == 1639
+                    && row.occurrence == 344
+                    && !row.whole_bound
+                    && row.completion
+                        == ken_runtime::D5bHs11MaterializerCompletion::WholeTransferred
+            }));
+            assert!(ken_runtime::d5b_hs11_materializer_mutation_is_exact());
+
+            let (wrong_origin, wrong_origin_rows, wrong_origin_applications) =
+                ken_runtime::with_d5b_hs11_materializer_mutation(
+                    ken_runtime::D5bHs11MaterializerMutation::UseCurrentFrameOrigin,
+                    || compile("px8f_hs11_current_frame_origin"),
+                );
+            assert_eq!(wrong_origin_applications, 1);
+            let wrong_origin_error = wrong_origin
+                .expect_err("using the current frame instead of producer origin must refuse");
+            assert!(
+                format!("{wrong_origin_error:?}").contains("aggregate")
+                    || format!("{wrong_origin_error:?}").contains("no ConstructorSymbol atom"),
+                "the wrong origin must refuse at aggregate authority before allocation: \
+                 {wrong_origin_error:?}"
+            );
+            assert!(
+                wrong_origin_rows.is_empty(),
+                "a failed authority lookup must publish no completed shell"
+            );
+            assert!(ken_runtime::d5b_hs11_materializer_mutation_is_exact());
+
+            let (restored, restored_rows, restored_applications) =
+                ken_runtime::with_d5b_hs11_materializer_mutation(
+                    ken_runtime::D5bHs11MaterializerMutation::Exact,
+                    || compile("px8f_hs11_restored"),
+                );
+            restored.expect("restoration to exact must compile the unchanged witness");
+            assert_eq!(restored_applications, 0);
+            let restored_carried = restored_rows
+                .iter()
+                .filter(|row| row.contains_carried)
+                .collect::<Vec<_>>();
+            assert_eq!(restored_carried.len(), 2);
+            assert_eq!(restored_carried[0].shell_origin, 1639);
+            assert_eq!(restored_carried[1].shell_origin, 1640);
+        })
+        .expect("spawn HS11 materializer proof thread")
+        .join()
+        .expect("HS11 materializer proof thread");
 }
