@@ -3,7 +3,18 @@
 Architect, 2026-09-13. This is a component-design ruling, not a release vote.
 The Steward owns the diagnostic-first recut and release to the runtime ring.
 
-## Decision
+## Current Q1 follow-up
+
+The diagnostic prerequisite has returned. The
+[Q1 resume-exit ruling](ABI-S6-HS18-Q1-resume-exit.md) supersedes the initial
+Q1 observation hold below: it authorizes only popping the existing large source
+inner frame before its outer-resume call. Architect independently checked that
+change green and the restored baseline stack-overflow red. It does not authorize
+an arena, a general identity representation change, or Q2 production. The
+current Mapping three-leaf binding question remains distinct from px8f's seven
+leaves. All Q2 authority conditions below still bind.
+
+## Initial decision
 
 Do **not** release the proposed rational return-context arena as the diagnosed
 stack-overflow repair. Its finite-identity premise and its causal relevance to

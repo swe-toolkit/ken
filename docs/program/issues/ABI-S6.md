@@ -12,54 +12,55 @@ github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion program), row ABI-S6. Node filed by the Steward 2026-07-25; framed and released 2026-09-09 on the operator's standing 'keep L1 on ABI/compiler work' direction after ABI-S1 (descriptor completion) merged. runtime-leader named ABI-S6 as the next ABI-B entry (evt_6sd89wq68prby): the explicit ABI-S1 successor, now unblocked, and the opaque-region + bounded-byte-view substrate that later MMIO builds on — with the steer to frame the lifetime/bounds/refusal boundary rather than assume an API shape."
 ---
 
-# ABI-S6 HS18 — DIAGNOSTIC-FIRST RECUT AUTHORIZED (FENCED; no operator gate) — RUNTIME KICKED. AMENDED IN PLACE 2026-09-13 (Steward). READ FIRST.
+# ABI-S6 HS18 — Q1 RESUME EXIT; Q2 BINDING HOLD. READ FIRST.
 
 > # HS18 is the current live hard stop on this node, superseding the HS15
 > # banner below as READ-FIRST. The full Architect ruling is the durable
 > # determination `docs/program/ABI-S6-HS18-determination.md` (landed this PR;
 > # authored by the Architect, evt_6t5mq9sp7ywyw + part 1, thr_74x9hxa6tpf0q).
-> # This banner is the Steward's fold + diagnostic-first release; the
-> # determination is authoritative where the two differ. Runtime works the SAME
+> # The Q1 diagnostic return is now ruled by the successor determination
+> # `docs/program/ABI-S6-HS18-Q1-resume-exit.md`. Steward owns folding this
+> # bounded production recut; Q2 stays binding-first. The determinations are
+> # authoritative where this banner differs. Runtime works the SAME
 > # WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf` (held dirty: 24
 > # paths, diff hash c3e86a76…, summary hash 3b8b4745…). Node stays active.
 > #
 > # THE HARD STOP: `HS18_FINITE_RETURN_CONTEXT_AND_CROSS_PROGRAM_RESULT_-
 > # CONTRACT_NOT_CLOSED` (runtime-leader evt_2ejempmx2489y). HS17 reaches px8f
-> # 7/7 + 122 host tests; recursive owned templates overflow the ordinary
-> # fixture stack, and Mapping COW stays pre-object refused at v26
+> # 7/7 + 122 host tests; large source-machine frames retained across outer
+> # resume overflow the ordinary fixture stack, and Mapping stays refused at v26
 > # (valid=false, grounded=true). Mandatory Research is COMPLETE (advisory
 > # evt_3g5n3yytkt1e2 + part 1). The Architect ruling is delivered. Runtime
 > # holds the pre-object refusal; no stack or contract suppression.
 > #
-> # THIS IS DIAGNOSTIC-FIRST. Do NOT release the proposed rational
-> # return-context arena as the repair — its finite-identity premise and its
-> # causal relevance to this failure are NOT established, and the initial
-> # advisory's causal claim was WITHDRAWN. Frame the corrected ruling: recursive
-> # owned contexts are a real representation hazard but are NOT the established
-> # localized cause of this fixture's overflow. Do not preserve that causal
-> # claim in the work or its acceptance criteria.
+> # DIAGNOSTIC RETURN: large synchronous lowering-frame retention is localized;
+> # a return-context arena is NOT the repair. Recursive owned contexts remain
+> # a separate hazard, not the measured cause. The bounded fix below changes
+> # compiler control only, not semantic identity or runtime representation.
 > #
-> # Q1 — BOUNDED OBSERVATION, RETURN EVIDENCE FIRST. Targeted runs only through
-> # `scripts/ken-cargo`, with the existing fixture, flags and stack UNCHANGED;
-> # preserve the ordinary failure. Locate the last completed phase and active
-> # call chain across planning, context validation/projection, lowering,
-> # finished verification and destruction. A permitted debugger or minimal
-> # test-only phase markers are acceptable; record their effect. No recursive
-> # Debug printing, no recursive depth measurement. Measure the context chain
-> # iteratively; report admitted discoveries, exact units, call occurrences,
-> # max retained context depth and unresolved frontier. Regenerate the CURRENT
-> # predecessor census (the seven-leaf equivalent of the preserved u3:60 CLIF)
-> # and JOIN the external module FuncId (displayed `u0:55`) to its actual typed
-> # unit and definition through `UnitBundle` — a displayed target is not proof
-> # of a source-function class or context ID. Pair every newly installed call
-> # with its actual finite emission occurrence; distinct generated IDs cannot be
-> # merged by body, constructor, local head, or truncated caller history. Bound
-> # exhaustion remains refusal. RETURN the localized cause + population ledger
-> # BEFORE changing any Q1 production representation. If the cause is a large
-> # lowering frame or another recursion, repair THAT measured cause; do not
-> # install an unrelated arena. Any later-authorized return-context graph is the
-> # conditional plan-owned nonrecursive-handle family in the determination — not
-> # authorized as the repair here.
+> # Q1 — BOUNDED RESUME EXIT. Apply the successor determination's exact
+> # three-site `source.rs` change: return `SourceMachineExit::ResumeOuter`
+> # after the existing cursor/root-authority/Trap checks, then dispatch the
+> # same resume in the thin wrapper AFTER the large inner frame has returned.
+> # Preserve the wrapper's logical source root/live-depth scope until dispatch
+> # completes, including on error; preserve the full copied Active frame and
+> # its borrowed parents. Keep resume's backedge guard/cursor/successor logic.
+> # No new runtime tag/route/owner, arena, unrelated boxing or driver rewrite.
+> # Architect's isolated probe passed the unchanged fixture 1/1; restoring
+> # the exact WIP reproduced stack overflow. Runtime must reproduce the real
+> # fixture assertions, scope/refusal controls and px8f preservation on its
+> # exact patch. No stack, profile, fixture-depth or bound change. This repairs
+> # the measured edge, not all possible recursion. Another overflow returns
+> # localized evidence, not permission to broaden the mechanism.
+> #
+> # CURRENT POPULATIONS: px8f u3:60 is 29 values/28 edges/seven leaves; its six
+> # fn56 calls resolve to one EXACT UnitBundle specialization3, not an owner
+> # quotient. Mapping u3:52 is five values/four edges/three leaves and emits
+> # NO u0:55 call. Its ungoverned v219 is a local allocation path with a
+> # potential actual2580/demanded3606 identity conflict. Bind helper roles,
+> # writes, source constructor and demanded contract before any Q2 production;
+> # do not relabel it or transplant the px8f proof. Both current dumps precede
+> # finished Result closure and are NOT finished-unit certificates.
 > #
 > # Q2 — BIND THE CALLER/CALLEE FIRST, THEN COMPOSE. Adopt modular
 > # finished-Result verification and predecessor-indexed proof composition over
@@ -124,10 +125,10 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S (the ABI-completion
 > # stack provision or bound increase; no weakening of the pre-object refusal.
 > # Both Q1 and Q2 are compiler-internal. No operator gate.
 > #
-> # ROUTING: Tier T1. Runtime returns Q1 localization/population and Q2 current
-> # caller/callee binding FIRST — not an assumed arena fix or a fabricated
-> # postcondition. Production proceeds only on the shown binding, else a bounded
-> # seam question. Same WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf`.
+> # ROUTING: Tier T1. Steward folds the Q1 resume-exit recut, then Runtime
+> # returns its exact bounded repair and targeted results. Q2 current Mapping
+> # bindings return FIRST, before Q2 production — no fabricated postcondition.
+> # A conflict or missing binding returns a bounded seam question. Same WIP branch `wp/ABI-S6-d5b-file-backed` over `37390dfcf`.
 > # Reviewers: Architect (required soundness reviewer for this class) +
 > # runtime-QA; standing Adversary hunt independent (crates/ touched -> M8
 > # applies) -> Steward M1-M4 -> lieutenant. Local gates targeted; full CI is
@@ -2358,6 +2359,38 @@ Architect inventory, 2026-09-11.
     but its exact route is `TailProducerToRet`, sourced at call `883/882/881`
     through frame 879 and Ret body 910. Treating either result as Direct would
     invent a join or substitute Direct for Tail (`evt_14ysmv6e7m0e9`).
+16. The detached target-3 result retains neither a live consuming occurrence nor
+    the caller's source return context. Its result-origin list cannot establish
+    which selected-case exits are already complete and which caller suffix is
+    still owed. The HS16 ruling requires private symbolic return-context
+    retention, not fabricated live control (`evt_1y4vcy2t35kb0`).
+17. HS16 retention grounds the detached selected exits and caller suffix, but
+    the static response-owner call forwards only a runtime word and outer Ret
+    shape. The selected caller therefore lacks a proof of the returned payload's
+    processing stage: outer identity 4442 fits both stages, while replaying the
+    Result consumer traps. The target-2 Tail seat emits no call and cannot mint
+    this missing receipt (`evt_5jwgw89vtfjth`, `evt_6hr7b89s5sxwx`).
+18. HS17 reaches writeAll parity and receipt controls, but the ordinary-stack
+    required-consumer fixture aborts and Mapping refuses terminal Result closure.
+    Initial phase attribution was unproved, so the
+    [HS18 determination](../ABI-S6-HS18-determination.md) required diagnosis
+    before any arena repair. The Q1 return localizes large source-machine frames
+    retained across outer resume; the
+    [resume-exit ruling](../ABI-S6-HS18-Q1-resume-exit.md) independently checks
+    a bounded frame-pop repair green and its restored baseline overflow red.
+    The initial preserved seven-leaf graph was misattributed to Mapping: current
+    px8f has those seven leaves and six exact specialization3 calls, whereas
+    current Mapping has three leaves and no u0:55 call. Mapping's ungoverned local
+    allocation carries a potential actual2580/demanded3606 identity conflict;
+    bind the actual roles and source before Q2 production, never relabel it.
+    No stack, bound, identity, ABI or pre-object-refusal weakening is authorized.
+
+Entries 16–18 restore the inventory missing from the diagnostic-first fold;
+the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
+Entry 6 and the localized Q1 part of entry 18 share the physical-frame-retention
+predicate: a synchronous lowering edge bypasses the existing large-frame exit
+protocol. The new exit applies that protocol to outer resume. Q2 is a distinct
+identity/finished-proof obligation, not repaired by moving a Rust call.
 
 Entries 1–3 share the predicate already ruled at hard stop 3: operation
 selection and response ownership lie across the checked-IH specialization
