@@ -184,6 +184,54 @@ was checked with `git rev-parse <ref>:<path>`, not assumed from the line text.
   `root_trap_catalog_index` (`compiled.rs:56`, **SAME AT BOTH**). **This is the
   fact the FENCED assessment rests on** — see "Why this is FENCED".
 
+> #### CORRECTED 2026-09-14 AT `d40d1213e`: THE SURFACE IS **31 ACROSS 10**, AND
+> #### THE "INDEPENDENT CORROBORATION" BELOW WAS NOT INDEPENDENT.
+>
+> **`D0` re-derived per `AC-1` by `runtime-implementer` (`evt_520p8ngmdhdhs`),
+> confirmed by the Steward against the object store at `origin/main`
+> `d40d1213e`.** Three of the 34 are test-side:
+>
+>     erasure.rs:7526, :7942     inside `#[cfg(test)] mod px7l_tests`  (attribute :7137, mod :7138)
+>     lowering/aggregates.rs:4569 inside `#[cfg(test)] mod tests`      (attribute :4457, mod :4458, closes :6456)
+>
+> ⇒ **`erasure.rs` is 7 production mints, not 9. `lowering/aggregates.rs` leaves
+> the file list entirely. The total is 31 across 10.** The coordinates the frame
+> names individually (`erasure.rs:2919`/`:6043`, `compiler_driver.rs:4159`,
+> `effect_v1.rs:3989`, the 257 aggregate) all survive the move from `e3fe32510`
+> unchanged; no drift correction is owed.
+>
+> **THE DEFECT CLASS IS THIS FRAME'S OWN, ONE LEVEL IN.** The block below
+> corrected the AGGREGATE (257 → 34) precisely because *"it counted in-file
+> `#[cfg(test)] mod tests` blocks as production"* — and then did not re-sweep the
+> ENUMERATION underneath it. **The correction fixed the number and inherited the
+> blind spot in the list.**
+>
+> **AND THE CORROBORATION BELOW IS SPURIOUS, WHICH IS THE PART WORTH KEEPING.**
+> The block argues that the census is independently confirmed because *"this
+> frame states `erasure.rs` has 2 colliding mints plus 7 incidental
+> discriminators, and 2 + 7 = 9 matches the census's 9 by a different method."*
+> **The two methods agreed because they shared one blind spot, not because they
+> were independent.** Both counted the same two `px7l_tests` sites as production.
+> The corrected identity is `2 + 5 = 7`. **An agreement between two instruments
+> is evidence only if their failure modes differ** — which is exactly what the
+> implementer's reconciliation did establish: their first instrument returned 37
+> across 13 by counting PARENT-DECLARED test modules as production (a single-file
+> scan structurally cannot see `#[cfg(test)]` on the `mod` line in the parent),
+> and 37 minus those 6 and 34 minus these 3 both land on **31**. Two instruments
+> with OPPOSITE blind spots reconciling is the warrant; two with the same one is
+> not.
+>
+> **What survives unchanged:** the argument that the non-colliding `erasure.rs`
+> mints discriminate *incidentally, by message content, not by any mechanism* —
+> which is what refutes alternative (a). **Five incidental production mints make
+> that point as well as seven** (`:3215`, `:3995`, `:4024`, `:4044`, `:4064`).
+> The population is smaller than stated and was partly not production at all; the
+> conclusion is untouched.
+>
+> **The table and prose below are left in their original form deliberately**, as
+> the record of what was certified and how it was wrong. Read the corrected
+> numbers from this block.
+
 - **The construction surface is 34 PRODUCTION SITES ACROSS 11 FILES — not the
   ~76 this frame first estimated.** `D0` certified it (`evt_2kv61375ae400`) and
   the frame's own number was flagged as an approximate grep census; it was, and
