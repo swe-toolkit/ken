@@ -453,13 +453,35 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
     );
 }
 
-/// Promise class: transition sentinel for HS18 amendment 3. MEASURED: changing
-/// the required destination's sole defining transport from body 788 target 2 to
-/// its real target-0 peer is applied, and the native Mapping build no longer
-/// succeeds while the unchanged interpreter still does. CLAIMED: the exact-call
+/// Promise class: durable invariant. MEASURED: changing the required
+/// destination's sole defining transport from body 788 target 2 to its real
+/// target-0 peer is applied, and the native Mapping build no longer succeeds
+/// while the unchanged interpreter still does. CLAIMED: the exact-call
 /// discriminator is load-bearing in production rather than observation-only.
 /// THE GAP: this fixed witness exercises the two-call body; the ordinary
 /// control above separately asserts the exact target/result pair selected.
+///
+/// THIS ASSERTS THE REFUSAL CLASS, NOT THE EXACT REASON, AND THE RECLASSIFICATION
+/// FROM SENTINEL TO INVARIANT IS THE POINT. It previously pinned one reason
+/// string byte-for-byte. `checked_ih_post_call_residual` emits three co-class
+/// reasons -- longer-than, non-computational, does-not-match -- and the wider
+/// `CheckedIhDetachedCallerCut` family has more still, so a one-string pin fused
+/// "the guard fell" and "the guard moved" into a single observable bit and could
+/// not discriminate them.
+///
+/// That is not hypothetical: on 2026-09-14 a scratch probe relocated this
+/// refusal from the longer-than arm to the does-not-match arm. `expect_err`
+/// still succeeded -- the wrong defining call still did not compile, so the
+/// property held -- and this control reddened anyway. It was read as evidence
+/// the guard had been defeated, and a repair was nearly ruled out on that basis.
+/// The class is what the property is about; which arm states it is an internal
+/// detail that may legitimately move.
+///
+/// The prefix below IS the class: `unsupported()` carries `construct` as a
+/// `&'static str` and renders it between two fixed separators, so matching the
+/// rendered prefix is equivalent to `construct == "CheckedIhDetachedCallerCut"`.
+/// The arm is printed rather than asserted, which keeps the diagnostic the exact
+/// pin was incidentally providing without making it load-bearing.
 #[test]
 fn wrong_defining_call_breaks_the_required_consumer_edge() {
     let (interpreted, interpreted_backing) = interpreted_only();
@@ -501,10 +523,16 @@ fn wrong_defining_call_breaks_the_required_consumer_edge() {
         ken_runtime::ObjectLinkerPackagingStage::ObjectEmission,
     );
     assert_eq!(error.field, "checked_process_object");
-    assert_eq!(
+    const DETACHED_CALLER_CUT: &str =
+        "unsupported runtime-IR lowering: CheckedIhDetachedCallerCut: ";
+    assert!(
+        error.reason.starts_with(DETACHED_CALLER_CUT),
+        "the wrong-call mutation left the detached-caller-cut refusal class entirely, which is \
+         the failure this control exists to catch -- a refusal in another class means the \
+         exact-call discriminator did not reject it: {:?}",
         error.reason,
-        "unsupported runtime-IR lowering: CheckedIhDetachedCallerCut: a post-call consumer receipt is longer than the exact local eliminator prefix",
     );
+    eprintln!("wrong-defining-call refusal arm: {}", error.reason);
 }
 
 /// Promise class: transition sentinel for HS18 amendment 3. MEASURED: the
