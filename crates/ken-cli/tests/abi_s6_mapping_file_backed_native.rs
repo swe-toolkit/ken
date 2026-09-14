@@ -706,12 +706,15 @@ fn generated_result_owner_certificate_rejects_each_finished_body_corruption() {
 }
 
 /// Promise class: durable invariant. MEASURED: the exact plan-owned immediate
-/// bridge and non-transport conjunction is reached once; promoting only that row
-/// recreates the forward-declared response owner with no verified selected call.
-/// CLAIMED: the bridge is honestly `InlineBridgeNoCall`, creates no response
-/// owner, and leaves ordinary effect lowering authoritative. THE GAP: plan-field
-/// and neighbour controls independently pin descriptor validation and prevent this
-/// mutation from broadening to transport or non-bridge callers.
+/// bridge and non-transport conjunction is classified once; promoting only that
+/// row applies once and is refused by the constructor-result-identity invariant
+/// during post-call consumer publication, before the owner gate. CLAIMED: the
+/// bridge is honestly `InlineBridgeNoCall`, creates no response owner, and leaves
+/// ordinary effect lowering authoritative. THE GAP: this deliberate fault
+/// injection is intended to reach a compiler invariant; the `rt_parity_native.rs`
+/// `restore-k` / `RestoreSelectedKTarget` control separately pins the owner gate,
+/// while plan-field and neighbour controls prevent this mutation from broadening
+/// to transport or non-bridge callers.
 #[test]
 fn immediate_nontransport_bridge_creates_no_response_owner() {
     let root = tempfile::Builder::new()
@@ -774,15 +777,16 @@ fn immediate_nontransport_bridge_creates_no_response_owner() {
         applications, 1,
         "the response mutation must promote exactly one immediate non-transport bridge"
     );
-    let refusal = match mutated {
-        Ok(_) => panic!("promoting the immediate bridge must recreate HS10"),
-        Err(error) => format!("{error:?}"),
+    let error = mutated.expect_err(
+        "promoting the immediate bridge must fail post-call consumer publication",
+    );
+    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(error) = error else {
+        panic!("the promoted immediate bridge reached the wrong refusal: {error:?}");
     };
-    assert!(
-        refusal
-            .contains("a forward-declared response owner has no verified selected incoming call")
-            && refusal.contains("disposition=Some(InlineNoCall)"),
-        "the mutation must restore the exact HS10 owner refusal: {refusal}"
+    assert_eq!(
+        error.reason,
+        "Cranelift backend failure: native static transition planner invariant failed; please report this compiler bug: a continuation target's selected source case has no successful constructor result identity",
+        "the fault injection must reach the exact constructor-result-identity invariant",
     );
 
     let restored = differential();
