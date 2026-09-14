@@ -70,6 +70,14 @@ criterion has to be able to FAIL. See `AC-1`.
 
 ## Fixed inputs
 
+> **INVARIANT OVER THIS SECTION: every coordinate below carries the SHA it was
+> measured at.** A line number is a claim about one tree; a bare one is worthless
+> and, worse, a bare PAIR of them can hide a SET difference by looking like
+> drift. This is a structural closure, not a style note — the same
+> misreading has now been registered at six sites across this arc, and per-site
+> correction stopped being the answer at about the fourth. If you add a
+> coordinate here without a SHA, the next reader inherits the defect.
+
 **MEASURED BY THE STEWARD at `686ffa8ac`** (the HS-arc WIP tip), except where a
 line says otherwise. Re-measure every coordinate at `D0`; `RuntimeTrap` itself
 lives in `ken-host` and is equally present on `origin/main`.
@@ -188,12 +196,26 @@ lives in `ken-host` and is equally present on `origin/main`.
   incidental discriminators, and **2 + 7 = 9 matches the census's 9** by a
   different method.
 
-  **One residual, named rather than absorbed:** `cranelift_backend/test_objects.rs`
-  (2 sites) is excluded because its module declaration is `#[cfg(test)]`-gated in
-  the PARENT — a gate a per-file classifier structurally cannot see. If another
-  module is gated the same way the count is 2 high per such module. That one was
-  checked because its name invited it; **there has been no sweep for others, and
-  `D3` owes one.**
+  **The residual's class is THREE modules and six sites, not one** — the
+  Architect ran the sweep (`evt_e8bzq3a95qz5`). Declaration-gated modules
+  containing `RuntimeTrap {` sites:
+
+      cranelift_backend/test_objects.rs                    2 sites, gated at cranelift_backend.rs:50
+      cranelift_backend/artifact/api/tests.rs              2 sites, gated at artifact/api.rs:13
+      cranelift_backend/lowering/core/primitive/tests.rs   2 sites, gated at primitive.rs:9
+
+  **The 34-file list contains none of them, so 34 is very likely correct — but
+  for a reason not yet established, and `D0` owes that.** The classifier excluded
+  two of these; nobody knows whether it did so because it recognises declaration
+  gates (**it cannot**) or because they happen to be named `tests.rs`.
+
+  **`cranelift_backend/test_support.rs` is the proof the distinction is live:**
+  declaration-gated at `:52`, **not** named `tests.rs`, and carrying zero
+  `RuntimeTrap` sites today. It is exactly the shape a filename heuristic misses,
+  sitting empty. `test_objects.rs` was found because its name invited it, and
+  both other members have inviting names too. **Confirm WHY those two were
+  excluded. If it was the filename, the instrument's blind spot is unbounded
+  rather than bounded at six.**
 
 - **THE `RuntimeTrap` DECLARATION LINE DRIFTS BETWEEN REFS**, and the header's
   correction does not cover it — that one is about the MINT sites, which genuinely

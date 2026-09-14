@@ -23,9 +23,11 @@ origin: "Architect rulings evt_5kzahxdv9w8d1 (the three parts, the forbidden alt
 >
 > - The type **does not exist on `origin/main`** (zero files with hits there,
 >   two files at `5d977ac79` and `686ffa8ac`).
-> - **All six reads borrow**, so dropping the derive raises no error at any of
->   them. Their words: Part 1 as ruled *"would have been a green node that
->   leaves the property it is named for still false."*
+> - **All EIGHT reads borrow** (six when the frame was written; `D0` found two
+>   more), so dropping the derive raises no error at any of them. Their words:
+>   Part 1 as ruled *"would have been a green node that leaves the property it
+>   is named for still false."* `D0` then confirmed it empirically: zero errors
+>   and the warning count unmoved, 110 to 110.
 >
 > ⇒ **Parts 1 and 3 are one change and they are `D2` here, together.** `D0` is
 > the probe that can still refute this — zero errors confirms, a broad error set
@@ -58,23 +60,23 @@ that has no single producer gate.
 
 **`GeneratedConstructorAuthority` DOES NOT EXIST ON `origin/main`.** Measured:
 `git grep -c GeneratedConstructorAuthority origin/main -- crates/` returns zero
-hits. It exists only on the runtime ring's **held, unreleased** branch
-`5d977ac79` (6 commits ahead of `origin/main`), introduced across `01d2ccb11`
-and `5d977ac79` — "ABI-S6 HS18: certify generated Result path cuts" / "audit
-generated Result protocols".
+hits. It exists only on the runtime lane's unlanded ABI-S6 HS18 work.
 
-**Three consequences, and none of them is a blocker:**
+**THE BASE IS `187895991`** — see "Sequencing", which carries the measurement.
+An earlier version of this section named `5d977ac79`; that SHA has **no ref
+pointing at it** and is interior to a pre-rebase backup. It is retired as a
+coordinate and appears below only where a historical measurement was taken at
+it, always with the SHA attached.
 
-1. **This node's base is `5d977ac79`, not `origin/main`**, and every coordinate
-   below is measured there unless it says otherwise.
-2. **Nothing here is "landable today" against `origin/main`.** The held branch
-   must land first, or this work is authored on top of it and lands with it.
-   **Which of those two, and when, is a sequencing call and it is the
-   Steward's** — it is taken in "Sequencing" below rather than left to the ring.
-3. The ruling's premise that Part 1 could go in ahead of everything came from
-   prose describing the tree, not from the tree. Recorded here because this arc
-   has now produced that shape more than once, on more than one seat, and the
-   cheap correction is to name the base in the frame.
+**Two consequences, and neither is a blocker:**
+
+1. **Nothing here is "landable today" against `origin/main`.** The entry-18
+   verifier repair lands first; this node is built on whatever that lands as.
+2. The original ruling's premise that Part 1 could go in ahead of everything
+   came from prose describing the tree, not from the tree. Recorded because this
+   arc produced that shape repeatedly, on several seats, and the cheap
+   correction is to name the base in the frame — which is what the Fixed-inputs
+   invariant above now enforces.
 
 ## The separability finding: Part 1 is not separable from Part 3
 
@@ -101,7 +103,7 @@ not change that.** Measured at `5d977ac79`:
   | `3262` / `3275` | `.values().any(..)` | `cfg(px8-ds-test-support)` mutation trigger |
   | `3307` / `3320` | `.values().find(\|a\| a.identity != identity)` | `cfg(px8-ds-test-support)` — deliberately selects a **foreign** authority's word to substitute |
   | `3343` / `3356` | `.iter().filter(..).map(..)` | grounds verification over **every** matching authority, feeding `verify_constructor_authority_ground` |
-  | `3387` / `3401` | `if let Some(authority) = ..get(source)` | **MISSED BY THE FRAME. `None` falls through.** |
+  | `3387` / `3401` | `if let Some(authority) = ..get(source)` | **MISSED BY THE FRAME.** On `None`, `grounds` is left UNCLEARED — **the proof survives the authority's absence** |
   | `3891` / `3905` | `.contains_key(&value) \|\| realized_call_words.contains(..)` | **MISSED BY THE FRAME.** A presence check falling through to an alternative |
   | `4284` / `4415` | `.get(&publication.returned_word)` | diagnostic |
   | `4312-4317` / `4443-4448` | `.len()`, `.values().filter(..).take(8)` | diagnostic |
@@ -153,6 +155,14 @@ Steward did not compile it: that needs the held branch checked out, and
 command that settles it is the first deliverable.
 
 ## Fixed inputs
+
+> **INVARIANT OVER THIS SECTION: every coordinate below carries the SHA it was
+> measured at.** A line number is a claim about one tree; a bare one is worthless
+> and, worse, a bare PAIR of them can hide a SET difference by looking like
+> drift. This is a structural closure, not a style note — the same
+> misreading has now been registered at six sites across this arc, and per-site
+> correction stopped being the answer at about the fourth. If you add a
+> coordinate here without a SHA, the next reader inherits the defect.
 
 **MEASURED BY THE STEWARD at `5d977ac79`** unless a line says otherwise.
 
@@ -283,6 +293,52 @@ change, per the separability finding:
     error rather than a fallthrough.** The current
     `get(..).is_some_and(..)`-then-continue shape is the silent pass in
     structural form.
+
+**`D2a` — ANSWER THE DISJUNCTION BEFORE BUILDING, NOT INSIDE IT.** At the decided
+base `187895991`, `prove_forwarded_value` satisfies one proof by **two**
+independent arms, verbatim:
+
+    if authorities
+        .get(&value)
+        .is_some_and(|authority| authority.identity == identity && authority.word == value)
+        || call_seeds.get(&value) == Some(&identity)
+    {
+
+`D2` makes `remove()`-at-consumer load-bearing on **arm 1 only. Arm 2 answers
+independently.** Naming `call_seeds` as "the fallthrough" is not establishing
+that it cannot answer for a value whose authority has just been consumed.
+**Measure whether the two populations are disjoint, or make both arms
+consuming.** Architect ruling `evt_7mgwzftyt0fm2`: *a guard closed on one arm of
+a disjunction closes the instance, not the class.* This is a measurement and it
+will not be accepted as an assertion.
+
+**`D2a` TRIGGER, conditional and not a present defect.** A third satisfier —
+`detached_consumer_authorities`, a sibling `BTreeMap<ir::Value, ..>` carrying
+`demanded_identity` and `after_word`, the same two facts under other names —
+exists **only** on the WIP probe `2b78e4d19` and its descendants. Measured:
+
+    187895991    0 occurrences      5d977ac79    0 occurrences
+    origin/main  0 occurrences      686ffa8ac   14 occurrences
+
+**If `2b78e4d19`'s detached map is ever carried into the landed lineage, a third
+independent satisfier arrives and `D2a`'s answer must be re-derived.** Until
+then the disjunction is two arms and this frame's row for that site is accurate.
+
+**`D2b` — THE MUTATION HARNESS BECOMES A HARD FAILURE ON `None`, AND IT LANDS
+BEFORE OR WITH THE CONSUMPTION CHANGE. NEVER AFTER.** `SubstituteQueriedWord`'s
+`if let Some(foreign) = ..find(..)` must error rather than skip. **The harness
+has precisely the defect this node exists to close — an absent authority taken
+as a silent pass — sitting inside the instrument that certifies the closure.**
+
+The sequencing is not optional and the reason is asymmetric: land the harness
+repair first and the moment consumption starves it the test reds and says so.
+Land `D2` first and the harness no-ops into green **at the exact moment you need
+it to catch a regression.**
+
+**The two degradation shapes are different and the second is worse.** A starved
+harness is a dead instrument — it fails to detect. A disjunction that succeeds
+via a sibling arm is **a false proof — it asserts.** One is blindness; the other
+is an unsound pass wearing a proof.
 
 **`D3` — report what the widening cost**: how many hand-off sites acquired an
 authority, how many consumers acquired a discharge, and every site reported
