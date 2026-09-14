@@ -365,8 +365,9 @@ symbolic run as a bare general atom. `fixed_binop` preserves the existing
 built-in arithmetic/equality path and never becomes a declaration or fixity
 name.
 
-The `expr application_atom` arm intentionally narrows bare application
-arguments. An expression not admitted by `application_atom` — including an
+Both application arms — `expr application_atom` and `operator_prefix` with its
+`application_atom+` tail — intentionally restrict bare arguments to atoms. An
+expression not admitted by `application_atom` — including an
 ungrouped lambda, `let`, `if`, `match`, temporal form, arrow, or projection —
 must be grouped before it is used as an application argument. Consequently the
 five leading forms — lambda and `let`, `if`, `match`, and `temporal` — reject at

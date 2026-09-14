@@ -12,21 +12,26 @@ six dedicated notation tokens, but the ordinary global-name, prefix, infix, and
 fixity consumers accept only the generic symbolic-operator token. The tokens
 therefore dead-end before the ordinary name path. The generic-operator and
 `let … in` controls below are live on that base and must remain green. The
-non-temporal rows of the application-atom boundary case form a
-**RED-UNTIL-LANG-RESERVED-INFIX-NAMES** aggregate. Its temporal row is instead
-**RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** (`OQ-syntax`; no build WP is framed
-in this candidate): landing the reserved-name build cannot clear a grouped
-expression form that is
-not yet available. Executed parser observations on the authorized re-anchor
-base `cb646c784b2dc480bdae703473055481ca6b5e44` show that some rows already
-have their target shape, but ungrouped `if` is still accepted as an argument, a
-bare projection still attaches inside the argument, and expression-level
-`temporal` is not yet accepted even when grouped.
+non-temporal rows of the application-atom boundary cases form a
+**RED-UNTIL-LANG-RESERVED-INFIX-NAMES** aggregate. Their temporal rows instead
+carry **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** (`OQ-syntax`; no build WP is
+framed in this candidate): landing the reserved-name build cannot clear a
+grouped expression form that is not yet available. The reserved-head temporal
+row also retains its reserved-name dependency until A0 lands. Executed parser
+observations on the authorized re-anchor base
+`cb646c784b2dc480bdae703473055481ca6b5e44` show that generic `(<+>)`,
+`<+> Zero`, and bare `<+>` all accept, while
+`<+> if true then Zero else Zero` still accepts as an operator-headed
+application. Some identifier-head rows already have their
+target shape, but ungrouped `if` is still accepted as an argument, a bare
+projection still attaches inside the argument, and expression-level `temporal`
+is not yet accepted even when grouped.
 
 **Promise class.** The exact six-name inventory and its five alias pairs are a
 normative compatibility vector. Ordinary application, resolved-identity fixity,
 and absence of a default binding are durable invariants. The grouped-argument
-boundary and its two intentional ungrouped parse trees are durable grammar
+boundary, across both application productions and both operator-name token
+classes, and its intentional ungrouped parse trees are durable grammar
 invariants. A future additive alias requires a separate contract change; it is
 not a snapshot update.
 
@@ -36,7 +41,7 @@ value is obtained from the parser, resolver, fixity table, or elaborated output
 under test. The isolated units prevent one earlier dead-end from hiding a later
 omitted name. A separate simultaneous unit gives the six definitions distinct
 literal bodies, so an accidental cross-row identity collapse cannot hide behind
-six internally consistent isolated runs. The application-atom table states each
+six internally consistent isolated runs. The application-atom tables state each
 grouped and ungrouped tree or rejection independently rather than deriving one
 from the parser's result for the other.
 
@@ -75,37 +80,49 @@ identical after alias expansion; the source lexemes are not two declarations.
 
 The tree observations in this section are fixed before name resolution or
 elaboration. The operator-value case separately observes the grouped name's
-resolved identity. Write `A(f, x)` for one application node and use `Lam`,
-`Let`, `If`, `Match`, `Temporal`, `Arrow`, and `Proj` for the corresponding
-chapter-32 expression productions. Parentheses group but do not add a tree
-node.
+resolved identity. Write `A(f, x)` for one application node, `N(<+>)` for the
+generic operator-name node, and `N(Le)` for the canonical reserved-name node.
+Use `Lam`, `Let`, `If`, `Match`, `Temporal`, `Arrow`, and `Proj` for the
+corresponding chapter-32 expression productions. Parentheses group but do not
+add a tree node.
 
 ### surface/operators/bare-operator-value-requires-grouping
 
 - spec: `32 §1`/§3
-- given-positive: the `Le` common fixture, plus
-  `const grouped_op : Nat -> Nat -> Nat = (≤)` in the same unit
-- given-negative: replace only `(≤)` in `grouped_op` with bare `≤`
-- expect-positive: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — `(≤)` parses as
-  the grouped `operator_name` atom and resolves to the fixture's exact `G(Le)`.
-  The existing `prefix_bare` observation independently shows that ungrouped
-  `≤ Zero (Suc Zero)` remains a complete `operator_prefix` application.
-- expect-negative: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — bare `≤` rejects
-  syntactically before resolution: it is neither an `application_atom` nor a
-  complete `operator_prefix`, because it has zero following atoms. It must not
-  produce a global-value tree for `G(Le)`.
-- why: rejecting every ungrouped operator would make the negative pass for the
-  wrong reason; the adjacent head-application positive keeps that route live.
-  **MEASURED:** the grouped zero-application value resolves and the ungrouped
-  zero-application value rejects while an ungrouped nonzero application
-  accepts. **CLAIMED:** grouping, not token identity, distinguishes an operator
-  value from the head-only prefix form. **THE GAP:** this parse-and-resolution
-  triple does not establish infix reassociation; the common fixture's separate
-  structural tree does.
+- given: instantiate two isolated common fixtures, first with generic
+  `OP = <+>` and then with reserved `OP = ≤`. Add these two lines to each unit:
 
-### surface/operators/non-atom-application-arguments-require-grouping
+  ```ken ignore
+  const grouped_op : Nat -> Nat -> Nat = (OP)
+  const applied_op : Nat -> Nat = OP Zero
+  ```
 
-- spec: `32 §3`
+  For the negative twin, replace only `(OP)` in `grouped_op` with bare `OP`.
+- expect-positive: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — for both literal
+  instantiations, `(OP)` parses as the grouped `operator_name` atom and resolves
+  to that fixture's exact `G(OP)`, while `OP Zero` parses as
+  `A(G(OP), Zero)`. The generic grouped and applied arms are live before A0 and
+  must remain so; the reserved arms turn green when A0 admits `Le` to the same
+  grammar.
+- expect-negative: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — bare `<+>` and bare
+  `≤` each reject syntactically before resolution: neither is an
+  `application_atom` or a complete `operator_prefix`, because each has zero
+  following atoms. Neither may produce a global-value tree for its `G(OP)`.
+  The generic refusal is a required behavior change, not a pre-existing token
+  dead end; the reserved refusal must occur after `Le` reaches `operator_name`.
+- why: rejecting every ungrouped operator would make both negatives pass for the
+  wrong reason, while special-casing only one token class would make one triple
+  pass. The adjacent grouped and nonzero-application positives keep each route
+  live. **MEASURED:** in both token classes the grouped zero-application value
+  resolves, the ungrouped zero-application value rejects, and an ungrouped
+  nonzero application accepts. **CLAIMED:** grouping, not token identity,
+  distinguishes an operator value from the head-only prefix form. **THE GAP:**
+  these parse-and-resolution triples do not establish infix reassociation; the
+  common fixtures' separate structural trees do.
+
+### surface/operators/identifier-headed-non-atom-arguments-require-grouping
+
+- spec: `32 §3`, `expr application_atom`
 - given: feed each table cell independently to the full-expression parser. The
   names are deliberately unresolved because the observation ends at parsing;
   no type or evaluation result is used as an oracle.
@@ -136,11 +153,59 @@ node.
   projection as an argument atom changes its named outer tree. **MEASURED:**
   seven independent grouped/ungrouped pairs expose four current reject
   boundaries, one deferred reject boundary, and two precedence boundaries.
-  **CLAIMED:**
-  only `application_atom` may occupy bare argument position. **THE GAP:** these
-  are parser observations only; the ordinary-application elaboration path is
-  covered independently by the common operator fixture and existing surface
+  **CLAIMED:** the `expr application_atom` production admits only atoms in bare
+  identifier-headed argument position. **THE GAP:** these are parser
+  observations only; the ordinary-application elaboration path is covered
+  independently by the common operator fixture and existing surface
   elaboration cases.
+
+### surface/operators/operator-prefix-arguments-are-atoms
+
+- spec: `32 §1`/§3, `operator_prefix ::= operator_name application_atom+`
+- given: parse every table row independently as shown. The generic `<+>` head
+  is the live `operator` control; the reserved `≤` head is the independent `Le`
+  discriminator. As in the identifier-head table, names remain unresolved and
+  the observation ends at parsing.
+
+  | head/class | grouped source | exact grouped tree | ungrouped source | exact ungrouped outcome |
+  |---|---|---|---|---|
+  | generic/lambda | `<+> (λx. x)` | `A(N(<+>), Lam(x, x))` | `<+> λx. x` | reject at `λ` after consuming `<+>`; no complete tree |
+  | reserved/lambda | `≤ (λx. x)` | `A(N(Le), Lam(x, x))` | `≤ λx. x` | reject at `λ` after consuming `Le`; no complete tree |
+  | generic/let | `<+> (let x = Zero in x)` | `A(N(<+>), Let(x, Zero, x))` | `<+> let x = Zero in x` | reject at `let` after consuming `<+>`; no complete tree |
+  | reserved/let | `≤ (let x = Zero in x)` | `A(N(Le), Let(x, Zero, x))` | `≤ let x = Zero in x` | reject at `let` after consuming `Le`; no complete tree |
+  | generic/if | `<+> (if true then Zero else Zero)` | `A(N(<+>), If(true, Zero, Zero))` | `<+> if true then Zero else Zero` | reject at `if` after consuming `<+>`; no complete tree |
+  | reserved/if | `≤ (if true then Zero else Zero)` | `A(N(Le), If(true, Zero, Zero))` | `≤ if true then Zero else Zero` | reject at `if` after consuming `Le`; no complete tree |
+  | generic/match | `<+> (match flag { true ↦ Zero; false ↦ Zero })` | `A(N(<+>), Match(flag, {true ↦ Zero; false ↦ Zero}))` | `<+> match flag { true ↦ Zero; false ↦ Zero }` | reject at `match` after consuming `<+>`; no complete tree |
+  | reserved/match | `≤ (match flag { true ↦ Zero; false ↦ Zero })` | `A(N(Le), Match(flag, {true ↦ Zero; false ↦ Zero}))` | `≤ match flag { true ↦ Zero; false ↦ Zero }` | reject at `match` after consuming `Le`; no complete tree |
+  | generic/temporal | `<+> (temporal { Top })` | **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** — `A(N(<+>), Temporal(Top))` | `<+> temporal { Top }` | reject at `temporal` after consuming `<+>`; no complete tree |
+  | reserved/temporal | `≤ (temporal { Top })` | **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** and **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** — `A(N(Le), Temporal(Top))` | `≤ temporal { Top }` | reject at `temporal` after consuming `Le`; no complete tree |
+  | generic/arrow | `<+> (Nat -> Nat)` | `A(N(<+>), Arrow(Nat, Nat))` | `<+> Nat -> Nat` | accept as `Arrow(A(N(<+>), Nat), Nat)`, not as the grouped tree |
+  | reserved/arrow | `≤ (Nat -> Nat)` | `A(N(Le), Arrow(Nat, Nat))` | `≤ Nat -> Nat` | accept as `Arrow(A(N(Le), Nat), Nat)`, not as the grouped tree |
+  | generic/projection | `<+> (box.value)` | `A(N(<+>), Proj(box, value))` | `<+> box.value` | accept as `Proj(A(N(<+>), box), value)`, not as the grouped tree |
+  | reserved/projection | `≤ (box.value)` | `A(N(Le), Proj(box, value))` | `≤ box.value` | accept as `Proj(A(N(Le), box), value)`, not as the grouped tree |
+
+- expect-nontemporal: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — all twelve
+  grouped sources have exactly the stated `operator_prefix` trees. The eight
+  ungrouped leading-form sources reject with their primary span on the argument
+  token named in the table, after the operator head has been consumed. The four
+  arrow/projection sources accept with exactly the stated outer trees.
+- expect-temporal: the generic grouped source is
+  **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE**. The reserved grouped source carries
+  that marker and **RED-UNTIL-LANG-RESERVED-INFIX-NAMES**; A0 can clear only its
+  head, not the unavailable grouped argument. Both ungrouped sources reject at
+  the `temporal` argument token once their head is admitted.
+- why: the live generic matrix rejects an implementation that leaves generic
+  operator prefixes on an arbitrary-`expr` argument path. The parallel reserved
+  matrix rejects a generic-only repair or an old `Le` token dead end: a reserved
+  negative that stops at `≤` rather than the tabled argument token fails.
+  Grouped positives prevent a reject-all repair, while the arrow/projection
+  trees distinguish atom consumption from precedence reparsing. **MEASURED:**
+  fourteen paired rows independently observe both operator-name token classes
+  at all seven argument classes. **CLAIMED:** the `application_atom+` tail, not
+  an arbitrary expression parser, is the only argument route from
+  `operator_prefix`. **THE GAP:** these are parse observations; the common
+  fixtures and the two operator-value triples separately pin resolution and
+  nonzero application for both heads.
 
 ## The six independent name cases
 
