@@ -155,14 +155,54 @@ lives in `ken-host` and is equally present on `origin/main`.
   (`compiled.rs:56`). **This is the fact the FENCED assessment rests on** — see
   "Why this is FENCED".
 
-- **The construction surface a required new field would touch: about 76
-  production `RuntimeTrap { .. }` sites across 20 files**, concentrated in
-  `object_linker_packaging.rs` (23), `ir.rs` (10), `erasure.rs` (9),
-  `static_transition.rs` (7), `joins_traps.rs` (6),
-  `native_process_entrypoint.rs` (6), `platform_runtime_support.rs` (5), plus
-  test-side literal constructions. This count is the `D0` input and is an
-  approximate census by grep, not a certified enumeration — `D0` produces the
-  exact number.
+- **The construction surface is 34 PRODUCTION SITES ACROSS 11 FILES — not the
+  ~76 this frame first estimated.** `D0` certified it (`evt_2kv61375ae400`) and
+  the frame's own number was flagged as an approximate grep census; it was, and
+  it was wrong in a specific way: **it counted in-file `#[cfg(test)] mod tests`
+  blocks as production.** Of 257 `RuntimeTrap {` sites at `686ffa8ac`, 223 are
+  test-side.
+
+  | count | file |
+  |---|---|
+  | 9 | `ken-elaborator/src/erasure.rs` |
+  | 6 | `ken-runtime/.../static_transition/joins_traps.rs` |
+  | 6 | `ken-runtime/src/ir.rs` |
+  | 3 | `ken-runtime/src/object_linker_packaging.rs` |
+  | 2 | `ken-runtime/.../planning/static_transition.rs` |
+  | 2 | `ken-runtime/src/platform_runtime_support.rs` |
+  | 2 | `ken-runtime/src/runtime_ir_evaluator.rs` |
+  | 1 | `ken-host/src/effect_v1.rs` |
+  | 1 | `ken-runtime/.../lowering/aggregates.rs` |
+  | 1 | `ken-runtime/.../lowering/core.rs` |
+  | 1 | `ken-runtime/.../lowering/mod.rs` |
+
+  **This roughly HALVES the migration surface**, which matters for a size-M node.
+
+  Two things about how that number was obtained are worth keeping. **The first
+  instrument returned 30 and was not reported** — `#[cfg(test)]` in this tree is
+  overwhelmingly ITEM-level rather than module-level, and a brace matcher
+  treating each as opening a block swallowed following code. A plausible number
+  from an instrument that could not discriminate. The replacement was
+  hand-validated on five files and agrees on all five, and it is independently
+  corroborated here: this frame states `erasure.rs` has 2 colliding mints plus 7
+  incidental discriminators, and **2 + 7 = 9 matches the census's 9** by a
+  different method.
+
+  **One residual, named rather than absorbed:** `cranelift_backend/test_objects.rs`
+  (2 sites) is excluded because its module declaration is `#[cfg(test)]`-gated in
+  the PARENT — a gate a per-file classifier structurally cannot see. If another
+  module is gated the same way the count is 2 high per such module. That one was
+  checked because its name invited it; **there has been no sweep for others, and
+  `D3` owes one.**
+
+- **THE `RuntimeTrap` DECLARATION LINE DRIFTS BETWEEN REFS**, and the header's
+  correction does not cover it — that one is about the MINT sites, which genuinely
+  do not drift. The struct does:
+
+      effect_v1.rs   derive at :4067  (686ffa8ac)
+                     derive at :3989  (origin/main)   -- 78 lines apart
+
+  Anyone building on `origin/main` and going to `:4067` lands 78 lines off.
 
 - **The fact that was already in the tree, three hard stops early**,
   `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/control.rs:4999`,
@@ -204,12 +244,31 @@ measured in this frame rather than argued:
     are compile errors, and cost does not outrank a class closure whose only net
     is an unsound pass.
 
-**`D0` still opens with a re-measure, and it is a gate, not a formality.**
-Produce the exact production-site count, re-measure every coordinate in "Fixed
-inputs" at the SHA being built, and confirm the cross-lane contention check
-below. **If the re-measure finds the FENCED premise wrong — any path that
-serializes a `RuntimeTrap` or pins its field layout — stop and return to the
-Steward before building.**
+**`D0` IS REPORTED AND THE GATE PASSES** (`evt_2kv61375ae400`). All three halves
+of the FENCED premise measured, and the third positively rather than as an
+absent grep:
+
+  - **No `serde`** anywhere in `effect_v1.rs`, at both refs.
+  - **No `repr`** on either type. The file's four `repr(..)` attributes sit on
+    `HostOpV1`, `CapabilityTokenV1`, `ResourceTokenV1` and `FdInheritancePolicyV1`.
+  - **Nothing serializes it or pins its layout** — zero hits for `RuntimeTrap` in
+    any serialize/encode/to_bytes/section context, and zero for
+    `size_of::<RuntimeTrap>` / `transmute` / `offset_of`. **Positively: what
+    crosses into generated code is an `i64`** — `emit_current_trap` stores
+    `identity.abi_word()` or a shifted root token into the trap slot. The struct
+    never crosses.
+
+⇒ **FENCED holds. No stop.** The come-back condition remains live for the rest
+of the build: if anything later serializes a `RuntimeTrap` or pins its field
+layout, that returns to the Steward before continuing.
+
+**L2 CONTENTION: CLEAR, AND MEASURED WITH A POSITIVE CONTROL.** No branch ahead
+of `origin/main` touches `erasure.rs` except runtime-lane ones. The control that
+makes the zero meaningful: **L2 branches do exist and are active in
+`ken-elaborator`** — `LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD`,
+`LANG-SURFACE-RECORD-DECL-FORM-RECUT`, `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES` —
+and every one of them avoids `erasure.rs`. The negative is a measurement, not an
+artifact of looking somewhere empty. **No sequencing is owed.**
 
 **`D1` — make the identity discriminate**, by the mechanism `D0` rules. Two
 distinct source occurrences eliminating the SAME family must produce
