@@ -1,5 +1,23 @@
 # ABI-S6 HS18 — closure mechanism, amendment 7
 
+> **ITS ORIGIN IS SUPERSEDED by
+> [amendment 8](ABI-S6-HS18-closure-mechanism-amendment-8.md), 2026-09-14.**
+> This document reinstates amendment 1's forward, under which the producer's
+> context invokes the owning context and forwards *that* result. HS12 measured
+> that origin FALSE: `constructed_context_frame` is a singular function-local
+> `Option` whose operands "cannot be reused elsewhere", so a seat may invoke
+> only the continuation it itself constructed and the producer's context is
+> not entitled to invoke the owning context at all. **Do not cite this
+> document as authority for producer-originated forwarding.**
+>
+> **What stands here, unchanged and still cited:** the forward's DESTINATION —
+> owning context `ContinuationContextId(0)`, Result contract
+> `DenseRange { start: 4442, len: 38 }`, equal to the detached sink's
+> independently derived demand, with zero edit to the finished identity chain;
+> the HS10 environment settlement; and the emission-ownership disposition.
+> **Amendment 8 withdraws the forward's ORIGIN — not its destination, and not
+> this document's other findings.**
+
 > **ERRATUM ON CURRENT `main`, AND IT CORRECTS AMENDMENT 6'S RULE.** Amendment 6
 > (`325f5b531`) mandates transfer into the continuation body on the ground that
 > the detached reconstruction supplies the producer's environment. **The
