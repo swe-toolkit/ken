@@ -239,9 +239,10 @@ they need not look at. It is not. Corrected on the Architect's census
   `responses.rs:358`, `:373`, `:1975`, same ref). At the decided base
   **`187895991`** these are `core.rs:9353`, `:9363`, `responses.rs:2327`
   (definitions `:418`, `:438`, `:2055`). **The failing `D6a` intra-function edge
-  is none of them.** This is the same disjointness the REKEY node records from
-  the other end, and it is the reason the consumer half of the measurement below
-  is not free.
+  is none of them.** This is the same site-level disjointness the REKEY node
+  records from the other end. **It is unrelated to the satisfier-population
+  disjointness `D2a` used to prescribe measuring** — that measurement is
+  withdrawn; see `D2a`.
 
 - **`LoweringOperand`** (`cranelift_backend/lowering/mod.rs` at `5d977ac79`,
   sealed and wildcard-free, its doc refusing a fallback arm as *"a wildcard with
@@ -353,35 +354,104 @@ change, per the separability finding:
     `get(..).is_some_and(..)`-then-continue shape is the silent pass in
     structural form.
 
-**`D2a` — ANSWER THE DISJUNCTION BEFORE BUILDING, NOT INSIDE IT.** At the decided
-base `187895991`, `prove_forwarded_value` satisfies one proof by **two**
-independent arms, verbatim:
+**`D2a` — MAKE EVERY ARM CONSUMING. DO NOT MEASURE THE POPULATIONS.**
+
+> ### RE-DERIVED 2026-09-14 by the Steward (`evt_752h5xfry09dh`). THE PRIOR
+> ### TEXT'S OWN TRIGGER CLAUSE FIRED, AND ITS TRIGGER WAS KEYED ON THE WRONG REF.
+>
+> This deliverable previously read *"at the decided base `187895991`,
+> `prove_forwarded_value` satisfies one proof by **two** independent arms"*, and
+> instructed: *measure whether the two populations are disjoint.* **That
+> instruction is withdrawn.** It is stated here rather than deleted because four
+> consecutive instrument-design passes were built to it, and the reason they
+> failed is the specification, not the instruments.
+
+**MEASURED at `686ffa8ac`, `units.rs:3129` — the guard has THREE arms:**
 
     if authorities
         .get(&value)
         .is_some_and(|authority| authority.identity == identity && authority.word == value)
+        || detached_consumer_authorities.get(&value).is_some_and(|authority| {
+            authority.demanded_identity == identity && authority.after_word == value
+        })
         || call_seeds.get(&value) == Some(&identity)
     {
 
-`D2` makes `remove()`-at-consumer load-bearing on **arm 1 only. Arm 2 answers
-independently.** Naming `call_seeds` as "the fallthrough" is not establishing
-that it cannot answer for a value whose authority has just been consumed.
-**Measure whether the two populations are disjoint, or make both arms
-consuming.** Architect ruling `evt_7mgwzftyt0fm2`: *a guard closed on one arm of
-a disjunction closes the instance, not the class.* This is a measurement and it
-will not be accepted as an assertion.
+    detached_consumer_authorities occurrences
+      origin/main   0      187895991    0      5d977ac79    0      686ffa8ac   14
 
-**`D2a` TRIGGER, conditional and not a present defect.** A third satisfier —
-`detached_consumer_authorities`, a sibling `BTreeMap<ir::Value, ..>` carrying
-`demanded_identity` and `after_word`, the same two facts under other names —
-exists **only** on the WIP probe `2b78e4d19` and its descendants. Measured:
+**The prior text named base `187895991`; the ring builds at `686ffa8ac`. The two
+refs differ in exactly the map the prescribed measurement was over.** The
+two-arm quote is accurate at the base it named and wrong at the base the work
+happens on.
 
-    187895991    0 occurrences      5d977ac79    0 occurrences
-    origin/main  0 occurrences      686ffa8ac   14 occurrences
+**The prior text anticipated this and could not fire.** Its trigger read *"if
+`2b78e4d19`'s detached map is ever carried into the **landed lineage**, a third
+independent satisfier arrives and `D2a`'s answer must be re-derived."* The
+measurement it guards runs at the **working** base, so the condition could not
+be met until after the work it guarded was finished. **A currency guard must be
+keyed on the ref its own measurement is taken at.**
 
-**If `2b78e4d19`'s detached map is ever carried into the landed lineage, a third
-independent satisfier arrives and `D2a`'s answer must be re-derived.** Until
-then the disjunction is two arms and this frame's row for that site is accurate.
+### The deliverable
+
+**REMOVE THE VALUE FROM ALL THREE MAPS. Do not measure disjointness at all.**
+
+**State it as the value, never as "the arm that fired" — the second is
+unbuildable** (Architect, `evt_4d72gc1ey8zem`, measured). The disjunction
+short-circuits and `units.rs:3137-3141` records only the value:
+
+    sources: BTreeSet::from([value])
+
+So arm identity does not survive the proof. It exists only at the decision point
+**inside** the recursion, which the placement ruling and the stack independently
+forbid. **Discharging by value works from `sources` alone at `:3603` and is what
+makes disjointness irrelevant** — which is the whole point of taking this arm.
+
+**BUDGET FOR THE DOWNSTREAM READERS. Draining the maps is not free.** Measured at
+`686ffa8ac`, every read of the two `body.*` maps after the proof:
+
+    3401  if let Some(authority) = body.authorities.get(source)
+    3905  if body.authorities.contains_key(&value) || realized_call_words.contains(&value)
+    4145  for (word, authority) in &body.detached_consumer_authorities
+    4371  &body.authorities,                4372  &body.detached_consumer_authorities,
+    4415  let Some(actual) = body.authorities.get(&publication.returned_word) else
+    4443  body.authorities                  4447  body.authorities.len()
+    4448  body.authorities
+
+**`:4447` reads `.len()`** — a removal changes that count and everything it
+feeds. `proof_call_seeds` is a local and is safe to drain; **the two `body.*`
+maps outlive the verification and are not.** So this deliverable carries either a
+**separate consumed-set alongside the maps**, or a verified claim that every one
+of those readers tolerates a drained map. **That is in scope. It is not to be
+discovered during the edit.**
+
+**Why this arm and not the measurement.** Architect ruling `evt_7mgwzftyt0fm2`:
+*a guard closed on one arm of a disjunction closes the instance, not the class.*
+That ruling defeats the measurement rather than motivating it — the Fixed-inputs
+census above records **three** fallthrough-on-absent sites (`3122`, `3387`,
+`3891`), not one, so establishing that two populations at `3129` are disjoint
+would close one instance at one site. **Making the arms consuming closes the
+class, and needs no population measurement.**
+
+**A stated assumption is still refused.** The prior text's *"this is a
+measurement and it will not be accepted as an assertion"* stands, and it binds
+in the new shape too: disjointness is **withdrawn from the deliverable**, not
+assumed to hold. Nothing in `D2` may rest on the populations being disjoint.
+
+**Placement is unchanged.** Post-convergence at `:3603`, one published
+generated-context `Result` as the unit of discharge — standing Architect
+rulings, unaffected by this re-derivation.
+
+**The measurement is not abandoned; it is a separate node.** See
+[[RT-FORWARDING-PROOF-SATISFIER-DISJOINTNESS]], which holds behind the fired
+`COORDINATION §1a` research advisory. **`D2` does not depend on it and must not
+be sequenced behind it.**
+
+**RE-DERIVATION TRIGGER, correctly keyed this time.** If a fourth satisfier
+appears in the `3129` guard **at the base the ring is building on** — not at
+`origin/main`, not at the landed lineage — this deliverable is re-derived again.
+Check it by reading the guard at your own base, not by counting occurrences at a
+ref someone else named.
 
 **`D2b` — THE MUTATION HARNESS BECOMES A HARD FAILURE ON `None`, AND IT LANDS
 BEFORE OR WITH THE CONSUMPTION CHANGE. NEVER AFTER.** `SubstituteQueriedWord`'s
@@ -426,6 +496,38 @@ AC cannot distinguish the repair from the defect.
 **`AC-4` — the carrier is unchanged.** `CarriedBoundaryWord` still holds exactly
 one field. A diff that adds a field to it fails this node regardless of what
 else it achieves. See "Cut items".
+
+**`AC-5` — DISCHARGE LINEARITY IS DETECTED AND REFUSED, and the test proves the
+second claim is caught.** Two obligations claiming the same value must produce a
+planner error naming that value. **The control is two-sided:** the same test must
+show the pre-repair path accepting the second claim silently, and the post-repair
+path refusing it — so the AC discriminates the repair from the defect rather than
+passing for any reason.
+
+**This AC is satisfied by DETECTION, not prevention, and that is a Steward
+ruling** (`evt_752h5xfry09dh`; the fork was posed by the Architect at
+`evt_4d72gc1ey8zem` and is frame authorship, not design). It is recorded here
+because the answer decides whether `D2a`'s arm is buildable at all:
+
+- Post-convergence at `:3603`, every proof has already run. Consumption there can
+  **detect** that two obligations claimed one value; it cannot **prevent** the
+  second from having used it.
+- **`AC-1` asks for detection.** Its required observation is *"does not compile,
+  or fails at plan time with a located error"* — a compile that converges, finds
+  the double claim, and refuses has done exactly that. Every other statement of
+  the property in this node names the same thing: `D2`'s *"planner error. Never a
+  silent pass"*, `AC-3`'s negative control against the pre-repair path *passing
+  it silently*, and the node title's *"never a silent pass"*. **The contrast
+  class throughout is SILENCE, not lateness.**
+- **The substantive ground, so this does not rest on wording alone:** a refused
+  compile emits no artifact. The harm this node exists to prevent is a wrong
+  artifact shipped by a silent pass; a post-convergence refusal produces none.
+
+**If a later reading shows `AC-1` demands prevention, this arm is foreclosed** —
+pre-convergence placement is refuted on three independent grounds (fixpoint
+re-entry, the live borrow, and headroom) and there is no third point. That
+outcome is a design fork and takes a Decision, not a ruling. **Do not resolve it
+by quietly moving the consumption earlier.**
 
 **Not an acceptance criterion, deliberately:** "no hand-off lacks an authority."
 That is the enumeration the ruling forbids, wearing an AC's clothes — it is
