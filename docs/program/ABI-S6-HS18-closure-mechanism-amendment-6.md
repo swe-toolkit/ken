@@ -1,5 +1,16 @@
 # ABI-S6 HS18 — closure mechanism, amendment 6
 
+> **THIS DOCUMENT'S RULE IS SUPERSEDED by
+> [amendment 7](ABI-S6-HS18-closure-mechanism-amendment-7.md).** The pre-build
+> control mandated below returned EMPTY: both retained selected bodies are
+> closed, so the producer environment was adequate and **the environment gap is
+> not the cause of this witness.** Transfer-as-the-repair is withdrawn. The
+> analysis here — the advisory's identity-does-not-entail-environment finding,
+> the premise correction, the `D3b` reading, and the emission-ownership
+> disposition — stands, and amendment 7 carries it forward. **Read amendment 7
+> for the operative rule.** This document is retained as the published record of
+> a ruling whose own control refuted it, which is what the control was for.
+
 > **AMENDMENT 5'S HS9 CONDITIONAL FIRED. Its ruling was HELD, not live, from
 > `evt_72kntabh04nns` until this document.** Amendment 5 wrote the branch out
 > itself — *"If the full chain still fails with no cut attached and the
