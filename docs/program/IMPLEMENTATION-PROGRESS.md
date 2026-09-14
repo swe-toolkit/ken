@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-14 09:18:43Z — from 608 issue file(s) in `docs/program/issues/`.
+2026-09-14 12:25:53Z — from 609 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -570,6 +570,7 @@ the committed file matches the generator's output.
 | `RT-TERMINAL-ALL-ELIM-AUTHORITY` | Issue the typed terminal-All structured-IH elimination authority upstream in checked erasure/planning, and let only that issued relation license the source-machine Match seat to consume a ComputationalRecursorClosure | draft | runtime | M | none | — |
 | `RT-TEST-SCRATCH-RAII` | Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition | merged | runtime | M | none | — |
 | `RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE` | Two control.rs trace helpers assert over ABORTED compiles -- owner and multiplicity each run five expressions, EVERY functionized compile aborts, and their trace-event assertions stay green, so zero completed functionized runs back any claim built on them; live on main today and independent of the retirement | merged | runtime | S | none | — |
+| `RT-TRAP-IDENTITY-EMISSION-COORDINATE` | Make a trap's identity carry its emission coordinate, so two eliminations of one family at two source sites are not equal as RuntimeTrap values and do not collapse to one PlannedTrapIdentity -- closing the attribution gap that left HS16-HS21 unable to say WHICH site fired, with a two-site discrimination acceptance criterion that the catalog-keying fix fails | draft | runtime | M | none | — |
 | `RT-UNIT-CLOSURE-CONVERT` | Activate function-unit closure conversion for predeclared units — a retained nested body's free de Bruijn references become declared typed capture slots, reconstructed at unit entry from exact caller operands | closed | runtime | TBD | none | — |
 | `RT-UNIT-FAILURE-STATUS-PROVENANCE` | Generated-unit failure-status provenance on the InvalidOffset witness path — preserve the root generated-unit failure's planned trap identity (calls.rs:2075-2090 TrapWord->-4) and fold the governed -3 producer through ONE signed-root-token mechanism decoded against the existing planner trap catalog at the linked reporting boundary, so the process reporter classifies by origin/kind instead of a bare scalar. Narrowed operative claim (NOT global closure): the other same-predicate producers are enumerated but out of this WP. Lands with SemanticErrorV1 still red, honestly reported as the ITree default — the InvalidOffset green belongs to the RT-ITREE-DEFAULT-SELECTION-PROVENANCE successor. | merged | runtime | M | none | — |
 | `RT-UNSUPPORTED-BINDING-ON-REFUSAL` | A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers | ready | runtime | M | none | — |
