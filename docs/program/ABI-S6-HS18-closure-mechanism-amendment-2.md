@@ -8,6 +8,9 @@
 > result that consumer applies to. Amendment 3 pairs the destination with the
 > exact emitted call whose result is the before-value. This document is retained
 > as the record of how that was reached, not as current authority.
+> **Amendment 3 is itself EXTENDED by
+> [amendment 4](ABI-S6-HS18-closure-mechanism-amendment-4.md)**, which closes the
+> realization half. Current authority is amendment 3 and amendment 4 together.
 
 Architect, 2026-09-13. Amends the
 [closure mechanism](ABI-S6-HS18-closure-mechanism.md) and
