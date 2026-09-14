@@ -1,7 +1,7 @@
 ---
 id: SPEC-RESERVED-INFIX-NAMES
 title: "bounded spec amendment so the six reserved glyph tokens (≤/<=, ≥/>=, ≠//=, ∧//\\, ∨/\\/, ∈) may be ordinary symbolic GLOBAL names and infix/fixity targets: amend 31/32's operator-name and fixity grammar to admit them, and correct 31's `∈` 'no operator semantics' sentence to permit a client-defined ordinary function while keeping any STANDARD membership binding deferred; NO `!=`/`in` aliases and NO standard Membership class in this node; plus a reaching seed"
-status: ready
+status: merged
 owner: spec
 size: S
 gate: none
