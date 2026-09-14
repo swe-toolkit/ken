@@ -48,23 +48,6 @@ enum ContinuationOperandEnvironment {
     CheckedIhTransport(CheckedIhEnvironmentTransport),
 }
 
-/// The sole projection from an exact call/destination pair to the destination
-/// consumed by lowering. No application path accepts a loose destination.
-fn required_consumer_destination_for_edge<'edge>(
-    edge: &'edge RequiredConsumerIncomingEdge<'_>,
-) -> &'edge RequiredConsumerDestination {
-    edge.destination()
-}
-
-/// Compile-fail control. The cfg-gated call fails with E0308 because a loose
-/// destination cannot stand in for its paired defining call. An ordinary crate
-/// check is the positive control.
-#[allow(unexpected_cfgs)]
-#[cfg(hs18_amend3_wrong_call_control)]
-fn hs18_amend3_wrong_call_compile_fail(destination: &RequiredConsumerDestination) {
-    let _ = required_consumer_destination_for_edge(destination);
-}
-
 #[cfg(feature = "px8-ds-test-support")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RequiredConsumerQueryMutation {
@@ -4352,28 +4335,18 @@ impl<'a> Lowering<'a> {
                     ));
                 }
                 let required_consumer_edge =
-                    receipt.boundary.required_consumer_incoming_edge();
+                    receipt.boundary.required_consumer_incoming_edge()?;
                 #[cfg(feature = "px8-ds-test-support")]
-                if let Some(edge) = required_consumer_edge.as_ref() {
-                    self.static_transition_plan
-                        .record_required_consumer_call_selection(edge)?;
-                }
-                #[cfg(feature = "px8-ds-test-support")]
-                let replayed;
-                #[cfg(feature = "px8-ds-test-support")]
-                let replay_completed = d5b_hs17_post_call_consumer_mutation()
-                    == D5bHs17PostCallConsumerMutation::ReplayCompletedSelectedExit;
-                #[cfg(feature = "px8-ds-test-support")]
-                let remaining = if replay_completed {
+                let remaining = if d5b_hs17_post_call_consumer_mutation()
+                    == D5bHs17PostCallConsumerMutation::ReplayCompletedSelectedExit
+                {
                     record_d5b_hs17_post_call_consumer_application();
-                    replayed = receipt.boundary.consumer().selected_case_exits().to_vec();
+                    let replayed = receipt.boundary.consumer().selected_case_exits().to_vec();
                     self.checked_ih_post_call_residual(replayed.as_slice(), eliminators)?
                 } else if let Some(edge) = required_consumer_edge.as_ref() {
-                    self.apply_required_consumer_incoming_edge(
-                        edge,
-                        receipt.boundary.caller_completed_exits()?,
-                        eliminators,
-                    )?
+                    self.static_transition_plan
+                        .record_required_consumer_call_selection(edge)?;
+                    self.apply_required_consumer_incoming_edge(edge, eliminators)?
                 } else {
                     self.checked_ih_post_call_residual(
                         receipt.boundary.caller_completed_exits()?,
@@ -4382,11 +4355,7 @@ impl<'a> Lowering<'a> {
                 };
                 #[cfg(not(feature = "px8-ds-test-support"))]
                 let remaining = if let Some(edge) = required_consumer_edge.as_ref() {
-                    self.apply_required_consumer_incoming_edge(
-                        edge,
-                        receipt.boundary.caller_completed_exits()?,
-                        eliminators,
-                    )?
+                    self.apply_required_consumer_incoming_edge(edge, eliminators)?
                 } else {
                     self.checked_ih_post_call_residual(
                         receipt.boundary.caller_completed_exits()?,
@@ -9245,21 +9214,32 @@ impl<'a> Lowering<'a> {
         })
     }
 
-    /// Apply the exact required-consumer incoming edge by retaining the local
-    /// eliminator stack that the selected response boundary would otherwise
-    /// treat as already completed. The opaque pair is the only argument shape;
-    /// a loose destination cannot authorize this edge.
+    /// Apply one exact required-consumer edge at the consumer occurrence paired
+    /// with its defining call. The call is derived from the edge's sole
+    /// transport; the selected incoming edge determines the retained suffix.
     fn apply_required_consumer_incoming_edge<'frame, 'src>(
         &self,
-        edge: &RequiredConsumerIncomingEdge,
-        completed_caller_exits: &[CheckedIhPostCallConsumerStep],
+        edge: &RequiredConsumerIncomingEdge<'_>,
         eliminators: &'frame [EliminatorFrame<'src>],
     ) -> Result<&'frame [EliminatorFrame<'src>], CraneliftBackendError> {
-        let _destination = required_consumer_destination_for_edge(edge);
-        let _incoming_call = edge.incoming_call_identity();
-        let _residual =
-            self.checked_ih_post_call_residual(completed_caller_exits, eliminators)?;
-        Ok(eliminators)
+        let defining_call = edge.destination().defining_call_identity();
+        if !self.continuation_candidate_is_consumed(defining_call) {
+            return Err(unsupported(
+                "RequiredConsumerIncomingEdge",
+                "the exact defining call has no completed continuation candidate",
+            ));
+        }
+        let completed_residual =
+            self.checked_ih_post_call_residual(edge.caller_completed_exits(), eliminators)?;
+        let completed_len = eliminators.len() - completed_residual.len();
+        let incoming_edge_index = edge.incoming_consumer_edge_index();
+        if incoming_edge_index >= completed_len {
+            return Err(unsupported(
+                "RequiredConsumerIncomingEdge",
+                "the exact incoming consumer edge is outside the completed caller prefix",
+            ));
+        }
+        Ok(&eliminators[incoming_edge_index..])
     }
 
     fn checked_ih_post_call_residual<'frame, 'src>(

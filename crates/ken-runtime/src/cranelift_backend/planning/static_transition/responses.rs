@@ -287,25 +287,30 @@ impl CheckedIhDetachedCallerCut {
     }
 }
 
-/// The exact before-value call paired with the distinct selected response edge
-/// that carries its Result into the verified consumer boundary. Construction is
-/// private to that already-validated boundary.
-pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge<'a> {
-    call: &'a RequiredConsumerCall,
-    incoming_call_identity: &'a ContinuationCallIdentity,
+/// The exact before-value transport paired with the selected incoming consumer
+/// edge. The defining call is derived from the destination's one transport;
+/// lowering has no second call identity it could supply independently.
+pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge<'plan> {
+    destination: &'plan super::aggregates::RequiredConsumerDestination,
+    caller_completed_exits: &'plan [CheckedIhPostCallConsumerStep],
+    incoming_consumer_edge_index: usize,
 }
 
 impl RequiredConsumerIncomingEdge<'_> {
     pub(in crate::cranelift_backend) fn destination(
         &self,
     ) -> &super::aggregates::RequiredConsumerDestination {
-        self.call.destination()
+        self.destination
     }
 
-    pub(in crate::cranelift_backend) fn incoming_call_identity(
+    pub(in crate::cranelift_backend) fn caller_completed_exits(
         &self,
-    ) -> &ContinuationCallIdentity {
-        self.incoming_call_identity
+    ) -> &[CheckedIhPostCallConsumerStep] {
+        self.caller_completed_exits
+    }
+
+    pub(in crate::cranelift_backend) fn incoming_consumer_edge_index(&self) -> usize {
+        self.incoming_consumer_edge_index
     }
 }
 
@@ -320,6 +325,7 @@ pub(in crate::cranelift_backend) struct CheckedIhStaticResponseReturnBoundary {
     owner: StaticResponseOwnerSpecialization,
     caller_cut: CheckedIhDetachedCallerCut,
     consumer: CheckedIhPostCallConsumer,
+    incoming_consumer_edge_index: Option<usize>,
 }
 
 impl CheckedIhStaticResponseReturnBoundary {
@@ -341,13 +347,22 @@ impl CheckedIhStaticResponseReturnBoundary {
 
     pub(in crate::cranelift_backend) fn required_consumer_incoming_edge(
         &self,
-    ) -> Option<RequiredConsumerIncomingEdge<'_>> {
-        self.consumer
-            .required_consumer()
-            .map(|call| RequiredConsumerIncomingEdge {
-                call,
-                incoming_call_identity: self.caller_cut.selecting_call(),
-            })
+    ) -> Result<Option<RequiredConsumerIncomingEdge<'_>>, CraneliftBackendError> {
+        let Some(call) = self.consumer.required_consumer() else {
+            return Ok(None);
+        };
+        let incoming_consumer_edge_index = self
+            .incoming_consumer_edge_index
+            .ok_or_else(|| {
+                planner_error(
+                    "an exact required-consumer destination has no selected incoming edge",
+                )
+            })?;
+        Ok(Some(RequiredConsumerIncomingEdge {
+            destination: call.destination(),
+            caller_completed_exits: self.caller_completed_exits()?,
+            incoming_consumer_edge_index,
+        }))
     }
 
     fn caller_exit_index(&self) -> Result<usize, CraneliftBackendError> {
@@ -387,20 +402,33 @@ impl CheckedIhStaticResponseReturnBoundary {
     }
 }
 
+/// One-source transport ownership for a post-call consumer. A required row
+/// cannot store a transport beside its call: the call's destination owns that
+/// exact transport, so there is no second value that could disagree with it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum CheckedIhPostCallTransport {
+    Ordinary(CheckedIhEnvironmentTransport),
+    Required(RequiredConsumerCall),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumer {
-    transport: CheckedIhEnvironmentTransport,
+    transport: CheckedIhPostCallTransport,
     actual_result_identity: ConstructorIdentity,
     demanded_result_identity: ConstructorIdentity,
     consumers: Vec<CheckedIhPostCallConsumerStep>,
     selected_case_exits: Vec<CheckedIhPostCallConsumerStep>,
     detached_return_context: Option<SourceReturnContextTemplate>,
-    required_consumer: Option<RequiredConsumerCall>,
 }
 
 impl CheckedIhPostCallConsumer {
     pub(in crate::cranelift_backend) fn transport(&self) -> &CheckedIhEnvironmentTransport {
-        &self.transport
+        match &self.transport {
+            CheckedIhPostCallTransport::Ordinary(transport) => transport,
+            CheckedIhPostCallTransport::Required(call) => {
+                call.destination().defining_transport()
+            }
+        }
     }
 
     pub(in crate::cranelift_backend) fn actual_result_identity(&self) -> ConstructorIdentity {
@@ -430,7 +458,10 @@ impl CheckedIhPostCallConsumer {
     pub(in crate::cranelift_backend) fn required_consumer(
         &self,
     ) -> Option<&RequiredConsumerCall> {
-        self.required_consumer.as_ref()
+        match &self.transport {
+            CheckedIhPostCallTransport::Ordinary(_) => None,
+            CheckedIhPostCallTransport::Required(call) => Some(call),
+        }
     }
 }
 
@@ -2007,26 +2038,27 @@ pub(super) fn build_checked_ih_post_call_consumers(
                 "a mismatched checked-IH transport Result produced no source return steps",
             ));
         }
-        let required_consumer = detached_return_context
-            .as_ref()
-            .map(|context| pair_detached_required_consumer(plan, transport, context))
-            .transpose()?;
+        let exact_transport = match detached_return_context.as_ref() {
+            Some(context) => CheckedIhPostCallTransport::Required(
+                pair_detached_required_consumer(plan, transport, context)?,
+            ),
+            None => CheckedIhPostCallTransport::Ordinary(transport.clone()),
+        };
         let (consumers, selected_case_exits) = if detached_return_context.is_some() {
             (Vec::new(), derived_steps)
         } else {
             (derived_steps, Vec::new())
         };
         result.push(CheckedIhPostCallConsumer {
-            transport: transport.clone(),
+            transport: exact_transport,
             actual_result_identity: actual,
             demanded_result_identity: demanded,
             consumers,
             selected_case_exits,
             detached_return_context,
-            required_consumer,
         });
     }
-    result.sort_by(|left, right| left.transport.cmp(&right.transport));
+    result.sort_by(|left, right| left.transport().cmp(right.transport()));
     Ok(result)
 }
 
@@ -2040,8 +2072,8 @@ pub(super) fn publish_checked_ih_post_call_consumers(
         let mut pair = None;
         'outer: for left in 0..rows.len() {
             for right in left + 1..rows.len() {
-                if rows[left].transport.source_call_identity()
-                    != rows[right].transport.source_call_identity()
+                if rows[left].transport().source_call_identity()
+                    != rows[right].transport().source_call_identity()
                     && rows[left].consumers.len() == rows[right].consumers.len()
                 {
                     pair = Some((left, right));
@@ -2094,7 +2126,7 @@ impl StaticTransitionPlan<'_> {
         let mut matching = self
             .checked_ih_post_call_consumers
             .iter()
-            .filter(|row| row.transport == *transport);
+            .filter(|row| row.transport() == transport);
         let Some(row) = matching.next() else {
             return Ok(None);
         };
@@ -2300,13 +2332,48 @@ impl StaticTransitionPlan<'_> {
                     "a static-response return boundary disagrees with its Result demand or retained checked-IH endpoints",
                 ));
             }
-            let boundary = CheckedIhStaticResponseReturnBoundary {
+            let mut boundary = CheckedIhStaticResponseReturnBoundary {
                 response: row.clone(),
                 owner: owner.clone(),
                 caller_cut,
                 consumer,
+                incoming_consumer_edge_index: None,
             };
             boundary.caller_exit_index()?;
+            if let Some(required_call) = boundary.consumer.required_consumer() {
+                // Select the exact completed caller edge whose occurrence tree
+                // contains the required consumer. This is a def-use relation
+                // over occurrences, not a generated-entry class coordinate.
+                let (consumer_origin, _) =
+                    required_call.destination().consumer_occurrence();
+                let mut matching_edges = Vec::new();
+                for (index, step) in boundary
+                    .caller_completed_exits()?
+                    .iter()
+                    .enumerate()
+                {
+                    if occurrence_subtree_contains(
+                        self,
+                        step.occurrence().eliminator_origin(),
+                        consumer_origin,
+                    )? {
+                        matching_edges.push(index);
+                    }
+                }
+                boundary.incoming_consumer_edge_index = match matching_edges.as_slice() {
+                    [index] => Some(*index),
+                    [] => {
+                        return Err(planner_error(
+                            "an exact required consumer has no incoming caller edge",
+                        ))
+                    }
+                    _ => {
+                        return Err(planner_error(
+                            "an exact required consumer has more than one incoming caller edge",
+                        ))
+                    }
+                };
+            }
             boundaries.push(boundary);
         }
         #[cfg(feature = "px8-ds-test-support")]
@@ -2343,8 +2410,8 @@ impl StaticTransitionPlan<'_> {
             saw_boundary = true;
             if boundary.caller_context().result_origin()
                 != caller_transport.destination_construct_origin()
-                || row.transport.destination_owner() != caller_transport.source_owner()
-                || row.transport.destination_body_origin() != context.root_origin()
+                || row.transport().destination_owner() != caller_transport.source_owner()
+                || row.transport().destination_body_origin() != context.root_origin()
             {
                 continue;
             }
@@ -2416,7 +2483,7 @@ impl StaticTransitionPlan<'_> {
                 selected_body_origin,
                 checked_frame_id: consumer_step.checked_frame_id(),
                 consumed_caller_suffix,
-                producer_transport: row.transport.clone(),
+                producer_transport: row.transport().clone(),
                 caller_transport: caller_transport.clone(),
             });
         }
@@ -2504,7 +2571,7 @@ impl StaticTransitionPlan<'_> {
         for identity in self
             .checked_ih_post_call_consumers
             .iter()
-            .filter(|row| row.transport.source_specialization() == target)
+            .filter(|row| row.transport().source_specialization() == target)
             .map(|row| row.actual_result_identity)
         {
             if !identities.contains(&identity) {

@@ -232,11 +232,8 @@ mod required_consumer_destination {
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub(in crate::cranelift_backend) struct RequiredConsumerDestination {
-        defining_call_identity: ContinuationCallIdentity,
-        defining_owner: ContinuationEmissionOwner,
-        defining_body_origin: StaticOriginId,
-        defining_result_origin: StaticOriginId,
-        consumer_frames: Vec<(StaticOriginId, Option<u64>)>,
+        defining_transport: CheckedIhEnvironmentTransport,
+        consumer_occurrence: (StaticOriginId, Option<u64>),
     }
 
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -250,33 +247,31 @@ mod required_consumer_destination {
         transport: &CheckedIhEnvironmentTransport,
         projection: &super::super::continuations::SourceReturnContextTemplate,
     ) -> Result<RequiredConsumerCall, CraneliftBackendError> {
-        let consumer_origins = projection
+        #[cfg(feature = "px8-ds-test-support")]
+        let transport = required_consumer_defining_transport(plan, transport)?;
+        let consumer_origin = projection
             .steps()
             .iter()
             .rev()
-            .filter_map(|step| {
+            .find_map(|step| {
                 matches!(
                     step.role(),
                     SourceReturnContextRole::ComputationalMatchCase(_)
                 )
                 .then_some(step.parent_origin())
             })
-            .collect::<Vec<_>>();
-        if consumer_origins.is_empty() {
-            return Err(planner_error(
-                "an exact detached required consumer has no computational occurrence",
-            ));
-        }
-        let consumer_frames = consumer_origins
-            .into_iter()
-            .map(|origin| checked_frame_for_consumer(plan, origin).map(|frame| (origin, frame)))
-            .collect::<Result<Vec<_>, _>>()?;
+            .ok_or_else(|| {
+                planner_error(
+                    "an exact detached required consumer has no computational occurrence",
+                )
+            })?;
+        let consumer_occurrence = (
+            consumer_origin,
+            checked_frame_for_consumer(plan, consumer_origin)?,
+        );
         let destination = RequiredConsumerDestination {
-            defining_call_identity: transport.source_call_identity.clone(),
-            defining_owner: transport.destination_owner,
-            defining_body_origin: transport.destination_body_origin,
-            defining_result_origin: transport.source_result_origin,
-            consumer_frames,
+            defining_transport: transport.clone(),
+            consumer_occurrence,
         };
         Ok(RequiredConsumerCall { destination })
     }
@@ -290,30 +285,36 @@ mod required_consumer_destination {
     }
 
     impl RequiredConsumerDestination {
+        pub(in crate::cranelift_backend) fn defining_transport(
+            &self,
+        ) -> &CheckedIhEnvironmentTransport {
+            &self.defining_transport
+        }
+
         pub(in crate::cranelift_backend) fn defining_call_identity(
             &self,
         ) -> &ContinuationCallIdentity {
-            &self.defining_call_identity
+            self.defining_transport.source_call_identity()
         }
 
         pub(in crate::cranelift_backend) fn defining_owner(
             &self,
         ) -> ContinuationEmissionOwner {
-            self.defining_owner
+            self.defining_transport.destination_owner
         }
 
         pub(in crate::cranelift_backend) fn defining_body_origin(&self) -> StaticOriginId {
-            self.defining_body_origin
+            self.defining_transport.destination_body_origin
         }
 
         pub(in crate::cranelift_backend) fn defining_result_origin(&self) -> StaticOriginId {
-            self.defining_result_origin
+            self.defining_transport.source_result_origin
         }
 
-        pub(in crate::cranelift_backend) fn consumer_frames(
+        pub(in crate::cranelift_backend) fn consumer_occurrence(
             &self,
-        ) -> &[(StaticOriginId, Option<u64>)] {
-            &self.consumer_frames
+        ) -> (StaticOriginId, Option<u64>) {
+            self.consumer_occurrence
         }
     }
 }
@@ -1601,8 +1602,24 @@ pub struct RequiredConsumerCallObservation {
     pub selected_result_origin: u32,
 }
 
+/// Production-side mutation proving that the exact defining transport selects
+/// the required-consumer relation rather than decorating an already-made choice.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RequiredConsumerCallMutation {
+    Exact,
+    SubstituteDefiningTransport {
+        defining_body_origin: u32,
+        selected_target: u32,
+        substitute_target: u32,
+    },
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
+    static REQUIRED_CONSUMER_CALL_MUTATION: Cell<RequiredConsumerCallMutation> =
+        const { Cell::new(RequiredConsumerCallMutation::Exact) };
+    static REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS: Cell<usize> = const { Cell::new(0) };
     static REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE: Cell<bool> = const { Cell::new(false) };
     static REQUIRED_CONSUMER_CALL_OBSERVATIONS:
         RefCell<Vec<RequiredConsumerCallObservation>> = const { RefCell::new(Vec::new()) };
@@ -1646,6 +1663,65 @@ pub fn with_required_consumer_call_observations<T>(
         .with(|rows| std::mem::take(&mut *rows.borrow_mut()));
     drop(restore);
     (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_required_consumer_call_mutation<T>(
+    mutation: RequiredConsumerCallMutation,
+    f: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_CALL_MUTATION
+                .with(|active| active.set(RequiredConsumerCallMutation::Exact));
+        }
+    }
+    REQUIRED_CONSUMER_CALL_MUTATION.with(|active| active.set(mutation));
+    REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let restore = Restore;
+    let result = f();
+    let applications = REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(Cell::get);
+    drop(restore);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn required_consumer_defining_transport<'plan>(
+    plan: &'plan StaticTransitionPlan<'_>,
+    selected: &'plan CheckedIhEnvironmentTransport,
+) -> Result<&'plan CheckedIhEnvironmentTransport, CraneliftBackendError> {
+    let RequiredConsumerCallMutation::SubstituteDefiningTransport {
+        defining_body_origin,
+        selected_target,
+        substitute_target,
+    } = REQUIRED_CONSUMER_CALL_MUTATION.with(Cell::get)
+    else {
+        return Ok(selected);
+    };
+    if selected.destination_body_origin.observation_ordinal() != defining_body_origin
+        || selected.source_call_identity.target().observation_ordinal() != selected_target
+    {
+        return Ok(selected);
+    }
+    let mut substitutes = plan.checked_ih_environment_transports.iter().filter(|candidate| {
+        candidate.destination_owner == selected.destination_owner
+            && candidate.destination_body_origin == selected.destination_body_origin
+            && candidate.source_call_identity.target().observation_ordinal() == substitute_target
+    });
+    let Some(substitute) = substitutes.next() else {
+        return Err(planner_error(
+            "the required-consumer defining-call mutation has no exact substitute transport",
+        ));
+    };
+    if substitutes.next().is_some() {
+        return Err(planner_error(
+            "the required-consumer defining-call mutation has an ambiguous substitute transport",
+        ));
+    }
+    REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS
+        .with(|count| count.set(count.get().saturating_add(1)));
+    Ok(substitute)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -8375,7 +8451,7 @@ impl StaticTransitionPlan<'_> {
     #[cfg(feature = "px8-ds-test-support")]
     pub(in crate::cranelift_backend) fn record_required_consumer_call_selection(
         &self,
-        edge: &RequiredConsumerIncomingEdge,
+        edge: &RequiredConsumerIncomingEdge<'_>,
     ) -> Result<(), CraneliftBackendError> {
         let destination = edge.destination();
         let ContinuationEmissionOwner::Specialization(enclosing) =
