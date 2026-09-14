@@ -85,17 +85,46 @@ The Adversary flipped `#[cfg(any())]` to `#[test]` on every retired census in
 >
 > **WHAT THIS BREAKS — AND IT IS THIS NODE'S OWN LOAD-BEARING CLAIM.** Arm 1
 > below proposes *"a test that `include_str!`s `control.rs`"* and asserts **"that
-> control would have reddened on `1aec3e3e1`."** Measured: an `include_str!` of
-> one file reaches **one of the three**, and the one it misses is
-> `d8_join_helpers_...` in `host_call_carrier.rs` — **this node's own headline
+> control would have reddened on `1aec3e3e1`."** Measured **at today's tree**: an
+> `include_str!` of one file reaches **one of the three**, and the one it misses
+> is `d8_join_helpers_...` in `host_call_carrier.rs` — **this node's own headline
 > example, the census whose subject was deleted.**
 >
-> ⇒ **The single-file control would NOT have reddened on `1aec3e3e1`.** The claim
-> is true only of a control that enumerates the population **across files**. A
-> control that misses the case the node was written about is not a cheaper
-> version of the right control; it is the wrong control. Arm 1 is re-priced
-> accordingly, and arm 2 is **three deletions across three files**, not three in
-> one.
+> ⇒ **The single-file control is INSUFFICIENT AS A THING TO BUILD TODAY.** The
+> claim is true only of a control that enumerates the population **across
+> files**. Arm 1 is re-priced accordingly, and arm 2 is **three deletions across
+> three files**, not three in one.
+>
+> > #### CORRECTION, SAME DAY (Architect `evt_4edykxbt49nf1`; re-measured by the
+> > #### Steward). AN EARLIER VERSION OF THIS BLOCK SAID *"stale, and not by
+> > #### drift — REFUTED."* **THAT WAS HALF RIGHT, AND THE WRONG HALF DISCREDITS
+> > #### THE ADVERSARY'S FIGURES.**
+> >
+> > **The node's `1aec3e3e1` sentence was TRUE WHEN WRITTEN.**
+> >
+> >     git ls-tree -r --name-only 1aec3e3e1 -- crates/ | grep 'control\.rs$'
+> >       -> ONE file.
+> >     all three censuses at 1aec3e3e1, in that one control.rs:
+> >       :8228   exactly_one_plan_origin_to_expression_lookup_exists
+> >       :9216   the_lower_expr_call_population_is_dispositioned_by_owner...
+> >       :12885  d8_join_helpers_have_the_closed_typed_caller_population
+> >     host_call_carrier.rs was ADDED by ee6e11f95, 2026-08-21
+> >       -> FOUR DAYS AFTER the hunt base b430d73e0
+> >
+> > At `1aec3e3e1`, `include_str!("control.rs")` **did** reach the D8 census. The
+> > coordinates are also exact at the hunt base. **The disposition is three-part,
+> > and collapsing it to one word was the error:**
+> >
+> >     insufficient   as a thing to BUILD TODAY
+> >     correct        as a claim about 1aec3e3e1
+> >     correct        in every coordinate WHEN WRITTEN
+> >
+> > **A blanket "refuted" tells the next reader to discount the Adversary's
+> > figures. The figures are good.** Do not put a word in front of a measurement
+> > that implies otherwise — and note that the thing which invalidated the
+> > coordinates, `RT-CONTROL-INTEGRATION-TESTS-SPLIT`, is the same file split
+> > that killed the three retired bodies. **This node's thesis applied to this
+> > node's own prose.**
 >
 > **THE ENUMERATOR HAZARD RUNS BOTH WAYS, AND THE LIVE ONE IS OVER-COUNTING.**
 > `AC-3` warns that an extractor silently *skipping* a spelling reintroduces this
@@ -168,6 +197,76 @@ closure property is worth a live control.
 
 ## `D0` — decide what a retired body IS. The fork is the whole node.
 
+> # `D0` IS RULED, 2026-09-14: **A RETIRED BODY IS NOT A RECORD. ARM 2 — DELETE
+> # THE THREE.** Architect `evt_4edykxbt49nf1`.
+>
+> **The ruling is a read of a controlled comparison the repo already ran, not a
+> preference between two untried conventions.** `RT-FNSPLIT-RECUR-PORT` retired
+> **four** censuses on one day, in this subtree, on the same family of text
+> censuses — and it used **both arms**:
+>
+>     arm 2 (delete + note)   1 census    27 days on: accurate, resolves, nothing
+>                                         to rot.  Successor LIVE at mod.rs:1586.
+>     arm 1 (keep the body)   3 censuses  27 days on: 3 of 3 dead, 4 of 7 D8
+>                                         asserts false, one names a function
+>                                         deleted 19 days later.
+>
+> **The deleted one is the healthy one.** The surviving note is
+> `control.rs:3282` — a retirement note with **no `cfg(any())` and no body**,
+> naming its successor by identifier —
+> `every_origin_to_expression_resolution_goes_through_the_single_route` — which
+> is live today at `mod.rs:1586` under `#[test]`. Verified independently by the
+> Steward.
+>
+> **POPULATION PRECISION, because this node is about exactly this.** The
+> amendment above measured **3 `#[cfg(any())]` regions across 3 files**, and that
+> is correct *for cfg regions*. The population of **retirements** is **four** —
+> three with notes, one (`mod.rs:1133`) with none:
+>
+>     control.rs:3282           note, NO body        retired by DELETION
+>     control.rs:4354           note + cfg body      census 3
+>     host_call_carrier.rs:1821 note + cfg body      census 1
+>     mod.rs:1133               NO NOTE, cfg body    census 2
+>     (grep -c RETIRED:  control.rs 2, host_call_carrier.rs 1, mod.rs 0)
+>
+> **Two populations, two counts, both right — and an enumerator keyed on
+> `#[cfg(any())]` cannot see the retirement that has no body.** That is `AC-3`'s
+> skipped-spelling hazard landing on the amendment that raised it.
+>
+> **NAME THE SUCCESSOR BY IDENTIFIER, NEVER BY POSITION.** The four notes form a
+> measured gradation, and it is why the rule is not stylistic:
+>
+>     control.rs:3282            BY IDENTIFIER   survived the split unchanged
+>     host_call_carrier.rs:1817  DESCRIPTIVELY   resolvable, but takes a search
+>     control.rs:4351            BY POSITION     "the controls ABOVE" -- cannot be
+>                                                checked, silently re-points when
+>                                                the file is cut
+>     mod.rs:1133                NAMES NOTHING
+>
+> **WHY NOT A CORRECTLY-BUILT ARM 1.** Not infeasible — not worth having. **Every
+> future true red from that control is "your dead text is dead."** The red on
+> `1aec3e3e1` would have fired because `RT-DESCENT-RETIRE` deliberately deleted
+> `merge_branch_value`; the tree was **right**, and the correct response to that
+> red is to delete the retired census. That is a maintenance tax on every
+> deletion campaign under `lowering/`, paid forever, to be discharged each time by
+> doing what this ruling does once. The repo already says this at the successor
+> of the census that *was* deleted (`mod.rs:1581-1584`): *"A pin that froze the
+> call count would go red on legitimate work and would be a snapshot wearing an
+> invariant's name."*
+>
+> **THIS IS NOT THE BANNED SPLIT-THE-DIFFERENCE.** Banned is *repairing* the four
+> false `D8` assertions or re-deriving the counts. This deletes the assertions
+> rather than repairing them; no count in the subtree changes value.
+>
+> **WHAT THE RULING DOES NOT ESTABLISH — preconditions on each deletion, not on
+> the ruling.** The Architect verified each named successor **exists**; it did
+> **not** verify each one **carries the property its note claims**. That is a
+> behavioural read at each successor's site and it is the ring's. **Census 2 is
+> the open one** — no note, so no named successor. If any census comes back *"the
+> successor does not carry it,"* that census goes back to the Architect on its
+> own and the other two proceed. The prose relocation in `(a)` below is also
+> **unpriced**; it is the only non-mechanical part.
+
 The two arms are not equivalent and neither is obviously right.
 
 1. **A retired body is a record.** Then it needs one cheap live control keeping
@@ -195,14 +294,78 @@ exists to stop, not an instance of it to clean up.
 
 ## Acceptance criteria
 
-- **`AC-1`.** `D0` is decided and `control.rs` says which reading it took, at the
-  retirement convention's own site rather than only in this node.
-- **`AC-2` — if arm 1: the control is demonstrated by the mutation it catches.**
-  Delete or rename an identifier named inside a retired body and show the control
-  reds; restore it and show green. **A green run on the current tree is not
-  evidence** — the current tree already fails 3 of 3, so the control must be
-  shown to red on today's `main` before any repair, and that red is the
-  acceptance evidence, not a regression.
+> # RE-CUT 2026-09-14 AFTER THE `D0` RULING. **`AC-2` IS NOT APPLICABLE — it was
+> # conditioned on arm 1, and arm 1 was not taken.**
+>
+> The Architect ruled the design; the acceptance is the Steward's. Under arm 2:
+>
+>     AC-1   RE-AIMED  state the convention at core/tests/mod.rs's header (it
+>                      already carries this subtree's ruled conventions). The
+>                      convention site DOES NOT EXIST yet -- the convention has
+>                      only ever been instantiated, never stated.
+>     AC-2   N/A       conditioned on arm 1's control. Not applicable, not waived:
+>                      there is no control to demonstrate.
+>     AC-3   STANDS    and is already answered -- see the population precision in
+>                      the D0 block: 3 cfg regions across 3 files, 4 retirements,
+>                      1 false positive at tests/control.rs:3729.
+>     AC-5   NEW       the three deletions, with their extents.
+>     AC-6   NEW       relocate the argued prose; delete only the counts.
+>     AC-7   NEW       census 2's successor note WRITTEN.
+>     AC-8   NEW       each deletion's successor carries the property.
+>     AC-4   UNCHANGED workspace green IN CI.
+>
+> - **`AC-5` — the three deletions, item head to closing brace.** Measured
+>   extents at `3876edea0`:
+>
+>       core/tests/control.rs            4354-4426     73 lines
+>       core/tests/mod.rs                1133-1334    202 lines
+>       core/tests/host_call_carrier.rs  1821-1847     27 lines
+>
+> - **`AC-6` — the ARGUMENT is relocated, the COUNTS are deleted.** *"git history
+>   remains the record"* is true of a count and **false of an argument.**
+>   `control.rs:4299-4350` is a 52-line argued doc comment attached to the retired
+>   `fn`, about the **live** authority — the validated owner partition and the two
+>   claims withdrawn from `AC-5` of its own node. `mod.rs`'s 202-line body carries
+>   the exported-surface argument, including why `AbiPlane`, `AbiDescriptor`,
+>   `build_abi_plane` and `AbiPlane::validate` stay `pub(super)` and are
+>   deliberately **not** in the list. **Prose about a live control belongs at the
+>   live control.** Relocating it is the one non-mechanical part of this WP and is
+>   **unpriced**; if it turns out larger than it looks, stop and say so.
+>
+> - **`AC-7` — census 2 gets a successor note WRITTEN, not just a deletion.**
+>   `core/tests/mod.rs` contains **zero** occurrences of `RETIRED`;
+>   `exactly_one_plan_origin_to_expression_lookup_exists` was cfg-retired with no
+>   successor named and no reason given. **This is the single case where arm 2 as
+>   the node states it genuinely loses something** — there is no note to survive.
+>   **If no live control carries the property, the note SAYS THAT**, rather than
+>   naming a successor that does not carry it.
+>
+> - **`AC-8` — each deletion's successor is shown to CARRY the property, not
+>   merely to exist.** The ruling verified existence only, and said so. This is a
+>   behavioural read at each successor's site and is a **precondition on that
+>   deletion**, not on the WP. A census whose successor does not carry the
+>   property goes back to the Architect on its own; the others proceed.
+
+- **`AC-1` — RE-AIMED BY THE `D0` RULING.** State the retirement convention at
+  `core/tests/mod.rs`'s header: **retirement is DELETION plus a note at the site
+  naming the successor control BY IDENTIFIER**, and `#[cfg(any())]` is not a
+  retirement idiom. Name a successor by identifier, **never by file or line** —
+  `RT-CONTROL-INTEGRATION-TESTS-SPLIT` moved every census in this subtree, and
+  the one note that named its successor by identifier survived it unchanged.
+  *(Superseded original: "`D0` is decided and `control.rs` says which reading it
+  took, at the retirement convention's own site rather than only in this node."
+  The site was right in spirit and wrong in file — the convention belongs at the
+  module root, and `control.rs` is one of three files it governs.)*
+- **`AC-2` — NOT APPLICABLE under the `D0` ruling (arm 2 taken).** Retained
+  verbatim below as the record of what arm 1 would have had to satisfy; it is
+  not a criterion of this WP and nothing is owed against it.
+  > **SUPERSEDED TEXT, retained as a record. NOT a criterion.** *"`AC-2` — if
+  > arm 1: the control is demonstrated by the mutation it catches. Delete or
+  > rename an identifier named inside a retired body and show the control reds;
+  > restore it and show green. A green run on the current tree is not evidence —
+  > the current tree already fails 3 of 3, so the control must be shown to red on
+  > today's `main` before any repair, and that red is the acceptance evidence,
+  > not a regression."*
 - **`AC-3` — the population is stated.** Say how many `#[cfg(any())]` regions
   exist **and in which files**, and how the control enumerates them. An
   identifier extractor that silently skips a spelling reintroduces exactly this
