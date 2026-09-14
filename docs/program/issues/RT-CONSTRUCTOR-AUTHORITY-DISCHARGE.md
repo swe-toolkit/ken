@@ -143,10 +143,27 @@ command that settles it is the first deliverable.
 ## Fixed inputs
 
 **MEASURED BY THE STEWARD at `5d977ac79`** unless a line says otherwise.
-Re-measure every coordinate at `D0`. These are two different branches, not two
-points on one: `demanded_result_identity` reads at `core.rs:9210` here and at
-`core.rs:9488` on `686ffa8ac`, 278 lines apart. **A line number is a claim about
-one tree and carries its SHA or it is worthless.**
+
+Re-measure every coordinate at `D0`. These are two different branches and
+neither is an ancestor of the other, so the coordinates differ in POPULATION,
+not only in position. Non-definition reads of `demanded_result_identity`:
+
+    5d977ac79    core.rs:9210, core.rs:9220, responses.rs:2247    THREE
+    686ffa8ac    core.rs:9488,               responses.rs:2607    TWO
+    origin/main  (symbol absent entirely)                         ZERO
+
+`core.rs:9220` and `:9488` are the same statement; `core.rs:9210` is a second
+read (`.tag_abi_word()`) present only on `5d977ac79`. **A line number is a claim
+about one tree and carries its SHA or it is worthless — and a line-number
+framing can hide a SET difference, which is the worse failure.**
+
+**This matters to `D1b` specifically.** That deliverable asks whether the
+demanded identity is available at each consumer, and the read-site SET is its
+input. An earlier version of this note paired `:9210` with `:9488` and called
+the gap a 278-line drift, which reports a MISSING site as a MOVED one — and
+tells anyone re-measuring that the extra `core.rs` read is a drifted duplicate
+they need not look at. It is not. Corrected on the Architect's census
+(`evt_6mgz3cjerky83`).
 
 - **The carrier, and the invariant that forbids the obvious fix.**
   `lowering/mod.rs:3843`, one field `word: ir::Value`, under a declaration that
