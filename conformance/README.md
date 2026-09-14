@@ -114,7 +114,9 @@ claim with no conformance case is a claim no one can rely on
   names identifier-only; grouped operator values and seven paired compound-
   argument rows pin the `application_atom` boundary; alias pairs remain one
   identity; `!=` and `in` remain refused with live controls. Reserved-name and
-  application-atom arms are red until `LANG-RESERVED-INFIX-NAMES`.
+  non-temporal application-atom arms are red until
+  `LANG-RESERVED-INFIX-NAMES`; the temporal row separately waits on the
+  unavailable `RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE`.
 - `surface/data-match/seed-data-match.md` — L2 sum types + `match` + refinements
   (`34`): real constructors + a computing `elim_D`, `match`→`elim_D` (nested),
   the **required exhaustiveness** safety (non-exhaustive rejects naming the

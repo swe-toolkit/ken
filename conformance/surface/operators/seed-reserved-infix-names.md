@@ -12,12 +12,16 @@ six dedicated notation tokens, but the ordinary global-name, prefix, infix, and
 fixity consumers accept only the generic symbolic-operator token. The tokens
 therefore dead-end before the ordinary name path. The generic-operator and
 `let … in` controls below are live on that base and must remain green. The
-application-atom boundary case is also
-**RED-UNTIL-LANG-RESERVED-INFIX-NAMES**. Executed parser observations on the
-authorized re-anchor base `cb646c784b2dc480bdae703473055481ca6b5e44`
-show that some rows already have their target shape, but ungrouped `if` is still
-accepted as an argument, a bare projection still attaches inside the argument,
-and expression-level `temporal` is not yet accepted even when grouped.
+non-temporal rows of the application-atom boundary case form a
+**RED-UNTIL-LANG-RESERVED-INFIX-NAMES** aggregate. Its temporal row is instead
+**RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** (`OQ-syntax`; no build WP is framed
+in this candidate): landing the reserved-name build cannot clear a grouped
+expression form that is
+not yet available. Executed parser observations on the authorized re-anchor
+base `cb646c784b2dc480bdae703473055481ca6b5e44` show that some rows already
+have their target shape, but ungrouped `if` is still accepted as an argument, a
+bare projection still attaches inside the argument, and expression-level
+`temporal` is not yet accepted even when grouped.
 
 **Promise class.** The exact six-name inventory and its five alias pairs are a
 normative compatibility vector. Ordinary application, resolved-identity fixity,
@@ -112,20 +116,27 @@ node.
   | let | `keep (let x = Zero in x)` | `A(keep, Let(x, Zero, x))` | `keep let x = Zero in x` | reject at the leading `let`; no complete tree |
   | if | `keep (if true then Zero else Zero)` | `A(keep, If(true, Zero, Zero))` | `keep if true then Zero else Zero` | reject at the leading `if`; no complete tree |
   | match | `keep (match flag { true ↦ Zero; false ↦ Zero })` | `A(keep, Match(flag, {true ↦ Zero; false ↦ Zero}))` | `keep match flag { true ↦ Zero; false ↦ Zero }` | reject at the leading `match`; no complete tree |
-  | temporal | `keep (temporal { Top })` | `A(keep, Temporal(Top))` | `keep temporal { Top }` | reject at the leading `temporal`; no complete tree |
+  | temporal | `keep (temporal { Top })` | **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** — `A(keep, Temporal(Top))` | `keep temporal { Top }` | reject at the leading `temporal`; no complete tree |
   | arrow | `keep (Nat -> Nat)` | `A(keep, Arrow(Nat, Nat))` | `keep Nat -> Nat` | accept as `Arrow(A(keep, Nat), Nat)`, not as the grouped tree |
   | projection | `keep (box.value)` | `A(keep, Proj(box, value))` | `keep box.value` | accept as `Proj(A(keep, box), value)`, not as the grouped tree |
 
-- expect: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — every grouped source has
-  exactly the stated application tree. The five ungrouped leading-form rows
-  reject with a primary span covering exactly the named leading token. The
-  arrow and projection rows accept with exactly their stated outer trees; they
-  do not silently acquire the grouped interpretation.
+- expect-nontemporal: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — every grouped
+  non-temporal source has exactly the stated application tree. The four
+  available ungrouped leading-form rows reject with a primary span covering
+  exactly the named leading token. The arrow and projection rows accept with
+  exactly their stated outer trees; they do not silently acquire the grouped
+  interpretation.
+- expect-temporal: **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** — once the
+  separately deferred grouped expression form exists, it has the tabled tree
+  and its ungrouped twin rejects at `temporal`. This row is not an A0 exit
+  condition and does not turn green merely because reserved infix names land.
 - why: each row varies only grouping around one named non-atom class. Restoring
-  unrestricted `expr expr` makes at least the five rejection rows accept as
-  applications; treating arrow or projection as an argument atom changes its
-  named outer tree. **MEASURED:** seven independent grouped/ungrouped pairs
-  expose five reject boundaries and two precedence boundaries. **CLAIMED:**
+  unrestricted `expr expr` makes the four currently available rejection rows,
+  and eventually the temporal row, accept as applications; treating arrow or
+  projection as an argument atom changes its named outer tree. **MEASURED:**
+  seven independent grouped/ungrouped pairs expose four current reject
+  boundaries, one deferred reject boundary, and two precedence boundaries.
+  **CLAIMED:**
   only `application_atom` may occupy bare argument position. **THE GAP:** these
   are parser observations only; the ordinary-application elaboration path is
   covered independently by the common operator fixture and existing surface

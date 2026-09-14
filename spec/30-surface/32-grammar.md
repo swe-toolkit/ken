@@ -368,8 +368,12 @@ name.
 The `expr application_atom` arm intentionally narrows bare application
 arguments. An expression not admitted by `application_atom` — including an
 ungrouped lambda, `let`, `if`, `match`, temporal form, arrow, or projection —
-must be grouped before it is used as an application argument. This removes the
-former ambiguous bare `expr expr` shape and is part of §3's contract pin; an
+must be grouped before it is used as an application argument. Consequently the
+five leading forms — lambda and `let`, `if`, `match`, and `temporal` — reject at
+their leading token when ungrouped after an application head, whereas arrow and
+projection remain well-formed with that application nested in their left
+`expr`, as `(keep Nat) -> Nat` and `(keep box).value` respectively. This removes
+the former ambiguous bare `expr expr` shape and is part of §3's contract pin; an
 implementation must not restore a second unrestricted application production.
 
 In an infix run, the `operator_name` arm of `binop` puts the name in the
