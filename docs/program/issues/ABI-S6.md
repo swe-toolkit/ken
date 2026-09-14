@@ -3085,6 +3085,70 @@ Architect inventory, 2026-09-11.
     Hard-stop count 19; the preceding M1-M3 diagnostic is NOT a stop, having
     returned the answer it was designed to return. Next mandatory advisory
     remains HS21.
+34. HS20, read-only at tip `936294421e` on CLIF
+    `52de12818184cace93f726615a92982a305cc43144d3bb719e93089427c4cf50`: the
+    ruled account is not refuted, it is UNATTRIBUTED — and the instrument every
+    conclusion in this chain rests on does not discriminate.
+    R1 MEASURED — the D6a discharge is non-total BY EMPTINESS, not by
+    mis-selection, and it is three instructions: the tag misses every case, one
+    comparison against the route-control word, then `jump block42(v84)`. No
+    projection, no chain step, no comparison against the demanded identity.
+    `remaining` was non-empty and contributed zero steps at the hand-off.
+    R2 MEASURED, AND IT CONFIRMS THE PREDICATE. `tag_abi_word` is
+    `((start << 32) | len) + 1`; decoded cold and then corroborated by a receipt
+    naming the exact function, frame and route:
+    `actual = ctor:px8f_write_all_native::ITree::Vis` (3380/38),
+    `demanded = ctor:px8f_write_all_native::ITree::Ret` (4442/38). That is
+    exactly the value-keyed pair the emitted hand-off ignores while keying on
+    the block it landed in. The callee's Result slot was independently located
+    by arithmetic — 8 Parameter + 6 Capture slots at 8 bytes each lands on
+    `ss7+112` — so the slot traced from source is the slot the receipt
+    describes, and the CLIF was bound by CONTENT hash rather than by a path.
+    R3 MEASURED — the inherited premise HOLDS: `block42` is the shared
+    return-body block, its two predecessors are the ordinary field-0 projection
+    and the unprojected D6a jump, and its closed default writes 43.
+    BUT THE INSTRUMENT IS NOT DISCRIMINATING. `func61` carries THREE
+    structurally identical trap-43 sites — lines 367, 590 and 1946 — each the
+    closed default of a two-arm match on the same two identities, each writing
+    43. "Trap 43 fired" therefore names a CODE, never a SITE, and this failure's
+    attribution to `block42` has rested on that code throughout.
+    THE FORK, which read-only evidence cannot settle. The frame-661 match
+    compares Vis BEFORE reaching D6a, so a word actually tagged Vis takes the
+    Vis case at `block213` and never reaches the D6a jump. Either (i) the
+    runtime tag is a fifth identity, neither Ret nor Vis — D6a is live, 590 is
+    the trap that fires, the account stands, and the contradiction moves to
+    `exact_result_identity`, which derives `actual = Vis`; or (ii) the tag is
+    Vis as `actual` says — D6a is DEAD on this witness, the Vis arm handles the
+    value correctly, and the failure is downstream of the Vis arm.
+    WHAT THIS DOES AND DOES NOT DISTURB. The D6a hand-off is non-total whichever
+    path this witness took, so the entry-33 closure and the §1b predicate are
+    untouched and the keying count stays SIX. What is disturbed is the SITE:
+    "the failure occurs at D6a" was never established.
+    RULED UNDER (ii), so it is not lost later: D6a's non-totality REMAINS A
+    DEFECT AND IS STILL FIXED. A fail-open guard with no live witness is
+    scheduled, not minor — it is armed and waiting for the first value that
+    reaches it, and the increment that arms it owes the fix. But it would not be
+    this witness's repair, and the recut must not scope itself around D6a as
+    this witness's site until the measurement says so.
+    CARRY FOR THE RECUT, a defect in its own right rather than an inconvenience
+    for this diagnosis: three sites sharing one trap identity make every future
+    failure at any of them unattributable on first evidence, and the cost falls
+    on whoever debugs it next. DISTINCT TRAP IDENTITIES PER SITE, as a
+    deliverable, not as instrumentation that gets reverted.
+    RE-CHECK OBLIGATION RECORDED, NOT OPENED: reasoning across HS16-HS18 treated
+    "the trap" as one object. Conclusions about BEHAVIOUR survive — HS17's A/B
+    compared two runs and does not depend on which site fired — but anything
+    concluding WHERE, or treating the trap as a single point, is in scope for
+    re-checking once the instrument discriminates.
+    AUTHORIZED, and it is the first non-read-only step since the stop:
+    instrument one distinct trap code per site AND capture the observed tag word
+    at the failing comparison — the first says which site, the second says why.
+    MEASUREMENT ONLY, never a candidate; the instrument must be PROVEN to
+    discriminate before a number from it is trusted; targeted build only; report
+    and stop, with no repair in the same turn.
+    Hard-stop count 20. The NEXT hard stop is HS21 and it is the SEVENTH
+    MANDATORY §1a ADVISORY — recorded here so it is expected, and so no repair
+    is hurried to land under it.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
