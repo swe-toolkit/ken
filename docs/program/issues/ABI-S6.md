@@ -2782,6 +2782,17 @@ Architect inventory, 2026-09-11.
     invocation, was attributed to a seat that does not hold the thing. Ruled:
     the certificate follows the consumer; Q2 stays a local universal at every
     seat and is NOT made conditional.
+26. the relocated creation-site application of RequiredConsumerIncomingEdge is
+    unconditional, but the seat has TWO receipts: the caller-completed
+    specialization-2 creation call (1617,1624,1605) and the edge's nested
+    specialization-3 defining call (874,1605,859). Applying the nested edge to
+    the already-final branch sends it to the Result match default (trap 43) —
+    keyed on ONE SEAT, TWO RECEIPTS, EDGE ATTACHED TO THE SEAT. Same predicate
+    as 20b and 25 at the application site. Ruled: the discriminator already
+    exists as the defining-call identity comparison at core.rs:9375; it becomes
+    a THREE-WAY disposition (apply / bypass-already-final / retain the
+    refusal), never a two-way gate, and the relocated application site must
+    route through the existing guard rather than around it.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
