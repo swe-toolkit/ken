@@ -2835,6 +2835,28 @@ Architect inventory, 2026-09-11.
     The §1b predicate of entries 24-27 SURVIVES unchanged; only the closure's
     SHAPE moved — from splitting the producer to re-keying the obligation onto
     the value's own static identity. Still value-keyed, still static.
+29. HS16, on the REKEY recut at base `6a1ecf204`: bypassing the edge dropped the
+    CONTINUATION, not merely the obligation. The demanded already-final `Ret`
+    arm bypassed `apply_required_consumer_incoming_edge` from inside its
+    existing selected block. That call returns `remaining`, and at
+    `core.rs:4378` an empty `remaining` routes to
+    `ProducerTrampolineStep::ordinary`, so the arm's whole eliminator chain was
+    never lowered. Native advanced past Trap 43 to `PatternMatchFailure: checked
+    HostIO match had no constructor arm` — the signature of an UNLOWERED
+    CONTINUATION, not of a wrong identity. The codebase already names this
+    failure mode at the same site: `D5bHs17PostCallConsumerMutation::
+    DropResidualSuffix` (`core.rs:4372`).
+    RULED: bypass the OBLIGATION, never the SUFFIX. The already-final arm
+    retains its suffix and lowers its ordinary source continuation; only the
+    identity comparison — whose premise HS15 closed — stops gating that seat.
+    PREDICATE: this is ONE TERM, TWO ARTIFACTS, and it is the first instance the
+    Architect authored. "Stop applying `RequiredConsumerIncomingEdge`
+    unconditionally" — the HS15 ruling and D2 both — names BOTH the identity
+    validation AND the suffix selection, so bypassing "it" is ambiguous between
+    them, and the implementer took the only reading the sentence supports. The
+    cost was one build turn and the repair is in the wording.
+    This is NOT a keying defect: the §1b seat-keyed-vs-value-keyed predicate of
+    entries 24-27 is untouched, and its count stays at four.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
