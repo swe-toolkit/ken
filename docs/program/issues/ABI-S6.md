@@ -2939,6 +2939,69 @@ Architect inventory, 2026-09-11.
     correct as written, nothing should be statically selected, and the defect is
     upstream: an over-eliminated value arriving where a `Result` is expected.
     Next mandatory advisory is HS21.
+32. HS18 RULED — the static `Result::Ok` selection is WITHDRAWN on soundness,
+    and the arc redirects upstream. The Architect re-derived the refutation
+    rather than adopting the advisory's: `private_write_all_fuel` constructs the
+    write-error `Ret (Err ResourceError Unit error)` inside the SAME certified
+    outer arm as both `Ok` sites, and which site an execution reaches is decided
+    by `writeAt`'s host response. So a static `Ok` selection is UNSOUND, not
+    merely unlicensed — it would execute the `Ok` arm on an `Err` carrier
+    whenever a write fails.
+    WITHDRAWN: the selection of `evt_621gd4vsk36z5`, with conditions A, B and C.
+    Condition C — which had authorized removing the `Err` arm as a named
+    consequence — is REVOKED EXPLICITLY; the `Err` arm must be emitted and
+    reachable.
+    RETAINED: the Ret body's `Result` match is correct as written, both arms,
+    nothing statically selected. Runtime tag dispatch of that source match is
+    NOT the refused tag-as-compiler-authority family — the compiler statically
+    owns each arm's identity and body and the tag only selects which executes,
+    minting no fact. That is the line entry 28 already drew, applied one layer
+    in.
+    §1a 6th MANDATORY ADVISORY DISCHARGED (`evt_2qdk2a3qwa4hs`,
+    `evt_71qmyd36rwygd`, `evt_72yy838768mgk`); advisory only, the ruling is the
+    Architect's. Prior art: a finite construction census proves the possible set
+    {Ok, Err} and never the member a given execution returns; production
+    recursive constructor analysis preserves the common outer `Ret` and loses
+    the differing nested constructor at the join. Constructor-directed CPS with
+    shared join points is RECORDED AS NOT OPENED — it does not carry the fact
+    across the join, it ELIMINATES the join by rewriting the recursive control
+    interface across the SCC, which is outside this node's fence and comes back
+    as its own question if ever.
+    TRAP 43 IS NOW THE DEFECT, NOT THE JUSTIFICATION: an exhaustive two-arm
+    match over a valid carrier must select an arm, so a no-arm result means an
+    upstream premise is false. For three hard stops it was read as a reason to
+    subtract the match. Three read-only diagnostics were ruled and returned
+    (`evt_7jhsw9j5p1had`): M2 ENCODING CLEAN — the emitted arm identities
+    `Err 0x0264_0000_0027` and `Ok 0x02e5_0000_0028` equal the tags the direct
+    producer sites write; M3 EMISSION CLEAN — both arm blocks emitted, both
+    dispatch edges live; M1 FIRED THE STOP.
+    THE DEFECT, from M1's own CLIF at `936294421e`: both predecessors of the
+    Result-match block derive from the SAME SSA value `v84`. The D6a
+    checked-answer route jumps to the match with `v84` UNPROJECTED; the ordinary
+    outer-Ret route projects FIELD 0 of that same `v84` and jumps with the
+    projection. One join parameter, one consumer, two incoming values differing
+    by exactly ONE FIELD PROJECTION — at most one of them can be a `Result`
+    carrier. A carrier's tag equals neither arm tag, both comparisons miss, and
+    Trap 43 follows with no encoding fault and no missing arm. M2 and M3 being
+    clean is what leaves this as the only remaining explanation.
+    RULED: ADD the missing projection on the deficient route, in ADDITION form —
+    removing no arm, suppressing no case, and touching neither the ordinary
+    route's existing projection nor the static-selection question, which is
+    closed. The false premise is in our own source and is corrected in the same
+    edit: the D6a comment's "(`Result::Ok` on the governed witness)" is a claim
+    about what the answer MEANS, and "fed to the return case's one retained
+    argument as itself" silently converted it into a claim about what DEPTH the
+    word sits at.
+    KEYING — NOT YET COUNTED. A precondition read is pending on `v84`'s carrier
+    at its definition. If it confirms the checked route is the deficient side,
+    this is the SIXTH keying instance — entries 24-27's predicate ONE LAYER IN,
+    the consumer keyed on the SEAT (the return case's one retained argument)
+    while elimination DEPTH is a property of the VALUE that arrives — and it
+    pulls the §1b predicate question rather than a seventh piecemeal
+    disposition.
+    NOT A NEW HARD STOP: the diagnostic returned the discriminating answer it
+    was designed to return, on no build turn and against no new structural wall.
+    The count stays at 18 and the next mandatory advisory remains HS21.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
