@@ -2717,6 +2717,14 @@ Architect inventory, 2026-09-11.
     itself withdrawn: a conclusion can survive the death of one of its premises,
     and it was withdrawn on the failure of one supporting argument rather than
     re-tested on its own.
+24. detached post-call consumer replayed at the producer seat, which holds
+    frame (661,1,859) while the owning context requires (661,1,1605) — keyed on
+    the PRODUCER SEAT AS ORIGIN. Predicate for entries 21-24 and, in
+    retrospect, for all twelve stops: every stop tried to give the producer
+    seat authority over the consumer's world and had to fabricate something the
+    seat does not hold. Not a fifth premise — the ORIGIN is wrong. Closed by
+    relocating the consumer's emission site to the creation-site function that
+    already holds both the exact frame and the producer's returned result.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
