@@ -2857,6 +2857,46 @@ Architect inventory, 2026-09-11.
     cost was one build turn and the repair is in the wording.
     This is NOT a keying defect: the §1b seat-keyed-vs-value-keyed predicate of
     entries 24-27 is untouched, and its count stays at four.
+30. HS17, on the same recut at WIP tip `936294421e`: the ruled suffix-retention
+    control CONFIRMED entry 29 — HostIO cleared and native returned to the
+    pre-rekey Trap 43 Result frontier. The minimum D3 disposition then bypassed
+    the demanded `Ret` arm's CASE BODY, forwarding the projected already-final
+    payload through the unchanged `remaining_eliminators`. Native advanced past
+    BOTH HostIO and Trap 43 and stopped at `PatternMatchFailure: no runtime
+    match case selected for decl:px8f_write_all_native::ITree`
+    (`planned_identity: 47`) — the closed default of an ordinary family match,
+    minted at elaboration (`erasure.rs:2919`), reached because the forwarded
+    value arrived unclassifiable. Note both this and entry 29's HostIO refusal
+    are closed defaults of the same kind; they differ only in WHICH match.
+    THE DISCRIMINATING A/B ALREADY RAN, inside this one stop. Run 1 (suffix
+    retained, body retained) stopped AT Trap 43. Run 2 (suffix retained, body
+    bypassed) advanced PAST Trap 43 and trapped in ITree. The sole intended
+    difference is the body bypass. Therefore the demanded arm's body is TWO
+    ARTIFACTS: the consumption that Trap 43 rejects, and the production of the
+    value the remaining chain consumes. Bypassing it removed both — which is
+    exactly why 43 cleared and ITree broke. No third build turn is owed to
+    establish this.
+    PREDICATE — this is §1b's mandatory answer at the 30th entry, and the
+    answer is YES. Entries 29 and 30 share a predicate, and it is the
+    ARCHITECT'S, not the code's. Every disposition written for this arm is
+    phrased with a SUBTRACTION VERB — "stop applying", "bypass the obligation,
+    never the suffix" — while the re-key actually requires an ADDITION: the arm
+    SELECTS its suffix from its own static constructor identity. A subtraction
+    verb names no site, so each build turn removed a different piece of the
+    arm's ordinary lowering (29 the suffix, 30 the body), and each removal was
+    locally the only reading its sentence supported.
+    CLOSURE, in place of a third disposition: the obligation is NOT made of
+    anything the arm emits. It is exactly the two refusals in
+    `apply_required_consumer_incoming_edge` — `core.rs:9233` and `:9243` at
+    blob `be2fddd656dea52e98b7119b14ca8dafbdca316d` — a function that takes no
+    `FunctionBuilder`, emits no instruction, and whose only output is the slice
+    `&eliminators[incoming_edge_index..]` at `:9248`. It follows that a correct
+    edit CANNOT remove emitted work on either arm, and that the re-key's diff
+    ADDS a selection at the case arm keyed on
+    `case_constructor_identity(eliminator.static_origin, index)`. D2 is to be
+    re-cast in addition form; D1 and D3-D6 are retained unchanged.
+    This is NOT a keying defect either: the §1b seat-keyed-vs-value-keyed
+    predicate of entries 24-27 is untouched and its count stays at FOUR.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
