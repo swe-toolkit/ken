@@ -1733,7 +1733,7 @@ Architect inventory, 2026-09-11.
 > # authoritative `InlineNoCall` settlement; entry 8 = a pre-lifecycle ingress that
 > # never entered its exact transport route; entry 9 = parent-kind admission after
 > # source/mint/edge validation. Settlement, ingress, and parent role are distinct
-> # authorities. Count remains 11; Research next re-triggers at 12.
+> # authorities. Count remains 9; Research next re-triggers at 12.
 > #
 > # CLASSIFICATION: a ONE-CONSUMER DOMAIN MISMATCH over an EXISTING canonical root
 > # class — NOT duplicate dispatcher entry, NOT lost non-root provenance, NOT a
