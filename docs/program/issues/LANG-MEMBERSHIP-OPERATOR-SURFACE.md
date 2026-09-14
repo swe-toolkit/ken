@@ -1,6 +1,6 @@
 ---
 id: LANG-MEMBERSHIP-OPERATOR-SURFACE
-title: "membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator"
+title: "the membership BUILD (re-cut 2026-09-13): define the Membership class and its three provider views (list; one ordered-key view serving Map and Set; relation-edge) in catalog and wire glyph-only ∈ elaboration to member-dispatch through A1's shared use-site resolver; ∈ is glyph-only so there is no let ... in ASCII collision and no standard in alias; HELD on SPEC-MEMBERSHIP-CLASS-CONTRACT + LANG-RESERVED-INFIX-NAMES + LANG-STANDARD-INFIX-CALL-COMPLETION, then the Steward frames full ACs and releases to the language ring"
 status: draft
 owner: language
 size: L

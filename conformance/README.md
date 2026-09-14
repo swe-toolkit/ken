@@ -108,11 +108,12 @@ claim with no conformance case is a claim no one can rely on
   ambiguity-is-an-error); the `data`/`match`/refinement cases are homed in
   `data-match/` (below).
 - `surface/operators/seed-reserved-infix-names.md` — the exact six reserved
-  notation identities admitted as ordinary symbolic global names: each reaches
-  declaration, bare/grouped prefix, infix, and fixity contexts; alias pairs are
-  one identity; unbound names reach resolution without gaining a standard
-  meaning; `!=` and `in` remain refused, with live generic-operator and local-let
-  controls. Reserved-name arms are red until `LANG-RESERVED-INFIX-NAMES`.
+  notation identities admitted as ordinary symbolic global names: isolated
+  four-context rows plus a simultaneous distinct-body fixture pin both omission
+  and cross-row non-collapse; an excluded-grammar matrix keeps local/structural
+  names identifier-only; alias pairs remain one identity; `!=` and `in` remain
+  refused with live controls. Reserved-name arms are red until
+  `LANG-RESERVED-INFIX-NAMES`.
 - `surface/data-match/seed-data-match.md` — L2 sum types + `match` + refinements
   (`34`): real constructors + a computing `elim_D`, `match`→`elim_D` (nested),
   the **required exhaustiveness** safety (non-exhaustive rejects naming the

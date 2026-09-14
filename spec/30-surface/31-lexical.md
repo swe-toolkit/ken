@@ -147,7 +147,10 @@ separately as `CONF-FMT8-LEVELTOK`.
   assigns no standard binding, meaning, or glyph-derived precedence. In
   particular, a client may define and use an ordinary function named `∈`, while
   a standard membership binding and its class/carrier design remain deferred.
-  `!=` is not an alias for `≠`, and `in` is not an alias for `∈`.
+  That client-defined name is authorable only with the glyph in this contract;
+  there is no current ASCII spelling. Assigning it a non-keyword ASCII digraph
+  remains available as a later additive contract change and is not inferred
+  here. `!=` is not an alias for `≠`, and `in` is not an alias for `∈`.
 - **The formatter emits canonical Unicode on save (principle 3).** The single
   mandated formatter normalizes accepted ASCII input to canonical Unicode
   glyph (and fixes layout), so the reader always sees consistent notation. This
@@ -587,9 +590,15 @@ token.
   from nullary constructors (`34`).
 - **`keyword`** — reserved (§4).
 - **`literal`** — numbers, strings, chars, bytes (§3).
-- **`operator`** — a generic symbolic operator token, from the curated
-  character set and excluding punctuation or notation claimed by another
-  token. Together with §1c's six dedicated notation tokens it feeds `32`'s
+- **`operator`** — after comment recognition, the lexer takes a maximal
+  non-empty run over the fixed ASCII character set
+  `+ - * / % = < > | \ :`. An exact spelling already claimed
+  by punctuation, a §1b notation token, or a §4 fixed operator keeps that
+  dedicated token kind; the separately retired `=>` spelling rejects. Every
+  other run is a generic symbolic `operator`. Consequently `<`, `>`, `/`, `%`,
+  and `<+>` are generic operators, while `!` is outside the character set and
+  `!=` rejects lexically at `!` rather than becoming an operator. Together with
+  §1c's six dedicated notation tokens, the generic kind feeds `32`'s
   `operator_name` production. Fixity and precedence are declared
   (`infixl`/`infixr`/`infix N`).
 - **`punct`** — `( ) [ ] { } , . ; : :: | = → @ ⟨ ⟩` and the spec brace

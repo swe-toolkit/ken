@@ -261,24 +261,30 @@ so nothing there is reserved.
 ```
 expr ::=
     "λ" binder+ "." expr | "\\" binder+ "->" expr  -- lambda
-  | expr expr  -- application (left assoc)
-  | expr binop expr  -- operators (declared fixity)
+  | expr application_atom  -- application (left assoc)
+  | operator_prefix  -- ungrouped operator allowed only as application head
+  | expr binop expr  -- fixity-neutral operator spine
   | "(" ident ":" type ")" "->" expr  -- dependent function type Π (a term; §2, 11 §1)
   | expr "->" expr  -- non-dependent function type (arrow); elaborates to kernel Pi
   | let_expr  -- sequential local binding group
   | "if" expr "then" expr "else" expr  -- = match on Bool
   | match_expr  -- pattern match (34); single-scrutinee eqn: modifier (34 §3.6)
   | expr "." ident | expr ".1" | expr ".2"  -- field / projection
+  | "temporal" "{" expr "}"  -- temporal obligation → Temporal data (72) [OQ-syntax]
+  | application_atom
+operator_prefix ::= operator_name application_atom+
+binop ::= operator_name | fixed_binop
+fixed_binop ::= "+" | "-" | "*" | "+%" | "-%" | "*%" | "=="
+application_atom ::=
+    literal | ident | ConId | qualified_global_ref
   | path "::" ident  -- canonical attached-proof path
   | proof_ref  -- attached-proof selector atom
   | recursive_result  -- Type-classified nested method result (34 §3.1.1)
   | induction_hypothesis  -- Omega-classified nested method result (34 §3.1.1)
+  | "(" operator_name ")"  -- grouped operator value
   | "(" expr ("," expr)* ")"  -- tuple / pair / grouping
-  | "{" field_assign ("," field_assign)* "}"  -- record literal
-  | "temporal" "{" expr "}"  -- temporal obligation → Temporal data (72) [OQ-syntax]
-  | literal | ident | ConId | operator_name | qualified_global_ref
-  | "(" operator_name ")"
   | "(" expr ":" type ")"  -- type ascription
+  | "{" field_assign ("," field_assign)* "}"  -- record literal
 let_expr ::= "let" let_binding (";" let_binding)* "in" expr
 let_binding ::= ident (":" type)? "=" expr
 match_expr ::= "match" expr ("eqn:" ident)? ("," expr)*
@@ -348,15 +354,25 @@ tokens (`31 §4`). The forms are scoped selectors, not function application,
 generated identifiers, or general-recursion constructs. Their sort-selected
 validity and meaning are fixed by `34 §3.1.1` and `39 §2.3`.
 
-An `operator_name` is an ordinary global reference atom in both bare and
-grouped form. Consequently `op a b` and `(op) a b` are ordinary prefix
-applications. In an infix run, the same name enters the existing fixity-neutral
-spine; after name resolution, the defining `GlobalId` selects its declared
-fixity (`33 §6`) and reassociation lowers to the same two ordinary applications.
-The six reserved notation identities add no built-in binary-operation variant
-or semantic dispatch. Their absence from the environment is therefore an
-unknown-global error after parsing, not a token dead end and not an implicit
-standard binding.
+An ungrouped `operator_name` is not a general `application_atom`. It is admitted
+only as the head of `operator_prefix`, with at least one following atom; grouping
+`(operator_name)` makes it an ordinary atom that may appear anywhere. Thus
+`OP a b` and `(OP) a b` are ordinary left-associated prefix applications, while
+`a OP b` has only the `binop` derivation rather than a competing three-atom
+application derivation. This restriction applies equally to generic and
+reserved operator names; it does not reclassify `+`, `*`, `==`, or any generic
+symbolic run as a bare general atom. `fixed_binop` preserves the existing
+built-in arithmetic/equality path and never becomes a declaration or fixity
+name.
+
+In an infix run, the `operator_name` arm of `binop` puts the name in the
+existing fixity-neutral spine. After name resolution, the defining
+`GlobalId` selects its declared fixity (`33 §6`), and reassociation lowers to
+the same two ordinary applications as prefix use. The six reserved notation
+identities add no built-in binary-operation variant or semantic dispatch.
+Their absence from the environment is therefore an unknown-global error after
+parsing, not a token
+dead end and not an implicit standard binding.
 
 Several decided constructs need **no special expression syntax** — they are
 ordinary terms over stdlib/library values (spelling still `OQ-syntax`):

@@ -18,11 +18,13 @@ normative compatibility vector. Ordinary application, resolved-identity fixity,
 and absence of a default binding are durable invariants. A future additive alias
 requires a separate contract change; it is not a snapshot update.
 
-**Independent oracle.** The expected inventory, application trees, and grouping
-below are stated directly from the amended spec. No expected value is obtained
-from the parser, resolver, fixity table, or elaborated output under test. Each
-name is exercised in an isolated compilation unit, so one earlier dead-end
-cannot hide a later omitted name.
+**Independent oracle.** The expected inventory, application trees, grouping,
+and literal results below are stated directly from the amended spec. No expected
+value is obtained from the parser, resolver, fixity table, or elaborated output
+under test. The isolated units prevent one earlier dead-end from hiding a later
+omitted name. A separate simultaneous unit gives the six definitions distinct
+literal bodies, so an accidental cross-row identity collapse cannot hide behind
+six internally consistent isolated runs.
 
 ## Common literal fixture
 
@@ -158,6 +160,53 @@ identical after alias expansion; the source lexemes are not two declarations.
   dedicated token out of the shared operator-name view changes its named cell
   to rejection even when the other five accept.
 
+### surface/operators/simultaneous-reserved-names-stay-distinct
+
+- spec: `31 §1c`; `32 §1`/§3; `33 §1`/§3.3
+- given: one compilation unit defines all six canonical names at once with
+  distinct integer-literal bodies, then calls every admitted source spelling:
+
+  ```ken ignore
+  fn ≤ (x : Int) (y : Int) : Int = 11
+  fn ≥ (x : Int) (y : Int) : Int = 22
+  fn ≠ (x : Int) (y : Int) : Int = 33
+  fn ∧ (x : Int) (y : Int) : Int = 44
+  fn ∨ (x : Int) (y : Int) : Int = 55
+  fn ∈ (x : Int) (y : Int) : Int = 66
+
+  const le_glyph : Int = ≤ 0 0
+  const le_ascii : Int = <= 0 0
+  const ge_glyph : Int = ≥ 0 0
+  const ge_ascii : Int = >= 0 0
+  const ne_glyph : Int = ≠ 0 0
+  const ne_ascii : Int = /= 0 0
+  const and_glyph : Int = ∧ 0 0
+  const and_ascii : Int = /\ 0 0
+  const or_glyph : Int = ∨ 0 0
+  const or_ascii : Int = \/ 0 0
+  const member_glyph : Int = ∈ 0 0
+  ```
+
+- expect: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — the unit accepts and its
+  declaration environment contains six pairwise-distinct identities
+  `G(Le)`, `G(Ge)`, `G(Ne)`, `G(And)`, `G(Or)`, and `G(Member)`. The following
+  table is the independently fixed observation map:
+
+  | constants | resolved callee | normal form |
+  |---|---|---|
+  | `le_glyph`, `le_ascii` | `G(Le)` | `11` |
+  | `ge_glyph`, `ge_ascii` | `G(Ge)` | `22` |
+  | `ne_glyph`, `ne_ascii` | `G(Ne)` | `33` |
+  | `and_glyph`, `and_ascii` | `G(And)` | `44` |
+  | `or_glyph`, `or_ascii` | `G(Or)` | `55` |
+  | `member_glyph` | `G(Member)` | `66` |
+
+- why: isolated fixtures establish acceptance but can remain internally
+  consistent if every dedicated token is mapped to one shared key. Here such a
+  collapse either creates a duplicate declaration or changes at least one
+  independently named callee/result row. The paired rows simultaneously prove
+  equality within each alias pair and inequality across the six identities.
+
 ### surface/operators/paired-aliases-cannot-bind-twice
 
 - spec: `31 §1a`/§1c; `32 §1`; `33 §3`/§6
@@ -262,11 +311,47 @@ identical after alias expansion; the source lexemes are not two declarations.
 - why: the six-name admission is an additive arm of the ordinary symbolic-name
   view, not a generic reclassification of symbolic source text.
 
-The amendment also does not admit any reserved notation token as a local
-binder, type or constructor name, module path or alias, record field, or
-attached-proof name. Tests for those grammars should continue to assert their
-existing identifier-only behavior; a rejection there is not evidence against
-the global-name acceptance cases above.
+### surface/operators/reserved-names-do-not-widen-excluded-grammars
+
+- spec: `32 §1`
+- given: compile every matrix row independently with the well-typed surroundings
+  its fragment needs. The six local-binder rows use the full canonical-token
+  roster. Each paired ASCII spelling lexes to the same token class before this
+  grammar boundary; the simultaneous fixture above exercises those spellings.
+  The remaining rows use one roster member per excluded grammar. Each negative
+  changes only the marked identifier from its adjacent positive:
+
+  | excluded grammar | negative fragment | ordinary-name positive | expected token class |
+  |---|---|---|---|
+  | local binder — `Le` | `fn f (≤ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Le`, not `ident` |
+  | local binder — `Ge` | `fn f (≥ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Ge`, not `ident` |
+  | local binder — `Ne` | `fn f (≠ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Ne`, not `ident` |
+  | local binder — `And` | `fn f (∧ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `And`, not `ident` |
+  | local binder — `Or` | `fn f (∨ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Or`, not `ident` |
+  | local binder — `Member` | `fn f (∈ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Member`, not `ident` |
+  | type name | `def ≤ = Nat` | `def Alias = Nat` | `Le`, not `ConId` |
+  | constructor name | `data Marker = ≥` | `data Marker = Only` | `Ge`, not `ConId` |
+  | module path | `module ≠ {}` | `module Provider {}` | `Ne`, not `ConId` |
+  | module alias | `import Provider as ∧` | `import Provider as Alias` | `And`, not `ConId` |
+  | record field | `record Box { ∨ : Nat }` | `record Box { value : Nat }` | `Or`, not `ident` |
+  | attached-proof name | `proof ∈ for id (x : Nat) : Equal Nat (id x) x = Refl` | `proof id_self for id (x : Nat) : Equal Nat (id x) x = Refl` | `Member`, not `ident` |
+
+- expect-positive: every ordinary `ident`/`ConId` control accepts in the same
+  parser-and-elaboration harness. The import rows have an existing `Provider`;
+  the proof rows have `fn id (x : Nat) : Nat = x`, so neither positive depends
+  on an unresolved surrounding name.
+- expect-negative: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — each negative
+  lexes the marked spelling to the dedicated token class shown, enters the
+  declaration form named by its leading keyword, and rejects at the marked
+  identifier-only grammar position. The diagnostic span is the reserved token
+  and says that the position expected `ident` or `ConId`, as shown; a rejection
+  before the declaration form or at an unrelated later name does not conform.
+- why: the admitted shared view is `operator_name`, used only by global value
+  and selection names. Reusing it as a general identifier parser would make at
+  least one matrix negative accept. The same-grammar positive rows distinguish
+  that over-widening refusal from a broken declaration parser, while the live
+  simultaneous global-name fixture distinguishes it from the old reserved-token
+  dead end.
 
 ## Seed placement
 
