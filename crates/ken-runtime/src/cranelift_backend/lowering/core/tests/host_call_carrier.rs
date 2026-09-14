@@ -1814,37 +1814,24 @@ fn d8_unsupported_carrier_production_publishes_no_unit_function() {
     );
 }
 
-// RETIRED by the RT-FNSPLIT-RECUR-PORT successor repair: caller-name counts
-// over repository text are not a behavioral representation proof. The borrowed
-// ingress `bytes_at` control exercises a CarrierWord predecessor through the
-// borrowed Option merge instead.
-#[cfg(any())]
-fn d8_join_helpers_have_the_closed_typed_caller_population() {
-    let helpers = include_str!("../../mod.rs");
-    let callers = include_str!("../../core.rs");
-    for name in [
-        "merge_branch_value",
-        "merge_scalar_branch",
-        "merge_planned_scalar_branch",
-    ] {
-        assert_eq!(
-            helpers.matches(&format!("fn {name}(")).count(),
-            1,
-            "D8 join helper family changed: {name}"
-        );
-    }
-    assert_eq!(callers.matches(".merge_branch_value(").count(), 4);
-    assert_eq!(callers.matches(".merge_scalar_branch(").count(), 10);
-    assert_eq!(
-        callers.matches(".merge_planned_scalar_branch(").count(),
-        1
-    );
-    assert_eq!(
-        helpers.matches("plan: &JoinPlanToken").count(),
-        3,
-        "every D8 helper must require the unmintable typed plan token"
-    );
-}
+// RETIRED by `RT-RETIRED-CENSUS-ROT` `D0`: a retired body is not a record, so
+// the census is deleted rather than kept under `#[cfg(any())]`.
+//
+// It counted `plan: &JoinPlanToken` in caller signatures in `mod.rs` -- a
+// CALLER-SIDE proxy for a CALLEE-SIDE guard. The property is enforced at the
+// point of use by `merge_scalar_operand` itself: a `LoweringOperand::Carried`
+// with no `required_kind` is refused ("a carried scalar reached an untyped
+// private merge consumer"), the boundary tag is then checked against the kind it
+// claims, and `ScalarMergeKind::RecursiveBackedge` is refused outright. That
+// fires on every caller, including ones not yet written, which a count of
+// callers cannot.
+//
+// The proxy had already drifted three ways: two of the three helpers moved to
+// `joins.rs` while the census read `mod.rs` alone, and a third legitimate
+// production caller (`lower_carried_bool_match`) now calls the helper directly.
+// A caller-side census cannot establish a callee-side invariant -- it reports
+// the caller population on the day it ran and reddens on every correct new
+// caller.
 
 fn d8_known_if_with_dead_join_sibling(selected: bool) -> RuntimeExpr {
     let dead = RuntimeExpr::Let {
