@@ -1,6 +1,6 @@
 ---
 id: RT-TRAP-IDENTITY-EMISSION-COORDINATE
-title: "Make a trap's identity carry its emission coordinate, so two eliminations of one family at two source sites are not equal as RuntimeTrap values and do not collapse to one PlannedTrapIdentity -- closing the attribution gap that left HS16-HS21 unable to say WHICH site fired, with a two-site discrimination acceptance criterion that the catalog-keying fix fails"
+title: "Make a trap's identity carry its emission coordinate, so eliminations of one family at distinct source sites are not equal as RuntimeTrap values and do not collapse to one PlannedTrapIdentity -- closing the attribution gap that left HS16-HS21 unable to say WHICH site fired, with a five-occurrence in-tree discrimination criterion that both the catalog-keying fix and a type-keyed fix fail"
 status: draft
 owner: runtime
 size: M
@@ -9,15 +9,28 @@ depends_on: []
 blocks: []
 github: null
 tier: T1
-origin: "Architect ruling evt_2qq9jr1c1e4p9 (2026-09-14), CORRECTED at evt_7eqc0hmbanyzm after runtime-implementer refuted the Architect's own proposed population; recorded durably in ABI-S6 entry 35 (routed f0a735f14). Split out of RT-CHECKED-IH-RESULT-OBLIGATION-REKEY because it is fork-independent and that node's widened D1 is not: see 'Why this is its own node'. Fixed inputs measured by the Steward at 686ffa8ac; re-measure at D0."
+origin: "Architect ruling evt_2qq9jr1c1e4p9 (2026-09-14), CORRECTED at evt_7eqc0hmbanyzm after runtime-implementer refuted the Architect's own proposed population; mechanism ruled (b) and AC-2 ratified at evt_5kzahxdv9w8d1; recorded durably in ABI-S6 entry 35 (routed f0a735f14). Split out of RT-CHECKED-IH-RESULT-OBLIGATION-REKEY because it is fork-independent and that node's widened D1 is not: see 'Why this is its own node'. Fixed inputs first measured by the Steward at 686ffa8ac, then re-measured on origin/main; re-measure again at D0."
 ---
 
-> # DRAFT — pending Architect sanity read. NOT released to the runtime ring.
+> # DRAFT — pending Architect read of THIS FRAME. NOT released to the ring.
 >
-> The Steward committed (evt_66qhft3939qpr) to sending this frame to the
-> Architect before the ring, because the boundary between the obligation and
-> the mechanism implementing it is exactly where this cut can go wrong. The
-> `D0` mechanism fork below is the specific thing that needs their ruling.
+> **The mechanism fork is closed.** The Architect ruled `(b)` at
+> `evt_5kzahxdv9w8d1` and ratified `AC-2` as authored here. What remains is the
+> read of the frame itself, which the Steward committed to at `evt_66qhft3939qpr`
+> and which the Architect re-affirmed ("release nothing until the frame reaches
+> me; I will read it before the ring").
+>
+> **Two things changed after that ruling and the Architect has not seen either.**
+> Both came out of grounding the handed-over witness against the tree instead of
+> transcribing it, and both are in this frame rather than in a message:
+>
+> 1. `AC-1` is now written on the **real five-occurrence fixture**, and splits
+>    into `AC-1a` / `AC-1b` because that fixture refutes a **second** plausible
+>    fix — keying on the instantiated type — which an authored two-site pair
+>    would have passed. See "Fixed inputs".
+> 2. Two of the three relayed counts for that fixture were wrong (**four**
+>    instantiations, not three; occurrence 2 is a `proc`). Corrected in place,
+>    with the grep that produces the second error named so it is not re-made.
 
 ## What this is
 
@@ -66,7 +79,9 @@ lives in `ken-host` and is equally present on `origin/main`.
   `repr`** on `RuntimeTrap` or `RuntimeTrapCode`.
 
 - **The two colliding mint sites, and there are exactly two**:
-  `crates/ken-elaborator/src/erasure.rs:2917` and `:6041`. Both build
+  `crates/ken-elaborator/src/erasure.rs:2919` and `:6043`, **re-measured on
+  `origin/main`** (they were `:2917` / `:6041` at `686ffa8ac`; the two-line shift
+  is why `D0` re-measures rather than trusting this list). Both build
 
       code: RuntimeTrapCode::PatternMatchFailure,
       message: format!("no runtime match case selected for {}", view.family_symbol),
@@ -79,6 +94,45 @@ lives in `ken-host` and is equally present on `origin/main`.
   distinct fixed or differently-interpolated message. **They discriminate
   incidentally, by message content — not by any mechanism.** Nothing stops the
   next family-symbol-derived default from colliding again.
+
+- **WHAT `family_symbol` ACTUALLY INDIVIDUATES, and it is the root of the
+  collapse.** It is a `StableSymbol` in the **`Declaration` namespace**, built
+  from the declaring package plus the family's dotted name
+  (`compiler_driver.rs:4159-4165`). **It carries no type arguments and no source
+  coordinate.** Every elimination of one family declaration therefore produces a
+  byte-identical message, whatever its instantiation and wherever it sits.
+
+- **THE FIVE-OCCURRENCE FIXTURE, ALREADY IN THE TREE AND ALREADY COLLAPSING.**
+  `crates/ken-verify/tests/px8f_write_partition.rs`, the `WRITE_ALL_PARTITION`
+  program constant beginning at line 15. **Byte-identical on `origin/main` and
+  in the Steward's worktree** (`git diff origin/main` empty for this path).
+  Five `match` sites eliminate the `Result` family, in five distinct enclosing
+  declarations:
+
+  | # | line | enclosing declaration | scrutinee instantiation |
+  |---|---|---|---|
+  | 1 | 18 | `fn body_from_write` (16) | `Result ResourceError Unit` |
+  | 2 | 41 | `proc after_read` (37) | `Result ResourceError ReadProgress` |
+  | 3 | 71 | `fn buffer_bracket_body` (68) | `Result ResourceError (ResourceBracketResult Unit Unit)` |
+  | 4 | 102 | `fn file_bracket_body` (99) | `Result FileError (ResourceBracketResult Unit Unit)` |
+  | 5 | 132 | `fn finish` (130) | `Result FileError (ResourceBracketResult Unit Unit)` |
+
+  **Four distinct instantiations across five sites — occurrences 4 and 5 share
+  one.** All five share the single `family_symbol`
+  `decl:px8f_write_partition::Result`, so all five mint **one** `RuntimeTrap`
+  value and `intern_trap` collapses them to **one** `PlannedTrapIdentity`.
+
+  **Two counts here are corrections to the numbers relayed when this witness was
+  handed over** ("five matches, five declarations, three instantiations"): the
+  instantiation count is **four**, not three, and occurrence 2's enclosing
+  declaration is a **`proc`**, not a `fn`. The second correction is the one that
+  matters to anyone re-running this: a `^fn ` grep silently attributes
+  occurrence 2 to the preceding `fn read_eof_body`, which does not mention
+  `Result` at all. Enumerate `fn` and `proc` together.
+
+  The shared instantiation at 4/5 is not an inconvenience in the fixture — it is
+  the half that makes `AC-1b` possible, and it is why this fixture is used
+  instead of an authored pair.
 
 - **The interning predicate**, in
   `cranelift_backend/planning/static_transition/joins_traps.rs:633`:
@@ -117,28 +171,37 @@ lives in `ken-host` and is equally present on `origin/main`.
 
 ## Deliverables
 
-**`D0` — the mechanism read, and it is a REPORT with a ruling gate, not a
-build.** Two mechanisms satisfy the obligation with blast radii that differ by
-more than an order of magnitude, and they differ in whether they close the
-CLASS or only the two known instances:
+**`D0` — the ruled migration. THE MECHANISM IS NO LONGER A FORK.** The Architect
+ruled mechanism **(b)** at `evt_5kzahxdv9w8d1`: **add a required
+emission-coordinate field to `RuntimeTrap`**, touching the ~76 production sites
+above plus tests. Every future mint must supply a coordinate or it is a compile
+error.
 
-  - **(a) Fold the coordinate into the existing `message`** at the colliding
-    mint sites. Touches about 2 sites. **Closes the named instances and not the
-    class**: a third family-symbol-derived default added later collides again,
-    and nothing reds when it does. It also makes user-facing diagnostic text the
-    carrier of an identity, which is a second authority over the same fact.
-  - **(b) Add a required emission-coordinate field to `RuntimeTrap`.** Touches
-    the ~76 production sites above plus tests. **Closes the class by
-    construction**: every future mint must supply a coordinate or it is a
-    compile error.
+**The refuted alternative, recorded because `AC-1` must be able to fail it:**
+(a) folding the coordinate into the existing `message` at the colliding mint
+sites, about 2 sites. It was refuted on three grounds, and the first is
+measured in this frame rather than argued:
 
-**Report the exact site count for (b), the exact colliding-site count for (a),
-and what each does to the message text. The Architect rules which mechanism
-before any build.** This is a component-design call and it is theirs, not the
-ring's and not the Steward's. The Steward's read is that (b) is the one that
-matches the obligation as stated — "a trap's identity must carry its emission
-coordinate" is a statement about every trap, and (a) satisfies it for two of
-them — but the cost is real and the call is the Architect's.
+  - **It closes the named INSTANCES, not the CLASS.** The fixed inputs above
+    record that the other seven `erasure.rs` mints discriminate **incidentally,
+    by message content, with no mechanism**. An incidental discrimination is not
+    a property — a third family-symbol-derived default added later collides
+    again and nothing reds when it does.
+  - **It puts a machine identity into user-facing diagnostic text**, making one
+    string serve two consumers with different requirements. That is this arc's
+    own predicate arriving inside the repair for it.
+  - **The compile-error form is actually available here**, which is exactly what
+    it is NOT for `RT-CHECKED-IH-RESULT-OBLIGATION-REKEY`'s `D1`. Where the
+    structural form is reachable, take it. 76 sites is mechanical, the failures
+    are compile errors, and cost does not outrank a class closure whose only net
+    is an unsound pass.
+
+**`D0` still opens with a re-measure, and it is a gate, not a formality.**
+Produce the exact production-site count, re-measure every coordinate in "Fixed
+inputs" at the SHA being built, and confirm the cross-lane contention check
+below. **If the re-measure finds the FENCED premise wrong — any path that
+serializes a `RuntimeTrap` or pins its field layout — stop and return to the
+Steward before building.**
 
 **`D1` — make the identity discriminate**, by the mechanism `D0` rules. Two
 distinct source occurrences eliminating the SAME family must produce
@@ -152,32 +215,52 @@ unrelated edits and would make the identity a function of traversal rather than
 of the source site.
 
 **`D2` — the discrimination control, and it is the load-bearing deliverable.**
-A test in which **two distinct source occurrences over the SAME decl** receive
-**DIFFERENT planned identities**.
+A test over the five-occurrence `WRITE_ALL_PARTITION` fixture in which all five
+`Result` eliminations receive **five distinct planned identities**, including
+the same-instantiation pair at occurrences 4 and 5.
 
-- **MEASURED** = two source sites eliminating one family get two distinct
-  `PlannedTrapIdentity` values.
+- **MEASURED** = five source sites eliminating one family declaration get five
+  distinct `PlannedTrapIdentity` values.
 - **CLAIMED** = a trap identity individuates the emission site.
-- **GAP** = a test that asserts the catalog's KEYING rather than the
-  DISCRIMINATION cannot fail the defect.
+- **GAP** = a test that asserts the catalog's KEYING, or that keys on the
+  instantiated type, cannot fail the defect.
 
-**`D3` — report what the migration required**, if `D0` rules mechanism (b):
-how many sites were touched, and whether any site could not supply a meaningful
-coordinate. **A site that cannot name its own emission coordinate is a FINDING
+**Use the fixture that is already there.** Adding a fresh two-site program
+alongside it would test the repair against an example authored after the fix was
+known — the existing five-site program predates it and collapses today.
+
+**`D3` — report what the migration required**: how many sites were touched, and
+whether any site could not supply a meaningful coordinate. **A site that cannot
+name its own emission coordinate is a FINDING
 to report, not a hole to fill with a placeholder** — a default value at such a
 site silently restores the collapse for exactly that site.
 
 ## Acceptance criteria
 
-**`AC-1` — the criterion is a DISCRIMINATION test, and the proof it is
-load-bearing is that the superseded fix FAILS it.** Two distinct source
-occurrences over the same decl receive different planned identities.
+**`AC-1` — a DISCRIMINATION test over the five-occurrence in-tree fixture. The
+five `Result` eliminations in `WRITE_ALL_PARTITION` receive FIVE distinct
+planned identities.**
 
-**Write it that way and the catalog-keying fix fails it.** "The catalog is keyed
-by occurrence" would have PASSED under that fix while three sites still shared
-code 43 — an AC that tests the KEY rather than the DISCRIMINATION cannot fail
-the defect it exists to catch. This sentence is the AC's control and is not to
-be dropped in a restatement.
+This is not an authored pair. The fixture is already in the tree and already
+collapses, and it is a stronger witness than a two-site construction because it
+refutes **two** plausible fixes rather than one.
+
+**`AC-1a` — the superseded catalog-keying fix must FAIL this criterion.** "The
+catalog is keyed by occurrence" passes a test written over the KEY while all
+five sites still share one identity, because `intern_trap` selects with
+`position(|candidate| candidate == trap)` — a predicate over VALUES. An AC that
+tests the keying rather than the discrimination cannot fail the defect it exists
+to catch.
+
+**`AC-1b` — keying by the INSTANTIATED TYPE must also FAIL this criterion, and
+this is the half only the real fixture provides.** Occurrences 4 and 5 carry the
+**identical** instantiation `Result FileError (ResourceBracketResult Unit Unit)`
+in two different declarations. Any coordinate that is a function of the type
+rather than of the source site leaves that pair collapsed. An authored two-site
+pair with distinct types would have passed a type-keyed fix and hidden this.
+
+Neither sub-criterion is to be dropped in a restatement: a criterion whose
+refuted alternatives are deleted can no longer be shown to discriminate.
 
 **`AC-2` — a positive control on the non-colliding population.** Two
 eliminations of **different** families continue to receive different identities,
@@ -227,12 +310,17 @@ inventory and is why `D3` exists — but a cross-crate Rust surface is not an AB
 
 ## Sizing / tier
 
-**Size M, tier T1.** Under mechanism (a) the diff is small; under (b) it is a
-wide mechanical migration with a narrow semantic core. Either way the review
-turns on an argument rather than a byte count: that the coordinate is a static
-fact rather than a traversal artifact, and that the control actually
-discriminates two sites rather than asserting a property of the keying.
-Architect required on the mechanism.
+**Size M, tier T1.** Under the ruled mechanism (b) this is a **wide mechanical
+migration with a narrow semantic core** — ~76 sites of bookkeeping around one
+design question. The review turns on an argument rather than a byte count: that
+the coordinate is a static planner or elaborator fact rather than a traversal
+artifact, and that the control actually discriminates five sites rather than
+asserting a property of the keying.
+
+**The T1 estimate is for the semantic core and the control, not the 76 sites.**
+If the ring wants to split the mechanical migration onto a cheaper seat once the
+coordinate's source is settled at `D1`, that is a reasonable cut and it is the
+Steward's to make — bring it back rather than absorbing it.
 
 ## Contention
 
