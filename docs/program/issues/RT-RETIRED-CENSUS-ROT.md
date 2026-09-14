@@ -22,9 +22,12 @@ origin: "Adversary hunt evt_6npaybf8cznp8 (2026-08-18) on the RT-D2-EVIDENCE-INS
 >
 > **Why this node and not another of the sixteen ungated `ready` runtime nodes:
 > it is the one with a genuinely CLEAN BASE.** It is `size: S`,
-> `depends_on: []`, and it touches `crates/ken-runtime/src/control.rs` — clear of
-> the 24-commit `wp/ABI-S6-d5b-file-backed` stack that every other runtime item is
+> `depends_on: []`, and it touches
+> `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/` — clear of the
+> 24-commit `wp/ABI-S6-d5b-file-backed` stack that every other runtime item is
 > entangled with. It can be cut from `origin/main` and reviewed on its own.
+> (The release post named `crates/ken-runtime/src/control.rs`; that path does not
+> exist. Corrected here, and the scope is three test files rather than one.)
 >
 > **It remains true that this is not urgent** — no behaviour is wrong and nothing
 > is unsound; the rot is in commentary rather than in compiled code. It is being
@@ -54,11 +57,68 @@ and permanently.
 The Adversary flipped `#[cfg(any())]` to `#[test]` on every retired census in
 `control.rs` and ran them under `-p ken-runtime --lib`. **All three fail.**
 
+> # COORDINATE AMENDMENT, 2026-09-14 — THE THREE CENSUSES ARE NOT IN ONE FILE,
+> # AND THAT REFUTES ARM 1's CONTROL AS THIS NODE SPECIFIES IT.
+>
+> **Re-derived by the runtime implementer at `3876edea0` before touching
+> anything, and verified independently by the Steward.** Every figure in the
+> tables below is the Adversary's from `b430d73e0` on 2026-08-18. **The findings
+> hold. The coordinates do not** — `control.rs` has been split since, so the line
+> numbers name lines that no longer exist, and the three censuses now sit in
+> **three different files**:
+>
+>     crates/ken-runtime/src/cranelift_backend/lowering/core/tests/
+>       mod.rs:1133               exactly_one_plan_origin_to_expression_lookup...
+>       control.rs:4354           the_lower_expr_call_population_is_disposition...
+>       host_call_carrier.rs:1821 d8_join_helpers_have_the_closed_typed_caller_...
+>
+> (Lines are the `#[cfg(any())]` attribute itself; the `fn` follows on the next
+> line.) All three are present and still retired. **Nothing was lost — they
+> moved.** Note the path: this is `.../lowering/core/tests/control.rs`, **not**
+> `crates/ken-runtime/src/control.rs`, which does not exist.
+>
+> **THE HEADLINE FINDING HOLDS AND IS STRONGER FOR BEING RE-MEASURED.**
+> `merge_branch_value` exists nowhere under `crates/` except as two string
+> literals inside the retired body itself (`host_call_carrier.rs:1826`, `:1836`).
+> A subject deleted 19 days after its census was retired, with nothing able to
+> notice.
+>
+> **WHAT THIS BREAKS — AND IT IS THIS NODE'S OWN LOAD-BEARING CLAIM.** Arm 1
+> below proposes *"a test that `include_str!`s `control.rs`"* and asserts **"that
+> control would have reddened on `1aec3e3e1`."** Measured: an `include_str!` of
+> one file reaches **one of the three**, and the one it misses is
+> `d8_join_helpers_...` in `host_call_carrier.rs` — **this node's own headline
+> example, the census whose subject was deleted.**
+>
+> ⇒ **The single-file control would NOT have reddened on `1aec3e3e1`.** The claim
+> is true only of a control that enumerates the population **across files**. A
+> control that misses the case the node was written about is not a cheaper
+> version of the right control; it is the wrong control. Arm 1 is re-priced
+> accordingly, and arm 2 is **three deletions across three files**, not three in
+> one.
+>
+> **THE ENUMERATOR HAZARD RUNS BOTH WAYS, AND THE LIVE ONE IS OVER-COUNTING.**
+> `AC-3` warns that an extractor silently *skipping* a spelling reintroduces this
+> class one level down. The hazard actually present in the tree is the mirror:
+>
+>     tests/control.rs:3729   "#[cfg(any())] impl Trait for Type {}"   INSIDE A
+>                                                                      STRING LITERAL
+>
+> A grep-based region-finder reports **four** regions where three exist. **Over-
+> counting is not the safe direction** — it manufactures a region containing no
+> identifiers, which then passes vacuously and pads the population `AC-3` asks
+> for. The measured population is **3 real regions across 3 files, plus 1 false
+> positive that a naive finder will pick up.**
+
 | retired census | line | first failure | measured vs asserted |
 |---|---|---|---|
 | `d8_join_helpers_have_the_closed_typed_caller_population` | 12891 | `control.rs:12899` | `fn merge_branch_value(` defs **0** vs 1 |
 | `exactly_one_plan_origin_to_expression_lookup_exists` | 8241 | `control.rs:8255` | pinned planner surface list has 32 entries; the current one is many times that |
 | `the_lower_expr_call_population_is_dispositioned_by_owner_not_by_site` | 9234 | `control.rs:9270` | `lower_expr` tokens **70** vs 65 |
+
+**The line numbers in this table are the 2026-08-18 pre-split coordinates and are
+retained as the record of what was measured.** Use the amendment block above for
+where these censuses actually are.
 
 libtest stops at the first assertion, so the D8 census was re-run with its
 asserts replaced by prints, letting the test's own instrument report every value.
@@ -111,9 +171,20 @@ closure property is worth a live control.
 The two arms are not equivalent and neither is obviously right.
 
 1. **A retired body is a record.** Then it needs one cheap live control keeping
-   it honest: a test that `include_str!`s `control.rs` and asserts every
-   identifier named inside a `#[cfg(any())]` block still resolves somewhere under
-   `crates/`. **That control would have reddened on `1aec3e3e1`.**
+   it honest: a test that reads **every file holding a retired region** and
+   asserts every identifier named inside a `#[cfg(any())]` block still resolves
+   somewhere under `crates/`. **A control of that shape would have reddened on
+   `1aec3e3e1`.**
+
+   **AMENDED 2026-09-14 — the original wording said `include_str!`s
+   `control.rs`, and that form is REFUTED.** The three retired regions live in
+   three files, so a single-file read reaches one of them and misses
+   `d8_join_helpers_...`, which is the very census whose subject `1aec3e3e1`
+   deleted. **The "would have reddened" claim is true of the multi-file form and
+   false of the single-file form**, and it is the reason anyone would choose
+   this arm — so it must not stay attached to the mechanism that cannot deliver
+   it. The control's own population is therefore part of the deliverable, not an
+   incidental: see the amendment block above, and `AC-3`.
 2. **A retired body is not a record.** Then deleting these three is more honest
    than preserving text that reads as one, and git history remains the record.
 
@@ -133,9 +204,14 @@ exists to stop, not an instance of it to clean up.
   shown to red on today's `main` before any repair, and that red is the
   acceptance evidence, not a regression.
 - **`AC-3` — the population is stated.** Say how many `#[cfg(any())]` regions
-  exist in `control.rs` and how the control enumerates them. An identifier
-  extractor that silently skips a spelling reintroduces exactly this class one
-  level down.
+  exist **and in which files**, and how the control enumerates them. An
+  identifier extractor that silently skips a spelling reintroduces exactly this
+  class one level down — **and one that over-counts is not the safe direction
+  either.** The measured population at `3876edea0` is **3 real regions across 3
+  files, plus 1 false positive** (`tests/control.rs:3729`, a `#[cfg(any())]`
+  inside a string literal). A finder that reports four has manufactured a region
+  with no identifiers in it, which then passes vacuously. **`AC-3` is satisfied
+  by a stated count that matches a stated file set, not by a number alone.**
 - **`AC-4` (no-regression).** Workspace green **in CI**, never a local
   `--workspace` run (`COORDINATION §12`).
 
