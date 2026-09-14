@@ -2725,6 +2725,12 @@ Architect inventory, 2026-09-11.
     seat does not hold. Not a fifth premise — the ORIGIN is wrong. Closed by
     relocating the consumer's emission site to the creation-site function that
     already holds both the exact frame and the producer's returned result.
+25. post-consumption Result certificate still demanded of the producer seat
+    after the consumer's emission site moved — keyed on WHICH SEAT CERTIFIES.
+    Same predicate as entry 24 one level up: the obligation, like the
+    invocation, was attributed to a seat that does not hold the thing. Ruled:
+    the certificate follows the consumer; Q2 stays a local universal at every
+    seat and is NOT made conditional.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
