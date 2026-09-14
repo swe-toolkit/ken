@@ -130,6 +130,63 @@ load-bearing, assert it separately and say why.
 
 **This is the durable product of the session and no correction touched it.**
 
+### `CTRL` HAS THREE PARTS AND THEY DO NOT SHARE A SEQUENCE
+
+Folded here rather than cut as a sibling: same control, same file, same guard, so
+a sibling node would only lengthen the path (`§4e` — a duplicate is a fold, not a
+frame). **But the parts have different dependencies, and leaving that implicit is
+what the Architect warned this must not become — an unwritten expectation.**
+
+**`CTRL-a` — assert the refusal CLASS. Independent. Startable now.** The repair
+described above. Depends on nothing in this node.
+
+**`CTRL-b` — RETIRE `D5bHs17PostCallConsumerMutation::ReplayCompletedSelectedExit`.
+Depends on `R3`.** Under the anchor join, accessor choice becomes
+**unobservable**: the extra leading step in the untrimmed chain is exactly what
+the anchor skips, so both paths land on the same window against the same frames.
+**The hazard did not become undetectable — it ceased to be a hazard**, and those
+two look identical on a red dashboard, which is why the distinction is written
+here.
+
+**Put the reason in the enum's DOC COMMENT, not only in the commit message**
+(Architect, `evt_5b93c7nrh14r0`). An inert mutation left in place invites a
+future reader to "restore" the control by weakening the join — the worst
+available outcome. The next reader asking *"why is accessor choice not tested
+here?"* must meet the answer at the code.
+
+**`CTRL-c` — COVER THE JOIN'S TWO REFUSALS. Depends on `R3`. BOTH, not one.**
+
+    no-match         perturb a receipt step's (eliminator_origin,
+                     checked_frame_id) so frame 0 matches nothing -> must refuse
+    multiple-match   duplicate the frame-0-matching step -> must refuse on
+                     non-uniqueness
+
+**Why this is required rather than thorough: `R3`'s entire soundness argument
+rests on these refusals, and nothing currently exercises either.** *Manufacture
+cannot refuse, a witness can* — the join is admissible **precisely and only**
+because it fails closed on no-match and on multiple-match. **A soundness argument
+resting on a refusal no test reaches is the defect class this whole node exists
+to chase.** If those paths are unreachable, or are later "simplified" to a
+sensible default, nothing catches it and the type goes on proving something it no
+longer proves.
+
+**One mutation is not enough.** They are different refusals on different
+conditions; a control exercising only the first says nothing about whether the
+second arm is live — the same reason `AC-2` demands a population rather than a
+verdict.
+
+**The direction argument, since re-pointing a sentinel requires one:** pre-`R3`
+the movable operand at these sites was **which accessor** was passed; post-`R3`
+that is fixed by construction and what remains movable is **the correspondence
+between receipt steps and frames**. **A mutation control must move the operand
+the contract actually depends on**, and `R3` changed which operand that is. This
+is a re-point *along the contract*, not to whatever is convenient.
+
+**`AC-6` is not in tension.** It forbids synthesizing an operand in the
+**production** path to make a check pass. A **test-only** mutation that corrupts
+an operand to verify a **refusal** is the opposite, and is what the mutation enum
+exists for.
+
 **`ROUTE` — route the required-consumer incoming edge at `:7720`, as a CORRECTNESS
 deliverable, explicitly NOT as the cause.** Fork on
 `required_consumer_incoming_edge()` — `Ok(None)` for ordinary transports
@@ -250,6 +307,15 @@ the check that carries the guard's remaining teeth at a length-1 frame list.
 **`AC-6` — nothing is synthesized to make two counts agree.** No fabricated
 receipt, step, eliminator frame, or index. Manufacturing either operand is
 indistinguishable from fixing the defect and tests a shape no program presents.
+
+**`AC-8` — A MUTATION'S EVIDENCE IS A PAIR. THE MUTATED RUN ALONE IS
+UNINTERPRETABLE.** Every mutation result must be reported with its **unmutated
+counterpart**. `anchor=1, window=1, eliminators=2` reads equally as *"the join
+skipped an element to hide a mismatch"* and as *"the join correctly skipped the
+caller-completed prefix"* — **only the unmutated run separates them.** A control
+that reports one run is reporting a verdict, not a measurement. This is `AC-2`
+specialized to mutations, and it caught a nearly-reported unsound `R3` on
+2026-09-14 by firing against its own author's build.
 
 **`AC-7` — a proposed mechanism must be stated with its falsification criterion
 before it is measured.** Both refutations that landed today worked because the
