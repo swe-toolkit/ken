@@ -2811,6 +2811,30 @@ Architect inventory, 2026-09-11.
     The closure it points at is therefore producer-side: make the identity not
     a union by splitting where the branch is already statically known, rather
     than recovering provenance downstream. Held pending the advisory.
+28. HS15 GATE: the full-token measurement REFUTES the projection hypothesis.
+    Both arms carry one identical `ContinuationCallIdentity` —
+    `producer_alternative` 1/1, `producer_construct_origin` 1617/1617,
+    `call_site_sequence` 0/0 — and more strongly there are not two values to
+    compare: ONE receipt attaches to the `RoutedAnswer` before head/case
+    selection and both case blocks descend from it. So the alternative is NOT
+    projected out; the receipt is minted UPSTREAM of the split and the
+    occurrence is genuinely shared. Producer-side splitting is therefore
+    unavailable here — the branch-determining static key the prior-art advisory
+    made its Q2 family conditional on is proved ABSENT at this site.
+    RULED — DECLINE THE EXACT-PROVENANCE CLAIM. Exact nested-call provenance at
+    the creation site is closed as an impossibility and is not to be reopened.
+    The obligation stops being keyed on the CALL OCCURRENCE and is keyed on the
+    VALUE'S CONSTRUCTOR IDENTITY, discharged inside the case arm, where that
+    identity is a planner fact from `case_constructor_identity(eliminator
+    static_origin, index)`. The runtime tag SELECTS the block; it never SUPPLIES
+    the identity — the same line this lowering already draws for case arity,
+    whose bound is the declared `argument_binders` and "NOT anything read off
+    the carried word". That distinction is what keeps this outside the refused
+    runtime-tag-as-compiler-authority family, and it is checkable rather than
+    asserted.
+    The §1b predicate of entries 24-27 SURVIVES unchanged; only the closure's
+    SHAPE moved — from splitting the producer to re-keying the obligation onto
+    the value's own static identity. Still value-keyed, still static.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
