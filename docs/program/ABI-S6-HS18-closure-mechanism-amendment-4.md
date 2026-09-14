@@ -1,5 +1,16 @@
 # ABI-S6 HS18 — closure mechanism, amendment 4
 
+> **ERRATUM, 2026-09-14. READ IT BEFORE ACTING ON THE REPRESENTATION
+> SECTION:**
+> [the executable input is a sliced suffix, not a field][erratum-4].
+>
+> The rule below is correct and unchanged. Two supporting claims are
+> **wrong**: the consumption census says three sites and there are **four**,
+> and `consumer.consumers()` is **empty by
+> construction on every detached row**, so it cannot be the executable input.
+> The erratum states the corrected spelling. It was found by the runtime ring
+> grounding the claim instead of building on it.
+
 Architect, 2026-09-14. Extends the
 [closure mechanism](ABI-S6-HS18-closure-mechanism.md) and
 [amendment 3](ABI-S6-HS18-closure-mechanism-amendment-3.md) on the ring's sixth
@@ -63,6 +74,9 @@ green by giving back the refusal, which is the loosening the Steward's M-gate
 exists to catch and which I pre-committed to rule against.
 
 ## The defect, in the code's own terms
+
+**This census is WRONG — see the erratum. There are four sites, not three.**
+Retained as written:
 
 The relation reaches lowering and is consumed at three sites. **Two of them
 emit. One validates.** The fork between them is a single predicate.
@@ -167,6 +181,10 @@ list: `validate_checked_ih_consumed_active` (`core.rs:9275`) builds it into an
 non-detached branch already supplies to the existing emitter.** Read the rule
 below with that spelling, not mine.
 
+**THIS SENTENCE IS ALSO WRONG — see the erratum.** `consumers` is empty on
+every detached row. Neither of my two spellings sliced the chain, which is what
+both of them actually needed to do.
+
 ## The rule
 
 **A final or demanded result identity must be minted by the function that
@@ -263,6 +281,115 @@ Each must be able to fail.
 3. **A second planner or runtime object** is the refused arm (b) under a new
    name.
 
+## Erratum: the executable input is a sliced suffix, not a field
+
+Architect, 2026-09-14, on the runtime ring's implementation hard stop. **The
+rule stated above stands unchanged.** A final or demanded result identity must
+still be minted by the function that lowers the consuming occurrence, from the
+after-definition it produced. What follows corrects two supporting claims that
+would have misdirected the repair.
+
+The ring grounded the claim rather than building on it, and additionally
+falsified the superseded spelling by measurement rather than by argument. That
+is why this costs an erratum and not a wrong candidate.
+
+### The chain must be SLICED, and neither of my spellings sliced it
+
+`derive_checked_ih_post_call_consumer_chain` runs **once**, before the
+detachment fork. The fork chooses only which field the one derived chain lands
+in (`responses.rs:2048-2051`):
+
+```text
+let (consumers, selected_case_exits) = if detached_return_context.is_some() {
+    (Vec::new(), derived_steps)     // detached
+} else {
+    (derived_steps, Vec::new())     // ordinary
+};
+```
+
+So on a detached row `consumers` is **empty by construction**, and
+`core.rs:9172` reads it only under `detached_return_context().is_none()`. The
+field is unreadable there by design. **Do not populate it** — moving one derived
+chain from a field lowering ignores into a field lowering reads is renaming, not
+repair. And the planner cannot make that choice in any case: the fact that
+discriminates requires an `ActiveContinuationFrame`, which exists only at
+lowering time.
+
+`selected_case_exits` is not the execution list either. It is a chain that must
+be cut **twice**, and both cutting authorities already exist:
+
+- `caller_exit_index()` (`responses.rs:368`) locates the caller cut's exit.
+  `owner_completed_exits()` is the prefix `[..index]`; `caller_completed_exits()`
+  is the suffix `[index..]`.
+- `apply_required_consumer_incoming_edge` (`core.rs:9220`) takes that suffix,
+  bounds-checks `incoming_consumer_edge_index` against the completed caller
+  prefix, and returns `&eliminators[incoming_edge_index..]`.
+
+Lowering the chain whole therefore re-lowers the **owner-completed prefix**,
+which the owner has already discharged. Measured consequence, on
+`px8f_write_all_native`: `PatternMatchFailure: no runtime match case selected`.
+The second consumption finds no case left to select.
+
+### The census is four sites, and the one I missed is the model
+
+`core.rs:4349`/`:4358` is a fourth consumption site and it **emits**: it builds
+the edge, calls `apply_required_consumer_incoming_edge`, and lowers the result
+through `continue_composed_value`. It is the only place amendment 3's landed
+edge is consumed to select an executable suffix, which makes it the pattern the
+detached sites need. Read `core.rs:4338-4363` as the model. I missed it, and it
+was the most load-bearing row in the table.
+
+### Amendment 3's triple is two-thirds realized on a detached row
+
+`required_consumer_incoming_edge()` (`responses.rs:348`) needs three inputs.
+`consumer.required_consumer()` is present on detached rows — their transport is
+`Required(pair_detached_required_consumer(...))`. The other two —
+`incoming_consumer_edge_index` and the `caller_cut` that `caller_exit_index()`
+keys on — are fields of `CheckedIhStaticResponseReturnBoundary`, **not of the
+consumer row**. So the edge is not constructible at `core.rs:6863` or
+`core.rs:6963` today.
+
+Amendment 3's invariant reads:
+
+```text
+(exact before-value, exact consumer occurrence, exact incoming edge)
+    -> (exact after-value, exact outgoing edge)
+```
+
+A detached row carries the before-value and the consumer occurrence and **not
+the exact incoming edge**. That absence is exactly what makes the chain
+unsliceable and therefore unexecutable.
+
+⇒ **The authorization is to complete amendment 3's own stated triple on the
+detached row.** That is one selection fact on an existing row. It is not a
+second metadata object and review tell 3 does not fire on it.
+
+### The lowering-time discriminator is computed and discarded
+
+`validate_checked_ih_consumed_active` (`core.rs:9275`) already answers the
+question at the site. It returns `true` when the active frame suffix exactly
+equals `selected_case_exits` under the cursor and lineage closure, `false` when
+there is no overlap, and an error on partial overlap. At `core.rs:6963` its
+result is bound to `_active_consumes_receipt` and thrown away.
+
+- **`true`** — `resume_active_continuation` discharges the consumer and its
+  result is the after-definition; the identity must be minted from it by the
+  function that lowered it. **One hole inside this arm:**
+  `resume_active_continuation` (`core.rs:3131`) returns its input unchanged when
+  `active.pending` is empty. A `true` receipt with empty pending yields no
+  after-definition and must refuse or Trap — never validate.
+- **`false`**, and `core.rs:6863` where there is no active frame to ask at all —
+  nothing discharges the consumer. This is the defect population, and the
+  edge-selected suffix is what must be lowered there.
+
+### A fourth review tell
+
+**Lowering `selected_case_exits` whole with a guard that suppresses the
+double-consumption is the withheld point repair in new clothes.** The slice is
+derived from the caller cut and the selected incoming edge, or it is not
+derived. A guard that detects the second consumption and skips it is a refusal
+wearing the closure's clothes, one level further out than the three tells above.
+
 ## Not authorized
 
 No ABI, schema, frame, owner key, tag, route-to-runtime, stack or bound change.
@@ -293,3 +420,5 @@ that it is present and populated — and px8f is not retired. **The criterion wa
 wrong, not the prediction.** I tested the planner's data when the defect lives
 in lowering's use of it. The predicate holds; the closure was incomplete, not
 inapplicable. That is what this amendment repairs.
+
+[erratum-4]: #erratum-the-executable-input-is-a-sliced-suffix-not-a-field
