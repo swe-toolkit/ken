@@ -1,7 +1,7 @@
 ---
 id: LANG-RESERVED-INFIX-NAMES
 title: "A0 of the reserved-infix-glyph objective: admit the six currently-reserved glyph tokens (Le ≤/<=, Ge ≥/>=, Ne ≠//=, And ∧//\\, Or ∨/\\/, Member ∈) as ordinary symbolic GLOBAL names and infix/fixity targets through ONE shared parser token-to-canonical-name view reused at every consumer site, entering the existing neutral-spine + GlobalId-keyed fixity reassociation as ordinary RApp; NO standard semantic binding, NO Membership class, NO `!=`/`in` alias -- syntax/naming only"
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
@@ -12,12 +12,12 @@ tier: T1
 origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy, grounding corrections evt_7z907rns84e6n), grounded at main 4fdd4f0ad; Architect probe SHA e0434d58 (temporary token-normalization probe of five representative definitions, all six names reached). Operator objective (Pat, 2026-09-12): full reserved infix glyphs. status draft: HELD until SPEC-RESERVED-INFIX-NAMES lands, then the Steward flips it ready and releases to the language ring. Architect is the required reviewer. IN-LANE: elaborator/parser surface, no new kernel mechanism/trust-root/TCB. Re-measure the seven consumer sites and lexer/formatter anchors at the cut."
 ---
 
-> # HELD until [[SPEC-RESERVED-INFIX-NAMES]] lands. Do NOT begin source edits.
+> # RELEASED to the language ring (Steward, 2026-09-14). [[SPEC-RESERVED-INFIX-NAMES]] landed.
 >
-> Draft, `depends_on` the spec amendment. The Steward flips it `ready` and
-> releases to the language ring once the spec node merges. The design below is the
-> Architect's A0 ruling (evt_784ge2nq65dfy); full detail and the probe are in that
-> event. Re-measure the parser/lexer/formatter anchors at the cut.
+> The `depends_on` spec amendment merged on main (`7dea59366`), so the hold is
+> lifted and this node is `ready`. The design below is the Architect's A0 ruling
+> (evt_784ge2nq65dfy); full detail and the probe are in that event. Re-measure
+> the parser/lexer/formatter anchors at the cut before touching source.
 
 ## What this is (Architect A0)
 
