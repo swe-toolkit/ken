@@ -248,7 +248,13 @@ is a re-point *along the contract*, not to whatever is convenient.
 an operand to verify a **refusal** is the opposite, and is what the mutation enum
 exists for.
 
-### STANDING RISK: `by_identity_join` IS TAKEN ON A PRODUCTION PATH THAT NO CURRENT FIXTURE MEASURES
+### STANDING RISK [DISCHARGED 2026-09-14, see below]: `by_identity_join` WAS TAKEN ON A PRODUCTION PATH THAT NO FIXTURE MEASURED
+
+**The record below is kept in its original tense deliberately.** It states the
+risk as it stood, then discharges it. A heading asserting a condition that no
+longer holds is how a node mis-frames a reader who never reaches the body — the
+defect this node was recut twice to avoid — so the discharge is in the heading
+and the reasoning is preserved intact underneath.
 
 **`CTRL-c` does NOT cover this**, and that is why it is written here rather than
 left as a line in the thread. The two join refusals are exercised at the sites
@@ -278,21 +284,61 @@ itself, applied to the question of what to do about an unmeasured path:
 It is not, and the argument for accepting that is the fail-closed property, not
 coverage.
 
-**THE DISCHARGE PATH EXISTS AND IT IS THE SAME MEASUREMENT AS `ROUTE`'S REFUTING
-CRITERION** (Architect, `evt_w1vnqexkhmxx`). The ambient edge-arm at `:4366` /
-`:4383` is an edge-bearing site with no fixture behind it, so the
-every-edge-bearing-site census in the `ROUTE` section above lands on exactly this
-path. **Two open items, one census. If anyone takes it, take it once and it
-answers both.** Optional, and nothing waits on it.
+### DISCHARGED 2026-09-14 — and the transfer to the shipping profile is a CONSTRUCTION, not a sample
 
-**What that census may NOT be read as doing.** It can discharge the risk by
-producing a measurement where there was none. It cannot discharge it by argument
-from the arms computing one anchor: that the two arms compute ONE anchor and so
-cannot disagree is PROVED; that the anchor is 0 where the EDGE arm runs is NOT.
-Every fixture to date measures the `else` arm, and an edge-arm program is a
-different program — nothing transfers. **This cell is the only one whose
-behaviour differs from everything measured (refused here, supported everywhere
-else), which is a reason to KEEP this section rather than soften it.**
+**The risk above was written about the VALUE** — *"the anchor is 0 where the
+EDGE arm runs is NOT proved"* — and that is what is now discharged. One census
+answered it and `ROUTE`'s refuting criterion together (`evt_2e6r1rza68k5w`): the
+ambient edge-arm at `:4366` / `:4383` had no fixture behind it and now has **15
+measured reaches across two venues, all `index = 0, anchor = 0`, all accepted**.
+
+**The cfg objection, raised and then closed rather than waved through.**
+`ken-cli` enables `px8-ds-test-support` unconditionally (`Cargo.toml:28`), so all
+15 reaches are the `#[cfg(feature = ...)]` copy and the shipping
+`#[cfg(not(...))]` copy is executed by no fixture. **The two copies are NOT
+identical** — the Architect opened both at `ff7638ff6` rather than reasoning from
+"it is the same logical call", which was a paraphrase that had been carrying the
+discharge:
+
+    test copy       an extra `record_required_consumer_call_selection(edge)?` before the
+                    apply, and a PRECEDING arm gated on `d5b_hs17_post_call_consumer_mutation()`
+    shipping copy   neither
+
+**Neither difference can reach this question, and the reason is a construction:**
+
+- The anchor comes from
+  `AnchoredEliminatorWindow::by_identity_join(edge.executable_exits(), eliminators)`
+  and the index from `edge.incoming_consumer_edge_index()`. **Both expressions
+  are textually identical in the two copies**, over `edge` and `eliminators`,
+  which are bound BEFORE the `cfg` split and are not derived from
+  `static_transition_plan`. `edge` is live across that `&mut` call and the crate
+  compiles, so the recording provably cannot mutate or invalidate either input.
+- The preceding arm is gated on an INJECTED MUTATION SELECTOR, not on a property
+  of the program being compiled, and when it fires it diverts to the residual
+  path and never reaches the edge arm. It can neither divert an unmutated program
+  away from the edge arm nor contaminate an edge-arm observation.
+
+⇒ **The anchor and index at the edge arm are profile-independent by
+construction, so the 15 measurements transfer.** What remains unmeasured in the
+shipping profile is EXECUTION, not the VALUE. **Do not re-state this as "logic
+measured, shipping profile not"** — that hedge sounds narrower and is less
+accurate, and it invites the census to be re-run for nothing.
+
+**Verified independently by the Steward at `ff7638ff6`, `core.rs:4337-4390`,
+before recording the discharge:** `required_consumer_edge` is bound at `:4337`,
+ahead of the `cfg` split; both edge arms call
+`by_identity_join(edge.executable_exits(), eliminators)` verbatim; the HS17 arm
+routes to `checked_ih_post_call_residual`, not to the apply.
+
+**What this does NOT license.** The join is still fail-closed rather than
+coverage-complete, and that is what made the pre-discharge posture defensible —
+see `ROUTE`'s converse above for the one configuration (`anchor != 0` with
+`index > anchor`) that no constructor has been shown to exclude.
+
+**SEPARATE, NOT A DEFECT CLAIM, AND NOT THIS NODE'S** (Architect): the shipping
+build does not call `record_required_consumer_call_selection` at all. Whether
+anything downstream needs that record is unestablished. A recording that exists
+only under a test feature is worth someone's eye on its own terms.
 
 ### `ROUTE` IS DECLINED. NOTHING TO BUILD. THIS IS A THEOREM, NOT A DEFERRAL.
 
@@ -321,13 +367,37 @@ preceding its element 0 yields the whole list. ⇒ **At any ambient site with a
 non-zero anchor, routing is the identity structurally — not because this program
 happened to measure 0.**
 
-The converse closes it: for `ROUTE` to have content at an ambient site you need
-`index >= anchor`, i.e. the ambient stack contains the consumer's own defining
-occurrence — the negation of `R3`'s premise. If that ever held, the anchor would
-be 0 and `apply_required_consumer_incoming_edge` would ACCEPT. **The refusal and
-`ROUTE`'s subject are exactly complementary: the refusal fires in precisely the
-cases where routing would have done nothing anyway. Declining costs no
-capability.**
+The converse closes it, and the strictness matters: for `ROUTE` to have content
+at an ambient site you need **`index > anchor`** — routing removes an element
+only when `index - anchor > 0`. The ambient stack merely CONTAINING the
+consumer's own defining occurrence is the weaker predicate `index >= anchor`,
+which is **necessary and not sufficient**: at `index == anchor` the definition
+is the window's FIRST element, so containment holds and cutting there removes
+nothing. That boundary case is not hypothetical — it is exactly what
+ambient-apply measured 15 times on 2026-09-14 (`index = 0, anchor = 0`).
+
+**Two disjoint ways routing fails to have content, and this node exhibits both:**
+
+    :7720           index <  anchor   0 - 1   cut precedes the window; UNREPRESENTABLE
+    ambient-apply   index == anchor   0 - 0   cut is the window's head; the IDENTITY
+
+**What is NOT established, stated plainly because an earlier version of this
+paragraph asserted it.** That earlier text said if routing ever had content
+"the anchor would be 0 and `apply_required_consumer_incoming_edge` would
+ACCEPT", and concluded the refusal and `ROUTE`'s subject are *exactly
+complementary* so declining costs no capability. **`index > anchor` does not
+force `anchor == 0`.** The anchor is obtained by identity join and `:7746` says
+it is "never computed as `index + 1`", so "the stack begins after the defining
+occurrence" describes what was measured, not what a constructor enforces. A
+site with `anchor != 0` AND `index > anchor` would have routable content and
+would be refused by `R3`'s guard — the one combination in which declining costs
+capability. **No such site is known or measured, and no constructor excluding
+it has been found.** That case is what the refuting criterion below exists to
+find; it is not excluded by argument.
+
+⇒ The decline stands on what is measured and derived: at every observed ambient
+site routing is the identity, by one of the two routes above. It does not stand
+on a proof that no other configuration exists.
 
 **The `index - anchor` repair is not merely unmeasured, it is UNREPRESENTABLE.**
 At `:7720` it is `0 - 1`, and no `usize` names a position before the window
@@ -348,13 +418,29 @@ difference between the two halves of the protocol.**
 
 > #### WHAT WOULD REFUTE THIS RULING — stated in advance, per `AC-7`
 >
-> **If any ambient post-call consumer site has `window_anchor == 0` with
-> `incoming_consumer_edge_index > 0` — or more generally `index >= anchor` — then
-> routing has real content at an ambient site and this ruling is wrong.**
+> **If any ambient post-call consumer site has `index > anchor` — equivalently,
+> `window_anchor == 0` with `incoming_consumer_edge_index > 0` in the anchor-zero
+> case — then routing has real content at an ambient site and this ruling is
+> wrong.**
 >
-> That is the existing `ROUTEPROBE` run over **every edge-bearing site** instead
-> of `:7720` alone. **It is not blocking and it does not license the ruling** —
-> declining is behaviour-neutral. It is what would REOPEN the question.
+> **The strictness is load-bearing and was wrong when first written.** The
+> original general form read `index >= anchor`, which the 2026-09-14 census
+> SATISFIES at ambient-apply (`index = 0, anchor = 0`, 15 reaches) while routing
+> there is `[0..]`, the identity. A refuting criterion that fires on data all
+> parties agree is inert is worse than no criterion, because the hit looks like
+> evidence. Caught by `runtime-implementer` against the census run to check it.
+>
+> **THE CENSUS HAS BEEN RUN — 2026-09-14, `evt_2e6r1rza68k5w`, `ROUTEPROBE` over
+> every edge-bearing ambient site in both venues.** No hit; no variation:
+>
+>     site                          observations          index   anchor
+>     ambient-apply  (:4366/:4383)  11 mapping + 4 px8f     0       0
+>     :7720                         11 mapping              0       1
+>
+> **The criterion is retained as a STANDING one, not as outstanding work.** It is
+> not blocking, and it does not license the ruling — declining is
+> behaviour-neutral. It is what would REOPEN the question at any site that
+> appears later.
 
 **`ROUTE` is the FOURTH proposed view of `:7720`, and like the first three it is
 the identity at the site.** What is new is that the reason is now derived rather
