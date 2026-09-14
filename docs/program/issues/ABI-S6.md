@@ -1733,7 +1733,7 @@ Architect inventory, 2026-09-11.
 > # authoritative `InlineNoCall` settlement; entry 8 = a pre-lifecycle ingress that
 > # never entered its exact transport route; entry 9 = parent-kind admission after
 > # source/mint/edge validation. Settlement, ingress, and parent role are distinct
-> # authorities. Count remains 9; Research next re-triggers at 12.
+> # authorities. Count remains 10; Research next re-triggers at 12.
 > #
 > # CLASSIFICATION: a ONE-CONSUMER DOMAIN MISMATCH over an EXISTING canonical root
 > # class — NOT duplicate dispatcher entry, NOT lost non-root provenance, NOT a
@@ -2664,6 +2664,29 @@ Architect inventory, 2026-09-11.
     "per-activation" hypothesis is withdrawn as having overshot into dynamism.
     Amendment 1's application-seat ruling is SUSPENDED rather than re-ruled —
     the seat is a consequence of the value/edge relation, not a declaration.
+21. HS9: every identity input bound and honest at b601e2ec7 (self-defining arm,
+    exact edge equality, recomputed population, full chain [699,661]) and the
+    witness fails IDENTICALLY — same trap, same planned identity 43. The failure
+    did not move. checked_ih_post_call_eliminators assigns env: producer_env to
+    every reconstructed consumer frame while taking static_origin from the
+    eliminator — keyed on the producer's environment, for a consumer that is not
+    lexically there. The third mandatory research advisory returns that exact
+    occurrence/call/value/edge identities do not entail the environment
+    condition, so no identity repair could have reached this.
+22. HS10: the mandated pre-build control REFUTES entry 21's cause for this
+    witness — both retained selected bodies (699/706 and 661/668) have EMPTY
+    free-variable sets, so producer_env was adequate and the environment axis is
+    closed. The control's own evidence relocates the defect: 699's selected arm
+    CONSTRUCTS ITree::Vis, which spec 36-effects.md:489 declares as the
+    unfinished node, in the elaborator's re-wrapping method shape — so the chain
+    produces a tree and hands it to a Result matcher, which selects nothing
+    honestly.
+    PREDICATE (entries 12-22, and the shared statement the chain was missing):
+    the obligation between a Vis producer and a Ret consumer is a FIXPOINT, not
+    a finite ordered sequence of static consuming occurrences, because the
+    number of Vis steps is a runtime quantity. No chain of static occurrences,
+    however perfectly identified, can bridge Vis to Ret. That is why ten repairs
+    improved identification and none moved the failure.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
