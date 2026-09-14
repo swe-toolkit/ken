@@ -37,6 +37,39 @@ origin: "Architect rulings evt_5kzahxdv9w8d1 (the three parts, the forbidden alt
 > `D1a`/`D1b` report to the Steward and to them; they rule again on either
 > finding.
 
+> # `D2` IS COMPLETE AND QA-APPROVED END TO END. IT IS **NOT** A ROUTABLE
+> # CANDIDATE, AND THE REASON IS ITS BASE, NOT ITS QUALITY.
+>
+> **Recorded by the Steward 2026-09-14 on the runtime leader's measurement
+> (`evt_6n2n6w5dg0e8d`).** QA approved the chain end to end:
+>
+>     9ede2e995   ledger + D2b harness
+>     f331f946c   ledger covers ARM 1            (QA finding, folded)
+>     b1575f536   the positive control, red-by-absence
+>     0d94d58b6   #[ignore] + reify trigger      (QA finding, folded)
+>
+> **Why it cannot be routed:** `wp/ABI-S6-d5b-file-backed` is 22 commits ahead of
+> its merge-base with `origin/main` (`4bf1ad362`), and `D2`'s four commits sit on
+> top of **18** of them — the D5b WIP arc, which is explicitly unstable
+> (`0bbe4a175` is REFUTED and marked do-not-build-on; `686ffa8ac` is `D2`'s
+> actual base). The two touched files diverge from `origin/main` by 5120 and 339
+> lines at that base. **This is not a cherry-pick situation; it is built directly
+> on unlanded content.**
+>
+> ⇒ **`D2` joins R1/R2 and entry-18 in the held-pending-D5b set.** Sequencing is
+> unchanged: **D5b stabilizes and lands → dependents rebase onto what landed →
+> then route, re-measuring at the new base.** D5b stabilization is now the
+> blocker for everything downstream in this lane.
+>
+> **Do not read this as a quality reservation.** Approved work, no clean base to
+> cut it against. The acceptance gate itself is discharged — see the `D2`
+> disposition below and [[RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY]] for
+> the residual, which is filed rather than implied.
+>
+> **What `D2` must not be quoted as** (Architect, `evt_56zx7a2z055yg`): not *"the
+> double-discharge property is established."* It is *"the net is in place, its
+> coverage is measured, and whether it ever has to fire is unmeasured."*
+
 ## What this is
 
 `RT-CHECKED-IH-RESULT-OBLIGATION-REKEY`'s `D1` says the `(actual, demanded)`
