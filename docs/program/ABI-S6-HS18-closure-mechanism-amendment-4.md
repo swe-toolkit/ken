@@ -410,7 +410,7 @@ taken**.
 
 ## What this says about the predicate
 
-Entry 21 is a new **witness**, not a new predicate. It shares the predicate of
+Entry 20a is a new **witness**, not a new predicate. It shares the predicate of
 entries 14, 16, 17 and 19, and sits closest to 16 and 17; entry 19 differs from
 it only in whether the skipped application had been emitted at all.
 
