@@ -1733,7 +1733,7 @@ Architect inventory, 2026-09-11.
 > # authoritative `InlineNoCall` settlement; entry 8 = a pre-lifecycle ingress that
 > # never entered its exact transport route; entry 9 = parent-kind admission after
 > # source/mint/edge validation. Settlement, ingress, and parent role are distinct
-> # authorities. Count remains 10; Research next re-triggers at 12.
+> # authorities. Count remains 11; Research next re-triggers at 12.
 > #
 > # CLASSIFICATION: a ONE-CONSUMER DOMAIN MISMATCH over an EXISTING canonical root
 > # class — NOT duplicate dispatcher entry, NOT lost non-root provenance, NOT a
@@ -2687,6 +2687,36 @@ Architect inventory, 2026-09-11.
     number of Vis steps is a runtime quantity. No chain of static occurrences,
     however perfectly identified, can bridge Vis to Ret. That is why ten repairs
     improved identification and none moved the failure.
+23. HS11: all three amendment-7 controls complete and the missing-drive cause is
+    refuted by a THIRD state the ruling did not enumerate — the existing drive is
+    EMITTED AND REACHED. The full host trace runs before the trap: two FsOpen,
+    BufferAllocate, FsReadAt, three recursive short FsWriteAt at offsets 0/2/4,
+    three ResourceRelease, and output.bin written with exact bytes `abcdef`. All
+    ten effects and settlements complete; only then does planned identity 43 trap
+    on decl:px8f_write_all_native::Result. Eliminator 661's selected body also
+    constructs ITree::Vis, so both consumers are re-wrapping tree transforms. And
+    re-wrap is the CORRECT elaborator selection: the fixture invokes surface bind
+    five times and never handler_fold, prelude binds bind to
+    effects::state::declare_bind whose law is bind (Vis op k) f = Vis op ih, and
+    apply (handler_fold_uniform) would be wrong because the responses are typed
+    host operations including three distinct short-write progresses, not one
+    fixed Nat. The defect stays in Runtime, post-effects.
+    PREDICATE (entries 12-23 — the statement the chain was missing, and the one
+    to hold this node to): identity, environment, chain-completeness and
+    freshness are NOT four defects. They are four PREMISES OF ONE OPERATION —
+    replaying a producer-side derivation at a consumer-side site. Each amendment
+    proved one premise and the replay stayed wrong because another failed, which
+    is why binding preconditions one at a time cannot terminate. A value that is
+    correct, closed, complete AND fresh would still be the wrong thing to hold,
+    because the sink should not hold a value across the drive at all. The closure
+    is to DELETE THE REPLAY, not to refresh its input; the replacement is the
+    forward amendment 1 named at the first hard stop and called "the actual
+    behavioral change" — the producer's context invokes the owning context and
+    forwards THAT result. Ruling evt_ng2bf6hd8e28 refuses the sixth
+    input-binding, and records that amendment 7's withdrawal of the forward was
+    itself withdrawn: a conclusion can survive the death of one of its premises,
+    and it was withdrawn on the failure of one supporting argument rather than
+    re-tested on its own.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
