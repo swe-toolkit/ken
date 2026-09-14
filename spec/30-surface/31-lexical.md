@@ -592,10 +592,11 @@ token.
 - **`literal`** — numbers, strings, chars, bytes (§3).
 - **`operator`** — after comment recognition, the lexer takes a maximal
   non-empty run over the fixed ASCII character set
-  `+ - * / % = < > | \ :`. An exact spelling already claimed
-  by punctuation, a §1b notation token, or a §4 fixed operator keeps that
-  dedicated token kind; the separately retired `=>` spelling rejects. Every
-  other run is a generic symbolic `operator`. Consequently `<`, `>`, `/`, `%`,
+  `+ - * / % = < > | \ :`. An exact spelling already claimed by punctuation,
+  a §1b notation token, or the §4 fixed operator-token set `+`, `-`, `*`, `+%`,
+  `-%`, `*%`, and `==` keeps that dedicated token kind; the separately retired
+  `=>` spelling rejects. Every other run is a generic symbolic `operator`.
+  Consequently `<`, `>`, `/`, `%`,
   and `<+>` are generic operators, while `!` is outside the character set and
   `!=` rejects lexically at `!` rather than becoming an operator. Together with
   §1c's six dedicated notation tokens, the generic kind feeds `32`'s
@@ -720,8 +721,9 @@ phrases fixed below):
   parentheses may disambiguate an ordinary application using the same
   identifier spellings. The formatter treats each whole phrase as one primary
   expression and preserves the spaces between its words;
-- the wrapping-arithmetic operator `+%` (and `wrapping_add`, …) in the operator
-  set (`35 §3`, OQ-1a);
+- the fixed operator tokens `+`, `-`, `*`, `+%`, `-%`, `*%`, and `==`
+  (`32 §3`; wrapping forms `35 §3`, OQ-1a). They keep dedicated token kinds
+  rather than entering generic `operator`;
 - the type-level identifiers `Lazy` (OQ-eval-order) and `Wrapping` (OQ-1a,
   `Wrapping[T]`);
 - an annotation token `annotation ::= "@" ident`, with `@ct` a named attribute

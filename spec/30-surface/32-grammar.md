@@ -365,6 +365,13 @@ symbolic run as a bare general atom. `fixed_binop` preserves the existing
 built-in arithmetic/equality path and never becomes a declaration or fixity
 name.
 
+The `expr application_atom` arm intentionally narrows bare application
+arguments. An expression not admitted by `application_atom` — including an
+ungrouped lambda, `let`, `if`, `match`, temporal form, arrow, or projection —
+must be grouped before it is used as an application argument. This removes the
+former ambiguous bare `expr expr` shape and is part of §3's contract pin; an
+implementation must not restore a second unrestricted application production.
+
 In an infix run, the `operator_name` arm of `binop` puts the name in the
 existing fixity-neutral spine. After name resolution, the defining
 `GlobalId` selects its declared fixity (`33 §6`), and reassociation lowers to
