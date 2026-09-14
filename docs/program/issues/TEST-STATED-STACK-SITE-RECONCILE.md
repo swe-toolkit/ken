@@ -68,13 +68,45 @@ origin: "Split out of TEST-NATIVE-STACK-PROVISIONING-STANDARD by the Steward whe
 >   a stack finding at all. See
 >   [[RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE]].
 >
-> **THE CHEAP GENERAL ANSWER, which is the part worth more than the correction:**
-> **`RUST_MIN_STACK=268435456` provisions every test in a run with ZERO source
-> edits.** No `.stack_size` call, no fixture change, no `AC-3`/`AC-5` exposure,
-> no contention with anyone's in-flight work. **Establish whether a site needs a
-> stack by running it under that env var before proposing any source change** —
-> it separates "needs headroom" from "needs a stated constant" without touching a
-> line, and this node's whole `D3` measurement problem is cheaper under it.
+> **THE CHEAP ANSWER — NARROWED 2026-09-14, AND THE EXCEPTION SITS INSIDE THIS
+> NODE'S OWN POPULATION. The earlier wording said "every test in a run"; that is
+> REPLACED, not qualified.**
+>
+> **`RUST_MIN_STACK=268435456` provisions the tests in a run that execute
+> IN-PROCESS, with zero source edits** — no `.stack_size` call, no fixture
+> change, no `AC-3`/`AC-5` exposure, no contention with in-flight work. That much
+> is measured: it provisions all 18 tests of
+> `abi_s6_mapping_file_backed_native`, which spawns nothing.
+>
+> **IT DOES NOT REACH A SPAWNED CHILD THAT STRIPS IT, AND 13 SITES DO.**
+> Measured by the Steward at `origin/main` `94d0dff33`:
+> `.env_remove("RUST_MIN_STACK")` occurs **13 times in 7 files across 4 crates**
+> — `ken-cli` (`px8f_buffer_native.rs` `:662 :751 :793`; `rt_parity_native.rs`
+> `:3115 :3133 :3160 :3223 :5433`), `ken-verify`
+> (`px8f_write_partition.rs:490`), `ken-kernel`
+> (`recursive_head_totality_d0.rs:401`), `ken-runtime`
+> (`object_linker_packaging.rs:3505`,
+> `planning/static_transition/closure.rs:4164`,
+> `lowering/core/tests/host_call_carrier.rs:1259`).
+>
+> ⇒ **`px8f_write_partition.rs` is one of THIS NODE'S OWN 15 sites** (it is named
+> in the anchors below). So the method this block used to prescribe — *run the
+> site under the env var to decide whether it needs a stack* — **silently
+> measures the parent while the child it is asking about runs on the default
+> stack.** A spawning site can pass under the env var and still need its stated
+> constant. **Do not classify a spawning site from a parent-process run.**
+>
+> **Before using the env var at any site, grep that file for `env_remove`.** One
+> command. Where it fires, the env var answers a different question than the one
+> asked, and the honest classification is a `D4` residual until the child is
+> measured directly.
+>
+> **This was a scope error, not a measurement error, and it was the Steward's.**
+> One fixture was measured — 18 tests, no spawning — and the conclusion was
+> written at the scope of *"every test in a run."* The counterexample was found
+> by the runtime implementer at `evt_3744yz9f8cnya` while reading the
+> mutation-child idiom for an unrelated purpose; the census was widened from that
+> single site to all 13 by the Steward.
 >
 > ⇒ **`D1`'s population is "sites that state a stack" UNION "sites measured to
 > need one and state none."** The second set is not grep-able, and it has **at
