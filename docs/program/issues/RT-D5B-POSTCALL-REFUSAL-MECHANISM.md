@@ -82,9 +82,24 @@ distinct `Packaging` reason in the run and the cause of 8 of 11 base reds.**
 
 **`D1` — FIND THE MECHANISM. Upstream of the call site, not at it.** Which
 producer emits a two-step exit chain for a body the lowering site reaches with
-one computational frame, and which of the two is inconsistent with the program?
+one computational frame, and **where does the disagreement actually live?**
 **Both operands are internally consistent at `:7720`** — start where they are
 produced, not where they meet.
+
+> **`D1` ADMITS THREE OUTCOMES AND MUST NOT BE READ AS A TWO-WAY CHOICE**
+> (Architect, `evt_53mb86qj64fj1`):
+>
+>   1. the receipt is wrong, **or**
+>   2. the eliminator frame set is wrong, **or**
+>   3. **BOTH ARE CORRECT AND THE CUT BETWEEN THEM IS MISPLACED.**
+>
+> **An earlier wording of this deliverable asked "which of the two is
+> inconsistent with the program?", which presupposes outcome 3 away.** That is
+> the shared premise of the three refuted mechanisms, reappearing in the sentence
+> meant to escape it — and the evidence points at 3: the frames equal
+> `receipt[1..]` elementwise, and the index producer names the consumer's **own**
+> occurrence, so both operands may be correct under one convention applied at the
+> wrong place. **Do not re-narrow it.**
 
 **State the DIRECTION and report counts with the population traced** (`AC-2`).
 **"I could not determine it" is an acceptable answer** and must be reported as a
@@ -112,8 +127,52 @@ deliverable, explicitly NOT as the cause.** Fork on
 `required_consumer_incoming_edge()` — `Ok(None)` for ordinary transports
 reproduces today's behaviour, so the route is total by construction — following
 `aggregates.rs:7826-7829`. **Do not let this land carrying an implication that it
-fixes the refusal: measured, it is a no-op at index 0.** It may be sequenced
-after `D1` if `D1` changes what correct routing means.
+fixes the refusal: measured, it is a no-op at index 0.**
+
+**`D3` MUST follow `D1`. This is a hard sequence, not a preference** (Architect,
+`evt_53mb86qj64fj1`). `D1` now decides what correct routing *means*: the open
+fork is whether the cut is `[index..]` or `[index+1..]`, and the two differ by
+exactly the consumer's own occurrence. **Building `D3` before `D1` settles lands
+the wrong cut with a passing test** — the `[index..]` cut is a no-op at index 0,
+so a green `D3` would prove nothing and look like a fix.
+
+## THE OPEN FORK `D1` MUST SETTLE, AND THE TWO READINGS THAT NARROW IT
+
+`incoming_consumer_edge_index` names the position of the consumer's **own**
+defining occurrence in the receipt chain, uniqueness enforced by its producer
+(`responses.rs:2366-2396`; no match and multiple matches are both planner
+errors). With `index=0`:
+
+    [index..]    2 steps vs 1 frame   refuses (today, and after routing)
+    [index+1..]  1 step  vs 1 frame   matches exactly
+
+    (a) the cut under-cuts by the consumer's own step
+    (b) [index..] is right and the receipt should not carry that step at all
+
+**Same symptom, opposite repairs.** Two readings that narrow this, both the
+Architect's at `evt_53mb86qj64fj1`, neither selecting an arm:
+
+- **The convention is UNIFORM across both variants — there is no
+  `SelfDefining`-only asymmetry.** `occurrence_subtree_contains`
+  (`occurrences.rs:290`) is **reflexive** (root is tested against the needle
+  before any descent), so both index producers name the consumer's own
+  occurrence. ⇒ either `[index..]` under-cuts for **both** variants, or the
+  receipt should exclude that step for **both**. **This dissolves the stated
+  objection to (a); it does not select (a).**
+- **The two site families differ in where their eliminator list COMES FROM.** At
+  `core.rs:9402-9406` and `:9421-9425` the list is **constructed from** the exit
+  chain, so correspondence holds by construction whatever the convention. At
+  `:7720` it is the **ambient** local frame list, where correspondence is an
+  assumption. `:4348`'s provenance is untraced.
+
+**The discriminator, recorded so it is not re-derived:** does
+`selected_case_exits` contain the consumer's own occurrence for **both**
+variants, **and** is the ambient frame list at `:7720` expected to contain a
+frame for that occurrence at all? **Counts and the producer set, per `AC-3`** —
+never a sample.
+
+**`required_consumer_executable_suffix` and `:7720` must not be decided
+separately.** They read the same cut, and `aggregates.rs:7826` consumes it too.
 
 ## Acceptance criteria
 
