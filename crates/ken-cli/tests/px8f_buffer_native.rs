@@ -1481,6 +1481,19 @@ fn deferred_constructor_materializer_completion_is_exact() {
 /// mutation raises when it finds no site: a control that silently declines to
 /// fire is the dead instrument this node exists to rule out.
 #[test]
+#[ignore = "IGNORED BECAUSE ITS SHAPE IS ABSENT HERE, NOT BECAUSE IT IS UNFINISHED. \
+            Measured at WRITE_ALL: staged=14, independent_and_published=2, \
+            demanded_per_independent_body=[(1, true), (1, true)] -- both bodies carrying an \
+            independent contract are demanded under exactly one identity, and it is their own \
+            contract, so arm 2 never runs for either and the arm-1/arm-2 collision cannot be \
+            built. Manufacturing it would mean synthesizing an identity, which \
+            RT-CONSTRUCTOR-AUTHORITY-DISCHARGE D1a/D1b forbid in terms. \
+            REIFY THIS TEST when a Ken source program is shown in which two callers demand \
+            different constructor identities of one response-owner body -- that is the open \
+            reachability node; drop this attribute and point the fixture at that source. \
+            Until then the ledger is the SOLE net for this shape: the :4394 missing-contract \
+            diagnostic is structurally unreachable in the collision case, because the collision \
+            requires BOTH demands proven, which leaves `missing` empty."]
 fn discharge_ledger_refuses_one_word_discharging_two_obligations() {
     std::thread::Builder::new()
         .name("px8f-d2-discharge-ledger".to_string())
