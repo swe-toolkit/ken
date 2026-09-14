@@ -1463,3 +1463,101 @@ fn deferred_constructor_materializer_completion_is_exact() {
         .join()
         .expect("HS11 materializer proof thread");
 }
+
+#[cfg(target_os = "linux")]
+/// Promise class: durable mutation proof. MEASURED: the discharge ledger of
+/// `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `D2` refuses a constructor word that
+/// discharges a second Result obligation, on an arm-1/arm-2 collision built at
+/// the production site that assembles `required` -- never at the ledger, which
+/// would test the guard against itself. CLAIMED: consumption is a move, and the
+/// missing case is a located planner error rather than a silent pass. THE GAP:
+/// this pins the collision the ledger was widened to see; it does not claim the
+/// collision is reachable from ordinary Ken source, which is unmeasured and
+/// deliberately not read either way.
+///
+/// The two halves share ONE input and differ only in whether the ledger's
+/// refusal is live, so a flipped guard fails both rather than neither. The
+/// execution witness is the applications count plus the fail-closed refusal the
+/// mutation raises when it finds no site: a control that silently declines to
+/// fire is the dead instrument this node exists to rule out.
+#[test]
+fn discharge_ledger_refuses_one_word_discharging_two_obligations() {
+    std::thread::Builder::new()
+        .name("px8f-d2-discharge-ledger".to_string())
+        .stack_size(WRITE_ALL_CLASSIFIER_STACK_BYTES)
+        .spawn(|| {
+            use ken_runtime::GeneratedResultPathProofMutation::{
+                DemandIndependentBodySecondIdentity, DemandIndependentBodySecondIdentityUnguarded,
+                Exact,
+            };
+
+            let dir = tempfile::Builder::new()
+                .prefix("ken-px8f-d2-discharge-ledger-")
+                .tempdir()
+                .unwrap();
+            let compile = |package: &str| {
+                ken_cli::build_native_program(
+                    WRITE_ALL,
+                    ken_cli::SourceFormat::Ken,
+                    package,
+                    dir.path(),
+                )
+            };
+
+            const COULD_NOT_FIRE: &str = "so the mutation could not fire";
+            const REFUSAL: &str =
+                "one generated-Result constructor word discharges two Result obligations";
+
+            // POSITIVE. The collision is built and the ledger must refuse it.
+            let (guarded, guarded_applications) =
+                ken_runtime::with_generated_result_path_proof_mutation(
+                    DemandIndependentBodySecondIdentity,
+                    || compile("px8f_d2_discharge_ledger_guarded"),
+                );
+            assert_eq!(
+                guarded_applications, 1,
+                "the discharge-ledger mutation must reach the required-assembly site exactly once"
+            );
+            let guarded = format!(
+                "{:?}",
+                guarded.expect_err("a word discharging two obligations must not compile")
+            );
+            assert!(
+                !guarded.contains(COULD_NOT_FIRE),
+                "the discharge-ledger control is a DEAD INSTRUMENT here: the mutation found no \
+                 body whose published Result word is also an identity-bearing call obligation's \
+                 result word, so it never built the collision it is meant to prove: {guarded}"
+            );
+            assert!(
+                guarded.contains(REFUSAL),
+                "the collision reached the wrong refusal, so this control does not pin the \
+                 ledger: {guarded}"
+            );
+
+            // NEGATIVE, on the SAME input. With the ledger's refusal suppressed
+            // -- the pre-repair path -- the identical double discharge compiles
+            // and says nothing. Without this half, the positive cannot tell a
+            // working ledger from a compile that was going to fail anyway.
+            let (unguarded, unguarded_applications) =
+                ken_runtime::with_generated_result_path_proof_mutation(
+                    DemandIndependentBodySecondIdentityUnguarded,
+                    || compile("px8f_d2_discharge_ledger_unguarded"),
+                );
+            assert_eq!(unguarded_applications, 1);
+            unguarded.expect(
+                "the pre-repair path must pass the identical double discharge SILENTLY -- if it \
+                 also refuses, the positive half is not attributable to the ledger",
+            );
+
+            // The mutation is scoped and restores.
+            let (exact, exact_applications) =
+                ken_runtime::with_generated_result_path_proof_mutation(Exact, || {
+                    compile("px8f_d2_discharge_ledger_exact")
+                });
+            assert_eq!(exact_applications, 0);
+            exact.expect("the unmutated source must still compile");
+        })
+        .expect("spawn D2 discharge-ledger proof thread")
+        .join()
+        .expect("D2 discharge-ledger proof thread");
+}
