@@ -2717,6 +2717,8 @@ pub(super) struct StagedResultBody {
     target: FuncId,
     func: Function,
     authorities: BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
+    detached_consumer_authorities:
+        BTreeMap<cranelift_codegen::ir::Value, CheckedIhDetachedConsumerAuthority>,
     call_obligations: Vec<PendingCallResultObligation>,
     boundary_arena: Option<cranelift_codegen::ir::Value>,
     publication: Option<FunctionResultPublication>,
@@ -2738,6 +2740,9 @@ fn stage_result_body(
         target,
         func,
         authorities: std::mem::take(&mut compiler.function_local.generated_constructor_authorities),
+        detached_consumer_authorities: std::mem::take(
+            &mut compiler.function_local.checked_ih_detached_consumer_authorities,
+        ),
         call_obligations: std::mem::take(
             &mut compiler.function_local.pending_call_result_obligations,
         ),
@@ -3114,6 +3119,8 @@ fn prove_forwarded_value(
     reachable: &BTreeSet<Block>,
     cuts: &BTreeSet<CertifiedInfeasibleEdge>,
     authorities: &BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
+    detached_consumer_authorities:
+        &BTreeMap<cranelift_codegen::ir::Value, CheckedIhDetachedConsumerAuthority>,
     call_seeds: &BTreeMap<cranelift_codegen::ir::Value, ConstructorIdentity>,
     identity: ConstructorIdentity,
     value: cranelift_codegen::ir::Value,
@@ -3122,6 +3129,9 @@ fn prove_forwarded_value(
     if authorities
         .get(&value)
         .is_some_and(|authority| authority.identity == identity && authority.word == value)
+        || detached_consumer_authorities.get(&value).is_some_and(|authority| {
+            authority.demanded_identity == identity && authority.after_word == value
+        })
         || call_seeds.get(&value) == Some(&identity)
     {
         return Ok(ForwardingProof {
@@ -3164,6 +3174,7 @@ fn prove_forwarded_value(
                             reachable,
                             cuts,
                             authorities,
+                            detached_consumer_authorities,
                             call_seeds,
                             identity,
                             incoming,
@@ -3184,6 +3195,7 @@ fn prove_forwarded_value(
                 reachable,
                 cuts,
                 authorities,
+                detached_consumer_authorities,
                 call_seeds,
                 identity,
                 left,
@@ -3195,6 +3207,7 @@ fn prove_forwarded_value(
                 reachable,
                 cuts,
                 authorities,
+                detached_consumer_authorities,
                 call_seeds,
                 identity,
                 right,
@@ -3360,6 +3373,7 @@ fn derive_certified_cuts(
                 &reachable,
                 &cuts.edges,
                 &body.authorities,
+                &body.detached_consumer_authorities,
                 proof_call_seeds,
                 identity,
                 tag_query.word,
@@ -3959,6 +3973,114 @@ fn prove_realized_value(
     Ok(result)
 }
 
+fn verify_detached_consumer_authority(
+    body: &StagedResultBody,
+    key: cranelift_codegen::ir::Value,
+    authority: &CheckedIhDetachedConsumerAuthority,
+    helpers: &crate::boundary_value_clif::BoundaryLocalFuncs,
+) -> Result<(), CraneliftBackendError> {
+    if key != authority.after_word || authority.before_word == authority.after_word {
+        return Err(backend_module(
+            "a detached-consumer authority does not name a distinct exact after-definition"
+                .to_string(),
+        ));
+    }
+    if authority.actual_identity == authority.demanded_identity {
+        return Err(backend_module(
+            "a detached-consumer authority does not preserve distinct actual and demanded identities"
+                .to_string(),
+        ));
+    }
+    let matching_before = body
+        .call_obligations
+        .iter()
+        .filter(|obligation| obligation.result_word == authority.before_word)
+        .collect::<Vec<_>>();
+    let [before] = matching_before.as_slice() else {
+        return Err(backend_module(
+            "a detached-consumer authority has no unique exact before-call obligation".to_string(),
+        ));
+    };
+    if before.identity != Some(authority.actual_identity) || !before.realization_required {
+        return Err(backend_module(
+            "a detached-consumer authority's before-call obligation lacks its actual identity proof"
+                .to_string(),
+        ));
+    }
+    let entry = body
+        .func
+        .layout
+        .entry_block()
+        .ok_or_else(|| backend_module("a staged Result function has no entry block".to_string()))?;
+    match body.func.dfg.value_def(authority.after_word) {
+        cranelift_codegen::ir::ValueDef::Param(block, _) if block == entry => {
+            return Err(backend_module(
+                "a detached-consumer authority renamed an entry parameter as an after-definition"
+                    .to_string(),
+            ))
+        }
+        cranelift_codegen::ir::ValueDef::Param(_, _)
+        | cranelift_codegen::ir::ValueDef::Result(_, _)
+        | cranelift_codegen::ir::ValueDef::Union(_, _) => {}
+    }
+    let arena = body.boundary_arena.ok_or_else(|| {
+        backend_module("a detached-consumer authority has no boundary arena".to_string())
+    })?;
+    let queries = verify_carrier_queries(&body.func, helpers.tag, arena)?;
+    let expected = i64::try_from(authority.demanded_identity.tag_abi_word()?).map_err(|_| {
+        backend_module("a detached-consumer demanded identity exceeds the runtime tag word".to_string())
+    })?;
+    let mut guarded = Vec::new();
+    for query in queries
+        .iter()
+        .filter(|query| query.word == authority.after_word)
+    {
+        for branch in body
+            .func
+            .layout
+            .blocks()
+            .flat_map(|block| body.func.layout.block_insts(block))
+        {
+            let cranelift_codegen::ir::InstructionData::Brif { arg, .. } =
+                &body.func.dfg.insts[branch]
+            else {
+                continue;
+            };
+            if comparison_with_constant(&body.func, *arg)
+                != Some((
+                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                    query.output,
+                    expected,
+                ))
+            {
+                continue;
+            }
+            let cranelift_codegen::ir::ValueDef::Result(comparison, 0) =
+                body.func.dfg.value_def(*arg)
+            else {
+                continue;
+            };
+            if verify_all_paths_after_instruction(
+                &body.func,
+                query.call,
+                comparison,
+                "a detached-consumer demanded-identity guard",
+            )
+            .is_ok()
+            {
+                guarded.push((query.call, branch));
+            }
+        }
+    }
+    if guarded.len() != 1 {
+        return Err(backend_module(format!(
+            "a detached-consumer after-definition has {} exact demanded-identity guards instead of one",
+            guarded.len()
+        )));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 struct FinishedUnitResultRealization {
     unit: ExistingResultUnitIdentity,
@@ -4019,6 +4141,14 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
         for obligation in &body.call_obligations {
             let target = Lowering::decode_direct_callee(&body.func, obligation.call)?;
             verify_call_result_obligation(&body.func, obligation, target)?;
+        }
+        for (word, authority) in &body.detached_consumer_authorities {
+            verify_detached_consumer_authority(
+                body,
+                *word,
+                authority,
+                helpers.boundary_value_abi,
+            )?;
         }
         if let Some(publication) = body.publication {
             verify_publication_and_terminals(body, publication, true)?;
@@ -4239,6 +4369,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                         &reachable,
                         &cuts.edges,
                         &body.authorities,
+                        &body.detached_consumer_authorities,
                         &call_seeds,
                         identity,
                         publication.returned_word,

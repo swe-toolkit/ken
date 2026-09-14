@@ -6855,19 +6855,30 @@ impl<'a> Lowering<'a> {
                     producer_env,
                 )?;
                 let answer = claimed.answer;
-                if let Some(consumer) = claimed
+                let result = if let Some(consumer) = claimed
                     .post_call_consumer
                     .as_ref()
                     .filter(|consumer| consumer.detached_return_context().is_some())
                 {
-                    self.validate_checked_ih_detached_result_shape(
+                    let raw = answer.value;
+                    let after = self.lower_checked_ih_detached_required_consumer_edge(
                         builder,
                         consumer,
-                        &answer.value,
+                        raw.clone(),
+                        producer_env,
                     )?;
-                }
+                    self.finish_checked_ih_detached_consumer_result(
+                        builder,
+                        consumer,
+                        &raw,
+                        after,
+                    )?
+                    .into_operand()
+                } else {
+                    answer.value
+                };
                 if !matches!(
-                    &answer.value,
+                    &result,
                     LoweringOperand::Carried(_)
                         | LoweringOperand::Specialized(
                             Lowered::Trap(_) | Lowered::RecursiveBackedge,
@@ -6878,7 +6889,7 @@ impl<'a> Lowering<'a> {
                         "a terminal checked-IH transport produced neither its governed post-call Result nor Trap",
                     ));
                 }
-                return Ok(ProducerTrampolineStep::ordinary(answer.value));
+                return Ok(ProducerTrampolineStep::ordinary(result));
             }
             return if lowered_args
                 .iter()
@@ -6956,12 +6967,35 @@ impl<'a> Lowering<'a> {
                 producer_env,
             )?;
             if let Some(consumer) = claimed.post_call_consumer.as_ref() {
-                let _active_consumes_receipt =
+                let active_consumes_receipt =
                     self.validate_checked_ih_consumed_active(consumer, &active)?;
-                let resumed =
-                    self.resume_active_continuation(builder, claimed.answer.value, active)?;
-                self.validate_checked_ih_detached_result_shape(builder, consumer, &resumed)?;
-                return Ok(ProducerTrampolineStep::ordinary(resumed));
+                let raw = claimed.answer.value;
+                let after = if active_consumes_receipt {
+                    if active.pending.is_empty() {
+                        return Err(unsupported(
+                            "CheckedIhDetachedCallerCut",
+                            "an exact active detached consumer has no pending after-definition",
+                        ));
+                    }
+                    self.resume_active_continuation(builder, raw.clone(), active)?
+                } else {
+                    let consumed = self.lower_checked_ih_detached_required_consumer_edge(
+                        builder,
+                        consumer,
+                        raw.clone(),
+                        producer_env,
+                    )?;
+                    self.resume_active_continuation(builder, consumed, active)?
+                };
+                let result = self
+                    .finish_checked_ih_detached_consumer_result(
+                        builder,
+                        consumer,
+                        &raw,
+                        after,
+                    )?
+                    .into_operand();
+                return Ok(ProducerTrampolineStep::ordinary(result));
             }
             return self
                 .resume_active_continuation(builder, claimed.answer.value, active)
@@ -9328,71 +9362,156 @@ impl<'a> Lowering<'a> {
         Ok(false)
     }
 
-    /// Guard a detached call result before a generated function may publish it
-    /// under its Result contract. This proves only the demanded outer shape;
-    /// it neither mints nor applies a source-cut receipt. A later ordinary
-    /// caller therefore remains a Scrutinee unless the closed static-response
-    /// boundary independently supplies [`EliminatorRole::StaticResponseReturn`].
-    fn validate_checked_ih_detached_result_shape(
+    /// Lower only the caller-owned suffix selected by the detached row's exact
+    /// caller cut and incoming consumer edge. The owner-completed prefix is not
+    /// replayed, and the required consumer edge must leave a nonempty
+    /// after-definition path.
+    fn lower_checked_ih_detached_required_consumer_edge(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         consumer: &CheckedIhPostCallConsumer,
-        value: &LoweringOperand,
-    ) -> Result<(), CraneliftBackendError> {
-        let word = match value {
+        raw: LoweringOperand,
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        if consumer.detached_return_context().is_none() {
+            return Err(unsupported(
+                "RequiredConsumerIncomingEdge",
+                "a detached required-consumer edge has no detached return context",
+            ));
+        }
+        let edge = consumer
+            .required_consumer_incoming_edge()?
+            .ok_or_else(|| {
+                unsupported(
+                    "RequiredConsumerIncomingEdge",
+                    "a detached post-call consumer has no exact incoming edge",
+                )
+            })?;
+        #[cfg(feature = "px8-ds-test-support")]
+        self.static_transition_plan
+            .record_required_consumer_call_selection(&edge)?;
+        #[cfg(feature = "px8-ds-test-support")]
+        if d5b_hs17_post_call_consumer_mutation()
+            == D5bHs17PostCallConsumerMutation::SkipDetachedRequiredConsumerSuffix
+        {
+            record_d5b_hs17_post_call_consumer_application();
+            return Ok(raw);
+        }
+        let eliminators = self.checked_ih_post_call_eliminators(
+            edge.caller_completed_exits(),
+            producer_env,
+        )?;
+        let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
+        if remaining.is_empty() {
+            return Err(unsupported(
+                "RequiredConsumerIncomingEdge",
+                "the exact incoming consumer edge selected no after-definition suffix",
+            ));
+        }
+        self.lower_computational_match_value_composed(
+            builder,
+            RoutedAnswer::direct(raw),
+            remaining,
+        )
+    }
+
+    /// Bind the before-definition only to its independently derived actual
+    /// identity, then mint the demanded identity from the result produced by
+    /// the exact consumer edge. The runtime tag query is a finalized-CFG cut;
+    /// it is not authority for the raw call definition.
+    fn finish_checked_ih_detached_consumer_result(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        consumer: &CheckedIhPostCallConsumer,
+        raw: &LoweringOperand,
+        after: LoweringOperand,
+    ) -> Result<CheckedIhDetachedConsumerResult, CraneliftBackendError> {
+        let raw_word = match raw {
             LoweringOperand::Carried(word) => *word,
             LoweringOperand::Specialized(_) => {
                 return Err(unsupported(
                     "CheckedIhDetachedCallerCut",
-                    "a detached return shape guard has no exact carried call Result",
+                    "a detached consumer has no exact carried call Result",
                 ));
             }
         };
-        let actual = self.emit_carrier_tag(builder, word)?;
-        let expected =
-            i64::try_from(consumer.demanded_result_identity().tag_abi_word()?).map_err(|_| {
-                unsupported(
-                    "CheckedIhDetachedCallerCut",
-                    "a detached return Result identity exceeds the runtime tag word",
-                )
-            })?;
-        Lowering::require_i64(builder, actual, expected);
-        // Runtime shape validation is not finished compiler authority. It
-        // records a pending obligation on the exact call/load already emitted;
-        // the staged callee/body proof must discharge that obligation later.
         let demanded = consumer.demanded_result_identity();
         let obligation = self
             .function_local
             .pending_call_result_obligations
             .iter_mut()
-            .find(|obligation| obligation.result_word == word.word)
+            .find(|obligation| obligation.result_word == raw_word.word)
             .ok_or_else(|| {
                 unsupported(
                     "CheckedIhDetachedCallerCut",
-                    "a detached return shape guard has no exact pending call/result obligation",
+                    "a detached consumer has no exact pending call/result obligation",
                 )
             })?;
         match obligation.identity {
             Some(identity) if identity != demanded => {
                 return Err(unsupported(
                     "CheckedIhDetachedCallerCut",
-                    "a detached return shape guard disagrees with the call's declared Result obligation",
+                    "a detached consumer disagrees with the call's declared final Result demand",
                 ));
             }
-            Some(_) => {}
-            None => obligation.identity = Some(demanded),
+            Some(_) | None => {}
         }
+        obligation.identity = Some(consumer.actual_result_identity());
         obligation.realization_required = true;
-        Ok(())
+
+        match &after {
+            LoweringOperand::Carried(after_word) => {
+                if after_word.word == raw_word.word {
+                    return Err(unsupported(
+                        "CheckedIhDetachedCallerCut",
+                        "a detached consumer returned its raw before-definition unchanged",
+                    ));
+                }
+                let authority = CheckedIhDetachedConsumerAuthority {
+                    actual_identity: consumer.actual_result_identity(),
+                    demanded_identity: demanded,
+                    before_word: raw_word.word,
+                    after_word: after_word.word,
+                };
+                if self
+                    .function_local
+                    .checked_ih_detached_consumer_authorities
+                    .insert(after_word.word, authority)
+                    .is_some()
+                {
+                    return Err(unsupported(
+                        "CheckedIhDetachedCallerCut",
+                        "one detached consumer after-definition was minted twice",
+                    ));
+                }
+                let observed = self.emit_carrier_tag(builder, *after_word)?;
+                let expected = i64::try_from(demanded.tag_abi_word()?).map_err(|_| {
+                    unsupported(
+                        "CheckedIhDetachedCallerCut",
+                        "a detached consumer's final Result identity exceeds the runtime tag word",
+                    )
+                })?;
+                Lowering::require_i64(builder, observed, expected);
+            }
+            LoweringOperand::Specialized(Lowered::Trap(_) | Lowered::RecursiveBackedge) => {}
+            LoweringOperand::Specialized(_) => {
+                return Err(unsupported(
+                    "CheckedIhDetachedCallerCut",
+                    "a detached consumer produced neither a carried after-definition, an exact recursive outgoing edge, nor Trap",
+                ));
+            }
+        }
+        Ok(CheckedIhDetachedConsumerResult { after })
     }
 
-    fn realize_checked_ih_post_call_steps(
+    fn checked_ih_post_call_eliminators<'frame>(
         &mut self,
-        builder: &mut FunctionBuilder<'_>,
         steps: &[CheckedIhPostCallConsumerStep],
-        returned: LoweringOperand,
-        producer_env: &[LoweringEnvironmentBinding],
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        producer_env: &'frame [LoweringEnvironmentBinding],
+    ) -> Result<Vec<EliminatorFrame<'frame>>, CraneliftBackendError>
+    where
+        'a: 'frame,
+    {
         let mut eliminators = Vec::with_capacity(steps.len());
         for step in steps {
             let occurrence = step.occurrence();
@@ -9429,6 +9548,17 @@ impl<'a> Lowering<'a> {
                 },
             ));
         }
+        Ok(eliminators)
+    }
+
+    fn realize_checked_ih_post_call_steps(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        steps: &[CheckedIhPostCallConsumerStep],
+        returned: LoweringOperand,
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let eliminators = self.checked_ih_post_call_eliminators(steps, producer_env)?;
         self.lower_computational_match_value_composed(
             builder,
             RoutedAnswer::direct(returned),

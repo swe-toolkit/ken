@@ -7810,6 +7810,28 @@ fn checked_ih_generated_entry_call_population(
     Ok(population)
 }
 
+fn checked_ih_post_call_consumer_roots(
+    plan: &StaticTransitionPlan<'_>,
+    enclosing_specialization: ContinuationSpecializationId,
+    worker_body_origin: StaticOriginId,
+) -> Result<Vec<StaticOriginId>, CraneliftBackendError> {
+    let mut roots = Vec::new();
+    for relation in &plan.checked_ih_post_call_consumers {
+        if relation.transport().destination_owner()
+            != ContinuationEmissionOwner::Specialization(enclosing_specialization)
+            || relation.transport().destination_body_origin() != worker_body_origin
+        {
+            continue;
+        }
+        let steps = match relation.required_consumer_executable_suffix()? {
+            Some(suffix) => suffix,
+            None => relation.consumers(),
+        };
+        roots.extend(steps.iter().map(|step| step.occurrence().body_origin));
+    }
+    Ok(roots)
+}
+
 pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_ih_generated_entry_accesses(
     plan: &StaticTransitionPlan<'_>,
     confluences: &BTreeMap<CheckedIhGeneratedEntryCoordinate, CheckedIhGeneratedEntryConfluence>,
@@ -7829,22 +7851,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
             .iter()
             .find(|context| context.id() == context_id)
             .ok_or_else(|| planner_error("a generated-entry class names no exact context"))?;
-        let post_call_consumer_roots = plan
-            .checked_ih_post_call_consumers
-            .iter()
-            .filter(|relation| {
-                relation.transport().destination_owner()
-                    == ContinuationEmissionOwner::Specialization(context.enclosing_specialization())
-                    && relation.transport().destination_body_origin()
-                        == context.worker_body_origin()
-            })
-            .flat_map(|relation| {
-                relation
-                    .consumers()
-                    .iter()
-                    .map(|step| step.occurrence().body_origin)
-            })
-            .collect::<Vec<_>>();
+        let post_call_consumer_roots = checked_ih_post_call_consumer_roots(
+            plan,
+            context.enclosing_specialization(),
+            context.worker_body_origin(),
+        )?;
         let population = checked_ih_generated_entry_call_population(
             plan,
             context.worker_body_origin(),
@@ -8078,21 +8089,11 @@ pub(super) fn record_checked_ih_generated_entry_admissions(
     let binder_resolutions = build_checked_binder_provenance(plan)?;
     let mut rows = Vec::new();
     for access in accesses.values() {
-        let post_call_consumer_roots = plan
-            .checked_ih_post_call_consumers
-            .iter()
-            .filter(|relation| {
-                relation.transport().destination_owner()
-                    == ContinuationEmissionOwner::Specialization(access.enclosing_specialization)
-                    && relation.transport().destination_body_origin() == access.worker_body_origin
-            })
-            .flat_map(|relation| {
-                relation
-                    .consumers()
-                    .iter()
-                    .map(|step| step.occurrence().body_origin)
-            })
-            .collect::<Vec<_>>();
+        let post_call_consumer_roots = checked_ih_post_call_consumer_roots(
+            plan,
+            access.enclosing_specialization,
+            access.worker_body_origin,
+        )?;
         let population = checked_ih_generated_entry_call_population(
             plan,
             access.worker_body_origin,

@@ -1019,6 +1019,7 @@ impl ArtifactHelpers<'_> {
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             generated_constructor_authorities: BTreeMap::new(),
+            checked_ih_detached_consumer_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
@@ -1317,6 +1318,11 @@ struct FunctionLocalRefs {
     /// its path or refuse, and it must never relabel the word.
     generated_constructor_authorities:
         BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
+    /// Demanded identities minted only after lowering an exact detached
+    /// required-consumer edge. The before-word remains governed separately by
+    /// its call-result obligation and actual identity.
+    checked_ih_detached_consumer_authorities:
+        BTreeMap<cranelift_codegen::ir::Value, CheckedIhDetachedConsumerAuthority>,
     /// Declared call-result obligations emitted in this function.  A record is
     /// pending until the callee's finished body and this exact status/Trap/load
     /// protocol have both been verified.
@@ -3901,6 +3907,27 @@ impl CheckedIhCapturedEnvironment {
 #[derive(Clone, Copy, Debug)]
 struct CheckedIhApplicationResult {
     word: CarriedBoundaryWord,
+}
+
+/// Compiler authority for publishing the result of a detached checked-IH
+/// consumer. Only the lowering functions that either emit the exact selected
+/// incoming edge or resume the exact active consumer can construct this value.
+struct CheckedIhDetachedConsumerResult {
+    after: LoweringOperand,
+}
+
+#[derive(Clone, Copy)]
+struct CheckedIhDetachedConsumerAuthority {
+    actual_identity: ConstructorIdentity,
+    demanded_identity: ConstructorIdentity,
+    before_word: cranelift_codegen::ir::Value,
+    after_word: cranelift_codegen::ir::Value,
+}
+
+impl CheckedIhDetachedConsumerResult {
+    fn into_operand(self) -> LoweringOperand {
+        self.after
+    }
 }
 
 impl CheckedIhApplicationResult {
