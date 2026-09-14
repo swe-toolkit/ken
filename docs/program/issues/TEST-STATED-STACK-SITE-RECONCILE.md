@@ -47,24 +47,41 @@ origin: "Split out of TEST-NATIVE-STACK-PROVISIONING-STANDARD by the Steward whe
 > second time it has been wrong by roughly a factor of two.**
 >
 > **BLINDNESS 1 — the census enumerates sites that STATE a stack, so it cannot
-> see a test that NEEDS one and states none.** Measured on the runtime ring's
-> base `686ffa8ac`: `crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs`
-> provisions **nothing** across its 18 tests, and
-> `absent_required_consumer_disposition_preserves_direct_and_tail_routes`
-> **overflows the stack when run in isolation, uninstrumented**. It passes in the
-> full suite, so nothing reds and no grep for `stack_size` will ever find it.
+> see a test that NEEDS one and states none.** The blindness is real and the
+> population is LARGER than first recorded. **The specific account written here
+> on 2026-09-14 has been REPLACED — read the correction below, and do not carry
+> the earlier one into a site comment.**
 >
-> **The justification is the corrected one, and it matters which.** The overflow
-> is **not** instrumentation-caused — that attribution was made three times and
-> withdrawn against an uninstrumented control. It is *"this test aborts in
-> isolation and nothing states the requirement."* **A probe run in the full suite
-> also overflows it**, independently. Do not write the retracted account into a
-> site comment.
+> **CORRECTED 2026-09-14 (Steward), from the ring's measurement at
+> `evt_2q1ggxnpemwyn` on base `686ffa8ac`:**
+>
+> - **The claim *"it passes in the full suite, so nothing reds"* is FALSE.**
+>   `crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs`, provisioned at
+>   that base, is **7 passed / 11 failed**. It is heavily red, not silently
+>   green.
+> - **The single named member was the wrong test.** Unprovisioned, the full
+>   suite overflows in
+>   `exact_required_consumer_edge_queries_resource_bracket_ok`, not in
+>   `absent_required_consumer_disposition_preserves_direct_and_tail_routes`.
+> - **8 of those 11 failures are one lowering refusal**
+>   (`CheckedIhDetachedCallerCut`), which is a compile-behaviour finding and not
+>   a stack finding at all. See
+>   [[RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE]].
+>
+> **THE CHEAP GENERAL ANSWER, which is the part worth more than the correction:**
+> **`RUST_MIN_STACK=268435456` provisions every test in a run with ZERO source
+> edits.** No `.stack_size` call, no fixture change, no `AC-3`/`AC-5` exposure,
+> no contention with anyone's in-flight work. **Establish whether a site needs a
+> stack by running it under that env var before proposing any source change** —
+> it separates "needs headroom" from "needs a stated constant" without touching a
+> line, and this node's whole `D3` measurement problem is cheaper under it.
 >
 > ⇒ **`D1`'s population is "sites that state a stack" UNION "sites measured to
-> need one and state none." The second set is not grep-able and is currently one
-> known member.** Record it as a residual under `D4` if you cannot enumerate it;
-> do not let the grep define the population.
+> need one and state none."** The second set is not grep-able, and it has **at
+> least two** known members rather than the one recorded earlier. Record what you
+> cannot enumerate as a `D4` residual; do not let the grep define the population,
+> and **do not inherit either named test from this block — re-measure at your own
+> base.**
 >
 > **BLINDNESS 2 — one site is PRODUCTION code and the three acts have no cell for
 > it.** `crates/ken-verify/src/scenario.rs:658` sets

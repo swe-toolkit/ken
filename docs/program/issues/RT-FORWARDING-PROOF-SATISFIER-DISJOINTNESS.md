@@ -12,20 +12,39 @@ tier: T1
 origin: "Split out of RT-CONSTRUCTOR-AUTHORITY-DISCHARGE D2a by the Steward at evt_752h5xfry09dh, when D2a was re-derived to its second arm. Filed rather than carried, because a carry with no home is what evaporates. The four hard stops and the full four-cell measurement table are the Architect's evt_2x1yk1cnmw6dg and the implementer's evt_6tk9xskk67jza; durable at target/D2-ASSIGNMENT.md on the ring's base."
 ---
 
-> # `draft` BECAUSE IT IS HELD, NOT BECAUSE THE FRAME IS OWED.
+> # THE §1a HOLD IS DISCHARGED — BY MEASUREMENT, NOT BY DEVIATION (2026-09-14).
 >
-> **The `COORDINATION §1a` research advisory fired on this question and is
-> unconsumed.** Research is quota-dead to roughly **2026-09-19**. The Steward
-> ruled HOLD rather than deviate (`evt_752h5xfry09dh`): four unaided passes
-> failed in two opposite directions, one of them the Architect's own, and this
-> is the point §1a exists to defend.
+> **The hold stood for about ninety minutes and then the ring dissolved the
+> question it was protecting.** §1a fired because four unaided passes had failed
+> in two opposite directions on *how to instrument this*. The answer is that
+> there was nothing wrong with the instrument: **the venue had a zero
+> population** (see the section below). At `px8f_buffer_native` the measurement
+> is cheap and has already returned **20 discharges, zero double-claims**.
 >
-> **`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` does NOT depend on this node and must
-> not be sequenced behind it.** `D2a` took its other arm. Nothing in `D2` rests
-> on the populations being disjoint — the property is **withdrawn**, not assumed.
+> **So the hold is lifted on its own terms.** I did not deviate, the Architect
+> did not rule unaided, and no fifth instrument was designed. §1a bought exactly
+> what it exists to buy: it stopped a fifth pass, and the fifth pass would have
+> been wrong in the same way as the first four.
 >
-> **Do not attempt a fifth instrument before the advisory returns.** That is the
-> whole content of the hold.
+> **RESEARCH SUB-QUESTION 1 IS WITHDRAWN — its premise is false.** It asked how
+> to observe a recursive compiler analysis *"without adding to the frames on its
+> path."* `prove_forwarded_value` was never on the overflowing path. There is no
+> frame-budget problem to solve. **Do not leave a falsified question standing in
+> a research queue** — sub-question 3 was already ruled (frame authorship), so
+> only sub-question 2 survives, and correction 4 weakens its evidence too.
+> The standing HS24 advisory is unaffected and stays fired.
+>
+> **`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` still does NOT depend on this node.**
+> `D2a` took its other arm and the ring has now BUILT it (`9ede2e995`). Nothing
+> in `D2` rests on the populations being disjoint — the property remains
+> **withdrawn**, not assumed. The measurement below is worth having on its own
+> merits; it is not on anyone's critical path.
+>
+> **WHAT IS NOT YET DONE, and it is the half that reads as done:** *"zero
+> double-claims"* is a **reading, not a result.** `AC-1`'s perturbation control
+> has not been run and `AC-2`'s per-arm statement has not been made. Three maps
+> are three pairwise claims; an aggregate cannot say which pair overlaps. **Do
+> not record this as measured until both are discharged.**
 
 ## What this is
 
@@ -47,27 +66,53 @@ one proof by **three** independent arms:
 **Are the three populations disjoint?** If they are not, a value whose authority
 has been discharged can still be proved by a sibling map.
 
-## WHY FOUR PASSES FAILED, SO THE FIFTH DOES NOT REPEAT THEM
+## WHY FOUR PASSES FAILED — THE POPULATION AT THAT VENUE IS ZERO
 
-The full four-cell table, measured by the ring:
+**REPLACED WHOLESALE 2026-09-14 (Steward). The four-cell stack table that stood
+here is FALSIFIED and is not preserved beside this, because a superseded reading
+is what the next implementer reads first.** Measured by the ring at
+`evt_2q1ggxnpemwyn`; the structural half re-verified by the Steward against the
+object DB rather than relayed.
 
-    A  full suite, uninstrumented, unprovisioned  ->  ok (18 tests)
-    B  --exact,    uninstrumented, unprovisioned  ->  STACK OVERFLOW
-    C  --exact,    uninstrumented, PROVISIONED    ->  no overflow; lowering refusal
-    D  full suite, WITH PROBE,     unprovisioned  ->  OVERFLOW, 0 ARMS lines
+**`prove_forwarded_value` is NEVER CALLED from
+`abi_s6_mapping_file_backed_native`.** Its only non-recursive entries are
+`units.rs:4366` in `exact_staged_unit` and `:3370` inside
+`derive_certified_cuts`, whose sole caller is `:4358` in that same
+`required`-driven loop.
 
-**B and D are each sufficient alone.** The path runs with less headroom than
-either the probe or the isolation configuration costs.
+    suite                                  enter  visit  discharge
+    abi_s6_mapping_file_backed_native         0      0        0
+    abi_s6_mapping_surface_native            18      0        0
+    px8f_buffer_native                        6     22       20
 
-**The untried cell is provisioned + full suite + probe, and it is not reachable
-cheaply.** All 18 tests in `abi_s6_mapping_file_backed_native.rs` invoke
-`build_native_program` (Steward, measured by enumerating all 18 direct call sites
-plus the `differential()` helper — a `differential()`-keyed grep gives 6 and is
-wrong). So provisioning for a probe run means provisioning all 18, which touches
-`:565` (carries R1) and `:719` (carries red #2), both QA-approved at exact SHAs.
+⇒ **Four instrument passes probed a function that venue cannot reach.** Not a
+stack problem. Not an isolation problem. **A zero population**, which returns the
+same silence a broken instrument does.
 
-**That scope constraint is the Steward's and is a price, not a law.** It protects
-verdict transfer. Name it back to the Steward if it binds; do not route around it.
+**What that falsifies, named so nobody rebuilds on it:**
+
+- **"The path runs with less headroom than the probe costs."** The overflow was
+  never on `prove_forwarded_value`'s path — it is not on the path at all. The
+  misattribution named the wrong function, so every conclusion keyed to it goes.
+- **Cell A ("full suite, uninstrumented, unprovisioned -> ok").** Does not
+  reproduce on a byte-identical tree; it overflows in a different test entirely
+  (`exact_required_consumer_edge_queries_resource_bracket_ok`). The original cell
+  A carried no SHA.
+- **Cell D's "0 ARMS lines."** Over-determined — zero with unlimited stack too,
+  because the population is zero.
+- **THE SCOPE COLLISION THAT SHAPED THIS WHOLE NODE DOES NOT EXIST.**
+  `RUST_MIN_STACK=268435456` provisions all 18 tests with **zero source edits** —
+  no fixture change, no touch of `:565` (R1) or `:719` (red #2), no verdict
+  transfer at risk. **My measurement that all 18 invoke `build_native_program`
+  was correct; the conclusion I drew from it was wrong**, because it assumed
+  provisioning must be written into the source. It was reachable by a knob nobody
+  considered.
+
+**The lesson that generalizes past this node: I priced my own constraint as the
+binding one and it was never binding.** I recorded *"price your own constraint
+instead of letting it be quoted back as a wall"* on this same arc this morning —
+and then the wall turned out to be imaginary in a second, independent way. **A
+constraint you authored is not evidence about the world.**
 
 ## What the advisory was asked
 
