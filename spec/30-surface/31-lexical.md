@@ -2,19 +2,20 @@
 
 > Status: **DRAFT v0**. **`OQ-syntax` principles DECIDED** (operator,
 > 2026-06-27, §1a); the concrete *token table* below is a **starter** that
-> iterates with the team, now *governed by* those principles. The literal forms
-> feeding `35-numbers.md` are the part that most matters for downstream
-> chapters.
+> iterates with the team, now *governed by* those principles. The six-name
+> reserved-infix admission is **contract-pinned** by
+> `SPEC-RESERVED-INFIX-NAMES` (§1c, §2). The literal forms feeding
+> `35-numbers.md` are the part that most matters for downstream chapters.
 
 ## 1. Source text
 
 - Source is **UTF-8**. Ken's notation operators may use the **curated** set of
   mathematical symbols in §1b (so `→`, `×`, `∧`, `Ω`, `≤`, `≠`, and `⊑`
   appear in source, matching the spec's notation). An ASCII spelling exists
-  for every such symbol so no program *requires* a special keyboard (§1a).
-  Stored identifier names are ASCII-only after the fixed §1b alias expansion
-  (§1e, §2); Unicode remains available in those aliases, notation, literals,
-  comments, and other specified payloads.
+  for every such symbol except the glyph-only §1c case. Stored identifier
+  names are ASCII-only after the fixed §1b alias expansion (§1e, §2); Unicode
+  remains available in those aliases, notation, literals, comments, and other
+  specified payloads.
 - Files use the extension `.ken`. Line endings are LF (CRLF tolerated).
 
 ## 1a. Notation: read-optimized canonical Unicode (`OQ-syntax` DECIDED)
@@ -65,8 +66,10 @@ agents. Five principles (decided; the §2–§6 spellings are a starter under th
 
 Canonical glyph ↔ ASCII input, drawn from the notation the spec already uses.
 **Starter, not final** — the team tunes spellings against real code; the
-*principles* (§1a) are fixed. The ASCII fallback prefers an established TeX/CS
-digraph where one is unambiguous, else the spelled-out name.
+*principles* (§1a) are fixed. The six reserved-infix operator-name spellings
+fixed in §1c are an explicit exception to that starter status. The ASCII
+fallback prefers an established TeX/CS digraph where one is unambiguous, else
+the spelled-out name.
 
 | Glyph | ASCII | Role |
 |---|---|---|
@@ -82,15 +85,17 @@ digraph where one is unambiguous, else the spelled-out name.
 | `≤` `≥` `≠` | `<=` `>=` `/=` | comparison |
 | `¬` `∧` `∨` | `not` `/\` `\/` | logical connectives |
 | `∈` | none (glyph-only) | membership notation (§1c exception) |
-| `⊑` `⊔` `⊓` | `<:` `\/` `/\` | IFC lattice flows-to / join / meet (`../60-security/61`) ‡ |
+| `⊑` `⊔` `⊓` | `<:`; join/meet ASCII open | IFC lattice flows-to / join / meet (`../60-security/61`) ‡ |
 | `×` | `><` | product type |
 | `ℓ` | `level` / `l` | universe level / label (role supplied by parser context) ‡ |
 
 † Equality notation is the load-bearing fine choice: `≡` propositional vs. `==`
 boolean `DecEq` (`33 §5`) must stay distinct (Lean/Agda convention); `=` is
 **binding only**. The exact ASCII for `≡` (`===` vs. a named form) is a team
-call. ‡ The lattice-op ASCII (`⊑`/`⊔`/`⊓`) remains a team call. The former
-`ℓ` overload is resolved by §1d's semantic-name/source-lexeme distinction:
+call. ‡ The join/meet lattice-op ASCII remains a team call. This contract fixes
+`/\` and `\/` as the `∧` and `∨` tokens, so those spellings are not also ASCII
+aliases for `⊓` and `⊔`. The former `ℓ` overload is resolved by §1d's
+semantic-name/source-lexeme distinction:
 source `ℓ`, `l`, and `level` all produce semantic `Ident("level")`, while the
 formatter losslessly re-emits whichever raw source lexeme was written. There
 is no distinct level-or-label token kind.
@@ -117,28 +122,32 @@ separately as `CONF-FMT8-LEVELTOK`.
   spellings remain accepted forever** (no program ever *requires* a special
   keyboard). This is genuinely a **lexer** capability, not only a convention.
 - **Exception — a glyph is glyph-only when its only natural ASCII form is a
-  distinct token claimed by a different construct.** The guarantee above assumes
-  a glyph's ASCII transliteration is free to be *the same token* as the glyph. It
-  fails only when a glyph's sole natural ASCII form is a word that a **different
-  construct** already forces to a **distinct** token — that word cannot then also
-  lex as the notation, so the glyph is **glyph-only** with no accepted ASCII
-  spelling. This is narrower than "the ASCII form is a reserved word": the §1a-P5
-  identifier-class aliases `∀`/`forall` and `∃`/`exists` are reserved words too,
-  but each **is** its glyph's same token (both spellings lex identically), so
-  those ASCII forms work normally and are untouched. "ASCII accepted forever"
-  does not apply to a glyph-only glyph — there is no ASCII form to accept, not
-  one that was withdrawn. The sole current instance is `∈`: its natural ASCII
-  `in` is the `let … in` separator — a distinct token claimed by that construct
-  (`31 §4`) — so `∈` lexes to its own membership token, distinct from `in`, with
-  no `in` alias. This narrows the guarantee to match the landed
-  lexer and adds no lexer/parser machinery. The narrowing costs nothing today
-  because `∈` has **no operator semantics** — no program can be written with it,
-  so none can require its ASCII form; this row fixes notation only and does not
-  introduce a membership operator. If such an operator is later introduced with
-  semantics whose ASCII-authorability matters, assigning a non-keyword ASCII
-  digraph is a separate decision then, not foreclosed here. The formatter follows
-  suit: it never rewrites the keyword `in` to `∈`, and emits `∈` with no ASCII
-  counterpart.
+  distinct token claimed by a different construct.** The guarantee above
+  assumes a glyph's ASCII transliteration is free to be *the same token* as the
+  glyph. It fails only when a glyph's sole natural ASCII form is a word that a
+  **different construct** already forces to a **distinct** token — that word
+  cannot then also lex as the notation, so the glyph is **glyph-only** with no
+  accepted ASCII spelling. This is narrower than "the ASCII form is a reserved
+  word": the §1a-P5 identifier-class aliases `∀`/`forall` and `∃`/`exists` are
+  reserved words too, but each **is** its glyph's same token (both spellings lex
+  identically), so those ASCII forms work normally and are untouched. "ASCII
+  accepted forever" does not apply to a glyph-only glyph — there is no ASCII
+  form to accept, not one that was withdrawn. The sole current instance is
+  `∈`: its natural ASCII `in` is the `let … in` separator — a distinct token
+  claimed by that construct (§4) — so `∈` lexes to its own notation token,
+  distinct from `in`, with no `in` alias. The formatter follows suit: it never
+  rewrites the keyword `in` to `∈`, and emits `∈` with no ASCII counterpart.
+- **The six reserved-infix notation tokens are ordinary symbolic global
+  names.** The exact admitted spellings are `≤`/`<=`, `≥`/`>=`, `≠`/`/=`,
+  `∧`/`/\`, `∨`/`\/`, and glyph-only `∈`. Each paired spelling is one token
+  and one global binding identity, not two declarations. Each of the six may
+  name a global `const`/`fn`/`proc`, appear as a bare or grouped prefix atom,
+  appear infix, and be the target of a fixity declaration through the ordinary
+  operator-name grammar (`32 §1`, §3, §6). This is name admission only: it
+  assigns no standard binding, meaning, or glyph-derived precedence. In
+  particular, a client may define and use an ordinary function named `∈`, while
+  a standard membership binding and its class/carrier design remain deferred.
+  `!=` is not an alias for `≠`, and `in` is not an alias for `∈`.
 - **The formatter emits canonical Unicode on save (principle 3).** The single
   mandated formatter normalizes accepted ASCII input to canonical Unicode
   glyph (and fixes layout), so the reader always sees consistent notation. This
@@ -578,8 +587,11 @@ token.
   from nullary constructors (`34`).
 - **`keyword`** — reserved (§4).
 - **`literal`** — numbers, strings, chars, bytes (§3).
-- **`operator`** — symbolic, from a fixed set plus user-defined (`33`); fixity
-  and precedence are declared (`infixl`/`infixr`/`infix N`).
+- **`operator`** — a generic symbolic operator token, from the curated
+  character set and excluding punctuation or notation claimed by another
+  token. Together with §1c's six dedicated notation tokens it feeds `32`'s
+  `operator_name` production. Fixity and precedence are declared
+  (`infixl`/`infixr`/`infix N`).
 - **`punct`** — `( ) [ ] { } , . ; : :: | = → @ ⟨ ⟩` and the spec brace
   `{ … | … }`.
 

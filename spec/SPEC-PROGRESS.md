@@ -82,8 +82,8 @@ to that same declaration, including its qualifications.
 | `20-verification/25-protocol.md` | `T1 elaborated; implementation-ready` | Normative for message shape, verdict cross-walk, and stability; exact JSON names remain a finalization surface. |
 | `20-verification/README.md` | `DRAFT v0` | Normative for the verification interface and soundness obligations; named prover internals remain team work. |
 | `30-surface/30-taxonomy.md` | not declared | Normative for the built-in/prelude/package boundary and minimality invariant; membership grows through its derivation process. |
-| `30-surface/31-lexical.md` | `DRAFT v0` | Settled for `OQ-syntax` principles; the concrete token table is a revisable starter. |
-| `30-surface/32-grammar.md` | `DRAFT v0` | Normative intent for which productions exist; exact spelling remains proposal-level. |
+| `30-surface/31-lexical.md` | `DRAFT v0`; reserved-infix admission contract-pinned | Settled for `OQ-syntax` principles; the exact six-name reserved-infix admission binds, while the remaining concrete token table is a revisable starter. |
+| `30-surface/32-grammar.md` | `DRAFT v0`; reserved-infix grammar contract-pinned | Normative intent for which productions exist; the six-name operator-name spellings bind, while other exact spelling remains proposal-level. |
 | `30-surface/33-declarations.md` | not declared | Normative for features and the named module, visibility, and class contracts; concrete spelling remains proposal-level. |
 | `30-surface/34-data-match.md` | `impl-ready (L2)` | Normative for the feature; nested-positive admission and selectors are partially landed, with the binary residual dependent-method re-check separately staged. |
 | `30-surface/35-numbers.md` | `impl-ready (L1)` | Normative for the numeric model and L1 scope; user-defined numeric instancing remains gated on L-classes. |
@@ -91,7 +91,7 @@ to that same declaration, including its qualifications.
 | `30-surface/37-strings-collections.md` | `impl-ready (L3)` | Binding for concepts, laws, lowering, and staging; exact API spelling and internal representations remain `(oracle)`-tagged. |
 | `30-surface/38-ffi-io.md` | `§1.1–§1.6 impl-ready (L6); §1.7 contract-pinned (PX8-T); §2–§4 impl-ready (L7); elaborated to team-ready rigor` | Normative for trust and effect discipline with the stated per-section delivery stages. |
 | `30-surface/39-elaboration.md` | `DRAFT v0; §5 (V0) elaborated to implementation rigor for the G1 minimal slice` | Normative for elaboration output and guarantees; §5 is V0 implementation-rigorous and the other named sections remain frame-level. |
-| `30-surface/README.md` | `DRAFT v0` | Normative for constructs and meaning; concrete syntax remains an explicitly revisable proposal. |
+| `30-surface/README.md` | `DRAFT v0` | Normative for constructs and meaning; concrete syntax remains an explicitly revisable proposal except where a subject chapter marks a spelling contract-pinned. |
 | `40-runtime/41-values.md` | `Elaborated (X2 contract)` | Normative for values, equality, callable boundaries, and durable canonical encoding; in-process representation is private. |
 | `40-runtime/42-evaluation.md` | `X1 elaborated; implementation-ready for Team Runtime; pure-core G1 scope` | Normative reference-evaluation contract for the declared pure-core and effect-driver scope. |
 | `40-runtime/43-termination.md` | `DRAFT v0` | Normative for the totality/partiality boundary. |

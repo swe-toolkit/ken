@@ -2,10 +2,10 @@
 
 > Status: **DRAFT v0**. Normative for the *constructs and their meaning*; the
 > **concrete syntax is a reasonable proposal, explicitly revisable** (OQ-syntax,
-> `../90-open-decisions.md`). Contract for WS-L. Resolution is intentionally
-> lower than `10-kernel/`/`20-verification/`: this fixes *what the language has*
-> and how it elaborates to the core, leaving spelling to be settled with the
-> team.
+> `../90-open-decisions.md`) except where a subject chapter marks a spelling
+> contract-pinned. Contract for WS-L. Resolution is intentionally lower than
+> `10-kernel/`/`20-verification/`: this fixes *what the language has* and how it
+> elaborates to the core, leaving other spelling to be settled with the team.
 
 The surface is the language a programmer or agent actually writes. It is also
 the **self-hosting substrate** (strategy WS-L), so it is core, not a late skin.
@@ -35,8 +35,10 @@ L8).
 - **Verification is in the surface, not bolted on.** `requires`/`ensures`,
   refinement types, and `prove` (`../20-verification/21-spec-syntax.md`) are
   first-class surface forms.
-- **Concrete syntax is OQ.** The forms below are a coherent proposal; bikeshed
-  (keywords, layout vs. braces, operator set) is deferred, not load-bearing.
+- **Concrete syntax is OQ except where explicitly pinned.** The forms below are
+  a coherent proposal; bikeshed (keywords, layout vs. braces, and unpinned
+  operator spellings) is deferred, not load-bearing. Chapters `31`/`32` mark
+  the exact six-name reserved-infix admission as contract-pinned.
 
 ## 2. Core vocabulary (proposal)
 
