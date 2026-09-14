@@ -4387,7 +4387,22 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     // initialized returned word. The exact call seed is a
                     // separate dependency; the tag/arity guard cannot conjure
                     // realization from an uninitialized Result slot.
-                    realized_call_words.contains(&publication.returned_word)
+                    //
+                    // THIS ARM DISCHARGES TOO, AND ITS WORD IS THE SAME ONE THE
+                    // OTHER ARM ROOTS AT. `publication` is per-BODY -- one
+                    // `Option<FunctionResultPublication>` at `:2724` -- while
+                    // the loop above iterates identities inside it, so both arms
+                    // work on `publication.returned_word` for the same body by
+                    // construction; there is no coincidence to wait for. A
+                    // ledger keyed per word but populated from one arm promises
+                    // coverage over a domain its population never covers, so the
+                    // key would read as the closure without being one.
+                    if realized_call_words.contains(&publication.returned_word) {
+                        discharge_sources.insert(publication.returned_word);
+                        true
+                    } else {
+                        false
+                    }
                 } else {
                     let cuts = derive_certified_cuts(
                         body,
