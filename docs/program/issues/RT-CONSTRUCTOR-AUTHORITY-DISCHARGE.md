@@ -164,20 +164,30 @@ command that settles it is the first deliverable.
 > correction stopped being the answer at about the fourth. If you add a
 > coordinate here without a SHA, the next reader inherits the defect.
 
-**MEASURED BY THE STEWARD at `5d977ac79`** unless a line says otherwise.
+**Every coordinate below names its own SHA. There is no section default.** A
+bare coordinate here is a defect, not an inheritance — see "Why there is no
+default" at the end of this section.
 
-Re-measure every coordinate at `D0`. These are two different branches and
-neither is an ancestor of the other, so the coordinates differ in POPULATION,
-not only in position. Non-definition reads of `demanded_result_identity`:
+Re-measure every coordinate at `D0`. The refs below are different branches and
+none is an ancestor of another, so the coordinates differ in POPULATION, not
+only in position. Non-definition reads of `demanded_result_identity`, where
+`core.rs` is `cranelift_backend/lowering/core.rs` and `responses.rs` is
+`cranelift_backend/planning/static_transition/responses.rs` (two different
+directories — the basenames alone do not resolve):
 
     5d977ac79    core.rs:9210, core.rs:9220, responses.rs:2247    THREE
+    187895991    core.rs:9353, core.rs:9363, responses.rs:2327    THREE
     686ffa8ac    core.rs:9488,               responses.rs:2607    TWO
-    origin/main  (symbol absent entirely)                         ZERO
+    origin/main  (symbol absent from crates/ entirely)            ZERO
 
-`core.rs:9220` and `:9488` are the same statement; `core.rs:9210` is a second
-read (`.tag_abi_word()`) present only on `5d977ac79`. **A line number is a claim
-about one tree and carries its SHA or it is worthless — and a line-number
-framing can hide a SET difference, which is the worse failure.**
+`187895991` is the decided base the ring is building on, and it is the row to
+use; it was added here because the table previously offered only a dead backup
+interior and two refs nobody is cutting from.
+
+`core.rs:9220`, `:9363` and `:9488` are the same statement; `core.rs:9210` /
+`:9353` is a second read (`.tag_abi_word()`) absent from `686ffa8ac`. **A line
+number is a claim about one tree and carries its SHA or it is worthless — and a
+line-number framing can hide a SET difference, which is the worse failure.**
 
 **This matters to `D1b` specifically.** That deliverable asks whether the
 demanded identity is available at each consumer, and the read-site SET is its
@@ -188,8 +198,12 @@ they need not look at. It is not. Corrected on the Architect's census
 (`evt_6mgz3cjerky83`).
 
 - **The carrier, and the invariant that forbids the obvious fix.**
-  `lowering/mod.rs:3843`, one field `word: ir::Value`, under a declaration that
-  reads verbatim:
+  `cranelift_backend/lowering/mod.rs:3843` at **`5d977ac79`** (same line at
+  `187895991`), one field `word: ir::Value`, under a declaration that reads
+  verbatim. The struct is `CarriedBoundaryWord` — **not**
+  `GeneratedConstructorAuthority`, which is a different struct nine lines below
+  at `mod.rs:3852` (same line at both `5d977ac79` and `187895991`) and is `D0`'s
+  subject. Do not conflate them:
 
       ⛔ It holds the word and NOTHING ELSE, and the emptiness is the point.
       ... Every question about this value -- which constructor, how many
@@ -198,26 +212,71 @@ they need not look at. It is not. Corrected on the Architect's census
       room for a compile-time answer is exactly how the wall would grow back.
 
 - **Carrier construction is unsealed**: built by struct literal at **35 sites
-  across 8 files**, no factory (aggregates 6, units 7, core 6, mod 5, joins 4,
-  effects 4, calls 3, source 1). A 36th site is an ordinary edit and produces no
-  compile error. **This is why the discharge cannot live at carrier
-  construction**, independently of the invariant above.
+  across 8 files** at **`5d977ac79`**, no factory (aggregates 6, units 7, core 6,
+  **mod 4**, joins 4, effects 4, calls 3, source 1). A 36th site is an ordinary
+  edit and produces no compile error. **This is why the discharge cannot live at
+  carrier construction**, independently of the invariant above.
+
+  **The per-file breakdown previously read `mod 5` and summed to 36 against a
+  headline of 35.** The headline is the correct number: `git grep -c
+  'CarriedBoundaryWord {'` over `lowering/` returns 46, of which 10 are under
+  `core/tests/`, and **one of the remaining 36 is the declaration itself** at
+  `mod.rs:3843`. Construction sites are 35; `mod.rs` holds 4 of them.
 
 - **The failing shape is a raw block edge**: `builder.ins().jump(block, &[word])`
-  at **86 sites**, an open Cranelift API with no interposition point between
-  deciding to jump and jumping.
+  at **86 sites** in `cranelift_backend/lowering/` at **`5d977ac79`**, an open
+  Cranelift API with no interposition point between deciding to jump and jumping.
 
-- **The consumer's demanded identity is read at three non-definition sites**:
-  `core.rs:9210`, `core.rs:9220`, `responses.rs:2247` (definitions at
-  `responses.rs:358`, `:373`, `:1975`). **The failing `D6a` intra-function edge
+  **Count `.jump(`, not `ins().jump(`.** The latter returns **70** on one-line
+  grep because rustfmt wraps 16 of these calls so that `.ins()` and `.jump(`
+  land on separate lines. All 16 were opened and every one has a `builder`
+  receiver, so 86 is the population and 70 is an instrument artifact. A
+  re-measurement that reports 70 has not found a smaller surface.
+
+- **The consumer's demanded identity is read at three non-definition sites** at
+  **`5d977ac79`**: `lowering/core.rs:9210`, `lowering/core.rs:9220`,
+  `planning/static_transition/responses.rs:2247` (definitions at
+  `responses.rs:358`, `:373`, `:1975`, same ref). At the decided base
+  **`187895991`** these are `core.rs:9353`, `:9363`, `responses.rs:2327`
+  (definitions `:418`, `:438`, `:2055`). **The failing `D6a` intra-function edge
   is none of them.** This is the same disjointness the REKEY node records from
   the other end, and it is the reason the consumer half of the measurement below
   is not free.
 
-- **`LoweringOperand`** (`mod.rs`, sealed and wildcard-free, its doc refusing a
-  fallback arm as *"a wildcard with better manners"*) is the near-miss to not
-  confuse with the target: it discriminates `Specialized` vs `Carried`, i.e.
-  whether a value is a runtime word **at all**. Right shape, wrong population.
+- **`LoweringOperand`** (`cranelift_backend/lowering/mod.rs` at `5d977ac79`,
+  sealed and wildcard-free, its doc refusing a fallback arm as *"a wildcard with
+  better manners"*) is the near-miss to not confuse with the target: it
+  discriminates `Specialized` vs `Carried`, i.e. whether a value is a runtime
+  word **at all**. Right shape, wrong population.
+
+### Why there is no default
+
+This section used to open with *"MEASURED BY THE STEWARD at `5d977ac79` unless a
+line says otherwise."* That line was written before the invariant above it
+existed, and it is the exact negation of it: the invariant's whole mechanism is
+that a bare coordinate becomes a **visible violation**, and a section default
+makes a bare coordinate **silently valid** by lending it an attribution instead
+of letting it lack one. The closure could not fire on the case it exists for.
+The Architect found it (`evt_6qwfs0j22sr01`).
+
+**It was not an idle risk — the default had already mis-attributed a
+coordinate.** The companion TRAP frame's default was `686ffa8ac`, and under it
+sat `compiler_driver.rs:4159-4165`, which resolves on `origin/main` `e3fe32510`
+and points at unrelated code on `686ffa8ac`. A reader following the default would
+have opened the wrong lines and found nothing wrong.
+
+The default also named a commit this same frame declares dead: `5d977ac79` has
+**no ref pointing at it** and is reachable only as an interior commit of
+`backup/ABI-S6-d5b-file-backed-pre-cb646`. Coordinates measured there are kept
+and labelled, because that is where the analysis was done; what is removed is
+the silent inheritance of that SHA by anything that forgot to name one.
+
+⇒ **The general form, worth more than this instance: adding an invariant can
+falsify a nearby line that was true before it, and that line will not look
+stale.** A stale-value sweep greps for an old value; there is no old value here
+to grep for. The defeating text contained no coordinate and no SHA — only the
+word "unless." When you add a rule, ask what nearby text was relying on the rule
+not existing.
 
 ## Deliverables
 
