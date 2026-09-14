@@ -2664,6 +2664,57 @@ Architect inventory, 2026-09-11.
     "per-activation" hypothesis is withdrawn as having overshot into dynamism.
     Amendment 1's application-seat ruling is SUSPENDED rather than re-ruled —
     the seat is a consequence of the value/edge relation, not a declaration.
+20a. HS6: amendment 3's construction rule holds and the stop escapes through the
+     REALIZATION half. On the detached branch lowering produces neither an
+     after-value nor an outgoing edge, so the arrow (exact before-value, exact
+     consumer occurrence, exact incoming edge) -> (exact after-value, exact
+     outgoing edge) is discharged by DECLARATION — keyed on a final or demanded
+     result identity ASSIGNED TO THE BEFORE-DEFINITION by a function that
+     validates that definition's shape, instead of minted by the function that
+     lowers the consuming occurrence. A witness, not a new predicate: it shares
+     the predicate of entries 14, 16, 17 and 19 and sits closest to 16 and 17.
+     Ruled in [amendment 4](../ABI-S6-HS18-closure-mechanism-amendment-4.md)
+     after the §1a hold at the 6th and the scoped advisory
+     (`evt_2k4w4qfasxxfq`, `evt_31jk5cggky8ar`; ruling `evt_2tcb055fpy7ce`),
+     which settled the posed fork as FALSE: a distinct semantic/IR transition is
+     mandatory, a distinct runtime carrier or second planner object is not. The
+     missing work is at `core.rs:9336` (native emission) and the planner
+     relation needs nothing added, so the arc's scope stands and this is NOT a
+     recut. Non-candidate `44d50af25` (CI-red, merge Decision void).
+     ERRATUM (2026-09-14): the rule stands, two supporting claims do not — the
+     consumption census says three sites and there are FOUR, and
+     `consumer.consumers()` is EMPTY BY CONSTRUCTION on every detached row, so
+     it cannot be the executable input; the executable input is a sliced suffix,
+     not a field. Neither spelling the amendment offered sliced the chain, which
+     is what both of them actually needed to do. Found by the runtime ring
+     GROUNDING the claim instead of building on it. Corrected there too: the
+     px8f prediction CRITERION was wrong rather than the prediction — it tested
+     the planner's data when the defect lives in lowering's use of it.
+20b. HS7's edge-selected suffix is built and emits, and HS8
+     (`evt_35n0d5ehaf3ex`, WIP `3e8cc3c3d`, not a candidate) traps at frame 2's
+     default because the before-value handed to the consumer is the terminal
+     environment-transport call's raw `ITree::Vis`, while the edge names a
+     different defining call. The advisory's step 1 — the exact finished callee
+     and Result-load edge establish the raw identity — was never made
+     enforceable: `lower_checked_ih_detached_required_consumer_edge` takes the
+     before-value as an independent parameter at both of its two call sites
+     (`core.rs:6864`, `core.rs:6982`) and never compares it to
+     `edge.destination().defining_call_identity()`, while the one guard present,
+     `continuation_candidate_is_consumed`, is a ledger query about the plan
+     rather than about the operand. Keyed on: **an input of the pairing supplied
+     independently and then certified** — the same predicate as entries 12-17,
+     19 and amendments 1-3, relocated to the last unbound input. Ruled in
+     [amendment 5](../ABI-S6-HS18-closure-mechanism-amendment-5.md), which
+     supersedes nothing: it is step one of the rule's own four-step closure,
+     stated in amendment 4 and never made enforceable.
+     FORK RESOLVED there as arm 2, and the caller cut must NOT be constructed
+     (`evt_2bj4w3e2kc6sp`, WIP `c35111dc2`, not a candidate):
+     `lower_checked_ih_detached_required_consumer_result` takes the single
+     `ClaimedContinuationResult`, derives the edge internally, compares owned
+     identity to defining identity with both in the refusal, and only then
+     extracts the word. No independent before-value parameter remains. **That
+     report was requested by the ruling and is NOT a hard stop** — the §1a count
+     stayed at 8 and the next re-trigger remained the 9th.
 21. HS9: every identity input bound and honest at b601e2ec7 (self-defining arm,
     exact edge equality, recomputed population, full chain [699,661]) and the
     witness fails IDENTICALLY — same trap, same planned identity 43. The failure
