@@ -482,6 +482,45 @@ hand-off.** An AC discharged by "we checked every site" is the enumeration form
 this node exists to avoid — the criterion is about what happens to a site nobody
 checked.
 
+> ### VENUE, ADDED 2026-09-14 (Steward). THE CONTROLS FOR `AC-1` AND `AC-3` ARE
+> ### AUTHORED IN `px8f_buffer_native`, NOT IN THE MAPPING FIXTURE.
+>
+> **Measured by the ring at `686ffa8ac` (`evt_2q1ggxnpemwyn`), verified by the
+> Steward against the object DB: `prove_forwarded_value` is NEVER CALLED from
+> `abi_s6_mapping_file_backed_native`.** Its only non-recursive entries are
+> `units.rs:4366` in `exact_staged_unit` and `:3370` inside
+> `derive_certified_cuts`, whose sole caller is `:4358` in that same
+> `required`-driven loop. `required` is non-empty only when a generated context
+> carries a declared result contract, gated on `has_detached_return` — **the same
+> detached-caller family whose lowering refuses at this base.**
+>
+>     suite                                  enter  visit  discharge
+>     abi_s6_mapping_file_backed_native         0      0        0
+>     abi_s6_mapping_surface_native            18      0        0
+>     px8f_buffer_native                        6     22       20
+>
+> ⇒ **The population at the mapping fixture is ZERO, and that — not stack, not
+> isolation — is why four instrument passes measured nothing.**
+>
+> **THE FRAME DEFECT IS MINE AND IT IS AN OMISSION, NOT A WRONG NAME.** `AC-1`
+> and `AC-3` state a property and name **no venue**. Nothing here ever pinned a
+> fixture. So the ring did the reasonable thing and took the nearest existing
+> mutation grid — `generated_result_path_proof_rejects_each_certificate_corruption`,
+> which lives in the mapping fixture. **An acceptance criterion that names an
+> observation but no venue gets discharged wherever the nearest plausible harness
+> already sits**, and that venue is chosen by proximity rather than by reach.
+>
+> **The venue requirement, now explicit: author the control where the population
+> is non-zero, and state the enter/visit/discharge counts you measured there.** A
+> control run at a venue with zero visits passes for the same reason a broken one
+> does. `px8f_buffer_native` is that venue: 20 discharges, and it **already hosts
+> the mutation-child idiom** (`assert_retained_result_closure_proof_mutation_child`
+> and three siblings at `:382`, `:435`, `:522`, `:612`), so the grid is authorable
+> there rather than needing invention.
+>
+> **This does not relax `AC-1` or `AC-3` by a word** — same property, same
+> two-sided control. It states where the observation is taken.
+
 **`AC-2` — the `D6a` edge discharges, or its failure is reported.** The
 intra-function block edge that failed in HS18 either carries an authority
 consumed against a real demanded identity, or `D1b` reports that the demand
