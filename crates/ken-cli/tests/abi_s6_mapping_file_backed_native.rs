@@ -453,6 +453,60 @@ fn file_backed_mapping_is_private_in_both_engines_and_preserves_the_file() {
     );
 }
 
+/// Promise class: transition sentinel for HS18 amendment 3. MEASURED: changing
+/// the required destination's sole defining transport from body 788 target 2 to
+/// its real target-0 peer is applied, and the native Mapping build no longer
+/// succeeds while the unchanged interpreter still does. CLAIMED: the exact-call
+/// discriminator is load-bearing in production rather than observation-only.
+/// THE GAP: this fixed witness exercises the two-call body; the ordinary
+/// control above separately asserts the exact target/result pair selected.
+#[test]
+fn wrong_defining_call_breaks_the_required_consumer_edge() {
+    let (interpreted, interpreted_backing) = interpreted_only();
+    assert_eq!(interpreted.exit_status, 0);
+    assert_eq!(interpreted.terminal_error, None);
+    assert_eq!(interpreted_backing, ORIGINAL);
+
+    let root = tempfile::Builder::new()
+        .prefix("ken-abi-s6-am3-wrong-call-")
+        .tempdir()
+        .expect("creates temporary root");
+    let (native_build, applications) = ken_runtime::with_required_consumer_call_mutation(
+        ken_runtime::RequiredConsumerCallMutation::SubstituteDefiningTransport {
+            defining_body_origin: 788,
+            selected_target: 2,
+            substitute_target: 0,
+        },
+        || {
+            ken_cli::build_native_program(
+                SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "abi_s6_am3_wrong_call",
+                root.path(),
+            )
+        },
+    );
+    assert_ne!(
+        applications, 0,
+        "the production-side defining-call mutation must reach body 788",
+    );
+    let error = native_build.expect_err(
+        "a destination transplanted to the wrong defining call must not compile Mapping",
+    );
+    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(error) = error else {
+        panic!("the wrong-call mutation reached the wrong refusal: {error:?}");
+    };
+    assert_eq!(
+        error.stage,
+        ken_runtime::ObjectLinkerPackagingStage::ObjectEmission,
+    );
+    assert_eq!(error.field, "checked_process_object");
+    assert_eq!(
+        error.reason,
+        "unsupported runtime-IR lowering: CheckedIhDetachedCallerCut: a post-call consumer receipt is longer than the exact local eliminator prefix",
+    );
+}
+
 /// Promise class: transition sentinel for HS18 amendment 3. MEASURED: the
 /// exact-call edge emits the four ResourceBracketResult alternatives at consumer
 /// origin 560 with `ResourceBracketOk` first and ABI identity
