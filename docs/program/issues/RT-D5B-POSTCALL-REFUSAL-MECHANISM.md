@@ -80,17 +80,40 @@ distinct `Packaging` reason in the run and the cause of 8 of 11 base reds.**
 
 ## Deliverables
 
-**`D1` — FIND THE MECHANISM. Upstream of the call site, not at it.** Which
+> **DELIVERABLE LABELS ARE `MECH` / `CTRL` / `ROUTE`, DELIBERATELY NOT `D1`/`D2`/`D3`.**
+> An earlier revision used `D2` for the control repair while
+> `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE`'s **held** `D2` was live in the same
+> thread — **one term naming two artifacts**, which is the exact defect class
+> this node was cut to chase, appearing in its own labels. The control-repair
+> commit `88893210a` carries the old label. **Renamed rather than annotated:**
+> annotation leaves a satisfied criterion and an unsatisfied one looking alike.
+
+**`MECH` — FIND THE MECHANISM. Upstream of the call site, not at it.** Which
 producer emits a two-step exit chain for a body the lowering site reaches with
-one computational frame, and which of the two is inconsistent with the program?
+one computational frame, and **where does the disagreement actually live?**
 **Both operands are internally consistent at `:7720`** — start where they are
 produced, not where they meet.
+
+> **`MECH` ADMITS THREE OUTCOMES AND MUST NOT BE READ AS A TWO-WAY CHOICE**
+> (Architect, `evt_53mb86qj64fj1`):
+>
+>   1. the receipt is wrong, **or**
+>   2. the eliminator frame set is wrong, **or**
+>   3. **BOTH ARE CORRECT AND THE CUT BETWEEN THEM IS MISPLACED.**
+>
+> **An earlier wording of this deliverable asked "which of the two is
+> inconsistent with the program?", which presupposes outcome 3 away.** That is
+> the shared premise of the three refuted mechanisms, reappearing in the sentence
+> meant to escape it — and the evidence points at 3: the frames equal
+> `receipt[1..]` elementwise, and the index producer names the consumer's **own**
+> occurrence, so both operands may be correct under one convention applied at the
+> wrong place. **Do not re-narrow it.**
 
 **State the DIRECTION and report counts with the population traced** (`AC-2`).
 **"I could not determine it" is an acceptable answer** and must be reported as a
 finding with its argument, not as an absence.
 
-**`D2` — repair the co-class control. Independent of `D1`; does not wait on it.**
+**`CTRL` — repair the co-class control. Independent of `MECH`; does not wait on it.**
 `wrong_defining_call_breaks_the_required_consumer_edge`
 (`abi_s6_mapping_file_backed_native.rs:463`) asserts one of **three co-class
 reason strings**, all emitted as `CheckedIhDetachedCallerCut`:
@@ -107,13 +130,98 @@ load-bearing, assert it separately and say why.
 
 **This is the durable product of the session and no correction touched it.**
 
-**`D3` — route the required-consumer incoming edge at `:7720`, as a CORRECTNESS
+**`ROUTE` — route the required-consumer incoming edge at `:7720`, as a CORRECTNESS
 deliverable, explicitly NOT as the cause.** Fork on
 `required_consumer_incoming_edge()` — `Ok(None)` for ordinary transports
 reproduces today's behaviour, so the route is total by construction — following
 `aggregates.rs:7826-7829`. **Do not let this land carrying an implication that it
-fixes the refusal: measured, it is a no-op at index 0.** It may be sequenced
-after `D1` if `D1` changes what correct routing means.
+fixes the refusal: measured, it is a no-op at index 0.**
+
+**`ROUTE` MUST follow `MECH`. This is a hard sequence, not a preference** (Architect,
+`evt_53mb86qj64fj1`). `MECH` now decides what correct routing *means*: the open
+fork is whether the cut is `[index..]` or `[index+1..]`, and the two differ by
+exactly the consumer's own occurrence. **Building `ROUTE` before `MECH` settles lands
+the wrong cut with a passing test** — the `[index..]` cut is a no-op at index 0,
+so a green `ROUTE` would prove nothing and look like a fix.
+
+## `MECH` IS ANSWERED, AND THE RULING IS RECORDED HERE RATHER THAN IN THREAD
+
+**Outcome 3: both operands are correct and the cut between them is misplaced.**
+The two site families build their eliminator lists under **different membership
+conventions** while sharing **one index convention**.
+`checked_ih_post_call_eliminators` emits exactly one frame per step or fails —
+no skip, no filter, both in-body branches are error returns — so at the
+constructed sites correspondence holds by construction. At `:7720` the list is
+the **ambient** local frame list, where it is an assumption.
+
+`incoming_consumer_edge_index` names the position of the consumer's **own**
+defining occurrence, uniqueness enforced (`responses.rs:2366-2396`). At
+`index=0`, `[index..]` is a no-op and `[index+1..]` matches — which is why
+mechanism 3 measured as vacuous.
+
+### THE RULING (Architect, `evt_5k7jd5agh133j` + `evt_11zby14s19hkh`)
+
+**`R3` — THE FRAME LIST MUST CARRY ITS ANCHOR.** The eliminator slice must carry
+**which receipt element its element 0 answers to**, as a type;
+`checked_ih_post_call_residual` takes that type and never a bare slice.
+
+**Two rejected repairs, and why — both remain rejected:**
+
+- **`R1`, give `:7720` a constructed list** — rejected because it makes the
+  guard's only discriminating check a tautology. **`:7720` is the one site where
+  this guard has teeth**, and weakening it by other means is still weakening it,
+  even though no arm's condition changes.
+- **`R2`, a bare `[index + 1..]`** — rejected as re-encoding the same unstated
+  convention one site over.
+
+**THE DISCRIMINATOR, which generalizes beyond this node: MANUFACTURE CANNOT
+REFUSE, A WITNESS CAN.** `index + 1` is a function of the index alone — it
+**cannot fail**, and yields an anchor that makes the counts agree whether or not
+the frames relate to the receipt at all. The identity join **fails closed**: no
+match or multiple matches, and it refuses. That is the whole test, and it is why
+the join is a witness where arithmetic is a synthesized one.
+
+**The anchor must derive from identity ORIGINATING AT PRODUCTION, never from
+arithmetic over the quantities being reconciled.** The Architect's earlier
+phrasing — *"obtained from where the ambient frames are produced"* — was
+corrected as unbuildable: no receipt is in scope on the
+`:3320 → :3364 → :3411 → :3798 → :7720` descent, and the anchor is a property of
+the **(frames, receipt) pair**, which first exists at `:7720`. **The line is the
+source of authority, not the location.**
+
+`core.rs:3330-3332` already declares this tuple the shared derivation —
+*"the checked bridge must carry this exact tuple, and two spellings is how they
+part"* — so the join **consumes** the mechanism the code provides rather than
+re-spelling it.
+
+**REQUIRED CONDITION — the join fixes WHERE the window starts, never WHAT is in
+it.** `checked_ih_post_call_residual` must still compare the full anchored
+window `receipt[anchor..]` against the frames **including element 0**, and still
+enforce the length relation. **Do not short-circuit element 0 as redundant
+post-join** — that turns `:7720` into exactly the tautology `R1` was rejected for
+creating. Preserved and non-definitional: the join's existence and uniqueness,
+the length relation from anchor to end, and the tail compared pairwise.
+
+**THE RESIDUAL, RECORDED AS A TRADE AND NOT AS A FREE REPAIR:** at a length-1
+frame list the pairwise content check is entirely definitional after the join, so
+the guard there reduces to existence, uniqueness and length. **That is weaker
+than today's positional check — in a case where today's positional check is
+wrong.**
+
+**The type takes exactly two constructors and no general one from a bare
+`usize`:** anchor 0 from a constructed list (justified by
+`checked_ih_post_call_eliminators` emitting one frame per step or failing), and
+the identity join (the unique receipt position matching `frame[0]`'s
+`(static_origin, checked_frame_id)`, or refuse). **A `usize` constructor would
+let `index + 1` back in through the front door and the type would prove
+nothing.**
+
+**Sequencing, approved:** land the anchor type with the constructed sites at
+anchor 0 — behaviour-identical and independently verifiable — with `:7720`
+untouched until the ambient half follows.
+
+**`required_consumer_executable_suffix` and `:7720` must not be decided
+separately.** They read the same cut, and `aggregates.rs:7826` consumes it too.
 
 ## Acceptance criteria
 
@@ -129,8 +237,12 @@ and found closed at two. **A larger sample of instances would never have license
 it** (`evt_5ycnn29hy38qs`). Any "by construction" claim in this node's closure
 must name its producer set.
 
-**`AC-4` — `D2`'s repaired control must be SHOWN to discriminate** *guard fell*
-from *guard moved*. Passing is not sufficient.
+**`AC-4` — `CTRL`'s repaired control must be SHOWN to discriminate** *guard fell*
+from *guard moved*. Passing is not sufficient. **Point it at the ruling
+(Architect, `evt_11zby14s19hkh`): it must show a wrong defining call STILL
+REFUSES under the anchored path, and the join's new refusals — no match, multiple
+matches — belong in the asserted refusal class.** The residual above makes this
+the check that carries the guard's remaining teeth at a length-1 frame list.
 
 **`AC-5` — the guard is untouched.** No change to the conditions at `:9256`,
 `:9263`, `:9268`.
@@ -157,7 +269,7 @@ status, not liveness.
 
 **This costs the lane nothing, and the reason is a distinction worth stating
 plainly: `§1a`'s hold binds the Architect's RULING, not the ring's
-MEASUREMENT.** `D1` is a measurement over producers and `D2` is a control repair;
+MEASUREMENT.** `MECH` is a measurement over producers and `CTRL` is a control repair;
 **neither needs a ruling to proceed, and both are the whole of the ring's next
 work.** So there is no five-day block to trade against, and the
 rule-unaided-provisionally deviation taken on the HS24/entry-18 arc **does not
@@ -188,8 +300,8 @@ this node lands, **before** that node's `D1` is answered from it.
 
 ## Sizing
 
-**`M`, T1.** `D2` is small and independent. `D1` is a reasoning deliverable over
-producers; if it becomes an unbounded search, stop and report — that is `D1`'s
+**`M`, T1.** `CTRL` is small and independent. `MECH` is a reasoning deliverable over
+producers; if it becomes an unbounded search, stop and report — that is `MECH`'s
 stated acceptable outcome, not a failure.
 
 ## Not this node
