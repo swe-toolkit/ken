@@ -488,11 +488,24 @@ checked.
 > **Measured by the ring at `686ffa8ac` (`evt_2q1ggxnpemwyn`), verified by the
 > Steward against the object DB: `prove_forwarded_value` is NEVER CALLED from
 > `abi_s6_mapping_file_backed_native`.** Its only non-recursive entries are
-> `units.rs:4366` in `exact_staged_unit` and `:3370` inside
-> `derive_certified_cuts`, whose sole caller is `:4358` in that same
-> `required`-driven loop. `required` is non-empty only when a generated context
-> carries a declared result contract, gated on `has_detached_return` — **the same
-> detached-caller family whose lowering refuses at this base.**
+> `units.rs:4366` in **`close_and_define_staged_result_bodies`** (`:4117`) and
+> `:3370` inside `derive_certified_cuts`, whose sole caller is `:4358` in that
+> same function — which IS the `required`-driven loop.
+>
+> > **CORRECTED 2026-09-14 (Architect, `evt_1y9rk2s98qxf3`). This first named
+> > `exact_staged_unit`, and that was wrong.** That is a 19-line helper at
+> > `:4097-4115` containing NEITHER call. **The mechanism: a "last `fn` before
+> > line N" scan matched `^pub fn ` and so skipped `pub(super) fn`, landing one
+> > function short.** The Architect reproduced the identical error with `awk`
+> > while checking it, and caught it only because the answer contradicted code
+> > they had read directly. **The conclusion is unchanged and better supported**
+> > — both entries are in or under the loop — but a reader who greps
+> > `exact_staged_unit` to check the premise finds a helper with neither call in
+> > it and must decide whether the premise was fabricated.
+>
+> `required` is non-empty only when a generated context carries a declared result
+> contract, gated on `has_detached_return` — **the same detached-caller family
+> whose lowering refuses at this base.**
 >
 >     suite                                  enter  visit  discharge
 >     abi_s6_mapping_file_backed_native         0      0        0
@@ -520,6 +533,26 @@ checked.
 >
 > **This does not relax `AC-1` or `AC-3` by a word** — same property, same
 > two-sided control. It states where the observation is taken.
+>
+> > ### THE VENUE RULING ANSWERS "IS THE CODE EXERCISED", NOT "DOES CONSUMPTION
+> > ### WORK." DO NOT QUOTE IT AS THE SECOND.
+> >
+> > **Guard added 2026-09-14 at the Architect's request (`evt_1y9rk2s98qxf3`),
+> > against the Steward's own ruling being over-read.** *"`D2` is acceptable on
+> > evidence from `px8f_buffer_native`"* rests on 6 enters / 22 visits / 20
+> > discharges, and that is a real and sufficient answer to the question that was
+> > posed — **is there a live population.**
+> >
+> > **It is not an answer to whether the consumption WORKS.** That still rests on
+> > *"20 discharges, zero double-claims"* — **a negative result whose
+> > discriminating power is unmeasured.** A control that has never produced the
+> > thing it is supposed to catch cannot distinguish "no double-claims occur"
+> > from "this control cannot see one."
+> >
+> > ⇒ **The Architect's acceptance gate is untouched by the venue ruling: a
+> > POSITIVE CONTROL producing a double-claim — specifically an arm-1/arm-2
+> > collision on one word.** Different axis from the lowering refusal, not
+> > relaxed, and the venue ruling does not try to.
 
 **`AC-2` — the `D6a` edge discharges, or its failure is reported.** The
 intra-function block edge that failed in HS18 either carries an authority

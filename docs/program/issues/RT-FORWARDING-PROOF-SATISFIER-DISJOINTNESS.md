@@ -26,6 +26,24 @@ origin: "Split out of RT-CONSTRUCTOR-AUTHORITY-DISCHARGE D2a by the Steward at e
 > what it exists to buy: it stopped a fifth pass, and the fifth pass would have
 > been wrong in the same way as the first four.
 >
+> ### WHAT IS DISCHARGED IS THE INSTRUMENT ASK. THE QUESTION IS NOT.
+>
+> **Narrowed 2026-09-14 at the Architect's request (`evt_1y9rk2s98qxf3`), and
+> the distinction is load-bearing:**
+>
+>     DISCHARGED   how to observe a recursive analysis without adding to the
+>                  frames on its path -- dead, the function was never on the
+>                  overflowing path
+>     NOT          whether the three satisfier populations are disjoint. Exactly
+>                  as unmeasured as it was this morning. This node is `draft`
+>                  with no result.
+>
+> ⇒ **Nothing here reopens sequencing `D2` behind this node.** That path was
+> closed on its own grounds and **stays closed** — the discharge STRENGTHENS the
+> closure, because sub-question 2 is the weakened remainder and disjointness is
+> therefore not getting measured soon. **If anyone reads "the hold is discharged"
+> as reopening it, that is the misreading to head off.**
+>
 > **RESEARCH SUB-QUESTION 1 IS WITHDRAWN — its premise is false.** It asked how
 > to observe a recursive compiler analysis *"without adding to the frames on its
 > path."* `prove_forwarded_value` was never on the overflowing path. There is no
@@ -76,9 +94,14 @@ object DB rather than relayed.
 
 **`prove_forwarded_value` is NEVER CALLED from
 `abi_s6_mapping_file_backed_native`.** Its only non-recursive entries are
-`units.rs:4366` in `exact_staged_unit` and `:3370` inside
-`derive_certified_cuts`, whose sole caller is `:4358` in that same
-`required`-driven loop.
+`units.rs:4366` in **`close_and_define_staged_result_bodies`** (`:4117`) and
+`:3370` inside `derive_certified_cuts`, whose sole caller is `:4358` in that
+same function — which IS the `required`-driven loop.
+
+**CORRECTED 2026-09-14** (Architect, `evt_1y9rk2s98qxf3`): this first named
+`exact_staged_unit`, a 19-line helper at `:4097-4115` containing neither call. A
+"last `fn` before line N" scan matched `^pub fn ` and skipped `pub(super) fn`,
+landing one function short. Conclusion unchanged.
 
     suite                                  enter  visit  discharge
     abi_s6_mapping_file_backed_native         0      0        0
