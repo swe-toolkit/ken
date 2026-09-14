@@ -2,7 +2,7 @@
 
 ## A calculus extracted from Ken's native backend
 
-> **Status:** research reference; partial and non-normative. This paper
+> **Status:** research reference that is partial and non-normative. This paper
 > reconstructs a compiler protocol from the implementation and the supporting
 > research reports. It is not peer reviewed, its metatheory is not mechanized,
 > and it does not add affine or linear types to Ken. The specification and
@@ -77,7 +77,7 @@ validated mint
 This paper asks whether that structure can be stated independently of the
 backend's present Rust containers. The answer is yes, with two qualifications.
 First, the common object is a family of obligation systems, not one universal
-ledger. Second, the calculus specifies a compiler protocol; it does not alter
+ledger. Second, the calculus specifies a compiler protocol, and it does not alter
 Ken's kernel, equality, or source-level resource model.
 
 The paper makes five contributions:
@@ -114,7 +114,7 @@ all of the relevant questions:
 The qualifier *causal* matters. An identity records why an event exists and
 which planning fact owns it. It is not merely a globally unique number. If a
 coordinate is removed from an identity, two distinct causes can collapse into
-one key; a subsequent duplicate-consumption error then truthfully reports the
+one key, and a subsequent duplicate-consumption error then truthfully reports the
 collision while misidentifying its cause.
 
 ### 2.2 Names are not resources
@@ -192,7 +192,7 @@ Ken's compiler is implemented in Rust and benefits from move-only structures,
 but this calculus is deliberately smaller than Rust's discipline. It omits
 loans, aliasing, lifetime inclusion, destructors, unwinding, provenance,
 interior mutability, and unsafe abstraction. Mutable ledgers enforce several
-of its exact-use properties dynamically during compilation; Rust's type checker
+of its exact-use properties dynamically during compilation, and Rust's type checker
 does not prove them all.
 
 ### 3.4 Translation validation and proof-producing compilation
@@ -216,7 +216,7 @@ extensional behavior while retaining computational properties such as
 canonicity and decidable checking [Altenkirch, McBride, and Swierstra 2007].
 TTobs and CCobs develop modern observational equality with proof irrelevance,
 normalization, conversion, quotients, and inductive types [Pujet and Tabareau
-2022; Sirman, Lennon-Bertrand, and Krishnaswami 2025].
+2022, and Sirman, Lennon-Bertrand, and Krishnaswami 2025].
 
 Ken's kernel is in this observational tradition. The compiler calculus does not
 solve the hard interaction between observational equality and linear values.
@@ -288,7 +288,7 @@ Gamma ::= empty
 ```
 
 These entries remain distinct despite sharing structural rules. A source term
-has a planned origin; a generated term does not. An inert identity is a name,
+has a planned origin, and a generated term does not. An inert identity is a name,
 not authority. A worker is reusable. A backend handle is scoped to the function
 whose backend builder created it.
 
@@ -303,7 +303,7 @@ O     ::= open(Q(o, payload))
 
 Map uniqueness prevents two live entries with the same identity. `Delta`
 admits exchange but does not generally admit contraction or weakening.
-Domain-specific coordinates remain in `kappa` or `payload`; erasing them can
+Domain-specific coordinates remain in `kappa` or `payload`, and erasing them can
 destroy injectivity.
 
 Lowering begins with one open entry for each identity in the validated plan.
@@ -582,7 +582,7 @@ R is functional from E to Pq
 ```
 
 `image(R) = Pq` is deliberately absent. An unused authorization record is
-lawful; an ungoverned event is not.
+lawful, and an ungoverned event is not.
 
 ### 6.4 Visit closure
 
@@ -650,7 +650,7 @@ For a valid state, either one reduction rule applies, the state is lawfully
 closed, or a failed premise identifies an absent authority, owner mismatch,
 unsupported representation, or backend inconsistency.
 
-This is not source-language progress. Compilation refusal is a valid outcome;
+This is not source-language progress. Compilation refusal is a valid outcome, and
 silent fallthrough is not.
 
 ## 8. Correspondence with Ken's implementation
@@ -676,7 +676,7 @@ Three details are load-bearing.
 
 First, `ContinuationCallIdentity` is planner-issued and opaque to lowering. Its
 semantic identity includes producer construct, alternative, call-site sequence,
-and recursive position; lowering can query the target and owner but cannot
+and recursive position, and lowering can query the target and owner but cannot
 reconstruct the identity from those projections.
 
 Second, `ContinuationClaimLedger` distinguishes declaration, exact claim,
@@ -692,7 +692,7 @@ visit independently and rejects an incomplete or discarded group before its
 body is defined, then restates the opened-versus-committed law globally.
 
 The calculus deliberately omits `BTreeMap`, `BTreeSet`, Cranelift entity types,
-and module boundaries. They implement finite relations and scoped evidence; they
+and module boundaries. They implement finite relations and scoped evidence, and they
 are not semantic rules.
 
 ## 9. Executable support
@@ -712,7 +712,7 @@ refusal.
 | affine capabilities reject a second use | splice-capability controls in `lowering/core/tests/control.rs` |
 
 These tests support an implementation correspondence, not a proof of the
-calculus. Several checks operate directly on ledger APIs; others exercise a
+calculus. Several checks operate directly on ledger APIs, and others exercise a
 full compile with a mutation installed. A mechanized account must distinguish
 the two and prove that extraction from production traces covers every relevant
 event.
@@ -758,7 +758,7 @@ a theorem connecting every evidence constructor to finished backend artifacts.
 ### 10.5 The implementation is evolving
 
 The correspondence is grounded in the repository revision recorded by the
-library manifest and status machinery. Names and module boundaries may change;
+library manifest and status machinery. Names and module boundaries may change, and
 the mathematical distinctions should survive only if their source mechanisms
 still do. This page must be revised when a cited producer, ledger, closure
 boundary, or evidence path changes semantically.
