@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-14 16:18:37Z — from 612 issue file(s) in `docs/program/issues/`.
+2026-09-14 17:43:01Z — from 613 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -433,6 +433,7 @@ the committed file matches the generator's output.
 | `RT-DESCENT-LANE-COMPLETENESS` | Is the functionized lane a complete replacement for RecursiveDescent, or has it been carrying only the ported subset? D2c refused NINE programs the retiring lane compiles, across FOUR independent constructs -- a pattern, not a missing case, so this is a lane-completeness question and not a port | closed | runtime | M | none | — |
 | `RT-DESCENT-RETIRE-PRIOR-ART` | Prior art admits the shape and carries no second descent lane -- retirement is supported and never by source unreachability -- this node's proposed pre-classifier IR invariant was DECLINED by the Architect in favour of uniform lowering, so the retirement is NOT gated on it and this row is not an unmet bar | merged | research | M | none | — |
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | merged | runtime | M | none | — |
+| `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` | Is there a Ken source program in which two callers demand different constructor identities of one response-owner body -- the shape RT-CONSTRUCTOR-AUTHORITY-DISCHARGE's discharge ledger exists to catch, which no permitted instrument has been able to construct. The stake is measured, not speculative: in exactly the collision case the units.rs:4407-4422 identity-mismatch diagnostic is structurally unreachable, so if the shape IS reachable the ledger is the SOLE net | draft | runtime | M | architect | — |
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-DYNAMIC-CONSTRUCTOR-DISPATCH-PROVENANCE` | M3 successor (recut) — bind px8ta's causal residual (emit_carrier_dynamic_constructor's direct return_(-3) at StaticOriginId(34)) to one actual generated function/owner/SSA discriminator/compare/successor, then repair only the proven layer; the equality chain over discriminator 1 with a declared tag-1 alternative reaches its residual, which the hard-stop #3 research advisory places most plausibly in value-handle provenance, not integer equality | merged | runtime | M | none | — |
 | `RT-EFFECT-CONTINUATION-WRITE-NARROWING` | Materialize closed effect-response planes through existing response owners: execute each host effect synchronously, resume its exact continuation once through the existing activation frame and Result slot, and preserve deferred ordinary lowering for open planes. First consumer: composed read-then-write narrowing returns ResourceBodyErr(InvalidOffset) instead of trapping at ResourceBodyResult. | merged | runtime | M | none | — |
@@ -705,7 +706,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft)
+- **architect**: `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft)
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
