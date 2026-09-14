@@ -36,9 +36,13 @@ origin: "Adversary hunt evt_6npaybf8cznp8 (2026-08-18) on the RT-D2-EVIDENCE-INS
 >
 > **`D0` is a component-design call and is the Architect's, not the
 > implementer's.** Take it there before building either arm; the Architect is
-> seated and light. Note `AC-2`'s shape in particular: the control must be shown
-> to **red on today's `main`** before any repair, and that red is the acceptance
-> evidence. A green run proves nothing here, because the tree already fails 3 of 3.
+> seated and light.
+>
+> **`D0` WAS RULED THE SAME DAY — ARM 2, DELETE THE THREE.** The paragraph above
+> stands as the release record; the design question it points at is closed. **The
+> `AC-2` guidance this block originally carried is withdrawn: `AC-2` was
+> conditioned on arm 1 and is NOT APPLICABLE.** See the `D0` ruling block and the
+> re-cut acceptance criteria below.
 
 ## The defect
 
@@ -187,6 +191,76 @@ non-`NativeScalarPair` representation before delegating to `merge_scalar_operand
 (`mod.rs:17942`), which takes no token and has **exactly two call sites in all of
 `crates/`** — those two wrappers. The count fell 3 to 2 because a helper was
 deleted, not because one lost its token.
+
+> #### THE COUNT IN THE PARAGRAPH ABOVE HAS EXPIRED. **THE CONCLUSION SURVIVES
+> #### FOR A DIFFERENT AND BETTER REASON.** (2026-09-14, Steward-measured.)
+>
+>     git grep -n 'merge_scalar_operand' -- 'crates/**/*.rs'     -> 7 hits
+>       joins.rs:2425                  the DEFINITION
+>       calls.rs:22                    a doc-comment mention
+>       joins.rs:967, :978             lower_carried_bool_match  PRODUCTION
+>       joins.rs:2412                  merge_scalar_branch       PRODUCTION
+>       mod.rs:12672                   merge_planned_scalar_branch PRODUCTION
+>       core/tests/constructors.rs:2700  a test, direct
+>
+> **FIVE call sites, THREE of them production — not two.** The coordinates above
+> have also moved: `merge_scalar_branch` and `merge_scalar_operand` are in
+> `joins.rs` now, not `mod.rs`. A third production caller,
+> `lower_carried_bool_match`, is legitimate — it takes `join_plan:
+> &JoinPlanToken` and skips the representation gate because a carried word has no
+> native pair, which is what `merge_scalar_branch`'s own doc says it fails closed
+> on.
+>
+> **THE GATE IS STILL CLOSED BY CONSTRUCTION — BY THE CALLEE'S OWN GUARD, NOT BY
+> THE CALLER POPULATION BEING SMALL.** `merge_scalar_operand` refuses a
+> `LoweringOperand::Carried` with no `required_kind` (*"a carried scalar reached
+> an untyped private merge consumer"*), checks the boundary tag against the kind
+> claimed, and refuses `ScalarMergeKind::RecursiveBackedge` outright. **That fires
+> on every caller, including callers not yet written**, which is exactly what a
+> count of callers cannot do.
+>
+> ⇒ **The ban below stands. Its stated ground is re-grounded here**, so that a
+> live prohibition does not rest on a false number. Architect
+> `evt_2h8c4fvvrf2jp`; call sites re-measured independently by the Steward.
+>
+> **NOT ESTABLISHED, and recorded as not established:** only
+> `merge_scalar_operand`'s `Carried` branch was read (`joins.rs:2432-2472`, which
+> `return`s). **Nobody has read the non-`Carried` continuation past `:2472`**, so
+> no one is claiming the guard is complete across every operand shape. Nor was
+> `JoinPlanToken` verified unmintable. Closing that is **one bounded read**,
+> optional, prices nothing here, and if it comes back "there is a hole" it goes to
+> the Architect on its own. **It is not a reason to keep 27 lines of dead text.**
+>
+> **RE-COORDINATED BY IDENTIFIER, which is this node's own new rule applied to
+> its own prose.** The paragraph above cites three `mod.rs:NNNNN` positions and
+> **two of the three are not in `mod.rs` at all any more**:
+>
+>     node says       ->  measured at origin/main, BY IDENTIFIER
+>     mod.rs:17919    ->  merge_scalar_branch          joins.rs:2400  pub(super)
+>     mod.rs:17942    ->  merge_scalar_operand         joins.rs:2425  pub(super)
+>     mod.rs:18271    ->  merge_planned_scalar_branch  mod.rs:12659
+>
+> **Read the paragraph above by those identifiers, never by its line numbers.**
+>
+> **AND NAME THE RIGHT FUNCTION WHEN CORRECTING A FALSE PREMISE.** The expired
+> "exactly two call sites" claim is about **`merge_scalar_operand`** — the one
+> that takes **no** token (`required_kind: Option<ScalarMergeKind>`).
+> `merge_planned_scalar_branch` is one of the two *wrappers* and **does** take
+> `join_plan: &JoinPlanToken` (`mod.rs:12659-12662`, verified). An earlier
+> Steward post attributed the expired count to the wrapper; the measurement and
+> the conclusion were unaffected, but the name was wrong, and a note written to
+> correct a false premise must not misname the function while doing it.
+>
+> On the three-production figure: `joins.rs:967` and `:978` are the two halves of
+> one site inside `lower_carried_bool_match`, `:967` being the `#[cfg(test)]`
+> half. Setting that aside leaves `:978`, `joins.rs:2412` and `mod.rs:12672` —
+> **three production callers.**
+>
+> **This is the FIFTH medium in this WP to rot the same way** — after the three
+> retired bodies, this node's coordinates, arm 1's mechanism, and the caller
+> count itself. A ban-ground paragraph, in prose, never compiled, inside a node
+> about records that rot. **It is also the first one repaired by the rule this WP
+> produced:** named by identifier, so the next file split cannot move it.
 
 **What the retired assertion did guard is the family's closure** — a third caller
 of `merge_scalar_operand` could be added inside `lowering/mod.rs` with no token
@@ -345,6 +419,35 @@ exists to stop, not an instance of it to clean up.
 >   behavioural read at each successor's site and is a **precondition on that
 >   deletion**, not on the WP. A census whose successor does not carry the
 >   property goes back to the Architect on its own; the others proceed.
+>
+>   > **`AC-8` FIRED AND IS DISCHARGED, 2026-09-14. ALL THREE CENSUSES PROCEED.**
+>   > Architect `evt_2h8c4fvvrf2jp`, on the implementer's precondition reads.
+>   >
+>   >     census 1  named successor borrowed_ingress_bytes_at_preserves_safe_none_bounds
+>   >               DOES NOT carry it -- a behavioural bounds test. Zero live TESTS
+>   >               assert the typed-token requirement.  PROCEEDS ANYWAY, see below.
+>   >     census 2  no note at all; note to be WRITTEN (AC-7)
+>   >     census 3  successor named BY POSITION ("the controls above"); live
+>   >               candidates exist at :483/:532/:583/:744 but a positional
+>   >               reference cannot be verified to resolve to what its author
+>   >               meant.  PROCEEDS; its note is REWRITTEN by identifier (AC-1).
+>   >
+>   > **Census 1 is the one worth reading twice, because `AC-8` resolved by
+>   > finding the record was never the body.** The census asserted
+>   > `helpers.matches("plan: &JoinPlanToken").count() == 3` over `mod.rs` — a
+>   > count of the token in **caller signatures**, in **one file**, as a proxy for
+>   > a guard that lives in the **callee's body**. The property is enforced at the
+>   > point of use by `merge_scalar_operand` itself.
+>   >
+>   > ⇒ **A CALLER-SIDE CENSUS CANNOT ESTABLISH A CALLEE-SIDE INVARIANT.** It
+>   > reports the caller population on the day it ran and goes red on every
+>   > legitimate new caller — here it would have fired on
+>   > `lower_carried_bool_match`, which is correct code. That is the same "your
+>   > dead text is dead" tax `D0` ruled against, one level in.
+>   >
+>   > **The search that returned zero was the wrong search**, and the census's own
+>   > framing is what invited it: it looked for a live **test**. The carrier is
+>   > not a test and is not on the caller side at all.
 
 - **`AC-1` — RE-AIMED BY THE `D0` RULING.** State the retirement convention at
   `core/tests/mod.rs`'s header: **retirement is DELETION plus a note at the site
@@ -387,7 +490,11 @@ exists to stop, not an instance of it to clean up.
 - **Repairing the four false D8 assertions.** See the fork — that is the
   split-the-difference move.
 - **Filing the `merge_scalar_operand` closure gap as a defect.** It is a missing
-  guard on a gate that is closed by construction today.
+  guard on a gate that is closed by construction today. **RE-GROUNDED
+  2026-09-14: still banned, but NOT because the caller population is small —
+  that count has expired (five call sites, three production, not two).** It is
+  closed by the **callee's own guard**, which fires on every caller including
+  ones not yet written. See the expiry block above.
 - **Claiming a regression or reclassifying `D3`'s landing.** `D3` is correct and
   this finding strengthens its choice: it rejected revival because the census is
   compiled out, and revival turns out not to be available for this family at all.
@@ -397,3 +504,53 @@ exists to stop, not an instance of it to clean up.
 Blocks nothing. The operator's run order stands. **It is worth doing before the
 next large deletion campaign under `lowering/`**, because that is when a retired
 body rots, and the campaign in front of it is the backend module split.
+
+## Counts and symptom inventory
+
+**Hard stops: 1.** `§1a` fires at 3, and the Steward's tracker is the count of
+record. The one stop is the Architect's own `§8` precondition firing while it
+built the ruling — counted deliberately rather than waived, on the ground that
+over-counting a structural wall is the safer error.
+
+**Symptom inventory, entry 1:**
+
+> 1. census 1's retirement note named a successor that does not carry the
+>    property, and the property turned out to be enforced somewhere else
+>    entirely — keyed on **caller signatures** when the guard is in the
+>    **callee's** body
+
+Its predicate is this node's own thesis one level in: **a record that names the
+tree by text or by position rots, and the guard it proxies for does not.**
+
+**The rot count for this WP is FIVE media, not three.** The three retired bodies
+(`cfg`-stripped), this node's coordinates (prose, never compiled), arm 1's
+mechanism (prose, never compiled), and the banned-scope caller count (prose,
+never compiled). **Two of the four were never compiled at all, so `cfg`-stripping
+cannot be the cause** — which refutes the node's own mechanism sentence,
+*"cfg-stripping precedes name resolution, so a retired body is neither
+type-checked nor name-resolved."* That is true in general about `cfg(any())`
+bodies and is **not** what killed these.
+
+**All three retired bodies are TEXT censuses** — every subject is a string
+literal (`include_str!` plus `.matches(...)`, or `identifier_occurrences`). **A
+live `#[test]` containing `"merge_branch_value"` in a string is not name-resolved
+against `merge_branch_value` either.** The compiler never checked these, before
+retirement or after. **What kept them honest was being RUN, and the assertion
+failing.** Name resolution is not in this story.
+
+## Census 1's note, for the deletion
+
+Suggested text, adjust freely — naming the real carrier **by identifier** is the
+point, per `AC-1`:
+
+```rust
+// RETIRED by RT-RETIRED-CENSUS-ROT D0 (a retired body is not a record).
+// This counted `plan: &JoinPlanToken` in caller signatures in `mod.rs` -- a
+// caller-side proxy for a callee-side guard. The property is enforced at the
+// point of use by `merge_scalar_operand` itself: a `LoweringOperand::Carried`
+// with no `required_kind` is refused ("a carried scalar reached an untyped
+// private merge consumer"), the boundary tag is then checked against that
+// kind, and `ScalarMergeKind::RecursiveBackedge` is refused outright. That
+// fires on every caller, including ones not yet written, which a count of
+// callers cannot.
+```
