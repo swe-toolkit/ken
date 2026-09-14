@@ -80,8 +80,15 @@ The reachability measurement grounded the flow; these are its coordinates.
   declared `argument_binders`, checked against the carried word's `field_count`
   at runtime "which is where a disagreement belongs." The result obligation is
   ruled onto the same footing.
-- **The fail-closed default**, `core.rs:9375`: the unmatched-arm refusal stays as
-  the default for an arm matching nothing.
+- **The detached-consumer identity guard**, `core.rs:9375`: an
+  identity-disagreement refusal ("detached before-value call disagrees with
+  required-consumer defining call") inside
+  `lower_checked_ih_detached_required_consumer_result` (`:9341`), reached from
+  `:6862`/`:6963`. It is a DISJOINT path from D2's receipt seat
+  (`StaticResponseReturn` -> `apply_required_consumer_incoming_edge` at
+  `:4349`/`:4358`), and that disjointness is the HS14 diagnosis: the relocated
+  site bypasses this guard, which is how a compile-time-refusable mismatch
+  reached runtime. It is NOT a case-arm unmatched-arm default.
 
 ## Deliverables
 
@@ -115,18 +122,43 @@ a silently-skipped discharge both leave those unchanged. The mutation must red
 because the discharge **did not run on the taken arm**, not because a case
 vanished from the emitted set.
 
-**`D4` — retentions, reported present and unchanged.** Each of these is retained
+**A single-arm witness does not establish a per-arm property** — that is this
+arc's signature defect one level down. The two arms are the base-completion and
+the recursive paths, so a recursive witness plausibly takes BOTH in one run.
+**State which arms the runtime takes in the witness, and witness the discharge on
+each arm it takes.** If only one arm is reachable in the available fixture, say
+so explicitly as a named GAP — an untaken arm's discharge is unwitnessed — rather
+than leaving it implicit; D3's own GAP line already demands emitted-but-untaken
+be distinguished from silently-skipped.
+
+**`D4` — the per-arm fail-closed disposition, report-only.** State what happens
+when the runtime tag matches NO arm's constructor identity after the re-key. On
+the evidence in hand this path is a runtime `PatternMatchFailure` — literally the
+Trap 43 text, "no runtime match case selected for decl:...Result" — i.e. a
+runtime trap, not a compile-time `Err(unsupported)`. **Report what the
+unmatched-tag path does after the re-key and whether that disagreement is
+compile-time refusable or only runtime-observable.** If it is only
+runtime-observable, that is a FINDING TO RECORD, not a defect to fix here: this
+deliverable does **not** authorize widening scope to make it compile-time
+refusable — it puts the answer on the record, because this whole arc exists
+because a compile-time-refusable mismatch was reaching runtime.
+
+**`D5` — retentions, reported present and unchanged.** Each of these is retained
 and must be shown still to hold, not merely left alone:
 
 - Q2 attribution stays **local and non-vacuous** — closed, do not reopen.
 - Certificate-follows-consumer.
 - Amendment-8 origin; the entry-18 verifier repair.
-- The `core.rs:9375` unmatched-arm refusal as the **fail-closed default**.
+- The `core.rs:9375` detached-consumer identity-disagreement refusal (on the
+  `:6862`/`:6963` path, disjoint from this node's seat): **report its REACHABLE
+  POPULATION after the re-key, not merely that it is present.** "Unchanged" must
+  not stand in for "still guards something" — name what still reaches it, or
+  state that nothing does.
 
-**`D5` — the advancing outcome.** Report what the seat does for the taken arm
-now that the obligation is per-arm. Trap 43 resolving for the taken arm is the
-expected shape. **If it advances to a refusal nobody predicted, stop and report
-— that is a finding, not a failure.**
+**`D6` — the advancing outcome.** Report what the seat does for the taken arm now
+that the obligation is per-arm — the receipt-seat trap that fired on the union no
+longer firing for the taken arm is the expected shape. **If it advances to a
+refusal nobody predicted, stop and report — that is a finding, not a failure.**
 
 ## THE CUT — stated so this node cannot drift into a refused family
 
