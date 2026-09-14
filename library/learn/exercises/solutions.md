@@ -8,15 +8,15 @@ the answer yourself rather than take it on this page's authority.
 
 1. `print (text : String) : IO (Result IOError Unit) visits [Console]` — the
    row `[Console]` says the *only* thing `print` may do to the world is act
-   on the `Console` effect; it rules out any other effect (`FS`, `Net`,
+   on the `Console` effect, and it rules out any other effect (`FS`, `Net`,
    `Clock`, `Rand`, …) regardless of what its body happens to contain
-   (`catalog/packages/Capability/Console/Text.ken.md`;
+   (`catalog/packages/Capability/Console/Text.ken.md`, and
    `spec/30-surface/36-effects.md`
    [§1](../../../spec/30-surface/36-effects.md#1-effects-as-a-static-row)).
 2. `decide` is declared `fn` — a pure, computational definition. That keyword
    alone tells you it carries the empty effect row: it can compute, and
    nothing else — no `visits` clause is even possible on a `fn`
-   (`catalog/packages/Core/Logic/EmptyDec.ken.md`;
+   (`catalog/packages/Core/Logic/EmptyDec.ken.md`, and
    `spec/30-surface/36-effects.md`
    [§1](../../../spec/30-surface/36-effects.md#1-effects-as-a-static-row)).
 
@@ -26,7 +26,7 @@ the answer yourself rather than take it on this page's authority.
    validates — it says nothing, on its own, about whether the kernel's
    `trusted_base()` also carries no postulate for that same goal.
    `proved` requires **both** conjuncts, and the second one is not
-   something `ken check`'s exit code establishes by itself; it requires a
+   something `ken check`'s exit code establishes by itself, and it requires a
    separate, explicit inspection of `trusted_base()`
    (`spec/20-verification/21-spec-syntax.md`
    [§5.4](../../../spec/20-verification/21-spec-syntax.md#54-the-honesty-guard-unknowntesteddelegated-never-read-proved)).
@@ -36,14 +36,14 @@ the answer yourself rather than take it on this page's authority.
 1. No, not the same claim. Combinators' zero is literal and unqualified —
    its own producer test confirms `trusted_base()` is set-equal before and
    after loading the package
-   (`catalog/packages/Data/Sums/Combinators.ken.md`;
+   (`catalog/packages/Data/Sums/Combinators.ken.md`, and
    `crates/ken-elaborator/tests/ds3_sum_combinators_acceptance.rs`,
    `trusted_base_delta_is_empty_across_the_file`). EmptyDec's "Zero new
    trust category" is narrower: its own Design notes name a possible
    instantiation (`dec_eq_decides Int`) whose `DecEq Int.sound` rides an
    axiom, so EmptyDec's zero covers only the *admission* of its own two
    inductives, not every instantiation a caller might choose
-   (`catalog/packages/Core/Logic/EmptyDec.ken.md`;
+   (`catalog/packages/Core/Logic/EmptyDec.ken.md`, and
    `crates/ken-elaborator/tests/ds1_empty_dec_acceptance.rs`,
    `ac3_trusted_base_delta_is_ordinary_inductive_admission_only`).
 2. Something else: it is real, current, checked prose that shows *why*
@@ -52,14 +52,14 @@ the answer yourself rather than take it on this page's authority.
    the spec's formal, tagged `tested` construct (an `assume`/`test`-tagged
    clause), which remains proposal-level and unexhibited by any registered
    fragment
-   (`catalog/packages/Tooling/Testing/Property.ken.md`;
+   (`catalog/packages/Tooling/Testing/Property.ken.md`, and
    `spec/20-verification/21-spec-syntax.md` §5.2, §5.5).
 
 ## 04 — Effects, capabilities, and authority
 
 1. `Full` retains all seven named filesystem rights, including write and
    delete, but may exercise them only within its `FsScope`. The runtime
-   capability check enforces rights and authority; downstream filesystem
+   capability check enforces rights and authority, and downstream filesystem
    resolution enforces confinement
    (`catalog/packages/Capability/Filesystem/Errors.ken.md`).
 2. False. The checked filesystem authority fragment now carries explicit
@@ -67,9 +67,9 @@ the answer yourself rather than take it on this page's authority.
    controls distinguish `Cap AFull` from `Cap APartial`. It deliberately
    contains no `attenuate`, `revoke`, or `strengthen` call: those management
    operations remain host/runner-side and unbound in Ken. Nor does the
-   fragment compare authorities at runtime; the authority index in `Cap a`
+   fragment compare authorities at runtime, and the authority index in `Cap a`
    makes the distinction static
-   (`catalog/packages/Capability/Filesystem/Authority.ken.md`;
+   (`catalog/packages/Capability/Filesystem/Authority.ken.md`, and
    `crates/ken-elaborator/tests/cat_capex_authority.rs`).
 
 ## 05 — Packages and provenance
@@ -81,7 +81,7 @@ the answer yourself rather than take it on this page's authority.
    in either closed list the cited taxonomy sections state, so this
    curriculum does not classify them — that is an honest gap in what the
    cited source pins, not a fact derivable by guessing
-   (`catalog/packages/Tooling/Testing/Property.ken.md`;
+   (`catalog/packages/Tooling/Testing/Property.ken.md`, and
    `spec/30-surface/30-taxonomy.md`
    [§3](../../../spec/30-surface/30-taxonomy.md#3-the-built-in-set--the-surface-tcb-irreducible),
    [§4](../../../spec/30-surface/30-taxonomy.md#4-the-prelude-tier--ken-defined-always-present-closed)).
@@ -95,7 +95,7 @@ the answer yourself rather than take it on this page's authority.
    style choice, the same idiom a proof-techniques guide entry uses
    elsewhere — not a claim that `import` failed or could not deliver
    `Transport`'s lemmas
-   (`catalog/packages/Core/Logic/EmptyDec.ken.md`;
+   (`catalog/packages/Core/Logic/EmptyDec.ken.md`, and
    `catalog/packages/Core/Logic/Transport.ken.md`).
 
 ## 06 — Execution
@@ -109,7 +109,7 @@ the answer yourself rather than take it on this page's authority.
    against either engine — both are grounded as real and tested from their
    own sources elsewhere
    (`crates/ken-cli/src/main.rs`, `check_file`/`run_file`/
-   `native_build_file`; `library/learn/reading-ken/06-execution.md`
+   `native_build_file`, and `library/learn/reading-ken/06-execution.md`
    §§2, 3, 5).
 2. No. The five `theorem`s are proofs about the *shape* of `writeAll`'s
    recursion and its error handling — real, kernel-checked claims about
@@ -127,6 +127,6 @@ the answer yourself rather than take it on this page's authority.
    cranelift_backend/` is real code in the tree, `ken native-build` is a
    working CLI subcommand that calls it, and `crates/ken-cli/tests/
    px4b_native_production.rs` drives real programs through it today. Both
-   facts are independently checkable and both are true; this page states
+   facts are independently checkable and both are true, and this page states
    the inconsistency rather than reading past it — nothing in either
    source resolves it.
