@@ -99,23 +99,43 @@ the `selected` block at the `core.rs:15758` body-lowering site. **Report the
 exact site and that the identity is the planner query's value, not read off the
 carried word or inferred from the runtime tag.**
 
-**`D2` — stop the identity comparison from gating the receipt seat, and RETAIN
-the suffix (HS16 disposition).** "Applying `RequiredConsumerIncomingEdge`" names
-TWO artifacts — validating the defining-call identity AND selecting the retained
-suffix — and only the FIRST must stop. **The identity validation stops gating
-this seat; the suffix selection and the continuation it schedules are retained
-UNCHANGED for both arms.** Do NOT bypass the whole call: bypassing
-`apply_required_consumer_incoming_edge` drops the arm's remaining eliminator
-chain — an empty `remaining` at `core.rs:4378` routes to
-`ProducerTrampolineStep::ordinary`, so the source continuation is never lowered
-(that is the `checked HostIO match had no constructor arm` signature HS16 hit,
-and `D5bHs17PostCallConsumerMutation::DropResidualSuffix` at `core.rs:4372`
-already names the same failure mode). The already-final arm keeps its suffix and
-lowers its ordinary source continuation; only the identity comparison — whose
-premise HS15 closed — stops gating this seat. **Report that the identity
-comparison no longer gates the seat, that the suffix and its scheduled
-continuation are retained for both arms, and that Trap 43's unconditional
-identity refusal is gone.**
+**`D2` — ADD a per-arm selection keyed on the constructor identity; remove NO
+emitted work (HS17 §1b-ii closure, ADDITION form).** The obligation is NOT
+anything the arm emits — not the suffix, not the body, not the continuation. It
+is exactly the two `return Err` in `apply_required_consumer_incoming_edge`
+(`core.rs:9233` and `:9243`), a function that takes no `FunctionBuilder`, emits
+no instruction, and whose only output is the slice
+`&eliminators[incoming_edge_index..]` (`:9248`). It follows structurally that a
+correct edit CANNOT remove emitted work on either arm. HS16 removed the suffix
+(dropped the continuation); HS17 removed the body (the demanded arm's body is TWO
+artifacts — the consumption Trap 43 rejects AND the production the remaining
+chain consumes — so bypassing it advanced past Trap 43 but broke ITree). Both
+were subtractions and both were wrong by construction, and both were the only
+reading a subtraction verb supported.
+
+**Both arms lower their ordinary body, retain their full suffix, and schedule
+their continuation exactly as in the body-retained run — nothing emitted is
+removed.** The re-key is an ADDITION: inside the case arm, the already-final
+`Ret` case must KEEP PRODUCING and STOP CONSUMING, and the fact that tells it
+which case it is is the static planner value D1 re-keys onto —
+`case_constructor_identity(eliminator.static_origin, index)` at `core.rs:15555`,
+discharged in the selected block. The runtime tag still only SELECTS the block;
+it never supplies the identity.
+
+**The exact selection operation is pinned by a READ, not guessed** (Architect
+ruling item 3): inside the `Ret` arm's body lowering, name the exact operation
+through which the already-final value enters consumption — the first thing
+reached from `core.rs:15758` that arrives at the receipt seat in
+`lower_computational_match_value_composed_once` (`core.rs:4337-4381`). Post that
+site; the Architect rules the added selection against it before any build. Also
+confirm (item 4) the skip-discharge mutation enum/application point was INACTIVE
+in the run-2 prototype, so the body bypass was genuinely the sole A/B difference.
+
+**Report: the site of the consumption operation (the item-3 read); that both
+arms' body, suffix, and continuation are unchanged from the body-retained run;
+and — once the Architect rules the selection — the ADDED per-arm selection and
+its identity source. No deliverable on this node authorizes removing emitted work
+from either arm.**
 
 **`D3` — the execution control, and it is the load-bearing deliverable.** A
 native observation that the exact per-arm discharge **executes for the
