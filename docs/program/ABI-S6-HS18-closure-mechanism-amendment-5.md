@@ -264,3 +264,120 @@ To be folded by the Steward without rewriting history:
 > than about the operand. Keyed on: **an input of the pairing supplied
 > independently and then certified** — the same predicate as entries 12-17, 19
 > and amendments 1-3, relocated to the last unbound input.
+
+---
+
+## Fork resolved — arm 2, and the caller cut must NOT be constructed
+
+Added 2026-09-14, after the ring built the refusal and returned the
+classification (`evt_2bj4w3e2kc6sp`, WIP `c35111dc2`, not a candidate). Folded
+into this amendment rather than issued as a sixth, because it answers the fork
+this amendment posed and splitting it would scatter one ruling across two
+documents.
+
+**This is not hard stop 9.** The refusal was built, it did not fire, and it
+produced exactly the classification it was designed to produce. The ring then
+asked the representation question this amendment instructed it to ask. **A stop
+I asked for is not a stop against the ruling** — the §1a count stays at **8**
+and the next re-trigger remains the **9th**. Recording that so the count is not
+inflated by a report I requested, and not deflated later either.
+
+The ring's closure is the ruled shape: `lower_checked_ih_detached_required_
+consumer_result` takes the single `ClaimedContinuationResult`, derives the edge
+internally, compares owned identity to defining identity with both in the
+refusal, and only then extracts the word. No independent before-value parameter
+remains. That is step 1, built.
+
+### The measurement answers the fork: neither option as posed
+
+The question was whether the no-completed-prefix case is **(a)** an empty owner
+prefix inside the existing cut, or **(b)** absence of a caller cut with a
+separate edge derivation.
+
+**Option (a) is not available, and the reason is in the cut's constructor.**
+`CheckedIhDetachedCallerCut` (`responses.rs:241-250`) is definitionally a
+**two-call** object. It carries `selecting_call`, and **both**
+`producer_transport` and `caller_transport` as separate transports. Its builder
+(`responses.rs:2246-2277`) takes every one of its caller-side fields from
+`boundary.caller_context()` — `caller_result_origin` from
+`caller_context().result_origin()`, `consumed_caller_suffix` from
+`caller_context().caller_suffix()` — and `consumed_continuation_origin` is *the
+continuation the caller consumed*.
+
+At the terminal defining call **there is no caller context.** So an "empty owner
+prefix" is not a degenerate value of an existing shape; **it requires
+fabricating the caller** — a caller context, a caller transport, and a selecting
+call for a call that nothing selected. That collapses producer and caller into
+one call, which is the "one definition now carries two identities" failure
+amendment 4 named, reintroduced in the object built to prevent it. It is also
+the degenerate-endpoint trap: a two-endpoint relation reviewed only at the point
+where its endpoints coincide reads as consistent precisely because the
+discriminator has been removed.
+
+**Option (b) is right in substance and wrong as posed.** There is no caller cut
+at this call, because there is no caller. But *"absence of a cut plus a separate
+edge derivation"* puts the decision back at the site: something must notice the
+`None` and choose a derivation, and a site that chooses is the open input this
+whole amendment exists to close. An `Option::None` that downstream code defaults
+on is the fourth input arriving from outside wearing a new spelling.
+
+### The authorized representation
+
+**The executable suffix is selected by an explicit two-armed relation, minted
+with the edge, never by the presence or absence of a cut.**
+
+- **Caller-completed arm** — a caller cut exists, carrying its two transports
+  and its caller context. Suffix is the exits at and after the caller's first
+  exit, exactly as `checked_ih_post_call_caller_exit_index` derives today.
+- **Self-defining arm** — one call, no caller, no cut, and **the suffix is the
+  FULL selected-case-exit chain**, because a call that completed nothing leaves
+  the whole chain live.
+
+Both arms carry their own evidence, and the arm is a property of the row, fixed
+where the defining call is named. **No lowering site may select the arm**, and
+neither arm is reachable by defaulting on the other's absence. The relation
+should not be representable without one arm or the other being chosen by its
+minter — the same discipline amendment 3 applied to the destination and this
+amendment applies to the before-value.
+
+### The falsification of the full chain is VOID — re-run it
+
+**This is the part not to skip.** The self-defining arm predicts the suffix at
+this call is `[699/frame3, 661/frame2]` — the whole chain. That is precisely
+what the eighth stop reported as already falsified: *"whole-chain execution
+`[699,661]` was already falsified: it reaches the same Result default after
+replaying owner work."*
+
+**That evidence does not transfer, and the ring's own reasoning is what voids
+it.** The return states that the generated-entry population is *"a faithful
+derivation from a false premise and must be recomputed after the cut is
+corrected."* The `[699,661]` run was made on the same tree, with the same false
+cut attached and the population derived from it. **The identical argument
+applies: it is a faithful execution of a program built from a false premise.**
+
+So the full chain has **not** been tested against the corrected representation.
+It has been tested against a program that removed frame 699 by a cut now proven
+false. Re-run it after the cut is gone, and report the result as new evidence.
+
+**If the full chain still fails with no cut attached and the population
+recomputed, that is a genuine hard stop and it is the 9th** — at which point I
+hold the ruling and call the research advisory before ruling again, per the
+standing trigger. Say so plainly if it happens; do not attempt a third
+representation.
+
+### On the population answer
+
+The answer given is the right one and it was answered in the right direction:
+the population is derived from the edge through
+`required_consumer_executable_suffix()`, not inserted to silence the refusal,
+and it is a faithful derivation from a premise now known false. **Recomputing it
+rather than preserving it is correct and is not optional** — a population that
+happens to be green under a corrected cut, but was derived under the false one,
+is green by coincidence and nothing would report that.
+
+### Not authorized, restated for this arm
+
+Fabricating a caller context, caller transport, or selecting call for a call
+that nothing selected is **not** authorized, in any spelling, including a
+sentinel or an "empty" caller. If the self-defining arm cannot be built without
+one, that is a stop and I want it back — not a synthesized caller.
