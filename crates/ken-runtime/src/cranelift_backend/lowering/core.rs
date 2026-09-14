@@ -6854,28 +6854,20 @@ impl<'a> Lowering<'a> {
                     &lowered_args,
                     producer_env,
                 )?;
-                let answer = claimed.answer;
-                let result = if let Some(consumer) = claimed
+                let result = if claimed
                     .post_call_consumer
                     .as_ref()
-                    .filter(|consumer| consumer.detached_return_context().is_some())
+                    .is_some_and(|consumer| consumer.detached_return_context().is_some())
                 {
-                    let raw = answer.value;
-                    let after = self.lower_checked_ih_detached_required_consumer_edge(
+                    self.lower_checked_ih_detached_required_consumer_result(
                         builder,
-                        consumer,
-                        raw.clone(),
+                        claimed,
+                        None,
                         producer_env,
-                    )?;
-                    self.finish_checked_ih_detached_consumer_result(
-                        builder,
-                        consumer,
-                        &raw,
-                        after,
                     )?
                     .into_operand()
                 } else {
-                    answer.value
+                    claimed.answer.value
                 };
                 if !matches!(
                     &result,
@@ -6966,33 +6958,13 @@ impl<'a> Lowering<'a> {
                 &lowered_args,
                 producer_env,
             )?;
-            if let Some(consumer) = claimed.post_call_consumer.as_ref() {
-                let active_consumes_receipt =
-                    self.validate_checked_ih_consumed_active(consumer, &active)?;
-                let raw = claimed.answer.value;
-                let after = if active_consumes_receipt {
-                    if active.pending.is_empty() {
-                        return Err(unsupported(
-                            "CheckedIhDetachedCallerCut",
-                            "an exact active detached consumer has no pending after-definition",
-                        ));
-                    }
-                    self.resume_active_continuation(builder, raw.clone(), active)?
-                } else {
-                    let consumed = self.lower_checked_ih_detached_required_consumer_edge(
-                        builder,
-                        consumer,
-                        raw.clone(),
-                        producer_env,
-                    )?;
-                    self.resume_active_continuation(builder, consumed, active)?
-                };
+            if claimed.post_call_consumer.is_some() {
                 let result = self
-                    .finish_checked_ih_detached_consumer_result(
+                    .lower_checked_ih_detached_required_consumer_result(
                         builder,
-                        consumer,
-                        &raw,
-                        after,
+                        claimed,
+                        Some(active),
+                        producer_env,
                     )?
                     .into_operand();
                 return Ok(ProducerTrampolineStep::ordinary(result));
@@ -9362,17 +9334,29 @@ impl<'a> Lowering<'a> {
         Ok(false)
     }
 
-    /// Lower only the caller-owned suffix selected by the detached row's exact
-    /// caller cut and incoming consumer edge. The owner-completed prefix is not
-    /// replayed, and the required consumer edge must leave a nonempty
-    /// after-definition path.
-    fn lower_checked_ih_detached_required_consumer_edge(
+    /// Consume one claimed call result through the detached row paired with
+    /// that same call. The before-value is owned by `claimed`; callers cannot
+    /// supply a word independently from the identity compared with the edge's
+    /// defining call.
+    fn lower_checked_ih_detached_required_consumer_result(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        consumer: &CheckedIhPostCallConsumer,
-        raw: LoweringOperand,
+        claimed: ClaimedContinuationResult,
+        active: Option<ActiveContinuationFrame<'_>>,
         producer_env: &[LoweringEnvironmentBinding],
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
+    ) -> Result<CheckedIhDetachedConsumerResult, CraneliftBackendError> {
+        let ClaimedContinuationResult {
+            identity,
+            answer,
+            post_call_consumer,
+            ..
+        } = claimed;
+        let consumer = post_call_consumer.ok_or_else(|| {
+            unsupported(
+                "RequiredConsumerIncomingEdge",
+                "a detached required-consumer result has no post-call relation",
+            )
+        })?;
         if consumer.detached_return_context().is_none() {
             return Err(unsupported(
                 "RequiredConsumerIncomingEdge",
@@ -9387,31 +9371,97 @@ impl<'a> Lowering<'a> {
                     "a detached post-call consumer has no exact incoming edge",
                 )
             })?;
+        let defining_call = edge.destination().defining_call_identity();
+        if &identity != defining_call {
+            return Err(unsupported(
+                "RequiredConsumerIncomingEdge",
+                format!(
+                    "detached before-value call {identity:?} disagrees with required-consumer defining call {defining_call:?}",
+                ),
+            ));
+        }
         #[cfg(feature = "px8-ds-test-support")]
         self.static_transition_plan
             .record_required_consumer_call_selection(&edge)?;
-        #[cfg(feature = "px8-ds-test-support")]
-        if d5b_hs17_post_call_consumer_mutation()
-            == D5bHs17PostCallConsumerMutation::SkipDetachedRequiredConsumerSuffix
-        {
-            record_d5b_hs17_post_call_consumer_application();
-            return Ok(raw);
-        }
-        let eliminators = self.checked_ih_post_call_eliminators(
-            edge.caller_completed_exits(),
-            producer_env,
-        )?;
-        let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
-        if remaining.is_empty() {
-            return Err(unsupported(
-                "RequiredConsumerIncomingEdge",
-                "the exact incoming consumer edge selected no after-definition suffix",
-            ));
-        }
-        self.lower_computational_match_value_composed(
+
+        let raw = answer.value;
+        let active_consumes_receipt = match active.as_ref() {
+            Some(active) => self.validate_checked_ih_consumed_active(&consumer, active)?,
+            None => false,
+        };
+        let consumed = if active_consumes_receipt {
+            None
+        } else {
+            #[cfg(feature = "px8-ds-test-support")]
+            if d5b_hs17_post_call_consumer_mutation()
+                == D5bHs17PostCallConsumerMutation::SkipDetachedRequiredConsumerSuffix
+            {
+                record_d5b_hs17_post_call_consumer_application();
+                Some(raw.clone())
+            } else {
+                let eliminators = self.checked_ih_post_call_eliminators(
+                    edge.caller_completed_exits(),
+                    producer_env,
+                )?;
+                let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
+                if remaining.is_empty() {
+                    return Err(unsupported(
+                        "RequiredConsumerIncomingEdge",
+                        "the exact incoming consumer edge selected no after-definition suffix",
+                    ));
+                }
+                Some(self.lower_computational_match_value_composed(
+                    builder,
+                    RoutedAnswer::direct(raw.clone()),
+                    remaining,
+                )?)
+            }
+            #[cfg(not(feature = "px8-ds-test-support"))]
+            {
+                let eliminators = self.checked_ih_post_call_eliminators(
+                    edge.caller_completed_exits(),
+                    producer_env,
+                )?;
+                let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
+                if remaining.is_empty() {
+                    return Err(unsupported(
+                        "RequiredConsumerIncomingEdge",
+                        "the exact incoming consumer edge selected no after-definition suffix",
+                    ));
+                }
+                Some(self.lower_computational_match_value_composed(
+                    builder,
+                    RoutedAnswer::direct(raw.clone()),
+                    remaining,
+                )?)
+            }
+        };
+        let after = match (active, active_consumes_receipt, consumed) {
+            (Some(active), true, None) => {
+                if active.pending.is_empty() {
+                    return Err(unsupported(
+                        "CheckedIhDetachedCallerCut",
+                        "an exact active detached consumer has no pending after-definition",
+                    ));
+                }
+                self.resume_active_continuation(builder, raw.clone(), active)?
+            }
+            (Some(active), false, Some(consumed)) => {
+                self.resume_active_continuation(builder, consumed, active)?
+            }
+            (None, false, Some(consumed)) => consumed,
+            _ => {
+                return Err(unsupported(
+                    "RequiredConsumerIncomingEdge",
+                    "a detached required-consumer result has inconsistent active/suffix disposition",
+                ))
+            }
+        };
+        self.finish_checked_ih_detached_consumer_result(
             builder,
-            RoutedAnswer::direct(raw),
-            remaining,
+            &consumer,
+            &raw,
+            after,
         )
     }
 
