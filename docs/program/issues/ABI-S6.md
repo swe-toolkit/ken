@@ -3149,6 +3149,101 @@ Architect inventory, 2026-09-11.
     Hard-stop count 20. The NEXT hard stop is HS21 and it is the SEVENTH
     MANDATORY §1a ADVISORY — recorded here so it is expected, and so no repair
     is hurried to land under it.
+35. HS21 RESOLVED BY MEASUREMENT — the chain's witness was the wrong program,
+    and measuring the right ones at the tip split one believed failure into
+    THREE. The seventh mandatory §1a advisory fired and was framed on this
+    baseline; it is FIRED AND UNCONSUMED, because research is quota-dead.
+    THE STOP. The implementer halted before instrumenting to report that the
+    CLIF behind every read in this chain (`hs15-natural-func61.clif`) builds
+    `px8f_write_all_native` (ken-cli, len-38 identities, funcid61) while the
+    CI red in `diagnosis-summary.txt` names `px8f_write_partition` (ken-verify,
+    len-37, funcid55). The Architect named that CLIF in its own R2 instruction
+    and praised binding it by content — which answered "is this the file I
+    named" and never "is this the failing program". `diagnosis-summary.txt`
+    also records `CI_HEAD=44d50af25`, a rebased twin and NOT an ancestor of the
+    implementer's tip, so its red was evidence about a twin lineage.
+    THE BASELINE, at tip `686ffa8ac`, clean tree, targeted `-p`, measurement
+    only, with the disk gate (`No space left on device` / `SIGBUS` / `ENOSPC` /
+    `Killed` / `OOM`) clean over every log and both suites linking and running.
+    THREE DISTINCT FAILURE MODES, not one:
+    (1) `px8f_write_partition` builds, LINKS, runs, writes `ABCDEFGH` at offset
+        10 with `assert_exact_sink` PASSING, and then exits 1 where 0 was
+        expected. CAUSE NOT ESTABLISHED; exit 1 is in neither of that test's
+        expected sets. The compile-time `ObjectLinkerPackagingError` refusal
+        DOES NOT REPRODUCE at this tip — `build_native_program`'s expect, the
+        exact string in the CI failure, never fired.
+    (2) `px8f_write_all_native`'s `linked_checked_write_all_observes_short_
+        progress_and_matches_interpreter` takes a RUNTIME TRAP:
+        `planned_identity: 43`, `code: PatternMatchFailure`, `message: "no
+        runtime match case selected for decl:px8f_write_all_native::Result"`.
+        R3's premise — the trap belongs to a Result match — is confirmed from
+        the failing run rather than inherited from the ruling, and the HS18
+        runtime-trap account is vindicated FOR THIS PROGRAM.
+        The sharper fact: the assertion is a FRONTIER SENTINEL that TOLERATES a
+        nonzero exit provided the trap is the named frontier
+        `ResourceBodyResult`. It got `PatternMatchFailure` on plain `Result`.
+        THE REGRESSION IS THAT THE TRAP MOVED, not that it traps.
+    (3) two further COMPILE-TIME backend refusals in that suite's control tests
+        (status-zero publication not reachable; the finished generated-Result
+        proof graph not closed). Four tests in the suite PASS, including the
+        boundary and positional controls.
+    Block42's arms are CORROBORATED, not receipt-confirmed: `Result::Ok` len 38
+    and `Result::Err` len 39 against the trap's `decl:...::Result` len 34, with
+    lengths agreeing and the emitted shape two one-binder arms plus a closed
+    default. No receipt prints the two spellings, so it is recorded at the same
+    standard under which `{3318,37}` was refused a name.
+    THE ARCHITECT'S OWN §6 DELIVERABLE WAS CORRECTED BEFORE IT WAS CUT, and the
+    correction came from the implementer against their own earlier proposal.
+    Re-keying the trap catalog on the OCCURRENCE is NECESSARY AND NOT
+    SUFFICIENT: `RuntimeTrap` derives `PartialEq`/`Eq` over exactly `{code,
+    message}` (`ken-host/src/effect_v1.rs:4068`) and the message is built as
+    `format!("no runtime match case selected for {}", view.family_symbol)`
+    (`ken-elaborator/src/erasure.rs:2919` and `:6043`). Two occurrences
+    eliminating one family are therefore EQUAL ON BOTH FIELDS, and
+    `intern_trap`'s `position(|candidate| candidate == trap)` collapses them no
+    matter how the catalog is keyed, because the key ranges over the values.
+    The obligation is that a trap's IDENTITY CARRIES ITS EMISSION COORDINATE;
+    catalog keying follows and does not substitute. Its acceptance criterion is
+    a DISCRIMINATION test — two distinct source occurrences over the same decl
+    must receive DIFFERENT planned identities — because the keying-shaped
+    criterion PASSES under the insufficient fix while three sites still share
+    code 43.
+    The fact that defeats the insufficient fix was already in the tree, written
+    at HS18, in a comment above a test named "Hard-stop #18 row 2": two
+    eliminations of one family in one declaration "agree on every field a header
+    fingerprint can see". It was recorded correctly, in a NEIGHBOURING
+    consumer's voice, and did not reach the consumer who needed it.
+    THE EVIDENCE-AXIS PREDICATE, kept deliberately OUT of the §1b keying count
+    because its subject is how WE read identifiers rather than how the compiler
+    keys authority: AN IDENTIFIER IS READ AS INDIVIDUATING MORE THAN IT
+    ACTUALLY INDIVIDUATES. Five distinct misreadings — a trap CODE read as a
+    SITE, a CLIF HASH read as the FAILING PROGRAM, a `CI_HEAD` SHA read as THIS
+    LINEAGE, `git merge-base --is-ancestor` read as LANDED-OR-NOT, and a LINE
+    NUMBER read as a position in the law rather than in one tree's copy. Its
+    closure has two clauses: every artifact cited as evidence is bound to the
+    failing RUN — name the program it builds, the lineage it came from and the
+    failure mode it exhibits, beside the hash; and BEFORE AN IDENTIFIER OR
+    PREDICATE MAY CARRY A CONCLUSION, ESTABLISH THAT IT CAN TAKE THE OTHER
+    VALUE ON THIS POPULATION, since an answer that cannot vary is a fact about
+    the probe and not about the world.
+    THE REPRESENTATION FORK REMAINS HELD, and mode (2) does not settle it. A
+    closed default firing inside a function places the defect on an
+    intra-function edge, which both arms reach: widening the existing
+    unit-keyed discharge population covers it, and making intra-function edges
+    structurally incapable of carrying a mismatched word covers it too. It is
+    consistent with both, so it discriminates neither, and a vindication is not
+    a discriminator.
+    Keyed on: the GRAIN AT WHICH AN IDENTITY INDIVIDUATES VERSUS THE GRAIN THE
+    FACT ITS CONSUMER NEEDS — a constructor identity is rightly content-keyed
+    because "which constructor" is a property of the value, a trap identity is
+    wrongly content-keyed because "which site" is a property of the occurrence,
+    and the Result-obligation discharge is wrongly unit-keyed because the
+    obligation is a property of the edge.
+    Hard-stop count 21. The seventh mandatory §1a advisory is DISCHARGED as
+    fired and framed, and recorded as UNCONSUMED. The next mandatory is HS24;
+    if it arrives with research still dead, two consecutive unconsumed
+    advisories is an operator-facing fact about the protocol, not a third
+    framing.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
