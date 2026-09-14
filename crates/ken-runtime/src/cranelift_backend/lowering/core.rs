@@ -9236,7 +9236,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         let completed_residual =
-            self.checked_ih_post_call_residual(edge.caller_completed_exits(), eliminators)?;
+            self.checked_ih_post_call_residual(edge.executable_exits(), eliminators)?;
         let completed_len = eliminators.len() - completed_residual.len();
         let incoming_edge_index = edge.incoming_consumer_edge_index();
         if incoming_edge_index >= completed_len {
@@ -9400,7 +9400,7 @@ impl<'a> Lowering<'a> {
                 Some(raw.clone())
             } else {
                 let eliminators = self.checked_ih_post_call_eliminators(
-                    edge.caller_completed_exits(),
+                    edge.executable_exits(),
                     producer_env,
                 )?;
                 let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
@@ -9419,7 +9419,7 @@ impl<'a> Lowering<'a> {
             #[cfg(not(feature = "px8-ds-test-support"))]
             {
                 let eliminators = self.checked_ih_post_call_eliminators(
-                    edge.caller_completed_exits(),
+                    edge.executable_exits(),
                     producer_env,
                 )?;
                 let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
