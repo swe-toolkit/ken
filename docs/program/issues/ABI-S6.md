@@ -3002,6 +3002,89 @@ Architect inventory, 2026-09-11.
     NOT A NEW HARD STOP: the diagnostic returned the discriminating answer it
     was designed to return, on no build turn and against no new structural wall.
     The count stays at 18 and the next mandatory advisory remains HS21.
+33. HS19, read-only at tip `936294421e`: the Architect's own ruled repair — add
+    the missing field-0 projection on the D6a checked-answer route — was
+    REFUTED before any build, and the refutation is stronger than the one that
+    was asked for.
+    THE READ. The precondition read returned outcome (b): `v84` is
+    `call_declared_unit_target`'s `stack_load` of the CALLEE's
+    `AbiSlotKind::Result` slot (`calls.rs`), so it is a constructed carrier of
+    the worker's own result constructor — not anything the caller wraps, and
+    not an already-projected payload.
+    THE ROUTE-INDEPENDENT REFUTATION, which supersedes the planner-precondition
+    argument it arrived with. Constructor identity is content-addressed on
+    spelling: `identity_span`'s contract states the span is canonical because
+    `SemanticMaterialArena::intern` is content-addressed, "that, not this
+    function, is what makes equal spellings" equal identities. Producer and
+    consumer share one tag authority: `emit_carrier_tag`'s returned word is
+    comparable only against a `ConstructorIdentity::tag_abi_word()` from the
+    same artifact plane — "the very word the producer wrote with
+    `store_tag_id`", which is D2. And D6a is guarded by
+    `if let Some((_return_index, _return_case)) = return_case`, so the
+    one-binder `::ITree::Ret` case is necessarily among the cases the loop
+    already compared and missed.
+    Therefore any `Construct{ ::ITree::Ret, [payload] }` anywhere in the
+    artifact stores exactly the word the Ret case compares against, matches it,
+    and takes the ordinary arm. NO VALUE REACHING THE D6a JUMP CAN BE A RET
+    CARRIER, on any route, including one a future `CHECKED_CONTROL_WORD`
+    producer might add. The ruled repair was not merely unsupported at that
+    program point — it was STRUCTURALLY UNREACHABLE there, and would have
+    projected field 0 of a non-Ret carrier for every program.
+    THE FRAMING CORRECTION, adopted. The ruling read the two predecessors of the
+    join as a depth mismatch on one value. They are DYNAMICALLY DISJOINT: the
+    ordinary Ret arm is reached only when the runtime tag equalled the Ret
+    case's identity, D6a only in the block left after every case identity
+    missed. Each route is correct for the case it handles and the ordinary
+    route is not one level too deep.
+    AUDIT NOTE. The worktree carried an uncommitted edit from the pre-reseat
+    seat implementing exactly the refuted repair, plus a comment rewrite
+    asserting its premise. It was NOT treated as evidence — had it been, it
+    would have corroborated the ruling from a shared assumption rather than a
+    check. Preserved at `0bbe4a175` with the refutation in its message and
+    reverted at `686ffa8ac`; it is audit history and is never a candidate.
+    KEYING INSTANCE — the SIXTH (entries 24-27, 31, 33). Entry 33 is also a
+    3rd-entry §1b trigger; both fired together and one answer discharges both,
+    while the two series stay distinct.
+    §1b ANSWERED — YES, THESE SHARE A PREDICATE: an authority, route, or
+    hand-off is keyed on a STATIC SEAT — a call occurrence, a case arm, a
+    frame, a fallback block — while the fact it must decide is a property of
+    the VALUE that arrives there. What this instance adds is why the chain
+    continued: every repair so far RE-KEYED ONE LAYER AND LEFT THE LAYER
+    BENEATH SEAT-KEYED. HS15 re-keyed the obligation off the call occurrence
+    onto the value's constructor identity (entry 28) and that held at the OUTER
+    layer; entry 31 found the union one layer in; here the planner already
+    computes the value-keyed facts — `actual_result_identity` and a derived
+    bridging chain for the case where it differs from `demanded` — but the
+    emitted D6a hand-off is keyed on which block it landed in and passes the
+    word as itself, so the value-keyed fact never governs the hand-off it
+    exists to govern.
+    STRUCTURAL CLOSURE, replacing a seventh piecemeal disposition: EVERY
+    HAND-OFF OF A COMPUTED WORD INTO A CONSUMER MUST DISCHARGE THE PAIR (the
+    word's actual constructor identity, the consumer's demanded identity), AND
+    THAT DISCHARGE MUST BE TOTAL — identities agree, the word passes; they
+    differ, the derived chain applies; neither holds, it is a PLANNER ERROR,
+    never a silent pass. No hand-off is justified by the block it occurs in.
+    D1 widens from "re-key the obligation" to that closure, the D6a carried
+    fallback included, with the residual chain as the mechanism. D3-D6 are
+    retained and not reopened.
+    THE EVIDENCE THE CLOSURE IS THE RIGHT ONE was already on the record and
+    unconnected: `apply_required_consumer_incoming_edge` ALREADY has this shape
+    — edge plus eliminators in, residual suffix out, two refusals — and entry
+    30's vacuous-discharge finding proved BOTH refusals INERT on this witness.
+    A discharge whose refusals cannot fire, beside a residual that may be
+    empty, IS a non-total discharge. That is the predicate stated concretely,
+    and it is why five locally-correct dispositions did not end the chain.
+    SCOPE PENDING, DIRECTION SETTLED: three read-only reads bound the closure —
+    whether `remaining` at the D6a hand-off is EMPTY, SHORT or MIS-SELECTED and
+    what chain the planner derived; the concrete tag word the callee writes
+    into the Result slot, naming `actual` from the CLIF already held; and a
+    MEASUREMENT of the premise the implementer had inherited from the ruling
+    rather than checked, that the Trap-43 match is the Ret body's `Result`
+    match. If that last one comes back otherwise, the consumer moves and the
+    ruling is re-cut.
+    Hard-stop count 19; the preceding M1-M3 diagnostic is NOT a stop, having
+    returned the answer it was designed to return. Next mandatory advisory
+    remains HS21.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
