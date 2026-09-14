@@ -80,6 +80,67 @@ distinct `Packaging` reason in the run and the cause of 8 of 11 base reds.**
 
 ## Deliverables
 
+> # EVERY DELIVERABLE IS ANSWERED. THE NODE IS NOT CLOSEABLE, AND THE REASON IS
+> # ITS BASE, NOT ITS CONTENT.
+>
+> **Disposition recorded by the Steward 2026-09-14 on the Architect's
+> `evt_w1vnqexkhmxx`** (*"`MECH` answered, `CTRL` complete, `R3` landed, `ROUTE`
+> declined with reason ⇒ the node's deliverables are closed"*):
+>
+>     MECH    ANSWERED   ruling below, evt_5k7jd5agh133j + evt_11zby14s19hkh
+>     CTRL    COMPLETE   88893210a (the class assertion, ruled as D3)
+>     R3      BUILT      43e4451e3 + ff7638ff6, QA APPROVED
+>     ROUTE   DECLINED   evt_w1vnqexkhmxx -- a theorem, not a deferral
+>
+> **"`R3` landed" means landed ON THE BRANCH, not on `origin/main`.** `43e4451e3`
+> and `ff7638ff6` sit on `wp/ABI-S6-d5b-file-backed`, 24 commits deep, on top of
+> four `ABI-S6 D5b WIP` commits carrying 12374 unlanded insertions.
+> `git merge-tree --write-tree origin/main ff7638ff6` differs from
+> `origin/main^{tree}`, so none of it is on `main`.
+>
+> ⇒ **DO NOT FLIP THIS NODE `merged`.** Deliverables being answered is not the
+> node being closed; **closure follows the merge.** This node joins `D2`, `R1`,
+> `R2` and entry-18 in the held-pending-D5b set, and it is held by the same
+> thing they are: there is no clean base below the work. See
+> [[RT-CONSTRUCTOR-AUTHORITY-DISCHARGE]]'s held block.
+>
+> # AND DO NOT DISPATCH `CTRL-a`. IT IS BUILT. THE REMAINING OBSTACLE IS
+> # LANDING, NOT A DELIVERABLE.
+>
+> **The Steward told the ring twice that `CTRL-a` was "startable now". That was
+> wrong when it was said, not merely stale** — `88893210a` was already in the
+> branch at the time (Architect, `evt_6zm1feakd1k6p`; verified independently):
+>
+>     git merge-base --is-ancestor 88893210a ff7638ff6   -> YES
+>     git merge-tree --write-tree origin/main 88893210a  -> 4a52074f91586eb514e8b3116e5b1b1ef889f58d
+>     git rev-parse origin/main^{tree}                   -> 07936923a39de217dfccf9c97bc30033d4eb8be0
+>
+> Ancestor of the branch tip; its merge against main differs from main's tree.
+> **Built and unlanded, exactly like `R3`.** Dispatching it sends an implementer
+> to rebuild what the branch already holds, and they would correctly hard-stop.
+>
+> **Read this deliverable list as a RECORD, never as a queue.** Every entry is
+> answered or built; none is pullable. The one thing that would reduce it is a
+> clean base under 24 commits, which is not work a build seat can pull.
+>
+> **State the scope beside every branch number, because three true numbers
+> disagree:**
+>
+>     git diff --stat origin/main...ff7638ff6   35 files 18592+ 6144-   vs MERGE-BASE: what the branch ADDS
+>     git diff --stat origin/main   ff7638ff6   47 files 18612+ 9062-   vs MAIN TIP: also reverses main's 21 commits
+>     git diff --stat 4bf1ad362     5a9a840ba   34 files 12374+ 5644-   the four bottom WIP commits ALONE
+>
+> The Steward and the Architect each reported one of the first two without
+> naming which question it answered, within an hour of reconciling the same
+> defect shape one artifact down.
+>
+> **What is NOT a blocker, measured so nobody re-derives it:** `0bbe4a175`
+> ("REFUTED ... DO NOT BUILD ON") leaves ZERO residue —
+> `git rev-parse 936294421^{tree} 686ffa8ac^{tree}` returns
+> `b41367855cc5f7b2a0ea098ed94a83b27c15cbc8` for **both**, and the diff between
+> them is empty. Under squash-merge no intermediate commit lands at all. The
+> chain's shape is not what holds this work.
+
 > **DELIVERABLE LABELS ARE `MECH` / `CTRL` / `ROUTE`, DELIBERATELY NOT `D1`/`D2`/`D3`.**
 > An earlier revision used `D2` for the control repair while
 > `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE`'s **held** `D2` was live in the same
@@ -217,19 +278,89 @@ itself, applied to the question of what to do about an unmeasured path:
 It is not, and the argument for accepting that is the fail-closed property, not
 coverage.
 
-**`ROUTE` — route the required-consumer incoming edge at `:7720`, as a CORRECTNESS
-deliverable, explicitly NOT as the cause.** Fork on
-`required_consumer_incoming_edge()` — `Ok(None)` for ordinary transports
-reproduces today's behaviour, so the route is total by construction — following
-`aggregates.rs:7826-7829`. **Do not let this land carrying an implication that it
-fixes the refusal: measured, it is a no-op at index 0.**
+**THE DISCHARGE PATH EXISTS AND IT IS THE SAME MEASUREMENT AS `ROUTE`'S REFUTING
+CRITERION** (Architect, `evt_w1vnqexkhmxx`). The ambient edge-arm at `:4366` /
+`:4383` is an edge-bearing site with no fixture behind it, so the
+every-edge-bearing-site census in the `ROUTE` section above lands on exactly this
+path. **Two open items, one census. If anyone takes it, take it once and it
+answers both.** Optional, and nothing waits on it.
 
-**`ROUTE` MUST follow `MECH`. This is a hard sequence, not a preference** (Architect,
-`evt_53mb86qj64fj1`). `MECH` now decides what correct routing *means*: the open
-fork is whether the cut is `[index..]` or `[index+1..]`, and the two differ by
-exactly the consumer's own occurrence. **Building `ROUTE` before `MECH` settles lands
-the wrong cut with a passing test** — the `[index..]` cut is a no-op at index 0,
-so a green `ROUTE` would prove nothing and look like a fix.
+**What that census may NOT be read as doing.** It can discharge the risk by
+producing a measurement where there was none. It cannot discharge it by argument
+from the arms computing one anchor: that the two arms compute ONE anchor and so
+cannot disagree is PROVED; that the anchor is 0 where the EDGE arm runs is NOT.
+Every fixture to date measures the `else` arm, and an edge-arm program is a
+different program — nothing transfers. **This cell is the only one whose
+behaviour differs from everything measured (refused here, supported everywhere
+else), which is a reason to KEEP this section rather than soften it.**
+
+### `ROUTE` IS DECLINED. NOTHING TO BUILD. THIS IS A THEOREM, NOT A DEFERRAL.
+
+**Architect ruling `evt_w1vnqexkhmxx`, recorded here rather than left in thread.**
+`ROUTE` was framed as a CORRECTNESS deliverable — route the required-consumer
+incoming edge at `:7720`, following `aggregates.rs:7826-7829`.
+**It is declined, and the reason is not "it measured zero."**
+
+**Routing is the identity wherever the anchor is non-zero, by construction, and
+the anchor is non-zero exactly when the ambient stack begins after the defining
+occurrence — which is the fact `R3` encodes.** `ROUTE`'s subject and `R3`'s
+premise are mutually exclusive and cannot both hold.
+
+The two numbers are independent joins, which is what makes the relation real
+rather than a tautology — different needles into the same receipt:
+
+    anchor (by_identity_join)     needle = eliminators[0]'s (static_origin, checked_frame_id)
+    index  (SelfDefining producer needle = required_call.destination().consumer_occurrence()
+            responses.rs:2400-2412)
+
+`index=0, anchor=1` therefore says: the destination's consumer occurrence sits at
+`receipt[0]`, the ambient window begins at `receipt[1]`, **and the route's cut
+point lies strictly BEFORE the window.** `index` names the consumer's own
+defining occurrence; the ambient stack begins after it; cutting a list at a point
+preceding its element 0 yields the whole list. ⇒ **At any ambient site with a
+non-zero anchor, routing is the identity structurally — not because this program
+happened to measure 0.**
+
+The converse closes it: for `ROUTE` to have content at an ambient site you need
+`index >= anchor`, i.e. the ambient stack contains the consumer's own defining
+occurrence — the negation of `R3`'s premise. If that ever held, the anchor would
+be 0 and `apply_required_consumer_incoming_edge` would ACCEPT. **The refusal and
+`ROUTE`'s subject are exactly complementary: the refusal fires in precisely the
+cases where routing would have done nothing anyway. Declining costs no
+capability.**
+
+**The `index - anchor` repair is not merely unmeasured, it is UNREPRESENTABLE.**
+At `:7720` it is `0 - 1`, and no `usize` names a position before the window
+starts. The semantically correct answer in that regime is "the whole window" —
+which is exactly what not routing already does.
+
+**THE CENSUS THAT WARRANTED `ROUTE` IS REAL AND WAS MIS-READ. RECORD IT AS A TYPE
+DIFFERENCE, NEVER AS A MISSING ROUTE.** The two halves of the protocol operate on
+**different lists**:
+
+    aggregates.rs:7826   planner    applies the index to STEPS  (required_consumer_executable_suffix)
+    core.rs:7757         lowering   would apply it to FRAMES    (the ambient eliminator stack)
+
+The planner's index is coherent because the list it indexes IS the receipt.
+Lowering's ambient list is not the receipt and does not share its membership
+convention. **The asymmetry is not lowering forgetting to route; it is a type
+difference between the two halves of the protocol.**
+
+> #### WHAT WOULD REFUTE THIS RULING — stated in advance, per `AC-7`
+>
+> **If any ambient post-call consumer site has `window_anchor == 0` with
+> `incoming_consumer_edge_index > 0` — or more generally `index >= anchor` — then
+> routing has real content at an ambient site and this ruling is wrong.**
+>
+> That is the existing `ROUTEPROBE` run over **every edge-bearing site** instead
+> of `:7720` alone. **It is not blocking and it does not license the ruling** —
+> declining is behaviour-neutral. It is what would REOPEN the question.
+
+**`ROUTE` is the FOURTH proposed view of `:7720`, and like the first three it is
+the identity at the site.** What is new is that the reason is now derived rather
+than measured. This is the same predicate `§1b` already closed — *a receipt index
+meeting a list with a different membership convention* — and declining `ROUTE` is
+that closure holding, not a fourth refutation of it.
 
 ## `MECH` IS ANSWERED, AND THE RULING IS RECORDED HERE RATHER THAN IN THREAD
 
@@ -384,6 +515,72 @@ theirs.
 
 **Distinct from the `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `D2` chain** (*"how does
 `D2` obtain discriminating evidence"*), which stands separately at **two**.
+
+> ### THREE DISTINCT CHAINS RUN THROUGH THIS LANE. DO NOT MOVE A FACT BETWEEN
+> ### THEM — THE STEWARD DID, AND IT NEARLY REACHED THE OPERATOR.
+>
+> | chain | count | advisory | status |
+> |---|---|---|---|
+> | *"what is the mechanism of the `:7720` refusal"* — THIS node | stop **3** | **QUEUED UNCONSUMED** at the quota-dead research seat | moot: measurement settled the question; revisit near 2026-09-19 only if the advisory CONTRADICTS it |
+> | *"how does `D2` obtain discriminating evidence"* — [[RT-CONSTRUCTOR-AUTHORITY-DISCHARGE]] | stop **2** | none called | separate |
+> | ABI-S6's HS chain, of which **HS18** is a member | HS18 is stop **18**; its `§1a` was the **6th** trigger | **DELIVERED in three parts and CONSUMED** (`evt_2qdk2a3qwa4hs`, `evt_71qmyd36rwygd`, `evt_72yy838768mgk`) | the Architect states it is RULED TWICE — `evt_4ms8rwyhnvgs9`, `evt_1hnd8tta02f59`, plus a corrected Deliverable 2 at `evt_7eqc0hmbanyzm` |
+>
+> **The dead-seat advisory belongs to the FIRST row only.** The Steward wrote
+> that HS18 was *"held at stop 3 behind an advisory queued against a seat that is
+> quota-dead"* — **one true fact about one chain, applied to another.** Caught by
+> the Architect at `evt_4twx5ypjqe0eh` before it reached Pat, where it would have
+> put the block on a seat that had answered nine hours earlier and pointed the
+> remedy at a 2026-09-19 reseat that changes nothing.
+>
+> **This node's own `§1a` section above is where that sentence was refuted** — it
+> already said the queued advisory is the MECHANISM chain's, and that `§1a`'s
+> hold binds a RULING and not the ring's MEASUREMENT. The Steward authored that
+> and then contradicted it in a post the same hour.
+>
+> **The HS18 row is recorded as the Architect's statement, not as the Steward's
+> finding, and the Architect has since REPLACED the caveat that sat here.** The
+> earlier version said the three rulings "predate `R3` landing, so whether the
+> projection deliverable survives the current tip is unmeasured. Check the three
+> events against the tip." **That instruction was wrong, and so is the
+> supersession reading offered in its place.** The three events have three
+> different dispositions and must not be carried as a set:
+>
+> - **`evt_1hnd8tta02f59` is VOID, and not by supersession.** Its ruling ("ADD
+>   the projection on the deficient route") was issued with three pre-committed
+>   outcomes on a precondition read: **(a)** `ITree::Ret` carrier ⇒ the ruling
+>   stands; **(b)** already a `Result` carrier ⇒ STOP, the Architect re-rules;
+>   **(c)** already-projected contents ⇒ STOP, the Architect re-rules. The read
+>   came back **(b)** — `686ffa8ac`'s own subject is *"restore landed D6a route
+>   -- precondition read is (b)"*. The ruling self-voided on a branch written
+>   before the evidence arrived. **It was then established that (a) was
+>   STRUCTURALLY UNREACHABLE** — D6a's guard is
+>   `if let Some((_return_index, _return_case)) = return_case`, so the one-binder
+>   `::ITree::Ret` case was necessarily compared and missed, and **no value
+>   reaching the D6a jump can be a Ret carrier on any route, ever.** The repair
+>   would have projected field 0 of a non-Ret carrier for every program. There is
+>   nothing to check against the tip, and that is the correct reason.
+> - **`evt_4ms8rwyhnvgs9` is DISCHARGED, not withdrawn.** What was withdrawn
+>   inside it was the static `Ok` selection, with Condition C revoked; its
+>   operative act was to redirect the arc UPSTREAM, which is what produced
+>   `evt_1hnd8tta02f59`. A withdrawal *in* a ruling is not a withdrawal *of* it.
+> - **`evt_7eqc0hmbanyzm` IS LIVE and nothing here touches it.** Its corrected
+>   Deliverable 2 — trap identity must carry its EMISSION COORDINATE, under a
+>   DISCRIMINATION acceptance criterion that the originally proposed fix FAILS —
+>   is the Steward's own stated input to `RT-TRAP-IDENTITY-EMISSION-COORDINATE`
+>   `D1`, the one item in lane 1 with a clean base. **Recording all three as
+>   superseded would kill the basis of the lane's only pullable work.**
+>
+> **The shape, for the fourth time in this lane today: one true fact about one
+> member of a set, applied to the set.**
+
+**THE `ROUTE` DECLINE DOES NOT ADVANCE THIS COUNT, AND THE STEWARD RECORDS IT AS
+SUCH.** `evt_w1vnqexkhmxx` is hard-stop **one** on *"should `:7720` route"* — a
+different design question from the mechanism chain, which closed at three. **No
+research trigger fires.** Recorded here because the Steward's tracker is the
+count of record and a decline that looks like a fourth refutation would otherwise
+be read as one: the mechanism chain's stops were accounts that measurement
+killed, whereas `ROUTE` was declined by DERIVATION from a fact `R3` had already
+established. **A closure holding is not a stop.**
 
 ## A re-measure obligation this node creates elsewhere
 
