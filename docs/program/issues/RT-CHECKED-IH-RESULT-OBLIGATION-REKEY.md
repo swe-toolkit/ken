@@ -99,11 +99,23 @@ the `selected` block at the `core.rs:15758` body-lowering site. **Report the
 exact site and that the identity is the planner query's value, not read off the
 carried word or inferred from the runtime tag.**
 
-**`D2` — stop applying `RequiredConsumerIncomingEdge` unconditionally at the
-receipt seat.** The edge/suffix selection stays upstream and pure (no
-`FunctionBuilder`, emits nothing); the certificate is emitted downstream, per
-arm, in the selected block. **Report that the receipt seat no longer carries the
-result obligation and that Trap 43's unconditional application is gone.**
+**`D2` — stop the identity comparison from gating the receipt seat, and RETAIN
+the suffix (HS16 disposition).** "Applying `RequiredConsumerIncomingEdge`" names
+TWO artifacts — validating the defining-call identity AND selecting the retained
+suffix — and only the FIRST must stop. **The identity validation stops gating
+this seat; the suffix selection and the continuation it schedules are retained
+UNCHANGED for both arms.** Do NOT bypass the whole call: bypassing
+`apply_required_consumer_incoming_edge` drops the arm's remaining eliminator
+chain — an empty `remaining` at `core.rs:4378` routes to
+`ProducerTrampolineStep::ordinary`, so the source continuation is never lowered
+(that is the `checked HostIO match had no constructor arm` signature HS16 hit,
+and `D5bHs17PostCallConsumerMutation::DropResidualSuffix` at `core.rs:4372`
+already names the same failure mode). The already-final arm keeps its suffix and
+lowers its ordinary source continuation; only the identity comparison — whose
+premise HS15 closed — stops gating this seat. **Report that the identity
+comparison no longer gates the seat, that the suffix and its scheduled
+continuation are retained for both arms, and that Trap 43's unconditional
+identity refusal is gone.**
 
 **`D3` — the execution control, and it is the load-bearing deliverable.** A
 native observation that the exact per-arm discharge **executes for the
