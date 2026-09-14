@@ -1,7 +1,7 @@
 ---
 id: RT-TRAP-IDENTITY-EMISSION-COORDINATE
 title: "Make a trap's identity carry its emission coordinate, so eliminations of one family at distinct source sites are not equal as RuntimeTrap values and do not collapse to one PlannedTrapIdentity -- closing the attribution gap that left HS16-HS21 unable to say WHICH site fired, with a five-occurrence in-tree discrimination criterion that both the catalog-keying fix and a type-keyed fix fail"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -12,25 +12,32 @@ tier: T1
 origin: "Architect ruling evt_2qq9jr1c1e4p9 (2026-09-14), CORRECTED at evt_7eqc0hmbanyzm after runtime-implementer refuted the Architect's own proposed population; mechanism ruled (b) and AC-2 ratified at evt_5kzahxdv9w8d1; recorded durably in ABI-S6 entry 35 (routed f0a735f14). Split out of RT-CHECKED-IH-RESULT-OBLIGATION-REKEY because it is fork-independent and that node's widened D1 is not: see 'Why this is its own node'. Fixed inputs first measured by the Steward at 686ffa8ac, then re-measured on origin/main; re-measure again at D0."
 ---
 
-> # DRAFT — pending Architect read of THIS FRAME. NOT released to the ring.
+> # RELEASED. Architect read and approved at `evt_5xtean9vczn36`.
 >
 > **The mechanism fork is closed.** The Architect ruled `(b)` at
-> `evt_5kzahxdv9w8d1` and ratified `AC-2` as authored here. What remains is the
-> read of the frame itself, which the Steward committed to at `evt_66qhft3939qpr`
-> and which the Architect re-affirmed ("release nothing until the frame reaches
-> me; I will read it before the ring").
+> `evt_5kzahxdv9w8d1` and ratified `AC-2` as authored here. They then read this
+> frame — not a description of it — and approved it for release.
 >
-> **Two things changed after that ruling and the Architect has not seen either.**
-> Both came out of grounding the handed-over witness against the tree instead of
-> transcribing it, and both are in this frame rather than in a message:
+> **What this frame changed after the ruling**, by grounding the handed-over
+> witness against the tree instead of transcribing it:
 >
-> 1. `AC-1` is now written on the **real five-occurrence fixture**, and splits
->    into `AC-1a` / `AC-1b` because that fixture refutes a **second** plausible
->    fix — keying on the instantiated type — which an authored two-site pair
->    would have passed. See "Fixed inputs".
+> 1. `AC-1` is written on the **real five-occurrence fixture**, and splits into
+>    `AC-1a` / `AC-1b` because that fixture refutes a **second** plausible fix —
+>    keying on the instantiated type — which an authored two-site pair would
+>    have passed. The Architect's verdict: a control they did not know to
+>    specify, and it exists only because the real fixture was used.
 > 2. Two of the three relayed counts for that fixture were wrong (**four**
 >    instantiations, not three; occurrence 2 is a `proc`). Corrected in place,
 >    with the grep that produces the second error named so it is not re-made.
+>    The wrong instantiation count never reached the durable record — ABI-S6
+>    entry 35 (blob `c62d2288`) carries no instantiation count — so no erratum
+>    is owed there.
+>
+> **One correction came back and is applied.** The mint-site line numbers do NOT
+> drift between `686ffa8ac` and `origin/main`: they are `:2919` / `:6043` at
+> both. The Steward's claimed two-line shift was a number carried from this
+> frame's own earlier prose rather than re-derived, inside a re-measurement
+> undertaken to avoid exactly that. The original citation was right at both refs.
 
 ## What this is
 
@@ -79,9 +86,10 @@ lives in `ken-host` and is equally present on `origin/main`.
   `repr`** on `RuntimeTrap` or `RuntimeTrapCode`.
 
 - **The two colliding mint sites, and there are exactly two**:
-  `crates/ken-elaborator/src/erasure.rs:2919` and `:6043`, **re-measured on
-  `origin/main`** (they were `:2917` / `:6041` at `686ffa8ac`; the two-line shift
-  is why `D0` re-measures rather than trusting this list). Both build
+  `crates/ken-elaborator/src/erasure.rs:2919` and `:6043`. **Measured at BOTH
+  `origin/main` and `686ffa8ac` and identical at both** — carry the SHA beside
+  the number, but there is no drift between these refs to correct for. `D0` still
+  re-measures at the SHA it builds on. Both build
 
       code: RuntimeTrapCode::PatternMatchFailure,
       message: format!("no runtime match case selected for {}", view.family_symbol),

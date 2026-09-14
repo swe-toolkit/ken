@@ -1,7 +1,7 @@
 ---
 id: RT-CONSTRUCTOR-AUTHORITY-DISCHARGE
 title: "Widen GeneratedConstructorAuthority from generated-context Result publication to every hand-off carrying a constructor word, and make the discharge the authority's CONSUMPTION at the consumer -- so a hand-off with no authority is a missing VALUE and a planner error, never a missing list entry and never a silent pass"
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -12,20 +12,28 @@ tier: T1
 origin: "Architect rulings evt_5kzahxdv9w8d1 (the three parts, the forbidden alternative) and evt_76sfwdh03d69f (the two-halved bounded measurement, and the correction of the Steward's 'no object exists' claim). Recut of RT-CHECKED-IH-RESULT-OBLIGATION-REKEY's D1, which could not be written while the representation fork was held. Fixed inputs measured by the Steward on 5d977ac79 and origin/main; re-measure at D0."
 ---
 
-> # DRAFT — pending Architect read. NOT released to the runtime ring.
->
-> The Architect's closing instruction: *"Release nothing until the frame reaches
-> me; I will read it before the ring."*
+> # RELEASED. Architect read and approved at `evt_5xtean9vczn36`.
 >
 > **THIS FRAME DOES NOT CUT THE THREE PARTS THE WAY THE RULING DID, AND THE
-> DIVERGENCE IS DELIBERATE.** The ruling described Part 1 — dropping
-> `Clone, Copy` from `GeneratedConstructorAuthority` — as *"one line, failures
-> are compile errors, independently landable today, and it must land first."*
-> **Measurement contradicts all three clauses.** The evidence is in "The
-> separability finding" below, and it is the first thing to read. If the
-> Architect reads it and still wants the split, that is their call and the
-> Steward will cut it — but it should be made against the measurement rather
-> than against the Steward's description of it.
+> ARCHITECT HAS ADOPTED THE DIVERGENCE.** The original ruling described Part 1 —
+> dropping `Clone, Copy` from `GeneratedConstructorAuthority` — as *"one line,
+> failures are compile errors, independently landable today, and it must land
+> first."* **Measurement contradicts all three clauses**, and the Architect
+> verified both grounds rather than taking them:
+>
+> - The type **does not exist on `origin/main`** (zero files with hits there,
+>   two files at `5d977ac79` and `686ffa8ac`).
+> - **All six reads borrow**, so dropping the derive raises no error at any of
+>   them. Their words: Part 1 as ruled *"would have been a green node that
+>   leaves the property it is named for still false."*
+>
+> ⇒ **Parts 1 and 3 are one change and they are `D2` here, together.** `D0` is
+> the probe that can still refute this — zero errors confirms, a broad error set
+> refutes and the cut splits the way the ruling originally described.
+>
+> **Nothing is owed from the Architect before the ring starts.** `D0` and
+> `D1a`/`D1b` report to the Steward and to them; they rule again on either
+> finding.
 
 ## What this is
 
@@ -135,8 +143,10 @@ command that settles it is the first deliverable.
 ## Fixed inputs
 
 **MEASURED BY THE STEWARD at `5d977ac79`** unless a line says otherwise.
-Re-measure every coordinate at `D0` — the `686ffa8ac` measurements of these same
-facts were 2 to 280 lines off, which is why this list is dated and not trusted.
+Re-measure every coordinate at `D0`. These are two different branches, not two
+points on one: `demanded_result_identity` reads at `core.rs:9210` here and at
+`core.rs:9488` on `686ffa8ac`, 278 lines apart. **A line number is a claim about
+one tree and carries its SHA or it is worthless.**
 
 - **The carrier, and the invariant that forbids the obvious fix.**
   `lowering/mod.rs:3843`, one field `word: ir::Value`, under a declaration that
