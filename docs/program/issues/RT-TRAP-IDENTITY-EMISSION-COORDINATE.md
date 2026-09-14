@@ -78,11 +78,18 @@ criterion has to be able to FAIL. See `AC-1`.
 > correction stopped being the answer at about the fourth. If you add a
 > coordinate here without a SHA, the next reader inherits the defect.
 
-**MEASURED BY THE STEWARD at `686ffa8ac`** (the HS-arc WIP tip), except where a
-line says otherwise. Re-measure every coordinate at `D0`; `RuntimeTrap` itself
-lives in `ken-host` and is equally present on `origin/main`.
+**Every coordinate below names its own SHA. There is no section default.** A
+bare coordinate here is a defect, not an inheritance — see "Why there is no
+default" at the end of this section. Re-measure every coordinate at `D0`;
+`RuntimeTrap` itself lives in `ken-host` and is equally present on `origin/main`.
 
-- **The equality that collapses them**, `crates/ken-host/src/effect_v1.rs:4067`:
+Where a line says **SAME AT BOTH**, the file is blob-identical at `686ffa8ac`
+and at `origin/main` `e3fe32510`, so the coordinate holds at either ref; that
+was checked with `git rev-parse <ref>:<path>`, not assumed from the line text.
+
+- **The equality that collapses them**, `crates/ken-host/src/effect_v1.rs:4067`
+  at **`686ffa8ac`** — this declaration DRIFTS; the `origin/main` coordinate and
+  the size of the gap are in the dedicated bullet below:
 
       #[derive(Clone, Debug, PartialEq, Eq)]
       pub struct RuntimeTrap {
@@ -95,7 +102,8 @@ lives in `ken-host` and is equally present on `origin/main`.
 
 - **The two colliding mint sites, and there are exactly two**:
   `crates/ken-elaborator/src/erasure.rs:2919` and `:6043`. **Measured at BOTH
-  `origin/main` and `686ffa8ac` and identical at both** — carry the SHA beside
+  `origin/main` `e3fe32510` and `686ffa8ac` and identical at both** (the file is
+  blob-identical across the two refs) — carry the SHA beside
   the number, but there is no drift between these refs to correct for. `D0` still
   re-measures at the SHA it builds on. Both build
 
@@ -107,21 +115,32 @@ lives in `ken-host` and is equally present on `origin/main`.
 
 - **The other seven `erasure.rs` mints do NOT collide**, and the reason matters:
   `:3215`, `:3995`, `:4024`, `:4044`, `:4064`, `:7526`, `:7942` each carry a
-  distinct fixed or differently-interpolated message. **They discriminate
-  incidentally, by message content — not by any mechanism.** Nothing stops the
-  next family-symbol-derived default from colliding again.
+  distinct fixed or differently-interpolated message — **SAME AT BOTH**
+  (`erasure.rs` is blob-identical at `686ffa8ac` and `e3fe32510`). **They
+  discriminate incidentally, by message content — not by any mechanism.** Nothing
+  stops the next family-symbol-derived default from colliding again.
 
 - **WHAT `family_symbol` ACTUALLY INDIVIDUATES, and it is the root of the
   collapse.** It is a `StableSymbol` in the **`Declaration` namespace**, built
   from the declaring package plus the family's dotted name
-  (`compiler_driver.rs:4159-4165`). **It carries no type arguments and no source
-  coordinate.** Every elimination of one family declaration therefore produces a
-  byte-identical message, whatever its instantiation and wherever it sits.
+  (`crates/ken-elaborator/src/compiler_driver.rs:4159-4165` at **`origin/main`
+  `e3fe32510`**; at `686ffa8ac` the same `fn declaration_symbol` begins at
+  **`:4163`**). **It carries no type arguments and no source coordinate.** Every
+  elimination of one family declaration therefore produces a byte-identical
+  message, whatever its instantiation and wherever it sits.
+
+  **This coordinate is why the section default had to go.** It was measured on
+  `origin/main` while the default asserted `686ffa8ac`, where `:4159` is an
+  unrelated `.insert(stable, LowerabilityStatus::Supported);` inside another
+  function. The default did not merely weaken the invariant — it was already
+  telling a reader the wrong ref for a live coordinate.
 
 - **THE FIVE-OCCURRENCE FIXTURE, ALREADY IN THE TREE AND ALREADY COLLAPSING.**
   `crates/ken-verify/tests/px8f_write_partition.rs`, the `WRITE_ALL_PARTITION`
-  program constant beginning at line 15. **Byte-identical on `origin/main` and
-  in the Steward's worktree** (`git diff origin/main` empty for this path).
+  program constant beginning at line 15. **Blob-identical at `origin/main`
+  `e3fe32510`, at `686ffa8ac`, and at the decided base `187895991`** — all three
+  are blob `7e83322db9693502`, so the line numbers in the table below hold at any
+  of them and the fixture cannot drift under this node.
   Five `match` sites eliminate the `Result` family, in five distinct enclosing
   declarations:
 
@@ -151,17 +170,19 @@ lives in `ken-host` and is equally present on `origin/main`.
   instead of an authored pair.
 
 - **The interning predicate**, in
-  `cranelift_backend/planning/static_transition/joins_traps.rs:633`:
-  `intern_trap` returns the index of the first `position(|candidate| candidate
-  == trap)`, else pushes. N equal-valued sites collapse to ONE
-  `PlannedTrapIdentity`.
+  `cranelift_backend/planning/static_transition/joins_traps.rs:633` —
+  **SAME AT BOTH**: `intern_trap` returns the index of the first
+  `position(|candidate| candidate == trap)`, else pushes. N equal-valued sites
+  collapse to ONE `PlannedTrapIdentity`.
 
 - **The trap catalog does NOT reach the emitted artifact as a value.** It is an
-  in-process `Vec<RuntimeTrap>` (`planning/static_transition.rs:587`,
-  `compiled.rs:25`, surfaced at `cranelift_backend/surface.rs:38`). The artifact
-  carries an index/token resolved host-side through `root_trap_catalog_index`
-  (`compiled.rs:56`). **This is the fact the FENCED assessment rests on** — see
-  "Why this is FENCED".
+  in-process `Vec<RuntimeTrap>` (`planning/static_transition.rs:587` at
+  **`686ffa8ac`**, which is **`:545`** on `origin/main` `e3fe32510` — this file
+  is not blob-identical across the two; `cranelift_backend/compiled.rs:25`,
+  **SAME AT BOTH**; surfaced at `cranelift_backend/surface.rs:38`, **SAME AT
+  BOTH**). The artifact carries an index/token resolved host-side through
+  `root_trap_catalog_index` (`compiled.rs:56`, **SAME AT BOTH**). **This is the
+  fact the FENCED assessment rests on** — see "Why this is FENCED".
 
 - **The construction surface is 34 PRODUCTION SITES ACROSS 11 FILES — not the
   ~76 this frame first estimated.** `D0` certified it (`evt_2kv61375ae400`) and
@@ -201,8 +222,18 @@ lives in `ken-host` and is equally present on `origin/main`.
   containing `RuntimeTrap {` sites:
 
       cranelift_backend/test_objects.rs                    2 sites, gated at cranelift_backend.rs:50
-      cranelift_backend/artifact/api/tests.rs              2 sites, gated at artifact/api.rs:13
-      cranelift_backend/lowering/core/primitive/tests.rs   2 sites, gated at primitive.rs:9
+      cranelift_backend/artifact/api/tests.rs              2 sites, gated at artifact/api.rs:12
+      cranelift_backend/lowering/core/primitive/tests.rs   2 sites, gated at primitive.rs:8
+
+  Gate coordinates name the **`#[cfg(test)]` attribute line**, not the `mod`
+  line below it. Two of them previously named the `mod` line (`api.rs:13`,
+  `primitive.rs:9`) while `cranelift_backend.rs:50` named the attribute, so one
+  phrase — "gated at" — pointed at two different kinds of line. Corrected to the
+  attribute at every row. All three hold at **`686ffa8ac`** and at **`origin/main`
+  `e3fe32510`**: `api.rs` and `primitive.rs` are blob-identical across the two,
+  and `cranelift_backend.rs` differs elsewhere but carries `#[cfg(test)]` /
+  `mod test_objects;` / `#[cfg(test)]` / `mod test_support;` at `:50`-`:53` at
+  both refs.
 
   **The 34-file list contains none of them, so 34 is very likely correct — but
   for a reason not yet established, and `D0` owes that.** The classifier excluded
@@ -210,7 +241,8 @@ lives in `ken-host` and is equally present on `origin/main`.
   gates (**it cannot**) or because they happen to be named `tests.rs`.
 
   **`cranelift_backend/test_support.rs` is the proof the distinction is live:**
-  declaration-gated at `:52`, **not** named `tests.rs`, and carrying zero
+  declaration-gated at `cranelift_backend.rs:52` (attribute line, both refs),
+  **not** named `tests.rs`, and carrying zero
   `RuntimeTrap` sites today. It is exactly the shape a filename heuristic misses,
   sitting empty. `test_objects.rs` was found because its name invited it, and
   both other members have inviting names too. **Confirm WHY those two were
@@ -222,13 +254,18 @@ lives in `ken-host` and is equally present on `origin/main`.
   do not drift. The struct does:
 
       effect_v1.rs   derive at :4067  (686ffa8ac)
-                     derive at :3989  (origin/main)   -- 78 lines apart
+                     derive at :3989  (origin/main e3fe32510)  -- 78 lines apart
 
   Anyone building on `origin/main` and going to `:4067` lands 78 lines off.
+  `origin/main` is pinned to `e3fe32510` here because a moving ref is not a
+  coordinate: the same sentence silently means a different tree tomorrow.
 
 - **The fact that was already in the tree, three hard stops early**,
-  `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/control.rs:4999`,
-  in a comment above a test named "Hard-stop #18 row 2":
+  `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/control.rs:4999`
+  at **`686ffa8ac`** (same line at `187895991`; this file is **not**
+  blob-identical on `origin/main` `e3fe32510`, where `:4999` is unrelated text —
+  locate it there by the string `Hard-stop #18 row 2`), in a comment above a test
+  named "Hard-stop #18 row 2":
 
       erasure.rs derives the case headers from the eliminated family and builds
       the default as format!("no runtime match case selected for
@@ -238,6 +275,34 @@ lives in `ken-host` and is equally present on `origin/main`.
   It was written for a NEIGHBOURING consumer (header fingerprints) and so never
   reached the consumer that needed it (trap identity). Recorded here because it
   is the reason this node exists at all, not as decoration.
+
+### Why there is no default
+
+This section used to open with *"MEASURED BY THE STEWARD at `686ffa8ac` (the
+HS-arc WIP tip), except where a line says otherwise."* That line predates the
+invariant above it and is the exact negation of it: the invariant works by making
+a bare coordinate a **visible violation**, and a section default makes a bare
+coordinate **silently valid** by lending it an attribution instead of letting it
+lack one. The closure could not fire on the case it exists for. The Architect
+found it (`evt_6qwfs0j22sr01`).
+
+**The default was not merely inert — it was already wrong about a live
+coordinate.** `compiler_driver.rs:4159-4165` was measured on `origin/main`
+`e3fe32510`; under the default it read as `686ffa8ac`, where `:4159` sits inside
+an unrelated function. A reader following the stated ref would have found
+nothing, with no way to tell whether the frame or the tree was at fault.
+
+`686ffa8ac` was also the wrong thing to privilege: it is the **HS-arc WIP probe
+tip**, the ref that is warm because everyone is quoting it, which is never the
+same object as the base a deliverable gets built on. Making the warm ref the
+silent default is the warm-ref failure written into the document's structure.
+
+⇒ **The general form, worth more than this instance: adding an invariant can
+falsify a nearby line that was true before it, and that line will not look
+stale.** A stale-value sweep greps for an old value; there is no old value here
+to grep for. The defeating text contained no coordinate and no SHA — only the
+word "except." When you add a rule, ask what nearby text was relying on the rule
+not existing.
 
 ## Deliverables
 
