@@ -11,12 +11,31 @@ github: null
 origin: "Adversary hunt evt_6npaybf8cznp8 (2026-08-18) on the RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING D3 landing b430d73e0. Steward-filed per COORDINATION section 2. The finding measured all three retired censuses by flipping cfg(any()) to #[test]; every figure below is the Adversary's, reproduced from its report."
 ---
 
-> # HELD BEHIND THE SINGLE RUNTIME LANE. Not startable on sight.
+> # RELEASED 2026-09-14 BY THE STEWARD. STARTABLE NOW, ON A CLEAN BASE.
 >
-> This is a real, measured gap and it is **not urgent**: no behaviour is wrong,
-> nothing is unsound, and the rot is in commentary rather than in compiled code.
-> It queues behind [[RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING]]'s `D4` and
-> the residuals already in the operator's run order.
+> **The hold is lifted and the reason it was written no longer holds.** It said
+> *"held behind the single runtime lane"* — the constraint was the runtime ring's
+> attention, not anything about this work. That constraint is inverted today: the
+> ABI-S6 / D5b stack is blocked behind a red CI at an unpushed tip, nothing there
+> is dispatchable to an implementer, and the runtime ring is idle. **Re-sequencing
+> is the Steward's call (`steward.md §3`); nothing in the node's content changed.**
+>
+> **Why this node and not another of the sixteen ungated `ready` runtime nodes:
+> it is the one with a genuinely CLEAN BASE.** It is `size: S`,
+> `depends_on: []`, and it touches `crates/ken-runtime/src/control.rs` — clear of
+> the 24-commit `wp/ABI-S6-d5b-file-backed` stack that every other runtime item is
+> entangled with. It can be cut from `origin/main` and reviewed on its own.
+>
+> **It remains true that this is not urgent** — no behaviour is wrong and nothing
+> is unsound; the rot is in commentary rather than in compiled code. It is being
+> released because it is *available*, not because it became important. **If
+> anything in the D5b arc becomes dispatchable, that outranks this.**
+>
+> **`D0` is a component-design call and is the Architect's, not the
+> implementer's.** Take it there before building either arm; the Architect is
+> seated and light. Note `AC-2`'s shape in particular: the control must be shown
+> to **red on today's `main`** before any repair, and that red is the acceptance
+> evidence. A green run proves nothing here, because the tree already fails 3 of 3.
 
 ## The defect
 
