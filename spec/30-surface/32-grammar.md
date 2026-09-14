@@ -1,9 +1,11 @@
 # Concrete grammar
 
-> Status: **DRAFT v0**. Proposal-level (OQ-syntax). An EBNF sketch of the
-> surface against the brace form (layout, `31 §6`, desugars to this). Normative
-> intent: the *productions that exist* (what can be written), not their exact
-> spelling.
+> Status: **DRAFT v0**. Proposal-level (OQ-syntax), except the six-name
+> reserved-infix grammar **contract-pinned** by `SPEC-RESERVED-INFIX-NAMES`
+> (§1, §3, §6). An EBNF sketch of the surface against the brace form (layout,
+> `31 §6`, desugars to this). Normative intent: the *productions that exist*
+> (what can be written); exact spellings remain proposal-level unless a section
+> fixes them explicitly.
 
 ## 1. Compilation units and declarations
 
@@ -18,19 +20,24 @@ capability_decl ::= ConId ConId
 import ::= "import" ModPath import_suffix?
 import_suffix ::= "as" ConId
                 | "(" import_item ("," import_item)* ")"
-import_item ::= name | name "as" rename
-rename ::= name
+import_item ::= global_name ("as" global_name)?
 export_decl ::= "export" ( ModPath selection_list | export_item_list )
 selection_list   ::= "(" export_item ("," export_item)* ")"
 export_item_list ::= export_item ("," export_item)*
-export_item      ::= name ( "as" name )?
+export_item      ::= global_name ("as" global_name)?
+
+value_name ::= ident | operator_name
+global_name ::= ident | ConId | operator_name
+operator_name ::= operator | reserved_infix_name
+reserved_infix_name ::= "≤" | "<=" | "≥" | ">=" | "≠" | "/="
+                      | "∧" | "/\\" | "∨" | "\\/" | "∈"
 
 visibility ::= "pub"
 decl ::= visibility? decl_core
 decl_core ::=
-    "const" ident binder* (":" type)? contract* constraint_clause? "=" expr  -- pure value (36 §1.6)
-  | "fn"    ident binder* (":" type)? contract* constraint_clause? "=" expr  -- pure function
-  | "proc"  ident binder* (":" type)? effects? contract* constraint_clause? "=" expr  -- effectful / imperative
+    "const" value_name binder* (":" type)? contract* constraint_clause? "=" expr  -- pure value (36 §1.6)
+  | "fn"    value_name binder* (":" type)? contract* constraint_clause? "=" expr  -- pure function
+  | "proc"  value_name binder* (":" type)? effects? contract* constraint_clause? "=" expr  -- effectful / imperative
   | "def" ConId tyvar* "=" type  -- definition: alias / refinement ("type" reserved)
   | "record" ConId tyvar* "{" field (";" field)* "}" derive?  -- product
   | "data" ConId tyvar* "=" simple_ctor ("|" simple_ctor)* derive?  -- simple sum sugar
@@ -74,13 +81,29 @@ row     ::= ConId ("," ConId)*                      -- concrete row  [FS, Consol
           | ConId ("," ConId)* "|" ident            -- open row  [FS | e]  (concrete head + poly tail)
 contract::= "requires" expr | "ensures" expr       -- (20)
 derive  ::= "derive" "(" ConId ("," ConId)* ")"    -- DecEq, Show, … (33)
-path    ::= ident ("." ident)*                     -- qualified value/module path
+fixity_decl ::= ("infixl" | "infixr" | "infix") precedence operator_name
+precedence ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+path    ::= ident ("." ident)*                     -- attached-proof subject path
+qualified_global_ref ::= ModPath "." global_name
 prop_block ::= "where" "{" prop_intro (";" prop_intro)* "}"
 prop_intro ::= ident ":" type
 ```
 
 The two `import_suffix` alternatives are mutually exclusive. One import may
 alias the module or select and rename exported names, never both.
+
+`operator_name` extends the existing generic `operator` name arm by exactly six
+reserved notation identities. The paired source spellings `≤`/`<=`, `≥`/`>=`,
+`≠`/`/=`, `∧`/`/\`, and `∨`/`\/` each denote one identity; `∈` is a sixth,
+glyph-only identity. Thus a pair cannot be declared or assigned fixity twice
+under its two spellings. `!=` is not a production, and keyword `in` remains only
+the distinct `let … in` token. The production is deliberately global:
+`value_name` admits it at a global `const`/`fn`/`proc` head, `global_name`
+admits it in selection, rename, and export positions, and
+`qualified_global_ref` admits it as a module-qualified suffix. Local binders,
+type and constructor names, module paths and aliases, record fields, and
+attached-proof names retain their existing `ident`/`ConId` productions; this
+amendment does not turn a notation token into a general identifier.
 
 In `export_decl`, `ModPath` is governed by the same role-blind path identity as
 an `import` target (`33 §3.2`). Neither form of `export_decl`, including a
@@ -238,23 +261,30 @@ so nothing there is reserved.
 ```
 expr ::=
     "λ" binder+ "." expr | "\\" binder+ "->" expr  -- lambda
-  | expr expr  -- application (left assoc)
-  | expr binop expr  -- operators (declared fixity)
+  | expr application_atom  -- application (left assoc)
+  | operator_prefix  -- ungrouped operator allowed only as application head
+  | expr binop expr  -- fixity-neutral operator spine
   | "(" ident ":" type ")" "->" expr  -- dependent function type Π (a term; §2, 11 §1)
   | expr "->" expr  -- non-dependent function type (arrow); elaborates to kernel Pi
   | let_expr  -- sequential local binding group
   | "if" expr "then" expr "else" expr  -- = match on Bool
   | match_expr  -- pattern match (34); single-scrutinee eqn: modifier (34 §3.6)
   | expr "." ident | expr ".1" | expr ".2"  -- field / projection
+  | "temporal" "{" expr "}"  -- temporal obligation → Temporal data (72) [OQ-syntax]
+  | application_atom
+operator_prefix ::= operator_name application_atom+
+binop ::= operator_name | fixed_binop
+fixed_binop ::= "+" | "-" | "*" | "+%" | "-%" | "*%" | "=="
+application_atom ::=
+    literal | ident | ConId | qualified_global_ref
   | path "::" ident  -- canonical attached-proof path
   | proof_ref  -- attached-proof selector atom
   | recursive_result  -- Type-classified nested method result (34 §3.1.1)
   | induction_hypothesis  -- Omega-classified nested method result (34 §3.1.1)
+  | "(" operator_name ")"  -- grouped operator value
   | "(" expr ("," expr)* ")"  -- tuple / pair / grouping
-  | "{" field_assign ("," field_assign)* "}"  -- record literal
-  | "temporal" "{" expr "}"  -- temporal obligation → Temporal data (72) [OQ-syntax]
-  | literal | ident | ConId | "(" operator ")"
   | "(" expr ":" type ")"  -- type ascription
+  | "{" field_assign ("," field_assign)* "}"  -- record literal
 let_expr ::= "let" let_binding (";" let_binding)* "in" expr
 let_binding ::= ident (":" type)? "=" expr
 match_expr ::= "match" expr ("eqn:" ident)? ("," expr)*
@@ -323,6 +353,38 @@ primary-expression boundary; otherwise its words remain ordinary identifier
 tokens (`31 §4`). The forms are scoped selectors, not function application,
 generated identifiers, or general-recursion constructs. Their sort-selected
 validity and meaning are fixed by `34 §3.1.1` and `39 §2.3`.
+
+An ungrouped `operator_name` is not a general `application_atom`. It is admitted
+only as the head of `operator_prefix`, with at least one following atom; grouping
+`(operator_name)` makes it an ordinary atom that may appear anywhere. Thus
+`OP a b` and `(OP) a b` are ordinary left-associated prefix applications, while
+`a OP b` has only the `binop` derivation rather than a competing three-atom
+application derivation. This restriction applies equally to generic and
+reserved operator names; it does not reclassify `+`, `*`, `==`, or any generic
+symbolic run as a bare general atom. `fixed_binop` preserves the existing
+built-in arithmetic/equality path and never becomes a declaration or fixity
+name.
+
+Both application arms — `expr application_atom` and `operator_prefix` with its
+`application_atom+` tail — intentionally restrict bare arguments to atoms. An
+expression not admitted by `application_atom` — including an
+ungrouped lambda, `let`, `if`, `match`, temporal form, arrow, or projection —
+must be grouped before it is used as an application argument. Consequently the
+five leading forms — lambda and `let`, `if`, `match`, and `temporal` — reject at
+their leading token when ungrouped after an application head, whereas arrow and
+projection remain well-formed with that application nested in their left
+`expr`, as `(keep Nat) -> Nat` and `(keep box).value` respectively. This removes
+the former ambiguous bare `expr expr` shape and is part of §3's contract pin; an
+implementation must not restore a second unrestricted application production.
+
+In an infix run, the `operator_name` arm of `binop` puts the name in the
+existing fixity-neutral spine. After name resolution, the defining
+`GlobalId` selects its declared fixity (`33 §6`), and reassociation lowers to
+the same two ordinary applications as prefix use. The six reserved notation
+identities add no built-in binary-operation variant or semantic dispatch.
+Their absence from the environment is therefore an unknown-global error after
+parsing, not a token
+dead end and not an implicit standard binding.
 
 Several decided constructs need **no special expression syntax** — they are
 ordinary terms over stdlib/library values (spelling still `OQ-syntax`):
@@ -412,9 +474,11 @@ contract is part of `fn`/`proc` (§1); refinements `{x:A|φ}` are types (§2).
 ## 6. Precedence and associativity (defaults)
 
 Application binds tightest; `@` (label / annotation prefix) tight; `->` and `×`
-are right-associative and looser than the arithmetic operators; user operators
-take declared fixity (`infixl`/`infixr`/`infix N`, default `infixl 9`); `:`
-(ascription) loosest.
+are right-associative and looser than the arithmetic operators; user operators,
+including every `reserved_infix_name`, take declared fixity
+(`infixl`/`infixr`/`infix N`, default `infixl 9`); `:` (ascription) loosest.
+The default is selected because the resolved identity has no declaration, never
+from the glyph or from which alias spelling reached that identity.
 
 **Arithmetic precedence — resolved (conventional default).** The core arithmetic
 operators bind by the conventional levels, so `a + b * c` parses as `a + (b *

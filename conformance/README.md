@@ -107,6 +107,17 @@ claim with no conformance case is a claim no one can rely on
 - `surface/seed-surface.md` — elaboration invariants (well-typed output,
   ambiguity-is-an-error); the `data`/`match`/refinement cases are homed in
   `data-match/` (below).
+- `surface/operators/seed-reserved-infix-names.md` — the exact six reserved
+  notation identities admitted as ordinary symbolic global names: isolated
+  four-context rows plus a simultaneous distinct-body fixture pin both omission
+  and cross-row non-collapse; an excluded-grammar matrix keeps local/structural
+  names identifier-only; two token-class operator-value triples, seven
+  identifier-head pairs, and fourteen generic/reserved operator-head pairs pin
+  both `application_atom`-bearing productions; alias pairs remain one identity;
+  `!=` and `in` remain refused with live controls. Reserved-name and
+  non-temporal application-atom arms are red until
+  `LANG-RESERVED-INFIX-NAMES`; the temporal rows separately wait on the
+  unavailable `RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE`.
 - `surface/data-match/seed-data-match.md` — L2 sum types + `match` + refinements
   (`34`): real constructors + a computing `elim_D`, `match`→`elim_D` (nested),
   the **required exhaustiveness** safety (non-exhaustive rejects naming the
@@ -230,8 +241,9 @@ claim with no conformance case is a claim no one can rely on
   parse and elaboration preservation, whole-catalog posture, literate prose
   identity, trivia/literal preservation, deterministic 88-column width, and
   token-role ambiguity), with controlled pairs for arrows, `:`/`::`, dot
-  roles, `l`/level, `in`/membership, every protected literal form, and all four
-  literate fence roles. Formatter-output cases are red until B3–C; the narrow
+  roles, `l`/level, keyword `in`/glyph-only `Member` name, every protected
+  literal form, and all four literate fence roles. Formatter-output cases are
+  red until B3–C; the narrow
   unparseable `ignore`/`reject` exemption remains token-aware.
 - `surface/elaboration/seed-multi-binding-let.md` — LET-4 sequential local
   binding groups: separator/match-boundary parses, left-to-right dependent
