@@ -37,10 +37,52 @@ origin: "Split out of TEST-NATIVE-STACK-PROVISIONING-STANDARD by the Steward whe
 > **It also depends on [[TEST-NATIVE-STACK-PROVISIONING-STANDARD]] landing** —
 > there is nothing to reconcile the sites *to* until the ruling is in its venue.
 
+> # AMENDED 2026-09-14 (Steward, `evt_752h5xfry09dh`). THE CENSUS IS STALE AGAIN,
+> # AND IT IS BLIND IN TWO DIRECTIONS THAT MATTER MORE THAN THE COUNT.
+>
+> **Re-measured at `origin/main` `7b070004`: 27 `.stack_size` call sites in 21
+> files across FIVE crates** — `ken-cli`, `ken-elaborator`, `ken-kernel`,
+> `ken-runtime`, `ken-verify`. The table below says 15 / 14 / 4 and does not name
+> `ken-kernel` at all. **`AC-1` already told you not to inherit it; this is the
+> second time it has been wrong by roughly a factor of two.**
+>
+> **BLINDNESS 1 — the census enumerates sites that STATE a stack, so it cannot
+> see a test that NEEDS one and states none.** Measured on the runtime ring's
+> base `686ffa8ac`: `crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs`
+> provisions **nothing** across its 18 tests, and
+> `absent_required_consumer_disposition_preserves_direct_and_tail_routes`
+> **overflows the stack when run in isolation, uninstrumented**. It passes in the
+> full suite, so nothing reds and no grep for `stack_size` will ever find it.
+>
+> **The justification is the corrected one, and it matters which.** The overflow
+> is **not** instrumentation-caused — that attribution was made three times and
+> withdrawn against an uninstrumented control. It is *"this test aborts in
+> isolation and nothing states the requirement."* **A probe run in the full suite
+> also overflows it**, independently. Do not write the retracted account into a
+> site comment.
+>
+> ⇒ **`D1`'s population is "sites that state a stack" UNION "sites measured to
+> need one and state none." The second set is not grep-able and is currently one
+> known member.** Record it as a residual under `D4` if you cannot enumerate it;
+> do not let the grep define the population.
+>
+> **BLINDNESS 2 — one site is PRODUCTION code and the three acts have no cell for
+> it.** `crates/ken-verify/src/scenario.rs:658` sets
+> `SCENARIO_COMPILER_STACK_BYTES` inside `execute_scenario`, reached from `pub fn
+> run_scenario`, with **no `#[cfg(test)]` anywhere above it**. The ruling opens
+> *"a test may set its own thread stack size"*; this is not a test. **`AC-5`
+> forbids changing it and the taxonomy cannot classify it**, so a reader lands in
+> a cell that does not exist and the node reads as complete.
+>
+> ⇒ **Classify it as `D4` residual and report it. Do not force it into an act,
+> and do not modify it.** Whether production code may state a stack, and under
+> what derivation, is a question for the parent standard and is not this node's
+> to settle.
+
 ## What this is
 
-**The 15 stated-stack sites, brought into line with the ruling.** The ruling
-itself is transcribed by the parent node; this one applies it.
+**The stated-stack sites, brought into line with the ruling.** The ruling itself
+is transcribed by the parent node; this one applies it.
 
 **The parent node originally carried this as a one-line-per-site pass. That
 sizing was built on a population of 6 in one crate and does not survive the
