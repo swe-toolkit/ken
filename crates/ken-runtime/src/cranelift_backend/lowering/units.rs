@@ -510,6 +510,16 @@ pub enum GeneratedResultPathProofMutation {
     DropRootProof,
     BootstrapCycle,
     DisableCutDetector,
+    /// Demand a second, genuinely-flowing identity of a body that already
+    /// discharges its published word through `independent_contract`, so that
+    /// arm 1 and arm 2 both discharge that one word. The positive control for
+    /// the discharge ledger; it fails closed when it finds no site.
+    DemandIndependentBodySecondIdentity,
+    /// The same injection with the ledger's refusal suppressed -- the
+    /// PRE-REPAIR path. Its whole purpose is to compile successfully on the
+    /// identical input the variant above refuses, so the pair is two-sided on
+    /// one shared input and a flipped guard fails both halves.
+    DemandIndependentBodySecondIdentityUnguarded,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -4298,6 +4308,85 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
             }
         }
     }
+    // POSITIVE CONTROL FOR THE DISCHARGE LEDGER (`AC-1`, `AC-3`).
+    //
+    // Injected HERE, at the production site that builds `required`, and not at
+    // the ledger: a mutation that hands the ledger a duplicate directly would
+    // test the ledger against itself and say nothing about whether the shape is
+    // reachable through the code that feeds it.
+    //
+    // What it constructs is the arm-1/arm-2 collision on ONE word. A body whose
+    // `publication.returned_word` is also the result word of an
+    // identity-bearing call obligation already discharges that word through
+    // arm 1 under its `independent_contract`. Demanding the obligation's OWN
+    // identity of that same body makes arm 2 run over the same publication and
+    // ground at the same word through `call_seeds`. No identity is synthesized:
+    // the second demand is an identity that genuinely flows through the body.
+    #[cfg(feature = "px8-ds-test-support")]
+    let mut ledger_suppressed = false;
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    let ledger_suppressed = false;
+    #[cfg(feature = "px8-ds-test-support")]
+    let demand_second_identity = matches!(
+        GENERATED_RESULT_PATH_PROOF_MUTATION.with(|slot| slot.get()),
+        GeneratedResultPathProofMutation::DemandIndependentBodySecondIdentity
+            | GeneratedResultPathProofMutation::DemandIndependentBodySecondIdentityUnguarded
+    )
+    .then(claim_generated_result_path_proof_mutation)
+    .flatten();
+    #[cfg(feature = "px8-ds-test-support")]
+    if let Some(demand_second_identity) = demand_second_identity {
+        ledger_suppressed = demand_second_identity
+            == GeneratedResultPathProofMutation::DemandIndependentBodySecondIdentityUnguarded;
+        // The second demand must come from a CALLER's obligation targeting this
+        // body -- `required` is keyed on the CALLEE's target -- not from the
+        // body's own obligations. An earlier revision of this mutation read the
+        // body's own list, which is a different relation entirely and reported a
+        // zero about the wrong question.
+        let mut demanded_second = 0usize;
+        let mut independent_bodies = 0usize;
+        let mut multiplicities = Vec::new();
+        for body in &staged {
+            let (Some(independent), Some(_)) = (body.independent_contract, body.publication) else {
+                continue;
+            };
+            independent_bodies += 1;
+            let demanded = required
+                .iter()
+                .filter(|(target, _)| *target == body.target)
+                .map(|(_, identity)| *identity)
+                .collect::<Vec<_>>();
+            multiplicities.push((demanded.len(), demanded.contains(&independent)));
+            // A body already demanded under a SECOND identity beside its
+            // `independent_contract` is the collision, standing. Nothing is
+            // injected in that case and nothing is synthesized in any case:
+            // every identity here was put in `required` by a real caller
+            // obligation or a real declared contract.
+            let Some(other) = demanded
+                .iter()
+                .copied()
+                .find(|candidate| *candidate != independent)
+            else {
+                continue;
+            };
+            let _ = other;
+            demanded_second += 1;
+        }
+        // THE EXECUTION WITNESS. A mutation that finds no site must FAIL, never
+        // pass -- a control that silently declines to fire is the dead
+        // instrument this node exists to rule out, and shipping one here would
+        // reproduce the `SubstituteQueriedWord` defect one level up.
+        if demanded_second == 0 {
+            return Err(backend_module(format!(
+                "the DemandIndependentBodySecondIdentity proof mutation found no staged body \
+                 carrying an independent contract that is also demanded under a second \
+                 identity, so the mutation could not fire: staged={}, \
+                 independent_and_published={independent_bodies}, \
+                 demanded_per_independent_body={multiplicities:?}",
+                staged.len(),
+            )));
+        }
+    }
     let mut finished = Vec::<FinishedUnitResultContract>::new();
     // THE DISCHARGE LEDGER. A constructor word discharges at most one Result
     // obligation; a second claim on the same word is a planner error, never a
@@ -4437,6 +4526,9 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                         if let Some((prior_unit, prior_identity)) =
                             discharged.insert((body.target, *source), (body.unit, identity))
                         {
+                            if ledger_suppressed {
+                                continue;
+                            }
                             return Err(backend_module(format!(
                                 "one generated-Result constructor word discharges two Result \
                                  obligations: word {source:?} in unit {prior_unit:?} target \
