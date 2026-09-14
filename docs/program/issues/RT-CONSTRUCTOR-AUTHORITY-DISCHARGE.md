@@ -88,17 +88,29 @@ not change that.** Measured at `5d977ac79`:
   `BTreeMap<ir::Value, GeneratedConstructorAuthority>` (`mod.rs:1319`), written
   by `register_generated_constructor_authority` (`mod.rs:4053`).
 - **Produced** at exactly two sites: `calls.rs:1866`, `core.rs:13994`.
-- **Read at SIX sites, all in `units.rs`, and every one of them is a shared
-  borrow over the map as a COLLECTION** — not one of them consumes anything:
+- **Read at EIGHT sites, all in `units.rs`, and every one of them is a shared
+  borrow over the map as a COLLECTION** — not one of them consumes anything.
+  **This census was SIX when the frame was authored; `D0` found two more**
+  (`evt_2kv61375ae400`), and both omissions are load-bearing. Line numbers at
+  `5d977ac79` / `686ffa8ac`; all eight exist at both refs, so the gap was a
+  census miss and not a lineage difference:
 
   | site | shape | what it does |
   |---|---|---|
-  | `3122-3124` | `.get(&value).is_some_and(..)` | the discharge check — **and `None` falls through** to `call_seeds` and then to a general forwarding search |
-  | `3262` | `.values().any(..)` | `cfg(px8-ds-test-support)` mutation trigger |
-  | `3307` | `.values().find(\|a\| a.identity != identity)` | `cfg(px8-ds-test-support)` — deliberately selects a **foreign** authority's word to substitute |
-  | `3343` | `.iter().filter(..).map(..)` | grounds verification over **every** matching authority, feeding `verify_constructor_authority_ground` |
-  | `4312` | `.get(&publication.returned_word)` | diagnostic |
-  | `4314-4318` | `.len()`, `.values().filter(..).take(8)` | diagnostic |
+  | `3122` / `3129` | `.get(&value).is_some_and(..)` | the discharge check — **`None` falls through** to `call_seeds` and then to a general forwarding search |
+  | `3262` / `3275` | `.values().any(..)` | `cfg(px8-ds-test-support)` mutation trigger |
+  | `3307` / `3320` | `.values().find(\|a\| a.identity != identity)` | `cfg(px8-ds-test-support)` — deliberately selects a **foreign** authority's word to substitute |
+  | `3343` / `3356` | `.iter().filter(..).map(..)` | grounds verification over **every** matching authority, feeding `verify_constructor_authority_ground` |
+  | `3387` / `3401` | `if let Some(authority) = ..get(source)` | **MISSED BY THE FRAME. `None` falls through.** |
+  | `3891` / `3905` | `.contains_key(&value) \|\| realized_call_words.contains(..)` | **MISSED BY THE FRAME.** A presence check falling through to an alternative |
+  | `4284` / `4415` | `.get(&publication.returned_word)` | diagnostic |
+  | `4312-4317` / `4443-4448` | `.len()`, `.values().filter(..).take(8)` | diagnostic |
+
+  **THE FRAME NAMED ONE SILENT PASS. THERE ARE THREE** — `3122`, `3387` and
+  `3891` are all fallthrough-on-absent. That is the population `D2`'s
+  hard-error-on-`None` has to cover, and an enumeration that stopped at the
+  first one is exactly the census blindness this node exists to replace with a
+  missing VALUE. The separability conclusion is unaffected: all eight borrow.
 
 - **Consumed** at `units.rs:5415`, `verify_constructor_authority_ground(body,
   authority: &GeneratedConstructorAuthority, helpers)` — by shared reference.
@@ -143,10 +155,27 @@ command that settles it is the first deliverable.
 ## Fixed inputs
 
 **MEASURED BY THE STEWARD at `5d977ac79`** unless a line says otherwise.
-Re-measure every coordinate at `D0`. These are two different branches, not two
-points on one: `demanded_result_identity` reads at `core.rs:9210` here and at
-`core.rs:9488` on `686ffa8ac`, 278 lines apart. **A line number is a claim about
-one tree and carries its SHA or it is worthless.**
+
+Re-measure every coordinate at `D0`. These are two different branches and
+neither is an ancestor of the other, so the coordinates differ in POPULATION,
+not only in position. Non-definition reads of `demanded_result_identity`:
+
+    5d977ac79    core.rs:9210, core.rs:9220, responses.rs:2247    THREE
+    686ffa8ac    core.rs:9488,               responses.rs:2607    TWO
+    origin/main  (symbol absent entirely)                         ZERO
+
+`core.rs:9220` and `:9488` are the same statement; `core.rs:9210` is a second
+read (`.tag_abi_word()`) present only on `5d977ac79`. **A line number is a claim
+about one tree and carries its SHA or it is worthless — and a line-number
+framing can hide a SET difference, which is the worse failure.**
+
+**This matters to `D1b` specifically.** That deliverable asks whether the
+demanded identity is available at each consumer, and the read-site SET is its
+input. An earlier version of this note paired `:9210` with `:9488` and called
+the gap a 278-line drift, which reports a MISSING site as a MOVED one — and
+tells anyone re-measuring that the extra `core.rs` read is a drifted duplicate
+they need not look at. It is not. Corrected on the Architect's census
+(`evt_6mgz3cjerky83`).
 
 - **The carrier, and the invariant that forbids the obvious fix.**
   `lowering/mod.rs:3843`, one field `word: ir::Value`, under a declaration that
@@ -197,11 +226,27 @@ Remove `#[derive(Clone, Copy)]` from `GeneratedConstructorAuthority`, build
 **Report the number and the sites either way.** This is a measurement whose
 purpose is to be able to come out the other way.
 
-**`D0` also counts the restructure surface**, which the derive probe does not
-reveal: the six read sites above, including the two `cfg(px8-ds-test-support)`
-mutation harnesses and specifically the one at `units.rs:3307` that depends on
-a foreign authority remaining live in the map. **How that harness survives
-consumption semantics is a `D0` answer, not a `D2` surprise.**
+**`D0` IS REPORTED AND CONFIRMS THE FINDING** (`evt_2kv61375ae400`). Derive
+removed, `-p ken-runtime --lib` built: **exit 0, ZERO compile errors, and the
+warning count did not move — 110 before, 110 after.** Not one site warned. Run
+at `686ffa8ac` rather than `5d977ac79`; the transfer was checked rather than
+assumed — the two refs do differ in `mod.rs` and `units.rs`, but all 14
+occurrences of the type and its map exist at both with the same shapes and only
+line numbers shifting.
+
+⇒ **Part 1 as originally ruled would have been a green node leaving the property
+it is named for still false.** `D1`/`D2` proceed as one change.
+
+**THE MUTATION HARNESS IS A NAMED `D2` RISK, ANSWERED BY `D0` RATHER THAN
+DISCOVERED MID-BUILD.** `SubstituteQueriedWord` (`units.rs:3307` / `:3320`)
+fires only `if let Some(foreign) = ..find(|a| a.identity != identity)` — it
+requires a foreign authority to be **still live in the map at verification
+time**. Under consumption semantics that becomes ordering-dependent: if none
+remains, `find` returns `None`, the mutation **silently becomes a no-op, and its
+test still passes.** That is a mutation control degrading into a dead
+instrument. **`D2` must answer it explicitly**, and a green suite is not the
+answer — a mutation harness that cannot fire is the failure mode this whole arc
+is organised around.
 
 **`D1` — the two-halved bounded measurement. BOTH HALVES ARE REPORTS, AND
 NEITHER MAY BE SATISFIED BY INVENTION.**
@@ -292,15 +337,56 @@ Report the difficulty instead.
 
 ## Sequencing
 
-**The held branch goes first, and this node is authored on top of it.**
-`5d977ac79` is 6 commits ahead of `origin/main` and carries the type this node
-widens. The Steward's call, taken here rather than left open:
+**THE BASE IS `187895991`, ON `wp/ABI-S6-d5b-file-backed`. Steward's call,
+taken on the ring's measurement and re-verified.** `5d977ac79` is NOT the base
+and never was a candidate.
 
-1. The runtime ring's held HS18 work routes on its own merits — the
-   representation fork that held it is now ruled, so the reason for the hold is
-   spent. It is not held on this node.
-2. This node is then cut against whatever SHA that lands as, and `D0` re-measures
-   every coordinate there.
+**This section has been wrong twice and the reason is worth keeping.** Its first
+version said the held work "routes on its own merits — the fork that held it is
+now ruled." Its second accepted that it needed R1, R2 and a 146-commit rebase.
+**Both inherited `5d977ac79` from participant status lines without asking what
+kind of object it is.** It is not a branch tip: **no ref points at it.** It is
+interior to `backup/ABI-S6-d5b-file-backed-pre-cb646` — a pre-rebase backup —
+and the rebase everyone said it needed **already existed** as the implementer's
+working branch. Three seats, the Architect and the Steward all treated a commit
+inside a backup as the live candidate, because a status line said "runtime held
+`5d977ac79`" and nobody ran `git for-each-ref --points-at`.
+
+Verified independently by the Steward:
+
+    backup/ABI-S6-d5b-file-backed-pre-cb646  tip 62a92e3db  merge-base 2a74775ae  146 behind main
+    wp/ABI-S6-d5b-file-backed (live)         tip 686ffa8ac  merge-base 4bf1ad362   10 behind main
+
+    git diff 2a74775ae 62a92e3db  -> sha256 f5600403834fcd6c
+    git diff 4bf1ad362 187895991  -> sha256 f5600403834fcd6c   TEXTUALLY IDENTICAL
+
+Same work, rebased — not similar work. `187895991` is a straight ancestor of
+`686ffa8ac`, so every exact SHA below it is preserved.
+
+**THE ORDER:**
+
+1. **Cut the candidate at `187895991`** — the rebased twin of the backup tip. It
+   excludes the six commits above it (`7dae3d039` plus five WIP/audit probes),
+   which are not part of the entry-18 verifier repair and should not ride with
+   it. The implementer's WIP branch stays intact.
+2. **R1 and R2 on that candidate.** R1 is at
+   `abi_s6_mapping_file_backed_native.rs:565` and R2 at `units.rs:5087` on this
+   lineage — both unaddressed here too, so nothing is lost by the base change.
+   **R1 is NOT mechanical**: mirroring the sibling's per-mutation pairing needs
+   the real refusal substring for each of 15 mutations, which are properties of
+   what each mutation produces and are not derivable by reading. Capture them,
+   author the pairing from the measured strings, and **prove the pairing bites
+   by cross-pairing one mutation with another's expected string and confirming
+   it FAILS** — otherwise the new form is a different shape with the same
+   non-discrimination.
+3. Rebase onto current `origin/main` (10 commits, not 146), QA, merge Decision,
+   route.
+4. **This node's `D2` builds on whatever that lands as, and on nothing else.**
+
+**Measurement base and build base are different questions.** `D0` ran at
+`686ffa8ac` and transfers: all 14 occurrences of the type and its map exist at
+both refs with identical shapes. Measure on either and **state the SHA beside
+every number**.
 
 **If the ring would rather fold `D0`'s one-line change into the held branch
 before it routes, bring that to the Steward** — it is cheaper than a follow-on
