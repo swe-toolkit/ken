@@ -15782,19 +15782,39 @@ impl<'a> Lowering<'a> {
         // convenience: an ordinary carried `ITree` constructor still takes its
         // own case, and this arm can never shadow one.
         //
-        // The checked recursive worker returns the checked *answer*
-        // (`Result::Ok` on the governed witness), which the **specialized** arm
-        // sends to the unique guarded `ITree::Ret` continuation. The carried arm
-        // used to ask instead whether that answer was literally an `ITree`
-        // constructor — it is not — and seal the closed default. This restores
-        // the same guarded route on the same fact.
+        // The checked recursive worker returns the checked answer. WHICH DEPTH
+        // that answer sits at depends on how the worker was reached, and the two
+        // routes genuinely differ — that is the whole hazard here:
         //
-        // ⛔ **No phase forgery.** The carried word is fed to the return case's
-        // one retained argument **as itself**: nothing is decoded, converted to
-        // `Lowered`, recovered as a template, or selected at runtime, and no
-        // constructor is matched by name. The guard is a compile-time property
-        // of the case *topology*, identical to the specialized arm's, and the
-        // word never participates in it.
+        // - The collapse/specialized arm never calls the worker. It runs the
+        //   worker body's payload in place (the body is
+        //   `Construct{ ITree::Ret, [payload] }` — see
+        //   `tail_worker_body_is_ret_kmatch`), so what it produces is the bare
+        //   answer the `ITree::Ret` would wrap, which is already exactly the
+        //   shared return block's single input. It routes there unprojected.
+        // - THIS route reaches the worker through an actual call. The worker
+        //   therefore executes that same `Construct` and returns the
+        //   CONSTRUCTED `ITree::Ret` carrier, which the static-response receipt
+        //   loads unprojected (`EliminatorRole::StaticResponseReturn`).
+        //
+        // So the carried word here is the `Ret` CARRIER, not the return case's
+        // retained argument, and it takes the same field-0 projection the
+        // ordinary `Ret` case applies. Handing it on "as itself" sends a carrier
+        // tag into the Ret body's `Result` match, where it equals neither arm's
+        // tag, so both comparisons miss and the closed default traps.
+        //
+        // ⛔ Do NOT restore the unprojected form by reading the answer's
+        // MEANING off the source (`Result::Ok` on the governed witness) — that
+        // says what the answer IS, never what depth the word sits at, and
+        // substituting one for the other is exactly how the projection went
+        // missing.
+        //
+        // ⛔ **No phase forgery.** The projection is a structural operation on a
+        // carrier whose shape the planner already owns: nothing is decoded,
+        // converted to `Lowered`, recovered as a template, or selected at
+        // runtime, and no constructor is matched by name. The guard is a
+        // compile-time property of the case *topology*, identical to the
+        // specialized arm's, and the word never participates in it.
         if let Some((_return_index, _return_case)) = return_case {
             let checked_route = builder.create_block();
             let default_route = builder.create_block();
@@ -15829,9 +15849,10 @@ impl<'a> Lowering<'a> {
             record_d6a_route_event(D6aRouteEvent::CarriedFallbackEmitted {
                 static_origin: eliminator.static_origin,
             });
-            // The checked answer is the return case's retained argument, not a
-            // projected field. Feed it to the same block as the ordinary Ret
-            // child; that block already owns the only lowering of the Ret body.
+            // Feed the same block as the ordinary Ret child; that block already
+            // owns the only lowering of the Ret body. Both predecessors must
+            // deliver the RETAINED ARGUMENT — never one carrier and one payload
+            // — so this route takes the same field-0 projection below.
             let return_body =
                 return_body.expect("a strict return case has a shared return-body block");
             #[cfg(any(test, feature = "px8-ds-test-support"))]
@@ -15851,8 +15872,9 @@ impl<'a> Lowering<'a> {
                 .map(|active| active.header)
             {
                 // The alternate value is the header's existing route-control
-                // parameter and reaches only the observer call. The shared
-                // return-body block still receives `scrutinee.word` unchanged.
+                // parameter and reaches only the observer call. The observation
+                // names the header scrutinee as the Ret input's PROVENANCE; the
+                // shared return-body block receives its field-0 projection.
                 let (observed_body_origin, observed_value, observed_order) =
                     checked_ih_fresh_result_route_ret_input_observer_inputs(
                         eliminator.static_origin,
@@ -15905,7 +15927,12 @@ impl<'a> Lowering<'a> {
                 }
             }
             if !lowered_separately {
-                builder.ins().jump(return_body, &[scrutinee.word.into()]);
+                // The same projection the ordinary `Ret` case performs at
+                // `emit_carrier_field(scrutinee, 0)`, on the same carrier shape:
+                // the worker returned the constructed `ITree::Ret`, and its one
+                // retained argument is what `return_body` consumes.
+                let returned = self.emit_carrier_field(builder, scrutinee, 0)?;
+                builder.ins().jump(return_body, &[returned.word.into()]);
             }
 
             builder.switch_to_block(default_route);
