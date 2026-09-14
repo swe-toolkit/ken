@@ -4337,29 +4337,62 @@ impl<'a> Lowering<'a> {
                 let required_consumer_edge =
                     receipt.boundary.required_consumer_incoming_edge()?;
                 #[cfg(feature = "px8-ds-test-support")]
-                let remaining = if d5b_hs17_post_call_consumer_mutation()
-                    == D5bHs17PostCallConsumerMutation::ReplayCompletedSelectedExit
-                {
+                let hs17 = d5b_hs17_post_call_consumer_mutation();
+                #[cfg(feature = "px8-ds-test-support")]
+                let remaining = if matches!(
+                    hs17,
+                    D5bHs17PostCallConsumerMutation::DropAnchorReceiptStep
+                        | D5bHs17PostCallConsumerMutation::DuplicateAnchorReceiptStep
+                ) {
                     record_d5b_hs17_post_call_consumer_application();
-                    let replayed = receipt.boundary.consumer().selected_case_exits().to_vec();
-                    self.checked_ih_post_call_residual(replayed.as_slice(), eliminators)?
+                    // R3's soundness argument is that the join REFUSES rather
+                    // than defaults. These two are what reach those refusals;
+                    // without them the premise is untested.
+                    let perturbed =
+                        Self::perturb_receipt_for_anchor_join(
+                            hs17,
+                            receipt.boundary.caller_completed_exits()?,
+                            eliminators,
+                        )?;
+                    self.checked_ih_post_call_residual(
+                        AnchoredEliminatorWindow::by_identity_join(
+                            perturbed.as_slice(),
+                            eliminators,
+                        )?,
+                    )?
                 } else if let Some(edge) = required_consumer_edge.as_ref() {
                     self.static_transition_plan
                         .record_required_consumer_call_selection(edge)?;
-                    self.apply_required_consumer_incoming_edge(edge, eliminators)?
+                    self.apply_required_consumer_incoming_edge(
+                        edge,
+                        AnchoredEliminatorWindow::by_identity_join(
+                            edge.executable_exits(),
+                            eliminators,
+                        )?,
+                    )?
                 } else {
                     self.checked_ih_post_call_residual(
-                        receipt.boundary.caller_completed_exits()?,
-                        eliminators,
+                        AnchoredEliminatorWindow::by_identity_join(
+                            receipt.boundary.caller_completed_exits()?,
+                            eliminators,
+                        )?,
                     )?
                 };
                 #[cfg(not(feature = "px8-ds-test-support"))]
                 let remaining = if let Some(edge) = required_consumer_edge.as_ref() {
-                    self.apply_required_consumer_incoming_edge(edge, eliminators)?
+                    self.apply_required_consumer_incoming_edge(
+                        edge,
+                        AnchoredEliminatorWindow::by_identity_join(
+                            edge.executable_exits(),
+                            eliminators,
+                        )?,
+                    )?
                 } else {
                     self.checked_ih_post_call_residual(
-                        receipt.boundary.caller_completed_exits()?,
-                        eliminators,
+                        AnchoredEliminatorWindow::by_identity_join(
+                            receipt.boundary.caller_completed_exits()?,
+                            eliminators,
+                        )?,
                     )?
                 };
                 let cleared = RoutedAnswer {
@@ -7716,8 +7749,17 @@ impl<'a> Lowering<'a> {
                 }
             }
             if let Some(consumer) = claimed.post_call_consumer.as_ref() {
-                let residual = self
-                    .checked_ih_post_call_residual(consumer.selected_case_exits(), eliminators)?;
+                // AMBIENT. The local eliminator stack begins after this
+                // consumer's own defining occurrence, while the receipt includes
+                // it -- measured 11/11 as receipt[1..] matching the single frame
+                // elementwise. The anchor is joined on identity, never computed
+                // as `index + 1`.
+                let residual = self.checked_ih_post_call_residual(
+                    AnchoredEliminatorWindow::by_identity_join(
+                        consumer.selected_case_exits(),
+                        eliminators,
+                    )?,
+                )?;
                 return Ok(if residual.is_empty() {
                     ProducerTrampolineStep::ordinary(claimed.answer.value)
                 } else {
@@ -9226,7 +9268,7 @@ impl<'a> Lowering<'a> {
     fn apply_required_consumer_incoming_edge<'frame, 'src>(
         &self,
         edge: &RequiredConsumerIncomingEdge<'_>,
-        eliminators: &'frame [EliminatorFrame<'src>],
+        window: AnchoredEliminatorWindow<'_, 'frame, 'src>,
     ) -> Result<&'frame [EliminatorFrame<'src>], CraneliftBackendError> {
         let defining_call = edge.destination().defining_call_identity();
         if !self.continuation_candidate_is_consumed(defining_call) {
@@ -9235,8 +9277,19 @@ impl<'a> Lowering<'a> {
                 "the exact defining call has no completed continuation candidate",
             ));
         }
-        let completed_residual =
-            self.checked_ih_post_call_residual(edge.executable_exits(), eliminators)?;
+        // `incoming_edge_index` is a position in the RECEIPT, and it is applied
+        // to the eliminator list below. That is coherent only when the two are
+        // aligned at 0. A non-zero anchor is not guessed at here: it is refused,
+        // because generalising the arithmetic to `index - anchor` would be
+        // unmeasured behaviour of exactly the kind this node exists to stop.
+        if window.anchor != 0 {
+            return Err(unsupported(
+                "RequiredConsumerIncomingEdge",
+                "an incoming consumer edge index was applied to an eliminator window that does                  not begin at the receipt's first step",
+            ));
+        }
+        let eliminators = window.eliminators;
+        let completed_residual = self.checked_ih_post_call_residual(window)?;
         let completed_len = eliminators.len() - completed_residual.len();
         let incoming_edge_index = edge.incoming_consumer_edge_index();
         if incoming_edge_index >= completed_len {
@@ -9248,11 +9301,73 @@ impl<'a> Lowering<'a> {
         Ok(&eliminators[incoming_edge_index..])
     }
 
+    /// Test-only: corrupt the receipt so the anchor join must refuse.
+    ///
+    /// `AC-6` forbids synthesizing an operand in the PRODUCTION path to make a
+    /// check pass. This is the opposite and is what this enum exists for:
+    /// corrupting an operand in a test-only path to verify that a refusal is
+    /// reachable.
+    ///
+    /// Fails closed when there is nothing to perturb -- a mutation that cannot
+    /// find its target must error, never silently no-op into a green test.
+    #[cfg(feature = "px8-ds-test-support")]
+    fn perturb_receipt_for_anchor_join(
+        mutation: D5bHs17PostCallConsumerMutation,
+        receipt: &[CheckedIhPostCallConsumerStep],
+        eliminators: &[EliminatorFrame<'_>],
+    ) -> Result<Vec<CheckedIhPostCallConsumerStep>, CraneliftBackendError> {
+        let Some(EliminatorFrame::Computational(first)) = eliminators.first() else {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "the HS17 anchor-correspondence mutation has no computational frame to anchor \
+                 on, so it could not fire",
+            ));
+        };
+        let Some(anchor) = receipt.iter().position(|step| {
+            step.occurrence().eliminator_origin() == first.static_origin
+                && step.checked_frame_id() == first.checked_frame_id
+        }) else {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "the HS17 anchor-correspondence mutation found no receipt step matching the \
+                 ambient window's first frame, so it could not fire",
+            ));
+        };
+        let mut perturbed = receipt.to_vec();
+        match mutation {
+            D5bHs17PostCallConsumerMutation::DropAnchorReceiptStep => {
+                perturbed.remove(anchor);
+            }
+            D5bHs17PostCallConsumerMutation::DuplicateAnchorReceiptStep => {
+                perturbed.insert(anchor, perturbed[anchor]);
+            }
+            _ => {
+                return Err(unsupported(
+                    "CheckedIhDetachedCallerCut",
+                    "an unrelated HS17 mutation reached the anchor-correspondence perturbation",
+                ))
+            }
+        }
+        Ok(perturbed)
+    }
+
     fn checked_ih_post_call_residual<'frame, 'src>(
         &self,
-        expected: &[CheckedIhPostCallConsumerStep],
-        eliminators: &'frame [EliminatorFrame<'src>],
+        window: AnchoredEliminatorWindow<'_, 'frame, 'src>,
     ) -> Result<&'frame [EliminatorFrame<'src>], CraneliftBackendError> {
+        // The window, not the caller, decides which slice of the receipt is
+        // compared. Both constructors guarantee `anchor <= receipt.len()`.
+        //
+        // THE FULL ANCHORED WINDOW IS COMPARED, INCLUDING ELEMENT 0, and the
+        // length relation is still enforced. The identity join makes element
+        // 0's pairwise comparison definitionally true, so skipping it as
+        // redundant is the tempting move -- and it is the one that would turn
+        // this site into a tautology, which is exactly why a constructed list
+        // was rejected here. What stays non-definitional: the join's existence
+        // and uniqueness, the length relation from the anchor to the end, and
+        // every element after the first.
+        let expected = &window.receipt[window.anchor..];
+        let eliminators = window.eliminators;
         if eliminators.len() < expected.len() {
             return Err(unsupported(
                 "CheckedIhDetachedCallerCut",
@@ -9403,7 +9518,13 @@ impl<'a> Lowering<'a> {
                     edge.executable_exits(),
                     producer_env,
                 )?;
-                let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
+                let remaining = self.apply_required_consumer_incoming_edge(
+                    &edge,
+                    AnchoredEliminatorWindow::from_constructed_frames(
+                        edge.executable_exits(),
+                        &eliminators,
+                    ),
+                )?;
                 if remaining.is_empty() {
                     return Err(unsupported(
                         "RequiredConsumerIncomingEdge",
@@ -9422,7 +9543,13 @@ impl<'a> Lowering<'a> {
                     edge.executable_exits(),
                     producer_env,
                 )?;
-                let remaining = self.apply_required_consumer_incoming_edge(&edge, &eliminators)?;
+                let remaining = self.apply_required_consumer_incoming_edge(
+                    &edge,
+                    AnchoredEliminatorWindow::from_constructed_frames(
+                        edge.executable_exits(),
+                        &eliminators,
+                    ),
+                )?;
                 if remaining.is_empty() {
                     return Err(unsupported(
                         "RequiredConsumerIncomingEdge",
@@ -17743,6 +17870,109 @@ fn d3b_replace_claim_index(
                 frame,
                 declared_slot: index,
             }
+        }
+    }
+}
+
+/// An eliminator slice together with the receipt position its element 0
+/// answers to.
+///
+/// **The frame list travelled without its alignment witness, and every
+/// mechanism refuted on 2026-09-14 died trying to recover that witness from
+/// lengths, from a choice of accessor, or from an index applied to a collection
+/// it did not index.** One index convention -- `incoming_consumer_edge_index`
+/// names the consumer's own defining step, uniformly across both selection
+/// variants -- meets two membership conventions: a list built by
+/// `checked_ih_post_call_eliminators` contains a frame for that defining step
+/// (one frame per step or it fails), while an ambient local frame list begins
+/// after it. A bare slice cannot say which it holds, so one cut was exactly
+/// right at one family of sites and over-reached by one at the other.
+///
+/// There are exactly TWO constructors and deliberately no general one from a
+/// `usize`. An arithmetic anchor is a function of the quantities being
+/// reconciled, so it cannot fail -- and an anchor that cannot fail makes the
+/// counts agree whether or not the frames correspond at all. **Manufacture
+/// cannot refuse; a witness can.** Both constructors below are witness-backed
+/// and both can refuse.
+struct AnchoredEliminatorWindow<'step, 'frame, 'src> {
+    receipt: &'step [CheckedIhPostCallConsumerStep],
+    anchor: usize,
+    eliminators: &'frame [EliminatorFrame<'src>],
+}
+
+impl<'step, 'frame, 'src> AnchoredEliminatorWindow<'step, 'frame, 'src> {
+    /// The frames were built FROM this receipt by
+    /// `checked_ih_post_call_eliminators`, which pushes exactly one frame per
+    /// step and otherwise returns an error -- there is no skip, filter or
+    /// omitting branch in it. So element 0 answers to receipt element 0, and
+    /// the anchor is justified by the producer rather than assumed.
+    fn from_constructed_frames(
+        receipt: &'step [CheckedIhPostCallConsumerStep],
+        eliminators: &'frame [EliminatorFrame<'src>],
+    ) -> Self {
+        Self {
+            receipt,
+            anchor: 0,
+            eliminators,
+        }
+    }
+
+    /// The frames are AMBIENT -- the local eliminator stack of whatever match
+    /// is being lowered, built by the generic producer descent with no receipt
+    /// anywhere in scope. The anchor is therefore not carried; it is joined.
+    ///
+    /// The join consumes the tuple the frame already carries from its own
+    /// minting, `(static_origin, checked_frame_id)`, which is the same tuple a
+    /// receipt step carries and the same pair the residual check compares. It
+    /// is the mechanism `checked_computational_frame` exists to provide -- "the
+    /// checked bridge must carry this exact tuple, and two spellings is how
+    /// they part" -- consumed rather than re-spelled, at the one point where
+    /// both ends are in scope. It is also the construction the planner already
+    /// performs from the other end, with the same unique-or-refuse discipline.
+    ///
+    /// Unique match or refuse. Never a default, never a nearest, never a
+    /// fallback to zero.
+    fn by_identity_join(
+        receipt: &'step [CheckedIhPostCallConsumerStep],
+        eliminators: &'frame [EliminatorFrame<'src>],
+    ) -> Result<Self, CraneliftBackendError> {
+        let Some(first) = eliminators.first() else {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "an ambient eliminator window has no frame to anchor a post-call consumer receipt",
+            ));
+        };
+        let EliminatorFrame::Computational(first) = first else {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "an ambient eliminator window is anchored by a non-computational frame",
+            ));
+        };
+        let matches = receipt
+            .iter()
+            .enumerate()
+            .filter(|(_, step)| {
+                step.occurrence().eliminator_origin() == first.static_origin
+                    && step.checked_frame_id() == first.checked_frame_id
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        match matches.as_slice() {
+            [anchor] => Ok(Self {
+                receipt,
+                anchor: *anchor,
+                eliminators,
+            }),
+            [] => Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "an ambient eliminator window's first frame is not a step of the post-call \
+                 consumer receipt, so the receipt describes a different occurrence",
+            )),
+            _ => Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "an ambient eliminator window's first frame matches more than one post-call \
+                 consumer receipt step, so its anchor is not unique",
+            )),
         }
     }
 }
