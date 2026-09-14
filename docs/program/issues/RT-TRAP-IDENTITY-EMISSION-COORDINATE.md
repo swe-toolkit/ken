@@ -613,8 +613,17 @@ of the source site.
 > per owner, so it would not have broken factoring — but a mechanism resting on
 > the phrase *"where the owner's body began"* has to compute that and did not.
 
-> #### `D1` IS NOT BUILDABLE AS FRAMED. THE SCOPE FORK IS THE STEWARD'S AND IS
-> #### OPEN PENDING ONE READ.
+> #### `D1` IS NOT BUILDABLE AS FRAMED. THE SCOPE FORK IS RIPE AND IS QUEUED FOR
+> #### THE OPERATOR.
+>
+> **Status, 2026-09-14 after the deciding read: the fork is no longer "pending
+> one read."** The read was taken, `(c)` is refuted and `(a2)` collapsed into
+> `(a)`, and what remains is a genuine operator call between an in-scope re-cut
+> that knowingly fails an AC and an unpriced repair across a crate and a lane
+> boundary. **The unpriced arm is stated as unpriced rather than guessed** — *"we
+> located the question and did not price it"* is the honest line, and the operator
+> can fund the kernel read as easily as anyone here can ask for it. Details below,
+> in the order they were measured.
 >
 > **Mechanism (b) as ruled — give `RuntimeTrap` a required coordinate field —
 > presumes a coordinate exists to put in it.** Four candidates, four closures,
@@ -675,20 +684,122 @@ of the source site.
 >            nothing at the mint to carry.  ARM (a), and the fork goes to the
 >            operator with both arms priced.
 >
-> **`off = 0` is consistent with both readings** — no push happens either because
-> erasure does no inlining here (the elaborator already did it) or because it
-> inlines by a non-pushing route. That is why the fork is not ripe and why it has
-> not gone to the operator: escalating now would ask them to choose between two
-> expensive arms with a cheap one unpriced (`§4c` — the constraint demanding the
-> escalation, *"no source coordinate exists"*, is the thing in question).
+> #### THE READ CAME BACK. THE ANSWER IS NEITHER PREDICTED OUTCOME, AND IT
+> #### REFUTES ARM `(c)` — THE ARM THIS SECTION WAS WRITTEN TO FUND.
+>
+> **The key set has THREE entries, and the five source declarations are not
+> among them.** Not "the five hold their own", not "the five hold copies" —
+> **absent as keys entirely.** All fourteen `Result` eliminations are already in
+> `main`'s body before erasure begins.
+>
+> ⇒ **`(c)` is dead, and it is dead by the structure it was proposed on.** `(c)`
+> was to carry the `(declaration, in-body position)` pair "that checked core
+> already distinguishes." Checked core distinguishes it only for declarations
+> that are KEYS. The five are not keys, so there is no
+> `CheckedCoreDeclarationBodyView` to hold a position within — the pair `(c)`
+> would carry does not exist to be carried. **The counter-example that refuted
+> `(a)`'s premise was `declarations` existing as a per-symbol map; the thing that
+> refutes `(c)` is which symbols are in it.** Same structure, one measurement
+> apart, and only the second was checked against the actual key set.
+>
+> **THE KEY SET'S PRODUCER, which is the cleanest fact in the arc.**
+> `erasure.rs:340-368` walks a queue; `collect_checked_body_declaration_refs:371`
+> matches exactly `DirectDeclarationCall` and `RecursiveDeclarationCall`.
+>
+>     the key set = the transitive closure of declarations reached by a
+>                   SURVIVING CALL NODE
+>
+> **The closure inlines nothing and chooses nothing — it reports.** The five are
+> absent for exactly one reason: no call to them survives. This is not a defect
+> in the closure and there is nothing to repair at `:340-368`.
+>
+> **AND THE REFERENCES WERE ALREADY GONE UPSTREAM OF THE ELABORATOR.** Read at
+> `d40d1213e`:
+>
+>     checked_core.rs:1453-1456      declarations is populated FROM
+>                                    selection.reachable_declarations, nothing else
+>     compiler_driver.rs:3477-3492   reachable_declarations is a GRAPH REACHABILITY
+>                                    CLOSURE over Term::Const references
+>                                    (collect_term_constants, :3494)
+>
+> ⇒ The key set is *"declarations still referenced by a surviving `Term::Const`"*,
+> and the five lost their references **upstream of checked-core construction
+> entirely**. There is no elaborator-side inlining step at which a provenance
+> symbol could be recorded, because by the time the elaborator builds checked
+> core the references are already gone.
+>
+> #### THE ARMS, RESTATED AFTER THE READ
+>
+>     (a)   establish source-occurrence identity UPSTREAM.  LOCATED, NOT PRICED:
+>           the candidate region is the KERNEL-TERM PRODUCER, not the elaborator.
+>           Crosses a crate and a lane boundary.
+>
+>     (b)   re-cut D1 to per-LOWERED-POSITION identity.  Satisfies AC-1, knowingly
+>           FAILS AC-2, and loses the interning the catalog exists for.  IN SCOPE,
+>           and the Steward's to decide if the operator declines to fund (a).
+>
+>     (c)   REFUTED by the key set.  The pair it would carry does not exist.
+>
+>     (a2)  "have the elaborator record which declaration a term was inlined from,
+>           at the point it inlines it" -- NAMES A POINT THAT IS NOT THERE.
+>           COLLAPSES INTO (a) rather than standing beside it.
+>
+>     (d)   preserve the CALL BOUNDARY for these five -- emit them as
+>           DirectDeclarationCall so their bodies survive as keys, after which
+>           (symbol, position) is derivable downstream with NO new field anywhere.
+>           (d) is what would make (c) work rather than a replacement for it.
+>           UNPRICED, one upstream read away, ADVOCATED BY NOBODY.
+>
+> **UNESTABLISHED, and the first decides `(a)` outright:**
+>
+>     - were the five emitted as Term::Const and substituted away, or NEVER
+>       emitted as separate constants at all?
+>     - does anything rewrite the STORED body, as distinct from unfolding for
+>       conversion?
+>
+> **`unfold_const` is NOT the answer to the second, and the implementer declined
+> to report it as one.** It lives at `ken-kernel/src/conv.rs:37` with five call
+> sites, all in `conv.rs` — that is conversion checking. **Conversion unfolds to
+> COMPARE terms; it does not thereby rewrite the term that gets stored.** Five
+> call sites in `conv.rs` is a fact about conversion, not about how `main`'s body
+> came to hold fourteen `Result` matches. Recorded here because it is the exact
+> shape this node has lost four candidates to, caught in advance on a find that
+> would have been very easy to report as a cause.
+>
+> #### A STATED LIMIT OF THE FIXTURE: DECLARATION-SYMBOL-ALONE PASSES HERE AND IS
+> #### WRONG IN GENERAL
+>
+> An early wording of `(a2)` keyed on *"provenance symbol only, no spans."*
+> **That gives one identity per declaration.**
+>
+>     AC-1b   occurrences 4 and 5 share the instantiation, and sit in
+>             file_bracket_body vs finish -- DIFFERENT declarations
+>     =>      declaration-alone separates them, so it passes AC-1b HERE
+>     =>      and the case it cannot handle -- two eliminations of one family in
+>             ONE declaration -- is not in this fixture at all
+>
+> That case is not exotic; it is the case this node exists to close, and
+> `control.rs`'s own *"Hard-stop #18 row 2"* comment describes it. **A coordinate
+> sufficient on this fixture and wrong in general is precisely what `AC-2` exists
+> to catch**, and the fixture cannot witness it. **This is the third thing this
+> fixture cannot witness**, alongside the interning half of `AC-2` and the
+> same-instantiation pair it *can*. Do not key anything on a declaration symbol
+> alone: that is now a known-dead shape, not a candidate.
+>
+> **`off = 0` was consistent with both predicted readings** — no push happens
+> either because erasure does no inlining here or because it inlines by a
+> non-pushing route. The read settles it in a third way: the elaborator never had
+> the boundary to destroy.
 >
 > **Counts.** `D1` hard stops **2**; `§1a` fires at 3 and the Steward's tracker is
-> the count of record. Symptom inventory: **two predicates, three instances** —
+> the count of record. Symptom inventory: **two predicates, four instances** —
 > (1) *a coordinate proposed and priced before the population it must individuate
 > was established*; (2) *a name was trusted to identify a population that nothing
 > measured against it*, instanced by `checked_occurrence_path`, by `owner`, and by
-> `stack`. Four probes run, four reverted, no code written, no placeholder
-> inserted — which is `D3` producing the outcome it exists to make reportable.
+> `stack`. **Seven probes run, seven reverted, no code written, no placeholder
+> inserted** — which is `D3` producing the outcome it exists to make reportable.
+> **The deliverable of this node is a finding, and the finding is that `D1` is
+> not buildable as framed.**
 
 **`D2` — the discrimination control, and it is the load-bearing deliverable.**
 A test over the five-occurrence `WRITE_ALL_PARTITION` fixture in which all five
