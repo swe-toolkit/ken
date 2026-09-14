@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-14 17:43:01Z — from 613 issue file(s) in `docs/program/issues/`.
+2026-09-14 19:03:02Z — from 614 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -426,6 +426,7 @@ the committed file matches the generator's output.
 | `RT-CROSSING-CALLEE-IDENTITY` | GeneratedUnitCallInput is measured at a shared helper with six callers, so branch 1 is provisional -- record WHOSE call is being carried, and exercise the tag's unused negative arm | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2314 |
 | `RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY` | Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it | closed | runtime | S | none | — |
 | `RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING` | Three instruments that discharged RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT cannot detect the failures they were chosen for -- AC-3's recorder is satisfied by a no-op D2, AC-4's control reaches its mechanism only from its own unit test, and the cfg(test) pin that cost a review round annotates a census compiled out 19 days earlier | merged | runtime | S | none | — |
+| `RT-D5B-POSTCALL-REFUSAL-MECHANISM` | What is the mechanism of the CheckedIhDetachedCallerCut refusal at lowering/core.rs:7720 -- the only distinct Packaging reason in abi_s6_mapping_file_backed_native and the cause of 8 of its 11 base reds, where a two-step SelfDefining post-call consumer receipt meets one computational eliminator frame. THREE mechanisms have been proposed and measured away in one session, all sharing the premise that the defect is reachable from the call site's inputs; the measurement says those inputs are internally consistent and the disagreement is upstream of them. The mechanism is UNKNOWN and this node exists to find it, not to carry a candidate | draft | runtime | M | architect | — |
 | `RT-DEAD-ARM-EFFECT-LOWERING` | A whole-program-dead but type-total request-handler arm is lowered at full strength, so its ConstructorTag effect seat (claim_host_effect_seat) fails the ENTIRE object emission on a path no execution reaches -- the cut is to lower a provably-unreachable total-handler arm's refusing effect seat to a runtime TRAP (fail-closed), gated on a conservative whole-program construction-site census, keeping the seat's Need-subset-Avail partition strict and unchanged | merged | runtime | M | none | — |
 | `RT-DEAD-ARM-JOIN-DISPOSITION` | The merged RT-DEAD-ARM-EFFECT-LOWERING trap short-circuits a provably-dead arm's lowering but leaves that arm's planned source-join origins neither emitted nor dispositioned, so finalize_join_disposition (joins.rs:1675) fires 'neither emitted nor statically unselected' once a downstream fix clears the effect-seat layer in front of it (19/19 unconsumed origins measured inside provably-dead arms, StaticOriginId(20)); complete the trap by dispositioning a PROVED-dead arm's joins as statically unselected (add to dispositioned_join_origins), reusing the RT-LEXICAL-RECURSOR-CONSUMERS D2b abandoned-region mechanism -- a latent completeness gap SURFACED (not caused) by RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL clearing the projection layer, co-landing with it as one candidate | closed | runtime | M | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
@@ -706,7 +707,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft)
+- **architect**: `RT-COMPILE-OUTCOME-RUN-CONFIGURATION-DEPENDENCE` (draft) `RT-D5B-POSTCALL-REFUSAL-MECHANISM` (draft) `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY` (draft)
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
