@@ -287,30 +287,63 @@ impl CheckedIhDetachedCallerCut {
     }
 }
 
+/// Which exact source-exit suffix remains executable for a required consumer.
+/// The arms are explicit planner evidence: lowering never infers one from the
+/// presence or absence of a caller cut.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum RequiredConsumerIncomingEdgeSelection {
+    /// A distinct selected caller completed the prefix before this suffix.
+    CallerCompleted {
+        caller_cut: CheckedIhDetachedCallerCut,
+        caller_exit_index: usize,
+        incoming_consumer_edge_index: usize,
+    },
+    /// The defining call has no caller and completed none of its exit chain.
+    SelfDefining {
+        incoming_consumer_edge_index: usize,
+    },
+}
+
 /// The exact before-value transport paired with the selected incoming consumer
 /// edge. The defining call is derived from the destination's one transport;
 /// lowering has no second call identity it could supply independently.
 pub(in crate::cranelift_backend) struct RequiredConsumerIncomingEdge<'plan> {
     destination: &'plan super::aggregates::RequiredConsumerDestination,
-    caller_completed_exits: &'plan [CheckedIhPostCallConsumerStep],
-    incoming_consumer_edge_index: usize,
+    selected_case_exits: &'plan [CheckedIhPostCallConsumerStep],
+    selection: &'plan RequiredConsumerIncomingEdgeSelection,
 }
 
-impl RequiredConsumerIncomingEdge<'_> {
+impl<'plan> RequiredConsumerIncomingEdge<'plan> {
     pub(in crate::cranelift_backend) fn destination(
         &self,
     ) -> &super::aggregates::RequiredConsumerDestination {
         self.destination
     }
 
-    pub(in crate::cranelift_backend) fn caller_completed_exits(
+    pub(in crate::cranelift_backend) fn executable_exits(
         &self,
-    ) -> &[CheckedIhPostCallConsumerStep] {
-        self.caller_completed_exits
+    ) -> &'plan [CheckedIhPostCallConsumerStep] {
+        match self.selection {
+            RequiredConsumerIncomingEdgeSelection::CallerCompleted {
+                caller_exit_index,
+                ..
+            } => &self.selected_case_exits[*caller_exit_index..],
+            RequiredConsumerIncomingEdgeSelection::SelfDefining { .. } => {
+                self.selected_case_exits
+            }
+        }
     }
 
     pub(in crate::cranelift_backend) fn incoming_consumer_edge_index(&self) -> usize {
-        self.incoming_consumer_edge_index
+        match self.selection {
+            RequiredConsumerIncomingEdgeSelection::CallerCompleted {
+                incoming_consumer_edge_index,
+                ..
+            }
+            | RequiredConsumerIncomingEdgeSelection::SelfDefining {
+                incoming_consumer_edge_index,
+            } => *incoming_consumer_edge_index,
+        }
     }
 }
 
@@ -323,8 +356,8 @@ impl RequiredConsumerIncomingEdge<'_> {
 pub(in crate::cranelift_backend) struct CheckedIhStaticResponseReturnBoundary {
     response: StaticResponseContinuation,
     owner: StaticResponseOwnerSpecialization,
-    caller_cut: CheckedIhDetachedCallerCut,
     consumer: CheckedIhPostCallConsumer,
+    required_consumer_edge: RequiredConsumerIncomingEdgeSelection,
 }
 
 impl CheckedIhStaticResponseReturnBoundary {
@@ -337,7 +370,12 @@ impl CheckedIhStaticResponseReturnBoundary {
     }
 
     pub(in crate::cranelift_backend) fn caller_cut(&self) -> &CheckedIhDetachedCallerCut {
-        &self.caller_cut
+        match &self.required_consumer_edge {
+            RequiredConsumerIncomingEdgeSelection::CallerCompleted { caller_cut, .. } => caller_cut,
+            RequiredConsumerIncomingEdgeSelection::SelfDefining { .. } => {
+                unreachable!("a static-response boundary cannot carry a self-defining edge")
+            }
+        }
     }
 
     pub(in crate::cranelift_backend) fn consumer(&self) -> &CheckedIhPostCallConsumer {
@@ -347,18 +385,47 @@ impl CheckedIhStaticResponseReturnBoundary {
     pub(in crate::cranelift_backend) fn required_consumer_incoming_edge(
         &self,
     ) -> Result<Option<RequiredConsumerIncomingEdge<'_>>, CraneliftBackendError> {
-        if self.consumer.required_consumer().is_some()
-            && self.consumer.required_consumer_caller_cut.as_ref() != Some(&self.caller_cut)
+        let Some(call) = self.consumer.required_consumer() else {
+            return Ok(None);
+        };
+        let RequiredConsumerIncomingEdgeSelection::CallerCompleted {
+            caller_cut,
+            caller_exit_index,
+            incoming_consumer_edge_index,
+        } = &self.required_consumer_edge
+        else {
+            return Err(planner_error(
+                "a static-response return boundary carries no caller-completed consumer edge",
+            ));
+        };
+        if caller_cut.producer_transport() != self.consumer.transport()
+            || *caller_exit_index
+                != checked_ih_post_call_caller_exit_index(&self.consumer, caller_cut)?
+            || *incoming_consumer_edge_index
+                >= self.consumer.selected_case_exits()[*caller_exit_index..].len()
         {
             return Err(planner_error(
-                "a static-response return boundary disagrees with its required-consumer caller cut",
+                "a static-response return boundary disagrees with its caller-completed consumer edge",
             ));
         }
-        self.consumer.required_consumer_incoming_edge()
+        Ok(Some(RequiredConsumerIncomingEdge {
+            destination: call.destination(),
+            selected_case_exits: self.consumer.selected_case_exits(),
+            selection: &self.required_consumer_edge,
+        }))
     }
 
     fn caller_exit_index(&self) -> Result<usize, CraneliftBackendError> {
-        checked_ih_post_call_caller_exit_index(&self.consumer, &self.caller_cut)
+        let RequiredConsumerIncomingEdgeSelection::CallerCompleted {
+            caller_exit_index,
+            ..
+        } = &self.required_consumer_edge
+        else {
+            return Err(planner_error(
+                "a static-response return boundary carries no caller-completed exit index",
+            ));
+        };
+        Ok(*caller_exit_index)
     }
 
     pub(in crate::cranelift_backend) fn owner_completed_exits(
@@ -400,6 +467,37 @@ fn checked_ih_post_call_caller_exit_index(
     Ok(index)
 }
 
+fn checked_ih_caller_completed_required_consumer_edge_index(
+    plan: &StaticTransitionPlan<'_>,
+    consumer: &CheckedIhPostCallConsumer,
+    caller_exit_index: usize,
+) -> Result<usize, CraneliftBackendError> {
+    let required_call = consumer.required_consumer().ok_or_else(|| {
+        planner_error("a caller-completed required-consumer edge has no exact destination")
+    })?;
+    let (consumer_origin, _) = required_call.destination().consumer_occurrence();
+    let executable_exits = &consumer.selected_case_exits()[caller_exit_index..];
+    let mut matching = Vec::new();
+    for (index, step) in executable_exits.iter().enumerate() {
+        if occurrence_subtree_contains(
+            plan,
+            step.occurrence().eliminator_origin(),
+            consumer_origin,
+        )? {
+            matching.push(index);
+        }
+    }
+    match matching.as_slice() {
+        [index] => Ok(*index),
+        [] => Err(planner_error(
+            "a caller-completed required consumer has no exact incoming edge",
+        )),
+        _ => Err(planner_error(
+            "a caller-completed required consumer has more than one incoming edge",
+        )),
+    }
+}
+
 /// One-source transport ownership for a post-call consumer. A required row
 /// cannot store a transport beside its call: the call's destination owns that
 /// exact transport, so there is no second value that could disagree with it.
@@ -417,8 +515,7 @@ pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumer {
     consumers: Vec<CheckedIhPostCallConsumerStep>,
     selected_case_exits: Vec<CheckedIhPostCallConsumerStep>,
     detached_return_context: Option<SourceReturnContextTemplate>,
-    required_consumer_caller_cut: Option<CheckedIhDetachedCallerCut>,
-    required_consumer_incoming_edge_index: Option<usize>,
+    required_consumer_edge: Option<RequiredConsumerIncomingEdgeSelection>,
 }
 
 impl CheckedIhPostCallConsumer {
@@ -468,62 +565,44 @@ impl CheckedIhPostCallConsumer {
         &self,
     ) -> Result<Option<RequiredConsumerIncomingEdge<'_>>, CraneliftBackendError> {
         let Some(call) = self.required_consumer() else {
-            if self.required_consumer_caller_cut.is_some()
-                || self.required_consumer_incoming_edge_index.is_some()
-            {
+            if self.required_consumer_edge.is_some() {
                 return Err(planner_error(
                     "an ordinary post-call consumer carries a required-consumer incoming edge",
                 ));
             }
             return Ok(None);
         };
-        let caller_cut = self.required_consumer_caller_cut.as_ref().ok_or_else(|| {
-            planner_error("an exact required-consumer destination has no selected caller cut")
+        let selection = self.required_consumer_edge.as_ref().ok_or_else(|| {
+            planner_error("an exact required-consumer destination has no explicit incoming edge")
         })?;
-        if caller_cut.producer_transport() != self.transport() {
+        let RequiredConsumerIncomingEdgeSelection::SelfDefining {
+            incoming_consumer_edge_index,
+        } = selection
+        else {
             return Err(planner_error(
-                "an exact required-consumer caller cut names another defining transport",
+                "a defining post-call consumer row carries a fabricated caller-completed edge",
+            ));
+        };
+        if *incoming_consumer_edge_index >= self.selected_case_exits.len() {
+            return Err(planner_error(
+                "the exact incoming consumer edge is outside its self-defining exit chain",
             ));
         }
-        let incoming_consumer_edge_index = self
-            .required_consumer_incoming_edge_index
-            .ok_or_else(|| {
-                planner_error(
-                    "an exact required-consumer destination has no selected incoming edge",
-                )
-            })?;
-        let caller_exit_index = checked_ih_post_call_caller_exit_index(self, caller_cut)?;
         Ok(Some(RequiredConsumerIncomingEdge {
             destination: call.destination(),
-            caller_completed_exits: &self.selected_case_exits[caller_exit_index..],
-            incoming_consumer_edge_index,
+            selected_case_exits: &self.selected_case_exits,
+            selection,
         }))
     }
 
     pub(in crate::cranelift_backend) fn required_consumer_executable_suffix(
         &self,
     ) -> Result<Option<&[CheckedIhPostCallConsumerStep]>, CraneliftBackendError> {
-        if self.required_consumer().is_none() {
+        let Some(edge) = self.required_consumer_incoming_edge()? else {
             return Ok(None);
-        }
-        let caller_cut = self.required_consumer_caller_cut.as_ref().ok_or_else(|| {
-            planner_error("an exact required-consumer destination has no selected caller cut")
-        })?;
-        let caller_exit_index = checked_ih_post_call_caller_exit_index(self, caller_cut)?;
-        let completed = &self.selected_case_exits[caller_exit_index..];
-        let index = self
-            .required_consumer_incoming_edge_index
-            .ok_or_else(|| {
-                planner_error(
-                    "an exact required-consumer destination has no selected incoming edge",
-                )
-            })?;
-        if index >= completed.len() {
-            return Err(planner_error(
-                "the exact incoming consumer edge is outside its caller-completed exits",
-            ));
-        }
-        Ok(Some(&completed[index..]))
+        };
+        let index = edge.incoming_consumer_edge_index();
+        Ok(Some(&edge.executable_exits()[index..]))
     }
 }
 
@@ -2119,8 +2198,7 @@ pub(super) fn build_checked_ih_post_call_consumers(
             consumers,
             selected_case_exits,
             detached_return_context,
-            required_consumer_caller_cut: None,
-            required_consumer_incoming_edge_index: None,
+            required_consumer_edge: None,
         });
     }
     result.sort_by(|left, right| left.transport().cmp(right.transport()));
@@ -2278,71 +2356,44 @@ fn checked_ih_detached_caller_cut_for_consumer(
 }
 
 fn attach_required_consumer_incoming_edges(
-    plan: &StaticTransitionPlan<'_>,
+    _plan: &StaticTransitionPlan<'_>,
     rows: &mut [CheckedIhPostCallConsumer],
 ) -> Result<(), CraneliftBackendError> {
-    for row_index in 0..rows.len() {
-        let selection = {
-            let row = &rows[row_index];
-            let Some(required_call) = row.required_consumer() else {
-                continue;
-            };
-            let (consumer_origin, _) = required_call.destination().consumer_occurrence();
-            let mut candidates = Vec::new();
-            for caller_transport in &plan.checked_ih_environment_transports {
-                let (_, Some(caller_cut)) = checked_ih_detached_caller_cut_for_consumer(
-                    plan,
-                    row,
-                    caller_transport,
-                )?
-                else {
-                    continue;
-                };
-                let caller_exit_index =
-                    checked_ih_post_call_caller_exit_index(row, &caller_cut)?;
-                let caller_completed_exits = &row.selected_case_exits[caller_exit_index..];
-                let mut matching_edges = Vec::new();
-                for (index, step) in caller_completed_exits.iter().enumerate() {
-                    if occurrence_subtree_contains(
-                        plan,
-                        step.occurrence().eliminator_origin(),
-                        consumer_origin,
-                    )? {
-                        matching_edges.push(index);
-                    }
-                }
-                match matching_edges.as_slice() {
-                    [incoming_edge_index] => {
-                        candidates.push((caller_cut, *incoming_edge_index));
-                    }
-                    [] => {}
-                    _ => {
-                        return Err(planner_error(
-                            "an exact required consumer has more than one incoming caller edge",
-                        ))
-                    }
-                }
+    for row in rows {
+        let Some(required_call) = row.required_consumer() else {
+            continue;
+        };
+        let consumer_occurrence = required_call.destination().consumer_occurrence();
+        let matches = row
+            .selected_case_exits
+            .iter()
+            .enumerate()
+            .filter(|(_, step)| {
+                (
+                    step.occurrence().eliminator_origin(),
+                    step.checked_frame_id(),
+                ) == consumer_occurrence
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let incoming_consumer_edge_index = match matches.as_slice() {
+            [index] => *index,
+            [] => {
+                return Err(planner_error(
+                    "a self-defining required consumer has no exact incoming edge",
+                ))
             }
-            match candidates.as_slice() {
-                [(caller_cut, incoming_edge_index)] => {
-                    Some((caller_cut.clone(), *incoming_edge_index))
-                }
-                [] => {
-                    return Err(planner_error(
-                        "an exact required consumer has no incoming caller edge",
-                    ))
-                }
-                _ => {
-                    return Err(planner_error(
-                        "an exact required consumer has more than one selected caller cut",
-                    ))
-                }
+            _ => {
+                return Err(planner_error(
+                    "a self-defining required consumer has more than one exact incoming edge",
+                ))
             }
         };
-        if let Some((caller_cut, incoming_edge_index)) = selection {
-            rows[row_index].required_consumer_caller_cut = Some(caller_cut);
-            rows[row_index].required_consumer_incoming_edge_index = Some(incoming_edge_index);
-        }
+        row.required_consumer_edge = Some(
+            RequiredConsumerIncomingEdgeSelection::SelfDefining {
+                incoming_consumer_edge_index,
+            },
+        );
     }
     Ok(())
 }
@@ -2561,13 +2612,25 @@ impl StaticTransitionPlan<'_> {
                     "a static-response return boundary disagrees with its Result demand or retained checked-IH endpoints",
                 ));
             }
+            let caller_exit_index =
+                checked_ih_post_call_caller_exit_index(&consumer, &caller_cut)?;
+            let incoming_consumer_edge_index =
+                checked_ih_caller_completed_required_consumer_edge_index(
+                    self,
+                    &consumer,
+                    caller_exit_index,
+                )?;
             let boundary = CheckedIhStaticResponseReturnBoundary {
                 response: row.clone(),
                 owner: owner.clone(),
-                caller_cut,
                 consumer,
+                required_consumer_edge:
+                    RequiredConsumerIncomingEdgeSelection::CallerCompleted {
+                        caller_cut,
+                        caller_exit_index,
+                        incoming_consumer_edge_index,
+                    },
             };
-            boundary.caller_exit_index()?;
             boundary.required_consumer_incoming_edge()?;
             boundaries.push(boundary);
         }
