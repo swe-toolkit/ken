@@ -97,7 +97,8 @@ pub use responses::{
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
     CheckedIhDetachedCallerCut, CheckedIhPostCallConsumer, CheckedIhStaticResponseReturnBoundary,
-    DeferredResponseRow, RequiredConsumerIncomingEdge, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
+    DeferredResponseRow, DeferredResponseSubCase, RequiredConsumerIncomingEdge,
+    ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
@@ -192,15 +193,16 @@ pub use aggregates::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
-    with_composed_return_forward_ret_role_witnesses, with_required_consumer_call_observations,
-    with_retained_result_closure_proof_mutation,
+    with_composed_return_forward_ret_role_witnesses, with_required_consumer_call_mutation,
+    with_required_consumer_call_observations, with_retained_result_closure_proof_mutation,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
     CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
     CheckedIhGeneratedEntryObservation, ComposedReturnForwardEdgeCollapsibilityObservation,
     ComposedReturnForwardRetAuthorityMutation, ComposedReturnForwardRetAuthorityObservation,
     ComposedReturnForwardRetCoordinateObservation, ComposedReturnForwardRetRoleWitnessObservation,
-    RequiredConsumerCallObservation, RetainedResultClosureProofMutation,
+    RequiredConsumerCallMutation, RequiredConsumerCallObservation,
+    RetainedResultClosureProofMutation,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
