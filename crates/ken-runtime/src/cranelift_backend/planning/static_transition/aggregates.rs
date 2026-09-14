@@ -249,6 +249,8 @@ mod required_consumer_destination {
     ) -> Result<RequiredConsumerCall, CraneliftBackendError> {
         #[cfg(feature = "px8-ds-test-support")]
         let transport = required_consumer_defining_transport(plan, transport)?;
+        // Template steps run root-to-result; reversing selects the first
+        // computational consumer reached by this exact result on return.
         let consumer_origin = projection
             .steps()
             .iter()
