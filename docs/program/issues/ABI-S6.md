@@ -2793,6 +2793,24 @@ Architect inventory, 2026-09-11.
     a THREE-WAY disposition (apply / bypass-already-final / retain the
     refusal), never a two-way gate, and the relocated application site must
     route through the existing guard rather than around it.
+27. HS15: the creation-site measurement REFUTES entry 26's ruling before any
+    build. Both constructor branches carry the SAME outer creation-call receipt
+    (1617,1624,1605); the nested defining call (874,1605,859) is planner
+    metadata on the edge and is neither arm's receipt. So the three-way
+    disposition cannot fire and is WITHDRAWN — one generated call identity
+    names a RUNTIME UNION of an independently-final Ret result (4442/38,
+    separately certified) and a nested defining-call raw Vis result (3380/38),
+    with no static discriminator at the creation site. Mandatory §1a research
+    hold fired (5th trigger; next is HS18).
+    PREDICATE (entries 24-27, and §1b's answer at the 27th): every one is
+    SEAT-KEYED WHERE THE FACT IS VALUE-KEYED. 24 attributed the invocation to a
+    seat, 25 the certificate to a seat, 26 the consumer edge to a seat holding
+    two receipts, and 27 one identity to a call site yielding two different
+    values. This is NOT the withdrawn "per-activation" hypothesis of entry 20 —
+    a value occurrence is static, and the overshoot there was into dynamism.
+    The closure it points at is therefore producer-side: make the identity not
+    a union by splitting where the branch is already statically known, rather
+    than recovering provenance downstream. Held pending the advisory.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
