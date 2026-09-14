@@ -11,12 +11,20 @@ base `582457ea0b27e608cdb96995494a4b6e3903cd51`, the lexer already produces
 six dedicated notation tokens, but the ordinary global-name, prefix, infix, and
 fixity consumers accept only the generic symbolic-operator token. The tokens
 therefore dead-end before the ordinary name path. The generic-operator and
-`let … in` controls below are live on that base and must remain green.
+`let … in` controls below are live on that base and must remain green. The
+application-atom boundary case is also
+**RED-UNTIL-LANG-RESERVED-INFIX-NAMES**. Executed parser observations on the
+authorized re-anchor base `cb646c784b2dc480bdae703473055481ca6b5e44`
+show that some rows already have their target shape, but ungrouped `if` is still
+accepted as an argument, a bare projection still attaches inside the argument,
+and expression-level `temporal` is not yet accepted even when grouped.
 
 **Promise class.** The exact six-name inventory and its five alias pairs are a
 normative compatibility vector. Ordinary application, resolved-identity fixity,
-and absence of a default binding are durable invariants. A future additive alias
-requires a separate contract change; it is not a snapshot update.
+and absence of a default binding are durable invariants. The grouped-argument
+boundary and its two intentional ungrouped parse trees are durable grammar
+invariants. A future additive alias requires a separate contract change; it is
+not a snapshot update.
 
 **Independent oracle.** The expected inventory, application trees, grouping,
 and literal results below are stated directly from the amended spec. No expected
@@ -24,7 +32,9 @@ value is obtained from the parser, resolver, fixity table, or elaborated output
 under test. The isolated units prevent one earlier dead-end from hiding a later
 omitted name. A separate simultaneous unit gives the six definitions distinct
 literal bodies, so an accidental cross-row identity collapse cannot hide behind
-six internally consistent isolated runs.
+six internally consistent isolated runs. The application-atom table states each
+grouped and ungrouped tree or rejection independently rather than deriving one
+from the parser's result for the other.
 
 ## Common literal fixture
 
@@ -56,6 +66,70 @@ The tree observations, rather than evaluation of the left-projecting function,
 make a wrong associativity visible. For a paired glyph/ASCII row, instantiate
 both spellings separately. The two checked terms and defining identities are
 identical after alias expansion; the source lexemes are not two declarations.
+
+## Operator values and the application-atom boundary
+
+The tree observations in this section are fixed before name resolution or
+elaboration. The operator-value case separately observes the grouped name's
+resolved identity. Write `A(f, x)` for one application node and use `Lam`,
+`Let`, `If`, `Match`, `Temporal`, `Arrow`, and `Proj` for the corresponding
+chapter-32 expression productions. Parentheses group but do not add a tree
+node.
+
+### surface/operators/bare-operator-value-requires-grouping
+
+- spec: `32 §1`/§3
+- given-positive: the `Le` common fixture, plus
+  `const grouped_op : Nat -> Nat -> Nat = (≤)` in the same unit
+- given-negative: replace only `(≤)` in `grouped_op` with bare `≤`
+- expect-positive: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — `(≤)` parses as
+  the grouped `operator_name` atom and resolves to the fixture's exact `G(Le)`.
+  The existing `prefix_bare` observation independently shows that ungrouped
+  `≤ Zero (Suc Zero)` remains a complete `operator_prefix` application.
+- expect-negative: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — bare `≤` rejects
+  syntactically before resolution: it is neither an `application_atom` nor a
+  complete `operator_prefix`, because it has zero following atoms. It must not
+  produce a global-value tree for `G(Le)`.
+- why: rejecting every ungrouped operator would make the negative pass for the
+  wrong reason; the adjacent head-application positive keeps that route live.
+  **MEASURED:** the grouped zero-application value resolves and the ungrouped
+  zero-application value rejects while an ungrouped nonzero application
+  accepts. **CLAIMED:** grouping, not token identity, distinguishes an operator
+  value from the head-only prefix form. **THE GAP:** this parse-and-resolution
+  triple does not establish infix reassociation; the common fixture's separate
+  structural tree does.
+
+### surface/operators/non-atom-application-arguments-require-grouping
+
+- spec: `32 §3`
+- given: feed each table cell independently to the full-expression parser. The
+  names are deliberately unresolved because the observation ends at parsing;
+  no type or evaluation result is used as an oracle.
+
+  | class | grouped source | exact grouped tree | ungrouped source | exact ungrouped outcome |
+  |---|---|---|---|---|
+  | lambda | `keep (λx. x)` | `A(keep, Lam(x, x))` | `keep λx. x` | reject at the leading `λ`; no complete tree |
+  | let | `keep (let x = Zero in x)` | `A(keep, Let(x, Zero, x))` | `keep let x = Zero in x` | reject at the leading `let`; no complete tree |
+  | if | `keep (if true then Zero else Zero)` | `A(keep, If(true, Zero, Zero))` | `keep if true then Zero else Zero` | reject at the leading `if`; no complete tree |
+  | match | `keep (match flag { true ↦ Zero; false ↦ Zero })` | `A(keep, Match(flag, {true ↦ Zero; false ↦ Zero}))` | `keep match flag { true ↦ Zero; false ↦ Zero }` | reject at the leading `match`; no complete tree |
+  | temporal | `keep (temporal { Top })` | `A(keep, Temporal(Top))` | `keep temporal { Top }` | reject at the leading `temporal`; no complete tree |
+  | arrow | `keep (Nat -> Nat)` | `A(keep, Arrow(Nat, Nat))` | `keep Nat -> Nat` | accept as `Arrow(A(keep, Nat), Nat)`, not as the grouped tree |
+  | projection | `keep (box.value)` | `A(keep, Proj(box, value))` | `keep box.value` | accept as `Proj(A(keep, box), value)`, not as the grouped tree |
+
+- expect: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — every grouped source has
+  exactly the stated application tree. The five ungrouped leading-form rows
+  reject with a primary span covering exactly the named leading token. The
+  arrow and projection rows accept with exactly their stated outer trees; they
+  do not silently acquire the grouped interpretation.
+- why: each row varies only grouping around one named non-atom class. Restoring
+  unrestricted `expr expr` makes at least the five rejection rows accept as
+  applications; treating arrow or projection as an argument atom changes its
+  named outer tree. **MEASURED:** seven independent grouped/ungrouped pairs
+  expose five reject boundaries and two precedence boundaries. **CLAIMED:**
+  only `application_atom` may occupy bare argument position. **THE GAP:** these
+  are parser observations only; the ordinary-application elaboration path is
+  covered independently by the common operator fixture and existing surface
+  elaboration cases.
 
 ## The six independent name cases
 
@@ -321,31 +395,33 @@ identical after alias expansion; the source lexemes are not two declarations.
   The remaining rows use one roster member per excluded grammar. Each negative
   changes only the marked identifier from its adjacent positive:
 
-  | excluded grammar | negative fragment | ordinary-name positive | expected token class |
+  | excluded grammar | negative fragment | ordinary-name positive | exact diagnostic at marked token |
   |---|---|---|---|
-  | local binder — `Le` | `fn f (≤ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Le`, not `ident` |
-  | local binder — `Ge` | `fn f (≥ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Ge`, not `ident` |
-  | local binder — `Ne` | `fn f (≠ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Ne`, not `ident` |
-  | local binder — `And` | `fn f (∧ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `And`, not `ident` |
-  | local binder — `Or` | `fn f (∨ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Or`, not `ident` |
-  | local binder — `Member` | `fn f (∈ : Nat) : Nat = Zero` | `fn f (x : Nat) : Nat = x` | `Member`, not `ident` |
-  | type name | `def ≤ = Nat` | `def Alias = Nat` | `Le`, not `ConId` |
-  | constructor name | `data Marker = ≥` | `data Marker = Only` | `Ge`, not `ConId` |
-  | module path | `module ≠ {}` | `module Provider {}` | `Ne`, not `ConId` |
-  | module alias | `import Provider as ∧` | `import Provider as Alias` | `And`, not `ConId` |
-  | record field | `record Box { ∨ : Nat }` | `record Box { value : Nat }` | `Or`, not `ident` |
-  | attached-proof name | `proof ∈ for id (x : Nat) : Equal Nat (id x) x = Refl` | `proof id_self for id (x : Nat) : Equal Nat (id x) x = Refl` | `Member`, not `ident` |
+  | local binder — `Le` | `const p : Nat = let ≤ = Zero in Zero` | `const p : Nat = let x = Zero in Zero` | `expected identifier, found Le` |
+  | local binder — `Ge` | `const p : Nat = let ≥ = Zero in Zero` | `const p : Nat = let x = Zero in Zero` | `expected identifier, found Ge` |
+  | local binder — `Ne` | `const p : Nat = let ≠ = Zero in Zero` | `const p : Nat = let x = Zero in Zero` | `expected identifier, found Ne` |
+  | local binder — `And` | `const p : Nat = let ∧ = Zero in Zero` | `const p : Nat = let x = Zero in Zero` | `expected identifier, found And` |
+  | local binder — `Or` | `const p : Nat = let ∨ = Zero in Zero` | `const p : Nat = let x = Zero in Zero` | `expected identifier, found Or` |
+  | local binder — `Member` | `const p : Nat = let ∈ = Zero in Zero` | `const p : Nat = let x = Zero in Zero` | `expected identifier, found Member` |
+  | type name | `def ≤ = Nat` | `def Alias = Nat` | `expected uppercase constructor name, found Le` |
+  | constructor name | `data Marker = Only | ≥` | `data Marker = Only | Another` | `expected uppercase constructor name, found Ge` |
+  | module path | `module ≠ {}` | `module Provider {}` | `expected uppercase constructor name, found Ne` |
+  | module alias | `import Provider as ∧` | `import Provider as Alias` | `expected identifier, found And` |
+  | record field | `record Box { ∨ : Nat }` | `record Box { value : Nat }` | `expected identifier, found Or` |
+  | attached-proof name | `proof ∈ for id (x : Nat) : Equal Nat (id x) x = Refl` | `proof id_self for id (x : Nat) : Equal Nat (id x) x = Refl` | `expected identifier, found Member` |
 
 - expect-positive: every ordinary `ident`/`ConId` control accepts in the same
   parser-and-elaboration harness. The import rows have an existing `Provider`;
   the proof rows have `fn id (x : Nat) : Nat = x`, so neither positive depends
   on an unresolved surrounding name.
 - expect-negative: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — each negative
-  lexes the marked spelling to the dedicated token class shown, enters the
-  declaration form named by its leading keyword, and rejects at the marked
-  identifier-only grammar position. The diagnostic span is the reserved token
-  and says that the position expected `ident` or `ConId`, as shown; a rejection
-  before the declaration form or at an unrelated later name does not conform.
+  lexes the marked spelling to its dedicated token class, enters the construct
+  containing the excluded identifier position, and produces the exact tabled
+  diagnostic. Its primary span is exactly the marked reserved token. In
+  particular, a local row must enter `let_binding` before refusing its name,
+  and the constructor row must consume `Only |` before refusing the second
+  constructor. A rejection at the surrounding declaration head or at an
+  unrelated later token does not conform.
 - why: the admitted shared view is `operator_name`, used only by global value
   and selection names. Reusing it as a general identifier parser would make at
   least one matrix negative accept. The same-grammar positive rows distinguish

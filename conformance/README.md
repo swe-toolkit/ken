@@ -111,9 +111,10 @@ claim with no conformance case is a claim no one can rely on
   notation identities admitted as ordinary symbolic global names: isolated
   four-context rows plus a simultaneous distinct-body fixture pin both omission
   and cross-row non-collapse; an excluded-grammar matrix keeps local/structural
-  names identifier-only; alias pairs remain one identity; `!=` and `in` remain
-  refused with live controls. Reserved-name arms are red until
-  `LANG-RESERVED-INFIX-NAMES`.
+  names identifier-only; grouped operator values and seven paired compound-
+  argument rows pin the `application_atom` boundary; alias pairs remain one
+  identity; `!=` and `in` remain refused with live controls. Reserved-name and
+  application-atom arms are red until `LANG-RESERVED-INFIX-NAMES`.
 - `surface/data-match/seed-data-match.md` — L2 sum types + `match` + refinements
   (`34`): real constructors + a computing `elim_D`, `match`→`elim_D` (nested),
   the **required exhaustiveness** safety (non-exhaustive rejects naming the
