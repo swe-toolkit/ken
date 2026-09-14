@@ -137,6 +137,19 @@ and — once the Architect rules the selection — the ADDED per-arm selection a
 its identity source. No deliverable on this node authorizes removing emitted work
 from either arm.**
 
+**D2 is discharged by the ADDED selection and by NOTHING else.** Removing,
+deleting, or disabling the two `return Err` refusals does NOT discharge D2, and
+on this witness would produce no observable change at all: an `Err` from
+`apply_required_consumer_incoming_edge` is a backend COMPILE failure, but PX8-F
+compiled, linked, ran, and trapped at RUNTIME (Trap 43, then HostIO, then ITree —
+all `PatternMatchFailure`), so the function returned `Ok` and its slice applied
+on every such compile, and neither refusal fired. Deleting them is therefore
+invisible here — green, no trap moves, and a truthful-looking "D2 discharged"
+with the actual fix never added. **Report (a report item, NOT a disposition)
+what the two refusals DO after the re-key — retained and still enforced, dead, or
+otherwise. Their fate is ruled against the item-3 site when the read lands, not
+guessed here.**
+
 **`D3` — the execution control, and it is the load-bearing deliverable.** A
 native observation that the exact per-arm discharge **executes for the
 runtime-TAKEN arm**, paired with a **skip-discharge mutation that reddens**.
