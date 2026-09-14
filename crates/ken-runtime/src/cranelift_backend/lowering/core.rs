@@ -9285,7 +9285,8 @@ impl<'a> Lowering<'a> {
         if window.anchor != 0 {
             return Err(unsupported(
                 "RequiredConsumerIncomingEdge",
-                "an incoming consumer edge index was applied to an eliminator window that does                  not begin at the receipt's first step",
+                "an incoming consumer edge index was applied to an eliminator window that \
+                 does not begin at the receipt's first step",
             ));
         }
         let eliminators = window.eliminators;
