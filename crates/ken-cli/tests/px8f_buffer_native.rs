@@ -622,8 +622,19 @@ fn assert_hs17_static_response_return_mutation_child() {
         "wrong-forwarded-word" => {
             ken_runtime::D5bHs17PostCallConsumerMutation::SubstituteForwardedResultWord
         }
-        "replay-selected-exit" => {
-            ken_runtime::D5bHs17PostCallConsumerMutation::ReplayCompletedSelectedExit
+        // RE-POINTED, NOT ADDED. `replay-selected-exit` moved the accessor
+        // passed at a residual call site. Under the anchored eliminator window
+        // the join recovers the same window from either accessor -- measured,
+        // both land on window=1 against eliminators=2 -- so that mutation went
+        // inert by construction and the hazard it policed ceased to exist.
+        //
+        // What the contract still depends on is the CORRESPONDENCE between
+        // receipt steps and frames, so the control follows that operand. Both
+        // modes are required: they are different refusals on different
+        // conditions, and one says nothing about whether the other arm is live.
+        "drop-anchor-step" => ken_runtime::D5bHs17PostCallConsumerMutation::DropAnchorReceiptStep,
+        "duplicate-anchor-step" => {
+            ken_runtime::D5bHs17PostCallConsumerMutation::DuplicateAnchorReceiptStep
         }
         "drop-residual-suffix" => ken_runtime::D5bHs17PostCallConsumerMutation::DropResidualSuffix,
         "mint-at-tail" => {
@@ -653,7 +664,8 @@ fn assert_hs17_static_response_return_mutation_child() {
     match mode.as_str() {
         "transplant-boundary"
         | "wrong-forwarded-word"
-        | "replay-selected-exit"
+        | "drop-anchor-step"
+        | "duplicate-anchor-step"
         | "mint-at-tail" => {
             let error = built.expect_err("malformed HS17 proof must refuse before an object");
             let text = format!("{error:?}");
@@ -664,6 +676,25 @@ fn assert_hs17_static_response_return_mutation_child() {
                     || text.contains("non-emitting Tail"),
                 "{mode}: wrong refusal: {text}"
             );
+            // THE DISJUNCTION ABOVE CANNOT TELL THE TWO ANCHOR REFUSALS APART --
+            // both mention "post-call consumer receipt", so either mode would
+            // satisfy it on the other's arm and the second arm could be dead
+            // without anything saying so. That is the co-class fusion repaired
+            // in `wrong_defining_call_breaks_the_required_consumer_edge`, and it
+            // would be reintroduced here by accepting the shared clause alone.
+            // These assert the CONDITION each mode injects, not the phrasing.
+            match mode.as_str() {
+                "drop-anchor-step" => assert!(
+                    text.contains("is not a step of"),
+                    "{mode}: the dropped anchor did not reach the no-match refusal: {text}"
+                ),
+                "duplicate-anchor-step" => assert!(
+                    text.contains("matches more than one"),
+                    "{mode}: the duplicated anchor did not reach the non-uniqueness refusal: \
+                     {text}"
+                ),
+                _ => {}
+            }
         }
         "delete-boundary" | "drop-residual-suffix" => {
             let built = built.expect("control keeps the outer ABI shape buildable");
@@ -727,7 +758,8 @@ fn static_response_return_boundary_controls_are_reaching() {
         "delete-boundary",
         "transplant-boundary",
         "wrong-forwarded-word",
-        "replay-selected-exit",
+        "drop-anchor-step",
+        "duplicate-anchor-step",
         "drop-residual-suffix",
         "mint-at-tail",
     ] {

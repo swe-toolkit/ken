@@ -1107,9 +1107,43 @@ pub enum D5bHs17PostCallConsumerMutation {
     DeleteStaticResponseBoundary,
     TransplantStaticResponseBoundary,
     SubstituteForwardedResultWord,
-    ReplayCompletedSelectedExit,
     DropResidualSuffix,
     MintReceiptAtNonEmittingTail,
+    /// Drop the receipt step the ambient window's first frame anchors to, so
+    /// the frame matches NO step and
+    /// `AnchoredEliminatorWindow::by_identity_join` must refuse on no-match.
+    ///
+    /// Named for its INJECTION POINT. `CheckedIhPostCallConsumerStep` has
+    /// private fields and only getters, so a step's identity cannot be forged
+    /// from the lowering side; removing the matching step is the available
+    /// honest injection for the same condition.
+    ///
+    /// This and its sibling below replaced `ReplayCompletedSelectedExit`, and
+    /// the reason belongs here rather than only in a commit message: **accessor
+    /// choice is no longer an operand of this contract.** That mutation
+    /// substituted the untrimmed `selected_case_exits()` for the trimmed
+    /// `caller_completed_exits()` at a residual call site. Under the anchored
+    /// window the join recovers the SAME window from either -- measured, the
+    /// extra leading step is exactly what the anchor skips -- so the mutation
+    /// became inert by construction. The hazard did not become undetectable; it
+    /// ceased to be a hazard.
+    ///
+    /// ⇒ If you are here because you want accessor choice tested again, the
+    /// answer is that it cannot go wrong, and restoring the old control by
+    /// weakening the join would trade a real guarantee for a test that passes.
+    /// What CAN still go wrong is the correspondence between receipt steps and
+    /// frames, which is what these two move.
+    ///
+    /// Both exist because R3's soundness argument is that the join REFUSES
+    /// rather than defaults -- a witness can fail, manufacture cannot -- and a
+    /// soundness premise no test reaches is exactly the shape this enum exists
+    /// to refuse. One of the two is not enough: they are different refusals on
+    /// different conditions.
+    DropAnchorReceiptStep,
+    /// Duplicate the step the ambient window's first frame anchors to, so the
+    /// join finds more than one and must refuse on non-uniqueness. Sibling of
+    /// `DropAnchorReceiptStep`; see its note.
+    DuplicateAnchorReceiptStep,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
