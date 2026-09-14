@@ -3316,15 +3316,27 @@ fn derive_certified_cuts(
     }
     #[cfg(feature = "px8-ds-test-support")]
     if mutation == Some(GeneratedResultPathProofMutation::SubstituteQueriedWord) {
-        if let Some(foreign) = body
+        // A mutation that cannot find its substitute must FAIL, never skip. The
+        // selection below reads the same map under the same predicate as the
+        // `mutation` binding above, so today a `None` here is unreachable -- but
+        // that is an invariant between two separate reads, not a guarantee, and
+        // the whole point of this node is that an absent authority taken as a
+        // silent pass is the defect. A skipping harness degrades into a dead
+        // instrument that still reports green.
+        let Some(foreign) = body
             .authorities
             .values()
             .find(|authority| authority.identity != identity)
             .map(|authority| authority.word)
-        {
-            for query in &mut tag_queries {
-                query.word = foreign;
-            }
+        else {
+            return Err(backend_module(
+                "the SubstituteQueriedWord proof mutation found no foreign constructor \
+                 authority to substitute, so the mutation could not fire"
+                    .to_string(),
+            ));
+        };
+        for query in &mut tag_queries {
+            query.word = foreign;
         }
     }
     #[cfg(feature = "px8-ds-test-support")]
@@ -3601,6 +3613,17 @@ fn derive_certified_cuts(
             break;
         }
     }
+    // POST-CONVERGENCE DISCHARGE. Every proof has run by here, so this is the
+    // first point at which the set of words this obligation grounded on is
+    // final. Collecting it earlier -- inside the fixpoint, or at the arm that
+    // matched -- would need the satisfier's identity, which exists only at the
+    // decision point inside the recursion, where the placement ruling and the
+    // path's stack headroom independently forbid it.
+    cuts.discharged_sources = cuts
+        .provenance
+        .values()
+        .flat_map(|provenance| provenance.sources.iter().copied())
+        .collect();
     verify_cut_provenance(body, &cuts)?;
     Ok(cuts)
 }
@@ -4276,6 +4299,16 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
         }
     }
     let mut finished = Vec::<FinishedUnitResultContract>::new();
+    // THE DISCHARGE LEDGER. A constructor word discharges at most one Result
+    // obligation; a second claim on the same word is a planner error, never a
+    // silent pass. The key carries the function because `ir::Value` is a
+    // per-`Function` index and two staged bodies both hold `v0`. `FuncId` alone
+    // identifies a body: `exact_staged_unit` errors unless exactly one staged
+    // body has a given target.
+    let mut discharged = BTreeMap::<
+        (FuncId, cranelift_codegen::ir::Value),
+        (ExistingResultUnitIdentity, ConstructorIdentity),
+    >::new();
     loop {
         let mut progress = false;
         for body in &staged {
@@ -4348,6 +4381,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                 let Some(publication) = body.publication else {
                     continue;
                 };
+                let mut discharge_sources = BTreeSet::new();
                 let proven = if body.independent_contract == Some(identity) {
                     // The response-owner verifier may refine only an actually
                     // initialized returned word. The exact call seed is a
@@ -4375,9 +4409,29 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                         publication.returned_word,
                         &mut BTreeSet::new(),
                     )?;
-                    proof.valid && proof.grounded
+                    if proof.valid && proof.grounded {
+                        discharge_sources = cuts.discharged_sources;
+                        discharge_sources.extend(proof.sources.iter().copied());
+                        true
+                    } else {
+                        false
+                    }
                 };
                 if proven {
+                    for source in &discharge_sources {
+                        if let Some((prior_unit, prior_identity)) =
+                            discharged.insert((body.target, *source), (body.unit, identity))
+                        {
+                            return Err(backend_module(format!(
+                                "one generated-Result constructor word discharges two Result \
+                                 obligations: word {source:?} in unit {prior_unit:?} target \
+                                 {:?} already discharged the obligation for constructor \
+                                 identity {prior_identity:?}, and unit {:?} claims it again \
+                                 for {identity:?}",
+                                body.target, body.unit,
+                            )));
+                        }
+                    }
                     finished.push(FinishedUnitResultContract {
                         unit: body.unit,
                         target: body.target,
@@ -4516,6 +4570,13 @@ struct CertifiedCutProvenance {
 struct CertifiedCuts {
     edges: BTreeSet<CertifiedInfeasibleEdge>,
     provenance: BTreeMap<CertifiedInfeasibleEdge, CertifiedCutProvenance>,
+    /// Every constructor word the converged cut proofs grounded on, unioned
+    /// across provenances. Filled once, after the fixpoint converges, and
+    /// consumed by the caller's discharge ledger. It records the WORD and not
+    /// which of the three satisfier arms answered for it, because the
+    /// disjunction short-circuits and `ForwardingProof::sources` keeps only the
+    /// value -- which is exactly why the discharge is per-word.
+    discharged_sources: BTreeSet<cranelift_codegen::ir::Value>,
 }
 
 #[derive(Clone, Debug)]
