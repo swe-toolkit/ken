@@ -2897,6 +2897,48 @@ Architect inventory, 2026-09-11.
     re-cast in addition form; D1 and D3-D6 are retained unchanged.
     This is NOT a keying defect either: the §1b seat-keyed-vs-value-keyed
     predicate of entries 24-27 is untouched and its count stays at FOUR.
+31. HS18, read-only at tip `936294421e`: the Architect's condition A —
+    name the planner fact licensing a static `Result::Ok` selection, and STOP if
+    none exists — is not merely unmet but POSITIVELY REFUTED, and the refutation
+    was re-derived by the Architect rather than taken on report.
+    `private_write_all_fuel` (`ken-elaborator/src/prelude.rs`) constructs the
+    outer `ITree::Ret` at THREE static sites in one proc: fuel `Zero` with
+    `(Ok ResourceError Unit MkUnit)`, the write-error branch with
+    `(Err ResourceError Unit error)`, and remaining `Zero` with `(Ok ... MkUnit)`
+    — the fourth arm recurses without constructing. So BOTH `Result`
+    constructors inhabit the SAME certified outer `Ret` arm.
+    Every available fact stops one layer ABOVE the claim:
+    `case_constructor_identity(frame 661, arm 0) = 4442/38` certifies the outer
+    arm and says nothing about its payload; `CheckedIhFreshResultRoute::
+    TailProducerToRet` (`aggregates.rs:485-518`) carries the source coordinate,
+    body origins, active frame, direction, Ret binder, delivery and capture
+    ordinal but NO payload-constructor field; and
+    `CheckedIhPostCallConsumer::{actual,demanded}_result_identity`
+    (`continuations.rs:6115-6220`) resolves to the two frame-661 `ITree` arms
+    (Vis 3380/38, Ret 4442/38), which do not classify the inner `Result` match.
+    The fixture's particular successful host response is RUNTIME evidence and
+    cannot mint compiler authority. Conditions B and C came back clean: no tag
+    comparison emitted, no `Err` arm removed, no selection attempted.
+    KEYING INSTANCE — the §1b seat-keyed-vs-value-keyed count moves to FIVE
+    (entries 24-27 and 31); the next instance is the SIXTH and pulls the §1b
+    predicate question. This is the SAME predicate ONE LAYER DOWN: HS15 re-keyed
+    the obligation off the call occurrence onto the value's own constructor
+    identity, that re-key held at the OUTER layer, and the union reappeared
+    immediately at the INNER one. The authority is again attached one level away
+    from the fact it is asked to decide.
+    §1a MANDATORY ADVISORY FIRED — the 6th trigger; the Architect HELD the
+    ruling and framed the question (`evt_6khe3w8e384ce`). The new fork, and the
+    reason it is not HS15's ground: at the inner layer the payload constructor
+    IS statically known at each producer site — three sites, closed and finite,
+    each carrying its constructor literally. That is exactly the
+    branch-determining static key the prior-art Q2 producer-split family was
+    made conditional on and which was proved ABSENT at the HS15 creation site;
+    here it is PRESENT, at a different site, separated from the consumer by a
+    RECURSIVE join. The advisory is also asked to test the alternative that the
+    union is IRREDUCIBLE — in which case the Ret body's `Result` match is
+    correct as written, nothing should be statically selected, and the defect is
+    upstream: an over-eliminated value arriving where a `Result` is expected.
+    Next mandatory advisory is HS21.
 
 Entries 16–18 restore the inventory missing from the diagnostic-first fold;
 the Q1 diagnostic return is a follow-up to entry 18, not a nineteenth hard stop.
