@@ -3,6 +3,34 @@
 //! Slice 4 populates `control`, `effects` and `constructors` -- the subjects
 //! whose tests reach `lowering::core`-private items. `values.rs` is populated
 //! in slice 5 from the Architect's ruled row list (`evt_3xvn8g7n5rv7m`).
+//!
+//! # Retiring a control in this subtree
+//!
+//! **Retirement is DELETION plus a note at the site naming the successor control
+//! BY IDENTIFIER.** (`RT-RETIRED-CENSUS-ROT` `D0`.)
+//!
+//! **`#[cfg(any())]` is not a retirement idiom.** A body under it is neither run
+//! nor name-resolved, so it records nothing and rots silently. The repo ran this
+//! experiment with a control group: `RT-FNSPLIT-RECUR-PORT` retired four
+//! censuses on one day and used both conventions. The one it DELETED, leaving a
+//! note, still resolves 27 days later. The three it KEPT were all dead on
+//! revival -- one of them naming a function that was deleted 19 days after its
+//! own retirement, with nothing able to notice.
+//!
+//! **Name the successor by IDENTIFIER, never by file or line.**
+//! `RT-CONTROL-INTEGRATION-TESTS-SPLIT` moved every census in this subtree. The
+//! one note that named its successor by identifier survived it unchanged; a note
+//! saying "the controls ABOVE" could no longer be checked, and re-points
+//! silently whenever the file is cut.
+//!
+//! **A note that names no successor is the worst case** -- it leaves nothing to
+//! verify and nothing to inherit the property. If no live control carries it,
+//! the note says THAT, in those words, rather than naming one that does not.
+//!
+//! **And check that the named successor CARRIES the property, not merely that it
+//! exists.** Two of the three retirements above named successors that exist; one
+//! of them tested something else entirely, and the property turned out to be
+//! enforced by a callee's own guard rather than by any test.
 
 // `super` here is `core`; re-exported so the leaf subject modules inherit
 // the same namespace via their own `use super::*`.
@@ -1130,208 +1158,28 @@ fn perturbing_a_borrowed_address_does_not_move_any_derived_origin() {
     );
 }
 
-#[cfg(any())]
-fn exactly_one_plan_origin_to_expression_lookup_exists() {
-    let planner = include_str!("../../../planning/static_transition.rs");
-
-    // The PRODUCING end, pinned as a whole exported surface rather than by
-    // searching for one name: a second resolver added here would redden this even
-    // if it were never called.
-    let exported: Vec<&str> = planner
-        .lines()
-        .filter(|line| {
-            line.trim_start()
-                .starts_with("pub(in crate::cranelift_backend) fn ")
-        })
-        .map(|line| line.trim())
-        .collect();
-    assert_eq!(
-        exported,
-        vec![
-            // `RT-FNSPLIT-B2F` `D1` — the emitter's read-only view of ONE
-            // validated function unit. Six accessors, one type, no constructor.
-            //
-            // ⭐ Same shape as `C1`'s four below: a *question* about a planned
-            // object with an answer the asker cannot mint. `EmittableUnit`'s
-            // fields are private and its sole producer is `emittable_units`, so
-            // a unit cannot be forged in `lowering` — and since `B2F` drives
-            // emission from units, emission cannot be driven from anything but
-            // the validated plane.
-            //
-            // ⛔ `AbiPlane`, `AbiDescriptor`, `build_abi_plane` and
-            // `AbiPlane::validate` stay `pub(super)` and are NOT here. The
-            // emitter reads a unit; it cannot construct the plane, mutate a
-            // descriptor, or reach the pre-emission validator to bypass it. One
-            // of those names appearing in this list is the violation.
-            //
-            // ⚠ None of the six returns a source term, so the `-> Result<&'src
-            // RuntimeExpr` count below is still exactly one and `B2A-S`'s `AC-4`
-            // is untouched. A unit carries an ORIGIN; resolving that origin to a
-            // term still goes through `source_occurrence`, which is why `B2F`
-            // adds no second `origin -> expression` lookup.
-            // `RT-FNSPLIT-B2F` `D4` — the cross-owner call edge's two ends,
-            // added deliberately and argued rather than bumped.
-            //
-            // ⚠ Both return an **identity**, never a source term, so neither can
-            // contribute to the `-> Result<&'src RuntimeExpr` count that carries
-            // `B2A-S`'s `AC-4` — which stays at exactly one.
-            //
-            // ⭐ Their producer `emittable_call_edges` (below) is the sole route
-            // to an `EmittableCallEdge`, whose fields are private — so `lowering`
-            // can read which unit calls which and cannot invent an edge the
-            // planner did not validate. ⛔ It does not classify edges: the walk
-            // is `SemanticPlane::static_body_call_edges`, beside the validator,
-            // because `static_transition.rs` may not name `SemanticOwner` at all.
-            "pub(in crate::cranelift_backend) fn caller(self) -> PredeclaredFunctionId {",
-            "pub(in crate::cranelift_backend) fn callee(self) -> PredeclaredFunctionId {",
-            "pub(in crate::cranelift_backend) fn callee_origin(self) -> StaticOriginId {",
-            "pub(in crate::cranelift_backend) fn function(self) -> PredeclaredFunctionId {",
-            "pub(in crate::cranelift_backend) fn origin(self) -> StaticOriginId {",
-            "pub(in crate::cranelift_backend) fn definition(self) -> AbiUnitDefinition {",
-            "pub(in crate::cranelift_backend) fn header(self) -> AbiFrameHeader {",
-            "pub(in crate::cranelift_backend) fn slots(self) -> &'plan [AbiSlot] {",
-            "pub(in crate::cranelift_backend) fn slot_offsets(",
-            "pub(in crate::cranelift_backend) fn process_parameter_slot(",
-            // ⭐ `RT-FNSPLIT-B2A-S` `AC-4`'s own **behavioural** instrument,
-            // added deliberately and argued rather than bumped. These three are
-            // the counters behind
-            // `every_origin_to_expression_resolution_goes_through_the_single_route`,
-            // which is the pin that carries `AC-4` once `B2F` `S6` widens
-            // `retained_body_occurrence`'s visibility — an enlargement of the
-            // reachable surface that THIS test cannot see, because it constrains
-            // the identifier `source_occurrence` and never asks who calls the
-            // route.
-            //
-            // ⚠ None of the three returns a source term — two return `()` and
-            // one returns `(usize, usize)` — so the `-> Result<&'src RuntimeExpr`
-            // count below is still exactly one and `AC-4` is untouched.
-            //
-            // ⛔ They are `#[cfg(test)]` probe infrastructure, and this list
-            // cannot tell that apart from production surface: it reads source
-            // text, so a `cfg`-gated item appears exactly like a live one. ⇒ A
-            // reader auditing this list for *production* exports must check the
-            // attribute at the declaration, not infer it from membership here.
-            "pub(in crate::cranelift_backend) fn ac4_open_route_window() {",
-            "pub(in crate::cranelift_backend) fn ac4_note_route_invocation() {",
-            "pub(in crate::cranelift_backend) fn ac4_route_counts() -> (usize, usize) {",
-            "pub(in crate::cranelift_backend) fn source_occurrence(",
-            "pub(in crate::cranelift_backend) fn child_static_origin(",
-            // `D8` exports one opaque, origin-keyed join-plan token. The token
-            // contains no term and has no public constructor.
-            "pub(in crate::cranelift_backend) fn join_plan_token(",
-            // `RT-CONTSRC-PRODUCER-LOCAL` `AC-1` — the case-emission verdict,
-            // added deliberately and argued rather than bumped.
-            //
-            // The carried source-machine `Match` route must emit exactly the
-            // cases the planner authorizes, and it must not re-derive that
-            // authority. This returns a VERDICT for one occurrence-and-ordinal:
-            // `case_emissions`, the producer-set derivation and `semantic` all
-            // stay private, so an emitter can obtain the answer and cannot mint
-            // or vary one. `None` is a refusal to answer, not a default.
-            //
-            // ⚠ It returns `Result<Option<CaseEmissionStatus>, _>`, so it does
-            // not contribute to the `-> Result<&'src RuntimeExpr` count that
-            // carries `B2A-S`'s `AC-4`.
-            "pub(in crate::cranelift_backend) fn case_emission_status(",
-            // `RT-FNSPLIT-C1` `D1` — the artifact-static identity capability.
-            //
-            // ⭐ These four are the whole of `D1`, and they are the shape the
-            // Architect's ruling requires: an occurrence-keyed *question* with
-            // an unmintable answer. ⛔ `SemanticPlane` and its `names` arena
-            // stay `pub(super)`; widening either to serve a consumer is what
-            // this pin exists to catch, and adding a capability is not that.
-            //
-            // ⚠ None of them returns a source term, so the `-> Result<&'src
-            // RuntimeExpr` count below is still exactly one. That assertion is
-            // the one carrying B2A-S's AC-4; this list is the surrounding
-            // allowed-inventory.
-            "pub(in crate::cranelift_backend) fn case_constructor_identity(",
-            "pub(in crate::cranelift_backend) fn constructor_symbol_identity(",
-            // `RT-FNSPLIT-C2-SYNTH-ID` adds one closed synthesized-role
-            // identity route plus the opaque dynamic-role population. Neither
-            // accepts a spelling, origin, hash, or ordinal from lowering.
-            "pub(in crate::cranelift_backend) fn synthesized_constructor_identity(",
-            "pub(in crate::cranelift_backend) fn synthesized_io_error_roles(",
-            "pub(in crate::cranelift_backend) fn project_field_identity(",
-            "pub(in crate::cranelift_backend) fn record_field_identity(",
-            "pub(in crate::cranelift_backend) fn root_static_origin(",
-            "pub(in crate::cranelift_backend) fn declaration_occurrence_origin(",
-            // `RT-FNSPLIT-B2F` `AC-11` — the per-transfer representability
-            // verdict, added deliberately and argued rather than bumped.
-            //
-            // ⭐ It returns a **verdict**, never the plane: `semantic`,
-            // `semantic_sources` and `abi` all stay private, so an emitter can
-            // obtain the answer and cannot re-derive a different one. That is
-            // what keeps representability a single authority instead of a check
-            // the emitter could route around — and it is why widening this one
-            // name does not widen the surface it guards.
-            //
-            // ⚠ It returns `Result<(), _>`, so it cannot contribute to the
-            // `-> Result<&'src RuntimeExpr` count that carries `B2A-S`'s `AC-4`.
-            "pub(in crate::cranelift_backend) fn validate_emitted_transfers_are_representable(",
-            // `RT-FNSPLIT-B2F` `D1` — the sole producer of an `EmittableUnit`,
-            // and therefore the sole route by which emission can be driven.
-            //
-            // ⛔ It projects `self.abi.descriptors`; it does not re-seed the
-            // population and must never be made to. The unit set is
-            // `plan.entries` ∪ every `EdgeKind::StaticBody` TARGET, already
-            // enforced by `validate_function_units`. In particular it does not
-            // consult `TransitionKind::ClosureBody`, which is a body's return
-            // successor and not a unit head.
-            "pub(in crate::cranelift_backend) fn emittable_call_edges(",
-            "pub(in crate::cranelift_backend) fn root_emittable_unit(",
-            "pub(in crate::cranelift_backend) fn emittable_units(",
-            "pub(in crate::cranelift_backend) fn plan_static_transition_graph<'src>(",
-            "pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'src>(",
-            "pub(in crate::cranelift_backend) fn governed_nested_resource_bracket(",
-        ],
-        "AC-4 -- the planner's exported surface changed; exactly one of these may \
-         return a source term"
-    );
-    assert_eq!(
-        planner
-            .lines()
-            .filter(|line| line.contains("-> Result<&'src RuntimeExpr"))
-            .count(),
-        1,
-        "AC-4 -- exactly one accessor may return a borrowed source expression \
-         (B2A-C's N3 required zero; B2A-S requires one)"
-    );
-
-    // The CONSUMING end, over the WHOLE backend production surface.
-    //
-    // ⛔ The first candidate scanned only `lowering/core.rs` and `lowering/mod.rs`
-    // and argued closure from `Lowering::static_transition_plan` being private.
-    // The Architect rejected that (`evt_6sq2tq3v9jcd0`) and was right: the
-    // resolver is `pub(in crate::cranelift_backend)` and `planning.rs` re-exports
-    // `plan_static_transition_graph` to the backend parent, so ANY backend sibling
-    // can build its own plan and call the resolver without owning a `Lowering` at
-    // all. A second call in `artifact/**`, `compiled.rs` or `planning.rs` would
-    // have stayed green. Privacy of one field was never the closure.
-    let mut mentions = Vec::new();
-    for (file, source) in BACKEND_PRODUCTION_SOURCES {
-        // `static_transition.rs` carries its tests inline; the census is about the
-        // production surface, and the planner's own tests legitimately call the
-        // resolver to exercise it.
-        let production = source
-            .split_once("\n#[cfg(test)]\nmod tests {")
-            .map_or(*source, |(before, _)| before);
-        let n = identifier_occurrences(production, "source_occurrence");
-        if n > 0 {
-            mentions.push((*file, n));
-        }
-    }
-    assert_eq!(
-        mentions,
-        vec![
-            ("lowering/core.rs", 1),
-            ("planning/static_transition.rs", 1)
-        ],
-        "AC-4 -- the resolver may be NAMED exactly twice in production: its \
-         definition in the planner, and its single call from \
-         `retained_body_occurrence`. Any third mention is a second lookup"
-    );
-}
+// RETIRED by `RT-RETIRED-CENSUS-ROT` `D0`: a retired body is not a record, so
+// the census is deleted rather than kept under `#[cfg(any())]`.
+//
+// THIS CENSUS HAD NO RETIREMENT NOTE AT ALL -- it was put under `#[cfg(any())]`
+// with no successor named and no reason given, which is why it is the one case
+// where the deletion had to establish a successor rather than preserve one.
+//
+// It pinned the planner's exported surface as a list of whole signature lines
+// read out of `static_transition.rs` -- a text census, frozen on the day it ran.
+// The behavioural property is carried by
+// `every_origin_to_expression_resolution_goes_through_the_single_route` (this
+// file), which counts resolutions against route invocations at runtime and pins
+// the RATIO rather than a count: seven consumption sites call the route today
+// and every one of them keeps it green, where a frozen list reddens on correct
+// work.
+//
+// NOT CARRIED FORWARD BY THAT SUCCESSOR, and reported rather than assumed: the
+// deleted body also argued the EXPORTED-SURFACE closure -- why `AbiPlane`,
+// `AbiDescriptor`, `build_abi_plane` and `AbiPlane::validate` stay `pub(super)`
+// and are deliberately absent, so that the emitter can read a validated unit but
+// cannot construct the plane, mutate a descriptor, or reach the pre-emission
+// validator to bypass it. No live control states that today.
 
 #[test]
 fn every_source_term_carrier_holds_an_occurrence_and_never_a_bare_expression() {
@@ -1464,10 +1312,12 @@ fn retained_closures_carry_a_static_origin_and_no_body_term() {
 /// **`RT-FNSPLIT-B2A-S` `AC-4` — every `origin -> expression` resolution goes
 /// through the single route.**
 ///
-/// ⛔⛔ **This exists because the instrument that used to carry `AC-4` is about
-/// to stop being able to.** `exactly_one_plan_origin_to_expression_lookup_exists`
-/// reads `static_transition.rs`'s **source text** and pins its exported
-/// signature list. Two things break that as `B2F` `S6` lands:
+/// ⛔⛔ **This exists because the instrument that used to carry `AC-4` could not
+/// keep doing so.** That instrument was a text census
+/// (`exactly_one_plan_origin_to_expression_lookup_exists`, retired under
+/// `#[cfg(any())]` and since DELETED by `RT-RETIRED-CENSUS-ROT` `D0` -- do not
+/// look for it): it read `static_transition.rs`'s **source text** and pinned its
+/// exported signature list. Two things broke that as `B2F` `S6` landed:
 ///
 /// 1. ⛔ It constrains the **identifier** `source_occurrence` and says nothing
 ///    about **who may call the route**. `S6` widens

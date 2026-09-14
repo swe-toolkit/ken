@@ -4296,134 +4296,28 @@ fn no_collection_is_keyed_by_a_scheduling_entry() {
 
 // ─── RT-FNSPLIT-B2O D6/D7 — the call population, and inertness ─────────────
 
-/// **`RT-FNSPLIT-B2O` `D6` — the `lower_expr` call population, and why its
-/// disposition is now BY OWNER rather than by source site.**
-///
-/// ⛔ **This is a report, not the authority, and this pin is FROZEN DECLARATION
-/// EVIDENCE.** The authority is the ownership mapping in the semantic plane —
-/// an occurrence's `StaticOriginId`, its validated `SemanticOwner`, and the
-/// planned edge kind.
-///
-/// ⚠ An earlier revision said this pin existed so the population *"cannot drift
-/// silently."* **It does not establish that**, and the claim is withdrawn: the
-/// census counts textual occurrences of an identifier, which is a declaration
-/// fact. It observes nothing about which Rust functions can reach a retained
-/// body. See the `D6` report's UNMECHANIZED section for the four residuals.
-///
-/// ⚠ **The census is TOKENIZED, not `self.`-spelled.** `grep -c
-/// 'self\.lower_expr('` returns **58** and silently loses the program's entry
-/// point: the root call is spelled `compiler.lower_expr(` (`core.rs:188`) and
-/// takes `root_static_origin`, so it *seeds* the descent rather than traversing.
-/// A receiver spelling is a census of the RECEIVER, and the call it misses is the
-/// one that matters most.
-///
-/// ⭐ **Why the count is asserted as two measurements and the 59 is DERIVED.**
-/// Freezing "59" directly would be a snapshot. Instead this pins the token total
-/// and the definition count, and subtracts — so the pin states the *relation*
-/// `calls = tokens - definitions`, and a call added or removed reddens with an
-/// arithmetic explanation rather than a bare number mismatch.
-///
-/// ### The disposition, derived from the ownership mapping
-///
-/// `B2O` makes a `StaticBody` edge the **one and only** owner boundary. So a call
-/// into `lower_expr` crosses an owner boundary **iff the occurrence it lowers is
-/// a `StaticBody` target — that is, iff it lowers a retained body.** ⇒ The test
-/// is on the **occurrence's owner and the planned edge kind**, and on nothing
-/// else.
-///
-/// ⛔ **Withdrawn here:** that retained bodies are *"reachable only through the
-/// single `origin -> expression` route"* and that the population is
-/// *"characterised structurally, by one pinned route."*
-/// `exactly_one_plan_origin_to_expression_lookup_exists` constrains the
-/// identifier `source_occurrence` **only** — it says nothing about who may call
-/// `retained_body_occurrence`, so it never supported either sentence.
-///
-/// ⇒ **The boundary-crossing population is derived from the validated owner
-/// partition**, instead of enumerated as a table of source sites. That is the
-/// repair for the withdrawn `AC-5`: its two-way site classification had no cell
-/// for "depends on the reaching path", so it could have been filled in completely
-/// and still been wrong. For the 14 caller-dependent sites the answer genuinely
-/// *is* a function of the reaching path — the same parameter carries both a
-/// retained body and ordinary sub-expressions — and no per-site row can say that.
-/// The **validated owner partition** can: an occurrence's `StaticOriginId`, its
-/// `SemanticOwner`, and the planned edge kind answer it per occurrence, which is
-/// the only authority here.
-// RETIRED by the RT-FNSPLIT-RECUR-PORT successor repair: token counts over
-// repository text do not establish occurrence ownership. The semantic-plane
-// owner/edge controls above carry that behavioral property.
-#[cfg(any())]
-fn the_lower_expr_call_population_is_dispositioned_by_owner_not_by_site() {
-    // Promise class: durable invariant — a relation over the production source,
-    // not a frozen count. `tokens` and `definitions` each move for a stated
-    // reason; `calls` is their difference.
-    let core = include_str!("../../core.rs");
-    let units = include_str!("../../units.rs");
-    let tokens = identifier_occurrences(core, "lower_expr")
-        + identifier_occurrences(units, "lower_expr");
-    let definitions = core
-        .lines()
-        .chain(units.lines())
-        .filter(|line| line.trim_end().ends_with("fn lower_expr("))
-        .count();
-    assert_eq!(
-        definitions, 1,
-        "D6: there must be exactly one `lower_expr` definition for the call \
-         count to be `tokens - definitions`"
-    );
-    let calls = tokens - definitions;
-    // ⭐ **59 -> 61 on `RT-FNSPLIT-C1` `D3`, then 61 -> 62 on
-    // `RT-FNSPLIT-C2-SYNTH-ID`, and the arithmetic is the whole
-    // report the pin asks for.** The two added calls are the case-body descents
-    // of the two *carried* elimination routes — `lower_carried_match` and
-    // `lower_carried_computational_match` — each lowering a case body under a
-    // `case_env` whose binders are runtime projections rather than compile-time
-    // constructor arguments. C2 adds the HostResult-specific carried case-body
-    // descent: the runtime success bit chooses the Result case, while the
-    // selected payload remains a carried operand in that case's environment.
-    //
-    // ⭐ **Neither is a new owner boundary**, which is the disposition this pin
-    // actually reports. A carried case body is reached by ordinary descent from
-    // the eliminator's own occurrence — `case_body_occurrence(static_origin,
-    // index, ..)`, the identical accessor the specialized routes use — so its
-    // occurrence's `SemanticOwner` and planned edge kind are unchanged. ⛔ No
-    // `StaticBody` edge is introduced, and no retained body is reached by a new
-    // path.
-    assert_eq!(
-        calls, 65,
-        "D6: the tokenized production call population into `lower_expr` moved. \
-         ⚠ If you reached this by counting `self.lower_expr(` you will have got \
-         one fewer -- the root call at `core.rs:188` is spelled \
-         `compiler.lower_expr(`"
-    );
-
-    // Non-vacuity: the tokenizer must actually see the root call's receiver
-    // spelling, or the paragraph above is describing something the pin cannot
-    // measure.
-    assert!(
-        units.contains("compiler.lower_expr("),
-        "D6: the functionized root call's spelling is gone, so this census no longer \
-         distinguishes the entry point from traversal"
-    );
-
-    // ⭐ The DISCRIMINATOR, on a shared input: a non-degenerate pair where the
-    // tokenizer and the receiver-spelled scan give different answers. Without
-    // this, "use the tokenizer" is advice rather than a checked property — and a
-    // positive control that only exercises `self.` would be spelling-scoped in
-    // exactly the way that produced 58.
-    let both_receivers =
-        "let a = self.lower_expr(b, o, e)?;\nlet c = compiler.lower_expr(b, o, e)?;\n";
-    assert_eq!(
-        identifier_occurrences(both_receivers, "lower_expr"),
-        2,
-        "the census must count a call regardless of its receiver"
-    );
-    assert_eq!(
-        both_receivers.matches("self.lower_expr(").count(),
-        1,
-        "if the receiver-spelled scan agreed with the tokenizer here, this pair \
-         would not discriminate and would prove nothing about the 58/59 gap"
-    );
-}
+// RETIRED by `RT-RETIRED-CENSUS-ROT` `D0`: a retired body is not a record, so
+// the census is deleted rather than kept under `#[cfg(any())]`.
+//
+// It counted tokens of `lower_expr` across `core.rs` and `units.rs` and derived
+// a call total -- a text census of the CALL POPULATION, standing in for a fact
+// about OCCURRENCE OWNERSHIP. The authority is the semantic plane's validated
+// owner partition: an occurrence's `StaticOriginId`, its `SemanticOwner`, and
+// the planned edge kind answer the disposition per occurrence, and a count of
+// textual occurrences observes none of them.
+//
+// Its previous note named the successor BY POSITION ("the owner/edge controls
+// above"). `RT-CONTROL-INTEGRATION-TESTS-SPLIT` has since cut this file, so that
+// reference could no longer be checked -- which is why the convention at this
+// module's root now requires naming a successor by IDENTIFIER. The live controls
+// resting on that authority are
+// `the_owner_classification_has_a_closed_production_naming_inventory` (below,
+// a declaration inventory) and
+// `correspondence_adds_no_emitted_unit_to_the_production_census` (behavioural).
+//
+// The argument this census carried about the live authority is NOT deleted with
+// it -- it is relocated to `the_owner_classification_has_a_closed_production_naming_inventory`
+// below, because prose about a live control belongs at the live control.
 
 /// **`RT-FNSPLIT-B2O` `D7`/`AC-1` — inertness, as reach rather than as a builder
 /// count.**
@@ -4465,6 +4359,36 @@ fn the_lower_expr_call_population_is_dispositioned_by_owner_not_by_site() {
 /// mechanism that would actually observe an emission edge. These two are
 /// declaration inventories that make a change loud, and that is their whole
 /// claim.
+/// **The `lower_expr` call population is dispositioned BY OWNER, not by source
+/// site.** Relocated here by `RT-RETIRED-CENSUS-ROT` `D0` from a deleted text
+/// census; the counts went with the census, the argument did not.
+///
+/// The authority is the ownership mapping in the semantic plane -- an
+/// occurrence's `StaticOriginId`, its validated `SemanticOwner`, and the planned
+/// edge kind.
+///
+/// `B2O` makes a `StaticBody` edge the **one and only** owner boundary. So a
+/// call into `lower_expr` crosses an owner boundary **iff the occurrence it
+/// lowers is a `StaticBody` target -- that is, iff it lowers a retained body.**
+/// The test is on the occurrence's owner and the planned edge kind, and on
+/// nothing else.
+///
+/// WITHDRAWN, and kept here because a withdrawal that is deleted reads as though
+/// it had never been made: that retained bodies are *"reachable only through the
+/// single `origin -> expression` route"*, and that the population is
+/// *"characterised structurally, by one pinned route."* The census that was said
+/// to support them constrained the identifier `source_occurrence` ONLY -- it said
+/// nothing about who may call `retained_body_occurrence`, so it never supported
+/// either sentence. (That census has itself since been deleted by the same node.)
+///
+/// This is also the repair for the withdrawn `AC-5`: its two-way site
+/// classification had no cell for *"depends on the reaching path"*, so it could
+/// have been filled in completely and still been wrong. For the 14
+/// caller-dependent sites the answer genuinely *is* a function of the reaching
+/// path -- the same parameter carries both a retained body and ordinary
+/// sub-expressions -- and no per-site row can say that. The validated owner
+/// partition can, per occurrence, which is the only authority here.
+///
 #[test]
 fn the_owner_classification_has_a_closed_production_naming_inventory() {
     // Promise class: durable invariant — a DECLARATION inventory.
