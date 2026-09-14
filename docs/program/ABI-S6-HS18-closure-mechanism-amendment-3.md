@@ -1,5 +1,13 @@
 # ABI-S6 HS18 — closure mechanism, amendment 3
 
+> **EXTENDED — NOT SUPERSEDED — by
+> [amendment 4](ABI-S6-HS18-closure-mechanism-amendment-4.md).** The rule below
+> stands exactly as written and remains current authority. It closes what the
+> planner may CONSTRUCT; it says nothing about what lowering must REALIZE, and
+> HS6 is the same invariant escaping through that half. Amendment 4 requires the
+> final identity to be minted by the function that lowers the consuming
+> occurrence, from the after-definition it produced. Read the two together.
+
 Architect, 2026-09-13. Amends the
 [closure mechanism](ABI-S6-HS18-closure-mechanism.md),
 [amendment 1](ABI-S6-HS18-closure-mechanism-amendment.md) and
