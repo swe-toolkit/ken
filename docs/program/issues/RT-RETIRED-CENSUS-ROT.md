@@ -1,7 +1,7 @@
 ---
 id: RT-RETIRED-CENSUS-ROT
 title: "Censuses retired by #[cfg(any())] are preserved as a readable record of a property, but cfg-stripping means nothing name-resolves them -- 3 of 3 are dead on revival, and one names a function deleted 19 days after its retirement"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
