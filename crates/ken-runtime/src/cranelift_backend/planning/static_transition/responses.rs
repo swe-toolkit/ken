@@ -369,12 +369,33 @@ impl CheckedIhStaticResponseReturnBoundary {
         &self.owner
     }
 
-    pub(in crate::cranelift_backend) fn caller_cut(&self) -> &CheckedIhDetachedCallerCut {
+    /// ⛔ **Refuses rather than panics, and its own neighbour twenty lines
+    /// below is why.** `required_consumer_incoming_edge` handles this exact
+    /// discriminant on this exact struct with a `planner_error`; this arm used
+    /// to `unreachable!` on it.
+    ///
+    /// The panic was CORRECT as the code stood -- one construction site
+    /// (`:2657`), every field private, and that constructor writes
+    /// `CallerCompleted` as a literal. But its correctness was a property of
+    /// that arrangement, not of the type, and nothing stated it here or
+    /// enforced it if a second constructor appeared. `ABI-S6 D5b` introduced
+    /// `SelfDefining` precisely to model self-defining edges explicitly, so
+    /// the variant exists because the design now expects them -- and the day
+    /// one reaches a static-response boundary, a compiler panic is the wrong
+    /// failure mode in a plane whose contract is refusals.
+    ///
+    /// Returning `Result` makes the invariant CHECKED instead of documented,
+    /// which is the difference this arc has spent its whole length learning.
+    pub(in crate::cranelift_backend) fn caller_cut(
+        &self,
+    ) -> Result<&CheckedIhDetachedCallerCut, CraneliftBackendError> {
         match &self.required_consumer_edge {
-            RequiredConsumerIncomingEdgeSelection::CallerCompleted { caller_cut, .. } => caller_cut,
-            RequiredConsumerIncomingEdgeSelection::SelfDefining { .. } => {
-                unreachable!("a static-response boundary cannot carry a self-defining edge")
+            RequiredConsumerIncomingEdgeSelection::CallerCompleted { caller_cut, .. } => {
+                Ok(caller_cut)
             }
+            RequiredConsumerIncomingEdgeSelection::SelfDefining { .. } => Err(planner_error(
+                "a static-response boundary cannot carry a self-defining edge",
+            )),
         }
     }
 

@@ -4262,11 +4262,11 @@ impl<'a> Lowering<'a> {
             EliminatorRole::StaticResponseReturn { receipt } => {
                 if receipt.boundary.owner().selected_caller() != &receipt.selected_caller
                     || receipt.boundary.response().k_identity() != &receipt.selected_caller
-                    || receipt.boundary.caller_cut().selecting_call() != &receipt.selected_caller
+                    || receipt.boundary.caller_cut()?.selecting_call() != &receipt.selected_caller
                     || match &receipt.emission_transport {
                         Some(transport) => {
                             transport.source_call_identity() != &receipt.selected_caller
-                                || receipt.boundary.caller_cut().caller_transport() != transport
+                                || receipt.boundary.caller_cut()?.caller_transport() != transport
                                 || !self
                                     .function_local
                                     .checked_ih_transport_emissions
@@ -9182,7 +9182,7 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .checked_ih_static_response_return_boundary(&identity)?;
         let answer = if let Some(boundary) = static_response_return_boundary {
-            if boundary.caller_cut().caller_transport() != transport || post_call_consumer.is_some()
+            if boundary.caller_cut()?.caller_transport() != transport || post_call_consumer.is_some()
             {
                 return Err(unsupported(
                     "CheckedIhStaticResponseReturnBoundary",
