@@ -1,6 +1,6 @@
 ---
 id: RT-DISCHARGE-EXCLUDE-OR-REFUSE-BACKSTOP
-title: "The discharge path can neither exclude nor refuse: authority_grounds filters the disagreeing authority out of the evidence set, then :3424 clears grounds and breaks, collapsing 'I could not prove this' into 'I proved there is nothing here'. The arc's own contract forbids exactly that. It may NOT land without a witness that makes the check fire -- until then it is a documented invariant, not a check."
+title: "The discharge path DETECTS a foreign producer identity and then silently discards the proof instead of refusing: the loop over proof.sources clears grounds and breaks at four sites, and an empty grounds falls through to `continue`, collapsing 'I could not prove this' into 'there is nothing here'. The arc's own contract forbids exactly that. It may NOT land without a witness that makes the check fire -- until then it is a documented invariant, not a check."
 status: draft
 owner: runtime
 size: M
@@ -9,7 +9,7 @@ tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Ruled out of the ABI-S6 D5b candidate by the Architect at evt_2ctrn25j8fe39 (2026-09-15) after runtime-implementer measured the repair inert on px8f (evt_6zww772af95c4). The Architect had ruled it the floor and riding the candidate at evt_2ptnm0dyjx4kw; the warrant was that it repairs the failure there, and that was refuted by measurement. Steward-filed per COORDINATION section 2."
+origin: "Ruled out of the ABI-S6 D5b candidate by the Architect at evt_2ctrn25j8fe39 (2026-09-15) after runtime-implementer measured the repair inert on px8f (evt_6zww772af95c4). The Architect had ruled it the floor and riding the candidate at evt_2ptnm0dyjx4kw; the warrant was that it repairs the failure there, and that was refuted by measurement. Steward-filed per COORDINATION section 2. AMENDED 2026-09-15 after the Architect reported two coordinate/AC defects (evt_7wsf1z27e679a) and the Steward's verification of them found a third, which refutes the mechanism the first filing asserted."
 ---
 
 > # FILED 2026-09-15 AS `draft`, DELIBERATELY NOT RELEASED.
@@ -23,29 +23,100 @@ origin: "Ruled out of the ABI-S6 D5b candidate by the Architect at evt_2ctrn25j8
 > wearing a repair's clothes, and it should be sized as one if that is what it
 > turns out to be.
 
+## READ THIS BEFORE ANY COORDINATE BELOW: THE SITES ARE CANDIDATE-ONLY
+
+**Every `units.rs` and `mod.rs` coordinate in this node is at
+`b0a7c2945`, the unlanded D5b candidate. NONE of them exist on `main`.**
+Measured at `origin/main` = `80e39a64a` (and unchanged at `9f9010dcb`):
+
+| probe | `origin/main` | `b0a7c2945` |
+|---|---|---|
+| `authority_grounds` in `lowering/units.rs` | **0 hits** | `:3377` |
+| `grounds.clear` in `lowering/units.rs` | **0 hits** | 4 hits |
+| `lowering/units.rs` length | 8445 lines | 12623 lines |
+| the contract doc-comment | **absent** | `lowering/mod.rs:1318` |
+
+**The bare line numbers resolve on `main` to real, unrelated, error-free code**
+— `:3377` and `:3424` are both `#[cfg(...)]` attributes on
+`px8-ds-test-support`. There is no signal to a reader that they are in the
+wrong tree; implausibility of the answer is the only detector, and these
+answers are perfectly plausible.
+
+This matters more here than in the case that taught the fleet the lesson,
+because **this node is `draft` and will outlive the candidate.** (c) has been
+ruled out of D5b, the candidate is respinning, and nothing guarantees these
+sites ever reach `main` at these offsets — or at all, in this shape.
+
+⇒ **Lead with the symbol name; the number never travels without its anchor.**
+Whoever discharges this re-measures the coordinates at the tip they are working
+on. Do not trust a number in this file against a tree that is not
+`b0a7c2945`.
+
 ## The defect, which survives the withdrawal
 
-Two sites, both true of the code independently of any particular program:
+True of the code independently of any particular program. All coordinates at
+`b0a7c2945`, `crates/ken-runtime/src/cranelift_backend/lowering/units.rs`.
 
-- `authority_grounds` (`units.rs:3377`) filters foreign authorities out with
-  `.filter(|(_, a)| a.identity == identity)` **before** the discharge loop runs.
-  The disagreement is removed from the evidence set.
-- `units.rs:3424` then responds to exhaustion with `grounds.clear(); break;` —
-  a **proof-search outcome consumed as an emission decision**, with nothing
-  connecting the two.
+**The filter.** `authority_grounds` (`:3377`) is built from `body.authorities`
+keeping only `authority.identity == identity`, so foreign-identity producers
+are absent from it.
 
-Together they collapse two different facts: *"I could not prove this"* and
-*"I proved there is nothing here."* The absence manufactured by the filter is
-read as agreement. The site must distinguish three outcomes, not two:
+**The loop.** Over `proof.sources` (`:3422` onward), each source reaches one of
+**four** `grounds.clear(); break;` sites — `:3425`, `:3429`, `:3437`, `:3445`.
+They are not one site and they do not have one cause:
+
+    :3425   authority.identity != identity || authority.word != *source
+            -- the foreign identity, read from the UNFILTERED body.authorities
+    :3429   authority_grounds.get(source) returned None
+    :3437   value_def of a proof-call seed is not a Result
+    :3445   source is neither an authority nor a proof-call seed
+
+**Then the drop.** After the loop, `if grounds.is_empty() { continue; }` — the
+tag query yields no carrier fact and the next one is tried.
+
+Together these collapse two different facts: *"I could not prove this"* and
+*"I proved there is nothing here."* The site must distinguish three outcomes,
+not two:
 
     identities agree                        -> emit
     path certifiably excluded (a real cut)  -> emit without that path
     NEITHER                                 -> REFUSE
 
-Today the third collapses into the first. **That is a fail-open**, and it is
-the defect whichever identity turns out to be authoritative.
+**That is a fail-open**, and it is the defect whichever identity turns out to
+be authoritative.
 
-The arc's own contract, `lowering/mod.rs:1314-1318`, already forbids it:
+## THE MECHANISM THIS NODE FIRST ASSERTED IS REFUTED. The defect is worse.
+
+The original filing said the filter *removes the disagreement from the evidence
+set*, and that the site then *responds to exhaustion* by clearing. **Measured at
+`b0a7c2945`, that is not what happens, and the correction cuts toward severity
+rather than away from it.**
+
+`:3424` tests `authority.identity != identity` against **`body.authorities`,
+the unfiltered map.** The foreign identity is therefore *detected, explicitly,
+at the site*. The clear-and-break at `:3425` is a deliberate response to having
+found the disagreement — not blindness manufactured upstream by the filter.
+
+⇒ **The site knows, and discards anyway.** Detection followed by silent discard
+is a strictly worse defect than the blindness first described, and it removes
+the most sympathetic reading of the code.
+
+A consequence worth stating plainly: because `:3425` is reached only when the
+identity matched is *false*, and `:3429` is reached only after `:3424` found
+the identity matching, **the filter's deletion cannot be what drives `:3429`** —
+an identity-matching source is in `authority_grounds` by construction. The
+filter looks load-bearing from the outside and, on this path, is not.
+
+**What this does NOT establish, and the discharging seat must not inherit it:**
+what the compiler does downstream with the missing carrier fact. `continue`
+skips the tag query; whether the unit then emits without the fact, or a later
+stage refuses, is **unmeasured here**. The fail-open claim above rests on the
+contract, not on a traced emission. Trace it before repairing it.
+
+## The contract it violates
+
+`lowering/mod.rs:1318` **at `b0a7c2945`** (absent from `main`), on
+`generated_constructor_authorities`:
 
 > These record the identity the producer actually emitted, including an
 > identity different from a generated function's demanded Result. The latter is
@@ -112,15 +183,53 @@ where it was correctly applied already.
 - **AC-1 (the witness, and it gates everything else).** The check is
   demonstrated **firing** on a real input — refusal observed, message shown.
   A run in which it does not fire is not evidence it works.
-- **AC-2 (both directions).** On an input where the identities agree, it does
-  **not** fire. Show both, from real compiles.
-- **AC-3.** The three outcomes are distinguished at the site, and the
+- **AC-2 (agree, does not fire).** On an input where the identities agree, it
+  does **not** fire. Show it, from a real compile.
+- **AC-3 (THE MIDDLE ARM — a foreign identity that IS legitimately cut).** An
+  input carrying a foreign producer identity **whose path is certifiably
+  excluded**, on which the check does **not** fire. This is a third input,
+  distinct from AC-2's: AC-2's program has no foreign identity at all and
+  therefore cannot reach the exclusion path.
+
+  **This AC exists to see the over-refusal direction, which AC-1 and AC-2
+  cannot see between them.** An implementation that refuses whenever it meets a
+  foreign authority satisfies both of them perfectly and breaks every
+  legitimately-cut program. The machinery is real rather than hypothetical:
+  `CertifiedInfeasibleEdge` is constructed at `units.rs:3577` and consulted at
+  `:3049` and `:3074` (all at `b0a7c2945`), so the arm has code behind it and
+  can be wrong.
+
+  **Discharging this by showing the arm is UNREACHABLE is an acceptable and
+  valuable result**, not a cop-out — a dead branch in the contract's
+  disjunction is worth knowing and simplifies the site to two outcomes. If that
+  is the finding, record *why*, with the measurement. What is **not** acceptable
+  is the arm living only in AC-4's prose: a mechanism claim in a comment is
+  structurally exempt from execution, and an unexercised third arm is the
+  unfalsifiable guard this node exists to prevent, one level in.
+
+  (Architect, `evt_7wsf1z27e679a`. Whether such a program is constructible is
+  open, and is the same search as D0's — this may cost nothing beyond an AC
+  recording that.)
+- **AC-4.** The three outcomes are distinguished at the site, and the
   distinction is stated in prose there — a reader who meets `grounds.clear()`
-  later must find the reason it is no longer sufficient.
-- **AC-4.** `authority_grounds`'s filter no longer deletes the evidence the
-  refusal depends on, or the refusal is taken before the filter. Say which.
-- **AC-5.** No regression, green in CI (never a local `--workspace` run;
+  later must find the reason it is no longer sufficient. **All four
+  clear-and-break sites are in scope**; state which of them the repair changes
+  and which it deliberately leaves, with the reason.
+- **AC-5.** State what drives the discard on each path actually repaired.
+  The first filing named the `authority_grounds` filter and that was measured
+  wrong for `:3425`; do not re-inherit it. If the filter turns out to delete
+  evidence some *other* path depends on, show that path.
+- **AC-6.** No regression, green in CI (never a local `--workspace` run;
   COORDINATION §12).
+
+## Open, and routed to the Architect rather than ruled here
+
+The mechanism correction above changes what a repair is aimed at. **AC-5
+replaces the original AC-4**, which asked that the filter stop deleting
+evidence the refusal depends on — a deliverable pointed at a site the
+measurement says is not the driver on this path. Whether the filter is
+nonetheless worth repairing on its own terms is the Architect's call, not the
+Steward's, and this node does not presume it.
 
 ## Contention
 
