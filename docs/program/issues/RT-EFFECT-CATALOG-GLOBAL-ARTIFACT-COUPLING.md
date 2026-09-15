@@ -1,7 +1,7 @@
 ---
 id: RT-EFFECT-CATALOG-GLOBAL-ARTIFACT-COUPLING
-title: "Any edit to effect_abi_v1.catalog silently breaks six landed object_linker_packaging tests -- including a pure demotion on a green tree with no promotion anywhere. Packaging succeeds, every hash and binding check passes, and the linked executable then exits 1 with empty stdout AND empty stderr. main is green only because nothing has edited that file in a long time."
-status: ready
+title: "WITHDRAWN -- FILED ON A FALSE PREMISE. There is no global catalog coupling. The six failures were a stale libken_runtime.a linked by the test harness; the premise is retracted and the real defect is refiled as RT-TEST-HARNESS-STATICLIB-CURRENCY."
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -12,12 +12,65 @@ github: null
 origin: "Measured by runtime-implementer at evt_1d76d3fz7c4v6 (2026-09-15) while diagnosing the ABI-S6 D5b arc's red. Surfaced as an arc finding, established as a main finding by a four-experiment differential. Steward-filed per COORDINATION section 2 and routed out of the D5b repair candidate deliberately -- see 'Why this is not part of the D5b candidate'."
 ---
 
-> # FILED 2026-09-15 BY THE STEWARD. STARTABLE NOW, STANDALONE REPRODUCER.
+> # WITHDRAWN 2026-09-15, SAME DAY IT WAS FILED. THE PREMISE IS FALSE.
 >
-> **This is a `main` defect, not an arc defect.** It reproduces on the green
-> base tree with none of the ABI-S6 D5b arc present, so the frame below never
-> asks anyone to build 24 commits first. One file edit on a clean checkout
-> reproduces it.
+> **There is no global catalog coupling. `main` was never at risk.** Everything
+> below the retraction is preserved as written so the reasoning can be audited;
+> **do not act on any of it.** The real defect is refiled as
+> `RT-TEST-HARNESS-STATICLIB-CURRENCY`.
+>
+> ## What was actually happening
+>
+> `object_linker_packaging`'s link step resolves its archive by scanning
+> `target/` for the **newest `libken_runtime*.a` on disk**. It never asks cargo
+> to build one, and `cargo test -p ken-runtime --lib` builds the rlib and the
+> test binary — **not the staticlib**. So every run linked a stale archive:
+>
+>     target/debug/libken_runtime.a          Sep 14 21:05
+>     crates/ken-host/effect_abi_v1.catalog  Sep 15 01:29
+>
+> The C starter bakes `ken_host::HOST_EFFECT_ABI_V1_HASH` at packaging time from
+> the freshly compiled constant; the stale archive carries the hash from whenever
+> it was last built. `ken_host_invocation_v1_init` compares them, mismatches, and
+> the starter returns 1 with nothing on either stream. **That is the silent exit
+> 1 — a build-freshness artifact, not a coupling.**
+>
+> Single-variable proof, same test binary, only the archive rebuilt:
+>
+>     before   libken_runtime.a Sep 14 21:05   1015 passed,  6 failed
+>     after    libken_runtime.a Sep 15 01:45   1021 passed,  0 failed
+>
+> ## Why the four-experiment differential was convincing and wrong
+>
+> With the catalog unedited, the stale archive's baked hash still matched, so
+> nothing fired. **Any** edit desynchronized them — producing a perfect
+> correlation with catalog edits and none with anything else.
+>
+> **Experiment 4 was the strongest-looking evidence and the least sound.** It
+> checked out the green base and applied a pure demotion, which **varies the tree
+> while holding the true cause fixed** — a checkout does not rebuild
+> `libken_runtime.a`, and the resolver simply takes the newest file present. A
+> differential that holds the real variable constant yields a *perfect*
+> correlation with whatever is being varied. The strength of the correlation was
+> the evidence of the flaw, and it was read as the evidence of the finding.
+>
+> ## Claims withdrawn, explicitly
+>
+> - "`main` is green only because nothing has edited `effect_abi_v1.catalog` in a
+>   long time." **False.** `main` is fine.
+> - "Any seat that touches that file reds six landed tests with no diagnostic
+>   output." **False.** Only a seat that then runs the `ken-runtime` lib suite
+>   *without* materializing a current staticlib. CI never does — the shard and
+>   px8f jobs run `cargo build --workspace --locked` first.
+> - "A landmine for whoever next does ordinary ABI work." **Not in that form.**
+>
+> The last three were the **Steward's** widening of the implementer's measured
+> claim, not the implementer's own. The measurement was "six rows fail when the
+> catalog is edited"; the fleet-wide framing was added when this node was written
+> and when the finding was briefed.
+>
+> Retracted by runtime-implementer at `evt_2jj57aq790r9e`, unprompted, while the
+> node was already landed and already in an operator briefing.
 >
 > **Lane 1.** It is on the D5b arc's critical path — D5b's deliverable IS a
 > catalog edit, and every catalog edit trips this — but the defect predates the
