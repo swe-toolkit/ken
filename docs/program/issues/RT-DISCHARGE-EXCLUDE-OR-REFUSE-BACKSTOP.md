@@ -260,14 +260,37 @@ node with it still standing.
 
 **1. D0's first conjunct admits benign instances.** The predicate is *a proof
 source carrying a foreign producer identity*, evaluated at `:3424` against
-`body.authorities`. That map ranges over **every carried constructor**, not over
-generated-context ones — measured at `core.rs:14363`, which has no
-generated-context gate between its entry and the registrar
+`body.authorities`. **That map is NOT restricted to generated-context
+constructors** — measured at `core.rs:14363`, which has no generated-context
+gate between its entry and the registrar
 (`RT-AUTHORITY-CONTRACT-MISDESCRIBES-ITS-POPULATION`). So an ordinary user
 constructor whose identity simply is not the demanded one satisfies D0's first
 conjunct. **A non-empty witness search is therefore as misreadable as an empty
 one**, and for the mirror-image reason: the predicate no longer separates a
 generated-context anomaly from an ordinary non-demanded constructor.
+
+**The population stated exactly** (Architect, `evt_2k1de0ch6d7qa`, both sites
+measured at `b0a7c2945`) — *every carried constructor reaching the registrar
+through `transfer_constructor_operands`*, **minus** the `exit_failure` case
+carrying a single `Carried` argument, which returns early, **plus** the
+synthesized-identity constructors from `calls.rs:1895`, whose writer is gated on
+`Lowered::Constructor { synthesized_identity: Some(..) }` and so contributes
+only a subset.
+
+**Do not carry "every carried constructor" forward into a criterion.** The
+argument needs only that the population is not restricted to generated-context
+constructors and that ordinary user constructors are in it, which is what was
+measured and what defeats D0's first conjunct as a discriminator. The universal
+is false at a measured site — `exit_failure` returns before the registrar — so
+once this section is dissolved into D0 and the ACs, it becomes a falsifiable
+overclaim: a reader checks it, finds the early return, and concludes the premise
+is broken when the argument never rested on the universal. **The weaker
+statement is both true and sufficient.**
+
+**This item was an instance of the defect item 4 names**, two items below, and
+the section did not apply its own corrective principle to itself. Recorded
+rather than silently fixed, because a section written to be dissolved rather
+than read is exactly where that goes unnoticed.
 
 **2. D0 must name the empty-search outcome IN ADVANCE.** "Search the corpus
 first" has no stated disposition for finding nothing. Without one, an empty
