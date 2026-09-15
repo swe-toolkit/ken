@@ -3920,6 +3920,13 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // identity. Registered here the moment the module exists, for the same
     // reason as every sibling: a production module absent from this roster
     // is invisible to every pin that iterates it.
+    // `ABI-S6` `D5b` — the immediate-bridge realization plane. A production
+    // source absent from this roster is invisible to every pin that iterates
+    // it, which is exactly what happened to it through fourteen commits.
+    (
+        "planning/static_transition/immediate_bridge.rs",
+        include_str!("../../../planning/static_transition/immediate_bridge.rs"),
+    ),
     (
         "planning/static_transition/joins_traps.rs",
         include_str!("../../../planning/static_transition/joins_traps.rs"),
@@ -4256,6 +4263,12 @@ fn the_backend_production_surface_inventory_is_closed() {
             // `EffectSeatVisitMutation`, `EffectSeatDispatchMutation`) stays
             // in `lowering/mod.rs` for item 16.
             ("planning/static_transition.rs", "effects"),
+            // `ABI-S6` `D5b` — the immediate-bridge realization plane, added by
+            // `7d35118da`. Registered here the moment the module exists, for the
+            // same reason as every sibling: a production module absent from this
+            // roster is invisible to every pin that iterates it, which is how it
+            // went unregistered through fourteen commits.
+            ("planning/static_transition.rs", "immediate_bridge"),
             // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — join disposition (which
             // representation a source join's result takes) and trap
             // identity (a value-keyed dedup catalog), factored into its own
@@ -4273,6 +4286,10 @@ fn the_backend_production_surface_inventory_is_closed() {
             // the StaticTransitionPlan projections that derive it, factored into
             // their own domain module.
             ("planning/static_transition.rs", "units"),
+            // `ABI-S6` `D5b` — the required-consumer destination vocabulary, an
+            // inline child module declared by aggregates.rs, which the roster
+            // scans after static_transition.rs.
+            ("planning/static_transition/aggregates.rs", "required_consumer_destination"),
             // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion
             // identity plane, a child of continuations (declared by
             // continuations.rs, which the roster scans after static_transition.rs).
