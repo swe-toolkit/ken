@@ -223,22 +223,28 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
     POPULATION   12 arm-1 hand-offs. Two published words, v1751 and v1386,
                  always at funcid58/funcid59, every table EMPTY.
                  4 demanded identities, 3 programs.
-    PARTITION    RAN. 12 arm-1 hand-offs = 7 ROOTS + 5 DOWNSTREAM. A repair
-                 lands at a ROOT; a downstream pair closes when its root does.
-                 => THE REPAIR COUNT IS 7, NOT 12. Twelve was a count of
-                 SYMPTOMS. SUPERSEDES "one shape repeated".
+    PARTITION    RAN, AND ITS NUMBER IS PROVISIONAL. 12 arm-1 hand-offs =
+                 7 ROOTS + 5 DOWNSTREAM, on the GROUNDING graph. A repair lands
+                 at a ROOT; a downstream pair closes when its root does. That
+                 twelve was a count of SYMPTOMS still holds and SUPERSEDES "one
+                 shape repeated" -- but 7 IS NOT YET A COUNT OF REPAIRS.
+                 DO NOT ACT ON 7 until GATE-BLOCK/GATE-NOPUB land: the join
+                 used the WRONG EDGE SET. See the two-graph block below.
                  ROOT/DOWNSTREAM IS A PROPERTY OF A (refusal, identity) PAIR,
                  NEVER OF A funcid -- funcid59 is downstream in 4 refusals and
                  a ROOT in 1. Every count here is a count of PAIRS.
                  Architect evt_9bz296v5099j, evt_18mtk5rr061nk.
-    SIZE         HELD AT M, and now held on EVIDENCE rather than carried. The
-                 repair count fell 12 -> 7, which argues down; the boundary
-                 below can take it lower still, and re-sizing twice on a fork
-                 that is still running is the guess this node exists to avoid.
-                 TRIGGER TO REVISIT: the boundary pass. If the downstream-of-
-                 EXCLUDED pairs are ruled correct propagations and the root
-                 count falls below ~5, re-cut to S. Steward decision; the
-                 Architect declined to rule size (evt_18mtk5rr061nk).
+    SIZE         HELD AT M. The 12 -> 7 fall argued down, but 7 is PROVISIONAL
+                 (wrong edge set), so the evidence that moved it has itself
+                 moved -- which STRENGTHENS holding rather than weakening it.
+                 Re-sizing on a number now known to be measured over the wrong
+                 graph is exactly the guess this node exists to avoid.
+                 TRIGGER TO REVISIT, unchanged in shape and now gated on the
+                 GATING-graph count: when GATE-BLOCK/GATE-NOPUB land, if the
+                 downstream-of-EXCLUDED pairs are ruled correct propagations
+                 and the root count settles below ~5, re-cut to S.
+                 Steward decision; the Architect declined to rule size
+                 (evt_18mtk5rr061nk).
     BOUNDARY     AT LEAST ONE OF THE 12 IS DOWNSTREAM OF AN EXCLUDED ARM-2
                  ENTRY. funcid59 is in scope; its callee funcid60 is in the
                  EXCLUDED arm-2 population. D1 MUST DISPOSITION THAT BOUNDARY
@@ -494,14 +500,53 @@ that callee is itself in `missing`.
 > those 5 rows**, and a stable wrong answer is more dangerous than a flickering
 > one. Every count in this section is a count of PAIRS.
 
-**THE PARTITION RAN. THE REPAIR COUNT IS 7, NOT 12.**
+> ### THE 7 IS PROVISIONAL — THE JOIN USED THE WRONG EDGE SET.
+>
+> **There are TWO graphs over the same bodies, and the partition asked the
+> wrong one.** Verified at source:
+>
+>     GROUNDING graph   the ELEVENTH field -- the callee at the PUBLISHED WORD.
+>                       Answers "what would ground this value". The join ran here.
+>     GATING graph      ALL of `body.call_obligations`, looped at :4420 and gated
+>                       at :4467 `if !all_calls_finished { continue; }` -- with the
+>                       two failure edges at :4427 (realization) and :4440
+>                       (identity/certificate). Answers "WHAT BLOCKS THIS ENTRY"
+>                       and therefore "WHERE DOES A REPAIR LAND".
+>
+> **`:4467` sits BEFORE the arm split at `:4474`**, so gating is decided over
+> every obligation a body carries, not just the one at its published word.
+>
+> ⇒ **A body can be ROOT on the grounding graph and DOWNSTREAM on the gating
+> graph — same body, same refusal, opposite classification.** `funcid60` is the
+> live candidate: it carries an identity-bearing obligation on `funcid58`, itself
+> a census member.
+>
+> **This is the PAIR RULE one level up.** That rule fixed the KEY (a
+> `(refusal, identity)` pair, not a funcid). This fixes the EDGE SET. A
+> classification is only as well-defined as the graph it is taken over, and
+> naming the key correctly does not save you from asking the wrong graph.
+>
+> **DO NOT ACT ON 7.** It is not yet a count of repairs. `GATE-BLOCK` /
+> `GATE-NOPUB` decide it. Architect `evt_3xn88cqhg1msp`, line numbers corrected
+> to `:4467`/`:4427`/`:4440` and verified at source here.
+>
+> **AND IT MAY INVERT THE BOUNDARY ENTIRELY.** If this measures out, the
+> EXCLUDED arm-2 entries may be **downstream of D1's own arm-1 population**
+> rather than independent "gate working" evidence — which would reverse the
+> direction of the boundary question below. NOT RULED; waiting on the numbers.
+
+**THE PARTITION RAN, ON THE GROUNDING GRAPH: 7 ROOTS + 5 DOWNSTREAM.**
 
     12 arm-1 hand-offs   ->   7 ROOTS  +  5 DOWNSTREAM
     plus 5 arm-2 roots (funcid60), which remain EXCLUDED
 
-⇒ **A repair lands at a root; a downstream pair closes when its root does.
-Twelve was a count of SYMPTOMS and seven is a count of REPAIRS** — the first
-hard number this population has had. Architect ruling `evt_18mtk5rr061nk`.
+⇒ **A repair lands at a root; a downstream pair closes when its root does. That
+twelve was a count of SYMPTOMS stands.** Architect ruling `evt_18mtk5rr061nk`.
+
+**BUT SEVEN IS NOT YET A COUNT OF REPAIRS**, because this join ran over the
+GROUNDING graph and "where does a repair land" is a question about the GATING
+graph — see the block above. It was published as the first hard number this
+population had; it is the first *approximate* one.
 
 **THE 5 DOWNSTREAM PAIRS ARE NOT REPAIRS; THEY ARE CONSEQUENCES**, and at least
 one is a consequence of an entry this node EXCLUDES — which is the boundary
