@@ -223,6 +223,28 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
     POPULATION   12 arm-1 hand-offs. Two published words, v1751 and v1386,
                  always at funcid58/funcid59, every table EMPTY.
                  4 demanded identities, 3 programs.
+    PARTITION    RAN. 12 arm-1 hand-offs = 7 ROOTS + 5 DOWNSTREAM. A repair
+                 lands at a ROOT; a downstream pair closes when its root does.
+                 => THE REPAIR COUNT IS 7, NOT 12. Twelve was a count of
+                 SYMPTOMS. SUPERSEDES "one shape repeated".
+                 ROOT/DOWNSTREAM IS A PROPERTY OF A (refusal, identity) PAIR,
+                 NEVER OF A funcid -- funcid59 is downstream in 4 refusals and
+                 a ROOT in 1. Every count here is a count of PAIRS.
+                 Architect evt_9bz296v5099j, evt_18mtk5rr061nk.
+    SIZE         HELD AT M, and now held on EVIDENCE rather than carried. The
+                 repair count fell 12 -> 7, which argues down; the boundary
+                 below can take it lower still, and re-sizing twice on a fork
+                 that is still running is the guess this node exists to avoid.
+                 TRIGGER TO REVISIT: the boundary pass. If the downstream-of-
+                 EXCLUDED pairs are ruled correct propagations and the root
+                 count falls below ~5, re-cut to S. Steward decision; the
+                 Architect declined to rule size (evt_18mtk5rr061nk).
+    BOUNDARY     AT LEAST ONE OF THE 12 IS DOWNSTREAM OF AN EXCLUDED ARM-2
+                 ENTRY. funcid59 is in scope; its callee funcid60 is in the
+                 EXCLUDED arm-2 population. D1 MUST DISPOSITION THAT BOUNDARY
+                 BEFORE REPAIRING ANY DOWNSTREAM ENTRY. Population NOT resized
+                 on this -- the remaining ten are still running.
+                 Architect evt_4s7beb7qyrhqz.
     REPAIR       PRODUCE constructor authority.
                  NOT re-keying: there is nothing to re-key, the tables are empty.
     SITE         the RESPONSE STAGING PATH at :6971 -- NOT the two published
@@ -314,7 +336,7 @@ is retired by this one, not merged with it.
 > route; do not scope at the emptiness of that cell.** Architect
 > `evt_7r7snh6bhm8vy`.
 
-### D1'S FIRST DESIGN QUESTION: PRODUCE vs PROVE. THE FORK HAS THREE ARMS.
+### D1'S FIRST DESIGN QUESTION: PRODUCE vs PROVE. THE FORK HAS FOUR ARMS.
 
 **Architect `evt_gjy1ed88b7nh`, adding an arm to its own ruling.** "Production,
 not re-keying" stands as against re-keying — the tables are empty — but it was a
@@ -334,21 +356,252 @@ elsewhere. **Arm 2 therefore discharges bodies holding no authority at the
 published word.** Arm 1 does none of it: its whole condition is
 `realized_call_words.contains(&publication.returned_word)`, a set membership.
 
-> **HAVING NO AUTHORITY AT THE PUBLISHED WORD IS NOT SUFFICIENT TO CAUSE A
-> REFUSAL.** `funcid60` is `Context`, 593 authorities, `None` at `v26`, and it
-> **closes** — the existing instance of a body discharging with no authority at
-> its published word. Two `Continuation` bodies (`funcid56`, `funcid57`) have
-> the same property and also closed.
+> ### RETRACTED — THIS BLOCK CARRIED A FALSE CLAIM AND IT WAS LOAD-BEARING.
+>
+> The retracted text asserted: *"Having no authority at the published word is
+> not sufficient to cause a refusal"*, offering `funcid60` as a body that
+> **closes** with `None` at `v26`, and `funcid56`/`funcid57` as two more.
+> Architect-authored (`evt_gjy1ed88b7nh`), Steward-carried, retracted at
+> `evt_9bz296v5099j`. **All three instances fail, and the first is refuted by
+> the census printed beside it.**
+>
+> **A CENSUS ENTRY IS, BY CONSTRUCTION, A BODY THAT DID NOT CLOSE.** Verified at
+> source, `units.rs:4555-4567` and `:4586-4589`:
+>
+>     missing  = required.iter().filter(|(target, identity)|
+>                    !finished.iter().any(|c| c.unit == target_unit
+>                        && c.target == *target && c.identity == *identity))
+>     details  = missing.iter().filter_map(...)   <- the census IS built from missing
+>
+> Every element of `missing` is a `(target, identity)` pair for which **no
+> finished certificate exists**. `funcid60` is a census entry — the fifth arm-2
+> tuple, identity `{4362, 37}` — so `funcid60` did **not** close. D0's twelfth
+> field says so independently: finished certificates for `funcid60` are `[]`.
+>
+> **`funcid56`/`funcid57` FAIL FOR A DIFFERENT REASON, AND IT IS THE SHARPER
+> ONE.** The inference was *"no `Continuation` body appears in `missing`,
+> therefore they closed."* But **`missing` is FILTERED FROM `required`**, so:
+>
+>     absent from `missing`  =  CLOSED  or  NEVER DEMANDED
+>     which one              =  UNMEASURED
+>
+> A body never demanded is never in `required`, therefore never in `missing`,
+> and **never had to close**. That is zero-executions-versus-never-called.
+>
+> ⇒ **One instance refuted, two undetermined: the claim has no support and is
+> withdrawn.** It is recorded rather than deleted so the next reader does not
+> re-derive it.
 
-⇒ **PROVE may dominate.** This node's founding defect is that arm 1 substitutes
-a PLANNED identity plus realization for an OBSERVED one. The remedy for that is
-to establish the observed identity, and `prove_forwarded_value` is the existing,
-already-trusted machinery that does exactly that — whereas producing an authority
-at two words is the narrowest patch that happens to satisfy the closure. **The
-repair may have been specified at the width of the closure rather than at the
-width of the defect** (the Architect's own words). The sharper question D1
-answers first: **is arm 1's weaker discharge condition the defect, rather than
-absent production?**
+**WHAT DOES NOT FALL WITH THE RETRACTION — do not over-retract.** The PROVE
+refutation below is measured **directly** and never rested on the withdrawn
+claim. The route/shape mechanism and `funcid60`'s eleventh field both stand.
+
+⇒ **PROVE AS STATED IS REFUTED, BY MEASUREMENT, AND THE FORK IS NOW FOUR.** D0
+wired arm 1 to `prove_forwarded_value` and reported the result rather than
+arguing from the signature: `valid = FALSE`, `grounded = FALSE`, for both
+`Response` bodies.
+
+    PRODUCE   make authority exist at v1751/v1386   <- what was ruled
+    RE-KEY    move authority that already exists    <- refuted, tables empty
+    PROVE     route Response through prove_forwarded_value
+                                                    <- REFUTED, measured
+    SEED      make `obligation.identity` be `Some` for the call whose result IS
+              the published word, so the EXISTING certificate -> call_seeds path
+              grounds it at `:3145`. No new machinery anywhere.
+
+**THE CAUSE IS THE ABSENT SEED, AND THE REFUSING ARM IS DOWNSTREAM OF IT.** The
+three direct grounding conditions sit at `:3139-3145`, **before** the
+`value_def` match; the `ValueDef::Result` arm returning `ForwardingProof::
+default()` is at **`:3234`**. Both `Response` bodies carry
+`obligation.identity = None` at the published word, so no call seed exists,
+`:3145` cannot fire, and the walk reaches `:3234` only afterwards. **Refusing
+`ValueDef::Result` is CORRECT and must not be repaired** — an instruction result
+is an ORIGIN, not forwarded from anywhere, so a forwarding proof declining to
+invent its provenance is the function working. Teaching the walk to handle it
+would be this node's own defect one level down: a plan standing in for an
+observation.
+
+**SEED IS THE ARM TO BEAT, AND IT CANNOT FAKE A DISCHARGE.** `call_seeds` is
+populated from `certificate.identity`, and a certificate comes from `finished` —
+a body that has **already discharged its own Result contract**. So a call seed
+is an OBSERVED identity, not a planned one, which answers this node's founding
+defect in its own terms. If no finished certificate matches,
+`all_calls_finished` goes false and the body **waits** rather than closing: the
+failure mode is a stall, not a false proof. PRODUCE has no such interlock.
+
+**SEED'S SUFFICIENCY IS NOT A PROPERTY OF A BODY, AND THE `[]` MEASUREMENT
+CANNOT SETTLE IT FOR A ROOT.** D0 measured `[]` finished certificates for both
+callees — but measured them in a tree where SEED had **not** been applied, and
+seeding changes which bodies are demanded at all (see SEED CREATES THE DEMAND IT
+NEEDS, below). The cases split by ROLE IN A GIVEN REFUSAL, never by funcid:
+
+    DOWNSTREAM pair   the callee is itself in THIS refusal's `missing` set, and
+                      `missing` filters `required` at :4555, so that callee is
+                      ALREADY DEMANDED and has ALREADY FAILED. Seeding makes the
+                      entry wait on a demonstrated failure. SEED does NOT
+                      close it.
+    ROOT pair         the callee is NOT in this refusal's `missing`. Whether SEED
+                      closes it is UNMEASURED: if the callee is not yet in
+                      `required`, seeding CREATES that demand and the callee may
+                      then certify. The pre-seed `[]` does not predict the
+                      post-seed state.
+
+⇒ **Do not read `[]` as evidence that SEED is insufficient.** For a downstream
+pair it is exactly that; for a root pair it is a measurement of a world that
+seeding would change. The open question **"is the callee in `required` at
+all?"** decides the root case.
+
+> **`[]` MEANS TWO DIFFERENT THINGS IN THE TWO ROWS, AND ONE NUMBER WAS REPORTED
+> FOR BOTH.** Pre-SEED, *"no certificate"* is ambiguous between **never asked**
+> and **asked and refused** — and SEED is exactly the change that resolves it,
+> so a pre-SEED measurement cannot bound a post-SEED behaviour on the root half.
+> **This is the same shape as absent-from-`missing` = CLOSED ∪ NEVER-DEMANDED,
+> reproduced one column over**, in the certificate field instead of the
+> membership field.
+
+### IT IS A GRAPH. WE HAVE BEEN READING IT AS A LIST.
+
+**Architect ruling `evt_9bz296v5099j`, and it supersedes "one shape repeated".**
+The refusal string has said this since the first filing: *"the finished
+generated-Result proof graph is **not closed**."*
+
+    funcid59   published word = Result(inst2064, 0), the result of a call to funcid60
+    funcid60   is ITSELF a census entry, failing on the SAME identity {4362, 37}
+    funcid58   PROVE-EVAL identity {4362, 37}
+    funcid59   PROVE-EVAL identity {4362, 37}
+
+⇒ **`funcid59` cannot be seeded by any repair made AT `funcid59`. Its callee
+never certifies**, and the thing SEED would make it wait for is **another member
+of the same failing population**.
+
+**WHY THIS CHANGES D1's SIZE AND NOT JUST ITS PROSE.** A fix applied at a
+downstream entry moves nothing while its root still fails, and a repair sized at
+12 when the roots number fewer is **sized at the wrong thing**. `size: M` was
+already carried rather than re-derived; this is the second open fork that could
+move it, and it is the one most likely to.
+
+**THE MEASUREMENT THAT PARTITIONS IT — a join on fields D0 already has.** For
+each of the 12: the callee at the published word (eleventh field), and whether
+that callee is itself in `missing`.
+
+    callee OUTSIDE the census   ->  ROOT
+    callee INSIDE the census    ->  DOWNSTREAM
+
+> **ROOT/DOWNSTREAM IS A PROPERTY OF A `(refusal, identity)` PAIR, NOT OF A
+> BODY.** `funcid59` is downstream in 4 refusals and a ROOT in 1 — the refusal
+> whose `missing` set is `{funcid58, funcid59}`, with no `funcid60` in it.
+> **Tabulating this per-funcid yields a stable-looking but wrong answer for 4 of
+> those 5 rows**, and a stable wrong answer is more dangerous than a flickering
+> one. Every count in this section is a count of PAIRS.
+
+**THE PARTITION RAN. THE REPAIR COUNT IS 7, NOT 12.**
+
+    12 arm-1 hand-offs   ->   7 ROOTS  +  5 DOWNSTREAM
+    plus 5 arm-2 roots (funcid60), which remain EXCLUDED
+
+⇒ **A repair lands at a root; a downstream pair closes when its root does.
+Twelve was a count of SYMPTOMS and seven is a count of REPAIRS** — the first
+hard number this population has had. Architect ruling `evt_18mtk5rr061nk`.
+
+**THE 5 DOWNSTREAM PAIRS ARE NOT REPAIRS; THEY ARE CONSEQUENCES**, and at least
+one is a consequence of an entry this node EXCLUDES — which is the boundary
+below, and it can take the count below 7 as well.
+
+> **"ROOT" MUST NOT QUIETLY BECOME "REPAIRABLE LOCALLY."** `funcid62 NOT IN
+> missing` inherits the exact ambiguity retracted above: **closed OR never
+> demanded.** The classification is sound either way — "root" asserts only that
+> the callee is not a census member — but the consequence is not:
+>
+>     funcid62 CLOSED for some identity  a certificate may already exist to ground on
+>     funcid62 NEVER DEMANDED            no certificate exists and none is coming;
+>                                        SEED at funcid58 must CREATE the demand
+>
+> One field settles it: **is `funcid62` in `required` at all?**
+
+**AND THE SECOND CASE IS SEED'S STRONGEST ARGUMENT, NOT A PROBLEM.** Verified at
+source, `:4300-4307`: the push to `required` is guarded by
+`let Some(identity) = obligation.identity else { continue; }`.
+
+⇒ **SUPPLYING `obligation.identity` AUTOMATICALLY ADDS `(callee, identity)` TO
+`required`. SEED CREATES THE DEMAND IT NEEDS.** Seeding `funcid58` does not
+merely let `funcid58` ground — it **obliges `funcid62` to certify**. And since
+`missing` filters `required`, a callee that fails to certify **enters the census
+as a new, more localized refusal**.
+
+> **SEED THEREFORE CANNOT SILENTLY SUCCEED.** Either the callee certifies and the
+> body closes on observed evidence, or the callee fails and the refusal gets
+> louder and better localized — **never a quiet green.** That is the fail-closed
+> direction this node exists to protect. **PRODUCE has no equivalent**: an
+> authority asserts an identity because something wrote it, and demands nothing
+> of anyone.
+
+**A JOIN HAZARD IS RECORDED AND MUST NOT BE RE-DERIVED.** D0's `SEED-DECL` print
+at the obligation creation site shows 116 call sites whose callee declares no
+contract and 4 that do, with `v1386` apparently among the four. **That table is
+NOT joinable to the census**: `SEED-DECL` does not carry the defining function,
+and Cranelift value numbering is **per-function**, so a bare `v1386` match across
+the two tables may name a different body's value. It is kept as DO-NOT-USE
+rather than deleted, because a deleted hazard gets re-derived by the next reader.
+
+**STILL OPEN, AND IT IS A SOURCE READ RATHER THAN A RUN.** Whether
+`obligation.identity = None` arises because the callee **declares nothing**, or
+because the call site **drops a contract the unit does have**. `DeclaredUnitCall`
+is constructed with `result_contract: None` at several sites and with a real
+contract at four. If the callee declares nothing, the defect is upstream at the
+declaration and `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` owns it; if it does
+declare, SEED is the repair and it is narrow. **The SITE line is NOT amended
+until this is read** — it still says `:6971`.
+
+### THE CUT CONTRADICTS ITSELF AT THE BOUNDARY, AND ONLY THE GRAPH SHOWS IT
+
+**Architect `evt_4s7beb7qyrhqz`. This is scope, not prose.**
+
+**Stated as PAIRS, per the rule above — `funcid59` is downstream in 4 refusals
+and a ROOT in 1, so this is about the 4, not about the body.**
+
+    the 4 DOWNSTREAM pairs whose callee is funcid60
+               the ENTRY is in D1's population (arm 1, one of the 12)
+               the CALLEE funcid60 is in the EXCLUDED population
+               (arm 2, "cause 2 is the gate working, unchanged by the closure")
+
+⇒ **D1 is scoped to repair entries whose blocker is explicitly OUT of its
+scope.** Those pairs cannot close while `funcid60` does not certify, and
+`funcid60` is excluded **by name**. That is a contradiction in the cut whichever
+side turns out to be right, and **it is invisible in a list** — it appears only
+once the population is read as a graph.
+
+**D1 DISPOSITIONS THIS BOUNDARY BEFORE REPAIRING ANY DOWNSTREAM ENTRY.**
+
+**THE BOUNDARY IS NOW THE WHOLE BALLGAME.** All 5 arm-2 roots are `funcid60`,
+excluded as "the gate working", and some of the 5 downstream arm-1 pairs are
+downstream of those. **If those arm-2 refusals are correct, their downstream
+pairs are CORRECT PROPAGATIONS and must not be repaired at all** — which takes
+D1's population below 7 as well. That is what the `funcid60` ARM2-EVAL decides,
+and it is the highest-value measurement in the arc.
+
+> **RAISED AS A QUESTION, EXPLICITLY NOT RULED (Architect).** The standing
+> ruling is that **cause 2 is the gate working and must not be repaired toward
+> green.** If `funcid60`'s arm-2 refusal is the proving arm correctly declining,
+> then `funcid59`'s failure is **the correct propagation of a correct refusal**,
+> and repairing `funcid59` would defeat a working gate one hop downstream —
+> exactly the move that was prohibited.
+>
+> It is **not ruled** because `funcid59` is **OVERDETERMINED**: it fails for its
+> own arm-1 reason *and* because its callee fails. Both would have to be
+> dispositioned separately.
+
+**`funcid60` IS NOW THE MOST INTERESTING BODY IN THE CENSUS.**
+
+    funcid60   ROOT. Publishes Param(block7,0) -- WALKABLE, unlike the Response
+               bodies. 593 authorities. Eleventh field Some(None): no obligation
+               names its published word, so it is blocked on no callee.
+               AND IT STILL FAILS TO CERTIFY {4362, 37}.
+
+Why does a walkable, authority-rich, callee-free body fail? Either the walk ran
+and found no grounding, or it hit `predecessors.is_empty()` under the cuts and
+returned the default. **Whichever it is, that is the arm-2 half — the half ruled
+to be the gate working — sitting directly upstream of an arm-1 entry D1 is
+scoped to fix.**
 
 ### OPEN — THE ENUM HAS THREE VARIANTS; THE CENSUS MEASURED TWO
 
