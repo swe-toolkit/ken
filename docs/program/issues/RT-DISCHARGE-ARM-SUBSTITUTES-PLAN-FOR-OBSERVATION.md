@@ -223,8 +223,17 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
     POPULATION   12 arm-1 hand-offs. Two published words, v1751 and v1386,
                  always at funcid58/funcid59, every table EMPTY.
                  4 demanded identities, 3 programs.
-    REPAIR       PRODUCE constructor authority at those words.
+    REPAIR       PRODUCE constructor authority.
                  NOT re-keying: there is nothing to re-key, the tables are empty.
+    SITE         the RESPONSE STAGING PATH at :6971 -- NOT the two published
+                 words. v1751/v1386 are where the symptom surfaces. Settled by
+                 the route read below; see also the open Continuation question,
+                 which decides the repair's SHAPE but not its site.
+    FIRST        D1 EVALUATES **PRODUCE AGAINST PROVE** BEFORE DESIGNING THE
+                 REPAIR. "Production, not re-keying" was a TWO-way fork and
+                 there is a third arm the code already implements; see below.
+                 This does not resize D1 -- it stops D1 building the narrow
+                 fix by default.
     EXCLUDED     the 5 arm-2 refusals -- the proving arm declining, unchanged by
                  the closure, and cause 2 is the gate working.
     EXCLUDED     the rt_parity (c1) entries -- PROVISIONALLY FOLDED, below. They
@@ -281,6 +290,132 @@ Response body whose `k_ret_identity()` differs from the demanded identity.
 **Do not restate the census as "bodies carrying an `independent_contract` have
 no authorities."** That is strictly stronger than what was measured, and the
 `Some(other)` case would falsify it while leaving every measured number intact.
+
+### THE ROUTE READ RAN. ROUTE SPLIT CONFIRMED, 17 of 17.
+
+`evt_5q6tah71smnn5`, same-tuple same-build measurement, arm-2 population covered
+**5 of 5** per the arm-2-first targeting: **zero counterexamples in the
+`Some(other)` cell.**
+
+    Response      12   auth = 0
+    Context        5   auth = 593
+
+⇒ **Authority production does not run on the RESPONSE-OWNER route.** Context
+bodies in the same compile get 593 entries; Response bodies get none. **The site
+is settled: `:6971`, not `v1751`/`v1386`.** An earlier provisional 3-of-17 read
+is retired by this one, not merged with it.
+
+> **THE EMPTY `Some(other)` CELL ESTABLISHES NOTHING ABOUT REACHABILITY, AND D1
+> MUST NOT TREAT THAT ARM AS DEAD CODE.** In the implementer's terms:
+> **unobserved-in-3-programs is not proven-impossible.** Five of five with zero
+> counterexamples is a strong empirical result about three programs of one
+> family; `:4474` is an equality, and nothing in the code bars a `Response` body
+> from arm 2 whenever `k_ret_identity()` differs from a demand. **Scope at the
+> route; do not scope at the emptiness of that cell.** Architect
+> `evt_7r7snh6bhm8vy`.
+
+### D1'S FIRST DESIGN QUESTION: PRODUCE vs PROVE. THE FORK HAS THREE ARMS.
+
+**Architect `evt_gjy1ed88b7nh`, adding an arm to its own ruling.** "Production,
+not re-keying" stands as against re-keying — the tables are empty — but it was a
+two-way fork, and **the code already implements a third arm**.
+
+    PRODUCE   make authority exist at v1751/v1386        <- what was ruled
+    RE-KEY    move authority that already exists         <- refuted, tables empty
+    PROVE     route Response bodies through prove_forwarded_value -- the
+              machinery arm 2 already uses and the kernel already trusts
+
+`prove_forwarded_value` at `:3126` grounds a value on **any** of three
+conditions — an `authorities` entry matching identity and word, a
+`detached_consumer_authorities` entry, or `call_seeds.get(&value) ==
+Some(&identity)` — and when none holds it **recurses through `value_def`**,
+walking block params back through reachable predecessors for a grounding source
+elsewhere. **Arm 2 therefore discharges bodies holding no authority at the
+published word.** Arm 1 does none of it: its whole condition is
+`realized_call_words.contains(&publication.returned_word)`, a set membership.
+
+> **HAVING NO AUTHORITY AT THE PUBLISHED WORD IS NOT SUFFICIENT TO CAUSE A
+> REFUSAL.** `funcid60` is `Context`, 593 authorities, `None` at `v26`, and it
+> **closes** — the existing instance of a body discharging with no authority at
+> its published word. Two `Continuation` bodies (`funcid56`, `funcid57`) have
+> the same property and also closed.
+
+⇒ **PROVE may dominate.** This node's founding defect is that arm 1 substitutes
+a PLANNED identity plus realization for an OBSERVED one. The remedy for that is
+to establish the observed identity, and `prove_forwarded_value` is the existing,
+already-trusted machinery that does exactly that — whereas producing an authority
+at two words is the narrowest patch that happens to satisfy the closure. **The
+repair may have been specified at the width of the closure rather than at the
+width of the defect** (the Architect's own words). The sharper question D1
+answers first: **is arm 1's weaker discharge condition the defect, rather than
+absent production?**
+
+### OPEN — THE ENUM HAS THREE VARIANTS; THE CENSUS MEASURED TWO
+
+    ExistingResultUnitIdentity      census entries
+      Response                          12   auth = 0
+      Context                            5   auth = 593
+      Continuation                       0   NOT MEASURED
+
+**`Continuation` is absent from all 17 and is NOT structurally barred from being
+there.** Demand is built as `Vec<(FuncId, ConstructorIdentity)>` at `:4293` —
+from `body.required_contract` at `:4297`, and from call obligations via
+`decode_direct_callee(&body.func, obligation.call)` at `:4304`/`:4307` — then
+matched at `:4356`/`:4406` by `.filter(|(target, _)| *target == body.target)`.
+**Demand matching is by `FuncId` and does not know the route.** So a
+`Continuation` body whose target is demanded enters that loop exactly like any
+other: **its absence here is a gap in the measurement, not a consequence of the
+code.**
+
+⇒ **This changes the repair's SHAPE, not its site.** `:6971` either way.
+
+    if Continuation ALSO produces authority   the split is Response-vs-rest, and
+                                              Response is missing something two
+                                              other routes have  -> ADDITIVE
+    if Continuation produces NONE either      the split is Context-vs-rest, and
+                                              only Context has it -- a different
+                                              repair and a different size
+
+**D1 establishes which before it designs the fix.** Same move that just paid:
+the enum is the printed variable, and two of its three values is not exhaustive
+over it. **It does not gate the route finding.**
+
+**This measurement is OWED AND UNRUN, and it is not cheap.** The question is
+`authorities.len()` on `Continuation` bodies **that appear in the census**, and
+none do — so it needs a program whose continuation bodies **fail to close**, and
+`px8f` has none. An adjacent pre-D0 staging reading exists (`Response` 0 of 2,
+`Continuation` 4 of 6, `Context` 4 of 6 carrying an authority at the published
+word) and points toward Response-vs-rest, but it is a different field, a
+different build, and a different population. **It does not substitute for the
+measurement.**
+
+> **THE MIRROR BOUND ON THAT ADJACENT TABLE, because it runs in the direction
+> that flatters the conclusion.** Its `Continuation`/`Context` legs are arbitrary
+> staged bodies; its `Response` leg is **n=2, and both rows ARE the defect
+> population** — `funcid58`/`funcid59` at `v1751`/`v1386`, the two words this
+> node is about. So it compares twelve arbitrary bodies against two selected for
+> being broken. ⇒ *"The Response route never produces authority"* remains
+> measured only on Response bodies chosen for failing, and **`px8f` cannot fix
+> that — every Response body it has is one of the two.**
+>
+> Note also that `Context` is **not** uniformly authority-bearing: `funcid60`
+> and `funcid61` look exactly like the Response rows on this axis. **The
+> predicate is not the route tag alone** — a route-level generalization died on
+> the same table that produced it.
+
+> ### THE CONTEXT CONTROL LOCALIZES A PATH. IT DOES NOT NAME A CAUSE.
+>
+> `Context → 593` beside `Response → 0` is the best row in the census and a real
+> control on the production axis. But **the two differ in more than the route
+> tag**: they are staged by different functions (`:8286` vs `:6971`), and
+> `Context` carries a `required_contract` (`context.result_contract`) where
+> `Response` carries an `independent_contract` and `None` for required.
+>
+> ⇒ The contrast licenses exactly *"scope at the Response staging path"* and
+> **does NOT license *"port what Context does to Response."*** **A control that
+> differs in several ways localizes the fault to a path; it does not identify
+> which difference causes it.** If D1 reaches for `Context` as a template, that
+> step needs its own argument.
 
 ### The census D1 is sized from
 
