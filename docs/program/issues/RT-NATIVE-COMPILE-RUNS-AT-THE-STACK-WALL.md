@@ -1,6 +1,6 @@
 ---
 id: RT-NATIVE-COMPILE-RUNS-AT-THE-STACK-WALL
-title: "IN A DEBUG BUILD the native compile's stack budget is spent BEFORE lowering begins -- a compile that rejects before native lowering needs (1920, 1952] of 2048 KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity, so lowering is a rounding error on a fixed prefix every compile pays. D4 measured that same row at (320, 352] in RELEASE, and no gate anywhere builds release: zero --release in ci.yml, build-ci-base.yml and scripts/ken-cargo. So the recurrence is CI's rather than the compiler's. Stated the way the decision needs it and with no midpoint invented: DEBUG HAS ROOM FOR EXACTLY ONE MORE 64 KiB PRELUDE ADDITION AND NOT TWO (headroom is [96, 128) KiB), while release has room for at least 26. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
+title: "IN A DEBUG BUILD the native compile's stack budget is spent BEFORE lowering begins -- a compile that rejects before native lowering needs (1920, 1952] of 2048 KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity, so lowering is a rounding error on a fixed prefix every compile pays. D4 measured that same row at (320, 352] in RELEASE, and no gate anywhere builds release: zero --release in ci.yml, build-ci-base.yml and scripts/ken-cargo. So the recurrence is CI's rather than the compiler's. Stated the way the decision needs it and with no midpoint invented: ON THE 2048 KiB TEST THREAD, DEBUG HAS ROOM FOR EXACTLY ONE MORE 64 KiB PRELUDE ADDITION AND NOT TWO (headroom is [96, 128) KiB) while release has room for at least 26 -- and neither row describes the product, which carries a stated 4 MiB minimum. THE REMEDY IS PROPAGATION, NOT MEASUREMENT: the two profiled numbers and that 4 MiB requirement have been in elab.rs:1347 for a month, correctly stated and carefully qualified, in a comment no gate reads and the 30 stack_size sites do not honour. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
 status: draft
 owner: runtime
 size: M
@@ -14,9 +14,11 @@ origin: "Measured by runtime-implementer 2026-09-15 while diagnosing the class-1
 
 ## The finding
 
-**The budget is gone before lowering starts.** Every figure is from binary
-search on `RUST_MIN_STACK` against the base `1dec48f33`, with no candidate
-commits present, and **every probe carries its executed count.**
+**The budget is gone before lowering starts, IN A DEBUG BUILD.** Every figure
+in this section is from binary search on `RUST_MIN_STACK` against the base
+`1dec48f33`, **under `cargo test`, unoptimized**, with no candidate commits
+present, and **every probe carries its executed count.** See D4 for the same
+row in release, where the picture is different.
 
     REJECTS BEFORE LOWERING -- verified live, "1 passed; 0 failed;
     0 ignored", 0.23s at default
@@ -30,8 +32,9 @@ commits present, and **every probe carries its executed count.**
 
 ⇒ **Doing no lowering at all and doing all of it differ by less than the
 granularity of the brackets** -- tens of KiB out of nearly two megabytes.
-**Roughly 94% of the budget is a fixed prefix every compile pays**, and lowering
-is a rounding error on top of it.
+**In debug, the great majority of the budget is a fixed prefix every compile
+pays** -- `(1920, 1952]` of 2048 KiB, so between 93.8% and 95.3%, stated as the
+interval the bracket supports -- and lowering is a rounding error on top of it.
 
 The default is bracketed to `(1536, 2048]` by the same instrument and pins to
 2048 only via the documented `std::thread` value -- **that last step is
@@ -83,13 +86,57 @@ profile.** AC-7 exists precisely to forbid that comparison. ⇒ **A decompositio
 to check, not a finding.** D4 is what makes it checkable: if D4 also re-states
 the prelude figure under a stated profile, this falls out for free.
 
-## THE BUILD PROFILE WAS THE UNCONTROLLED VARIABLE. IT HAS NOW BEEN VARIED.
+## THE PROFILE WAS VARIED ONCE, A MONTH AGO, AND THE RESULT IS IN THE SOURCE
 
-Every stack figure in this investigation, and in both merged precedent nodes,
-was taken under `cargo test` -- an unoptimized build. The variable was never
-varied, so the severity for shipped compiles was a property of the measurement
-configuration being read as a property of the subject: the same class as the
-`#[ignore]` confound, one axis over.
+**WITHDRAWN: "the build profile was the uncontrolled variable" and "every stack
+figure this project has produced is a debug figure."** Both were this node's,
+both are false, and both were pointed at the operator. Verified by the Steward
+at `origin/main`, `crates/ken-elaborator/src/elab.rs:1347-1357`:
+
+    REQUIRED MINIMUM (LANG-PRELUDE-ELABORATION-DEPTH D1/D4, measured at
+    2ca91a3a): a caller of `ElabEnv::new` + `elaborate_file` -- what `ken
+    check`/`ken run` actually do -- must provision at least 4 MiB of stack
+    ... worst observed 1,982,464 bytes, ~1.98 MiB ...
+    Optimized peak measured the same way: ~280 KiB.
+
+`2ca91a3a` is a real commit (2026-08-14). ⇒ **The profile WAS varied, once, and
+a release figure has existed in the elaborator's own source for a month.**
+
+**The census that produced the false inference was itself sound.** Zero
+`--release` across `.github/` and `scripts/`, re-verified. That answers *"does
+any gate build release?"* -- and it was allowed to answer *"has anyone ever
+measured release?"*, a strictly larger question with a different answer. **A
+claim inherits the scope of the site you checked, not the scope you stated**
+(Architect, `evt_6d1bx8rn8br76`, withdrawing his own sentence).
+
+**THE EXISTENCE IS ESTABLISHED. THE VALUE IS A COMMENT.** `~280 KiB` occurs
+**exactly once in the entire tree** -- the Steward grepped it; it is a
+transcription with no custodian, which `prelude.rs` warns about in its own
+words: *"an in-code figure would need a custodian and would go stale silently at
+the next unrelated edit, with nothing red."* Nobody has re-run `2ca91a3a`'s
+measurement.
+
+**AND D4 DISAGREES WITH IT ON THE RELEASE SIDE WHILE AGREEING ON THE DEBUG
+SIDE** (runtime-implementer, read at source, `evt_1d0gmk3vgmj2r`):
+
+    DEBUG    comment 1,982,464 B = 1936 KiB   vs  D4 (1920, 1952]
+             -> the EXACT MIDPOINT of D4's interval. Converges tightly.
+
+    RELEASE  comment ~280 KiB                 vs  D4 ( 320,  352]
+             -> at least 40 KiB BELOW, outside the interval. 15-25% apart.
+
+**No reconciliation is offered and none should be invented.** *Peak usage* and
+*minimum provisionable thread stack* are different quantities, and that would
+explain D4 sitting higher in release -- **but the same offset should then appear
+in debug, and it does not.** So the obvious explanation covers one half and
+fails on the other. The honest statement is that two release figures differ by
+15-25% and nothing in the corpus reconciles them.
+
+**A COINCIDENCE FLAGGED SO NOBODY READS IT AS EVIDENCE.** `1,982,464 B` is
+exactly `1936.0 KiB` -- the midpoint this node was corrected for inventing two
+commits ago. It happens to equal a real measured peak. **That is luck, and it is
+the best available argument that inventing it was still wrong: a reader cannot
+tell luck from evidence.**
 
 **D4 ANSWERED IT. THE FIRST PRE-COMMITTED ARM FIRED.** Same row, same
 instrument, same base `1dec48f33`, both profiles (runtime-implementer,
@@ -130,6 +177,15 @@ not test -- *"in an unoptimized build a new arm's locals in `check` are paid by
 every call regardless of which arm runs"* predicted a debug-inflated frame, and
 a collapse of `[5.45, 6.10]`x is what that looks like measured.
 
+**D4'S CONTRIBUTION, STATED NARROWLY AND STILL REAL.** It is **not** the first
+variation of the build profile -- `2ca91a3a` did that a month ago. It is **the
+first release figure on this row, and the first taken under the ignore-screen
+and executed-count preconditions**, which is why it can be compared to the
+comment at all. That the repo's month-old debug figure lands on the exact
+midpoint of D4's debug bracket is **independent corroboration taken by a
+different seat, at a different commit, by a different method, on a different
+subject** -- worth more than novelty would have been.
+
 **WHAT D4 DOES NOT ESTABLISH, and it bounds how far the result travels:**
 
 - **One row.** The ratio is measured on the pre-lowering row only. The four
@@ -151,9 +207,9 @@ correctly noting a stack bracket cannot answer it. **The repo answers it**
     --release in scripts/ken-cargo                     0
 
 ⇒ **Nothing in CI and nothing in the sanctioned local build path ever builds
-release.** Every stack figure this project has produced -- tonight's, both
-merged nodes', the thirteen sites in `LANG-PRELUDE-ELABORATION-DEPTH` -- is a
-debug figure, and **the 352 KiB release number is exercised by no gate.**
+release, so no release stack figure is exercised by any gate.** That is the
+whole of what this census supports -- see the withdrawal above for the larger
+claim it was allowed to carry and cannot.
 
 **THE CANARY ARITHMETIC, IN THE ONLY FORM THE BRACKETS SUPPORT.** Take the
 **subtraction** rather than the division and no midpoint is needed --
@@ -177,6 +233,15 @@ prelude additions is spent against the one, not the twenty-six. *"About 6% of
 headroom"* cannot be acted on without knowing 6% of what; *"one more, not two"*
 can.
 
+**BOTH ROWS OF THAT TABLE DESCRIBE A 2048 KiB TEST THREAD. NEITHER DESCRIBES
+THE PRODUCT.** `ken check` and `ken run` carry a **stated** requirement of
+**at least 4 MiB** (`elab.rs:1347`), and the same comment says Rust's 2 MiB
+spawned-thread default *"must not be treated as adequate -- it is
+`r3_c2_source_mixed_branch.rs`'s `r3_4b` worker's exact failure configuration
+(#2144), not a safe answer."* **So "the product has room for 26 more" is a
+statement about release code on a 2 MiB thread, which is not the configuration
+the product is specified to run in.** Read the table as CI-side only.
+
 **`1936` and `336` appeared here in the routed version and were never measured
 -- they are the midpoints of the two brackets, and every percentage on those
 lines was derived from them** (Architect, `evt_4dk1z2ffyef8f`, correcting his
@@ -189,12 +254,30 @@ stated rules. **Debug is a ~6x-amplified early-warning instrument for release
 stack growth, and 30 sites were spent silencing it** -- then the same condition
 was met in a 31st place and filed as a new discovery, three times.
 
-**WHERE THE REMEDY LIVES, AND IT IS MOSTLY NOT NEW WORK.**
-`agent/playbooks/tools/stated-stacks.md` act 2 already permits provisioning a
-baseline **when stated**. The debug test path needs a stated adequate stack and
-a rule; the 30 unstated sites violate a standard that exists rather than
-revealing an absent one. With `AC-7`, the deliverable is **two stated numbers
-carrying their profiles**, not a compiler project.
+**THE REMEDY SHRANK A SECOND TIME, AND THE GAP IS PROPAGATION, NOT
+MEASUREMENT.** The deliverable was placed in `stated-stacks.md` act 2 as *"two
+stated numbers with their profiles."* **Those two numbers already exist, with
+their profiles** -- plus a stated `REQUIRED MINIMUM` of 4 MiB for `ken
+check`/`ken run`, plus the scope qualifier carried inside the requirement
+sentence rather than beneath it, where a reader cannot take the number without
+the caveat. It was written a month ago in the function everyone has been
+reading all night.
+
+⇒ **A correctly stated, carefully qualified requirement lives in a comment that
+no gate reads, and the 30 `stack_size` sites do not honour it.** The work is to
+make the stated requirement enforceable and propagated, not to measure it.
+
+**This is `a-mechanism-claim-in-a-comment-is-structurally-exempt-from-execution`
+at BOTH polarities, in one night, four hours apart.** At `Cargo.toml:61-62` a
+comment asserts something **false** and nothing can redden. Here a comment
+asserts something **true and carefully qualified** and nothing can enforce it.
+**Identical structural cause; one was filed as a finding and the other was read
+straight past by the same reader.**
+
+**One caveat before anyone leans on the comment as the bound:** D4 puts the
+release figure 15-25% away from the comment's, and half the 4 MiB requirement
+rests on that side. **A transcription is not a re-derived measurement** -- the
+`~280 KiB` should be re-run, not cited.
 
 ## What this explains, and what it costs
 
@@ -218,6 +301,14 @@ stack. ⇒ **"Elaborate fewer declarations" is aimed wrong**, and so is lazy or
 on-demand registration, **unless the declaration skipped is the deep one.** This
 sentence is here because it is the remedy a fresh reader proposes first, it is
 plausible, it is expensive, and the max-not-sum fact rules it out on its own.
+
+**SETTLED FOR FREE, and it is not an attribution.** The merged node's deep call
+-- `register_decimal_char`'s 31-level cascade -- **is on the prelude path**:
+`register_prelude` spans `prelude.rs:471-3127` and calls it at `:1267`, verified
+by the Steward at `origin/main`. So that node's *"unrelated to any arm here"*
+meant unrelated to the **record-literal arms**, not to the prelude, and the
+`1933` convergence is a prelude figure. **It still does not attribute tonight's
+peak to a phase.**
 
 **NOT ESTABLISHED: that the prefix IS prelude elaboration.** What is measured is
 that ~1920 KiB is spent **before lowering**. It is not attributed to a phase.
@@ -289,9 +380,15 @@ IN ONE HOUR, ON THIS NODE.**
                                were never measured, 20 lines after the interval
                                defect was named -- and it reached the title
 
-Three independent authors, three instances, zero carelessness: **a criterion is
-naturally applied to the claims made after it and never to the sentences
-already standing in the document that states it.**
+    "a claim inherits the      a three-site --release census answered "does any
+     scope of the site you      gate build release?" and was allowed to answer
+     checked"                   "has anyone ever measured release?" -- by the
+                                author of that lesson, while auditing the same
+                                shape in other people's work all night
+
+Four independent instances, three authors, zero carelessness: **a criterion is
+naturally applied to the claims made after it, and to other people's work, and
+never to the sentences already standing in the document that states it.**
 
 ⇒ **CUTTING AN AC OBLIGES ONE PASS OVER THE CONTAINING DOCUMENT AGAINST THAT
 AC BEFORE THE ARTIFACT IS ROUTED.** It is cheap, it is mechanical, and it would

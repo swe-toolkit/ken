@@ -30,10 +30,19 @@ zero carelessness:
                                       interval defect had been named, and from
                                       there it reached the title
 
+    "a claim inherits the scope of    a three-site census answering "does any
+     the site you checked, not the     gate build release?" was allowed to
+     scope you stated"                 answer "has anyone ever measured
+                                       release?" — by the author of that very
+                                       lesson, while auditing the identical
+                                       shape in other people's work all night
+
 **The mechanism is not inattention. A criterion arrives attached to the next
 claim you make, and the sentences already written are not re-read as claims —
 they have become the background you are writing against.** Each author caught
-somebody else's instance immediately and walked past their own.
+somebody else's instance immediately and walked past their own. **The fourth
+instance extends the shape past freshly-cut criteria to long-held ones: the rule
+you are actively enforcing on others is the one you stop applying to yourself.**
 
 ## How to apply
 
