@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-15 01:48:45Z — from 617 issue file(s) in `docs/program/issues/`.
+2026-09-15 02:38:48Z — from 618 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -128,6 +128,7 @@ the committed file matches the generator's output.
 | `CI-SHARD-DURATION-BALANCE` | Partition the test shards by measured DURATION rather than by test count, and choose the shard count from the same measurement — count partitioning produced a 3.45x spread across 8 shards, so one shard ran 18m43s while another ran 5m25s and the run paid the maximum, not the mean. | merged | verify | S | none | https://github.com/swe-toolkit/ken/pull/3158 |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
+| `CI-WRITE-PARTITION-JOB-COMMENT-STALE` | ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red. | ready | runtime | S | none | — |
 | `CI-Z3-BASE-IMAGE` | Bake z3 into a digest-pinned ghcr base image and run the restored z3-process-adapter job in it, so the flaky apt-get-install-z3 step leaves CI's critical path | merged | verify | S | none | — |
 | `CONF-BLOCKER-MARKER-RECONCILE` | Three landed `BLOCKED-ON-` markers say 'no blocker node exists' and two of them are now false, while seven other blocked rows name their blockers in prose that no grep can find -- reconcile the corpus against the tracker and adjudicate the one blocker still unowned | merged | spec-enclave | S | none | — |
 | `CONF-BLOCKER-OWNER-RESOLVABILITY` | 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all | ready | spec-enclave | M | none | — |
@@ -662,6 +663,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CAT-PROOF-COMPLETENESS-SURVEY` — Survey every catalog package for incomplete proofs and dependence on computational tests: classify each package as fully-proven, tested-only-with-deferred-proofs, or no-proof-obligation, citing the exact intrinsics vs tests per package; produce the ledger from which the Steward frames the missing *-LAWS follow-ons. Grounded in PRINCIPLES #16 (a package is finished only when proven).
+- `CI-WRITE-PARTITION-JOB-COMMENT-STALE` — ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-RESERVED-INFIX-NAMES` — A0 of the reserved-infix-glyph objective: admit the six currently-reserved glyph tokens (Le ≤/<=, Ge ≥/>=, Ne ≠//=, And ∧//\\, Or ∨/\\/, Member ∈) as ordinary symbolic GLOBAL names and infix/fixity targets through ONE shared parser token-to-canonical-name view reused at every consumer site, entering the existing neutral-spine + GlobalId-keyed fixity reassociation as ordinary RApp; NO standard semantic binding, NO Membership class, NO `!=`/`in` alias -- syntax/naming only
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
