@@ -1,290 +1,237 @@
 ---
 id: RT-NATIVE-COMPILE-RUNS-AT-THE-STACK-WALL
-title: "The native compile's stack consumption SCALES WITH THE PROGRAM, unmeasured and unbounded: one real complete compile fits in 64 KiB while three others need ~1950 KiB of a 2048 KiB default, a thirtyfold spread, and nothing states which programs are which or what the limit is. So a candidate adding 64 KiB aborts one of them and looks guilty while not being the cause. This is the THIRD measured instance of that condition -- LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT and LANG-PRELUDE-ELABORATION-DEPTH are both merged, both single-digit-percent headroom, both diagnosed trigger-not-cause -- and the first predicted this recurrence IN WRITING."
+title: "Roughly 94 percent of the native compile's 2048 KiB stack budget is consumed BEFORE lowering begins: a compile that rejects before native lowering needs (1920, 1952] KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity. Lowering is a rounding error on a fixed prefix every compile pays. So a candidate adding 64 KiB aborts and looks guilty while not being the cause. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
 status: draft
 owner: runtime
-size: L
+size: M
 gate: none
 tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Measured by runtime-implementer 2026-09-15 while diagnosing the class-1 SIGABRT on PR #3676 (evt_3c8a5tzt0ksmx, evt_1bk3sktcha9vr, evt_5xtnkrqadf69d, evt_1yh3m79r5wdjb). Architect ruled the shave-the-increment arm is not a coherent stopping point and named the base-bracket narrowing as the deciding measurement (evt_29ph3z4a7661t), then withdrew a minimal-compile probe when the screen's fourth row answered it better. Steward found the merged precedents and filed. Funding is an operator scope call and is NOT taken here."
+origin: "Measured by runtime-implementer 2026-09-15 while diagnosing the class-1 SIGABRT on PR #3676. This node was FILED WITH THE OPPOSITE CONCLUSION at 3603991f2 and is rewritten, not amended -- its floor-side evidence was two #[ignore]d tests that never executed (harness: '0 passed; 1 ignored; 0.00s'). Architect caught the ignore census (evt_3zv3c7ya7jkzr chain); implementer withdrew the refutation and re-measured on a verified-live row. Funding is an operator scope call and is NOT taken here."
 ---
 
-## SUSPENDED: THE FLOOR-SIDE EVIDENCE MAY BE VACUOUS. READ THIS FIRST.
+## The finding
 
-**Both floor rows carry `#[ignore]` at the probe base `1dec48f33`** -- verified
-by the Steward directly against that tree, and by the Architect against
-`origin/main` (`evt_3zr83trkqgt3h`):
+**The budget is gone before lowering starts.** Every figure is from binary
+search on `RUST_MIN_STACK` against the base `1dec48f33`, with no candidate
+commits present, and **every probe carries its executed count.**
 
-    px8l_recursive_decl_native.rs      #[ignore = "RT-BORROWED-INPUT-CARRIER-
-                                        DURABILITY: ... traps ..."]
-    px7m_hostresult_computational...   #[ignore = "RT-SITEOP-CARRIED-WITNESS
-                                        D2: ... refuses ..."]
+    REJECTS BEFORE LOWERING -- verified live, "1 passed; 0 failed;
+    0 ignored", 0.23s at default
+      nondecreasing_cycle_is_rejected_before_native_lowering   (1920, 1952]
 
-**Every heavy row is live `#[test]`. Seven rows, six files, zero exceptions: the
-ignored/live split predicts the cheap/expensive split exactly.**
-
-⇒ **If those rows never executed, every number on the floor side of this node is
-vacuous**, and with it the thirtyfold spread, the refutation of a shared
-component, and this node's central claim. On live rows only the lowest
-measurement is `rt_branched` at `>512 KiB` and everything else is `>1024` --
-which is the **uniform** picture, the opposite of what the body below argues.
-
-**The one measurement that settles it** is the harness `running N tests ... X
-passed; Y failed; Z ignored` summary from any floor probe. `Z` counting the
-floor row means it never ran.
-
-**Why this was not caught by the rule that should have caught it.** The
-implementer's own standard -- *"a floor measured on a compile that did not happen
-is worth nothing"* -- was applied to `dasm_c2` on `rc=101` and missed these,
-because **`rc=0` is one number covering two facts: ran and passed, and never
-ran.** The rule caught the row that failed loudly and missed the two that
-succeed silently. `dasm_c2` is the control that proves the mechanism: live,
-executed, real non-zero code -- and it was the one discarded.
-
-**Provenance of the error, recorded because it crossed three seats.** The
-Architect asserted the floor row was a verified real compile from a **call-path
-read**, not an execution check; the Steward inherited that word and filed it as
-a measurement without asking how execution had been established; the
-implementer's discounting rule could not see it. **One unexamined word, three
-seats.** It is the Architect's own D5b ruling of the same night -- *an inert
-instrument is green-vs-green in the limit* -- arriving on this node's evidence.
-
-**Until the harness line is read, treat everything below the next heading as
-UNDER CHALLENGE.** If the rows never ran, this node is rewritten rather than
-amended: a claim whose evidence is withdrawn should not be patched.
-
-## The finding, measured
-
-**The compile's own stack requirement is ambient, unmeasured, and discovered
-only by SIGABRT.** All figures come from binary search on `RUST_MIN_STACK`
-against the base `1dec48f33`, with **no candidate commits present**. The
-instrument brackets the requirement directly rather than inferring it from
-struct sizes or a backtrace.
-
-    px8l_recursive_decl_native
-      dynamic_multistep_seed_preserves_updated_parameter_order    <= 64 KiB
-    abi_s6_mapping_surface_native
-      window_direct_map_bytes_executes_natively                (1920, 1984]
+    LOWERS, EMITS AND EXECUTES
       complete_carried_mapping_access_matrix_matches_the...    (1952, 1984]
-    lang_nested_former_recursion_native                            > 1024
-    px8h_heterogeneous_continuation                                > 1024
+      window_direct_map_bytes_executes_natively                (1920, 1984]
+      nested_former_fold_executes_natively                     (1920, 1984]
+      multiple_steps_preserve_the_recursive_payload            (1920, 1984]
 
-Against a 2048 KiB default, the heavy rows sit at **95.3% - 96.9% occupancy**,
-leaving 64 - 96 KiB. The default is bracketed to `(1536, 2048]` by the same
-measurements and pins to 2048 only via the documented `std::thread` value --
-**that last step is documentation, not measurement**, stated so a later reader
-does not inherit it as a derived figure.
+⇒ **Doing no lowering at all and doing all of it differ by less than the
+granularity of the brackets** -- tens of KiB out of nearly two megabytes.
+**Roughly 94% of the budget is a fixed prefix every compile pays**, and lowering
+is a rounding error on top of it.
 
-## The claim is NOT that every Ken compile runs near the wall
+The default is bracketed to `(1536, 2048]` by the same instrument and pins to
+2048 only via the documented `std::thread` value -- **that last step is
+documentation, not measurement.**
 
-**It is the opposite, and this is the node's central point.** A real, complete
-native compile -- prelude elaborated, lowered, emitted, executed -- fits in
-**64 KiB**. The implementer verified that row is a genuine compile before
-trusting it as a floor, tracing `assert_agreement` through
-`ken_cli::build_native_program` (`px8l_recursive_decl_native.rs:122`) to the
-same `compile_native_program_sources` entry the heavy rows use.
+## EVERY NUMBER ABOVE IS A DEBUG BUILD. RELEASE IS UNMEASURED.
 
-⇒ **A thirtyfold spread, driven by the program.** Consumption scales with what
-is being compiled; nothing states which programs are expensive, and nothing
-bounds the scaling. Some compiles sit at 96.9% and others at 3%.
+**Every stack measurement in this investigation, and in both merged precedent
+nodes, was taken under `cargo test` -- an unoptimized build.** The variable was
+never varied. `LANG-PRELUDE-ELABORATION-DEPTH` says in its own body:
 
-**This is sharper than, and contrary to, what the screen alone supported.** A
-3-of-4 overflow at 1024 KiB reads as "the compiler is uniformly deep". The floor
-row refutes that. **Do not restate this node as "every native compile is near
-the wall"**, and do not present `3/4` as a rate -- three independent failures
-refute "one pathological row" outright, but four rows cannot estimate what
-fraction of the surface is affected. That is a wider census and a different
-instrument.
+> in an unoptimized build a new arm's locals in `check` are paid by every call
+> regardless of which arm runs
 
-## How the comparison class was chosen, since that is what could invalidate it
+⇒ **The severity of this condition for shipped compiles is unmeasured**, and
+that is a property of the measurement configuration being read as a property of
+the subject -- the same class as the `#[ignore]` confound, one axis over. It is
+**not** an attribution claim and does not weaken `AC-5`; it names a condition
+nobody controlled.
 
-Not by name and not by "looks heavy". `compile_native_program_sources` was on
-the stack at the fault per the lldb backtrace; it is defined once at
-`crates/ken-elaborator/src/compiler_driver.rs:2699` and `ken-cli`'s tests reach
-it through one wrapper, so **"drives a comparable in-process Ken compile" holds
-by construction**. The failing files are otherwise unlike each other: a second
-row in the *same* file as the original (separating row from file), nested former
-recursion, heterogeneous continuation. Three independent programs, three
-independent test binaries.
+**The discriminator, with both readings fixed in advance** (Architect,
+`evt_7kxt44edjhjwq`). Subject: the `nondecreasing_cycle` row -- live, executed,
+never lowers, already bracketed in debug.
 
-## METHOD: the near-miss that decided this, recorded for the next bracketer
+    requirement COLLAPSES in release   frame-size dominated. A CI and test-
+                                       infrastructure condition carrying a
+                                       stated-bound obligation. The SMALLER
+                                       program of work.
 
-When the first probe overflowed at 128 and 64 KiB, the implementer wrote that
-*"at 128 KiB essentially anything overflows, so those low probes carry no
-information."* **A full native compile then passed at 64 KiB.**
+    requirement HOLDS in release       depth dominated and live for users. The
+                                       2 MiB default is a product constraint,
+                                       not a test artifact. The LARGER one.
 
-⇒ **An assumption about which probes carry information is itself a claim, and
-here it was the load-bearing one.** Acting on it would have stopped the downward
-bracket at 512, reported the floor as `<= 512 KiB` rather than `<= 64`, and
-weakened the refutation of cause B **eightfold**. The probes dismissed as
-uninformative were the ones that mattered.
+**This is the question the funding call turns on**, and it is two probes on an
+instrument that already exists.
 
-This is in the node beside the numbers because the next person bracketing
-anything will have the same instinct.
+## What this explains, and what it costs
 
-## Cause B is refuted; cause A survives only in part, and the anomaly says why
+**The cluster.** Four unrelated programs landing inside one 64 KiB window at the
+top of the budget is exactly what a fixed shared prefix produces: everyone pays
+~1920, everyone lands just under 2048, and the program's own contribution is too
+small to separate them. **The cluster was reported twice as awkward for the
+then-current thesis, and the awkwardness was the signal.**
 
-    CAUSE B  one shared prefix (e.g. prelude elaboration) consumes most of the
-             budget before lowering starts.  Remedy: fix that one floor.
-    CAUSE A  consumption is in the lowering recursion and scales with the
-             program.  Remedy: per-level frame reduction.
+**The candidate is already filed and merged.** `LANG-PRELUDE-ELABORATION-DEPTH`
+states that *every compilation elaborates the whole prelude* and measures
+`elab.rs:997` at ~115 KiB of headroom out of 2 MiB. That implies a requirement
+of **1933 KiB, which falls inside `(1920, 1952]`** -- an independent measurement
+from a different subsystem a month earlier, landing inside tonight's bracket to
+within its own resolution. **The two nodes are plausibly one finding.**
 
-**B is refuted by measurement.** If a shared prefix cost ~1900 KiB, the floor
-row would pay it too; it completes in 64 KiB. The Architect proposed
-constructing a minimal-compile probe to separate these and **withdrew it when
-the screen's fourth row turned out to be that probe already**, and a real row
-rather than a constructed one.
+**STACK DEPTH IS A MAX OVER THE PRELUDE'S DECLARATIONS, NOT A SUM.**
+`register_prelude` makes 177 `elaborate_decl` calls from one call site, and each
+returns before the next is made -- so 177 registrations do not accumulate on the
+stack. ⇒ **"Elaborate fewer declarations" is aimed wrong**, and so is lazy or
+on-demand registration, **unless the declaration skipped is the deep one.** This
+sentence is here because it is the remedy a fresh reader proposes first, it is
+plausible, it is expensive, and the max-not-sum fact rules it out on its own.
 
-**A's LOCATION HALF IS NOT ESTABLISHED, and the anomaly is why.**
-`nondecreasing_cycle_is_rejected_before_native_lowering` -- a row that by its own
-name stops *before* lowering -- needs **more than 1024 KiB**, overflowing at
-1024, 512, 256 and 128. **A row that rejects before lowering costs more than
-sixteen times a row that lowers, emits and runs.** If the expensive recursion
-were in lowering, that row should be cheap. It is not.
+**NOT ESTABLISHED: that the prefix IS prelude elaboration.** What is measured is
+that ~1920 KiB is spent **before lowering**. It is not attributed to a phase.
+The row's name and its 0.23-second runtime say it stops early -- strong, but a
+name and a duration are not a profile. **Do not name a function nobody has
+instrumented.**
 
-⇒ **Either the expensive path is not lowering, or there is more than one
-expensive path. Both readings are live.**
+## WITHDRAWN: this node's original conclusion, and why
 
-**KEEP:** consumption scales with the program, unmeasured and unbounded, so some
-compiles sit at 96.9% and others at 3%, and nothing states which is which or
-what the limit is. **DROP, until something measures it:** that the consumption
-is in the lowering recursion. The measurement establishes **program-dependence,
-not location** (Architect, `evt_79fyfvanbk896`).
+**This node was filed at `3603991f2` claiming the opposite** -- a thirtyfold
+program-dependent spread with no shared component. Every clause is refuted:
 
-⇒ **"Per-level frame reduction" is therefore a CANDIDATE remedy, not the implied
-one** -- remedy shape follows location, and location is unattributed. The
-anomaly is in this node as the reason for that, not as an untidy loose end.
+    thirty-fold range          its low end was an UNEXECUTED test
+    no shared component        the shared component is ~94% of the budget
+    bound consumption broadly  find ONE expensive shared path
+    the larger program of work plausibly the SMALLER one
+
+**The floor-side evidence was two `#[ignore]`d rows.** Harness output at the
+probe base:
+
+    RUST_MIN_STACK=64KiB  px8l dynamic_multistep_seed_...
+    test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured;
+                 2 filtered out; finished in 0.00s
+
+Both floor rows carry `#[ignore]` at `1dec48f33` (`px8l` under
+`RT-BORROWED-INPUT-CARRIER-DURABILITY`, `px7m` under
+`RT-SITEOP-CARRIED-WITNESS D2`), and both annotations say the row **fails** if
+it runs. Nine rows across seven files; of the eight stack-measured rows, the
+**2 ignored were the only two cheap ones** and all **6 live ones are
+expensive**. Zero exceptions: the ignored/live split predicted the
+cheap/expensive split exactly.
+
+## METHOD: why the rule that should have caught this did not
+
+**`rc=0` is one number covering two facts: ran-and-passed, and never-ran.**
+libtest defines a run's success as `state.failed == 0`
+(`formatters/pretty.rs:270`, `terse.rs:259`), **which zero executed tests
+satisfies by construction.** So an exit code can never witness execution.
+
+The standing rule -- *"a floor measured on a compile that did not happen is
+worth nothing"* -- was applied to `dasm_c2` on `rc=101` and missed these two.
+**It caught the row that failed loudly and missed the two that succeeded
+silently**, and `dasm_c2` was the control that proved the mechanism: live,
+executed, real non-zero code, and it was the one discarded.
+
+⇒ **Screening `#[ignore]` status is a precondition of this instrument, not a
+nicety, and every probe states its executed count.** A pass is reported as
+`1 passed`, never as "no overflow" and never as an exit code.
+
+**Provenance, recorded because it crossed three seats.** Execution was asserted
+from a **call-path read** rather than an execution check; the Steward inherited
+the word "verified" and filed it as a measurement without asking how execution
+had been established; the implementer's discounting rule could not see it. **One
+unexamined word, three seats, into a durable artifact.** It is the Architect's
+own D5b ruling of the same night -- *an inert instrument is green-vs-green in
+the limit* -- arriving on this node's own evidence. A census tally inherited the
+same way inside the commit that documented the mechanism.
 
 ## This is the third instance, and the first one predicted it
 
-`LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` (merged) recorded the same condition on
+`LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` (merged) recorded the condition on
 `px4b_native_production`, and its body says:
 
 > So the path is armed for whatever lands next, and the next candidate to trip
 > it will look equally guilty and equally not be the cause.
 
-**That came true on a different path.** That instance overflowed in
-`register_prelude` (`ken-elaborator`); this one in `lower_expr` (`ken-runtime`
-cranelift lowering). Same double structure: an A/B attributes the abort to the
-candidate *and* the candidate's additions are not the deficit.
-
-`LANG-PRELUDE-ELABORATION-DEPTH` (merged) is the second: `elab.rs:997` measured
-~115 KiB of headroom out of 2 MiB, and **thirteen sites across four crates
-independently bumped their thread to 256 MiB without any stated rule.**
-
-⇒ **Per-instance repairs were applied twice and the condition recurred.** That
-is the evidence bearing on whether to repair instances or the scaling, and it is
-historical rather than predicted.
-
-## The criterion and the remedy shape both already exist
-
-**The criterion.** `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT`'s `D3` reads *"the
-margin stated as a number ... The node's real product is that this number
-exists."* The Architect independently re-derived it tonight as *"it lands with a
-stated headroom number ... and not with a green check as its evidence."* **Two
-independent routes to one criterion, weeks apart, from different evidence.**
-
-**The remedy shape.** `crates/ken-verify/tests/px8f_write_partition.rs:368-374`
-already implements it:
-
-    WRITE_ALL_PARTITION_STACK_MEASURED_PEAK_BYTES
-    WRITE_ALL_PARTITION_STACK_HEADROOM_BYTES = 252 * 1024 * 1024
-    // measured headroom without depending on ambient RUST_MIN_STACK
-
-⇒ **The population that has a stated margin is not the population that needs
-one.** Sites that state a stack are covered by `TEST-STATED-STACK-SITE-RECONCILE`
-(15 sites). **Nothing covers the population that states nothing and inherits the
-ambient default**, which is where all three SIGABRTs happened.
+**That came true on a different path.** `LANG-PRELUDE-ELABORATION-DEPTH`
+(merged) is the second, and named this node's leading candidate a month early.
+**Per-instance repairs were applied twice and the condition recurred.**
 
 ## Deliverables
 
-- **D0. The requirement stated as a number** for each measured row, with its
-  budget in the same place. Brackets for the remaining heavy rows are in flight
-  at +/-64 KiB; they are corroboration, not a dependency, since the cause fork
-  is already settled.
-- **D1. What separates cheap from expensive.** The floor row and the heavy rows
-  differ by 30x through the same entry point. **That property is what a remedy
-  has to address** -- a per-level frame reduction on the common path may not
-  reach whatever is expensive about the three. This is the real next question.
-- **D2. The population enumerated:** which in-process compiles inherit the
-  ambient default rather than stating a stack. State the method, so a zero for
-  any search term is readable as evidence about that term.
-- **D3. A stated bound TOGETHER WITH THE INPUT IT IS A FUNCTION OF.** Not "the
-  compiler needs N KiB" but "the requirement is a function of the program, here
-  is the measured worst case over a **named population**, and here is what
-  bounds it."
-
-  **Why the program-wide form is wrong, which is not obvious.** If consumption
-  is a function of the program, there is no single number that is "the
-  compiler's stack requirement." A stated program-wide number measured on the
-  floor row would read **64 KiB**, be perfectly true, satisfy a program-wide
-  criterion, and be useless. **A number without its input is the same defect one
-  level down** -- satisfiable by measuring the cheapest thing in the class.
-
-  This is the Architect's third rescoping of its own criterion tonight: per-row,
-  then program-wide, now bound-with-input. It is recorded as a rescoping rather
-  than presented as the original, because each earlier form **could be satisfied
-  without the property being true** -- the same defect being caught elsewhere in
-  this arc, in the author's own criteria.
+- **D0. Attribute the prefix to a phase.** ~1920 KiB is spent before lowering;
+  which phase spends it is unmeasured. This is the gating question and it needs
+  a profile, not a name.
+  **A first target, offered as a HYPOTHESIS and not a finding** (Architect,
+  `evt_3mwrt8gj994q1`): `register_prelude` is a single function spanning
+  `prelude.rs:471-3127` -- 2657 lines, 177 call expressions, 4 top-level
+  conditionals -- reached from exactly one call site, and **in an unoptimized
+  build its own frame is a candidate for a large fixed cost**, since debug
+  builds allocate slots for a function's locals and temporaries with little
+  reuse. It would account for a cost that is fixed, near-constant across
+  programs, not a depth phenomenon, and largely gone in release -- and it
+  **predicts D4's outcome**, which makes it refutable rather than decorative.
+  Measure it first; `AC-5` still forbids the node asserting it.
+- **D1. Reconcile with `LANG-PRELUDE-ELABORATION-DEPTH`.** If the prefix is
+  prelude elaboration, these are one finding and that node's merged status is
+  itself a result -- a repair that did not hold. **Establish it; do not assume
+  it from the arithmetic.**
+- **D2. A stated bound TOGETHER WITH THE INPUT IT IS A FUNCTION OF**, over a
+  named population. Not "the compiler needs N KiB": a number without its input
+  is satisfiable by measuring the cheapest member. (Architect's third rescoping
+  of this criterion, `evt_79fyfvanbk896`.)
+- **D3. A live cheap row, or the finding that none exists.** The floor side is
+  currently **empty**. Whether any native compile is cheap is unmeasured, and
+  "none exists" would be a stronger result than the one this node first claimed.
+- **D4. Separate the build profile. RUN THIS FIRST.** Re-bracket
+  `nondecreasing_cycle_is_rejected_before_native_lowering` in release against
+  its debug bracket, both readings pre-committed above. Last in the list and
+  first in time: it is two probes, it bounds the severity of everything else
+  here, and **the funding call should not be made without it.**
 
 ## Acceptance criteria
 
-- **AC-1.** Every number is measured, not inferred. This margin arrived
-  unnoticed precisely because nobody had probed it.
-- **AC-2.** No `RUST_MIN_STACK` raise and no `stack_size` added to buy headroom.
-  The fix is a **reduction** of what frames hold -- inherited from
-  `LANG-RECORD-STACK-OVERFLOW`, restated by the Architect. **This is the
-  criterion most likely to be reached for under pressure**, because raising the
-  limit converts the measurement into a workaround for the condition it
-  uncovered.
-- **AC-3.** Any repair lands carrying its resulting headroom as a number. **A
-  green check is not evidence** -- it cannot distinguish 3% from 22%, which is
-  how this survived until an arc tipped it.
-- **AC-4.** The `3/4` screen is never restated as a rate, and the node is never
-  restated as "every native compile is near the wall".
-- **AC-5.** The rejection-path anomaly is either explained or carried forward as
-  an open observation. It is not absorbed into the cause-A story by silence, and
-  no deliverable asserts a location for the consumption until one is measured.
-- **AC-6.** Any stated bound names **the input it is a function of and the
-  population it is a worst case over.** A bare number satisfies nothing here: a
-  true program-wide figure measured on the cheapest member is the failure mode
-  this criterion exists to exclude.
-- **AC-7.** No-regression, green in CI (`COORDINATION §12`, never a local
+- **AC-1.** Every probe reports its **executed count**. No claim rests on an
+  exit code or on "no overflow".
+- **AC-2.** Every measured row's `#[ignore]` status is stated at the measured
+  SHA, not at `origin/main`.
+- **AC-3.** No `RUST_MIN_STACK` raise and no `stack_size` added to buy headroom.
+  The fix is a **reduction** -- inherited from `LANG-RECORD-STACK-OVERFLOW`.
+  **The criterion most likely to be reached for under pressure.**
+- **AC-4.** Any repair lands carrying its resulting headroom as a number. **A
+  green check is not evidence**; it cannot distinguish 3% from 22%.
+- **AC-5.** No deliverable names the expensive phase until D0 measures it.
+- **AC-7.** Every stack figure states the **build profile** it was taken under.
+  A number without its profile is not comparable to one taken under the other,
+  and this node was written with every number in it taken under only one.
+- **AC-6.** No-regression, green in CI (`COORDINATION §12`, never a local
   `--workspace` run).
-
-## OPEN, and decision-relevant
-
-**Did the earlier per-instance repair hold?** `px4b_native_production` was the
-first instance and still provisions no stack today. Whether it is *back* at the
-wall is **unmeasured**. One screen at 1024 KiB answers it, and it distinguishes
-"targeted fixes hold" from "targeted fixes get re-crossed" -- the crux of the
-funding question. Requested and not yet run.
 
 ## Not this node
 
-- **Not the remedy.** Bounding the scaling across the ambient population is
-  program-sized. **Whether it is funded, and when, is an operator scope call
-  under `steward/lanes.md` §0** -- no measurement here adds or re-scopes a lane.
-  This node is `draft` for exactly that reason: it must not be pulled before
-  that call.
+- **Not the remedy's funding.** Whether this is worked, and when, is an operator
+  scope call under `steward/lanes.md` §0. **`draft` is what stops it being
+  pulled before that call.** The Steward told the operator this pointed at the
+  *larger* program of work; that rested on the withdrawn evidence and **the
+  correction is that it plausibly points at the smaller one.** *Plausibly* is
+  load-bearing: **which of the two it is, is exactly what D4 measures**, and the
+  brief carries that it is unmeasured rather than asserting either.
 - **Not `#3676`.** That candidate cannot be repaired into landing by shaving its
-  own increment, because the condition it tripped is 96.9% occupancy with none
-  of its commits present. Its routing is independent and unchanged.
+  own increment: the condition it tripped is ~94% occupancy with none of its
+  commits present. Routing independent and unchanged.
 - **Not `TEST-STATED-STACK-SITE-RECONCILE`.** That owns sites that *state* a
-  stack; this owns the population that states nothing. Do not merge them.
-- **Not the growth curve.** Attributing which arc commit supplied a 64 KiB straw
-  on a 96.9%-full stack has no repair attached to either outcome. Cancelled.
+  stack; this owns the population that states nothing.
+- **Not the growth curve.** Cancelled -- attributing a 64 KiB straw on a
+  96.9%-full stack has no repair attached to either outcome.
 
 ## Related
 
+- `LANG-PRELUDE-ELABORATION-DEPTH` -- merged; names this node's leading
+  candidate and supplies the independent 1933 KiB figure.
 - `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` -- merged; first instance, whose
   written prediction this node confirms.
-- `LANG-PRELUDE-ELABORATION-DEPTH` -- merged; second instance, and the source of
-  the thirteen-sites-at-256-MiB census.
 - `TEST-STATED-STACK-SITE-RECONCILE` -- `ready`; the complementary population.
-- `TEST-NATIVE-STACK-PROVISIONING-STANDARD` -- merged; the statedness standard,
-  governing a test's stack rather than a compile's requirement.
 - `LANG-RECORD-STACK-OVERFLOW` -- merged; source of the reduction-not-raise rule.

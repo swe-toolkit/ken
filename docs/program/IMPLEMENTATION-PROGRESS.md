@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-15 05:23:37Z — from 625 issue file(s) in `docs/program/issues/`.
+2026-09-15 05:36:02Z — from 625 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -514,7 +514,7 @@ the committed file matches the generator's output.
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-MUTATION-ARM-CONTROL-COVERAGE` | The backend's refusal-mutation corpus is 410 non-Exact arms across 76 enums, and we do not know how many drive a live control. An arm no control drives is a mutation the suite cannot detect -- it produces no signal at either end, so every base-vs-tip diff of outcomes is structurally blind to exactly it. | draft | runtime | M | none | — |
 | `RT-NATIVE-CARRIED-VALUE` | Native carried-value / higher-order boundary lowering — the capability program that closes PX8's native full-program half, structured as two tracks over ONE open representation decision | closed | runtime | L | none | — |
-| `RT-NATIVE-COMPILE-RUNS-AT-THE-STACK-WALL` | The native compile's stack consumption SCALES WITH THE PROGRAM, unmeasured and unbounded: one real complete compile fits in 64 KiB while three others need ~1950 KiB of a 2048 KiB default, a thirtyfold spread, and nothing states which programs are which or what the limit is. So a candidate adding 64 KiB aborts one of them and looks guilty while not being the cause. This is the THIRD measured instance of that condition -- LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT and LANG-PRELUDE-ELABORATION-DEPTH are both merged, both single-digit-percent headroom, both diagnosed trigger-not-cause -- and the first predicted this recurrence IN WRITING. | draft | runtime | L | none | — |
+| `RT-NATIVE-COMPILE-RUNS-AT-THE-STACK-WALL` | Roughly 94 percent of the native compile's 2048 KiB stack budget is consumed BEFORE lowering begins: a compile that rejects before native lowering needs (1920, 1952] KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity. Lowering is a rounding error on a fixed prefix every compile pays. So a candidate adding 64 KiB aborts and looks guilty while not being the cause. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged. | draft | runtime | M | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NATIVE-READEOF-WITNESS-FOLD` | Two-quarter native carried-value fold: un-ignore the ReadEof full-program row via a new zero-TCB rt_cap41 executing native-closure witness, and confirm the already-green SemanticErrorV1 (InvalidOffset) row stays rearmed. Honest progress toward RT-NATIVE-CARRIED-VALUE's four-value PX8 closure; Wrote and ReadSome remain #[ignore]d under the composed-return arc and this node does NOT close the parent. | merged | runtime | S | none | — |
 | `RT-NATIVE-TRACK0-REARM` | Track 0 of the native carried-value program — un-ignore the stale first-order native rows, re-measure, and re-arm the vacuous native CI jobs (decision-4 de-vacuuming), using the workspace ignored-sweep as the oracle | merged | runtime | S | none | — |
