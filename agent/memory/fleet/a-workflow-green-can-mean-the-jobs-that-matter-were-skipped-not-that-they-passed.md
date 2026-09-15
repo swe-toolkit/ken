@@ -38,13 +38,17 @@ a real base, and because it was the only one carrying evidence it was mistaken
 for the whole story — a **selection effect**, not a diagnosis.
 
 ⇒ **The seventeenth is the roll-up, and it belongs to neither class.** It runs
-on `main` every time and succeeds in two to six seconds — but it succeeds *by
-accepting the skips* (below), so it is not a base measurement of anything. A
-job that always runs and never exercises the code is the same blindness as one
-that never runs, wearing the opposite appearance.
+**unconditionally** — the roll-up carries `if: always()` (`ci.yml:477`, with a
+comment saying why: without it a failed dependency leaves the required check
+*skipped* and blocks the PR with no signal) and is **not** one of the eight
+`mode == 'full'` jobs. That is also why it appears in a census of *failing*
+checks at all: `always()` fires it even when everything upstream is red. And it
+**succeeds by accepting the skips** (below). So it is not a base measurement of
+anything: a job that always runs and never exercises the code is the same
+blindness as one that never runs, wearing the opposite appearance.
 
 **The green was produced by the jobs not running, and the mechanism is
-deliberate.** Verified at `origin/main`: nine jobs carry
+deliberate.** Verified at `origin/main`: **eight** jobs carry
 `if: needs.classify-paths.outputs.mode == 'full'`, and `classify-paths` runs
 `scripts/ci-doc-only.py`, which returns `doc-only` when every changed path is
 under `docs/`, `agent/` or `library/` and outside the deny list (`crates/`,
@@ -118,6 +122,18 @@ disowned wording first. The lesson it failed to sweep against is
 which landed in the very commit this branch was cut from. **Cutting a
 correction obliges one pass over the whole containing document for the phrasing
 you just disowned**, not only over the sentence you came to fix.
+
+**AND THE JOB COUNT IN THIS FILE WAS WRONG FOR THE SAME REASON THE FILE IS
+ABOUT.** It read *"nine jobs carry `mode == 'full'`"*. There are **eight**. The
+nine came from `grep -n "classify-paths.outputs.mode"`, which matches nine
+lines — and the ninth is `ci.yml:504`, a **shell** condition inside the
+roll-up's own step testing `= doc-only`, not a job gate at all. ⇒ **The line
+that inflated the count is the roll-up's own line, inside a sentence whose
+purpose was to say the roll-up is not among them.** A count is only as good as
+the predicate that selected its population, and `grep` will answer the question
+you typed rather than the one you meant — which is
+[[a-claim-inherits-the-scope-of-the-site-you-checked-not-the-scope-you-stated]]
+in its cheapest form.
 
 **The scope this failed at.** Three seats read the same green — a build leader,
 the Architect, and the Steward — and none of us asked whether the suite had
