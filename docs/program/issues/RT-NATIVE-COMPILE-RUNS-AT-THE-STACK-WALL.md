@@ -1,6 +1,6 @@
 ---
 id: RT-NATIVE-COMPILE-RUNS-AT-THE-STACK-WALL
-title: "Roughly 94 percent of the native compile's 2048 KiB stack budget is consumed BEFORE lowering begins: a compile that rejects before native lowering needs (1920, 1952] KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity. Lowering is a rounding error on a fixed prefix every compile pays. So a candidate adding 64 KiB aborts and looks guilty while not being the cause. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
+title: "IN A DEBUG BUILD roughly 94 percent of the native compile's 2048 KiB stack budget is consumed BEFORE lowering begins -- and D4 measured the same row at 17 percent in release, so the recurrence is CI's rather than the compiler's: CI sits about 6 percent of prelude growth from the wall while the product sits about 510 percent from it, and no gate anywhere builds release. a compile that rejects before native lowering needs (1920, 1952] KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity. Lowering is a rounding error on a fixed prefix every compile pays. So a candidate adding 64 KiB aborts and looks guilty while not being the cause. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
 status: draft
 owner: runtime
 size: M
@@ -37,36 +37,144 @@ The default is bracketed to `(1536, 2048]` by the same instrument and pins to
 2048 only via the documented `std::thread` value -- **that last step is
 documentation, not measurement.**
 
-## EVERY NUMBER ABOVE IS A DEBUG BUILD. RELEASE IS UNMEASURED.
+## "PRE-LOWERING" IS CONFIRMED. "PRE-LOWERING" IS NOT ONE CONSUMER.
 
-**Every stack measurement in this investigation, and in both merged precedent
-nodes, was taken under `cargo test` -- an unoptimized build.** The variable was
-never varied. `LANG-PRELUDE-ELABORATION-DEPTH` says in its own body:
+**The row that bounds the pre-lowering claim was selected to drive the kernel's
+size-change-termination gate to rejection** (Architect, verified at source,
+`evt_526whg4xnpb2m`):
 
-> in an unoptimized build a new arm's locals in `check` are paid by every call
-> regardless of which arm runs
+    fn spin (fuel : Nat) : HostIO APartial ExitCode = spin fuel
+    .expect_err("the kernel SCT gate must reject a non-decreasing
+                 recursive cycle")
 
-⇒ **The severity of this condition for shipped compiles is unmeasured**, and
-that is a property of the measurement configuration being read as a property of
-the subject -- the same class as the `#[ignore]` confound, one axis over. It is
-**not** an attribution claim and does not weaken `AC-5`; it names a condition
-nobody controlled.
+⇒ Its `(1920, 1952]` covers prelude registration **plus** program elaboration
+**plus** the termination check. At least two candidates live inside that
+bracket: **prelude registration, which is unconditional, and termination
+checking, which is program-triggered** -- and the row establishing the bound is
+one chosen for the second. **Nothing here weakens "the spend is before
+lowering." It forbids reading that as "the spend is the prelude."**
 
-**The discriminator, with both readings fixed in advance** (Architect,
-`evt_7kxt44edjhjwq`). Subject: the `nondecreasing_cycle` row -- live, executed,
-never lowers, already bracketed in debug.
+**This does NOT touch D4.** D4 compares one row against itself across build
+profiles; the confound is present in both arms and cancels. **It bites the
+absolute claims -- D0, D3, and the decomposition below -- not the differential
+one.** Stated because the reverse reading is available and would retire the
+cheapest measurement on the list.
 
-    requirement COLLAPSES in release   frame-size dominated. A CI and test-
-                                       infrastructure condition carrying a
-                                       stated-bound obligation. The SMALLER
-                                       program of work.
+## A DECOMPOSITION THE NUMBERS PERMIT, WHICH IS NOT ASSERTED AND MAY NOT BE
 
-    requirement HOLDS in release       depth dominated and live for users. The
-                                       2 MiB default is a product constraint,
-                                       not a test artifact. The LARGER one.
+    prelude alone (merged node)      2048 - 115  =  ~1933 KiB
+    whole trivial reject row                     <=  1952 KiB
+    => everything else that row does             <=  ~19 KiB
+       (three declarations elaborated, SCT gate run to rejection)
 
-**This is the question the funding call turns on**, and it is two probes on an
-instrument that already exists.
+    heavy rows that fully compile                <=  1984 KiB
+    => lowering + emission + execution           <=  ~51 KiB over prelude
+
+If it holds it is far stronger than "94% pre-lowering": **the prelude would be
+nearly the whole cost, and program elaboration, termination checking, lowering,
+emission and running the binary would together fit in about 2.5% of the
+budget** -- which would also bound SCT at ~19 KiB and dissolve the confound
+above.
+
+**It is not asserted, and the Architect declined to assert it, on this node's
+own AC-7.** The subtraction combines `1933` -- taken from a merged node -- with
+tonight's brackets, and **the two have not been shown to share a build
+profile.** AC-7 exists precisely to forbid that comparison. ⇒ **A decomposition
+to check, not a finding.** D4 is what makes it checkable: if D4 also re-states
+the prelude figure under a stated profile, this falls out for free.
+
+## THE BUILD PROFILE WAS THE UNCONTROLLED VARIABLE. IT HAS NOW BEEN VARIED.
+
+Every stack figure in this investigation, and in both merged precedent nodes,
+was taken under `cargo test` -- an unoptimized build. The variable was never
+varied, so the severity for shipped compiles was a property of the measurement
+configuration being read as a property of the subject: the same class as the
+`#[ignore]` confound, one axis over.
+
+**D4 ANSWERED IT. THE FIRST PRE-COMMITTED ARM FIRED.** Same row, same
+instrument, same base `1dec48f33`, both profiles (runtime-implementer,
+`evt_2rq86bavmstt8`):
+
+    DEBUG     (1920, 1952] KiB    ~94.5% of a 2048 KiB budget
+    RELEASE   ( 320,  352] KiB    ~17%
+
+      1024 pass(1 executed)        384 pass(1 executed)
+       512 pass(1 executed)        352 pass(1 executed)
+       256 OVERFLOW                320 OVERFLOW
+       128 OVERFLOW
+        64 OVERFLOW
+
+⇒ **Between a 5.5-fold and a 6.1-fold reduction** -- the brackets bound the
+ratio at `1920/352 = 5.45` to `1952/320 = 6.1`, and **that interval is the
+honest figure**; two seats quoted 5.5x and 5.8x as point values from these same
+brackets within minutes of each other. **The margin goes from 96 KiB to about
+1700.** The
+condition is **frame-size dominated**, which was the arm meaning: the remedy is
+the elaborator's recursive `check` frame, the severity for shipped compiles is
+far lower than for CI, and **this is substantially the SMALLER program of
+work.**
+
+**The preconditions were discharged before the number, not after.** `#[ignore]`
+screened at the SHA rather than at HEAD; the control re-run inside the release
+binary (`1 passed; 0 failed; 0 ignored`, 0.09s) rather than inherited from
+debug; and **the release binary shown to be a distinct artifact** --
+`px8l_recursive_decl_native-894faa2b7dc8a9b1` at 19,392,776 bytes against the
+debug `-3058e1fdeee79953` at 75,598,704. Different path, different hash,
+different size: not a debug binary aliased under `--release`. Every probe line
+above reports what executed.
+
+It also corroborates the merged node's prose from a direction that node could
+not test -- *"in an unoptimized build a new arm's locals in `check` are paid by
+every call regardless of which arm runs"* predicted a debug-inflated frame, and
+a 5.5x collapse is what that looks like measured.
+
+**WHAT D4 DOES NOT ESTABLISH, and it bounds how far the result travels:**
+
+- **One row.** The ratio is measured on the pre-lowering row only. The four
+  heavy rows that lower, emit and run are **unmeasured in release**, and they
+  exercise a different path -- which is the reason this row was chosen.
+- **It does not make the condition benign.** 352 KiB of 2048 is comfortable; it
+  is still an unstated requirement that nothing measures and nothing bounds, and
+  `37 §9`'s queue of prelude additions grows it **in either profile.** The
+  condition is smaller, not absent.
+
+## NO GATE ANYWHERE EXERCISES THE RELEASE NUMBER
+
+The implementer left open whether Ken ships through a release-profile binary,
+correctly noting a stack bracket cannot answer it. **The repo answers it**
+(Architect, `evt_76nhsb73ys3wx`):
+
+    --release in .github/workflows/ci.yml              0
+    --release in .github/workflows/build-ci-base.yml   0
+    --release in scripts/ken-cargo                     0
+
+⇒ **Nothing in CI and nothing in the sanctioned local build path ever builds
+release.** Every stack figure this project has produced -- tonight's, both
+merged nodes', the thirteen sites in `LANG-PRELUDE-ELABORATION-DEPTH` -- is a
+debug figure, and **the 352 KiB release number is exercised by no gate.**
+
+**THE CANARY ARITHMETIC, WHICH IS THE ACTIONABLE PART.** Same code, same row,
+expressed as growth absorbable before the 2048 KiB wall:
+
+    DEBUG    1936 / 2048   wall at 1.06x   ~6% of headroom left
+    RELEASE   336 / 2048   wall at 6.1x    ~510%
+
+⇒ **CI is about 6% of prelude growth from breaking again; the product is about
+510% away. The recurrence is CI's, not the compiler's**, and `37 §9`'s open
+queue of prelude additions is spent against the 6%.
+
+**SO THE WORKAROUND POPULATION READS BACKWARDS FROM HOW IT WAS BUILT.** 30
+`stack_size` occurrences across 21 files, 14 at the same 256 MiB constant, zero
+stated rules. **Debug is a ~6x-amplified early-warning instrument for release
+stack growth, and 30 sites were spent silencing it** -- then the same condition
+was met in a 31st place and filed as a new discovery, three times.
+
+**WHERE THE REMEDY LIVES, AND IT IS MOSTLY NOT NEW WORK.**
+`agent/playbooks/tools/stated-stacks.md` act 2 already permits provisioning a
+baseline **when stated**. The debug test path needs a stated adequate stack and
+a rule; the 30 unstated sites violate a standard that exists rather than
+revealing an absent one. With `AC-7`, the deliverable is **two stated numbers
+carrying their profiles**, not a compiler project.
 
 ## What this explains, and what it costs
 
@@ -186,6 +294,26 @@ same way inside the commit that documented the mechanism.
 - **D3. A live cheap row, or the finding that none exists.** The floor side is
   currently **empty**. Whether any native compile is cheap is unmeasured, and
   "none exists" would be a stronger result than the one this node first claimed.
+  **The row must elaborate a trivial program TO COMPLETION**, without an SCT
+  rejection -- see the confound below. A cheap-row hunt that lands on another
+  rejection row re-measures the same mixture.
+  **D3 IS A DIRECT TEST OF D0'S HYPOTHESIS, AND BOTH OUTCOMES ARE RECORDED HERE
+  BEFORE IT RUNS** (Architect, `evt_526whg4xnpb2m`). `register_prelude` has one
+  call site, in `ElabEnv` construction, unconditional -- so every compile pays
+  its peak:
+
+      prelude peak really is ~1933 KiB   NO live row can be cheap. D3 comes back
+                                         EMPTY and the emptiness is the RESULT.
+      D3 finds ONE cheap live row        the prelude-peak hypothesis is REFUTED,
+                                         whatever D4 says about profile.
+
+  **Both predictions are DEBUG-PROFILE predictions and D3 must be run in debug
+  to test them** -- per `AC-7`, and because D4 measured every row to be cheap in
+  release, where the search would return a hit that means nothing.
+
+  **Recorded in advance because an unexpected empty result and a predicted empty
+  result get acted on completely differently** -- the first reads as "we did not
+  look hard enough" and gets repeated, at cost, forever.
 - **D4. Separate the build profile. RUN THIS FIRST.** Re-bracket
   `nondecreasing_cycle_is_rejected_before_native_lowering` in release against
   its debug bracket, both readings pre-committed above. Last in the list and
@@ -216,14 +344,27 @@ same way inside the commit that documented the mechanism.
   scope call under `steward/lanes.md` §0. **`draft` is what stops it being
   pulled before that call.** The Steward told the operator this pointed at the
   *larger* program of work; that rested on the withdrawn evidence and **the
-  correction is that it plausibly points at the smaller one.** *Plausibly* is
-  load-bearing: **which of the two it is, is exactly what D4 measures**, and the
-  brief carries that it is unmeasured rather than asserting either.
+  correction is that it points at the smaller one.** That was filed as
+  *plausible* pending D4; **D4 has since measured it**, the first arm fired, and
+  the remedy's locus is `stated-stacks.md` act 2 plus two stated numbers rather
+  than a compiler project. **The size question is answered; the funding question
+  is still the operator's.**
 - **Not `#3676`.** That candidate cannot be repaired into landing by shaving its
   own increment: the condition it tripped is ~94% occupancy with none of its
   commits present. Routing independent and unchanged.
 - **Not `TEST-STATED-STACK-SITE-RECONCILE`.** That owns sites that *state* a
   stack; this owns the population that states nothing.
+- **NOT the false `Cargo.toml` comment, which is a SEPARATE FINDING TO FILE.**
+  Root `Cargo.toml:61-62` reads *"CI builds the full workspace and runs
+  release/conformance ... Release profile is left at defaults (CI owns it)."*
+  **Both clauses are false** -- CI has zero `--release` occurrences (measured
+  above), and the conformance job echoes *"conformance suite not yet implemented
+  (WP F2)"*. **"CI owns it" names an owner that does not exist.** It is recorded
+  here rather than folded because it is a false claim about CI sitting in the
+  file a reader opens to answer exactly the question being asked of the
+  operator, and **a mechanism claim in a comment is structurally exempt from
+  execution**, so nothing could ever have gone red on it. Architect
+  `evt_76nhsb73ys3wx`; not folded at the Architect's own request.
 - **Not the growth curve.** Cancelled -- attributing a 64 KiB straw on a
   96.9%-full stack has no repair attached to either outcome.
 
