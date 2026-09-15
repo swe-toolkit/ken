@@ -1,0 +1,76 @@
+---
+scope: fleet
+audience: (see scope README)
+source: 2026-09-15, PR #3676 census — "main is green" was read as a base
+  measurement by three seats, while every test shard and every native-slow job
+  had been skipped by path classification in the green runs and cancelled in
+  the only two that expanded them
+---
+
+# A workflow green can mean the jobs that matter were SKIPPED, not that they passed
+
+**Measured 2026-09-15.** `#3676` was red and the question was whether its
+failures were its own regressions. Main's last runs all read `success`, so main
+looked like a clean base. It is not a base at all:
+
+    latest main runs, conclusion success   test shard 1..8/8      SKIPPED
+                                           ALL native-slow jobs   SKIPPED
+                                           job names still read "${{ matrix.shard }}"
+                                           -- the matrix never expanded
+
+    only 2 of the last 60 main runs        every test shard       CANCELLED
+    executed those jobs at all             every rt_parity shard  CANCELLED
+                                           px8f_write_partition   success
+
+⇒ **Fifteen of the seventeen failing checks had NO base measurement anywhere in
+sixty main runs**, so whether they were the candidate's regressions or standing
+main-wide breakage was unestablished **in either direction**. Exactly one job
+had a real base (`px8f_write_partition`: passes on main, fails on the
+candidate), and because it was the only one carrying evidence it was mistaken
+for the whole story — a **selection effect**, not a diagnosis.
+
+**The green was produced by the jobs not running.** A path-classification step
+(`classify changed paths`) gates the expensive matrices, so a docs-only or
+`agent/`-only commit greens the whole workflow without compiling a line of the
+native suite. Nothing is broken; the run is behaving as designed. What is
+broken is reading its conclusion as information about the suite.
+
+## The tells, in the order they are cheap
+
+- **A job conclusion of `skipped` is not a pass.** `gh pr checks` and the run
+  summary present a skipped required job indistinguishably from a passing one
+  at the run level; only the per-job conclusion separates them.
+- **An unexpanded matrix is visible in the NAME.** A job still literally called
+  `test shard ${{ matrix.shard }}/8` never ran — a real one is named
+  `test shard 3/8`. This is the fastest signal in the whole listing.
+- **A roll-up check is not the thing it is named after.** `build + test` here
+  has one step, `All test jobs passed`, and finishes in 3 seconds. It is a
+  downstream aggregator; its failure carries no independent cause, and its
+  *name* invites you to report a compile failure that did not happen.
+
+## How to apply
+
+- **Before calling a ref a base, confirm the specific jobs EXECUTED on it.**
+  Not the run conclusion — the per-job conclusion for the jobs you are
+  comparing:
+  ```sh
+  gh api "repos/<o>/<r>/actions/runs/<id>/jobs?per_page=60" \
+    --jq '.jobs[]|select(.name|test("<job pattern>"))|"\(.conclusion)\t\(.name)"'
+  ```
+- **"Is it red on main?" has three answers, not two:** passes, fails, and
+  **never ran there**. The third is the common one for expensive
+  path-gated suites, and it is the one that silently becomes "it passes."
+- **When exactly one job in a failing set has a base measurement, expect it to
+  look decisive and distrust that.** It is the only one that *could* produce
+  evidence; its prominence is an artifact of the instrument.
+
+**The scope this failed at.** Three seats read the same green — a build leader,
+the Architect, and the Steward — and none of us asked whether the suite had
+run. It is
+[[a-claim-inherits-the-scope-of-the-site-you-checked-not-the-scope-you-stated]]
+applied to CI, and it is the workflow-scale form of
+[[libtest-reports-ok-for-zero-executed-tests-so-a-green-probe-may-have-run-nothing]]:
+**the criterion is `failed == 0`, and zero executed jobs satisfies it by
+construction.** Related:
+[[a-green-pilot-is-not-evidence-for-a-shape-it-never-produced]],
+[[ci-history-answers-does-it-pass-on-main-for-free-but-read-the-job-conclusion-not-the-runs]].
