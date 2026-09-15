@@ -1,6 +1,6 @@
 ---
 id: RT-TRAP-MESSAGE-NAMES-FAMILY-NOT-POPULATION
-title: "The PatternMatchFailure trap prints only view.family_symbol, so 'no runtime match case selected for X' is the IDENTICAL string across FOUR states -- no arms, a short arm set from a non-exhaustive SOURCE, a short arm set from a DROPPED arm, and complete arms whose tags diverged. It is a verdict with no population: one string for four distinct failure modes, two of which are the user's own bug, and the user who hits it gets a diagnostic they cannot act on."
+title: "The PatternMatchFailure trap prints only view.family_symbol, so the same string covers an absurd elimination on an uninhabited type, a non-exhaustive user match, arms dropped by the compiler, and complete arms whose tags diverged. It is a verdict with no population, and its criterion is the three axes -- arm set, declared roster, decoded observed tag -- not a list of states: this node enumerated three, then four, and was wrong both times, and the user who hits it gets a diagnostic they cannot act on."
 status: ready
 owner: runtime
 size: S
@@ -26,39 +26,83 @@ At `b0a7c2945`, `crates/ken-elaborator/src/erasure.rs`:
     6043        message: format!("no runtime match case selected for {}", view.family_symbol),
 
 The family symbol is the only thing that varies. **The arms are not named, and
-the tag actually observed is not named.** So one string covers **four** distinct
-states, two of which are the user's own bug and two of which are compiler
-defects:
+the tag actually observed is not named.** So one string covers many distinct
+states — some of them the user's own bug, some of them compiler defects, and at
+least one of them not a defect at all.
 
-    no arms at all                                        -> compiler defect
-    short arm set because the SOURCE was non-exhaustive    -> THE USER'S OWN BUG
-    short arm set because something DROPPED an arm         -> compiler defect
-    arms complete, tags diverged                           -> compiler defect
+## THE CRITERION IS THE THREE AXES, NOT A LIST OF STATES
+
+**Do not read the table below as the specification.** This node's enumeration
+has been wrong twice, in two different directions, and each correction was
+locally right without closing the class:
+
+- filed with **three** states, collapsing *non-exhaustive user source* with
+  *compiler dropped an arm* (Architect, `evt_78d5649dyc51c`);
+- amended to **four**, mislabelling the zero-arm row as a compiler defect
+  (Architect, `evt_3tz3zp3djrke1`).
+
+**An enumeration that needs a second repair needs a closure, not a better
+list.** The closure is that three axes determine every state, including states
+nobody has listed:
+
+    AXIS 1  the arm count and arm constructor symbols   (D0)
+    AXIS 2  the DECLARED constructor roster             (D0a)
+    AXIS 3  the decoded observed tag                    (D1)
+
+Illustrative, not exhaustive, and deliberately not numbered:
+
+    arms 0, declared 0               absurd elimination -- NOT A DEFECT.
+                                     If it FIRED, bottom was inhabited.
+    arms 0, declared N               arms dropped                -> compiler defect
+    arms < declared, source short    non-exhaustive match        -> THE USER'S BUG
+    arms == declared, tag unmatched  tags diverged               -> compiler defect
 
 **This is a verdict with no population.** It reports that nothing matched
 without reporting what was available to match or what was presented — the
 distinction between *"I had nothing to check against"* and *"I checked and
 none applied"*.
 
-**Rows 2 and 3 are the pair that matters most and they are the hardest to
-separate.** `cases` is built from `view.branches` — the source match's *written*
-branches (`erasure.rs:2835-2837` and `:5981-5983`) — so a user who writes a
-non-exhaustive match legitimately produces a short arm set. That is their
-source, not a defect. Nothing in the current message, and nothing in an arm
-count alone, separates it from the compiler having lost an arm.
+### The zero-arm row is not a defect, and mislabelling it is the worse error
 
-(Architect, `evt_78d5649dyc51c`: the first filing of this node stated three
-states and collapsed exactly this pair, while its own motivation section named
-the distinction as the user-facing one.)
+`spec/10-kernel/14-inductive.md:77` declares the uninhabited type:
+
+    data Empty :            Type 0 where           -- ⊥, no constructors
+
+A match on `Empty` legitimately has **zero branches**. `cases` is built one push
+per `view.branches` entry, so `cases` is empty and the default trap is emitted.
+**That is the ordinary lowering of an absurd elimination.**
+
+⇒ **If that trap ever fires, the finding is not "the compiler dropped arms" — it
+is that a value of an uninhabited type was materialized**, which is a soundness
+violation of a completely different and far more serious kind.
+
+Row 2's old mislabel misdirected an investigator *toward* the compiler. This one
+misdirects **away from the most serious thing the trap can tell you**, which is
+why the label matters more here than the count does.
+
+**Not established:** whether the elaborator lowers a zero-branch match today, so
+the absurd state may be unreachable in the current build (Architect, explicitly
+not verified). **That does not rescue the label, and under the axes framing it
+stops mattering** — the criterion rests on the axes, not on which states happen
+to be reachable this month.
+
+### Why the source-versus-dropped pair still needs the roster
+
+`cases` is built from `view.branches` — the source match's *written* branches
+(`erasure.rs:2835-2837` and `:5981-5983`) — so a user who writes a
+non-exhaustive match legitimately produces a short arm set. That is their
+source, not a defect. **An arm count alone cannot separate it from the compiler
+having lost an arm**, which is what AXIS 2 exists for.
 
 ## Why it is worth fixing independently of any live hunt
 
 - **The user gets an unactionable diagnostic.** Anyone hitting this trap learns
   the family and nothing else. They cannot tell a compiler bug from a
   non-exhaustive match in their own source.
-- **The investigator gets one string for four hypotheses**, which means the
-  message can never be the instrument — a separate instrumented compile is
-  required to learn what the trap already knew at the moment it fired.
+- **The investigator gets one string for every state the three axes
+  distinguish**, which means the message can never be the instrument — a
+  separate instrumented compile is required to learn what the trap already
+  knew at the moment it fired.
 - It was measured costing exactly that on 2026-09-15: the px8f hunt could not
   distinguish these cases from the failure output and had to add compile-time
   prints to partition a space the trap site had in hand.
@@ -79,10 +123,11 @@ own author had retracted.
 - **D0.** The message reports the population, not only the verdict: the family
   symbol, the arm count, the arm constructor symbols, and the tag actually
   observed.
-- **D0a — THE DECLARED CONSTRUCTOR ROSTER, which is what separates rows 2 and
-  3.** The message also reports the constructors the family *declares*. Arms
-  versus declared constructors separates non-exhaustive-source from
-  dropped-arm; the decoded observed tag separates matched from diverged.
+- **D0a — THE DECLARED CONSTRUCTOR ROSTER (AXIS 2), which is what separates a
+  non-exhaustive source from a dropped arm.** The message also reports the
+  constructors the family *declares*. Arms versus declared constructors
+  separate non-exhaustive-source from dropped-arm; the decoded observed tag
+  separates matched from diverged.
   Without this the message can carry an arm count and still leave the single
   most useful question — *is my match non-exhaustive, or did the compiler lose
   an arm?* — unanswerable from the message alone.
@@ -117,18 +162,38 @@ own author had retracted.
 
 ## Acceptance criteria
 
-- **AC-1.** From the message text alone — **without the reader holding the
-  source** — a reader can distinguish the **four** states above. Demonstrate
-  with a real trap from each state that is constructible; for any state that
-  cannot be constructed, say so and why rather than asserting it is covered.
+- **AC-1 (THE AXES, NOT A COUNT).** From the message text alone — **without the
+  reader holding the source** — a reader can determine **all three axes**: the
+  arm count and arm constructor symbols, the declared constructor roster, and
+  the decoded observed tag. **Any two states differing in those axes are
+  distinguishable from the message alone.**
 
-  **The non-exhaustive-source versus dropped-arm split is the one this AC
-  exists for.** An implementation that reports the family, the arm count, the
-  arm symbols and the tag satisfies an arm-count-based reading of this AC
-  completely and still cannot answer it. If D0a is descoped for any reason,
-  **this AC must be amended in the same change** to say the split requires the
-  reader's source — so that a passing AC-1 is never later read as having
-  delivered a distinction it did not.
+  **This AC is deliberately not a list of states, and must not be rewritten as
+  one.** The list has been wrong twice — three states collapsing the
+  user-versus-compiler pair, then four mislabelling the absurd case — and each
+  time the criterion inherited the error. Keyed to the axes, a state nobody has
+  thought of cannot invalidate it, and the count never has to be right.
+
+  Demonstrate with a real trap from each **constructible** state; for any state
+  that cannot be constructed, say so and why rather than asserting it is
+  covered. The zero-arm/zero-declared case in particular may be unreachable
+  today — declare that rather than claiming coverage.
+
+  **If D0a is descoped for any reason, this AC must be amended in the same
+  change** to record that AXIS 2 is unavailable and which distinctions are lost
+  with it — so a passing AC-1 is never later read as having delivered a
+  separation it did not.
+- **AC-1a (THE LABELS, WHICH ARE NOT THE SAME DELIVERABLE AS THE AXES).** Where
+  the message or its documentation attributes a state to a cause, the
+  attribution is correct. Specifically: **a zero-arm match on a family with zero
+  declared constructors is not reported, described, or documented as a compiler
+  defect.** If that trap fires, the message must not send an investigator
+  hunting dropped arms — the condition it indicates is that a value of an
+  uninhabited type was materialized.
+
+  This is separate from AC-1 on purpose: the axes can all be present and
+  correct while a label on top of them points the reader at the wrong failure.
+  Both of this node's enumeration errors were label errors, not axis errors.
 - **AC-2.** The tag is shown decoded. A test pins a decoded name, not an
   integer, so a future change that regresses to raw words fails.
 - **AC-3.** The emitting site is identifiable from the message.
