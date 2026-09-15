@@ -213,12 +213,79 @@ measured-no-shift.**
 > land: a measured population is what tells us whether the upstream repair is
 > small or is an arc.
 
-## D1 — the closure proper, scoped by D0's answer
+## D1 — the closure proper. SIZED 2026-09-15 FROM D0'S CENSUS.
 
-The arm-1 repair above, landed, **plus** whatever D0 shows is needed upstream to
-make constructor authority actually present at the words that now refuse. D1 is
-deliberately not sized here: **D0's population is what sizes it**, and sizing it
-now would be the guess this node exists to replace.
+The arm-1 repair above, landed, **plus** the upstream repair D0's population
+shows is needed. D0 has run; the guess this node existed to replace was not
+made. **Architect ruling `evt_1xemdvdj9fghw`: for D0's measured population the
+repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
+
+    POPULATION   12 arm-1 hand-offs. Two published words, v1751 and v1386,
+                 always at funcid58/funcid59, every table EMPTY.
+                 4 demanded identities, 3 programs.
+    REPAIR       PRODUCE constructor authority at those words.
+                 NOT re-keying: there is nothing to re-key, the tables are empty.
+    EXCLUDED     the 5 arm-2 refusals -- the proving arm declining, unchanged by
+                 the closure, and cause 2 is the gate working.
+    EXCLUDED     the rt_parity (c1) entries -- PROVISIONALLY FOLDED, below. They
+                 enter neither D1's scope nor its sizing.
+    HOLE         abi_s6_mapping_file_backed_native is NOT MEASURED and is NOT
+                 KNOWN TO CONTRIBUTE ZERO. It aborts (SIGABRT, stack overflow)
+                 before producing a hand-off. Zero executions and never-ran are
+                 two facts and one number; do not let this population enter D1
+                 as a zero.
+
+### D1 MUST TEST THE CORRELATION BEFORE IT PATCHES ANYTHING
+
+**The two words are where the symptom surfaces, not necessarily where the cause
+lives.** Across all 17 census entries, the property arm 1 keys on and the
+property that predicts an empty table are perfectly correlated: every body
+carrying an `independent_contract` has `authorities = 0`, every body without one
+has 593. **If that correlation is causal rather than coincidental, the defect is
+not missing authority at `v1751`/`v1386` — it is that the authority-production
+path does not run for independent-contract bodies**, and the repair is a
+structural closure there rather than a fix at two words.
+
+⇒ **D1 establishes which before it repairs.** A two-word patch that leaves a
+causal production gap in place closes the symptom this census found and none of
+the population it did not.
+
+**The correlation is EMPIRICAL, not structural.** Nothing in the code forces it:
+arm 1's condition is `independent_contract == Some(identity)` and mentions
+`authorities` nowhere. It is 17 for 17 on three programs of one family, which is
+why D1 tests it rather than assuming it.
+
+### The census D1 is sized from
+
+Delivered `evt_50wgwpaancsqh`, **counts corrected at `evt_1rvbsp2qrkapy`** —
+the first report was parsed from a log still being written (the waiter keyed on
+`test result:`, which that suite emits four times because it re-executes itself
+as child processes). The corrected figures are the operative ones:
+
+| | entries | field 5 `authorities.len()` | field 6 |
+|---|---|---|---|
+| **ARM 1** | 12 | `0` — every one | `[]` — every one |
+| **ARM 2** | 5 | `593` — every one | 8 words — every one |
+
+17 for 17, 4 demanded identities, 3 programs, **no intermediate case**.
+`funcid60` takes arm 2 with 593 entries two functions away in the same compile:
+an in-compile control nobody had to construct.
+
+> **FIELD 6 IS NOT INDEPENDENT OF FIELD 5 AND MUST NOT BE COUNTED AS A SECOND
+> MEASUREMENT.** At `:4609-4614` field 6 is `body.authorities.values().filter(…)`
+> — with `authorities.len() == 0` it is `[]` **by construction**. "12 with
+> `field5 = 0`, 12 with `field6 = []`" is one fact reported twice. **`field5 = 0`
+> is decisive for (c2) on its own** (a body with no authorities has none for the
+> demanded identity), so the conclusion stands at full strength and field 6 adds
+> nothing to it. Recorded because two routes agreeing is informative exactly when
+> they could have disagreed — Architect `evt_1xemdvdj9fghw`, correcting a
+> Steward suggestion that named field 6 as the distinguishing measurement.
+
+**The SIGABRT baseline run is NOT owed and is not to be spent now.** The
+attribution is adequately fenced: the Steward's CI census attributed those shards
+to stack overflow before this closure existed, which is strong but is not a
+control at this SHA. The stack-overflow population is its own node. **A baseline
+becomes owed the moment anyone claims the closure caused it.**
 
 ## Acceptance
 
@@ -296,7 +363,7 @@ level down; see the ruling immediately below.
 > arm ran. A population attached by a fact the artifact prints beats one
 > attached by a mechanism it cannot see.
 
-### Case (c) is TWO populations, and only one of them has that ground
+### Case (c) is TWO populations; one had a ground, and that ground is now PROVISIONAL
 
 Measured across all six `rt_parity_native` shards (lieutenant, `evt_2cedrpvwyyv70`;
 five shards carry only `funcid58`/`funcid56`, one additionally carries
@@ -307,12 +374,44 @@ five shards carry only `funcid58`/`funcid56`, one additionally carries
 | **(c1) MISPLACED** — `funcid58`, `funcid56` | 695 | `[v33002]` | evidence exists, keyed elsewhere |
 | **(c2) ABSENT** — `funcid55` | **0** | `[]` | no evidence anywhere |
 
-⇒ **(c1) folds on the keying ground. (c2) DOES NOT** — its table is empty, so
+⇒ **(c1) folded on the keying ground — DOWNGRADED to provisional, see the block
+below this paragraph. (c2) DOES NOT FOLD** — its table is empty, so
 there is nothing misplaced and no keying fact to attach by. It does not fold on
 the mechanism ground either, which is undetermined for it exactly as for the
 others. **`funcid55` is currently attached to this node by nothing but the error
-string, and is recorded here as UNATTACHED pending the `independent_contract`
-print.**
+string, and is recorded here as UNATTACHED.** The `independent_contract` print
+now exists and has run — **but on the px8f programs, not on these shards**, so
+it has not settled `funcid55`.
+
+> ### 2026-09-15: (c1) IS DOWNGRADED FROM FOLDED TO PROVISIONALLY FOLDED.
+>
+> **Architect `evt_1xemdvdj9fghw`, cutting against its own earlier fold.** D0's
+> census came back bimodal 17 for 17: arm 1 only ever on an EMPTY table, arm 2
+> only ever on a populated one. If that holds generally, a body with `auth=695`
+> is an **arm-2** body — and an arm-2 refusal is the proving arm doing its job,
+> the gate working, explicitly **not this node's defect**. The (c1) entries have
+> exactly that shape.
+>
+> **It is a downgrade and not a removal, and the discipline that stops it being
+> a removal is the one this node already enforces.** The bimodality is measured
+> on px8f, three programs of one family. Extending it to `rt_parity` is the same
+> cross-compile transfer that "a funcid is not an identity across two compiles"
+> forbids — making the move with the *correlation* instead of with the number.
+> The `rt_parity` arm was **never measured**: those entries were read from CI
+> logs before the ninth field existed.
+>
+> ⇒ **The pending read is now a TEST OF THE BIMODALITY, not a classification,
+> and that makes it worth more than when it was ordered:**
+>
+>     arm 2 on auth=695   the correlation HOLDS; those entries are the gate
+>                         working and they leave this node entirely
+>     arm 1 on auth=695   the correlation BREAKS -- arm 1 is reachable WITH a
+>                         populated table, which is a NEW and LARGER finding
+>                         than the one this node was cut for
+>
+> **Either answer is worth having and neither blocks `D1`**, which excludes these
+> entries from its scope and its sizing either way. Venue and timing are the
+> ring's call.
 
 **Lead on what `funcid55` is, scoped because it is NOT measured here.**
 `RT-DISCHARGE-EXCLUDE-OR-REFUSE-BACKSTOP` records `derive_certified_cuts` —
