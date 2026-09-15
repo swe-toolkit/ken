@@ -61,6 +61,24 @@ claim whose own coverage cannot be vouched for is worse than no claim, because
 it will be cited. Do not go looking for them, and do not treat "410" as a
 partial answer — it is the corpus size, not a coverage figure.
 
+## One confirmed instance, found incidentally the same day
+
+**This is no longer hypothetical.** While restoring `d8k`'s detector,
+runtime-implementer needed `D5bHs7DetachedDispositionMutation::IgnoreInlineNoCall`
+and found it **referenced only by its own definition** in `lowering/mod.rs` — no
+control anywhere armed it. Restoring the detector gave it its **first live
+control** (evt_224pgw48ngrty, 2026-09-15).
+
+The shape is sharper than this node's general framing: **`7d35118da` added the
+clause, added the arm to perturb that clause, and never wrote a row that arms
+it.** The arm existed, looked like coverage, and drove nothing.
+
+It was found because an unrelated repair happened to need it — which is the
+argument for the census rather than against it. **One instance discovered by
+accident is not evidence the population is small.** It is evidence the
+population is not empty, and that nothing currently in the tree would have
+reported it.
+
 ## Deliverables
 
 - **D0 — a trustworthy instrument.** Attribute every mutation arm to the
