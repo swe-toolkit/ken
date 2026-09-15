@@ -86,6 +86,32 @@ survive into the sweep so nobody "fixes" HS18's scope.
   renaming is a separate decision with a different blast radius; if the sweep
   finds the ambiguity is load-bearing in code too, file that separately.
 
+## OPEN SCOPE QUESTION: this node is `doc`, and the defect recurs in CODE
+
+Raised by the Architect at `evt_53p7m3s2f6t8q`, recorded here rather than acted
+on. **Four times in this arc a name has not told us its population:**
+
+    the contract's two `demanded` artifacts, eighteen lines apart
+    `Result` naming ITREE-RESULT and USER-RESULT          (this node)
+    `generated_constructor_authorities` ranging over EVERY carried constructor
+        (RT-AUTHORITY-CONTRACT-MISDESCRIBES-ITS-POPULATION)
+    `PlannedTrapIdentity`, a dedup index keyed on trap value with no origin
+        (RT-TRAP-IDENTITY)
+
+**At least two of those are in code, which a doc sweep does not reach.** So this
+node may be scoped wrong: it is `owner: doc`, and a corpus disambiguation pass
+cannot catch a field whose name misdescribes its population in Rust.
+
+**Deliberately not converted into a node tonight**, and the reason is the test
+in `§4c`: a node needs an assignable deliverable, and *"names should tell their
+populations"* is not one yet. The three code instances already have their own
+nodes; the pattern across them is an observation, not work.
+
+**The trigger to revisit:** a fifth instance, or any instance that the three
+existing nodes do not already cover. At that point the right artifact is
+probably a code-side convention or a check — not a widening of this doc sweep.
+Do not widen this node's scope to absorb them.
+
 ## Contention
 
 Doc-only, `docs/` and possibly `spec/`. **Contention-free with the build lane**
