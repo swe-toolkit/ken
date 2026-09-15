@@ -96,7 +96,7 @@ the ruling was gated on; the Architect read it at source and it confirms.
 That is why the trapping carrier is exactly the one with no authority. Not a
 coincidence — **the arm is only reachable without one.**
 
-### Arm 1 is not a rare branch. It is the measured path, and arm 2 never runs.
+### Arm 1 is not a rare branch. The conditional makes it the path, and `WRITE_ALL` shows it trafficked.
 
 **Independent corroboration, from a measurement taken for a different question**
 (`RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY`, 2026-09-14, venue finding
@@ -236,9 +236,66 @@ asymmetry is the defect; a repair that leaves arm 1 checking something weaker
 than arm 2 has relocated it. Name what each arm requires, side by side.
 
 **AC-5. Each missing entry is classified into ONE of the four cases in the
-fence below, and ONLY case (c) folds into this node.** A report of the form
-*"not a differing identity, therefore this node's"* does not satisfy this — that
-is the elimination the fence exists to prevent.
+fence below, and an entry folds in only on a ground the artifact prints.** A
+report of the form *"not a differing identity, therefore this node's"* does not
+satisfy this — that is the elimination the fence exists to prevent. **Nor does
+"case (c), therefore same mechanism as cause 1"**, which is the elimination one
+level down; see the ruling immediately below.
+
+> ### CASE (c) IS A SYMPTOM, NOT A MECHANISM. BOTH ARMS PRODUCE IT.
+>
+> **Architect `evt_3rp08wzfyqr1q`, correcting its own four-case spec; verified
+> at source by the Steward.** `FinishedUnitResultContract` is pushed in exactly
+> **one** place, `:4542`, inside `if proven` at `:4524` — and **both arms feed
+> that one `proven`**. So:
+>
+>     arm 1 taken, word not in realized_call_words  -> proven=false -> case (c)
+>     arm 2 taken, proof not valid/grounded         -> proven=false -> case (c)
+>
+> ⇒ **No certificate does not distinguish the arms.** And arm 2 declining is
+> **the proving arm doing its job** — it consulted `body.authorities`, found
+> nothing usable, and refused. That is the opposite of arm 1's substitution.
+> Folding an arm-2 refusal in as an instance of *"arm 1 substitutes a plan for
+> an observation"* would put a false mechanism claim in the artifact that exists
+> to record that mechanism.
+>
+> **The `a/b/c/d` split is exhaustive over AUTHORITY STATE. The fold is a claim
+> about MECHANISM. Different variables** — the same shape as the defect this
+> fence was written to fix, one level down.
+>
+> **THE ATTACHMENT GROUND IS THE KEYING FACT, WHICH IS ARM-INDEPENDENT.** Field 6
+> of the details tuple lists authorities matching the demanded identity
+> elsewhere in the table. Where it is non-empty, an authority for that identity
+> **exists and is simply not keyed at `publication.returned_word`** — whichever
+> arm ran. A population attached by a fact the artifact prints beats one
+> attached by a mechanism it cannot see.
+
+### Case (c) is TWO populations, and only one of them has that ground
+
+Measured across all six `rt_parity_native` shards (lieutenant, `evt_2cedrpvwyyv70`;
+five shards carry only `funcid58`/`funcid56`, one additionally carries
+`funcid55`):
+
+| | `authorities.len()` | field 6 | reading |
+|---|---|---|---|
+| **(c1) MISPLACED** — `funcid58`, `funcid56` | 695 | `[v33002]` | evidence exists, keyed elsewhere |
+| **(c2) ABSENT** — `funcid55` | **0** | `[]` | no evidence anywhere |
+
+⇒ **(c1) folds on the keying ground. (c2) DOES NOT** — its table is empty, so
+there is nothing misplaced and no keying fact to attach by. It does not fold on
+the mechanism ground either, which is undetermined for it exactly as for the
+others. **`funcid55` is currently attached to this node by nothing but the error
+string, and is recorded here as UNATTACHED pending the `independent_contract`
+print.**
+
+**Lead on what `funcid55` is, scoped because it is NOT measured here.**
+`RT-DISCHARGE-EXCLUDE-OR-REFUSE-BACKSTOP` records `derive_certified_cuts` —
+the first line of **arm 2** — running exactly twice in the whole px8f compile,
+for `funcid55` and `funcid60`. If that carries, `funcid55` reached arm 2 and its
+refusal is the proving arm working, not this node's defect. **That measurement
+was at `b0a7c2945` on the px8f compile, not at `0f71ab5b9` on an rt_parity
+shard**: different SHA, different program. A funcid is not an identity across two
+compiles. It is a lead about which arm to expect, and the print settles it.
 
 ## THE FENCE: the six `rt_parity_native` shards are NOT established as this node's
 
