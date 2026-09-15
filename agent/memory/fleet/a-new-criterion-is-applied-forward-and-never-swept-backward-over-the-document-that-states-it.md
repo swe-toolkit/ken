@@ -63,10 +63,10 @@ the sentence you came to fix — the same single mechanical pass this file alrea
 prescribes for a new AC, applied to a withdrawal.
 
 **The count is checkable against this file rather than against anyone's memory**
-— four instances in the table above, this one fifth. Keep it that way: an
-ordinal asserted from recall is not evidence, and the author of the fifth
-instance was handed the number "fifth" without being told which population it
-indexed.
+— four instances in the table above, the retraction case fifth, and the partial
+sweep below it sixth. Keep it that way: an ordinal asserted from recall is not
+evidence, and the author of the fifth instance was handed the number "fifth"
+without being told which population it indexed.
 
 ⇒ **AND THE FIRST READING OF THAT SENTENCE WAS ITSELF WRONG, WHICH IS THE
 SHARPEST INSTANCE IN THE FILE.** It read *"three instances at the top, a fourth
@@ -80,6 +80,39 @@ agreement rather than as contradiction, inside the very sentence written to make
 the count checkable. A reader who trusts the sentence never opens the table; a
 reader who opens the table gets the right total and no reason to re-read the
 sentence. **A total that survives a wrong population is not a verified count.**
+
+## SIXTH INSTANCE, 2026-09-15: DOING THE SWEEP IS WHAT MADE ME STOP
+
+**A partial sweep is more dangerous than no sweep, because it retires the
+obligation.** This is the mechanism the file did not have, and it explains why
+the prescribed pass keeps getting skipped by people who did perform it.
+
+The Architect handed the Steward a scope clause for a node — separate the *rule*
+(read off a conditional, no measurement needed) from what a two-body measurement
+actually adds. The Steward applied it forward, then **swept backward** and found
+a second occurrence in a later section where the unscoped form was carrying a
+real inference, and fixed that too. Two sweeps, the harder one caught.
+
+**And then stopped, one line short of the section heading** — which still read
+*"It is the measured path"*, the exact conflation the twelve lines beneath it
+had just been rewritten to separate. The Architect found it on the next round.
+
+⇒ **The failure is not inattention and it is not laziness: it is CLOSURE.** Two
+completed sweeps produce a sense of having discharged the obligation that
+skipping the sweep entirely would never produce. The author who does one pass is
+*more* likely to stop before the second than the author who has not started —
+the first pass is what converts "I must sweep this" into "I swept this."
+
+**And the line it stopped before is the one this file already ranks FIRST.** The
+How-to-apply below says the title and summary block are where it lands hardest
+and to sweep those first. The Steward swept body prose, then a body paragraph,
+and never reached the heading — **executing the rule in the reverse of its own
+stated priority order, having read it.**
+
+⇒ **Sweep the headings, the title, and the index row BEFORE the prose.** Not
+because prose matters less, but because the prose pass is what makes you believe
+you are finished. Order the cheap high-value targets first so that stopping
+early stops in the right place.
 
 ## How to apply
 
