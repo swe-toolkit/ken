@@ -108,7 +108,7 @@ resolve against the tip before routing.**
 ```sh
 git log --format='%h|%s' <BASE>..<SHA> -i \
   --grep='not merge-ready' --grep='not merge ready' \
-  --grep='do not build on' --grep='do not merge'
+  --grep='do not build on' --grep='do-not-merge'
 ```
 
 **Do NOT add `--grep='WIP'` to that command.** It is the obvious term and it is
@@ -150,11 +150,39 @@ says is unfinished, finished now?* Most answers are yes and cost a sentence.
 >
 > The narrow predicate is also cheap to trust: the same 2000-commit census found
 > **zero prior instances** of a self-declared not-merge-ready commit landing.
-> Five of its six historical hits are the operator's own merge-on-green
-> boilerplate in the opposite polarity (*"if CI reds, report it, do not merge
-> past"*) — hence the deliberate absence of a `merge past` term — and the sixth
-> refers to a *different* commit as do-not-merge. This is a rare, cleanly
-> greppable marker, which is what makes it a gate rather than a reform.
+> This is a rare, cleanly greppable marker, which is what makes it a gate rather
+> than a reform.
+>
+> #### `do-not-merge` IS HYPHENATED ON PURPOSE. Do not "fix" it to the spaced form.
+>
+> The spaced spelling `do not merge` is a **prefix of the operator's own
+> merge-on-green boilerplate** — *"if CI reds, report it, do not merge past"* —
+> so it matches that boilerplate by construction, on every candidate, forever.
+>
+> This step shipped with the spaced form and the Architect measured it
+> (`evt_22zqt6d2ft4md`); I re-ran it over 3000 commits of `origin/main`:
+>
+>     spaced  `do not merge`      7 hits, 5 of them the boilerplate
+>     hyphenated `do-not-merge`   3 hits, 0 of them the boilerplate
+>     over the 36-commit arc      2 hits either way — both true positives kept
+>
+> **So the correction that removed nine noisy `WIP` hits had replaced them with
+> five noisy boilerplate hits**, reproducing one level down the exact failure it
+> was written to fix. The reasoning that shipped with it was also wrong, and is
+> worth naming because it is a tempting mistake: it claimed the boilerplate was
+> handled by *declining to search for* `merge past`. **Not searching for a phrase
+> does not stop a shorter term from matching it.** What admits the boilerplate is
+> the presence of `do not merge`, not the absence of anything.
+>
+> Both true positives survive the narrowing, which is the direction that had to
+> be checked — a predicate narrowed until it drops a real hit is the worse error.
+>
+> Two residuals, neither a problem. The playbook's own commits match this step,
+> because the file documents its own search terms; the step runs over a
+> *candidate range* and never over the playbook's history. And the census is a
+> measurement over this corpus, not a proof about the phrasing space: no one has
+> established that some other spelling of a genuine do-not-merge instruction
+> exists which only the spaced form would catch.
 
 > #### Measured 2026-09-15, and it is why this step exists
 >
