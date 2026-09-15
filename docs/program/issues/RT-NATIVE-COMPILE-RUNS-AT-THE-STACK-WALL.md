@@ -116,62 +116,53 @@ words: *"an in-code figure would need a custodian and would go stale silently at
 the next unrelated edit, with nothing red."* Nobody has re-run `2ca91a3a`'s
 measurement.
 
-**AND D4 DISAGREES WITH IT ON THE RELEASE SIDE WHILE AGREEING ON THE DEBUG
-SIDE** (runtime-implementer, read at source, `evt_1d0gmk3vgmj2r`):
+**THE RAW COMPARISON AGAINST D4** (runtime-implementer, read at source,
+`evt_1d0gmk3vgmj2r`). **Read the resolution below before drawing anything from
+it -- these are not comparable quantities:**
 
     DEBUG    comment 1,982,464 B = 1936 KiB   vs  D4 (1920, 1952]
-             -> the EXACT MIDPOINT of D4's interval. Converges tightly.
+             -> lands on the exact midpoint of D4's interval
 
     RELEASE  comment ~280 KiB                 vs  D4 ( 320,  352]
-             -> at least 40 KiB BELOW, outside the interval. 15-25% apart.
+             -> at least 40 KiB below it, outside the interval
 
-**No reconciliation is offered and none should be invented.** *Peak usage* and
-*minimum provisionable thread stack* are different quantities, and that would
-explain D4 sitting higher in release -- **but the same offset should then appear
-in debug, and it does not.** So the obvious explanation covers one half and
-fails on the other. The honest statement is that two release figures differ by
-15-25% and nothing in the corpus reconciles them.
+**THERE IS NO ANOMALY. THE TWO PAIRS ARE INCOMPARABLE, AND THE COMMENT SAYS SO
+ITSELF.** The premise needed to settle this is stated eleven lines further down
+the same block, and the Steward verified it at `origin/main`:
 
-**AND THE ASYMMETRY MAY INVERT: THE DEBUG AGREEMENT IS THE SUSPECT ONE.**
-Architect, `evt_evwnx38tea7h`. **A debug figure obtained on a 2 MiB thread is at
-most 2048 by construction -- a program needing more does not report a number, it
-aborts.** Both debug figures sit in the narrow band under that ceiling and
-*could not* have come back higher and still been figures; the release figures
-sit under ~1700 KiB of slack with no ceiling near them, and are free to
-disagree. ⇒ **Agreement inside a range-restricted window is weaker evidence than
-disagreement outside one**, and this is the family of the libtest defect that
-cost this node its first claim: **a number that exists only when the thing fits
-is evidence about the ceiling before it is evidence about the subject.**
+    // `ken-cli`'s own 8 MiB main thread has wide headroom today (~6.1 MiB
+    // unoptimized free)
 
-**The premise is unstated and is itself checkable, so do not adopt this as
-settled either.** It holds for D4's bracket, whose search could not report above
-its own ceiling. **It holds for the month-old peak only if that peak was also
-taken on a 2 MiB-bounded run**, and the comment does not say how it was
-instrumented. **Establish that before treating the debug convergence as an
-artefact** -- the inversion is a live candidate, not a correction.
+    8192 KiB thread - 1936 KiB peak = 6256 KiB = 6.109 MiB   exact match
 
-**BOTH OBVIOUS EXPLANATIONS OF THE RELEASE GAP FAIL, WHICH IS WHY IT IS WORTH
-ONE PROBE:**
+⇒ **The 1,982,464-byte peak was taken on an 8 MiB thread with 6.1 MiB of slack
+beneath it.** It was never pressed against any 2048 ceiling. With that in hand,
+both pairs resolve:
 
-    peak vs provisionable   debug   offset in (-16, 16]   no fixed offset and
-                            release offset in ( 40, 72]   no proportional one
-                                                          fits both
+    DEBUG    peak 1936 (8 MiB, uncapped)  vs  D4 min-viable (1920, 1952]
+             min-viable would sit BELOW the peak -- impossible for one program,
+             since you must provision at least what you use
+             => THESE ARE DIFFERENT PROGRAMS; the agreement is COINCIDENCE
 
-    a month of growth       28 commits touched prelude.rs since 2ca91a3a,
-                            net +480 lines -- but MAX-not-SUM makes depth a max
-                            over the 177 registrations, so added declarations
-                            do not raise the peak unless one is deeper than
-                            register_decimal_char's 31-level cascade. And the
-                            frame-growth mechanism the comment names is
-                            explicitly an UNOPTIMIZED effect.
-                            => staleness explains DEBUG growth, not RELEASE
-                            growth -- the opposite of what is needed.
+    RELEASE  peak 280 (same method)       vs  D4 min-viable ( 320,  352]
+             min-viable sits 40-72 KiB ABOVE the peak
+             => the EXPECTED ordering; nothing to explain
 
-**Neither model fits.** That makes the release gap a live question one number
-settles, not an embarrassment. It is `D5`. **The line delta above is arithmetic
-over commit counts, not a profile**, and under MAX-not-SUM a line delta is an
-especially weak proxy for depth -- which is the same reason it fails as an
-explanation.
+**And the comment names the two programs**: a bare-prelude four-line program
+calling no prelude combinator, against tonight's SCT `nondecreasing_cycle` row.
+`elab.rs:1366-68` already forbids swapping peak-usage for minimum-viable-stack.
+⇒ **Peak and min-viable across two different programs are not required to agree
+in either profile. The implementer's refusal to reconcile them was the correct
+read of both halves**, and the debug convergence reported earlier as
+corroboration is coincidence.
+
+**WITHDRAWN: the range-restriction inversion**, which this node carried one
+commit ago as a live candidate (Architect `evt_evwnx38tea7h`, withdrawn by its
+author at `evt_1rsh3qk513qtc`). The argument was that a debug figure exists only
+when it fits, so it is evidence about the ceiling first. **The check that
+argument itself demands is to read whether the measurement stated its own
+slack. It did, in the next paragraph.** A selection-effect argument proposed
+without checking the selection.
 
 **A COINCIDENCE FLAGGED SO NOBODY READS IT AS EVIDENCE.** `1,982,464 B` is
 exactly `1936.0 KiB` -- the midpoint this node was corrected for inventing two
@@ -222,10 +213,15 @@ a collapse of `[5.45, 6.10]`x is what that looks like measured.
 variation of the build profile -- `2ca91a3a` did that a month ago. It is **the
 first release figure on this row, and the first taken under the ignore-screen
 and executed-count preconditions**, which is why it can be compared to the
-comment at all. That the repo's month-old debug figure lands on the exact
-midpoint of D4's debug bracket is **independent corroboration taken by a
-different seat, at a different commit, by a different method, on a different
-subject** -- worth more than novelty would have been.
+comment at all.
+
+**NOT corroboration.** That the repo's month-old debug figure lands on the exact
+midpoint of D4's debug bracket was reported as independent corroboration, by two
+seats, and **it is coincidence** -- the two are peak-usage and minimum-viable
+stack over two different programs, and a min-viable below a peak is impossible
+for one program, which is how we know they are different programs. **The
+strongest-looking number in the exchange turned out to be the emptiest**, and it
+looked strongest precisely because it agreed to the digit.
 
 **WHAT D4 DOES NOT ESTABLISH, and it bounds how far the result travels:**
 
@@ -321,10 +317,20 @@ asserts something **true and carefully qualified** and nothing can enforce it.
 **Identical structural cause; one was filed as a finding and the other was read
 straight past by the same reader.**
 
-**One caveat before anyone leans on the comment as the bound:** D4 puts the
-release figure 15-25% away from the comment's, and half the 4 MiB requirement
-rests on that side. **A transcription is not a re-derived measurement** -- the
-`~280 KiB` should be re-run, not cited.
+**A THIRD INSTANCE OF THE SAME DEFECT, FOLDED HERE RATHER THAN FILED, BECAUSE
+IT IS EVIDENCE FOR THIS FINDING AND NOT A NEW ONE.** The same comment carries an
+open obligation:
+
+    // Whether the headline peak-usage figure itself needs revising still
+    // requires a peak-usage run on a deep source, which nobody has done.
+
+⇒ **An open obligation, correctly stated, sitting in production source with no
+node and no owner.** The tree states the requirement, states its limits, and
+states what remains undone -- **and nothing anywhere can read any of it.**
+
+**One caveat before anyone leans on the comment as the bound:** it is a
+transcription with no custodian, and **a transcription is not a re-derived
+measurement.** `~280 KiB` should be re-run (`D5`), not cited.
 
 ## What this explains, and what it costs
 
@@ -340,6 +346,16 @@ states that *every compilation elaborates the whole prelude* and measures
 of **1933 KiB, which falls inside `(1920, 1952]`** -- an independent measurement
 from a different subsystem a month earlier, landing inside tonight's bracket to
 within its own resolution. **The two nodes are plausibly one finding.**
+
+**BUT THIS FIGURE, UNLIKE THE 1936 PEAK, WAS TAKEN ON A 2 MiB THREAD**, and the
+range-restriction caution therefore **does** apply to it: a measurement that
+reports 115 KiB of headroom is a measurement that fit, and one that had not fit
+would have produced no number at all. **So `1933` landing inside a bracket
+bounded above by the same 2048 is weaker evidence than it reads as.** The
+`1,982,464`-byte peak was refuted as range-restricted because it ran on an 8 MiB
+thread with 6.1 MiB of slack; **`1933` has no such defence, and nobody has
+checked whether it needs one.** Do not promote this convergence while `D0` is
+open.
 
 **STACK DEPTH IS A MAX OVER THE PRELUDE'S DECLARATIONS, NOT A SUM.**
 `register_prelude` makes 177 `elaborate_decl` calls from one call site, and each
@@ -499,9 +515,11 @@ have caught all three of the above.
   **Recorded in advance because an unexpected empty result and a predicted empty
   result get acted on completely differently** -- the first reads as "we did not
   look hard enough" and gets repeated, at cost, forever.
-- **D5. Re-measure the optimized peak at HEAD by `2ca91a3a`'s own method**, and
-  state how that method bounds the run, so the range-restriction question above
-  is answered rather than argued. Both outcomes are fixed in advance:
+- **D5. Re-measure the optimized peak at HEAD by `2ca91a3a`'s own method.**
+  **Reduced to one question.** How the method bounds the run is now answered
+  from the tree -- `ken-cli`'s 8 MiB main thread, observed peak, slack stated --
+  so all that remains is: **is `~280 KiB` still true at HEAD**, after 28 commits
+  and +480 net lines in `prelude.rs`? Both outcomes are fixed in advance:
 
       ~280 returned        the comment is CURRENT and the release gap is real;
                            different-program / different-quantity is the
