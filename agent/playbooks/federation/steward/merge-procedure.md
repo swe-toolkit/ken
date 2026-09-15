@@ -99,6 +99,60 @@ match any`. Always an explicit SHA.
 > and the direction is identical — success reported over a smaller population
 > than was declared, with no error and no short-list warning.
 
+### M2a — READ THE COMMIT MESSAGES FOR SELF-DECLARED UNREADINESS
+
+Shape is not the only thing the object DB will tell you. **Scan the candidate's
+commit bodies, and treat any self-declared unreadiness as a claim you must
+resolve against the tip before routing.**
+
+```sh
+git log --format='%h|%s' <BASE>..<SHA> \
+  --grep='not merge-ready' --grep='not merge ready' --grep='WIP' \
+  --grep='do not merge' --grep='do not build on' -i
+```
+
+**A WIP marker on an intermediate commit is NOT by itself a defect, and you
+must not treat it as one.** The publisher squashes, so the arc collapses to one
+commit and intermediate states never reach `main`'s history. Rings develop
+incrementally and label their checkpoints honestly; punishing that would buy
+nothing and would teach seats to stop writing it down. **What you are looking
+for is a marker whose stated CONDITION is still true at the tip** — a live
+description of the candidate, wearing a historical commit's clothes.
+
+So the check is one question per hit, not a veto: *is the thing this commit
+says is unfinished, finished now?* Most answers are yes and cost a sentence.
+
+> #### Measured 2026-09-15, and it is why this step exists
+>
+> The 36-commit ABI-S6 D5b candidate `0f71ab5b9` carried **11 commits with such
+> markers**, including one reading `DO NOT BUILD ON`. Ten were ordinary
+> incremental checkpoints, resolved by the tip, exactly as above.
+>
+> The eleventh, `a8430a8c2` (arc commit 5 of 35), ended:
+>
+> > *native execution still reaches a controlled ResourceBodyResult pattern
+> > trap (exit 1 vs interpreter 0); this commit is a WIP proof checkpoint, **not
+> > merge-ready***
+>
+> **That sentence is a precise description of the CI failure that stopped the
+> merge thirty commits later**, and it was true continuously in between. It
+> passed an Architect design APPROVE, a QA CONFIRMED, this Steward's M1-M4, and
+> a route to the publisher. Every gate read past it, mine included, because
+> nothing in any gate's procedure looked at a commit body.
+>
+> The author did the right thing and wrote it down. **A record nobody reads is
+> not a gate** — the same finding this arc spent the day establishing about
+> documented-versus-checked invariants, pointed at process instead of code.
+> `not merge-ready` in a commit body stopped nothing.
+>
+> The condition in that message was also **directly testable**: "exit 1 vs
+> interpreter 0" names a differential anyone could run. The check is cheap
+> because the honest marker usually tells you how to resolve it.
+
+Route the hits to the ring rather than adjudicating them yourself — the ring
+knows which are stale. What you own is asking, and recording the answer in the
+Decision alongside the M2 numbers.
+
 ## M3 — Cited-source check
 
 One command, not a judgment:
