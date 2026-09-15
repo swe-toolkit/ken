@@ -22,7 +22,6 @@ use crate::cranelift_backend::lowering::units::{
     srcbody_bind_order_take, SrcbodyBindHost, SrcbodyBindOrderObservation,
 };
 
-
 #[derive(Clone, Copy, Debug)]
 pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
     Delete,
@@ -35,7 +34,9 @@ pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
 /// exercises a ledger, authority, or frame validator and never lowers an
 /// expression through it, so no child origin is ever derived. A test that DOES
 /// lower a fixture builds its own `Lowering` with that fixture's plan.
-pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowering<'a> {
+pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(
+    seed_env: &'a NativeSeedEnvironment,
+) -> Lowering<'a> {
     Lowering {
         seed_env,
         declarations: BTreeMap::new(),
@@ -101,7 +102,12 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_constructor_authorities: BTreeMap::new(),
+            checked_ih_detached_consumer_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -273,7 +279,12 @@ fn run_px8j_malformed_recursor_consumer(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_constructor_authorities: BTreeMap::new(),
+            checked_ih_detached_consumer_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -398,9 +409,9 @@ fn run_px8j_malformed_recursor_consumer(
         selected_scope: None,
     };
     let active_frames = [EliminatorFrame::Active(active)];
-    let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-        recursor,
-    ))];
+    let env = [LoweringEnvironmentBinding::Value(
+        LoweringOperand::Specialized(recursor),
+    )];
     let mut function_context = FunctionBuilderContext::new();
     let mut builder = FunctionBuilder::new(&mut context.func, &mut function_context);
     let entry = builder.create_block();
@@ -513,6 +524,7 @@ fn oriented_same_depth_siblings_require_exact_dynamic_edges() {
         ContinuationActivationId(14),
         segment,
         edges,
+        None,
     )
     .expect("exact child-to-parent edges keep same-depth siblings separate");
     assert_eq!(
@@ -529,6 +541,310 @@ fn oriented_same_depth_siblings_require_exact_dynamic_edges() {
 }
 
 #[test]
+fn oriented_external_source_parent_requires_the_exact_invocation_frame_pair() {
+    let mut plan = oriented_test_ih_plan();
+    let origin = RecursorProducerOriginId(74);
+    let mut selection = oriented_test_layer(0, RecursorLayerRole::SelectsOccurrence { origin });
+    selection.checked_invocation_id = None;
+    selection.checked_invocation_source = None;
+    selection.checked_invocation_depth = 0;
+    let frame = plan
+        .frames
+        .iter_mut()
+        .find(|frame| frame.frame_id == 0)
+        .expect("fixture carries frame 0");
+    frame.runtime_frame_fingerprint = crate::compiler_private_computational_match_frame_fingerprint(
+        &selection.cases,
+        &selection.default,
+    );
+    frame.occurrence_binding_fingerprint =
+        crate::compiler_private_oriented_occurrence_binding_fingerprint(frame);
+    plan.validate().expect("updated fixture plan remains valid");
+    let segment = RecursorInvocationSegment::new(
+        origin,
+        0,
+        selection,
+        RecursorUnwindStack {
+            later_wrappers_in_construction_order: Vec::new(),
+        },
+        ContinuationCursorId(75),
+        None,
+        Some(200),
+    );
+    let invocation = CheckedRecursiveInvocationInstance {
+        source: InvocationTemplateRef::ComputationalIHCall(100),
+        invocation_instance_id: 12,
+        semantic_depth: 2,
+        dynamic_splice_edge: Some(DynamicSpliceEdgeId(76)),
+    };
+    let edge = || DynamicSpliceEdge {
+        edge_id: DynamicSpliceEdgeId(76),
+        child_invocation_instance_id: 12,
+        parent_invocation_instance_id: 11,
+        checked_call_template_id: 100,
+        parent_frame_template_id: 0,
+        segment_site_id: 9,
+    };
+    let parent = CheckedComputationalFrame {
+        id: Some(0),
+        invocation_id: Some(11),
+        invocation_source: Some(InvocationTemplateRef::ComputationalIHCall(100)),
+        invocation_depth: 1,
+    };
+
+    let installed = compose_oriented_subcontinuation(
+        Some(&plan),
+        Some(invocation),
+        ContinuationActivationId(77),
+        segment.clone(),
+        vec![edge()],
+        Some(parent),
+    )
+    .expect("a child-only segment accepts its exact non-root external parent");
+    assert_eq!(
+        installed
+            .semantic_frames
+            .iter()
+            .map(|layer| (layer.checked_invocation_id, layer.checked_frame_id))
+            .collect::<Vec<_>>(),
+        vec![(Some(12), Some(0))],
+        "instantiation qualifies frame 0 only for the new child"
+    );
+
+    let canonical_root = CheckedComputationalFrame {
+        id: Some(0),
+        invocation_id: None,
+        invocation_source: None,
+        invocation_depth: 0,
+    };
+    let root_edge = || DynamicSpliceEdge {
+        parent_invocation_instance_id: 0,
+        ..edge()
+    };
+    let assert_child_only = |installed: InstalledOrientedSubcontinuationSegment, case: &str| {
+        assert_eq!(
+            installed
+                .semantic_frames
+                .iter()
+                .map(|layer| (layer.checked_invocation_id, layer.checked_frame_id))
+                .collect::<Vec<_>>(),
+            vec![(Some(12), Some(0))],
+            "{case}: frame 0 must stay qualified by nonzero child 12"
+        );
+    };
+    let refusal_reason =
+        |result: Result<InstalledOrientedSubcontinuationSegment, CraneliftBackendError>,
+         case: &str| {
+            match result {
+                Ok(_) => panic!("{case} must refuse"),
+                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "OrientedSubcontinuationPlanV1",
+                    reason,
+                })) => reason,
+                Err(error) => panic!("{case} reached the wrong refusal: {error:?}"),
+            }
+        };
+
+    for (root, spelling) in [
+        (canonical_root, "invocation-absent root"),
+        (
+            CheckedComputationalFrame {
+                invocation_id: Some(0),
+                ..canonical_root
+            },
+            "explicit-zero root",
+        ),
+    ] {
+        let installed = compose_oriented_subcontinuation(
+            Some(&plan),
+            Some(invocation),
+            ContinuationActivationId(77),
+            segment.clone(),
+            vec![root_edge()],
+            Some(root),
+        )
+        .unwrap_or_else(|error| panic!("{spelling} must install: {error:?}"));
+        assert_child_only(installed, spelling);
+    }
+
+    let (mutated_root, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                Some(canonical_root),
+            )
+        });
+    assert_eq!(applications, 1, "one exact root and edge pair applies once");
+    assert_eq!(
+        refusal_reason(mutated_root, "exact-root causality mutation"),
+        "an external source parent is not a non-root checked invocation"
+    );
+
+    let (without_parent, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                None,
+            )
+        });
+    assert_eq!(applications, 0, "outer None must not be inferred as root");
+    assert_child_only(
+        without_parent.expect("an absent external parent remains distinct from explicit root"),
+        "no external parent",
+    );
+
+    let (nonroot, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![edge()],
+                Some(parent),
+            )
+        });
+    assert_eq!(
+        applications, 0,
+        "the root mutation must not fire for non-root"
+    );
+    assert_child_only(
+        nonroot.expect("the non-root row stays admissible under the root mutation"),
+        "non-root parent",
+    );
+
+    let (frame_mismatch, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                Some(CheckedComputationalFrame {
+                    id: Some(1),
+                    ..canonical_root
+                }),
+            )
+        });
+    assert_eq!(
+        applications, 0,
+        "a root frame mismatch refuses before mutation"
+    );
+    assert_eq!(
+        refusal_reason(frame_mismatch, "root frame mismatch"),
+        "an external source parent does not match exactly one incoming dynamic edge"
+    );
+
+    let (nonzero_edge, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![edge()],
+                Some(canonical_root),
+            )
+        });
+    assert_eq!(
+        applications, 0,
+        "a nonzero parent edge refuses before mutation"
+    );
+    assert_eq!(
+        refusal_reason(nonzero_edge, "nonzero edge parent"),
+        "an external source parent does not match exactly one incoming dynamic edge"
+    );
+
+    let partial_root = CheckedComputationalFrame {
+        invocation_source: Some(InvocationTemplateRef::ComputationalIHCall(100)),
+        ..canonical_root
+    };
+    let (partial, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge()],
+                Some(partial_root),
+            )
+        });
+    assert_eq!(applications, 0, "a partial tuple refuses before mutation");
+    assert_eq!(
+        refusal_reason(partial, "partial root tuple"),
+        "a computational frame carries an inconsistent checked invocation tuple"
+    );
+
+    let mut duplicate = root_edge();
+    duplicate.edge_id = DynamicSpliceEdgeId(78);
+    let (duplicated, applications) =
+        with_d5b_hs9_external_root_mutation(D5bHs9ExternalRootMutation::RejectExactRoot, || {
+            compose_oriented_subcontinuation(
+                Some(&plan),
+                Some(invocation),
+                ContinuationActivationId(77),
+                segment.clone(),
+                vec![root_edge(), duplicate],
+                Some(canonical_root),
+            )
+        });
+    assert_eq!(
+        applications, 0,
+        "two matching root edges refuse before mutation"
+    );
+    assert_eq!(
+        refusal_reason(duplicated, "duplicate root edge"),
+        "an external source parent does not match exactly one incoming dynamic edge"
+    );
+
+    for (changed, axis) in [
+        (
+            CheckedComputationalFrame {
+                invocation_id: Some(10),
+                ..parent
+            },
+            "invocation",
+        ),
+        (
+            CheckedComputationalFrame {
+                id: Some(1),
+                ..parent
+            },
+            "frame",
+        ),
+    ] {
+        let error = match compose_oriented_subcontinuation(
+            Some(&plan),
+            Some(invocation),
+            ContinuationActivationId(77),
+            segment.clone(),
+            vec![edge()],
+            Some(changed),
+        ) {
+            Ok(_) => panic!("changing only the external parent {axis} must refuse"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "OrientedSubcontinuationPlanV1",
+                ref reason,
+            }) if reason == "an external source parent does not match exactly one incoming dynamic edge"
+        ));
+    }
+}
+
+#[test]
 fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
     let reject =
         |segment: RecursorInvocationSegment, edges: Vec<DynamicSpliceEdge>, expected: &str| {
@@ -539,6 +855,7 @@ fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
                 ContinuationActivationId(14),
                 segment,
                 edges,
+                None,
             ) {
                 Ok(_) => panic!("a malformed dynamic splice graph must reject before CFG"),
                 Err(error) => error,
@@ -684,9 +1001,9 @@ fn run_px8ds_edge_consumer(
         selected_scope: None,
     };
     let active_frames = [EliminatorFrame::Active(active)];
-    let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-        recursor,
-    ))];
+    let env = [LoweringEnvironmentBinding::Value(
+        LoweringOperand::Specialized(recursor),
+    )];
     let call = RuntimeExpr::Call {
         callee: Box::new(RuntimeExpr::Var(0)),
         args: Vec::new(),
@@ -774,8 +1091,6 @@ fn oriented_edge_mutations_reject_in_all_three_direct_consumers() {
         }
     }
 }
-
-
 
 #[test]
 fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
@@ -871,6 +1186,17 @@ fn oriented_source_open_occurrence_cross_checks_the_closure_selected_parent() {
     let mismatch = compiler
         .validate_source_dynamic_splice_parent(instance, &open)
         .expect_err("source and closure parent identities must agree before CFG");
+    assert!(matches!(
+        mismatch,
+        CraneliftBackendError::Unsupported(UnsupportedLowering { reason, .. })
+            if reason.contains("source open occurrence disagrees")
+    ));
+
+    open.frame.checked_frame_id = Some(2);
+    open.frame.checked_invocation_id = Some(17);
+    let mismatch = compiler
+        .validate_source_dynamic_splice_parent(instance, &open)
+        .expect_err("source and closure parent invocation identities must agree before CFG");
     assert!(matches!(
         mismatch,
         CraneliftBackendError::Unsupported(UnsupportedLowering { reason, .. })
@@ -997,10 +1323,6 @@ fn px8j_release_validator_rejects_repeated_and_broken_scope_lineage() {
     }
 }
 
-
-
-
-
 #[test]
 fn oriented_open_control_obligations_are_affine_and_mint_exact() {
     let plan = oriented_test_ih_plan();
@@ -1015,6 +1337,7 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         deleted,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("deleting only an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1037,6 +1360,7 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         duplicated,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("duplicating an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1059,6 +1383,7 @@ fn oriented_endpoint_corruption_and_affine_reuse_fail_closed() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("endpoint corruption must reject before installation"),
         Err(error) => error,
@@ -1164,11 +1489,14 @@ fn px8j_owned_scope_deletion_fails_closed_before_another_frame_is_emitted() {
     let expression = host_result_closure_match(px8j_layered_recursive_result(1, 1));
     let (exact_result, _exact_trace) =
         px8j_capture_source_trace(&expression, false, "ken_px8j_scope_exact");
-    assert!(matches!(
-        exact_result,
-        Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
-            if reason == "terminal answer has no affine checked-root authority"
-    ), "the owned-scope fixture must retain its measured checked-root refusal");
+    assert!(
+        matches!(
+            exact_result,
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
+                if reason == "terminal answer has no affine checked-root authority"
+        ),
+        "the owned-scope fixture must retain its measured checked-root refusal"
+    );
 }
 #[test]
 fn px8j_all_three_producer_paths_reach_real_consumers() {
@@ -1214,30 +1542,30 @@ fn px8j_all_three_producer_paths_reach_real_consumers() {
         event,
         Px8jSourceTraceEvent::Selection { origin: actual } if *actual == origin
     )));
-    assert!(!trace.iter().any(|event| matches!(
-        event,
-        Px8jSourceTraceEvent::Mint {
-            path: Px8jProducerPath::SourceMachine,
-            ..
-        }
-    )), "the corrected row-2 outcome has no SourceMachine mint: {trace:#?}");
+    assert!(
+        !trace.iter().any(|event| matches!(
+            event,
+            Px8jSourceTraceEvent::Mint {
+                path: Px8jProducerPath::SourceMachine,
+                ..
+            }
+        )),
+        "the corrected row-2 outcome has no SourceMachine mint: {trace:#?}"
+    );
 
     let deferred = RuntimeExpr::Match {
         scrutinee: Box::new(px8j_deferred_recursive_field_fixture()),
-        cases: [
-            "ctor:prelude::Result::Err",
-            "ctor:prelude::Result::Ok",
-        ]
-        .into_iter()
-        .map(|constructor| RuntimeMatchCase {
-            constructor: constructor.to_string(),
-            binders: 1,
-            body: RuntimeExpr::Construct {
-                constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
-                args: Vec::new(),
-            },
-        })
-        .collect(),
+        cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+            .into_iter()
+            .map(|constructor| RuntimeMatchCase {
+                constructor: constructor.to_string(),
+                binders: 1,
+                body: RuntimeExpr::Construct {
+                    constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+                    args: Vec::new(),
+                },
+            })
+            .collect(),
         default: RuntimeTrap {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: "direct deferred HostResult default".to_string(),
@@ -1403,13 +1731,16 @@ fn px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin() {
         host_result_closure_match(px8j_recursive_sibling_result(1, 2, px8j_aggregate_result()));
     let (result, _trace) =
         px8j_capture_source_trace(&expression, false, "ken_px8j_live_sibling_origins");
-    assert!(matches!(
-        result,
-        Err(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
-            if reason == "the selected case has a recursive position 1 that the continuation \
-                specialization projects no worker for, so its induction-hypothesis prefix \
-                cannot be built"
-    ), "the two-sibling fixture must retain its measured missing-worker outcome");
+    assert!(
+        matches!(
+            result,
+            Err(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
+                if reason == "the selected case has a recursive position 1 that the continuation \
+                    specialization projects no worker for, so its induction-hypothesis prefix \
+                    cannot be built"
+        ),
+        "the two-sibling fixture must retain its measured missing-worker outcome"
+    );
 }
 /// **`RT-LEXICAL-ROW2-MISSING-MINT` successor measurement — is the recursive IH
 /// installed and consumed on the functionized lane, or absent?**
@@ -1609,12 +1940,11 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
     // `Exact` is the identity perturbation, used for its other effect: it
     // clears the route trace on the way in, so what is read back is this
     // compile's events and not the baseline's residue.
-    let (result, trace, routes) =
-        with_d6a_route_mutation(D6aRouteMutation::Exact, || {
-            let (result, trace) =
-                px8j_capture_source_trace(&expression, false, "ken_row2_ih_functionized");
-            (result, trace, d6a_route_trace())
-        });
+    let (result, trace, routes) = with_d6a_route_mutation(D6aRouteMutation::Exact, || {
+        let (result, trace) =
+            px8j_capture_source_trace(&expression, false, "ken_row2_ih_functionized");
+        (result, trace, d6a_route_trace())
+    });
     result.expect("the surviving functionized lane must compile row 2");
 
     assert_eq!(
@@ -1622,10 +1952,7 @@ fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
             lifecycle(&trace, Px8jProducerPath::Composed),
             lifecycle(&trace, Px8jProducerPath::SourceMachine),
         ),
-        (
-            (true, true, true),
-            (false, false, false),
-        ),
+        ((true, true, true), (false, false, false),),
         "the surviving lane must mint, install, and consume the recursive IH \
          through Composed, never through SourceMachine: {trace:#?}"
     );
@@ -1770,6 +2097,7 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         replayed,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("an inherited open scope cannot replay its semantic transformer"),
         Err(error) => error,
@@ -1788,6 +2116,7 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         omitted,
         Vec::new(),
+        None,
     ) {
         Ok(_) => panic!("a pending selection cannot be omitted from semantic work"),
         Err(error) => error,
@@ -1908,7 +2237,10 @@ fn unmarked_equal_shape_frame_cannot_consume_retained_join_site() {
         }) if reason.contains("unconsumed or orphan site")
     ));
 }
-pub(in crate::cranelift_backend::lowering) fn px8j_scope_chain_observation_result(transform_layers: usize, input_depth: usize) -> RuntimeExpr {
+pub(in crate::cranelift_backend::lowering) fn px8j_scope_chain_observation_result(
+    transform_layers: usize,
+    input_depth: usize,
+) -> RuntimeExpr {
     let tree_constructor =
         |_layer: usize, constructor: &str| format!("ctor:fixture::PX8JScopeTree::{constructor}");
     fn child(depth: usize, node: &str, leaf: &str) -> RuntimeExpr {
@@ -2127,14 +2459,17 @@ fn px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind() {
             false,
             &format!("ken_px8j_live_scope_depth_{depth}"),
         );
-        assert!(matches!(
-            result,
-            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct: "StaticWorkerBinding",
-                reason,
-            })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
-                && reason.contains("has no runtime representation")
-        ), "scope depth {depth} must retain its measured conservation refusal");
+        assert!(
+            matches!(
+                result,
+                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "StaticWorkerBinding",
+                    reason,
+                })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
+                    && reason.contains("has no runtime representation")
+            ),
+            "scope depth {depth} must retain its measured conservation refusal"
+        );
     }
 }
 #[test]
@@ -2301,7 +2636,12 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_constructor_authorities: BTreeMap::new(),
+            checked_ih_detached_consumer_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -2359,6 +2699,7 @@ fn oriented_segment_keeps_semantic_and_control_axes_independent() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
+        None,
     )
     .unwrap();
     assert_eq!(
@@ -2397,6 +2738,7 @@ fn oriented_fresh_ih_semantics_retain_all_inherited_control_obligations() {
         ContinuationActivationId(8),
         oriented_five_control_invocation(),
         Vec::new(),
+        None,
     )
     .unwrap();
     assert_eq!(
@@ -2796,9 +3138,9 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         Census {
             file: "lowering/aggregates.rs",
             source: include_str!("../../aggregates.rs"),
-            builders: 4,
+            builders: 0,
             definitions: 0,
-            declarations: 2,
+            declarations: 0,
             data_declarations: 0,
             data_definitions: 0,
         },
@@ -2920,7 +3262,28 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             // compile. The sixth site defines the validated static response
             // owners. This row still counts builder SITES, never emitted units.
             builders: 6,
-            definitions: 6,
+            // ⭐ 6 -> 4, and the two sites RELOCATED rather than vanished --
+            // measured, because a vanished production emitter would be a
+            // finding and not a census update. At the base, six passes each
+            // built and defined their own population:
+            // `define_static_response_owner_bodies`,
+            // `define_continuation_bodies`,
+            // `define_continuation_context_bodies`,
+            // `define_static_continuation_fusion_bodies`,
+            // `define_root_adapter`, `define_unit_body`. `ABI-S6 D5b`
+            // consolidated the first three into one staged pass,
+            // `close_and_define_staged_result_bodies`, which takes a
+            // `Vec<StagedResultBody>` and defines all of them in one loop.
+            // Three define sites became one: net -2.
+            //
+            // ⛔ The BUILDER count is unchanged at 6, which is the check
+            // that this was a consolidation of the DEFINE step only and not
+            // a loss of emitters: the bodies are still built in as many
+            // places as before, they are merely defined together. No other
+            // file in the crate gained a `.define_function(` site --
+            // verified by a per-file base-vs-tip count across all of
+            // `ken-runtime`, which is what rules out relocation elsewhere.
+            definitions: 4,
             // Three declaration sites: the emittable unit bundle,
             // `RT-CONTSPEC-ACTIVATE` `D2`'s forward declaration of one target
             // per planned continuation specialization, and `D5a`'s forward
@@ -2962,6 +3325,22 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         Census {
             file: "planning/static_transition/aggregates.rs",
             source: include_str!("../../../planning/static_transition/aggregates.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
+        // `ABI-S6` `D5b` — the immediate-bridge realization plane. A planning
+        // module with no emission, so every count is zero, and the zero is
+        // load-bearing for the same reason as `abi.rs`: the planner mints
+        // bridge realization rows and must never emit against them. Registered
+        // when the roster gained the file -- a rostered file with no census row
+        // leaves the census reading complete while that file is unmeasured,
+        // which is the condition `AC-2` refuses.
+        Census {
+            file: "planning/static_transition/immediate_bridge.rs",
+            source: include_str!("../../../planning/static_transition/immediate_bridge.rs"),
             builders: 0,
             definitions: 0,
             declarations: 0,
@@ -3230,31 +3609,31 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
     );
     for row in census {
         assert_eq!(
-            row.source.matches("FunctionBuilder::new(").count(),
+            production_occurrences(row.source, "FunctionBuilder::new("),
             row.builders,
             "{}: N1 -- the production root builder census moved",
             row.file
         );
         assert_eq!(
-            row.source.matches(".define_function(").count(),
+            production_occurrences(row.source, ".define_function("),
             row.definitions,
             "{}: N1/N2 -- a definition was added or removed",
             row.file
         );
         assert_eq!(
-            row.source.matches(".declare_function(").count(),
+            production_occurrences(row.source, ".declare_function("),
             row.declarations,
             "{}: N2 -- a function declaration was added or removed",
             row.file
         );
         assert_eq!(
-            row.source.matches(".declare_data(").count(),
+            production_occurrences(row.source, ".declare_data("),
             row.data_declarations,
             "{}: N3 -- an artifact-static data declaration was added or removed",
             row.file
         );
         assert_eq!(
-            row.source.matches(".define_data(").count(),
+            production_occurrences(row.source, ".define_data("),
             row.data_definitions,
             "{}: N3 -- an artifact-static data definition was added or removed",
             row.file
@@ -3468,6 +3847,84 @@ fn the_identifier_census_survives_the_evasions_that_defeated_the_text_scan() {
 /// `the_backend_production_surface_inventory_is_closed` and forcing its source
 /// into this roster.
 #[cfg(test)]
+/// Count `needle` in `source`, EXCLUDING the body of every `#[cfg(test)]`-gated
+/// item.
+///
+/// ⭐ **The census measures the PRODUCTION emission surface, and without this it
+/// did not.** It counted raw string occurrences with no `cfg` attribution at
+/// all, so a test rig in a production file read as production emitters. `AC-4`,
+/// the pin directly below, has always done this attribution; this one never
+/// learned to, and was accidentally correct only while no test code in a
+/// rostered file had built a `FunctionBuilder`.
+///
+/// `ABI-S6 D5b` ended that: `units.rs` gained a four-builder harness inside
+/// `#[cfg(test)] mod generated_result_protocol_verifier`, and the row moved 6
+/// -> 10 while the production surface stood still at 6. `aggregates.rs` was
+/// already carrying the same error -- its own row comment says the non-zero
+/// count is "entirely its own `D2`-landed test rig", which is exactly a
+/// production census reporting a test population.
+///
+/// The attribution mirrors `AC-4`'s: a `#[cfg(...)]` naming the `test`
+/// identifier marks the next item, and a marked item opening a brace is skipped
+/// to its matching close. Unlike `AC-4`, which only needs to skip the item's
+/// HEAD to enumerate `mod` declarations, this must skip the BODY -- the needles
+/// live inside it.
+fn production_occurrences(source: &str, needle: &str) -> usize {
+    let mut production = String::with_capacity(source.len());
+    let mut pending_test_item = false;
+    let mut skip_depth = 0i32;
+    for line in source.lines() {
+        if skip_depth > 0 {
+            skip_depth += line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            continue;
+        }
+        let trimmed = line.trim();
+        if trimmed.starts_with("#[cfg(") {
+            pending_test_item |= identifier_occurrences(trimmed, "test") > 0
+                || identifier_occurrences(trimmed, "ken_ac10_production_mint_probe") > 0;
+            continue;
+        }
+        if trimmed.starts_with("#[") || trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+        if pending_test_item {
+            // ⛔ The marked item's head MAY SPAN SEVERAL LINES, so the opening
+            // brace is not necessarily on the line the head starts on. An
+            // earlier form cleared the mark at the head and armed the skip only
+            // when that one line contained a `{`, which meant a `#[cfg(test)]`
+            // item written as
+            //
+            //     #[cfg(test)]
+            //     fn harness(
+            //     module: &mut M,
+            //     ) {
+            //
+            // had its whole body counted as production surface -- the exact
+            // miscount this function exists to end, reintroduced by the repair
+            // for it. (Found in review; no rostered file exhibits the shape
+            // today, so it corrected no current number. It would have been
+            // silent when one did.)
+            //
+            // So the mark is held until the item is RESOLVED: the first `{`
+            // opens the body and arms the skip, and a `;` reached first means a
+            // declaration with no body. Head lines are never production.
+            let opens = line.matches('{').count() as i32;
+            if opens > 0 {
+                pending_test_item = false;
+                skip_depth = opens - line.matches('}').count() as i32;
+                continue;
+            }
+            if line.trim_end().ends_with(';') {
+                pending_test_item = false;
+            }
+            continue;
+        }
+        production.push_str(line);
+        production.push('\n');
+    }
+    production.matches(needle).count()
+}
+
 const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     (
         "cranelift_backend.rs",
@@ -3506,7 +3963,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs` above: a production
     // source absent from this roster is invisible to every pin that
     // iterates it.
-    ("lowering/aggregates.rs", include_str!("../../aggregates.rs")),
+    (
+        "lowering/aggregates.rs",
+        include_str!("../../aggregates.rs"),
+    ),
     // `RT-EMITTER-EFFECTS-SPLIT` `D1` — the effects emitter. Registered here
     // the moment the module exists, for the same reason as
     // `boundary.rs`/`source.rs`/`calls.rs`/`joins.rs`/`aggregates.rs` above:
@@ -3575,6 +4035,13 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     // identity. Registered here the moment the module exists, for the same
     // reason as every sibling: a production module absent from this roster
     // is invisible to every pin that iterates it.
+    // `ABI-S6` `D5b` — the immediate-bridge realization plane. A production
+    // source absent from this roster is invisible to every pin that iterates
+    // it, which is exactly what happened to it through fourteen commits.
+    (
+        "planning/static_transition/immediate_bridge.rs",
+        include_str!("../../../planning/static_transition/immediate_bridge.rs"),
+    ),
     (
         "planning/static_transition/joins_traps.rs",
         include_str!("../../../planning/static_transition/joins_traps.rs"),
@@ -3911,6 +4378,12 @@ fn the_backend_production_surface_inventory_is_closed() {
             // `EffectSeatVisitMutation`, `EffectSeatDispatchMutation`) stays
             // in `lowering/mod.rs` for item 16.
             ("planning/static_transition.rs", "effects"),
+            // `ABI-S6` `D5b` — the immediate-bridge realization plane, added by
+            // `7d35118da`. Registered here the moment the module exists, for the
+            // same reason as every sibling: a production module absent from this
+            // roster is invisible to every pin that iterates it, which is how it
+            // went unregistered through fourteen commits.
+            ("planning/static_transition.rs", "immediate_bridge"),
             // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — join disposition (which
             // representation a source join's result takes) and trap
             // identity (a value-keyed dedup catalog), factored into its own
@@ -3928,6 +4401,10 @@ fn the_backend_production_surface_inventory_is_closed() {
             // the StaticTransitionPlan projections that derive it, factored into
             // their own domain module.
             ("planning/static_transition.rs", "units"),
+            // `ABI-S6` `D5b` — the required-consumer destination vocabulary, an
+            // inline child module declared by aggregates.rs, which the roster
+            // scans after static_transition.rs.
+            ("planning/static_transition/aggregates.rs", "required_consumer_destination"),
             // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion
             // identity plane, a child of continuations (declared by
             // continuations.rs, which the roster scans after static_transition.rs).
@@ -4018,7 +4495,6 @@ fn the_bare_source_term_detector_catches_the_shape_it_is_looking_for() {
     ));
 }
 
-
 // ─── RT-FNSPLIT-B2A-S AC-1/AC-6 — the retained-body carrier holds a NAME ──────
 //
 // ⛔ AC-1 asks for this structurally, not asserted. It reads the DECLARATIONS of
@@ -4064,7 +4540,6 @@ fn the_field_inventory_extractor_sees_an_added_term_field() {
          the inventory equality"
     );
 }
-
 
 /// **`RT-FNSPLIT-B2A-S` D2 — the plan cannot escape into the compiled artifact,
 /// shown by the type system rather than asserted in prose.**
@@ -4771,8 +5246,7 @@ fn a_retained_body_is_defined_once_even_when_called_twice() {
          test measures nothing, whatever the relation below reports."
     );
     assert_eq!(
-        twice,
-        once,
+        twice, once,
         "AC-6 -- one retained closure occurrence applied twice performed \
          {twice} origin->expression resolutions against {once} when applied \
          once. The selected functionized authority must define that retained \
@@ -4918,7 +5392,6 @@ fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
         }) if reason == expected_reason
     ));
 }
-
 
 // ── `RT-BRANCH-LOCAL-DECLARED-CALLABLE` `D1` — AC-1, the seam property ────────
 //

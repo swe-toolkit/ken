@@ -5233,10 +5233,47 @@ fn d8k_the_causal_population_is_a_disjoint_partition_of_direct_and_composed() {
     // the discharge rather than by the seat having been loosened: turn the
     // discharge off and the old refusal comes straight back.
     {
-        use crate::cranelift_backend::lowering::{set_d8j_mutation, D8jMutation};
+        // ⛔ TWO mutations, and the second one HOLDS A CONFOUNDER FIXED rather
+        // than adding a perturbation. `ABI-S6 D5b` gave the causal edge a
+        // SECOND carrier: the residual filter now also excuses an edge whose
+        // identity settled `InlineNoCall`. Suppressing the discharge empties
+        // `pending_composed_discharges`, which is what
+        // `continuation_candidate_is_consumed` reads, so the candidate reads
+        // as unconsumed, the bridge settles it `InlineNoCall`, and the edge is
+        // excused by the new clause instead of reaching this seat.
+        //
+        // ⇒ `SuppressDischargeAfterRealCall` STOPPED BEING SINGLE-VARIABLE.
+        // Left alone it no longer isolates "the discharge is absent"; it also
+        // moves the disposition, and the compile then succeeds for a reason
+        // that has nothing to do with the property this row is about. The
+        // clause read green while measuring nothing -- a hole in the proof,
+        // not a hole in the program: production emission is untouched, because
+        // an identity that really does composed-discharge always has its
+        // pending record and is never settled `InlineNoCall`.
+        //
+        // Arming `IgnoreInlineNoCall` pins the second carrier so the first can
+        // be removed alone, which restores exactly the isolation this row was
+        // written with. The application count is asserted because a zero would
+        // mean the excusal never applied and the row passed WITHOUT the
+        // confounder being present -- vacuously green, the failure mode this
+        // whole clause exists to refuse.
+        use crate::cranelift_backend::lowering::{
+            set_d8j_mutation, with_d5b_hs7_detached_disposition_mutation,
+            D5bHs7DetachedDispositionMutation, D8jMutation,
+        };
         set_d8j_mutation(D8jMutation::SuppressDischargeAfterRealCall);
-        let (error, _counters, _markers) = d8e_witness_compile("d8k_suppressed", 3, true);
+        let ((error, _counters, _markers), inline_excusals) =
+            with_d5b_hs7_detached_disposition_mutation(
+                D5bHs7DetachedDispositionMutation::IgnoreInlineNoCall,
+                || d8e_witness_compile("d8k_suppressed", 3, true),
+            );
         set_d8j_mutation(D8jMutation::Exact);
+        assert_eq!(
+            inline_excusals, 1,
+            "the suppressed run must present exactly one InlineNoCall excusal for the pin to \
+             hold fixed. Zero means the second carrier was never in play and this row proves \
+             nothing about the first"
+        );
         let refusal = format!(
             "{:?}",
             error.expect("with nothing discharged the causal edge is detached again")

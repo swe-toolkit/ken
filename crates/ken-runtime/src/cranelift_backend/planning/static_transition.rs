@@ -16,6 +16,7 @@ mod continuations;
 #[cfg(test)]
 pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_owned_worker_captures_fixture;
 mod effects;
+mod immediate_bridge;
 mod joins_traps;
 mod occurrences;
 mod responses;
@@ -40,22 +41,20 @@ use super::{
 #[cfg_attr(not(test), allow(unused_imports))]
 use crate::boundary_value::{BoundaryClass, BoundaryReferentOwner, BoundaryTag};
 use crate::{RuntimeExpr, RuntimeTrap};
-use abi::AbiPlane;
 #[cfg_attr(not(test), allow(unused_imports))]
 use abi::install_continuation_specialization_abi;
-use semantic_ir::{SemanticMaterialArena, SemanticPlane, SemanticSourceKind, SemanticSourceSeed};
-#[cfg_attr(not(test), allow(unused_imports))]
-use semantic_ir::{
-    build_bool_constructor_inventory, build_synthesized_constructor_inventory,
-};
+use abi::AbiPlane;
 #[cfg_attr(not(test), allow(unused_imports))]
 use semantic_ir::RuntimeExprShape;
+#[cfg_attr(not(test), allow(unused_imports))]
+use semantic_ir::{build_bool_constructor_inventory, build_synthesized_constructor_inventory};
+use semantic_ir::{SemanticMaterialArena, SemanticPlane, SemanticSourceKind, SemanticSourceSeed};
 // `RT-CONTSRC-PRODUCER-LOCAL` `D2` — the shape vocabulary, so a producer-local
 // contract asks the existing `abi::result_carrier` authority rather than
 // restating a carrier.
 use occurrences::{
-    occurrence_authority, occurrence_subtree_contains, PlannedOccurrence, PlannedOccurrenceAuthority,
-    PlannedOccurrenceChildAuthority,
+    occurrence_authority, occurrence_subtree_contains, PlannedOccurrence,
+    PlannedOccurrenceAuthority, PlannedOccurrenceChildAuthority,
 };
 #[cfg_attr(not(test), allow(unused_imports))]
 use occurrences::{origin_of, validate_occurrence_authority_plan};
@@ -65,13 +64,46 @@ use occurrences::{origin_of, validate_occurrence_authority_plan};
 // `SemanticPlane`, `SemanticMaterialArena` and the `names` arena stay on the
 // `use` above, visible only inside this planner. Widening either of those to
 // serve a consumer is the move `§2d` forbids.
-pub(in crate::cranelift_backend) use abi::{
-    AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
-    AbiRootIngress, AbiSchedulingIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
-    expected_capture_slot,
-};
 #[cfg(test)]
 pub(in crate::cranelift_backend) use abi::with_c4_disabled_for_independent_control;
+pub(in crate::cranelift_backend) use abi::{
+    expected_capture_slot, AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership,
+    AbiProcessParameter, AbiRootIngress, AbiSchedulingIngress, AbiSlot, AbiSlotKind,
+    AbiStorageOwner, AbiUnitDefinition,
+};
+pub(in crate::cranelift_backend) use immediate_bridge::{
+    classify_immediate_bridge, produces_deforestable_aggregate_with_ih,
+    requires_heterogeneous_deforestation, ImmediateBridgeCause, ImmediateBridgeConsumer,
+    ImmediateBridgeConsumerKind, ImmediateBridgeRealization, ImmediateBridgeSelection,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub use immediate_bridge::{with_d5b_hs10_bridge_plan_mutation, D5bHs10BridgePlanMutation};
+pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) use responses::{
+    d5b_hs17_post_call_consumer_mutation, record_d5b_hs17_post_call_consumer_application,
+};
+#[cfg(feature = "px8-ds-test-support")]
+pub use responses::{
+    d5b_hs17_post_call_consumer_mutation_is_exact,
+    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    static_response_context_demand_mutation_is_exact,
+    suppressed_execute_then_resume_response_is_exact, with_d5b_hs10_inline_response_mutation,
+    with_d5b_hs17_post_call_consumer_mutation, with_mixed_owner_execute_then_resume_overpromotion,
+    with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
+    D5bHs10InlineResponseMutation, D5bHs17PostCallConsumerMutation,
+    StaticResponseContextDemandMutation,
+};
+#[allow(unused_imports)]
+pub(in crate::cranelift_backend) use responses::{
+    CheckedIhDetachedCallerCut, CheckedIhPostCallConsumer, CheckedIhStaticResponseReturnBoundary,
+    DeferredResponseRow, DeferredResponseSubCase, RequiredConsumerIncomingEdge,
+    ResponseDisposition, SsaInfeasible,
+    StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
+    StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
+    StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
+    StaticResponsePhaseA,
+};
 #[cfg(test)]
 pub(in crate::cranelift_backend) use semantic_ir::with_last_io_error_role_omitted;
 #[cfg(test)]
@@ -82,43 +114,56 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     BoolMatchCaseOrdinals, ConstructorIdentity, FieldIdentity, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,
 };
-pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
-#[allow(unused_imports)]
-pub(in crate::cranelift_backend) use responses::{
-    DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
-    StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
-    StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
-    StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
-    StaticResponsePhaseA,
-};
-#[cfg(feature = "px8-ds-test-support")]
-pub use responses::{
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
-    static_response_context_demand_mutation_is_exact,
-    suppressed_execute_then_resume_response_is_exact,
-    with_mixed_owner_execute_then_resume_overpromotion,
-    with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
-    StaticResponseContextDemandMutation,
-};
-pub(in crate::cranelift_backend) use units::{
-    EmittableCallKind, PredeclaredFunctionId,
-};
+pub(in crate::cranelift_backend) use units::{EmittableCallKind, PredeclaredFunctionId};
 
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use continuations::{
-    ContinuationSpecializationId, ContinuationEmissionOwner, ContinuationContextId, PlannedContinuationContext, ContinuationContextView, ContinuationInputSource, ProducerLocalBinding, ProducerLocalLocator, ContinuationSourceCoordinate, ContinuationEnvironmentClaimOver, ContinuationEnvironmentClaim, ContinuationEnvironmentDraft, ContinuationFrameRequirement, ContinuationFrameIdentity, ContinuationAvailabilityOver, ContinuationAvailabilityViews, ContinuationAvailabilityDraft, ContinuationSourceSlotAuthority, ContinuationWorkerCaptureSource, ContinuationWorkerCaptureProvenance, ContinuationConsumingOccurrence, RequiredConsumerProjection, ContinuationCallIdentity, ContinuationUnitView, ContinuationOrdinaryEnvelopeRole, ComposedWorkerRouteEligibility, ComposedWorkerView, ComposedCallTarget, ContinuationInputView, ContinuationCallView, ContinuationResultEdge, verify_current_lexical_availability, verify_predeclared_entry_frame_membership, FusionComposedEdge, FusionOwnedOuterRealization, FusionCompositionLayer, AdmittedContinuationDiscovery, CheckedCaseBinderRole, CheckedCaseBinderLayout, CheckedIhBinding, CheckedTransportCoordinate, StaticContinuationFusionId, StaticContinuationFusionKey, StaticContinuationFusionDescriptor, StaticContinuationFusionPlan, StaticContinuationFusionView, fusion_redirect_target, BodyEmissionDisposition, FusionOwnedBody, FusionRegionClaim, FusionClaimRefusal, FusionRegionClaimLedger, build_static_continuation_fusion_plan, StaticContinuationFusionCandidate,
+    build_static_continuation_fusion_plan, fusion_redirect_target,
+    verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
+    AdmittedContinuationDiscovery, BodyEmissionDisposition, CheckedCaseBinderLayout,
+    CheckedCaseBinderRole, CheckedIhBinding, CheckedIhPostCallConsumerStep,
+    CheckedTransportCoordinate, ComposedCallTarget, ComposedWorkerRouteEligibility,
+    ComposedWorkerView, ContinuationAvailabilityDraft, ContinuationAvailabilityOver,
+    ContinuationAvailabilityViews, ContinuationCallIdentity, ContinuationCallView,
+    ContinuationConsumingOccurrence, ContinuationContextId, ContinuationContextView,
+    ContinuationEmissionOwner, ContinuationEnvironmentClaim, ContinuationEnvironmentClaimOver,
+    ContinuationEnvironmentDraft, ContinuationFrameIdentity, ContinuationFrameRequirement,
+    ContinuationInputSource, ContinuationInputView, ContinuationOrdinaryEnvelopeRole,
+    ContinuationResultEdge, ContinuationSourceCoordinate, ContinuationSourceSlotAuthority,
+    ContinuationSpecializationId, ContinuationUnitView, ContinuationWorkerCaptureProvenance,
+    ContinuationWorkerCaptureSource, FusionClaimRefusal, FusionComposedEdge,
+    FusionCompositionLayer, FusionOwnedBody, FusionOwnedOuterRealization, FusionRegionClaim,
+    FusionRegionClaimLedger, PlannedContinuationContext, ProducerLocalBinding,
+    ProducerLocalLocator, RequiredConsumerProjection, SourceReturnContextRole,
+    SourceReturnContextStep, SourceReturnContextTemplate, SourceWorkerReturnBoundary,
+    StaticContinuationFusionCandidate, StaticContinuationFusionDescriptor,
+    StaticContinuationFusionId, StaticContinuationFusionKey, StaticContinuationFusionPlan,
+    StaticContinuationFusionView,
 };
 #[cfg(test)]
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use continuations::{
-    D3bFinalizationPerturbation, d3b_refinalize, d3b_publish_without_finalization, ComposedCallTargetDefect, set_composed_call_target_defect, RequiredConsumerProjectionDisposition, ContinuationRequiredConsumerObservation, RequiredConsumerProjectionMutation, with_required_consumer_projection_mutation, take_continuation_required_consumer_observations, with_continuation_consuming_occurrence_seed_mutated, with_continuation_consuming_eliminator_seed_mutated, EnvelopeDefect, set_envelope_defect, set_primary_fusion_key_derivation_mutated, set_binder_body_resolution_suppressed, set_static_body_triple_duplicated, set_post_specialization_descent_suppressed, set_continuation_descent_owner_duplication, FusionClaimParameterMutation, FusionProducerCaptureMutation, with_fusion_producer_capture_mutation, with_fusion_claim_parameter_mutation, reset_r3_fusion_claim_consumptions, r3_fusion_claim_consumptions,
+    d3b_publish_without_finalization, d3b_refinalize, r3_fusion_claim_consumptions,
+    reset_r3_fusion_claim_consumptions, set_binder_body_resolution_suppressed,
+    set_composed_call_target_defect, set_continuation_descent_owner_duplication,
+    set_envelope_defect, set_post_specialization_descent_suppressed,
+    set_primary_fusion_key_derivation_mutated, set_static_body_triple_duplicated,
+    take_continuation_required_consumer_observations,
+    with_continuation_consuming_eliminator_seed_mutated,
+    with_continuation_consuming_occurrence_seed_mutated, with_fusion_claim_parameter_mutation,
+    with_fusion_producer_capture_mutation, with_required_consumer_projection_mutation,
+    ComposedCallTargetDefect, ContinuationRequiredConsumerObservation, D3bFinalizationPerturbation,
+    EnvelopeDefect, FusionClaimParameterMutation, FusionProducerCaptureMutation,
+    RequiredConsumerProjectionDisposition, RequiredConsumerProjectionMutation,
 };
 use continuations::{PlannedContinuationSpecialization, PlannedContinuationSpecializationCall};
 
 #[cfg(test)]
 #[allow(unused_imports)]
 use continuations::{
-    CONTINUATION_INTERN_MUTATION, CONTINUATION_PRODUCTION_MUTATION, COMPOSED_CALL_TARGET_DEFECT, WEAKEN_CONTINUATION_DECREASING_MEASURE, SUPPRESS_POST_SPECIALIZATION_DESCENT, DUPLICATE_STATIC_BODY_TRIPLE, ENVELOPE_DEFECT,
+    COMPOSED_CALL_TARGET_DEFECT, CONTINUATION_INTERN_MUTATION, CONTINUATION_PRODUCTION_MUTATION,
+    DUPLICATE_STATIC_BODY_TRIPLE, ENVELOPE_DEFECT, SUPPRESS_POST_SPECIALIZATION_DESCENT,
+    WEAKEN_CONTINUATION_DECREASING_MEASURE,
 };
 // `RT-BACKEND-SPLIT-CLOSURE` (item 18): `validate_continuation_specialization_
 // closure`/`ContinuationProjectionOmission`/`ContinuationInternMutation`
@@ -148,15 +193,16 @@ pub use aggregates::{
     with_checked_ih_generated_entry_observations,
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
-    with_composed_return_forward_ret_role_witnesses,
-    with_retained_result_closure_proof_mutation, CheckedIhContinuationInheritanceMutation,
-    CheckedIhContinuationInheritanceObservation, CheckedIhGeneratedEntryAdmissionMutation,
-    CheckedIhGeneratedEntryAdmissionObservation, CheckedIhGeneratedEntryArrivalMutation,
-    CheckedIhGeneratedEntryConfluenceMutation, CheckedIhGeneratedEntryObservation,
-    ComposedReturnForwardEdgeCollapsibilityObservation,
+    with_composed_return_forward_ret_role_witnesses, with_required_consumer_call_mutation,
+    with_required_consumer_call_observations, with_retained_result_closure_proof_mutation,
+    CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
+    CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,
+    CheckedIhGeneratedEntryArrivalMutation, CheckedIhGeneratedEntryConfluenceMutation,
+    CheckedIhGeneratedEntryObservation, ComposedReturnForwardEdgeCollapsibilityObservation,
     ComposedReturnForwardRetAuthorityMutation, ComposedReturnForwardRetAuthorityObservation,
-    ComposedReturnForwardRetRoleWitnessObservation,
-    ComposedReturnForwardRetCoordinateObservation, RetainedResultClosureProofMutation,
+    ComposedReturnForwardRetCoordinateObservation, ComposedReturnForwardRetRoleWitnessObservation,
+    RequiredConsumerCallMutation, RequiredConsumerCallObservation,
+    RetainedResultClosureProofMutation,
 };
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -168,38 +214,36 @@ pub(in crate::cranelift_backend) use aggregates::{
     record_checked_ih_generated_entry_ordinary_continuation,
     record_checked_ih_generated_entry_raw_arrival, record_checked_ih_generated_entry_reached,
     record_composed_return_forward_edge_collapsibility,
-    record_composed_return_forward_ret_authority,
-    record_composed_return_forward_ret_role_witness,
+    record_composed_return_forward_ret_authority, record_composed_return_forward_ret_role_witness,
     take_composed_return_forward_ret_population_mutation,
 };
 
 // `RT-PLANNER-AGGREGATES-SPLIT` `D1` — the aggregates domain's cross-boundary
 // surface: `lowering` and `planning`'s own re-export both reach these through
 // this module, unchanged from before the move.
+#[cfg(test)]
+use aggregates::{
+    aggregate_child_referent_owners, fixed_node_selected_owner, flatten_allocation_reachable_uses,
+    host_effect_recipe_tree, node_referent_owners, validate_aggregate_producers_are_unique,
+    SynthesizedAggregateStep,
+};
+use aggregates::{
+    checked_ih_post_call_consumer_frames, lifetime_referent_affinity,
+    CheckedIhGeneratedEntryConfluence, CheckedIhGeneratedEntryCoordinate,
+};
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use aggregates::{
     AggregateOccurrenceId, AggregateOccurrenceProducer, BoundaryClosureEnvironment,
     CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
-    CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
-    CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,
-    CheckedIhGeneratedEntryProjection,
-    CheckedIhImmediateKBindingLocator,
-    CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
-    PlannedAggregateAllocation, PlannedAggregateOwnership,
+    CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination, CheckedIhFreshResultRoute,
+    CheckedIhGeneratedEntryAccess, CheckedIhGeneratedEntryAdmission,
+    CheckedIhGeneratedEntryCallCoordinate, CheckedIhGeneratedEntryProjection,
+    CheckedIhImmediateKBindingLocator, CheckedIhKAvailabilityDomain, RequiredConsumerCall,
+    RequiredConsumerDestination,
+    CheckedIhTransportInputDestination, PlannedAggregateAllocation, PlannedAggregateOwnership,
     PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRole, SynthesizedAggregateRoot, SynthesizedDynamicSet,
-};
-use aggregates::{
-    lifetime_referent_affinity, CheckedIhGeneratedEntryConfluence,
-    CheckedIhGeneratedEntryCoordinate,
-};
-#[cfg(test)]
-use aggregates::{
-    aggregate_child_referent_owners, fixed_node_selected_owner,
-    flatten_allocation_reachable_uses, host_effect_recipe_tree, node_referent_owners,
-    validate_aggregate_producers_are_unique, SynthesizedAggregateStep,
 };
 
 // `RT-PLANNER-EFFECTS-SPLIT` `D1` — the host-effect seat authority's
@@ -212,25 +256,27 @@ pub(in crate::cranelift_backend) use effects::{
     CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]
-pub(in crate::cranelift_backend) use effects::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
+pub(in crate::cranelift_backend) use effects::{
+    set_effect_seat_plan_mutation, EffectSeatPlanMutation,
+};
 
 // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — the joins-traps domain's
 // cross-boundary surface: `lowering` and `planning`'s own re-export both
 // reach these through this module, unchanged from before the move.
+use joins_traps::PlannedJoinResult;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use joins_traps::{
     dead_arm_effect_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
     JoinPlanToken, JoinResultRepresentation,
 };
-use joins_traps::PlannedJoinResult;
 
 // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — the closure lifecycle's
 // cross-boundary surface: `lowering` and `planning`'s own re-export both
 // reach these through this module, unchanged from before the split.
 pub(in crate::cranelift_backend) use closure::CaseEmissionStatus;
+use closure::PlannedCaseEmission;
 #[cfg(test)]
 pub(in crate::cranelift_backend) use closure::{PlannedResultFieldKindForTest, ScaleBPlanCensus};
-use closure::PlannedCaseEmission;
 use construction::Planner;
 // `RT-PLANNER-ROOT-CLOSURE-SPLIT` `D1` — root's own `mod tests` (still
 // resident here pending `D2`) reaches these purely-internal construction/
@@ -238,9 +284,9 @@ use construction::Planner;
 // items 4-9's own moved-domain tests did.
 #[cfg(test)]
 use closure::{
-    d4b_arm_admission, d4b_take_admission, with_static_worker_member_mutation,
-    validate_static_worker_member_population, validate_case_emission_plan,
-    validate_substrate_preallocation_closure, BoundaryACensus, BoundaryB1Census, CaseProducerSet,
+    d4b_arm_admission, d4b_take_admission, validate_case_emission_plan,
+    validate_static_worker_member_population, validate_substrate_preallocation_closure,
+    with_static_worker_member_mutation, BoundaryACensus, BoundaryB1Census, CaseProducerSet,
     D4bVerdict, StaticWorkerMemberMutation, MAX_HELPERS_PER_STATIC_SOURCE,
 };
 #[cfg(test)]
@@ -248,7 +294,6 @@ use construction::{
     reset_recursive_lowering_frame_count, D4DeclarationTargetMutation,
     D4_DECLARATION_TARGET_MUTATION,
 };
-
 
 /// One planned entry paired with the body occurrence its own planning visit
 /// returned.
@@ -283,7 +328,6 @@ struct PlannedEntryBody {
     entry: StaticNodeId,
     body_occurrence: StaticOriginId,
 }
-
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
@@ -459,14 +503,12 @@ pub(in crate::cranelift_backend) enum PlannedReferentLifetime {
     ActivationOwned,
 }
 
-
 /// Bounds-checked dense-range slice, failing closed rather than truncating.
 fn dense_slice<T>(arena: &[T], range: semantic_ir::DenseRange) -> Option<&[T]> {
     let start = range.start as usize;
     let end = start.checked_add(range.len as usize)?;
     arena.get(start..end)
 }
-
 
 #[derive(Clone)]
 pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
@@ -572,8 +614,15 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// One independently validated consumer-level occurrence per continuation
     /// call whose discovery established the relation. Keyed by the whole opaque
     /// call identity, never by specialization identity or function provenance.
-    required_consumer_projections:
-        BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
+    required_consumer_projections: BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
+    /// Exact post-call source consumers for checked-IH transports whose actual
+    /// continuation result differs from the response context's demanded Result.
+    /// Compiler-only: no ABI descriptor or runtime frame references this plane.
+    checked_ih_post_call_consumers: Vec<CheckedIhPostCallConsumer>,
+    /// Exact immediate producer/eliminator bridges, keyed by the complete call
+    /// identity whose call seat the bridge realizes without a physical call.
+    /// Built once before response phase B and re-derived exactly at closeout.
+    immediate_bridge_realizations: BTreeMap<ContinuationCallIdentity, ImmediateBridgeRealization>,
     /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts.
     /// Causal-call demands retain the exact prefix produced by specialization
     /// planning; validated static-response demands append through the same
@@ -590,8 +639,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// The typed fail-closed result for a genuinely opaque/dynamic response K
     /// or a source that cannot be expressed in the existing typed schema.
     static_response_infeasible: Option<SsaInfeasible>,
-    /// The complete Deferred residual. P1 is a response with no continuation
-    /// unit. In an open plane, transport-source K callers remain P2 so the plane
+    /// The complete Deferred residual. A plan-owned non-transport immediate
+    /// bridge has no response owner and lowers its effect ordinarily. P1 is a
+    /// response with no continuation unit. In an open plane, transport-source K
+    /// callers remain P2 so the plane
     /// is not partially specialized. An eligible closed plane with at least two
     /// exclusively-predeclared producer groups turns those emissions into owner calls;
     /// a single-stage plane retains the forward-Ret path. The suppression
@@ -706,7 +757,6 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
     }
 }
 
-
 /// Every emission owner under which an inline synthesized aggregate is built.
 ///
 /// A seat is emitted by its own predeclared unit. It is also emitted under each
@@ -755,7 +805,9 @@ fn inline_synthesized_seat_emission_owners(
         let body_position = alternative
             .checked_add(1)
             .ok_or_else(|| planner_capacity_error("continuation case position overflows"))?;
-        let body = plan.semantic.child_origin(unit.continuation_origin(), body_position)?;
+        let body = plan
+            .semantic
+            .child_origin(unit.continuation_origin(), body_position)?;
         if occurrence_subtree_contains(plan, body, seat)? {
             owners.push(ContinuationEmissionOwner::Specialization(unit.id()));
         }
@@ -773,15 +825,16 @@ fn inline_synthesized_seat_emission_owners(
         );
         for row in plan.static_response_deferred() {
             let k_body = plan.deferred_response_k_body(row)?;
-            let owns_seat = if row.effect_origin() == seat {
-                true
-            } else if row.sub_case() == DeferredResponseSubCase::UnconsumedTransportCaller {
-                match k_body {
-                    Some(body) => occurrence_subtree_contains(plan, body, seat)?,
-                    None => false,
+            let owns_seat = match row.sub_case() {
+                DeferredResponseSubCase::InlineBridgeNoCall
+                | DeferredResponseSubCase::NoContinuationUnit => row.effect_origin() == seat,
+                DeferredResponseSubCase::UnconsumedTransportCaller => {
+                    row.effect_origin() == seat
+                        || match k_body {
+                            Some(body) => occurrence_subtree_contains(plan, body, seat)?,
+                            None => false,
+                        }
                 }
-            } else {
-                false
             };
             if !owns_seat {
                 continue;
@@ -1014,11 +1067,13 @@ pub struct DeferredResponseObservation {
     pub operation_root_origin: u32,
     pub effect_origin: u32,
     pub operation: String,
-    /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (ineligible
+    /// "InlineBridgeNoCall" (plan-owned non-transport immediate bridge),
+    /// "NoContinuationUnit" (P1), or "UnconsumedTransportCaller" (ineligible
     /// or test-suppressed P2).
     pub sub_case: String,
-    /// The K's capture / continuation-input counts (P2 from the demand, P1
-    /// zero). Eligible-plane has-K census comes from Specialized rows.
+    /// The K's capture / continuation-input counts (immediate bridge or P2 from
+    /// the demand, P1 zero). Eligible-plane has-K census comes from Specialized
+    /// rows.
     pub capture_count: usize,
     pub continuation_input_count: usize,
     /// The structurally nearest specialized handler, only when the lexical K
@@ -1039,9 +1094,9 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
-    /// The complete Deferred residual: P1 plus ineligible or test-suppressed
-    /// P2. Together with the Specialized rows this is the full response-Vis
-    /// classification.
+    /// The complete Deferred residual: plan-owned non-transport immediate
+    /// bridges, P1, plus ineligible or test-suppressed P2. Together with the
+    /// Specialized rows this is the full response-Vis classification.
     pub static_response_deferred: Vec<DeferredResponseObservation>,
 }
 
@@ -1117,7 +1172,9 @@ fn record_static_response_feasibility_diagnostic(
                 base_owner: format!("{:?}", infeasible.base_owner()),
                 vis_origin: infeasible.vis_origin().0,
                 producer_call_origin: infeasible.producer_call_origin().map(|origin| origin.0),
-                operation: infeasible.operation().map(|operation| format!("{operation:?}")),
+                operation: infeasible
+                    .operation()
+                    .map(|operation| format!("{operation:?}")),
                 k_closure_origin: infeasible.k_closure_origin().map(|origin| origin.0),
                 k_body_origin: infeasible.k_body_origin().map(|origin| origin.0),
                 k_capture_count: infeasible.k_capture_count(),
@@ -1126,9 +1183,8 @@ fn record_static_response_feasibility_diagnostic(
             }),
         ),
     };
-    let (static_response_rows, static_response_infeasible) = observe(
-        plan.static_response_feasibility_ledger(ken_host::HostOpV1::BufferAllocate)?,
-    );
+    let (static_response_rows, static_response_infeasible) =
+        observe(plan.static_response_feasibility_ledger(ken_host::HostOpV1::BufferAllocate)?);
     let (all_static_response_rows, all_static_response_infeasible) =
         observe(plan.static_response_feasibility_ledger_all()?);
     let static_response_owners = match plan.static_response_owner_specializations()? {
@@ -1339,7 +1395,6 @@ pub(in crate::cranelift_backend) use tests::{
 #[cfg(test)]
 mod tests {
 
-
     /// `D2g` — the `R3` shape, in an unmarked and a checked-transport form.
     ///
     /// One builder for both, so the two differ in **transport and nothing
@@ -1368,7 +1423,10 @@ mod tests {
     /// when its own description is edited. Moving the marker in the Runtime IR
     /// is what shows it detects a change in the thing described.
     #[cfg(test)]
-    pub(super) fn d2g_declaration_body_relocated(checked: bool, relocate_outer_slot: bool) -> RuntimeExpr {
+    pub(super) fn d2g_declaration_body_relocated(
+        checked: bool,
+        relocate_outer_slot: bool,
+    ) -> RuntimeExpr {
         let trap = |what: &str| RuntimeTrap {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: format!("D2g {what} default"),
@@ -1406,8 +1464,9 @@ mod tests {
                     call_template_id: call,
                     checked_occurrence_path: path,
                     kind: crate::CheckedComputationalIHInvocationKind::OrdinaryApplication,
-                    binder_morphism:
-                        crate::CheckedComputationalIHBinderMorphism::identity_for_test(0),
+                    binder_morphism: crate::CheckedComputationalIHBinderMorphism::identity_for_test(
+                        0,
+                    ),
                     body: Box::new(body),
                 }
             } else {
@@ -1593,12 +1652,16 @@ mod tests {
                     find(body, frame_id)
                 }
                 RuntimeExpr::CheckedComputationalIHSlots { body, .. }
-                | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => find(body, frame_id),
+                | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => {
+                    find(body, frame_id)
+                }
                 RuntimeExpr::ComputationalMatch {
                     scrutinee, cases, ..
                 } => find(scrutinee, frame_id)
                     .or_else(|| cases.iter().find_map(|case| find(&case.body, frame_id))),
-                RuntimeExpr::Construct { args, .. } => args.iter().find_map(|arg| find(arg, frame_id)),
+                RuntimeExpr::Construct { args, .. } => {
+                    args.iter().find_map(|arg| find(arg, frame_id))
+                }
                 RuntimeExpr::LexicalClosure { body, .. } => find(body, frame_id),
                 RuntimeExpr::Call { callee, args } => find(callee, frame_id)
                     .or_else(|| args.iter().find_map(|arg| find(arg, frame_id))),
@@ -1609,7 +1672,6 @@ mod tests {
     }
 
     use super::abi::{AbiCarrier, AbiSlot};
-
 
     pub(super) const D2G_DECLARATION: &str = "decl:fixture::d2g";
 
@@ -1858,7 +1920,11 @@ mod tests {
     /// producer: the outer match's scrutinee carries the same symbol, and
     /// keying the widening on the symbol widened both.
     #[cfg(test)]
-    pub(super) fn d2j_rewrite_body(expr: RuntimeExpr, cause: D2jCause, in_case_body: bool) -> RuntimeExpr {
+    pub(super) fn d2j_rewrite_body(
+        expr: RuntimeExpr,
+        cause: D2jCause,
+        in_case_body: bool,
+    ) -> RuntimeExpr {
         match expr {
             RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
                 let frame_id = if cause == D2jCause::Frame && frame_id == D2G_OUTER_FRAME {
@@ -2190,7 +2256,10 @@ mod tests {
             parent_frame_template_id: Some(D2G_OUTER_FRAME),
             parent_segment_site_id: Some(9),
             caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
-            runtime_marker_locations: vec![location(d2j_prefixed_under(cause, d2g_call_location()))],
+            runtime_marker_locations: vec![location(d2j_prefixed_under(
+                cause,
+                d2g_call_location(),
+            ))],
             occurrence_binding_fingerprint: 0,
         };
         call.occurrence_binding_fingerprint =
@@ -2227,7 +2296,6 @@ mod tests {
             },
         }
     }
-
 
     /// `D2f` Deliverable 0 — THE ONE fixture constructor, shared by the
     /// planner controls in this module and the full-compile gate in
@@ -2299,7 +2367,6 @@ mod tests {
         Ok(plan)
     }
 
-
     /// Install one plane — optionally with the key perturbed — and preflight it.
     ///
     /// The perturbation is applied to the key **production derived**, so a
@@ -2340,7 +2407,6 @@ mod tests {
         Ok(ledger)
     }
 
-
     use super::semantic_ir::{RuntimeExprShape, SemanticSourceKind};
     use super::*;
     use crate::cranelift_backend::surface::NativeSeedEnvironment;
@@ -2375,7 +2441,10 @@ mod tests {
         RecursiveResult,
     }
 
-    pub(super) fn role_at(index: u32, outer_to_inner: &[GovernedBracketRole]) -> GovernedBracketRole {
+    pub(super) fn role_at(
+        index: u32,
+        outer_to_inner: &[GovernedBracketRole],
+    ) -> GovernedBracketRole {
         outer_to_inner[outer_to_inner.len() - 1 - index as usize]
     }
 
@@ -2569,7 +2638,6 @@ mod tests {
         assert_eq!(*length, 1.into());
     }
 
-
     pub(super) fn assert_fixed_helper_identity_shape(key: PlannedHelperKey) {
         fn require_copy<T: Copy>() {}
         require_copy::<PlannedHelperKey>();
@@ -2603,7 +2671,6 @@ mod tests {
         }
     }
 
-
     /// Two `Let` occurrences of identical shape and counts whose positional
     /// children are different occurrences.
     /// ⛔ **Test-local, closure-REFUSING witness for exactly this fixture's
@@ -2632,7 +2699,9 @@ mod tests {
         ),
     }
 
-    pub(in crate::cranelift_backend) fn fixture_witness(expr: &RuntimeExpr) -> Option<FixtureWitness> {
+    pub(in crate::cranelift_backend) fn fixture_witness(
+        expr: &RuntimeExpr,
+    ) -> Option<FixtureWitness> {
         Some(match expr {
             RuntimeExpr::Construct { constructor, args }
                 if constructor == "ctor:prelude::Unit::MkUnit" && args.is_empty() =>
@@ -2674,7 +2743,10 @@ mod tests {
         }
     }
 
-    pub(super) fn nodes_of_shape(plan: &StaticTransitionPlan, shape: RuntimeExprShape) -> Vec<StaticNodeId> {
+    pub(super) fn nodes_of_shape(
+        plan: &StaticTransitionPlan,
+        shape: RuntimeExprShape,
+    ) -> Vec<StaticNodeId> {
         plan.semantic_sources
             .iter()
             .filter_map(|source| {
@@ -2684,7 +2756,8 @@ mod tests {
             .collect()
     }
     #[cfg(test)]
-    pub(in crate::cranelift_backend) fn b2ac_topology_fixtures() -> Vec<(&'static str, RuntimeExpr)> {
+    pub(in crate::cranelift_backend) fn b2ac_topology_fixtures() -> Vec<(&'static str, RuntimeExpr)>
+    {
         let leaf = || RuntimeExpr::Value(RuntimeValue::Bool(true));
         let trap = || RuntimeTrap {
             code: RuntimeTrapCode::PatternMatchFailure,
@@ -2754,10 +2827,11 @@ mod tests {
         ]
     }
 
-
     // ---- RT-FNSPLIT-B2O — static body ownership -----------------------------
 
-    pub(in crate::cranelift_backend) fn b2o_transparent_declaration(body: RuntimeExpr) -> RuntimeDeclaration {
+    pub(in crate::cranelift_backend) fn b2o_transparent_declaration(
+        body: RuntimeExpr,
+    ) -> RuntimeDeclaration {
         RuntimeDeclaration {
             symbol: "decl:fixture::b2o".to_string(),
             kind: RuntimeDeclarationKind::Transparent { body },
@@ -2802,7 +2876,6 @@ mod tests {
     // files MUST leave these green, and a pin that reddens on one of those is a
     // defect in the pin, reported as such rather than repaired into greenness.
     // ================================================================
-
 
     pub(in crate::cranelift_backend) fn b2r_plan(expr: &RuntimeExpr) -> StaticTransitionPlan<'_> {
         let declarations = BTreeMap::new();
@@ -2911,7 +2984,9 @@ mod tests {
         plan_static_transition_graph(expr, &BTreeMap::new()).expect("contspec fixture plans")
     }
 
-    pub(in crate::cranelift_backend) fn contspec_parameter_match(case_body: RuntimeExpr) -> RuntimeExpr {
+    pub(in crate::cranelift_backend) fn contspec_parameter_match(
+        case_body: RuntimeExpr,
+    ) -> RuntimeExpr {
         let worker = RuntimeExpr::LexicalClosure {
             captures: Vec::new(),
             params: vec!["worker".to_string()],
@@ -2943,7 +3018,6 @@ mod tests {
         }
     }
 
-
     pub(super) fn contspec_complete_environment_fixture() -> RuntimeExpr {
         RuntimeExpr::Let {
             // Rebind process parameter 1 at de Bruijn ordinal 0. The
@@ -2966,7 +3040,6 @@ mod tests {
             }),
         }
     }
-
 
     /// A `ComputationalMatch` whose single case has **one recursive position
     /// and one ordinary argument binder**, with a persistent scrutinee, and

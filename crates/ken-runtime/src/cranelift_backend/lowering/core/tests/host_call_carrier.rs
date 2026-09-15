@@ -578,6 +578,7 @@ fn rtfp_compose(
         ContinuationActivationId(8),
         segment,
         Vec::new(),
+        None,
     )
 }
 

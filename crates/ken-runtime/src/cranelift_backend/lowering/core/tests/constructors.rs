@@ -12,10 +12,10 @@ use crate::nc5_seed_examples;
 // (`a_missing_diagnostic_child_that_was_already_absent_is_not_a_mutation_hit`,
 // discriminating a different, already-RETAIN `D4` mutation) reaches them back
 // by path, ruled test module, `use` permitted (AC-8 class 2).
+use crate::boundary_value::BoundaryWord;
 use crate::cranelift_backend::lowering::aggregates::tests::{
     d7_constructor_arguments, d7_ownership_run,
 };
-use crate::boundary_value::BoundaryWord;
 use crate::cranelift_backend::lowering::joins::{
     with_carried_match_dispatch_mutation, CarriedMatchDispatchMutation,
 };
@@ -252,7 +252,12 @@ fn run_dynamic_constructor_dispatch_fixture(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_constructor_authorities: BTreeMap::new(),
+            checked_ih_detached_consumer_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -345,9 +350,7 @@ fn run_dynamic_constructor_dispatch_fixture(
         .define_function(func_id, &mut context)
         .map_err(|error| backend_module(error.to_string()))?;
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
-    let carrier_identity_catalog = compiler
-        .static_transition_plan
-        .carrier_identity_catalog()?;
+    let carrier_identity_catalog = compiler.static_transition_plan.carrier_identity_catalog()?;
     let compiled = CompiledModule::from_parts(
         module,
         func_id,
@@ -465,7 +468,7 @@ fn dynamic_constructor_known_omission_owns_source_default() {
         tag: 0,
         constructor: "ctor:fixture::Dynamic::Missing".to_string(),
         identity: test_synthesized_constructor_identity(),
-                    occurrence: None,
+        occurrence: None,
         fields: Vec::new(),
     };
     let owned = RuntimeTrap {
@@ -518,7 +521,7 @@ fn dynamic_constructor_fields_precede_outer_environment_in_declaration_order() {
         tag: 7,
         constructor: "ctor:fixture::Dynamic::Pair".to_string(),
         identity: test_synthesized_constructor_identity(),
-                    occurrence: None,
+        occurrence: None,
         fields: vec![
             Lowered::Bytes(b"first".to_vec()),
             Lowered::String("second".to_string()),
@@ -526,34 +529,28 @@ fn dynamic_constructor_fields_precede_outer_environment_in_declaration_order() {
     };
     let env = materialize_dynamic_constructor_env(
         &alternative,
-        &[LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-            Lowered::Bytes(b"outer".to_vec()),
-        ))],
+        &[LoweringEnvironmentBinding::Value(
+            LoweringOperand::Specialized(Lowered::Bytes(b"outer".to_vec())),
+        )],
     );
-    assert!(
-        matches!(
-            &env[0],
-            LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(Lowered::Bytes(
-                value,
-            ))) if value == b"first"
-        )
-    );
-    assert!(
-        matches!(
-            &env[1],
-            LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(Lowered::String(
-                value,
-            ))) if value == "second"
-        )
-    );
-    assert!(
-        matches!(
-            &env[2],
-            LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(Lowered::Bytes(
-                value,
-            ))) if value == b"outer"
-        )
-    );
+    assert!(matches!(
+        &env[0],
+        LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(Lowered::Bytes(
+            value,
+        ))) if value == b"first"
+    ));
+    assert!(matches!(
+        &env[1],
+        LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(Lowered::String(
+            value,
+        ))) if value == "second"
+    ));
+    assert!(matches!(
+        &env[2],
+        LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(Lowered::Bytes(
+            value,
+        ))) if value == b"outer"
+    ));
 }
 
 #[test]
@@ -1986,7 +1983,12 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             generated_context_captures: None,
             constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
-            seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
+            generated_constructor_authorities: BTreeMap::new(),
+            checked_ih_detached_consumer_authorities: BTreeMap::new(),
+            pending_call_result_obligations: Vec::new(),
+            seed_material:
+                crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(
+                ),
             host_dispatch: None,
             host_dispatch_context: None,
             services_pointer: None,
@@ -2026,11 +2028,8 @@ pub(in crate::cranelift_backend::lowering) fn bind_bare_test_trap_lane(
     compiler: &mut Lowering<'_>,
     builder: &mut FunctionBuilder<'_>,
 ) {
-    let lane = builder.create_sized_stack_slot(StackSlotData::new(
-        StackSlotKind::ExplicitSlot,
-        8,
-        3,
-    ));
+    let lane =
+        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
     compiler.function_local.trap_exit = None;
     compiler
         .function_local
@@ -2241,12 +2240,12 @@ fn c1_d3_a_carried_operand_survives_case_env_and_nested_lowering() {
     //
     // ⛔ Without this the test is consistent with a spine that answers
     // `Carried` for everything.
-    let specialized_env = [LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-        Lowered::Bool {
+    let specialized_env = [LoweringEnvironmentBinding::Value(
+        LoweringOperand::Specialized(Lowered::Bool {
             value: seeded_word,
             known: Some(true),
-        },
-    ))];
+        }),
+    )];
     let specialized_out = compiler
         .lower_expr(
             &mut builder,
@@ -2481,8 +2480,7 @@ fn ac_c7_compile_edge<'src>(
 }
 
 fn ac_c7_run(code: *const u8, arena: *const u64) -> i64 {
-    let f: extern "C" fn(*const u64, *mut i64) -> i64 =
-        unsafe { std::mem::transmute(code) };
+    let f: extern "C" fn(*const u64, *mut i64) -> i64 = unsafe { std::mem::transmute(code) };
     let mut trap_identity = 0;
     let result = f(arena, &mut trap_identity);
     if trap_identity == 0 {
@@ -2560,8 +2558,8 @@ pub(super) fn c2_compile_edge_with_arg<'src>(
         // carrier producer/consumer paths do not use native-Int services.
         compiler.function_local.boundary_arena = Some(parameters[0]);
         bind_bare_test_trap_lane(&mut compiler, &mut builder);
-        let result = emit(&mut compiler, &mut builder, parameters[1])
-            .expect("the C2 carrier edge emits");
+        let result =
+            emit(&mut compiler, &mut builder, parameters[1]).expect("the C2 carrier edge emits");
         builder.ins().return_(&[result]);
         builder.seal_all_blocks();
         builder.finalize();
@@ -2574,13 +2572,8 @@ pub(super) fn c2_compile_edge_with_arg<'src>(
     (module, code)
 }
 
-pub(super) fn c2_run_edge_with_arg(
-    code: *const u8,
-    arena: *const u64,
-    argument: i64,
-) -> i64 {
-    let function: extern "C" fn(*const u64, i64) -> i64 =
-        unsafe { std::mem::transmute(code) };
+pub(super) fn c2_run_edge_with_arg(code: *const u8, arena: *const u64, argument: i64) -> i64 {
+    let function: extern "C" fn(*const u64, i64) -> i64 = unsafe { std::mem::transmute(code) };
     function(arena, argument)
 }
 
@@ -2681,11 +2674,8 @@ fn d1_compile_carried_match_consumer<'src>(
         })
         .collect::<Vec<_>>();
     let seed_env = NativeSeedEnvironment::empty();
-    let (module, code) = ac_c7_try_compile_edge_with_operands(
-        &seed_env,
-        plan,
-        1,
-        |compiler, builder, operands| {
+    let (module, code) =
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, operands| {
             compiler.enter_source_occurrence_plan(match_origin)?;
             let lowered = compiler.lower_carried_match(
                 builder,
@@ -2705,8 +2695,7 @@ fn d1_compile_carried_match_consumer<'src>(
                 )?
                 .0
                 .payload)
-        },
-    )?;
+        })?;
     Ok((module, code, selected_values))
 }
 
@@ -2749,20 +2738,12 @@ fn carried_bool_dispatch_selects_exact_false_and_true_ordinals() {
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = ac_c7_bind_arena(&mut store);
     assert_eq!(
-        d1_run_carried_word(
-            code,
-            base,
-            d1_raw_immediate(BoundaryTag::ImmediateBool, 0),
-        ),
+        d1_run_carried_word(code, base, d1_raw_immediate(BoundaryTag::ImmediateBool, 0),),
         selected[1],
         "payload 0 must select False, which is source ordinal 1"
     );
     assert_eq!(
-        d1_run_carried_word(
-            code,
-            base,
-            d1_raw_immediate(BoundaryTag::ImmediateBool, 1),
-        ),
+        d1_run_carried_word(code, base, d1_raw_immediate(BoundaryTag::ImmediateBool, 1),),
         selected[0],
         "payload 1 must select True, which is source ordinal 0"
     );
@@ -2783,11 +2764,7 @@ fn carried_bool_dispatch_refuses_payload_two() {
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = ac_c7_bind_arena(&mut store);
     assert_eq!(
-        d1_run_carried_word(
-            code,
-            base,
-            d1_raw_immediate(BoundaryTag::ImmediateBool, 2),
-        ),
+        d1_run_carried_word(code, base, d1_raw_immediate(BoundaryTag::ImmediateBool, 2),),
         -1,
         "payload 2 must refuse at the finite Bool discriminator"
     );
@@ -3070,7 +3047,10 @@ fn carried_bounded_nat_adapter_is_load_bearing() {
     );
     let (_mutated_module, without_adapter, _) =
         mutated.expect("the adapter-removal mutation compiles");
-    assert_eq!(hits, 1, "the mutation must reach the exact Nat adapter once");
+    assert_eq!(
+        hits, 1,
+        "the mutation must reach the exact Nat adapter once"
+    );
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = ac_c7_bind_arena(&mut store);
     for (payload, expected) in [(0, selected[0]), (1, selected[1])] {
@@ -3098,8 +3078,8 @@ fn carried_bounded_nat_adapter_is_load_bearing() {
 fn carried_structural_nat_adapter_is_load_bearing() {
     let source = d1_nat_match_expr();
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
-    let (_exact_module, exact, selected) = d1_compile_carried_match_consumer(&source, &symbols)
-        .expect("Nat family lowers");
+    let (_exact_module, exact, selected) =
+        d1_compile_carried_match_consumer(&source, &symbols).expect("Nat family lowers");
     let (mutated, hits) = with_carried_match_dispatch_mutation(
         CarriedMatchDispatchMutation::DropStructuralNatAdapter,
         || d1_compile_carried_match_consumer(&source, &symbols),
@@ -3121,8 +3101,7 @@ fn carried_structural_nat_adapter_is_load_bearing() {
             "the structural mutation must preserve BoundedNat payload {payload}",
         );
 
-        let structural =
-            d1_raw_immediate(BoundaryTag::ImmediateStructuralNat, payload);
+        let structural = d1_raw_immediate(BoundaryTag::ImmediateStructuralNat, payload);
         assert_eq!(d1_run_carried_word(exact, base, structural), expected);
         assert_eq!(
             d1_run_carried_word(without_structural, base, structural),
@@ -3191,16 +3170,15 @@ fn d1_compile_nat_spill_producer(
                         one,
                         1,
                     );
-                    let (minted, _predecessor, _remaining) =
-                        Lowering::mint_validated_progress_nat(
-                            builder,
-                            success,
-                            value,
-                            zero,
-                            value,
-                            value,
-                            Some(zero),
-                        );
+                    let (minted, _predecessor, _remaining) = Lowering::mint_validated_progress_nat(
+                        builder,
+                        success,
+                        value,
+                        zero,
+                        value,
+                        value,
+                        Some(zero),
+                    );
                     Lowered::BoundedNat(minted)
                 }
                 D1NatRepresentation::Structural => {
@@ -3274,10 +3252,10 @@ fn carried_non_bool_match_refuses_structural_and_bounded_nat_spills() {
             "{label} control must actually take the spill route"
         );
         assert_eq!(
-            store.image().0.node_field(
-                spilled_word.payload(),
-                crate::boundary_value::NODE_CLASS,
-            ),
+            store
+                .image()
+                .0
+                .node_field(spilled_word.payload(), crate::boundary_value::NODE_CLASS,),
             Some(BoundaryClass::Int as u64),
             "{label} spill must carry the exact Int class before consumption"
         );
@@ -3444,8 +3422,8 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
             let true_word = builder.ins().iconst(types::I64, 1);
             let false_word = builder.ins().iconst(types::I64, 0);
             let discriminator = builder.ins().iconst(types::I64, 0);
-            let ok_identity = compiler
-                .synthesized_fixed_identity(SynthesizedFixedConstructorRole::ReadSome)?;
+            let ok_identity =
+                compiler.synthesized_fixed_identity(SynthesizedFixedConstructorRole::ReadSome)?;
             let ok = Lowered::DynamicConstructor(DynamicConstructorV1 {
                 discriminator,
                 alternatives: vec![DynamicConstructorAlternativeV1 {
@@ -3524,11 +3502,7 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
                 })],
             };
             Ok(compiler
-                .transfer_into_carrier(
-                    builder,
-                    ordinary_producer_origin,
-                    &ordinary_result,
-                )?
+                .transfer_into_carrier(builder, ordinary_producer_origin, &ordinary_result)?
                 .word)
         },
     );
@@ -3570,11 +3544,9 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     let success_word = c2_run_edge_with_arg(producer, base, 1);
     let success_observed = c2_run_edge_with_arg(consumer, base, success_word);
     let true_boundary_word =
-        (1u64 << crate::boundary_value::BOUNDARY_TAG_BITS)
-            | BoundaryTag::ImmediateBool as u64;
+        (1u64 << crate::boundary_value::BOUNDARY_TAG_BITS) | BoundaryTag::ImmediateBool as u64;
     assert_eq!(
-        success_observed as u64,
-        true_boundary_word,
+        success_observed as u64, true_boundary_word,
         "runtime success must select the DynamicConstructor payload, preserve \
          its D2 identity, match it through the ordinary tag helper, and project \
          its field"
@@ -3642,16 +3614,16 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
         producer_plan,
         move |compiler, builder, success| {
             let resource = builder.ins().iconst(types::I64, resource);
-            let response_pointer =
-                builder.ins().iconst(types::I64, response_pointer);
+            let response_pointer = builder.ins().iconst(types::I64, response_pointer);
             let response_len = builder.ins().iconst(types::I64, response_len);
             let result = Lowered::HostResult {
                 success,
                 // `D4b`: the span is warranted by `response_backing` above,
                 // which is real storage of exactly `response_len` bytes.
-                error: Box::new(Lowered::ResponseBytes(
-                    SafeByteSpan::for_control(response_pointer, response_len),
-                )),
+                error: Box::new(Lowered::ResponseBytes(SafeByteSpan::for_control(
+                    response_pointer,
+                    response_len,
+                ))),
                 ok: Box::new(Lowered::ResourceToken { value: resource }),
                 err_constructor: symbols.result_err.clone(),
                 ok_constructor: symbols.result_ok.clone(),
@@ -3678,10 +3650,8 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
         &seed_env,
         resource_plan,
         |compiler, builder, word| {
-            let payload = compiler.emit_carrier_host_payload(
-                builder,
-                CarriedBoundaryWord { word },
-            )?;
+            let payload =
+                compiler.emit_carrier_host_payload(builder, CarriedBoundaryWord { word })?;
             compiler.emit_carrier_scalar(builder, payload)
         },
     );
@@ -3696,10 +3666,8 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
         // and asserting on the copied CONTENT is a strictly stronger claim than
         // a xor of two scalars ever was.
         |compiler, builder, word| {
-            let payload = compiler.emit_carrier_host_payload(
-                builder,
-                CarriedBoundaryWord { word },
-            )?;
+            let payload =
+                compiler.emit_carrier_host_payload(builder, CarriedBoundaryWord { word })?;
             Ok(payload.word)
         },
     );
@@ -3724,9 +3692,10 @@ fn c2_ac6_host_result_covers_resource_token_and_response_bytes_payloads() {
         1,
         "the error form has the same canonical one-payload physical shape"
     );
-    let response_word = crate::boundary_value::BoundaryWord(
-        c2_run_edge_with_arg(read_response, base, err_word) as u64,
-    );
+    let response_word =
+        crate::boundary_value::BoundaryWord(
+            c2_run_edge_with_arg(read_response, base, err_word) as u64
+        );
     assert_eq!(
         response_word.tag(),
         Some(BoundaryTag::PersistentGround),
@@ -4035,7 +4004,9 @@ fn ac_c7_project_edge(fields: [(&str, &str); 2], project: &str) -> (i64, u64, u6
                 expr: project_expr.as_ref(),
                 static_origin: project_origin,
             },
-            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))],
+            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                word,
+            ))],
         )?;
         let LoweringOperand::Carried(child) = eliminated else {
             panic!(
@@ -4286,7 +4257,9 @@ fn ac_c7_match_edge(scrutinee: &str, inner: &str) -> (i64, u64, u64) {
                 expr: match_expr.as_ref(),
                 static_origin: match_origin,
             },
-            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))],
+            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                word,
+            ))],
         )?;
         let LoweringOperand::Carried(selected) = eliminated else {
             panic!("a carried `Match` merges in the carrier lane, so its result is `Carried`");
@@ -4446,7 +4419,9 @@ fn ac_c7_computational_match_edge(scrutinee: &str, inner: &str) -> (i64, u64, u6
                 expr: match_expr.as_ref(),
                 static_origin: match_origin,
             },
-            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))],
+            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                word,
+            ))],
         )?;
         let LoweringOperand::Carried(selected) = eliminated else {
             panic!(
@@ -4678,7 +4653,9 @@ fn ac_c4_recursive_edge(
                 expr: match_expr.as_ref(),
                 static_origin: match_origin,
             },
-            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))],
+            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                word,
+            ))],
         )?;
         let LoweringOperand::Carried(selected) = eliminated else {
             panic!(
@@ -5018,7 +4995,9 @@ fn ac_c4_ownership_edge_with_case_body(
                 expr: match_expr.as_ref(),
                 static_origin: match_origin,
             },
-            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))],
+            &[LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                word,
+            ))],
         )?;
         let LoweringOperand::Carried(selected) = eliminated else {
             panic!("a carried `ComputationalMatch` merges in the carrier lane")
@@ -5066,7 +5045,10 @@ fn ac_c4_ownership_edge_with_case_body(
 #[test]
 fn c1_d3_ac_c4_the_recursive_positions_ownership_comes_from_the_frame() {
     let (observed, alpha, leaf, trace) = ac_c4_ownership_edge();
-    assert_ne!(alpha, leaf, "NON-VACUITY: the two children must be distinguishable");
+    assert_ne!(
+        alpha, leaf,
+        "NON-VACUITY: the two children must be distinguishable"
+    );
 
     let mints: Vec<_> = trace
         .iter()
@@ -5180,7 +5162,10 @@ fn c1_d3_ac_c4_the_residual_holds_the_declared_positions_projected_child() {
         })
         .collect();
     assert_eq!(
-        projections.iter().map(|(position, _)| *position).collect::<Vec<_>>(),
+        projections
+            .iter()
+            .map(|(position, _)| *position)
+            .collect::<Vec<_>>(),
         (0..ARGUMENT_BINDERS).collect::<Vec<_>>(),
         "the recursive case projects exactly its {ARGUMENT_BINDERS} binders, in \
          order, and the `Leaf` case projects none: {trace:#?}"
@@ -5246,10 +5231,8 @@ fn c1_d3_ac_c4_the_residual_holds_the_declared_positions_projected_child() {
 /// ⚠ Promise class: **durable invariant**.
 #[test]
 fn c1_d3_ac_c4_each_case_binder_reads_its_own_constructor_field() {
-    let (first, alpha, leaf, _trace) =
-        ac_c4_ownership_edge_with_case_body(RuntimeExpr::Var(1));
-    let (second, _alpha, _leaf, _trace) =
-        ac_c4_ownership_edge_with_case_body(RuntimeExpr::Var(2));
+    let (first, alpha, leaf, _trace) = ac_c4_ownership_edge_with_case_body(RuntimeExpr::Var(1));
+    let (second, _alpha, _leaf, _trace) = ac_c4_ownership_edge_with_case_body(RuntimeExpr::Var(2));
     assert_ne!(
         alpha, leaf,
         "NON-VACUITY: the two children must be distinguishable identities"
@@ -5391,7 +5374,9 @@ fn c1_d3_ac_c4_the_recursor_capsule_is_refused_before_its_residual_is_read() {
             constructor: "ctor:fixture::C1::Wrap".to_string(),
             synthesized_identity: None,
             occurrence: Some(wrap_occurrence),
-            args: vec![ConstructorField::specialized(ac_c4_recursor_capsule(residual))],
+            args: vec![ConstructorField::specialized(ac_c4_recursor_capsule(
+                residual,
+            ))],
         };
         let refused = compiler
             .transfer_into_carrier(&mut builder, construct_origin, &inadmissible)
@@ -5458,11 +5443,8 @@ fn b2f_d9_dispatch(payloads: &[i64]) -> Vec<crate::boundary_value::BoundaryWord>
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
     let seed_env = NativeSeedEnvironment::empty();
-    let (_module, code) = ac_c7_try_compile_edge_with_operands(
-        &seed_env,
-        plan,
-        1,
-        |compiler, builder, operands| {
+    let (_module, code) =
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, operands| {
             let payload = operands[0];
             let marker = builder
                 .ins()
@@ -5476,9 +5458,8 @@ fn b2f_d9_dispatch(payloads: &[i64]) -> Vec<crate::boundary_value::BoundaryWord>
                 known: None,
             };
             Ok(compiler.transfer_into_carrier(builder, root, &value)?.word)
-        },
-    )
-    .expect("the magnitude dispatch emits");
+        })
+        .expect("the magnitude dispatch emits");
 
     let run: extern "C" fn(*const u64, i64) -> i64 = unsafe { std::mem::transmute(code) };
     payloads
@@ -5495,7 +5476,9 @@ fn b2f_d9_dispatch(payloads: &[i64]) -> Vec<crate::boundary_value::BoundaryWord>
             if word.tag() == Some(BoundaryTag::PersistentGround) {
                 let image = store.image();
                 assert_eq!(
-                    image.0.node_field(word.payload(), crate::boundary_value::NODE_CLASS),
+                    image
+                        .0
+                        .node_field(word.payload(), crate::boundary_value::NODE_CLASS),
                     Some(BoundaryClass::Int as u64),
                     "the spill arm must allocate the class the disposition \
                      declares in `spill: Some(_)`"
@@ -5716,12 +5699,16 @@ fn b2f_d9_no_spillable_tag_can_make_the_immediate_producer_answer_shape() {
 /// and that class is the axis `store_bytes_len` and `store_byte` guard on. ⛔ A
 /// `Bytes`-only fixture leaves `String`'s guard arm unreached — the defect
 /// `boundary_value_clif`'s own history records.
-fn b2f_d9_bytes_edge(literal: Lowered) -> (crate::boundary_value::BoundaryWord, Option<u64>, Vec<u8>) {
+fn b2f_d9_bytes_edge(
+    literal: Lowered,
+) -> (crate::boundary_value::BoundaryWord, Option<u64>, Vec<u8>) {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
     let seed_env = NativeSeedEnvironment::empty();
     let (_module, code) = ac_c7_compile_edge(&seed_env, plan, move |compiler, builder| {
-        Ok(compiler.transfer_into_carrier(builder, root, &literal)?.word)
+        Ok(compiler
+            .transfer_into_carrier(builder, root, &literal)?
+            .word)
     });
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = ac_c7_bind_arena(&mut store);
@@ -5870,11 +5857,8 @@ fn b2f_d9_wide_int(
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
     let seed_env = NativeSeedEnvironment::empty();
-    let (_module, code) = ac_c7_try_compile_edge_with_operands(
-        &seed_env,
-        plan,
-        2,
-        |compiler, builder, operands| {
+    let (_module, code) =
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 2, |compiler, builder, operands| {
             let arena = compiler
                 .function_local
                 .boundary_arena
@@ -5925,17 +5909,15 @@ fn b2f_d9_wide_int(
                 known: None,
             };
             Ok(compiler.transfer_into_carrier(builder, root, &value)?.word)
-        },
-    )
-    .expect("the wide-Int producer emits");
+        })
+        .expect("the wide-Int producer emits");
 
     let run: extern "C" fn(*const u64, i64, i64) -> i64 = unsafe { std::mem::transmute(code) };
     let native = crate::native_int::NativeIntArenaV1::default();
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = b2f_d9_bind_wide_arena(&mut store, &native);
-    let word = crate::boundary_value::BoundaryWord(
-        run(base, limbs[0] as i64, limbs[1] as i64) as u64,
-    );
+    let word =
+        crate::boundary_value::BoundaryWord(run(base, limbs[0] as i64, limbs[1] as i64) as u64);
     let image = store.image();
     let copied = image.0.node_limbs(word.payload()).map(<[u64]>::to_vec);
     let sign = image
@@ -6094,16 +6076,12 @@ fn b2f_d9_a_no_pair_spillable_crosses_on_its_own_tag() {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
     let seed_env = NativeSeedEnvironment::empty();
-    let (_module, code) = ac_c7_try_compile_edge_with_operands(
-        &seed_env,
-        plan,
-        1,
-        |compiler, builder, operands| {
+    let (_module, code) =
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, operands| {
             let status = Lowered::ProcessExitStatus { value: operands[0] };
             Ok(compiler.transfer_into_carrier(builder, root, &status)?.word)
-        },
-    )
-    .expect("the no-pair spillable emits");
+        })
+        .expect("the no-pair spillable emits");
     let run: extern "C" fn(*const u64, i64) -> i64 = unsafe { std::mem::transmute(code) };
     let mut store = crate::boundary_value::BoundaryValueStore::new();
     let (_arena, base) = ac_c7_bind_arena(&mut store);
@@ -6337,6 +6315,44 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
          the bare fixture's deliberately absent function-local target: {destination_error:?}"
     );
 
+    // Independently enter that same exact transport destination through ordinary
+    // `lower_expr`. Resetting the decision ledger makes the final `has_transport`
+    // observation depend on this ingress rather than the direct producer control
+    // above.
+    reset_invocation_return_transport_decisions();
+    let mut ingress_compiler = bare_carrier_test_lowering(&seed_env, plan.clone());
+    ingress_compiler.defining_emission_owner = Some(owner);
+    ingress_compiler.defining_unit = Some(defining_unit);
+    ingress_compiler.process_object = true;
+    let mut ingress_func = Function::with_name_signature(
+        UserFuncName::user(0, 0),
+        cranelift_codegen::ir::Signature::new(cranelift_codegen::isa::CallConv::SystemV),
+    );
+    let mut ingress_context = FunctionBuilderContext::new();
+    let mut ingress_builder = FunctionBuilder::new(&mut ingress_func, &mut ingress_context);
+    let ingress_entry = ingress_builder.create_block();
+    ingress_builder.switch_to_block(ingress_entry);
+    bind_bare_test_trap_lane(&mut ingress_compiler, &mut ingress_builder);
+    let ingress_error = expect_lowering_rejection(ingress_compiler.lower_expr(
+        &mut ingress_builder,
+        SourceOccurrence {
+            expr: destination,
+            static_origin: transport.destination_construct_origin(),
+        },
+        &[],
+    ));
+    assert!(
+        matches!(
+            ingress_error,
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "CheckedIhEnvironmentTransport",
+                ref reason,
+            }) if reason.contains("force-materialization target was not declared")
+        ),
+        "ordinary ingress must redirect the exact destination into the same \
+         transport-aware producer path: {ingress_error:?}"
+    );
+
     let (_module, code) =
         ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, operands| {
             compiler.defining_emission_owner = Some(owner);
@@ -6509,6 +6525,7 @@ fn worker_call_target(template: units::WorkerTemplate) -> units::DeclaredUnitCal
         header: template.header,
         slots: template.slots,
         offsets: template.offsets,
+        result_contract: None,
     }
 }
 
@@ -6775,26 +6792,27 @@ fn lower_against_static_worker(
     let seed_env = NativeSeedEnvironment::empty();
     let mut compiler = bare_carrier_test_lowering(&seed_env, subject_plan);
     if declare_target {
-        compiler
-            .function_local
-            .worker_calls
-            .insert(
-                body_origin,
-                worker_call_target(worker_descriptor(body_origin, declared_arity, 1)),
-            );
+        compiler.function_local.worker_calls.insert(
+            body_origin,
+            worker_call_target(worker_descriptor(body_origin, declared_arity, 1)),
+        );
     }
-    let env = [LoweringEnvironmentBinding::StaticWorker(StaticWorkerBinding {
-        closure_origin,
-        body_origin,
-        declared_arity,
-        captures: vec![LoweringOperand::Specialized(Lowered::Bytes(b"cap".to_vec()))],
-        route: StaticWorkerCallRoute::RawWorker,
-        // `D8i` — a hand-built ordinary binding. ⛔ The composed arm is not
-        // constructible here even in a test: it needs a planner-issued
-        // `ContinuationCallIdentity`, which has no constructor outside planning.
-        discharge: ContinuationDischarge::DirectSpecializationCall,
-        transport: None,
-    })];
+    let env = [LoweringEnvironmentBinding::StaticWorker(
+        StaticWorkerBinding {
+            closure_origin,
+            body_origin,
+            declared_arity,
+            captures: vec![LoweringOperand::Specialized(Lowered::Bytes(
+                b"cap".to_vec(),
+            ))],
+            route: StaticWorkerCallRoute::RawWorker,
+            // `D8i` — a hand-built ordinary binding. ⛔ The composed arm is not
+            // constructible here even in a test: it needs a planner-issued
+            // `ContinuationCallIdentity`, which has no constructor outside planning.
+            discharge: ContinuationDischarge::DirectSpecializationCall,
+            transport: None,
+        },
+    )];
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
         cranelift_codegen::ir::Signature::new(cranelift_codegen::isa::CallConv::SystemV),
@@ -6894,18 +6912,14 @@ fn static_worker_as_aggregate_field_is_transported_and_non_materializable() {
         constructor: "ctor:fixture::Box::Wrap".to_string(),
         args: vec![RuntimeExpr::Var(0)],
     };
-    let lowered = match lower_against_static_worker(
-        &subject,
-        1,
-        true,
-        StaticWorkerTestRoute::Direct,
-    ) {
-        Ok(LoweringOperand::Specialized(lowered)) => lowered,
-        Ok(LoweringOperand::Carried(_)) => {
-            panic!("a template transporting a static worker must not reach the carrier")
-        }
-        Err(error) => panic!("the worker is transported rather than refused here: {error:?}"),
-    };
+    let lowered =
+        match lower_against_static_worker(&subject, 1, true, StaticWorkerTestRoute::Direct) {
+            Ok(LoweringOperand::Specialized(lowered)) => lowered,
+            Ok(LoweringOperand::Carried(_)) => {
+                panic!("a template transporting a static worker must not reach the carrier")
+            }
+            Err(error) => panic!("the worker is transported rather than refused here: {error:?}"),
+        };
     let error = match lowered.boundary_transfer_admissibility() {
         Ok(()) => panic!(
             "a constructor transporting a static worker field must refuse at the boundary,              before any allocation or emitted transfer"
@@ -7187,15 +7201,14 @@ fn static_worker_witness_runs_and_distinguishes_capture_order() {
     .expect("the ordinary witness compiles");
     let observed = compiled.run(None).expect("the witness runs").0;
     let swapped = static_worker_witness(false);
-    let swapped_observed =
-        crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
-            &swapped,
-            &NativeSeedEnvironment::empty(),
-        )
-        .expect("the capture-swapped witness compiles")
-        .run(None)
-        .expect("the swapped witness runs")
-        .0;
+    let swapped_observed = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
+        &swapped,
+        &NativeSeedEnvironment::empty(),
+    )
+    .expect("the capture-swapped witness compiles")
+    .run(None)
+    .expect("the swapped witness runs")
+    .0;
     assert_ne!(
         observed, swapped_observed,
         "swapping the capture order must change the linked result"
@@ -7234,7 +7247,10 @@ fn static_worker_unused_binding_succeeds() {
     )
     .expect("an unused worker binding is lawful and must compile");
     assert_eq!(
-        compiled.run(None).expect("the unused-binding fixture runs").0,
+        compiled
+            .run(None)
+            .expect("the unused-binding fixture runs")
+            .0,
         RuntimeObservation::Returned(RuntimeGroundValue::Int(42.into()))
     );
 }
@@ -7277,9 +7293,7 @@ fn static_worker_twice_called_binding_succeeds() {
         &NativeSeedEnvironment::empty(),
     )
     .expect("a twice-called worker binding is lawful and must compile");
-    compiled
-        .run(None)
-        .expect("the twice-called fixture runs");
+    compiled.run(None).expect("the twice-called fixture runs");
 }
 
 // ─── RT-WORKER-BIND `D5`/`D6`/`D7` — multiple, nested, and completion ───────
@@ -7561,17 +7575,15 @@ fn ac5_restoring_carried_capture_narrowing_reds_the_ordinary_witness() {
         baseline.is_ok(),
         "the witness must be green at the same seam the mutation reddens"
     );
-    let error = with_static_worker_mutation(
-        StaticWorkerMutation::RestoreCarriedCaptureNarrowing,
-        || {
+    let error =
+        with_static_worker_mutation(StaticWorkerMutation::RestoreCarriedCaptureNarrowing, || {
             crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
                 &witness,
                 &NativeSeedEnvironment::empty(),
             )
             .err()
-        },
-    )
-    .expect("restoring the carried-capture narrowing must red the witness");
+        })
+        .expect("restoring the carried-capture narrowing must red the witness");
     assert!(
         format!("{error:?}").contains("specialized-only surface"),
         "reds at the D2 carried-capture seam, not somewhere else: {error:?}"
@@ -7605,17 +7617,15 @@ fn ac5_redirecting_the_resolved_worker_target_reds_the_same_shape_witness() {
         baseline.is_ok(),
         "the same-shape witness must be green at the seam the mutation reddens"
     );
-    let error = with_static_worker_mutation(
-        StaticWorkerMutation::RedirectResolvedWorkerTarget,
-        || {
+    let error =
+        with_static_worker_mutation(StaticWorkerMutation::RedirectResolvedWorkerTarget, || {
             crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
                 &program,
                 &NativeSeedEnvironment::empty(),
             )
             .err()
-        },
-    )
-    .expect("redirecting the resolved worker target must red the same-shape witness");
+        })
+        .expect("redirecting the resolved worker target must red the same-shape witness");
     assert!(
         format!("{error:?}").contains("worker call target carries origin"),
         "reds at the D4 transport seam's own origin check: {error:?}"
@@ -7910,7 +7920,9 @@ fn a_construction_time_occurrence_lookup_fails_closed() {
 /// has to be *discovered* rather than fabricated, which is also the honest
 /// shape: the control below is about a seat the planner really issued records
 /// for.
-pub(in crate::cranelift_backend::lowering) fn first_effect_seat(plan: &StaticTransitionPlan<'_>) -> Option<StaticOriginId> {
+pub(in crate::cranelift_backend::lowering) fn first_effect_seat(
+    plan: &StaticTransitionPlan<'_>,
+) -> Option<StaticOriginId> {
     let mut stack = vec![plan.root_static_origin().ok()?];
     let mut seen = 0usize;
     while let Some(origin) = stack.pop() {
@@ -7918,7 +7930,10 @@ pub(in crate::cranelift_backend::lowering) fn first_effect_seat(plan: &StaticTra
         if seen > 4096 {
             return None;
         }
-        if matches!(plan.source_occurrence(origin), Ok(RuntimeExpr::Effect { .. })) {
+        if matches!(
+            plan.source_occurrence(origin),
+            Ok(RuntimeExpr::Effect { .. })
+        ) {
             return Some(origin);
         }
         let mut position = 0;
@@ -7958,9 +7973,7 @@ pub(in crate::cranelift_backend::lowering) fn first_effect_seat(plan: &StaticTra
 /// refuses everything".
 #[test]
 fn a_dynamic_alternative_with_no_planned_record_refuses() {
-    use crate::cranelift_backend::planning::{
-        SynthesizedAggregatePath, SynthesizedAggregateRoot,
-    };
+    use crate::cranelift_backend::planning::{SynthesizedAggregatePath, SynthesizedAggregateRoot};
 
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let write = RuntimeExpr::Effect {
@@ -8098,34 +8111,6 @@ fn a_dynamic_alternative_with_no_planned_record_refuses() {
     );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /// `RT-CLOSURE-BOUNDARY-LANE` D4: a diagnostic mutation is not a hit when the
 /// unmutated child lookup was already absent.
 ///
@@ -8170,7 +8155,10 @@ fn a_missing_diagnostic_child_that_was_already_absent_is_not_a_mutation_hit() {
 
     baseline.expect("the unmutated source-machine entry route compiles");
     mutated.expect("the diagnostic mutation cannot change compilation");
-    assert_eq!(baseline_hits, 0, "the baseline installs no ownership mutation");
+    assert_eq!(
+        baseline_hits, 0,
+        "the baseline installs no ownership mutation"
+    );
     assert_eq!(
         mutation_hits, 0,
         "the diagnostic control must not install an ownership mutation",
@@ -8194,10 +8182,6 @@ fn a_missing_diagnostic_child_that_was_already_absent_is_not_a_mutation_hit() {
         "an honest absence must remain an Entry tag under the mutation",
     );
 }
-
-
-
-
 
 // -- `D7` checkpoint 1: the retained-callable capture contract ---------------
 //
@@ -9002,11 +8986,7 @@ fn d4_seat(need: EffectSeatNeed) -> PlannedEffectSeat {
 
 /// Transfer `literal` into the carrier, observe it through the `D4` observer,
 /// and return the SSA value at `field` (0 pointer, 1 length, 2 outcome).
-fn d4_observe(
-    content: Option<Vec<u8>>,
-    field: usize,
-    expect_len: usize,
-) -> (i64, Option<Vec<u8>>) {
+fn d4_observe(content: Option<Vec<u8>>, field: usize, expect_len: usize) -> (i64, Option<Vec<u8>>) {
     let fixture = ac_c7_ctor("Alpha");
     let (plan, root) = planned_root_occurrence(&fixture);
     let seed_env = NativeSeedEnvironment::empty();

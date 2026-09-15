@@ -35,8 +35,8 @@
 //! and `constructors.rs`'s own tests were never part of the `D0`/`D2` move
 //! population (that ledger scoped `AC-2` to `control.rs` only).
 
-use super::*;
 use super::core::CheckedFrameBranchScope;
+use super::*;
 
 pub(super) enum SourceContinuation<'a> {
     Terminal(SourceContinuationTerminal<'a>),
@@ -171,6 +171,55 @@ enum SourceCallOutcome<'a> {
     Complete(LoweringOperand),
 }
 
+/// A transient exit from the large source-machine frame. Recursive source
+/// descent is dispatched only after the inner frame has returned.
+enum SourceMachineExit<'a> {
+    Complete(LoweringOperand),
+    ResumeOuter {
+        value: LoweringOperand,
+        active: ActiveContinuationFrame<'a>,
+    },
+    Reenter {
+        expr: OwnedSourceOccurrence,
+        env: Vec<LoweringEnvironmentBinding>,
+        control: SourceControl<'a>,
+    },
+    DynamicMatch(SourceDynamicMatchRequest<'a>),
+}
+
+/// The exact arguments already selected by the source machine for one dynamic
+/// match. This request is compiler-private and exists only across the inner
+/// frame-pop boundary.
+struct SourceDynamicMatchRequest<'a> {
+    scrutinee: SourceDynamicMatchScrutinee,
+    cases: Vec<crate::RuntimeMatchCase>,
+    default: RuntimeTrap,
+    static_origin: StaticOriginId,
+    env: Vec<LoweringEnvironmentBinding>,
+    control: SourceControl<'a>,
+}
+
+/// Closed dynamic-match dispatch selected before leaving the source machine.
+enum SourceDynamicMatchScrutinee {
+    BoundedNat {
+        value: BoundedNatV1,
+        structural: bool,
+    },
+    Bool {
+        condition: cranelift_codegen::ir::Value,
+        true_case_index: usize,
+        false_case_index: usize,
+    },
+    HostResult {
+        success: cranelift_codegen::ir::Value,
+        error: Lowered,
+        ok: Lowered,
+        err_constructor: String,
+        ok_constructor: String,
+    },
+    DynamicConstructor(DynamicConstructorV1),
+    Carried(CarriedBoundaryWord),
+}
 
 /// `RT-CONTSRC-PRODUCER-LOCAL` `AC-1` -- the source-carried CONTROL mutation
 /// family, for the activation-gate controls of families 5 and 2a.
@@ -285,8 +334,6 @@ struct SourceCarriedCase {
     borrowed: Option<(i64, usize)>,
 }
 
-
-
 /// **`RT-RECURSOR-TRANSPORT` `D2` trace helpers.** Test-only.
 ///
 /// The ordered continuation stack, top first. `SourceContinuation` has no
@@ -301,9 +348,9 @@ fn rt_continuation_kinds(continuation: &SourceContinuation<'_>) -> Vec<&'static 
             SourceContinuation::Terminal(SourceContinuationTerminal::ReturnValue) => {
                 ("TerminalReturnValue", None)
             }
-            SourceContinuation::Terminal(
-                SourceContinuationTerminal::ReturnToProducerHole { .. },
-            ) => ("TerminalReturnToProducerHole", None),
+            SourceContinuation::Terminal(SourceContinuationTerminal::ReturnToProducerHole {
+                ..
+            }) => ("TerminalReturnToProducerHole", None),
             SourceContinuation::Terminal(SourceContinuationTerminal::ResumeOuter { .. }) => {
                 ("TerminalResumeOuter", None)
             }
@@ -357,7 +404,6 @@ fn rt_operand_desc(operand: &LoweringOperand) -> String {
         }
     }
 }
-
 
 // `RT-SOURCE-MACHINE-TYPES-SPLIT` `D1` — split out of a shared
 // `thread_local!` block in `core.rs` that also held the `CCR_D2_*` counters
@@ -427,7 +473,6 @@ pub(in crate::cranelift_backend) fn set_lrc_d2a_suppress_forward(suppress: bool)
     LRC_D2A_SUPPRESS_FORWARD.with(|cell| cell.set(suppress));
 }
 
-
 /// **`D8f`** — let the DECLINED call answer for the checked application's
 /// composed causal identity, which is what it did before this checkpoint.
 ///
@@ -492,9 +537,8 @@ pub fn with_checked_ih_generated_entry_capsule_mutation<T>(
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
-            GENERATED_ENTRY_CAPSULE_MUTATION.with(|active| {
-                active.set(CheckedIhGeneratedEntryCapsuleMutation::Exact)
-            });
+            GENERATED_ENTRY_CAPSULE_MUTATION
+                .with(|active| active.set(CheckedIhGeneratedEntryCapsuleMutation::Exact));
             CheckedIhGeneratedEntryAccess::reset_published_projection_control_observations();
         }
     }
@@ -511,7 +555,8 @@ pub fn checked_ih_generated_entry_capsule_mutation_is_exact() -> bool {
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub(super) fn checked_ih_generated_entry_capsule_mutation() -> CheckedIhGeneratedEntryCapsuleMutation {
+pub(super) fn checked_ih_generated_entry_capsule_mutation() -> CheckedIhGeneratedEntryCapsuleMutation
+{
     GENERATED_ENTRY_CAPSULE_MUTATION.with(std::cell::Cell::get)
 }
 
@@ -527,9 +572,11 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
     // template 3. Mutating both would exercise ordinary dispatch first and say
     // nothing about the governed guard. This test-only transition coordinate is
     // the capsule control's injection point, never applicability authority.
-    if !matches!(mutation, CheckedIhGeneratedEntryCapsuleMutation::Exact
-        | CheckedIhGeneratedEntryCapsuleMutation::ProvenanceIndex)
-        && pending.call_template_id != 3
+    if !matches!(
+        mutation,
+        CheckedIhGeneratedEntryCapsuleMutation::Exact
+            | CheckedIhGeneratedEntryCapsuleMutation::ProvenanceIndex
+    ) && pending.call_template_id != 3
     {
         return binding.clone();
     }
@@ -560,14 +607,13 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
             }
         }
         Mutation::SpecializedSibling => {
-            binding = LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-                Lowered::Closure {
+            binding =
+                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(Lowered::Closure {
                     captures: Vec::new(),
                     params: Vec::new(),
                     body: pending.application_origin,
                     boundary_environment: None,
-                },
-            ));
+                }));
         }
         Mutation::StaticWorker => {
             binding = LoweringEnvironmentBinding::StaticWorker(StaticWorkerBinding {
@@ -580,7 +626,9 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
                 transport: None,
             });
         }
-        Mutation::WrongFrame | Mutation::WrongSlot | Mutation::WrongInvocation
+        Mutation::WrongFrame
+        | Mutation::WrongSlot
+        | Mutation::WrongInvocation
         | Mutation::NonCarriedResidual => {
             if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                 Lowered::ComputationalRecursorClosure {
@@ -603,9 +651,8 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
                         invocation.selection.static_origin = pending.invocation_origin;
                     }
                     Mutation::NonCarriedResidual => {
-                        *residual = Box::new(LoweringOperand::Specialized(
-                            Lowered::RecursiveBackedge,
-                        ));
+                        *residual =
+                            Box::new(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
                     }
                     _ => unreachable!(),
                 }
@@ -647,7 +694,6 @@ impl<'a> Lowering<'a> {
         }
         self.disposition_statically_unselected_match_cases(match_origin, selected_case)
     }
-
 }
 
 impl<'a> Lowering<'a> {
@@ -698,7 +744,6 @@ impl<'a> Lowering<'a> {
         }
         Ok(carried)
     }
-
 }
 
 impl<'a> Lowering<'a> {
@@ -759,7 +804,20 @@ impl<'a> Lowering<'a> {
             .live_source_continuations
             .checked_add(1)
             .expect("compiler-private live source-continuation depth exhausted");
-        let result = self.lower_source_machine_with_continuation_inner(builder, expr, env, control);
+        let result =
+            match self.lower_source_machine_with_continuation_inner(builder, expr, env, control) {
+                Ok(SourceMachineExit::Complete(value)) => Ok(value),
+                Ok(SourceMachineExit::ResumeOuter { value, active }) => {
+                    self.resume_active_continuation(builder, value, active)
+                }
+                Ok(SourceMachineExit::Reenter { expr, env, control }) => {
+                    self.lower_source_machine_with_continuation(builder, expr, env, control)
+                }
+                Ok(SourceMachineExit::DynamicMatch(request)) => {
+                    self.lower_source_dynamic_match_request(builder, request)
+                }
+                Err(error) => Err(error),
+            };
         self.live_source_continuations = self
             .live_source_continuations
             .checked_sub(1)
@@ -768,13 +826,14 @@ impl<'a> Lowering<'a> {
         result
     }
 
+    #[inline(never)]
     fn lower_source_machine_with_continuation_inner<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         expr: OwnedSourceOccurrence,
         env: Vec<LoweringEnvironmentBinding>,
         control: SourceControl<'b>,
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
+    ) -> Result<SourceMachineExit<'b>, CraneliftBackendError> {
         let mut state = SourceMachineState::Eval { expr, env, control };
         loop {
             state = match state {
@@ -874,13 +933,14 @@ impl<'a> Lowering<'a> {
                         // generated call key is capsule-independent.
                         #[cfg(feature = "px8-ds-test-support")]
                         let mutated_binding = if let (Some(_), Some(pending)) = (
-                            self.function_local.checked_ih_generated_entry_access.as_ref(),
+                            self.function_local
+                                .checked_ih_generated_entry_access
+                                .as_ref(),
                             self.pending_computational_ih_call,
                         ) {
-                            let callee_origin = self.static_transition_plan.child_static_origin(
-                                pending.application_origin,
-                                0,
-                            )?;
+                            let callee_origin = self
+                                .static_transition_plan
+                                .child_static_origin(pending.application_origin, 0)?;
                             if callee_origin == static_origin {
                                 let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(
                                     || {
@@ -947,22 +1007,19 @@ impl<'a> Lowering<'a> {
                         // run and no pending constructor continuation, so the
                         // existing template can open its conservation ledger
                         // without restructuring partial machine state.
-                        let recognized =
-                            Self::recognized_constructor_worker_fields(&args, &env);
+                        let recognized = Self::recognized_constructor_worker_fields(&args, &env);
                         if recognized.iter().any(Option::is_some) {
                             SourceMachineState::Value {
-                                value: RoutedAnswer::direct(
-                                    LoweringOperand::Specialized(
-                                        self.static_worker_constructor_template(
-                                            builder,
-                                            static_origin,
-                                            &constructor,
-                                            &args,
-                                            &recognized,
-                                            &env,
-                                        )?,
-                                    ),
-                                ),
+                                value: RoutedAnswer::direct(LoweringOperand::Specialized(
+                                    self.static_worker_constructor_template(
+                                        builder,
+                                        static_origin,
+                                        &constructor,
+                                        &args,
+                                        &recognized,
+                                        &env,
+                                    )?,
+                                )),
                                 control,
                             }
                         } else if args.is_empty() {
@@ -1064,8 +1121,11 @@ impl<'a> Lowering<'a> {
                             // `D2k-1b-i` — the source machine's terminal
                             // disposition, counted into the same conservation
                             // ledger as the direct descent's.
-                            self.static_worker_fields
-                            .note_consuming_call(worker.transport, static_origin, self.defining_function_id)?;
+                            self.static_worker_fields.note_consuming_call(
+                                worker.transport,
+                                static_origin,
+                                self.defining_function_id,
+                            )?;
                             #[cfg(test)]
                             d8e_record_consumption();
                             // `D8l2` — which facet this consumption carried,
@@ -1125,21 +1185,22 @@ impl<'a> Lowering<'a> {
                                         control,
                                     }
                                 } else {
-                                let before = self.live_source_continuations;
-                                let (called, emission) = self.call_static_worker_with_inputs(
-                                    builder,
-                                    &worker,
-                                    Vec::new(),
-                                    static_origin,
-                                    None,
-                                )?
-                                .into_emitted()?;
-                                // `D8p` — the TARGET side, under the same key,
-                                // written only now that the call instruction
-                                // exists and carrying the run it actually took.
-                                #[cfg(test)]
-                                if disposition == CheckedApplicationDisposition::ConsumedHere {
-                                    crate::cranelift_backend::lowering::record_d8p_emitted_target(
+                                    let before = self.live_source_continuations;
+                                    let (called, emission) = self
+                                        .call_static_worker_with_inputs(
+                                            builder,
+                                            &worker,
+                                            Vec::new(),
+                                            static_origin,
+                                            None,
+                                        )?
+                                        .into_emitted()?;
+                                    // `D8p` — the TARGET side, under the same key,
+                                    // written only now that the call instruction
+                                    // exists and carrying the run it actually took.
+                                    #[cfg(test)]
+                                    if disposition == CheckedApplicationDisposition::ConsumedHere {
+                                        crate::cranelift_backend::lowering::record_d8p_emitted_target(
                                         crate::cranelift_backend::lowering::D8pEmittedTarget {
                                             function: self.defining_function_id,
                                             application_origin: static_origin,
@@ -1149,25 +1210,25 @@ impl<'a> Lowering<'a> {
                                             supplied_operands: emission.supplied_operands,
                                         },
                                     );
-                                }
-                                // `D8f` — the disposition, recorded AFTER the
-                                // call instruction exists. A record here is
-                                // therefore "this exact call was emitted, with
-                                // this disposition", which is what an omission
-                                // control needs: emitted, and not consumed.
-                                #[cfg(test)]
-                                crate::cranelift_backend::lowering::record_d8f_disposition(
-                                    self.defining_function_id,
-                                    static_origin,
-                                    disposition,
-                                );
-                                // `D8j` — the call is emitted and its result is
-                                // in hand under the SAME `control` this arm was
-                                // entered with. Only now may a composed
-                                // obligation be claimed.
-                                // **`D8f` — THE CLAIM DISPOSITION, three cases,
-                                // matched exhaustively.**
-                                match disposition {
+                                    }
+                                    // `D8f` — the disposition, recorded AFTER the
+                                    // call instruction exists. A record here is
+                                    // therefore "this exact call was emitted, with
+                                    // this disposition", which is what an omission
+                                    // control needs: emitted, and not consumed.
+                                    #[cfg(test)]
+                                    crate::cranelift_backend::lowering::record_d8f_disposition(
+                                        self.defining_function_id,
+                                        static_origin,
+                                        disposition,
+                                    );
+                                    // `D8j` — the call is emitted and its result is
+                                    // in hand under the SAME `control` this arm was
+                                    // entered with. Only now may a composed
+                                    // obligation be claimed.
+                                    // **`D8f` — THE CLAIM DISPOSITION, three cases,
+                                    // matched exhaustively.**
+                                    match disposition {
                                     // The `D8j` population: an ordinary composed
                                     // call, untouched by this seam, claims its
                                     // causal identity exactly as before.
@@ -1197,10 +1258,10 @@ impl<'a> Lowering<'a> {
                                         }
                                     }
                                 }
-                                SourceMachineState::Value {
-                                    value: RoutedAnswer::direct(called),
-                                    control,
-                                }
+                                    SourceMachineState::Value {
+                                        value: RoutedAnswer::direct(called),
+                                        control,
+                                    }
                                 }
                             } else {
                                 let first = remaining.remove(0);
@@ -1294,7 +1355,7 @@ impl<'a> Lowering<'a> {
                     }
                     match control.continuation {
                         SourceContinuation::Terminal(SourceContinuationTerminal::ReturnValue) => {
-                            return Ok(value);
+                            return Ok(SourceMachineExit::Complete(value));
                         }
                         SourceContinuation::Terminal(
                             SourceContinuationTerminal::ReturnToProducerHole {
@@ -1316,7 +1377,7 @@ impl<'a> Lowering<'a> {
                                 ));
                             }
                             if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
-                                return Ok(value);
+                                return Ok(SourceMachineExit::Complete(value));
                             }
                             source_active_cursor(
                                 &control.selected,
@@ -1359,9 +1420,12 @@ impl<'a> Lowering<'a> {
                             }
                             self.restore_root_terminal_authority(root_authority, expected)?;
                             if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
-                                return Ok(value);
+                                return Ok(SourceMachineExit::Complete(value));
                             }
-                            return self.resume_active_continuation(builder, value, *active);
+                            return Ok(SourceMachineExit::ResumeOuter {
+                                value,
+                                active: *active,
+                            });
                         }
                         SourceContinuation::Terminal(SourceContinuationTerminal::JumpToJoin(
                             edge,
@@ -1369,7 +1433,9 @@ impl<'a> Lowering<'a> {
                             if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
                                 let failure = builder.ins().iconst(types::I64, -4);
                                 builder.ins().return_(&[failure]);
-                                return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+                                return Ok(SourceMachineExit::Complete(
+                                    LoweringOperand::Specialized(Lowered::RecursiveBackedge),
+                                ));
                             }
                             let value = if edge.target.terminal_active_prefix.is_empty() {
                                 value
@@ -1422,7 +1488,9 @@ impl<'a> Lowering<'a> {
                                         .jump(edge.target.block, &[word.word.into()]);
                                 }
                             }
-                            return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
+                            return Ok(SourceMachineExit::Complete(
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge),
+                            ));
                         }
                         SourceContinuation::LetBody { body, env, next } => {
                             control.continuation = *next;
@@ -1785,10 +1853,12 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                                     "CheckedSelectedRecursor"
                                                 }
                                         },
-                                        role_kind: match forwarded.role {
+                                        role_kind: match &forwarded.role {
                                             EliminatorRole::Scrutinee => "Scrutinee",
                                             EliminatorRole::AnswerAfterComputationalFrame { .. } =>
                                                 "AnswerAfterComputationalFrame",
+                                            EliminatorRole::StaticResponseReturn { .. } =>
+                                                "StaticResponseReturn",
                                         },
                                         continuation_kinds: rt_continuation_kinds(
                                             &control.continuation,
@@ -1827,28 +1897,36 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             };
                             match value {
                                 LoweringOperand::Specialized(Lowered::BoundedNat(nat)) => {
-                                    return self.lower_source_bounded_nat_match(
-                                        builder,
-                                        nat,
-                                        false,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::BoundedNat {
+                                                value: nat,
+                                                structural: false,
+                                            },
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::StructuralNat(nat)) => {
-                                    return self.lower_source_bounded_nat_match(
-                                        builder,
-                                        BoundedNatV1::derived_from_validated(nat.value),
-                                        true,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::BoundedNat {
+                                                value: BoundedNatV1::derived_from_validated(
+                                                    nat.value,
+                                                ),
+                                                structural: true,
+                                            },
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::Bool { value, known }) => {
                                     let true_case = cases.iter().enumerate().find(|(_, case)| {
@@ -1884,27 +1962,22 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                             control,
                                         }
                                     } else {
-                                        let (true_index, true_case) = true_case;
-                                        let (false_index, false_case) = false_case;
-                                        let true_body = self.case_body_occurrence(
-                                            static_origin,
-                                            true_index,
-                                            &true_case.body,
-                                        )?;
-                                        let false_body = self.case_body_occurrence(
-                                            static_origin,
-                                            false_index,
-                                            &false_case.body,
-                                        )?;
-                                        return self.lower_source_dynamic_bool_match(
-                                            builder,
-                                            value,
-                                            true_body,
-                                            false_body,
-                                            static_origin,
-                                            &env,
-                                            control,
-                                        );
+                                        let (true_case_index, _) = true_case;
+                                        let (false_case_index, _) = false_case;
+                                        return Ok(SourceMachineExit::DynamicMatch(
+                                            SourceDynamicMatchRequest {
+                                                scrutinee: SourceDynamicMatchScrutinee::Bool {
+                                                    condition: value,
+                                                    true_case_index,
+                                                    false_case_index,
+                                                },
+                                                cases,
+                                                default,
+                                                static_origin,
+                                                env,
+                                                control,
+                                            },
+                                        ));
                                     }
                                 }
                                 LoweringOperand::Specialized(Lowered::HostResult {
@@ -1914,30 +1987,37 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     err_constructor,
                                     ok_constructor,
                                 }) => {
-                                    return self.lower_source_dynamic_host_result_match(
-                                        builder,
-                                        success,
-                                        *error,
-                                        *ok,
-                                        &err_constructor,
-                                        &ok_constructor,
-                                        &cases,
-                                        default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::HostResult {
+                                                success,
+                                                error: *error,
+                                                ok: *ok,
+                                                err_constructor,
+                                                ok_constructor,
+                                            },
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) => {
-                                    return self.lower_source_dynamic_constructor_match(
-                                        builder,
-                                        dynamic,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee:
+                                                SourceDynamicMatchScrutinee::DynamicConstructor(
+                                                    dynamic,
+                                                ),
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(Lowered::Constructor {
                                     constructor,
@@ -1953,7 +2033,9 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                             static_origin,
                                             None,
                                         )?;
-                                        return Ok(LoweringOperand::Specialized(Lowered::Trap(default)));
+                                        return Ok(SourceMachineExit::Complete(
+                                            LoweringOperand::Specialized(Lowered::Trap(default)),
+                                        ));
                                     };
                                     self.disposition_statically_unselected_match_cases(
                                         static_origin,
@@ -2026,15 +2108,16 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     ) {
                                         return Err(refusal);
                                     }
-                                    return self.lower_source_carried_match(
-                                        builder,
-                                        word,
-                                        &cases,
-                                        &default,
-                                        static_origin,
-                                        &env,
-                                        control,
-                                    );
+                                    return Ok(SourceMachineExit::DynamicMatch(
+                                        SourceDynamicMatchRequest {
+                                            scrutinee: SourceDynamicMatchScrutinee::Carried(word),
+                                            cases,
+                                            default,
+                                            static_origin,
+                                            env,
+                                            control,
+                                        },
+                                    ));
                                 }
                                 LoweringOperand::Specialized(_) => {
                                     #[cfg(any(
@@ -2320,7 +2403,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             trap: default.clone(),
                                         },
                                     );
-                                    return Ok(LoweringOperand::Specialized(Lowered::Trap(default)));
+                                    return Ok(SourceMachineExit::Complete(
+                                        LoweringOperand::Specialized(Lowered::Trap(default)),
+                                    ));
                                 };
                                 #[cfg(test)]
                                 px8tr_record_trap_provenance(
@@ -2342,12 +2427,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     return_index,
                                     return_case.body.clone(),
                                 )?;
-                                return self.lower_source_machine_with_continuation(
-                                    builder,
-                                    body,
-                                    case_env,
+                                return Ok(SourceMachineExit::Reenter {
+                                    expr: body,
+                                    env: case_env,
                                     control,
-                                );
+                                });
                             } else {
                                 if !matches!(&value, LoweringOperand::Specialized(Lowered::Constructor { .. })) {
                                     return Err(unsupported(
@@ -2373,7 +2457,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         },
                                     );
                                 }
-                                return Ok(LoweringOperand::Specialized(Lowered::Trap(default)));
+                                return Ok(SourceMachineExit::Complete(
+                                    LoweringOperand::Specialized(Lowered::Trap(default)),
+                                ));
                             };
                             let LoweringOperand::Specialized(Lowered::Constructor { args, .. }) = value else {
                                 unreachable!("a selected source case has a constructor value")
@@ -2473,7 +2559,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         env.clone(),
                                         static_origin,
                                         provenance,
-                                        frame.checked_frame_id,
+                                        frame.checked_tuple(),
                                         slot_template_id,
                                         producer_origin,
                                         position,
@@ -2503,7 +2589,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 retained.specialized_ref_at("an eliminator frame's scrutinee")?,
                             )? {
                                 Ok(frame_env) => frame_env,
-                                Err(trap) => return Ok(LoweringOperand::Specialized(Lowered::Trap(trap))),
+                                Err(trap) => {
+                                    return Ok(SourceMachineExit::Complete(
+                                        LoweringOperand::Specialized(Lowered::Trap(trap)),
+                                    ));
+                                }
                             };
                             let mut case_env = induction_hypotheses;
                             #[cfg(test)]
@@ -2597,7 +2687,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     control,
                                 )? {
                                     SourceCallOutcome::Continue(state) => state,
-                                    SourceCallOutcome::Complete(value) => return Ok(value),
+                                    SourceCallOutcome::Complete(value) => {
+                                        return Ok(SourceMachineExit::Complete(value));
+                                    }
                                 }
                             } else {
                                 let first = args.remove(0);
@@ -2719,7 +2811,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         .source_call_state(builder, callee, lowered, env, control)?
                                     {
                                         SourceCallOutcome::Continue(state) => state,
-                                        SourceCallOutcome::Complete(value) => return Ok(value),
+                                        SourceCallOutcome::Complete(value) => {
+                                            return Ok(SourceMachineExit::Complete(value));
+                                        }
                                     },
                                 }
                             } else {
@@ -2748,6 +2842,101 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     }
                 }
             };
+        }
+    }
+
+    #[inline(never)]
+    fn lower_source_dynamic_match_request<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        request: SourceDynamicMatchRequest<'b>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let SourceDynamicMatchRequest {
+            scrutinee,
+            cases,
+            default,
+            static_origin,
+            env,
+            control,
+        } = request;
+        match scrutinee {
+            SourceDynamicMatchScrutinee::BoundedNat { value, structural } => self
+                .lower_source_bounded_nat_match(
+                    builder,
+                    value,
+                    structural,
+                    &cases,
+                    &default,
+                    static_origin,
+                    &env,
+                    control,
+                ),
+            SourceDynamicMatchScrutinee::Bool {
+                condition,
+                true_case_index,
+                false_case_index,
+            } => {
+                let true_case = cases.get(true_case_index).ok_or_else(|| {
+                    unsupported("Match", "transported Bool True case index is out of bounds")
+                })?;
+                let false_case = cases.get(false_case_index).ok_or_else(|| {
+                    unsupported(
+                        "Match",
+                        "transported Bool False case index is out of bounds",
+                    )
+                })?;
+                let true_body =
+                    self.case_body_occurrence(static_origin, true_case_index, &true_case.body)?;
+                let false_body =
+                    self.case_body_occurrence(static_origin, false_case_index, &false_case.body)?;
+                self.lower_source_dynamic_bool_match(
+                    builder,
+                    condition,
+                    true_body,
+                    false_body,
+                    static_origin,
+                    &env,
+                    control,
+                )
+            }
+            SourceDynamicMatchScrutinee::HostResult {
+                success,
+                error,
+                ok,
+                err_constructor,
+                ok_constructor,
+            } => self.lower_source_dynamic_host_result_match(
+                builder,
+                success,
+                error,
+                ok,
+                &err_constructor,
+                &ok_constructor,
+                &cases,
+                default,
+                static_origin,
+                &env,
+                control,
+            ),
+            SourceDynamicMatchScrutinee::DynamicConstructor(dynamic) => self
+                .lower_source_dynamic_constructor_match(
+                    builder,
+                    dynamic,
+                    &cases,
+                    &default,
+                    static_origin,
+                    &env,
+                    control,
+                ),
+            SourceDynamicMatchScrutinee::Carried(word) => self.lower_source_carried_match(
+                builder,
+                word,
+                &cases,
+                &default,
+                static_origin,
+                &env,
+                control,
+            ),
         }
     }
 
@@ -4179,8 +4368,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             ));
         };
         #[cfg(feature = "px8-ds-test-support")]
-        let callee_index = if GENERATED_ENTRY_CAPSULE_MUTATION
-            .with(std::cell::Cell::get)
+        let callee_index = if GENERATED_ENTRY_CAPSULE_MUTATION.with(std::cell::Cell::get)
             == CheckedIhGeneratedEntryCapsuleMutation::ProvenanceIndex
         {
             callee_index.wrapping_add(1)
@@ -4221,6 +4409,176 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         Ok(binding)
     }
 
+    fn bind_checked_ih_detached_caller_cut<'b>(
+        &mut self,
+        transport: &CheckedIhEnvironmentTransport,
+        call: cranelift_codegen::ir::Inst,
+        mut control: SourceControl<'b>,
+    ) -> Result<SourceControl<'b>, CraneliftBackendError> {
+        if !self
+            .function_local
+            .checked_ih_transport_emissions
+            .iter()
+            .any(|(emitted, actual)| emitted == transport && *actual == call)
+        {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut does not bind its actual emitted transport call",
+            ));
+        }
+        let Some(cut) = self
+            .static_transition_plan
+            .checked_ih_detached_caller_cut(transport)?
+        else {
+            return Ok(control);
+        };
+        if cut.selecting_call() != transport.source_call_identity()
+            || cut.caller_transport() != transport
+            || cut.caller_result_origin() != transport.destination_construct_origin()
+            || cut.producer_transport().destination_owner() != transport.source_owner()
+            || cut.producer_transport().destination_body_origin()
+                != transport.source_worker_body_origin()
+        {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut does not bind the complete producer/caller transport endpoints",
+            ));
+        }
+        let scope = control.selected.selected_scope.as_ref().ok_or_else(|| {
+            unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut reached no selected source scope",
+            )
+        })?;
+        if scope.frame.static_origin != cut.consumed_continuation_origin()
+            || scope.frame.checked_frame_id != cut.checked_frame_id()
+        {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut does not match the selected continuation and checked frame",
+            ));
+        }
+        let SourceContinuation::CheckedComputationalIHInvocationReturn {
+            call_template_id,
+            next,
+        } = control.continuation
+        else {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut has no exact checked-IH invocation-return head",
+            ));
+        };
+        let construct = *next;
+        let SourceContinuation::ConstructArgument {
+            static_origin,
+            next,
+            ..
+        } = &construct
+        else {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut has no exact pending caller construction",
+            ));
+        };
+        if !self
+            .static_transition_plan
+            .checked_ih_detached_caller_construct_binds(&cut, *static_origin)?
+        {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut's construction is outside the exact selected source case",
+            ));
+        }
+        let SourceContinuation::Terminal(SourceContinuationTerminal::ResumeOuter {
+            expected,
+            active,
+            ..
+        }) = next.as_ref()
+        else {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut does not end at the selected source scope's exact return terminal",
+            ));
+        };
+        let active_scope = active.selected_scope.ok_or_else(|| {
+            unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut's return terminal has no selected source scope",
+            )
+        })?;
+        let pending_matches_consumed_suffix = control.selected.pending.len()
+            == cut.consumed_caller_suffix().len()
+            && control
+                .selected
+                .pending
+                .iter()
+                .zip(cut.consumed_caller_suffix())
+                .all(|(frame, step)| match frame {
+                    EliminatorFrame::Computational(frame) => {
+                        frame.static_origin == step.origin()
+                            && frame.checked_frame_id == step.checked_frame_id()
+                    }
+                    EliminatorFrame::Ordinary(_)
+                    | EliminatorFrame::PendingLet(_)
+                    | EliminatorFrame::InvocationReturn
+                    | EliminatorFrame::Active(_) => false,
+                });
+        if !cut.consumed_caller_suffix().is_empty() && !pending_matches_consumed_suffix {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut cannot bind its consumed caller suffix to the active source suffix",
+            ));
+        }
+        if *expected != control.selected.cursor
+            || active.activation != control.selected.activation
+            || active.cursor != control.selected.cursor
+            || active_scope.scope_origin != scope.scope_origin
+            || active_scope.parent_scope != scope.parent_scope
+            || active_scope.frame.static_origin != scope.frame.static_origin
+            || active_scope.frame.checked_frame_id != scope.frame.checked_frame_id
+            || active_scope.frame.checked_invocation_id != scope.frame.checked_invocation_id
+            || active_scope.frame.checked_invocation_source != scope.frame.checked_invocation_source
+            || active_scope.frame.checked_invocation_depth != scope.frame.checked_invocation_depth
+        {
+            return Err(unsupported(
+                "CheckedIhDetachedCallerCut",
+                "a detached caller cut's activation, cursor, selected lineage, or checked invocation tuple does not match its return terminal",
+            ));
+        }
+        let SourceContinuation::ConstructArgument { next: residual, .. } = construct else {
+            unreachable!("the pending caller construction was validated above")
+        };
+        control.continuation = SourceContinuation::CheckedComputationalIHInvocationReturn {
+            call_template_id,
+            next: residual,
+        };
+        Ok(control)
+    }
+
+    fn bind_checked_ih_detached_caller_cut_from_call<'b>(
+        &mut self,
+        transport: &CheckedIhEnvironmentTransport,
+        call: Option<cranelift_codegen::ir::Inst>,
+        control: SourceControl<'b>,
+    ) -> Result<SourceControl<'b>, CraneliftBackendError> {
+        match call {
+            Some(call) => self.bind_checked_ih_detached_caller_cut(transport, call, control),
+            None => {
+                #[cfg(feature = "px8-ds-test-support")]
+                if d5b_hs17_post_call_consumer_mutation()
+                    == D5bHs17PostCallConsumerMutation::MintReceiptAtNonEmittingTail
+                {
+                    record_d5b_hs17_post_call_consumer_application();
+                    return Err(unsupported(
+                        "CheckedIhDetachedCallerCut",
+                        "a non-emitting Tail seat cannot mint a post-call receipt",
+                    ));
+                }
+                Ok(control)
+            }
+        }
+    }
+
     fn source_call_state<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -4241,7 +4599,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         // authority: positive `NonGoverned` membership continues unchanged;
         // absence is a broken closed population and fails closed.
         if let (Some(access), Some(pending)) = (
-            self.function_local.checked_ih_generated_entry_access.clone(),
+            self.function_local
+                .checked_ih_generated_entry_access
+                .clone(),
             self.pending_computational_ih_call,
         ) {
             let callee_origin = self
@@ -4313,7 +4673,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     #[cfg(feature = "px8-ds-test-support")]
                     let mutation = checked_ih_generated_entry_arrival_mutation();
                     #[cfg(feature = "px8-ds-test-support")]
-                    if mutation == CheckedIhGeneratedEntryArrivalMutation::GovernedThroughNonGoverned
+                    if mutation
+                        == CheckedIhGeneratedEntryArrivalMutation::GovernedThroughNonGoverned
                     {
                         record_checked_ih_generated_entry_ordinary_continuation(
                             &access,
@@ -4324,7 +4685,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         );
                     } else {
                         let validation_count = match mutation {
-                            CheckedIhGeneratedEntryArrivalMutation::DuplicateGovernedValidation => 2,
+                            CheckedIhGeneratedEntryArrivalMutation::DuplicateGovernedValidation => {
+                                2
+                            }
                             CheckedIhGeneratedEntryArrivalMutation::SkipGovernedValidation => 0,
                             _ => 1,
                         };
@@ -4535,7 +4898,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     if let ComposedReturnForwardRetAuthorityOutcome::Formed(authority) =
                         &forward_ret_outcome
                     {
-                        let collapsible = self.tail_route_is_forward_edge_collapsible(&transport)?;
+                        let collapsible =
+                            self.tail_route_is_forward_edge_collapsible(&transport)?;
                         let candidate_body_purities =
                             self.tail_route_forward_edge_body_purities(&transport)?;
                         record_composed_return_forward_edge_collapsibility(
@@ -4610,12 +4974,20 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 // to value-returning tails without narrowing
                                 // formation (planned == formed == base).
                                 if !self.tail_worker_body_is_ret_kmatch(&transport)?
-                                    || !self.tail_route_is_forward_edge_collapsible(&transport)? {
+                                    || !self.tail_route_is_forward_edge_collapsible(&transport)?
+                                {
                                     self.pending_computational_ih_call.take();
                                     let result = self
                                         .call_tail_checked_ih_transport_from_case_environment(
                                             builder, &transport, &env,
                                         )?;
+                                    let control = self
+                                        .bind_checked_ih_detached_caller_cut_from_call(
+                                            &transport,
+                                            result.call,
+                                            control,
+                                        )?;
+                                    let result = result.operand;
                                     return Ok(SourceCallOutcome::Continue(
                                         SourceMachineState::Value {
                                             value: RoutedAnswer::checked(result),
@@ -4698,9 +5070,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 self.pending_computational_ih_call.take();
                                 let environment = self
                                     .checked_ih_captured_environment_from_case_environment(
-                                        builder,
-                                        &transport,
-                                        &env,
+                                        builder, &transport, &env,
                                     )?;
                                 return Ok(SourceCallOutcome::Continue(
                                     SourceMachineState::Value {
@@ -4720,6 +5090,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     .call_tail_checked_ih_transport_from_case_environment(
                                         builder, &transport, &env,
                                     )?;
+                                let control = self.bind_checked_ih_detached_caller_cut_from_call(
+                                    &transport,
+                                    result.call,
+                                    control,
+                                )?;
+                                let result = result.operand;
                                 return Ok(SourceCallOutcome::Continue(
                                     SourceMachineState::Value {
                                         value: RoutedAnswer::checked(result),
@@ -4808,6 +5184,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             .call_tail_checked_ih_transport_from_case_environment(
                                                 builder, &transport, &env,
                                             )?;
+                                        let control = self.bind_checked_ih_detached_caller_cut_from_call(
+                                            &transport,
+                                            result.call,
+                                            control,
+                                        )?;
+                                        let result = result.operand;
                                         return Ok(SourceCallOutcome::Continue(
                                             SourceMachineState::Value {
                                                 value: RoutedAnswer::checked(result),
@@ -4843,6 +5225,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         .call_tail_checked_ih_transport_from_case_environment(
                                             builder, &transport, &env,
                                         )?;
+                                    let control = self.bind_checked_ih_detached_caller_cut_from_call(
+                                        &transport,
+                                        result.call,
+                                        control,
+                                    )?;
+                                    let result = result.operand;
                                     return Ok(SourceCallOutcome::Continue(
                                         SourceMachineState::Value {
                                             value: RoutedAnswer::checked(result),
@@ -4878,8 +5266,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         control,
                     }));
                 }
-                let checked_ih_invocation =
-                    self.mint_checked_computational_ih_instance(&mut recursor)?;
+                let checked_ih_invocation = self.mint_checked_computational_ih_instance(
+                    &mut recursor,
+                    control.selected.selected_scope.as_ref(),
+                )?;
+                let mut external_source_parent = None;
                 if let Some(CheckedRecursiveInvocationInstance {
                     source: InvocationTemplateRef::ComputationalIHCall(call_template_id),
                     ..
@@ -4909,6 +5300,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         checked_ih_invocation.expect("matched checked IH invocation"),
                         open,
                     )?;
+                    external_source_parent = Some(open.frame.checked_tuple());
                     if call.parent_frame_template_id != open.frame.checked_frame_id
                         || call.parent_segment_site_id
                             != open.frame.checked_frame_id.and_then(|frame_id| {
@@ -4920,6 +5312,14 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             "checked IH invocation parent edge does not match the active open occurrence",
                         ));
                     }
+                }
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                if external_source_parent.is_some()
+                    && d5b_hs5_source_parent_mutation()
+                        == D5bHs5SourceParentMutation::DropSourceParentAtCompose
+                {
+                    d5b_hs5_record_mutation_application();
+                    external_source_parent = None;
                 }
                 let (base, boundary) =
                     decompose_computational_recursor(LoweringOperand::Specialized(recursor));
@@ -4974,6 +5374,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         activation,
                         invocation,
                         checked_ih_invocation,
+                        external_source_parent,
                     )?;
                     #[cfg(test)]
                     d5a_trace(format!(
@@ -4991,7 +5392,7 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                         let value = self.call_declared_recursive_position_unit(
                             builder,
                             body,
-                            &args,
+                            args,
                             Some(coordinates),
                         )?;
                         #[cfg(test)]
@@ -5033,6 +5434,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         activation,
                         invocation,
                         checked_ih_invocation,
+                        external_source_parent,
                     )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
                         value: RoutedAnswer::direct(LoweringOperand::Specialized(
@@ -5053,39 +5455,27 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                             "recursive constructor field is not a closure",
                         ));
                     };
-                    if params.len() != args.len() {
-                        return Err(unsupported(
-                            "ComputationalMatch",
-                            format!(
-                                "recursive field expects {} args but call provides {}",
-                                params.len(),
-                                args.len()
-                            ),
-                        ));
-                    }
-                    // Two roles, as elsewhere on this path: ordered unit-call
-                    // inputs, or an environment prefix. Only the second binds.
-                    // ⚠ The ARGUMENTS cross here; the CAPTURES do not, and that
-                    // is a stated boundary rather than an oversight. A capture
-                    // arrives inside an already-lowered `Lowered::Closure`, so
-                    // a specialized one still reaches
-                    // `call_declared_unit_target`'s fallback — where, since it
-                    // carries its own producer certificate, it authorizes
-                    // itself.
-                    let mut call_inputs = self.carry_source_call_inputs(builder, body, args)?;
-                    call_inputs.extend(captures);
+                    // The source-machine route lowers the application arguments
+                    // under its own control, then presents arguments and the
+                    // selected closure's captures separately. The private
+                    // recursive-call sum records that this is a complete direct
+                    // worker run; no consumer may rediscover that fact by length.
+                    let arguments = self.carry_source_call_inputs(builder, body, args)?;
                     let mut suspended = armed.suspended;
                     suspended.continuation = self.install_recursor_invocation(
                         suspended.continuation,
                         activation,
                         invocation,
                         checked_ih_invocation,
+                        external_source_parent,
                     )?;
                     let coordinates = carried_coordinates;
-                    let value = self.call_declared_recursive_position_unit(
+                    let value = self.call_declared_recursive_position_closure_unit(
                         builder,
                         body,
-                        &call_inputs,
+                        &params,
+                        arguments,
+                        captures,
                         Some(coordinates),
                     )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
@@ -5100,7 +5490,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             _ => Err(unsupported("Call", "callee is not a closure")),
         }
     }
-
 }
 
 impl<'a> Lowering<'a> {
@@ -5155,7 +5544,6 @@ impl<'a> Lowering<'a> {
     ) -> Result<OwnedSourceOccurrence, CraneliftBackendError> {
         self.owned_child_occurrence(parent, 1 + index, body)
     }
-
 }
 
 impl<'a> Lowering<'a> {
@@ -5419,6 +5807,7 @@ impl<'a> Lowering<'a> {
         activation: ContinuationActivationId,
         invocation: RecursorInvocationSegment,
         checked_ih_invocation: Option<CheckedRecursiveInvocationInstance>,
+        external_source_parent: Option<CheckedComputationalFrame>,
     ) -> Result<SourceContinuation<'b>, CraneliftBackendError> {
         if !recursor_invocation_is_checked(&invocation) {
             validate_recursor_invocation_install_shape(&invocation)?;
@@ -5450,6 +5839,7 @@ impl<'a> Lowering<'a> {
             activation,
             invocation,
             dynamic_splice_edges,
+            external_source_parent,
         )?;
         debug_assert_eq!(installed.activation, activation);
         debug_assert!(installed
@@ -5976,17 +6366,18 @@ impl<'a> Lowering<'a> {
             ),
             // `D7` -- the allocation lane is the second fact resolved
             // at the producer and carried with the template.
-            occurrence: Some(self.static_transition_plan.source_aggregate_occurrence(
-                static_origin,
-                PlannedAggregateShape::Constructor,
-            )?),
+            occurrence: Some(
+                self.static_transition_plan.source_aggregate_occurrence(
+                    static_origin,
+                    PlannedAggregateShape::Constructor,
+                )?,
+            ),
             args: lowered_args
                 .into_iter()
                 .map(ConstructorField::specialized)
                 .collect(),
         })
     }
-
 }
 
 #[cfg(test)]
@@ -6004,10 +6395,6 @@ mod tests {
     //! once a sibling test subtree needed the same fixture.
 
     use super::*;
-    use crate::cranelift_backend::UnsupportedLowering;
-    use crate::cranelift_backend::lowering::core::tests::{
-        host_result_closure_match, inert_test_static_origin, px8j_layered_recursive_result,
-    };
     use crate::cranelift_backend::lowering::core::tests::control::{
         oriented_dynamic_sibling_fixture, px8j_aggregate_result, px8j_capture_source_trace,
         px8j_recursive_sibling_result, px8j_scope_chain_observation_result,
@@ -6016,6 +6403,10 @@ mod tests {
     use crate::cranelift_backend::lowering::core::tests::source_frame_bridge::{
         d8f_compile, d8n_compile,
     };
+    use crate::cranelift_backend::lowering::core::tests::{
+        host_result_closure_match, inert_test_static_origin, px8j_layered_recursive_result,
+    };
+    use crate::cranelift_backend::UnsupportedLowering;
 
     #[test]
     fn ordinary_match_backedge_forward_preserves_both_routing_axes() {
@@ -6046,7 +6437,7 @@ mod tests {
             let forwarded = RoutedAnswer::forward(
                 LoweringOperand::Specialized(Lowered::RecursiveBackedge),
                 expected_route,
-                expected_role,
+                expected_role.clone(),
             );
             assert!(matches!(
                 forwarded.value,
@@ -6075,7 +6466,6 @@ mod tests {
         UnwindOrigin,
         RepeatedScopeIdentity,
     }
-
 
     fn run_px8j_source_machine_install(
         malformation: Option<Px8jInstallMalformation>,
@@ -6155,18 +6545,18 @@ mod tests {
             ContinuationActivationId(21),
             invocation,
             None,
+            None,
         )
     }
 
-
     #[test]
     fn px8j_source_machine_install_rejects_repeated_scope_identity() {
-        let error =
-            match run_px8j_source_machine_install(Some(Px8jInstallMalformation::RepeatedScopeIdentity))
-            {
-                Ok(_) => panic!("the unchecked source-machine install must validate before CFG"),
-                Err(error) => error,
-            };
+        let error = match run_px8j_source_machine_install(Some(
+            Px8jInstallMalformation::RepeatedScopeIdentity,
+        )) {
+            Ok(_) => panic!("the unchecked source-machine install must validate before CFG"),
+            Err(error) => error,
+        };
         assert!(matches!(
             error,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
@@ -6175,7 +6565,6 @@ mod tests {
             }) if reason == "recursor unwind repeats a selected scope identity"
         ));
     }
-
 
     #[test]
     fn px8j_source_machine_install_rejects_wrong_control_roles_and_origins() {
@@ -6207,7 +6596,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn px8j_source_machine_install_accepts_valid_unchecked_segment() {
         let installed = run_px8j_source_machine_install(None)
@@ -6217,7 +6605,6 @@ mod tests {
             SourceContinuation::ApplyRecursorSelection { .. }
         ));
     }
-
 
     fn run_px8ds_source_consumer(mutation: Px8dsEdgeMutation) -> Result<(), CraneliftBackendError> {
         let seed_env = NativeSeedEnvironment::empty();
@@ -6263,10 +6650,10 @@ mod tests {
                 ContinuationActivationId(90),
                 segment,
                 None,
+                None,
             )
             .map(|_| ())
     }
-
 
     #[test]
     fn oriented_edge_mutations_reject_in_the_source_machine_consumer() {
@@ -6296,7 +6683,6 @@ mod tests {
             );
         }
     }
-
 
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8f` — the declined call is emitted and does
     /// not answer for the checked application's causal identity.**
@@ -6381,7 +6767,10 @@ mod tests {
             BTreeMap::new();
         for (function, origin, disposition) in d8f_dispositions() {
             let function = function.expect("every disposition names its defining Function");
-            let previous = by_body.entry(function).or_default().insert(origin, disposition);
+            let previous = by_body
+                .entry(function)
+                .or_default()
+                .insert(origin, disposition);
             assert!(
                 previous.is_none(),
                 "one call edge per (defining body, occurrence): a second disposition under one key \
@@ -6485,7 +6874,10 @@ mod tests {
         reset_d8n_observations();
         reset_d8j_discharged();
         let plain = d8n_compile();
-        assert!(plain.is_none(), "the unmarked composed witness compiles: {plain:?}");
+        assert!(
+            plain.is_none(),
+            "the unmarked composed witness compiles: {plain:?}"
+        );
         assert!(
             !d8j_discharged().is_empty(),
             "a lawful composed call with no marker anywhere must still claim its causal identity. \
@@ -6503,7 +6895,6 @@ mod tests {
             d8f_dispositions()
         );
     }
-
 
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D6b` — the ORDINARY-UNIT COPY carries a word
     /// at the recursive position, so using it as a specialized callee fails closed
@@ -6563,7 +6954,8 @@ mod tests {
     /// matched on the error's construct category with the callee edge named, never
     /// on formatted text alone.
     #[test]
-    fn d6b_calling_the_selected_recursive_argument_in_the_ordinary_unit_copy_fails_closed_at_the_carrier() {
+    fn d6b_calling_the_selected_recursive_argument_in_the_ordinary_unit_copy_fails_closed_at_the_carrier(
+    ) {
         use crate::cranelift_backend::surface::{CraneliftBackendError, UnsupportedLowering};
 
         // The positive control, first: the same fixture with nothing armed.
@@ -6574,8 +6966,10 @@ mod tests {
         )
         .map(|_| ())
         .map_err(|error| format!("{error:?}"))
-        .expect("POSITIVE CONTROL: the unarmed fixture compiles, so the refusal below is attributable \
-                 to the one index that moved");
+        .expect(
+            "POSITIVE CONTROL: the unarmed fixture compiles, so the refusal below is attributable \
+                 to the one index that moved",
+        );
 
         crate::cranelift_backend::test_objects::set_px8tr_call_selected_recursive_argument(true);
         let outcome = crate::cranelift_backend::test_objects::emit_px8tr_nested_post_effect_object(
@@ -6608,7 +7002,6 @@ mod tests {
             ),
         }
     }
-
 
     /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` — each compile that reaches the
     /// backedge seat forwards its marker, while earlier projection-owned refusals
@@ -6732,8 +7125,8 @@ mod tests {
                 let established_suppressed_arrivals =
                     std::num::NonZeroUsize::new(*suppressed_arrivals).unwrap_or_else(|| {
                         panic!(
-                            "the enabled leg reached D2a on {label}, but its suppressed twin did not"
-                        )
+                        "the enabled leg reached D2a on {label}, but its suppressed twin did not"
+                    )
                     });
                 assert_eq!(
                     established_suppressed_arrivals, established_arrivals,
@@ -6823,7 +7216,6 @@ mod tests {
         );
     }
 
-
     /// The observation one run yields. Grouped so the two legs are compared on the
     /// same axes rather than on whichever field each happened to read.
     #[cfg(test)]
@@ -6866,7 +7258,8 @@ mod tests {
             set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
         };
         use crate::cranelift_backend::lowering::{
-            lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
+            lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation,
+            lrc_d2b_worker_calls,
         };
         struct Restore;
         impl Drop for Restore {
@@ -7003,7 +7396,6 @@ mod tests {
         );
     }
 
-
     /// Row 3's exact shape with **only** the `Let` value changed to an ordinary
     /// constructor.
     ///
@@ -7015,8 +7407,7 @@ mod tests {
     /// The producer, its two recursive positions, the `Let` and the `Call Var(2)`
     /// body are row 3's own.
     fn px8j_sibling_result_with_ordinary_let_value() -> RuntimeExpr {
-        let mut expression =
-            px8j_recursive_sibling_result(1, 2, px8j_aggregate_result());
+        let mut expression = px8j_recursive_sibling_result(1, 2, px8j_aggregate_result());
         let RuntimeExpr::ComputationalMatch { cases, .. } = &mut expression else {
             panic!("row 3's fixture is a computational match");
         };
@@ -7039,7 +7430,6 @@ mod tests {
         });
         expression
     }
-
 
     /// **`D2b` ROW A — CAPABILITY GATE ONLY. This row does NOT show a body running.**
     ///
@@ -7073,7 +7463,8 @@ mod tests {
             set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
         };
         use crate::cranelift_backend::lowering::{
-            lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
+            lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation,
+            lrc_d2b_worker_calls,
         };
         struct Restore;
         impl Drop for Restore {
@@ -7084,7 +7475,8 @@ mod tests {
 
         let run = |mode: LrcD2bLetDisposition| -> D2bObservation {
             let _restore = Restore;
-            let expression = host_result_closure_match(px8j_sibling_result_with_ordinary_let_value());
+            let expression =
+                host_result_closure_match(px8j_sibling_result_with_ordinary_let_value());
             lrc_d2b_reset_observation();
             set_lrc_d2b_let_disposition(mode);
             let (result, _trace) =
@@ -7187,7 +7579,6 @@ mod tests {
         );
     }
 
-
     /// Row 3's **single**-position shape with its recursive `Call` wrapped in a
     /// `Let` whose value is ordinary.
     ///
@@ -7234,7 +7625,6 @@ mod tests {
         expression
     }
 
-
     /// **`D2b` ROW B — the REACHING non-backedge branch: the body runs, its join is
     /// consumed, and nothing is dispositioned.**
     ///
@@ -7270,8 +7660,8 @@ mod tests {
             set_lrc_d2b_let_disposition, LrcD2bLetDisposition,
         };
         use crate::cranelift_backend::lowering::{
-            lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_let_arrivals, lrc_d2b_reset_observation,
-            lrc_d2b_worker_calls,
+            lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_let_arrivals,
+            lrc_d2b_reset_observation, lrc_d2b_worker_calls,
         };
         struct Restore;
         impl Drop for Restore {
@@ -7397,12 +7787,25 @@ mod tests {
         // 4. THE MODE TOGGLE CHANGES NOTHING on the ordinary branch — every axis.
         let exact = run(LrcD2bLetDisposition::Exact);
         let suppressed = run(LrcD2bLetDisposition::Suppress);
-        assert_eq!(exact.0, suppressed.0, "the mode changed a live row's outcome");
-        assert_eq!(exact.1, suppressed.1, "the mode changed a live row's LetBody arrivals");
-        assert_eq!(exact.2, suppressed.2, "the mode changed a live row's entered occurrences");
-        assert_eq!(exact.3, suppressed.3, "the mode changed a live row's static-worker calls");
-        assert_eq!(exact.4, suppressed.4, "the mode changed a live row's join accounting");
+        assert_eq!(
+            exact.0, suppressed.0,
+            "the mode changed a live row's outcome"
+        );
+        assert_eq!(
+            exact.1, suppressed.1,
+            "the mode changed a live row's LetBody arrivals"
+        );
+        assert_eq!(
+            exact.2, suppressed.2,
+            "the mode changed a live row's entered occurrences"
+        );
+        assert_eq!(
+            exact.3, suppressed.3,
+            "the mode changed a live row's static-worker calls"
+        );
+        assert_eq!(
+            exact.4, suppressed.4,
+            "the mode changed a live row's join accounting"
+        );
     }
-
-
 }
