@@ -44,6 +44,28 @@ somebody else's instance immediately and walked past their own. **The fourth
 instance extends the shape past freshly-cut criteria to long-held ones: the rule
 you are actively enforcing on others is the one you stop applying to yourself.**
 
+**FIFTH INSTANCE, 2026-09-15, and it is the sharpest — it happened in a commit
+cut from the commit that landed THIS FILE.** Writing
+[[a-workflow-green-can-mean-the-jobs-that-matter-were-skipped-not-that-they-passed]],
+the Steward published a mechanism claim (*"the matrix never expanded"*), had it
+refuted, and shipped a correction whose **commit message explicitly disowns the
+phrase** — while leaving that same phrase standing in the evidence block
+twenty-five lines above the line it fixed, and in the frontmatter. A reader met
+the disowned wording first, sitting above the corrected text contradicting it.
+
+⇒ **The shape extends once more: it is not only new criteria that go
+unswept, but your own retractions.** Disowning a phrase in a commit message
+feels like having removed it. **Cutting a correction obliges one pass over the
+whole containing document for the phrasing you just disowned**, not only over
+the sentence you came to fix — the same single mechanical pass this file already
+prescribes for a new AC, applied to a withdrawal.
+
+**The count is checkable against this file rather than against anyone's memory**
+— three instances at the top, a fourth named above, this one fifth. Keep it
+that way: an ordinal asserted from recall is not evidence, and the author of the
+fifth instance was handed the number "fifth" without being told which population
+it indexed.
+
 ## How to apply
 
 - **Cutting an AC obliges ONE PASS over the containing document against that
