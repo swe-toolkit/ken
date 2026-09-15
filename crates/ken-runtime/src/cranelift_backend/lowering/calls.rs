@@ -1092,19 +1092,29 @@ impl<'a> Lowering<'a> {
         // exact-coverage validation performed by the planner projection.
         let ordinary_envelope = unit.ordinary_envelope()?;
         let header = view.header();
-        if unit.ordinary_parameters() != view.parameters()
-            || view.parameters() != header.parameters
-            || ordinary_envelope.len() != header.parameters as usize
+        // Each clause compares two counts DERIVED FROM THE SAME PLAN OBJECT.
+        // The retired clause did not: it equated `unit.ordinary_parameters()`
+        // -- the enclosing specialization's own ordinary-parameter run, off
+        // its key -- with the generated context's Parameter run, off
+        // `planned`. Those are different populations and no relation makes
+        // them equal. The context's run is the worker's declared arity plus
+        // its captures, which is what the direct-worker arm below already
+        // asserts (`parameters = application arguments + caller worker
+        // captures`, and again against `emitted_inputs`). The
+        // specialization's ordinary envelope does not enter that relation, so
+        // it must not be equated with it here.
+        if view.parameters() != header.parameters
+            || u32::try_from(ordinary_envelope.len()).ok() != Some(unit.ordinary_parameters())
         {
             return Err(unsupported(
                 "ContinuationSpecialization",
                 format!(
-                    "the enclosing specialization, generated context, and context header \
-                         disagree on the retargeted Parameter run: unit {}, context {}, header \
-                         {}, roles {}",
-                    unit.ordinary_parameters(),
+                    "the generated context disagrees with its own header on the Parameter \
+                         run, or the enclosing specialization with its own ordinary envelope: \
+                         context {}, header {}, unit {}, roles {}",
                     view.parameters(),
                     header.parameters,
+                    unit.ordinary_parameters(),
                     ordinary_envelope.len(),
                 ),
             ));
