@@ -1,6 +1,6 @@
 ---
 id: RT-NATIVE-COMPILE-RUNS-AT-THE-STACK-WALL
-title: "IN A DEBUG BUILD roughly 94 percent of the native compile's 2048 KiB stack budget is consumed BEFORE lowering begins -- and D4 measured the same row at 17 percent in release, so the recurrence is CI's rather than the compiler's: CI sits about 6 percent of prelude growth from the wall while the product sits about 510 percent from it, and no gate anywhere builds release. a compile that rejects before native lowering needs (1920, 1952] KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity. Lowering is a rounding error on a fixed prefix every compile pays. So a candidate adding 64 KiB aborts and looks guilty while not being the cause. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
+title: "IN A DEBUG BUILD the native compile's stack budget is spent BEFORE lowering begins -- a compile that rejects before native lowering needs (1920, 1952] of 2048 KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity, so lowering is a rounding error on a fixed prefix every compile pays. D4 measured that same row at (320, 352] in RELEASE, and no gate anywhere builds release: zero --release in ci.yml, build-ci-base.yml and scripts/ken-cargo. So the recurrence is CI's rather than the compiler's. Stated the way the decision needs it and with no midpoint invented: DEBUG HAS ROOM FOR EXACTLY ONE MORE 64 KiB PRELUDE ADDITION AND NOT TWO (headroom is [96, 128) KiB), while release has room for at least 26. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
 status: draft
 owner: runtime
 size: M
@@ -104,12 +104,14 @@ instrument, same base `1dec48f33`, both profiles (runtime-implementer,
        128 OVERFLOW
         64 OVERFLOW
 
-⇒ **Between a 5.5-fold and a 6.1-fold reduction** -- the brackets bound the
-ratio at `1920/352 = 5.45` to `1952/320 = 6.1`, and **that interval is the
-honest figure**; two seats quoted 5.5x and 5.8x as point values from these same
-brackets within minutes of each other. **The margin goes from 96 KiB to about
-1700.** The
-condition is **frame-size dominated**, which was the arm meaning: the remedy is
+⇒ **The DEBUG-TO-RELEASE RATIO is in `[5.45, 6.10]`** -- bounded by
+`1920/352 = 5.45` and `1952/320 = 6.10` -- and **that interval is the honest
+figure**; two seats quoted 5.5x and 5.8x as point values from these same
+brackets within minutes of each other. **Do not confuse this with the release
+wall multiplier `[5.82, 6.40)` below**: they are different quantities that
+happen to overlap, not one number transcribed twice. **The headroom goes from
+`[96, 128)` KiB to `[1696, 1728)`** -- both exact, by subtraction from 2048.
+The condition is **frame-size dominated**, which was the arm meaning: the remedy is
 the elaborator's recursive `check` frame, the severity for shipped compiles is
 far lower than for CI, and **this is substantially the SMALLER program of
 work.**
@@ -126,7 +128,7 @@ above reports what executed.
 It also corroborates the merged node's prose from a direction that node could
 not test -- *"in an unoptimized build a new arm's locals in `check` are paid by
 every call regardless of which arm runs"* predicted a debug-inflated frame, and
-a 5.5x collapse is what that looks like measured.
+a collapse of `[5.45, 6.10]`x is what that looks like measured.
 
 **WHAT D4 DOES NOT ESTABLISH, and it bounds how far the result travels:**
 
@@ -153,15 +155,33 @@ release.** Every stack figure this project has produced -- tonight's, both
 merged nodes', the thirteen sites in `LANG-PRELUDE-ELABORATION-DEPTH` -- is a
 debug figure, and **the 352 KiB release number is exercised by no gate.**
 
-**THE CANARY ARITHMETIC, WHICH IS THE ACTIONABLE PART.** Same code, same row,
-expressed as growth absorbable before the 2048 KiB wall:
+**THE CANARY ARITHMETIC, IN THE ONLY FORM THE BRACKETS SUPPORT.** Take the
+**subtraction** rather than the division and no midpoint is needed --
+`2048 - (1920, 1952] = [96, 128)` is exact:
 
-    DEBUG    1936 / 2048   wall at 1.06x   ~6% of headroom left
-    RELEASE   336 / 2048   wall at 6.1x    ~510%
+    DEBUG    headroom  [  96,  128) KiB   wall at [1.049, 1.067)x   4.9% - 6.7%
+    RELEASE  headroom  [1696, 1728) KiB   wall at [5.82,  6.40 )x   482% - 540%
 
-⇒ **CI is about 6% of prelude growth from breaking again; the product is about
-510% away. The recurrence is CI's, not the compiler's**, and `37 §9`'s open
-queue of prelude additions is spent against the 6%.
+**AND THE ABSOLUTE FORM ANSWERS THE OPERATOR'S QUESTION WHERE THE PERCENTAGE
+DOES NOT.** The decision is whether the next prelude addition fits, and the
+candidate that triggered this arc was **64 KiB**:
+
+- **Debug absorbs exactly one more 64 KiB candidate, and not two.** `64 <= 96`
+  holds at every point of the bracket, and `128 > headroom` holds at every
+  point because the headroom is strictly below 128. **Both halves are true over
+  the whole interval -- no midpoint, no error bar.**
+- **Release absorbs at least 26 of them** (`1696 / 64`).
+
+⇒ **The recurrence is CI's, not the compiler's**, and `37 §9`'s open queue of
+prelude additions is spent against the one, not the twenty-six. *"About 6% of
+headroom"* cannot be acted on without knowing 6% of what; *"one more, not two"*
+can.
+
+**`1936` and `336` appeared here in the routed version and were never measured
+-- they are the midpoints of the two brackets, and every percentage on those
+lines was derived from them** (Architect, `evt_4dk1z2ffyef8f`, correcting his
+own block). This is the interval defect from 20 lines above, reappearing in the
+paragraph the brief quotes, after it had been named.
 
 **SO THE WORKAROUND POPULATION READS BACKWARDS FROM HOW IT WAS BUILT.** 30
 `stack_size` occurrences across 21 files, 14 at the same 256 MiB constant, zero
@@ -255,6 +275,27 @@ unexamined word, three seats, into a durable artifact.** It is the Architect's
 own D5b ruling of the same night -- *an inert instrument is green-vs-green in
 the limit* -- arriving on this node's own evidence. A census tally inherited the
 same way inside the commit that documented the mechanism.
+
+**A NEW CRITERION IS APPLIED FORWARD AND NEVER SWEPT BACKWARD. THREE FOR THREE,
+IN ONE HOUR, ON THIS NODE.**
+
+    AC-7 (state the profile)   the Architect restated the cross-node predicate
+                               without its profile, one message after proposing
+                               AC-7
+    AC-7                       this node's TITLE claimed 94% without saying
+                               debug -- in the node that cut AC-7
+    the interval rule          the canary block re-derived percentages from
+                               1936 and 336, midpoints of the two brackets that
+                               were never measured, 20 lines after the interval
+                               defect was named -- and it reached the title
+
+Three independent authors, three instances, zero carelessness: **a criterion is
+naturally applied to the claims made after it and never to the sentences
+already standing in the document that states it.**
+
+⇒ **CUTTING AN AC OBLIGES ONE PASS OVER THE CONTAINING DOCUMENT AGAINST THAT
+AC BEFORE THE ARTIFACT IS ROUTED.** It is cheap, it is mechanical, and it would
+have caught all three of the above.
 
 ## This is the third instance, and the first one predicted it
 
