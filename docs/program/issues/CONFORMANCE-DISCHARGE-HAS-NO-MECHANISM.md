@@ -87,6 +87,69 @@ detected that it did not happen, because of fact 1.
 returns exactly one non-comment hit: the job name in fact 1. There is no runner
 in CI and none was found elsewhere.
 
+**THE CORPUS TODAY IS A SPECIFICATION OF TESTS, NOT TESTS** (Architect,
+`evt_6bnsxcdfjywek`). Cases 2 and 3 say they *"lift to green on the D1
+candidate"*, but **"lift to green" has no mechanism either** — those rows are
+prose assertions about a suite that cannot run.
+
+**On its own that is entirely honest and appropriate.** A specification of tests
+is a legitimate artifact and staging one ahead of its runner is how this corpus
+was deliberately built (`seed-mapping.md:24-26`: *"The seed is staged now as the
+control that makes §1.9's negatives testable"*). **It becomes dishonest only
+because fact 1 reports a pass over it.** Recorded here because it tells whoever
+builds the runner what they are inheriting: not a suite with a missing driver,
+but a specification that has never been executed at all.
+
+### 4. THE NAMED SOUNDNESS GATE CANNOT EVALUATE THE THING IT GATES
+
+Raised by the Architect about itself (`evt_6bnsxcdfjywek`), and recorded because
+it is the fact most likely to be lost in a thread.
+
+`ABI-S6.md` names the Architect directly: *"The Architect is D5b's REQUIRED
+reviewer (`evt_5en9jgjb24the`): the COW discriminator is soundness-relevant."*
+
+⇒ **The named gate on the COW discriminator is a gate no instrument in the tree
+can evaluate.** Its review of that conjunct could only be a reading of the
+implementation. The Architect has stated prospectively that **no approval of its
+own on any D5b head may be read as discharging the COW conjunct**, and that its
+verdict on that half will be *"unmeasured, hold"* unless a runner exists — citing
+its own prior instance (`50da348a`) where it proved a control inert and then
+approved on a structural argument anyway.
+
+**Absence of a working instrument is not evidence of absence, and discovering an
+instrument is inert is a stop, not a pass.** Do not treat an Architect approval
+on a future D5b head as covering this.
+
+## RULED: the criterion is not defective, it is REPORTING
+
+Architect D3 disposition, `evt_6bnsxcdfjywek`. This node was routed asking
+whether D5b's COW acceptance criterion needed a satisfiable form. **It does
+not.**
+
+D5b's text says a green-vs-green pass against the named non-conforming
+implementation *"is vacuous and is a HARD STOP, not a discharge."* **An inert
+instrument is green-vs-green in the limit** — green against the conforming
+implementation, green against the MAP_SHARED one, green against no
+implementation at all. So the criterion **already disposes of this case by its
+own text**. It needs applying, not weakening, and applying it says D5b's COW
+conjunct is undischarged today.
+
+**The disposition is to RECORD, NOT RELAX:**
+
+- **Do not weaken D5b to the native half.**
+- **Do not split D5b so the closeable part can be declared done** — that is a
+  deferral that reads as delivery, and it is precisely the shape the criterion
+  was written to forbid.
+- The COW conjunct stands on `main` as **explicitly undischarged and currently
+  undischargeable for a named reason**, so that when the runner exists the
+  obligation is still there to collect.
+
+**Why the conjunction became load-bearing in a direction nobody intended:** the
+two conjuncts are different KINDS of deliverable — one is a capability, the
+other is evidence *about* that capability — and their instruments belong to
+different seats. Binding them was the honest framing and remains right; what
+changed is that the evidence half's instrument was never built.
+
 ## What this does to ABI-S6 D5b
 
 D5b's objective is a conjunction (`docs/program/issues/ABI-S6.md:3771-3790`):
@@ -121,12 +184,27 @@ un-lifted D5a rows are the evidence that an absent mechanism silently converts
   inference that has already failed once here.
 - **D2 — THE CI JOB STOPS REPORTING A PASS IT CANNOT EARN.** Either it runs the
   corpus, or it reports `skipped`/`neutral` rather than `pass`. **A job that
-  cannot fail must not be green.** The cheap arm is available immediately and is
-  not blocked on D0.
-- **D3 — D5b'S AC GETS A SATISFIABLE FORM, OR AN EXPLICIT DEFERRAL.** Route to
-  the Architect with D0's answer. **Do not silently drop the COW clause** — its
-  hard-stop wording is the only thing standing between D5b and a vacuous
-  green-vs-green close.
+  cannot fail must not be green.** The reporting-only arm is not blocked on D0.
+
+  **THIS IS THE MOST VALUABLE ITEM IN THE NODE, NOT THE SMALL ONE** (Architect,
+  `evt_6bnsxcdfjywek`, dissenting from this node's original framing of it as the
+  cheap arm). Converting a `pass` the job cannot earn into `skipped`/`neutral`
+  is not cosmetic: **it converts an active falsehood into an honest absence.**
+
+  ⇒ **An inert instrument reporting `pass` is worse than no instrument at all**,
+  because no instrument at least leaves a visible hole. Fact 2 is the proof it
+  has already cost something — a specified lift silently failed to happen for
+  four days, and the only thing that could have noticed was reporting success.
+
+  **The Architect would release this arm to any live seat now.** It is not
+  released, and the reason is sequencing, not merit — see "Release trigger".
+- **D3 — DISCHARGED AT FILING, BY RULING. Do not re-open it as framed.** This
+  deliverable originally asked for D5b's AC to be given a satisfiable form or an
+  explicit deferral. The Architect ruled (`evt_6bnsxcdfjywek`) that the criterion
+  is not defective — see "RULED" above — so **there is no AC repair to build.**
+  What remains of D3 is only the recording: D5b's COW conjunct stands as
+  explicitly undischarged and currently undischargeable, with the named reason
+  attached, and the Architect's prospective recusal (fact 4) travels with it.
 
 ## Acceptance criteria
 
@@ -173,8 +251,29 @@ panes reading ~6490 minutes to reset. **That is the honest reason this is
 D5b's closing path.
 
 Release when a spec-enclave or verify seat is live, or on an operator reseat.
-**D2's reporting-only arm is small enough that any live seat could take it
-alone** if the lane wants the misleading green gone sooner.
+
+### D2's reporting arm: endorsed for immediate release, NOT released. Read this before deciding.
+
+**The Architect would release it now, to any live seat** (`evt_6bnsxcdfjywek`).
+The Steward did not, and the reason is sequencing against an absent operator,
+not a disagreement about merit:
+
+- **Lane 1 is on the class-1 stack overflow** and the Architect itself said
+  nothing here competes with that. The runtime ring is the only live build ring.
+- **Every seat that would naturally own `.github/workflows/` is on the Codex
+  wall.** "Release to any live seat" has no addressee today that is not either
+  the priority lane or a non-building seat.
+- **`.github/` is not a Steward-route path.** `COORDINATION §14a` exempts
+  `agent/` and `docs/program/`; a CI workflow edit is neither, so the Steward
+  authoring it directly is not the shortcut it looks like.
+- The operator was away when this was folded (2026-09-15, until ~12:00 UTC), and
+  releasing work against the standing lane roster is an operator call
+  (`steward.md §0`, `§3`).
+
+**So this is a decision waiting for an addressee, not a judgment that it can
+wait.** The falsehood is months old and the eight-hour delay costs nothing; what
+would cost something is quietly widening the lane while nobody is watching.
+Whoever next has a live seat and an operator: this is the first thing to pull.
 
 ## Contention
 
