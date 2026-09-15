@@ -3138,9 +3138,9 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         Census {
             file: "lowering/aggregates.rs",
             source: include_str!("../../aggregates.rs"),
-            builders: 4,
+            builders: 0,
             definitions: 0,
-            declarations: 2,
+            declarations: 0,
             data_declarations: 0,
             data_definitions: 0,
         },
@@ -3262,7 +3262,28 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             // compile. The sixth site defines the validated static response
             // owners. This row still counts builder SITES, never emitted units.
             builders: 6,
-            definitions: 6,
+            // ⭐ 6 -> 4, and the two sites RELOCATED rather than vanished --
+            // measured, because a vanished production emitter would be a
+            // finding and not a census update. At the base, six passes each
+            // built and defined their own population:
+            // `define_static_response_owner_bodies`,
+            // `define_continuation_bodies`,
+            // `define_continuation_context_bodies`,
+            // `define_static_continuation_fusion_bodies`,
+            // `define_root_adapter`, `define_unit_body`. `ABI-S6 D5b`
+            // consolidated the first three into one staged pass,
+            // `close_and_define_staged_result_bodies`, which takes a
+            // `Vec<StagedResultBody>` and defines all of them in one loop.
+            // Three define sites became one: net -2.
+            //
+            // ⛔ The BUILDER count is unchanged at 6, which is the check
+            // that this was a consolidation of the DEFINE step only and not
+            // a loss of emitters: the bodies are still built in as many
+            // places as before, they are merely defined together. No other
+            // file in the crate gained a `.define_function(` site --
+            // verified by a per-file base-vs-tip count across all of
+            // `ken-runtime`, which is what rules out relocation elsewhere.
+            definitions: 4,
             // Three declaration sites: the emittable unit bundle,
             // `RT-CONTSPEC-ACTIVATE` `D2`'s forward declaration of one target
             // per planned continuation specialization, and `D5a`'s forward
@@ -3304,6 +3325,22 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         Census {
             file: "planning/static_transition/aggregates.rs",
             source: include_str!("../../../planning/static_transition/aggregates.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
+        // `ABI-S6` `D5b` — the immediate-bridge realization plane. A planning
+        // module with no emission, so every count is zero, and the zero is
+        // load-bearing for the same reason as `abi.rs`: the planner mints
+        // bridge realization rows and must never emit against them. Registered
+        // when the roster gained the file -- a rostered file with no census row
+        // leaves the census reading complete while that file is unmeasured,
+        // which is the condition `AC-2` refuses.
+        Census {
+            file: "planning/static_transition/immediate_bridge.rs",
+            source: include_str!("../../../planning/static_transition/immediate_bridge.rs"),
             builders: 0,
             definitions: 0,
             declarations: 0,
@@ -3572,31 +3609,31 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
     );
     for row in census {
         assert_eq!(
-            row.source.matches("FunctionBuilder::new(").count(),
+            production_occurrences(row.source, "FunctionBuilder::new("),
             row.builders,
             "{}: N1 -- the production root builder census moved",
             row.file
         );
         assert_eq!(
-            row.source.matches(".define_function(").count(),
+            production_occurrences(row.source, ".define_function("),
             row.definitions,
             "{}: N1/N2 -- a definition was added or removed",
             row.file
         );
         assert_eq!(
-            row.source.matches(".declare_function(").count(),
+            production_occurrences(row.source, ".declare_function("),
             row.declarations,
             "{}: N2 -- a function declaration was added or removed",
             row.file
         );
         assert_eq!(
-            row.source.matches(".declare_data(").count(),
+            production_occurrences(row.source, ".declare_data("),
             row.data_declarations,
             "{}: N3 -- an artifact-static data declaration was added or removed",
             row.file
         );
         assert_eq!(
-            row.source.matches(".define_data(").count(),
+            production_occurrences(row.source, ".define_data("),
             row.data_definitions,
             "{}: N3 -- an artifact-static data definition was added or removed",
             row.file
@@ -3810,6 +3847,60 @@ fn the_identifier_census_survives_the_evasions_that_defeated_the_text_scan() {
 /// `the_backend_production_surface_inventory_is_closed` and forcing its source
 /// into this roster.
 #[cfg(test)]
+/// Count `needle` in `source`, EXCLUDING the body of every `#[cfg(test)]`-gated
+/// item.
+///
+/// ⭐ **The census measures the PRODUCTION emission surface, and without this it
+/// did not.** It counted raw string occurrences with no `cfg` attribution at
+/// all, so a test rig in a production file read as production emitters. `AC-4`,
+/// the pin directly below, has always done this attribution; this one never
+/// learned to, and was accidentally correct only while no test code in a
+/// rostered file had built a `FunctionBuilder`.
+///
+/// `ABI-S6 D5b` ended that: `units.rs` gained a four-builder harness inside
+/// `#[cfg(test)] mod generated_result_protocol_verifier`, and the row moved 6
+/// -> 10 while the production surface stood still at 6. `aggregates.rs` was
+/// already carrying the same error -- its own row comment says the non-zero
+/// count is "entirely its own `D2`-landed test rig", which is exactly a
+/// production census reporting a test population.
+///
+/// The attribution mirrors `AC-4`'s: a `#[cfg(...)]` naming the `test`
+/// identifier marks the next item, and a marked item opening a brace is skipped
+/// to its matching close. Unlike `AC-4`, which only needs to skip the item's
+/// HEAD to enumerate `mod` declarations, this must skip the BODY -- the needles
+/// live inside it.
+fn production_occurrences(source: &str, needle: &str) -> usize {
+    let mut production = String::with_capacity(source.len());
+    let mut pending_test_item = false;
+    let mut skip_depth = 0i32;
+    for line in source.lines() {
+        if skip_depth > 0 {
+            skip_depth += line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            continue;
+        }
+        let trimmed = line.trim();
+        if trimmed.starts_with("#[cfg(") {
+            pending_test_item |= identifier_occurrences(trimmed, "test") > 0
+                || identifier_occurrences(trimmed, "ken_ac10_production_mint_probe") > 0;
+            continue;
+        }
+        if trimmed.starts_with("#[") || trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+        if pending_test_item {
+            pending_test_item = false;
+            if line.contains('{') {
+                skip_depth =
+                    line.matches('{').count() as i32 - line.matches('}').count() as i32;
+                continue;
+            }
+        }
+        production.push_str(line);
+        production.push('\n');
+    }
+    production.matches(needle).count()
+}
+
 const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     (
         "cranelift_backend.rs",
