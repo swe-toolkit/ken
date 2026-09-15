@@ -1103,15 +1103,34 @@ impl<'a> Lowering<'a> {
         // captures`, and again against `emitted_inputs`). The
         // specialization's ordinary envelope does not enter that relation, so
         // it must not be equated with it here.
-        if view.parameters() != header.parameters
-            || u32::try_from(ordinary_envelope.len()).ok() != Some(unit.ordinary_parameters())
-        {
+        // ONE criterion, and the unit side is deliberately not one.
+        //
+        // A second disjunct comparing `ordinary_envelope.len()` against
+        // `unit.ordinary_parameters()` stood here briefly and was a THEOREM,
+        // not a check: `ordinary_envelope()` builds the envelope as
+        // `nonrecursive + key.worker.captures` with `nonrecursive_field_count
+        // = key.ordinary_parameters - captures`, so its length is
+        // `key.ordinary_parameters` by construction. The only shape that
+        // could break it -- the selected position absent from the closed
+        // projection -- is refused at `continuations.rs:1663`, and
+        // `:1800`/`:1624` refuse a length disagreeing with the header
+        // independently. All three reach this seat as `Err` through the `?`
+        // above, so the disjunct could never have fired. A clause that cannot
+        // fail is the one nobody re-examines when they later need it to, and
+        // it made this law LOOK like it covered the unit side here.
+        //
+        // The unit side is enforced upstream, in the planner, at the sites
+        // named above. `ordinary_envelope` is still bound above for that
+        // enforcement -- the `?` is the point of the call -- and its length is
+        // reported below as context, never as a criterion.
+        if view.parameters() != header.parameters {
             return Err(unsupported(
                 "ContinuationSpecialization",
                 format!(
                     "the generated context disagrees with its own header on the Parameter \
-                         run, or the enclosing specialization with its own ordinary envelope: \
-                         context {}, header {}, unit {}, roles {}",
+                         run: context {}, header {} (unit {}, roles {}, reported as context \
+                         and not compared -- they range over the enclosing specialization, \
+                         not this context)",
                     view.parameters(),
                     header.parameters,
                     unit.ordinary_parameters(),
