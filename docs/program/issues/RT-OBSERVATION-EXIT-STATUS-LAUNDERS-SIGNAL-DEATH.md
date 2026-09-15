@@ -50,6 +50,27 @@ therefore conspicuous. **A program whose vocabulary includes 1 would have
 produced a plausible, wrong, unremarkable number.** Detectability here was a
 property of the victim, not of the instrument. That is the whole finding.
 
+## What this node is NOT about, measured the same day it was filed
+
+This was found while diagnosing the D5b CI red, and **the laundering was not
+what caused that red.** runtime-implementer answered it at both trees with
+fresh artifacts and reported the arm directly: `code()` was **not** `None`, the
+child was **not** signal-killed, and `terminal_error` came back
+`RuntimeTrap(PatternMatchFailure)` — a Ken-level trap, exiting 1 through the C
+starter's `if (value < 0) return 1;` path, which is a real and producible 1.
+
+That does not weaken this node and it must not be read as refuting it. The
+finding was always about the **site**, not about that failure — the Architect
+said so when raising it, having run nothing. The site still substitutes a
+chosen value for absent information, and a signal-killed child still arrives
+downstream as an ordinary `1`. What the measurement removes is any temptation
+to treat this node as the D5b repair, or to close it by fixing D5b.
+
+**Recorded here because the opposite mistake was made on this arc once
+already**: a node filed mid-hunt was read as the hunt's cause, and stayed
+`ready` on a premise its own author had retracted. A node filed during a hunt
+needs its relationship to that hunt written down while both are fresh.
+
 ## The design fork, which is the Architect's call and is deliberately not ruled here
 
 Two shapes, with different blast radii:
@@ -96,6 +117,14 @@ paid for.
   equality is a *symptom* check and `terminal_error` is the *cause* check, and
   a failing symptom check that preempts the cause check converts a diagnosis
   into a re-run. Census the pairing rather than fixing only this row.
+
+  **This row is already done, in the D5b respin.** The Steward ruled that the
+  three-line diagnostic that produced the `RuntimeTrap` reading stays in that
+  candidate rather than being reverted and refiled here. So D3's remaining
+  scope is **every OTHER occurrence of the pairing**, and its census must be
+  taken against the tree *after* the respin lands. Do not re-fix
+  `px8f_write_partition.rs:315-316`; do use it as the worked example of the
+  shape you are looking for.
 
 ## Acceptance criteria
 
