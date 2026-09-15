@@ -248,6 +248,90 @@ reusable part.
 Both are the zero-versus-never distinction applied one level further out than
 where it was correctly applied already.
 
+## HELD AGAINST THE NEXT TOUCH — five items, none yet folded into D0/AC text
+
+This node is `draft` and deliberately unreleased, so nothing can be pulled on a
+premise these items change. They are recorded here rather than dissolved into
+the deliverables **because a held item that lives only in a thread is not a held
+item** — each of the five arrived in conversation after the third amendment, and
+this section is where they become durable. **Whoever next touches this node
+folds them into D0 and the ACs and deletes this section**; do not release the
+node with it still standing.
+
+**1. D0's first conjunct admits benign instances.** The predicate is *a proof
+source carrying a foreign producer identity*, evaluated at `:3424` against
+`body.authorities`. That map ranges over **every carried constructor**, not over
+generated-context ones — measured at `core.rs:14363`, which has no
+generated-context gate between its entry and the registrar
+(`RT-AUTHORITY-CONTRACT-MISDESCRIBES-ITS-POPULATION`). So an ordinary user
+constructor whose identity simply is not the demanded one satisfies D0's first
+conjunct. **A non-empty witness search is therefore as misreadable as an empty
+one**, and for the mirror-image reason: the predicate no longer separates a
+generated-context anomaly from an ordinary non-demanded constructor.
+
+**2. D0 must name the empty-search outcome IN ADVANCE.** "Search the corpus
+first" has no stated disposition for finding nothing. Without one, an empty
+search reads as *no witness exists* when it equally supports *the selector
+cannot see one* — the same zero-versus-never confusion this node already
+records one level out. Name the outcomes before the search runs, as
+`RT-TRAP-MESSAGE-NAMES-FAMILY-NOT-POPULATION`'s AC-4a does.
+
+**3. AC-4's dead-arm entry needs its evidence attached, not its verdict.** The
+`:3429` arm is ruled dead. The entry should carry **how** — derived
+structurally, and corroborated at 13 evaluations with 0 fires against a
+*reached* control. A verdict with the corroboration stripped off cannot be
+re-audited, and a dead-arm claim is exactly the kind that a later change
+silently revives.
+
+**4. The reach measurement is scoped to ONE COMPILE, and D0 states it wider.**
+"`derive_certified_cuts` runs twice in the entire px8f compile" is a fact about
+one compile of one program. D0 currently reads as though two-bodies-reach-the-
+seat were a property of the mechanism. **A claim inherits the scope of the site
+that was measured, not the scope it was written at** — restate the bound, or
+measure a second program.
+
+**5. A BLOCK-PARAMETER PROOF SOURCE REACHES THE SINK CARRYING NO IDENTITY AT
+ALL, AND D0 DOES NOT COVER IT.** (Architect, `evt_43kpzzebpxre6`, from a census
+of every reader and writer of the map at `b0a7c2945` across `lowering/`
+excluding tests.)
+
+The map has **exactly two writers**, both inside
+`register_generated_constructor_authority`, reached only from `calls.rs:1895`
+and `core.rs:14445` — both constructor-emission sites — plus `units.rs:2752`
+taking the whole map wholesale. Every other occurrence is a read. **There is no
+propagation step anywhere**, and the map is keyed on `ir::Value`.
+
+⇒ A block parameter is a **fresh** `Value`, distinct from whatever its
+predecessors pass to it. Even when a predecessor constructs the value properly
+and registers an authority against *its* word, **the authority does not survive
+the join** — nothing is dropped and nothing is defective; the authority is
+keyed on a word that no longer names the value.
+
+⇒ Such a source misses `body.authorities.get(source)` at `:3423` entirely, so
+it **never reaches ARM 1 or ARM 2**. It falls to ARM 3 or ARM 4 and into the
+shared `grounds.is_empty()` sink. **That is a concrete, named route into the
+fail-open with no foreign identity anywhere in it.** D0's conjunction is about
+carrying a foreign identity; this route carries no identity to be foreign, and
+the sink absorbs it identically.
+
+**This strengthens the four-arms-one-sink finding rather than disturbing it.**
+The collapse was argued to be a property of the loop's exit discipline rather
+than of `:3424`; a second, structurally different route to the same
+indistinguishable observable is what a shared sink being the defect predicts.
+
+**NOT ESTABLISHED, and it is the whole measurement: whether any real proof
+source, in any compile, is ever a block parameter.** The census establishes that
+such a source *could not* acquire an authority. It says nothing about whether
+one ever arrives. Reachability is not to be asserted from the structural
+argument — that is the predicate this arc has already paid four corrections for.
+
+Superseded on the way in: an earlier reading of this miss as *"the scrutinee
+arrives across a function boundary, produced in a different function than the
+one matching on it"* is **not supported**. `v97 def=Param(block42, 0)` is a
+block parameter within `funcid61`; its producers are that block's predecessor
+edges, which may well be in the same function. Recorded because the wrong
+mechanism was in the thread and read as established.
+
 ## Acceptance criteria
 
 - **AC-1 (the witness, and it gates everything else).** The check is
