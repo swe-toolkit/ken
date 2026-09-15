@@ -1,7 +1,7 @@
 ---
 id: RT-DISCHARGE-ARM-SUBSTITUTES-PLAN-FOR-OBSERVATION
 title: "Arm 1 of the constructor-identity discharge substitutes a PLANNED identity plus realization for an OBSERVED constructor identity at the returned word. It never consults `body.authorities` at any point -- its whole discharge condition is membership of the returned word in `realized_call_words`, and `independent_contract` is `emission.row.k_ret_identity()`, a planned value off the emission row. The plan is compared against the demand, the word is checked to be initialized, and NOTHING checks what the word actually holds. The two live symptoms are the two exits of this one rule, and ONE OF THEM IS THE GATE WORKING: repairing the emission refusal toward green converts a loud refusal into a silent miscompile. The closure makes the tree REDDER, and that red population is the deliverable."
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -174,6 +174,32 @@ demand. **Realization stays necessary and stops being sufficient.**
 The deliverable is a **census**: how many, and which, hand-offs carry no
 constructor authority. Report it as a population with identities, not as a pass
 or fail.
+
+### D0 carries ONE added print, and it rides this rebuild — not a separate one
+
+**Add `body.independent_contract` as a NINTH field of the details tuple at
+`:4587-4625`, in the same build.** Architect, `evt_3rp08wzfyqr1q`, overruling
+the Steward's *"do not add a print"*: *"not a separate build, not a census."*
+The marginal cost is one field, because `D0` rebuilds `units.rs` anyway.
+
+One field settles three questions at once, and each of them otherwise costs a
+sampling campaign:
+
+1. **Which arm ran** — for the whole population, structurally, rather than by
+   classifying more shard logs one at a time. Case (c) cannot answer this
+   (both arms produce it); `independent_contract` can.
+2. **Whether `RT-DISCHARGE-EXCLUDE-OR-REFUSE-BACKSTOP` has its witness.** That
+   node's `D0` is a conjunction whose second half is *"a body that REACHES THE
+   PROOF PATH AT ALL"* — arm 2. This field says so directly. That node has been
+   stalled for want of exactly this and is not to be given a separate hunt.
+3. **Whether the keying defect is arm-correlated**, which is what sizes `D1`.
+
+**Verify no content-addressed arena shift, cheaply**: read one known identity
+constant before and after the change. This is a `backend_module(format!(...))`
+error path rather than an interned trap message, so a shift is not expected —
+but the fleet has already been bitten once by a diagnostic string reindexing an
+arena and turning a true 402 into a measured 0. **Expected-no-shift is not
+measured-no-shift.**
 
 > **THIS INCREMENT MAKES THE TREE REDDER AND THAT IS THE POINT.** Cause 1's
 > population converts from compile-and-trap into refuse-at-emission, so the
@@ -406,19 +432,44 @@ identities of one body. That is a reachability question about the ledger's
 purpose, not about what arm 1 consults. It supplies this node with evidence
 (above) and takes none from it.
 
-## Why `draft` and not released
+## RELEASED 2026-09-15 21:30. The hold is discharged.
 
-**The `rt_parity` discriminator decides this node's population**, and
-runtime-implementer is running it now. Releasing before it lands invites the
-ring to fold six checks in on a signature match, which is the one thing the
-Architect fenced.
+**The release condition this node set was:** *"the discriminator result is
+posted. Nothing else gates it — `D0` does not depend on that read, only its
+scope does."*
 
-**Release condition:** the discriminator result is posted. Nothing else gates
-it — `D0` does not depend on that read, only its scope does — so this is a short
-hold, not a queue.
+**It is posted.** The lieutenant read all six `rt_parity_native` shards
+(`evt_2cedrpvwyyv70`): five carry `funcid58`/`funcid56` only, one additionally
+carries `funcid55`. The scope that read decides is recorded above — (c1) folds,
+(c2) is unattached.
 
-The ring is not idle behind this: the discriminator is the implementer's task,
-and it is the input.
+> ### THE HOLD HAD BECOME CIRCULAR, AND THAT IS WHY THIS SAYS 21:30 RATHER THAN 20:55.
+>
+> The `independent_contract` ninth field is to be added **inside `D0`'s
+> rebuild** — the Architect's words were *"not a separate build, not a census"*,
+> on the stated ground that **`D0` already rebuilds `units.rs` with the closure
+> applied.** That is true once `D0` is running, and `D0` is this node's first
+> deliverable.
+>
+>     node release   waits on  the print
+>     the print      waits on  D0's rebuild
+>     D0             waits on  node release
+>
+> **All three legs were individually correct.** The Architect assumed `D0` was
+> scheduled; it could not be, because the node holding it was unreleased — and
+> the Steward was holding it for a measurement that `D0` was supposed to
+> produce. The tell was five seats reading **identical ctx across a 30-minute
+> interval** with work owed: not one stalled seat, a ring with no actionable
+> next step.
+>
+> ⇒ **The conflation was mine: "the discriminator answered" is not "the
+> population is fully classified."** The node's own condition asked for the
+> first. I held for the second, which `D0` exists to deliver. **A release
+> condition is discharged by the event it names, not by the certainty the
+> author wishes it had bought.**
+
+`funcid55` remains **UNATTACHED** — that is a recorded state of the population,
+not an unmet release condition. `D0` settles it.
 
 ## Contention
 
