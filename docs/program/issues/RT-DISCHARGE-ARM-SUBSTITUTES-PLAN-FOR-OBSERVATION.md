@@ -235,25 +235,52 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  two facts and one number; do not let this population enter D1
                  as a zero.
 
-### D1 MUST TEST THE CORRELATION BEFORE IT PATCHES ANYTHING
+### D1 MUST FIRST ASK WHETHER THE SPLIT IS A ROUTE SPLIT
 
 **The two words are where the symptom surfaces, not necessarily where the cause
-lives.** Across all 17 census entries, the property arm 1 keys on and the
-property that predicts an empty table are perfectly correlated: every body
-carrying an `independent_contract` has `authorities = 0`, every body without one
-has 593. **If that correlation is causal rather than coincidental, the defect is
-not missing authority at `v1751`/`v1386` — it is that the authority-production
-path does not run for independent-contract bodies**, and the repair is a
-structural closure there rather than a fix at two words.
+lives.** Across all 17 census entries the arm taken and the authority count are
+perfectly correlated: every arm-1 entry has `authorities = 0`, every arm-2 entry
+has 593.
 
-⇒ **D1 establishes which before it repairs.** A two-word patch that leaves a
-causal production gap in place closes the symptom this census found and none of
-the population it did not.
+**`independent_contract` is a ROUTE TAG, not a data-dependent property of a
+body.** It is set at exactly three staging sites, and its presence is decided by
+the site:
 
-**The correlation is EMPIRICAL, not structural.** Nothing in the code forces it:
-arm 1's condition is `independent_contract == Some(identity)` and mentions
-`authorities` nowhere. It is 17 for 17 on three programs of one family, which is
-why D1 tests it rather than assuming it.
+    :6971  Response(StaticResponseOwnerId)             Some(k_ret_identity())
+    :7586  Continuation(ContinuationSpecializationId)  None
+    :8286  Context(ContinuationContextId)              None
+
+`k_ret_identity()` returns `ConstructorIdentity`, not an `Option`, and `:6978`
+wraps it `Some(...)` unconditionally. So `independent_contract.is_some()` holds
+**exactly** when `unit` is `Response`.
+
+⇒ The likeliest explanation of the bimodality is therefore not a subtle causal
+correlation but a **route split**: the 12 arm-1 entries are Response-route
+bodies, and the 5 arm-2 entries may simply be Continuation/Context bodies whose
+authority production runs elsewhere. **If so the finding is that the
+authority-production path does not run on the RESPONSE-OWNER ROUTE** — a
+locatable structural claim rather than a correlation to be tested.
+
+⇒ **D1 answers this by reading one field it already has.** Every staged body
+carries `unit: ExistingResultUnitIdentity` at `:2726`. Print its variant beside
+the ninth field and re-read the same census: no new experiment, no new run.
+
+    all 5 arm-2 entries Continuation/Context   the split IS a route split; scope
+                                               D1 at the Response staging path,
+                                               not at two words
+    any arm-2 entry a Response body            NOT purely route -- that body
+                                               carries an independent_contract
+                                               and took arm 2 on a differing
+                                               identity, so the equality in the
+                                               arm condition is doing real work
+
+**ARM 1 IS AN EQUALITY, NOT A PRESENCE TEST.** At `:4474` the condition is
+`body.independent_contract == Some(identity)`. Arm 2 is its negation and covers
+two distinct populations: `None` (Continuation/Context), and `Some(other)` — a
+Response body whose `k_ret_identity()` differs from the demanded identity.
+**Do not restate the census as "bodies carrying an `independent_contract` have
+no authorities."** That is strictly stronger than what was measured, and the
+`Some(other)` case would falsify it while leaving every measured number intact.
 
 ### The census D1 is sized from
 
