@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-15 03:53:33Z — from 623 issue file(s) in `docs/program/issues/`.
+2026-09-15 04:03:27Z — from 624 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -139,6 +139,7 @@ the committed file matches the generator's output.
 | `CONF-STALE-RED-DISPOSITIONS` | Eleven conformance sites assert RED-UNTIL-BUILT or BLOCKED-ON against producers that have already landed -- the mirror of the unproducible-fixture defect, and it makes finished work read as outstanding | merged | spec-enclave | M | none | — |
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE | merged | spec-enclave | S | none | — |
+| `CONFORMANCE-DISCHARGE-HAS-NO-MECHANISM` | Discharging a conformance seed case has never once been performed in this repo, and three independent facts say so: the `conformance suite` CI job is a placeholder that echoes a string and is structurally incapable of failing, the two D5a seed rows that the seed document says lift on the D1 candidate still read BLOCKED-ON-ABI-S6-D5a four days after D5a landed, and nothing anywhere reads the 85-file corpus. ABI-S6 D5b carries DISCHARGE the MAP_PRIVATE COW seed case as half its stated objective, so D5b has an acceptance criterion that no seat can satisfy or falsify. | draft | spec | M | none | — |
 | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` | Every postulate audit label is a canonical artifact-identity input: decide whether a semantic hash should encode label prose, and if not, migrate | draft | language | L | none | — |
 | `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make both checker surfaces' own domain honest: derive and validate world/object sorts and binder scope in check_tree and in the Ken checker, fail-closed, instead of relying on every caller to pass embed's image | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/3041 |
 | `DOC-AGENT-CITE` | agent core modules name normative authorities as a reading list rather than binding them to claim classes, so seven of seven cold runs made material claims without citing the sources D2 requires | merged | doc | M | none | — |
