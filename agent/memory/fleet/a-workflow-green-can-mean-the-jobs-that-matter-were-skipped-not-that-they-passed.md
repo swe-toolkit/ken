@@ -29,20 +29,45 @@ had a real base (`px8f_write_partition`: passes on main, fails on the
 candidate), and because it was the only one carrying evidence it was mistaken
 for the whole story — a **selection effect**, not a diagnosis.
 
-**The green was produced by the jobs not running.** A path-classification step
-(`classify changed paths`) gates the expensive matrices, so a docs-only or
-`agent/`-only commit greens the whole workflow without compiling a line of the
-native suite. Nothing is broken; the run is behaving as designed. What is
-broken is reading its conclusion as information about the suite.
+**The green was produced by the jobs not running, and the mechanism is
+deliberate.** Verified at `origin/main`: nine jobs carry
+`if: needs.classify-paths.outputs.mode == 'full'`, and `classify-paths` runs
+`scripts/ci-doc-only.py`, which returns `doc-only` when every changed path is
+under `docs/`, `agent/` or `library/` and outside the deny list (`crates/`,
+`spec/`, `catalog/`, `conformance/`, `.github/`, `scripts/`,
+`docs/program/evidence/`). The roll-up even codifies it — `ci.yml:504` passes a
+`skipped` result **on purpose** when the mode is `doc-only`.
+
+⇒ **The filter is not a bug and must not be "fixed".** Its logic is sound: a
+doc-only push cannot break `crates/`, and removing it pays full native cost on
+every documentation commit. **The entire defect is in what gets read off the
+result.** "Main is green" is heard as *the suite passes*; it means only
+*nothing this push could break, broke*.
+
+**The remedy is therefore additive, not a repair: a scheduled full run on
+`main`.** That manufactures the standing base measurement, leaves the PR-side
+cost optimization intact, and is the cheapest thing that makes a red candidate
+classifiable at all.
+
+**THE DOC TRACK IS A GENERATOR OF UNINFORMATIVE GREENS.** It runs concurrently
+by standing operator exception *precisely because* it touches `agent/` and
+`library/` rather than `crates/` — which is exactly the condition that
+classifies `doc-only`. So every doc-track publish adds another green run with
+the native suite skipped, and it has been running all week. **This very lesson
+is `agent/`-only and lands the same way**: the artifact recording the invisible
+suite is published through the mechanism that makes it invisible.
 
 ## The tells, in the order they are cheap
 
 - **A job conclusion of `skipped` is not a pass.** `gh pr checks` and the run
   summary present a skipped required job indistinguishably from a passing one
   at the run level; only the per-job conclusion separates them.
-- **An unexpanded matrix is visible in the NAME.** A job still literally called
-  `test shard ${{ matrix.shard }}/8` never ran — a real one is named
-  `test shard 3/8`. This is the fastest signal in the whole listing.
+- **A literal `${{ matrix.shard }}` in a job name means that job never ran.** A
+  job reported as `test shard ${{ matrix.shard }}/8` was skipped; a real one is
+  named `test shard 3/8`. This is the fastest signal in the whole listing.
+  **It is a symptom, not a defect** — the matrix is well-formed
+  (`shard: [1,2,3,4,5,6,7,8]`); GitHub simply reports a skipped matrix job with
+  its name template unsubstituted, because nothing ran to substitute it.
 - **A roll-up check is not the thing it is named after.** `build + test` here
   has one step, `All test jobs passed`, and finishes in 3 seconds. It is a
   downstream aggregator; its failure carries no independent cause, and its
