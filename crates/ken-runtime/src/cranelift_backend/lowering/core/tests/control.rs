@@ -3888,12 +3888,36 @@ fn production_occurrences(source: &str, needle: &str) -> usize {
             continue;
         }
         if pending_test_item {
-            pending_test_item = false;
-            if line.contains('{') {
-                skip_depth =
-                    line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            // ⛔ The marked item's head MAY SPAN SEVERAL LINES, so the opening
+            // brace is not necessarily on the line the head starts on. An
+            // earlier form cleared the mark at the head and armed the skip only
+            // when that one line contained a `{`, which meant a `#[cfg(test)]`
+            // item written as
+            //
+            //     #[cfg(test)]
+            //     fn harness(
+            //     module: &mut M,
+            //     ) {
+            //
+            // had its whole body counted as production surface -- the exact
+            // miscount this function exists to end, reintroduced by the repair
+            // for it. (Found in review; no rostered file exhibits the shape
+            // today, so it corrected no current number. It would have been
+            // silent when one did.)
+            //
+            // So the mark is held until the item is RESOLVED: the first `{`
+            // opens the body and arms the skip, and a `;` reached first means a
+            // declaration with no body. Head lines are never production.
+            let opens = line.matches('{').count() as i32;
+            if opens > 0 {
+                pending_test_item = false;
+                skip_depth = opens - line.matches('}').count() as i32;
                 continue;
             }
+            if line.trim_end().ends_with(';') {
+                pending_test_item = false;
+            }
+            continue;
         }
         production.push_str(line);
         production.push('\n');
