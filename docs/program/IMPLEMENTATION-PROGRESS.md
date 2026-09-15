@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-15 01:31:08Z — from 615 issue file(s) in `docs/program/issues/`.
+2026-09-15 01:40:10Z — from 616 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -507,6 +507,7 @@ the committed file matches the generator's output.
 | `RT-MATCH-SCRUTINEE-PORT` | NOT A PORT -- excluding MatchScrutineeRecursor is behaviour-preserving across all five quotient rows, measured differentially in both directions, so no capability is at stake and no mechanism is owed; the variant is routing-load-bearing and capability-inert | closed | runtime | L | none | — |
 | `RT-MATERIALIZED-DEAD-JOIN-RECONCILE` | Reconcile the materialized-but-dead source-join disagreement as a CLASS over StaticOriginId(288) AND (301) (8 entries in RT_PARITY_SOURCE) -- a join dead-classified yet still reachable at final validation is a genuine disagreement between two reachability views, so determine which view is stale (the pre-existing dead disposition is false and the origin is actually reachable, OR the CFG retained a live edge that should have been eliminated -- predecessor removed, successor PHIs repaired) and correct THAT side, never a blind drop of either. validate_materialized_dead_join_cfg stays byte-untouched -- it is the correct fail-closed boundary that CAUGHT this; the fix is on the producing side. Bounded by RT-COLD-LOWERING-PATH-ENUMERATION report 1 (Architect ruling evt_r3tt1gpv4tkn point 2 + sharpened evt_4ag90qfacmgwy: this is a class over both origins, not an instance). | closed | runtime | M | none | — |
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
+| `RT-MUTATION-ARM-CONTROL-COVERAGE` | The backend's refusal-mutation corpus is 410 non-Exact arms across 76 enums, and we do not know how many drive a live control. An arm no control drives is a mutation the suite cannot detect -- it produces no signal at either end, so every base-vs-tip diff of outcomes is structurally blind to exactly it. | draft | runtime | M | none | — |
 | `RT-NATIVE-CARRIED-VALUE` | Native carried-value / higher-order boundary lowering — the capability program that closes PX8's native full-program half, structured as two tracks over ONE open representation decision | closed | runtime | L | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NATIVE-READEOF-WITNESS-FOLD` | Two-quarter native carried-value fold: un-ignore the ReadEof full-program row via a new zero-TCB rt_cap41 executing native-closure witness, and confirm the already-green SemanticErrorV1 (InvalidOffset) row stays rearmed. Honest progress toward RT-NATIVE-CARRIED-VALUE's four-value PX8 closure; Wrote and ReadSome remain #[ignore]d under the composed-return arc and this node does NOT close the parent. | merged | runtime | S | none | — |
