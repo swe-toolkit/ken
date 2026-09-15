@@ -106,10 +106,17 @@ commit bodies, and treat any self-declared unreadiness as a claim you must
 resolve against the tip before routing.**
 
 ```sh
-git log --format='%h|%s' <BASE>..<SHA> \
-  --grep='not merge-ready' --grep='not merge ready' --grep='WIP' \
-  --grep='do not merge' --grep='do not build on' -i
+git log --format='%h|%s' <BASE>..<SHA> -i \
+  --grep='not merge-ready' --grep='not merge ready' \
+  --grep='do not build on' --grep='do not merge'
 ```
+
+**Do NOT add `--grep='WIP'` to that command.** It is the obvious term and it is
+the wrong field. See the measurement below.
+
+The predicate is a **self-assessment of merge-readiness in the negative**, not a
+progress label. `WIP` says *"this is a checkpoint"*; `not merge-ready` says
+*"this must not ship"*. Only the second is a claim you can resolve.
 
 **A WIP marker on an intermediate commit is NOT by itself a defect, and you
 must not treat it as one.** The publisher squashes, so the arc collapses to one
@@ -121,6 +128,33 @@ description of the candidate, wearing a historical commit's clothes.
 
 So the check is one question per hit, not a veto: *is the thing this commit
 says is unfinished, finished now?* Most answers are yes and cost a sentence.
+
+> #### The noise and the signal are in DIFFERENT FIELDS. Measured, 2026-09-15.
+>
+> This step shipped with `--grep='WIP'` in it and that was wrong. Corrected
+> after the Architect censused the disqualifying predicate over 2000 commits of
+> `origin/main` (`evt_2ptnm0dyjx4kw`) and I re-ran both forms on the arc:
+>
+>     with    --grep='WIP'      11 hits
+>     without --grep='WIP'       2 hits   <- a8430a8c2 and 2b8e2ba41
+>     `WIP` in the SUBJECT line  9
+>
+> **Nine of the eleven were subject-line progress labels, and the true positive
+> was not one of them.** `a8430a8c2`'s subject is confident — *"ABI-S6 HS18:
+> certify generated Result path cuts"* — and the admission is the last sentence
+> of a dense body. So the `WIP` term contributes only noise here, and a reviewer
+> facing eleven hits of which nine are plainly ordinary would rationally dismiss
+> the list, taking the true positive with it. **A check whose false-positive rate
+> teaches you to skim it is worse than no check**, because it also supplies an
+> alibi.
+>
+> The narrow predicate is also cheap to trust: the same 2000-commit census found
+> **zero prior instances** of a self-declared not-merge-ready commit landing.
+> Five of its six historical hits are the operator's own merge-on-green
+> boilerplate in the opposite polarity (*"if CI reds, report it, do not merge
+> past"*) — hence the deliberate absence of a `merge past` term — and the sixth
+> refers to a *different* commit as do-not-merge. This is a rare, cleanly
+> greppable marker, which is what makes it a gate rather than a reform.
 
 > #### Measured 2026-09-15, and it is why this step exists
 >
