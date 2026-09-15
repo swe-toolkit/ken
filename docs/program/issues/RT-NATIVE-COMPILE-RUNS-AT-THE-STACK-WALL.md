@@ -1,6 +1,6 @@
 ---
 id: RT-NATIVE-COMPILE-RUNS-AT-THE-STACK-WALL
-title: "IN A DEBUG BUILD the native compile's stack budget is spent BEFORE lowering begins -- a compile that rejects before native lowering needs (1920, 1952] of 2048 KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity, so lowering is a rounding error on a fixed prefix every compile pays. D4 measured that same row at (320, 352] in RELEASE, and no gate anywhere builds release: zero --release in ci.yml, build-ci-base.yml and scripts/ken-cargo. So the recurrence is CI's rather than the compiler's. Stated the way the decision needs it and with no midpoint invented: ON THE 2048 KiB TEST THREAD, DEBUG HAS ROOM FOR EXACTLY ONE MORE 64 KiB PRELUDE ADDITION AND NOT TWO (headroom is [96, 128) KiB) while release has room for at least 26 -- and neither row describes the product, which carries a stated 4 MiB minimum. THE REMEDY IS PROPAGATION, NOT MEASUREMENT: the two profiled numbers and that 4 MiB requirement have been in elab.rs:1347 for a month, correctly stated and carefully qualified, in a comment no gate reads and the 30 stack_size sites do not honour. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
+title: "IN A DEBUG BUILD the native compile's stack budget is spent BEFORE lowering begins -- a compile that rejects before native lowering needs (1920, 1952] of 2048 KiB and one that lowers, emits and executes needs (1920, 1984], a difference inside the brackets' own granularity, so lowering is a rounding error on a fixed prefix every compile pays. D4 measured that same row at (320, 352] in RELEASE, and no gate anywhere builds release: zero --release in ci.yml, build-ci-base.yml and scripts/ken-cargo. So the recurrence is CI's rather than the compiler's. Stated the way the decision needs it and with no midpoint invented: ON THE 2048 KiB TEST THREAD, DEBUG HAS ROOM FOR EXACTLY ONE MORE 64 KiB PRELUDE ADDITION AND NOT TWO (headroom is [96, 128) KiB) while release has room for at least 26 -- and NEITHER row describes the product, which carries a stated 4 MiB minimum and on that configuration has room for at least 58. THE REMEDY IS PROPAGATION, NOT MEASUREMENT: the two profiled numbers and that 4 MiB requirement have been in elab.rs:1347 for a month, correctly stated and carefully qualified, in a comment no gate reads and the 30 stack_size sites do not honour. THIRD measured instance; LANG-PRELUDE-ELABORATION-DEPTH named this candidate a month ago and is merged."
 status: draft
 owner: runtime
 size: M
@@ -132,6 +132,47 @@ in debug, and it does not.** So the obvious explanation covers one half and
 fails on the other. The honest statement is that two release figures differ by
 15-25% and nothing in the corpus reconciles them.
 
+**AND THE ASYMMETRY MAY INVERT: THE DEBUG AGREEMENT IS THE SUSPECT ONE.**
+Architect, `evt_evwnx38tea7h`. **A debug figure obtained on a 2 MiB thread is at
+most 2048 by construction -- a program needing more does not report a number, it
+aborts.** Both debug figures sit in the narrow band under that ceiling and
+*could not* have come back higher and still been figures; the release figures
+sit under ~1700 KiB of slack with no ceiling near them, and are free to
+disagree. ⇒ **Agreement inside a range-restricted window is weaker evidence than
+disagreement outside one**, and this is the family of the libtest defect that
+cost this node its first claim: **a number that exists only when the thing fits
+is evidence about the ceiling before it is evidence about the subject.**
+
+**The premise is unstated and is itself checkable, so do not adopt this as
+settled either.** It holds for D4's bracket, whose search could not report above
+its own ceiling. **It holds for the month-old peak only if that peak was also
+taken on a 2 MiB-bounded run**, and the comment does not say how it was
+instrumented. **Establish that before treating the debug convergence as an
+artefact** -- the inversion is a live candidate, not a correction.
+
+**BOTH OBVIOUS EXPLANATIONS OF THE RELEASE GAP FAIL, WHICH IS WHY IT IS WORTH
+ONE PROBE:**
+
+    peak vs provisionable   debug   offset in (-16, 16]   no fixed offset and
+                            release offset in ( 40, 72]   no proportional one
+                                                          fits both
+
+    a month of growth       28 commits touched prelude.rs since 2ca91a3a,
+                            net +480 lines -- but MAX-not-SUM makes depth a max
+                            over the 177 registrations, so added declarations
+                            do not raise the peak unless one is deeper than
+                            register_decimal_char's 31-level cascade. And the
+                            frame-growth mechanism the comment names is
+                            explicitly an UNOPTIMIZED effect.
+                            => staleness explains DEBUG growth, not RELEASE
+                            growth -- the opposite of what is needed.
+
+**Neither model fits.** That makes the release gap a live question one number
+settles, not an embarrassment. It is `D5`. **The line delta above is arithmetic
+over commit counts, not a profile**, and under MAX-not-SUM a line delta is an
+especially weak proxy for depth -- which is the same reason it fails as an
+explanation.
+
 **A COINCIDENCE FLAGGED SO NOBODY READS IT AS EVIDENCE.** `1,982,464 B` is
 exactly `1936.0 KiB` -- the midpoint this node was corrected for inventing two
 commits ago. It happens to equal a real measured peak. **That is luck, and it is
@@ -226,7 +267,8 @@ candidate that triggered this arc was **64 KiB**:
   holds at every point of the bracket, and `128 > headroom` holds at every
   point because the headroom is strictly below 128. **Both halves are true over
   the whole interval -- no midpoint, no error bar.**
-- **Release absorbs at least 26 of them** (`1696 / 64`).
+- **Release on that same 2048 KiB test thread absorbs at least 26 of them**
+  (`1696 / 64`). **This is not the product figure** -- see below.
 
 ⇒ **The recurrence is CI's, not the compiler's**, and `37 §9`'s open queue of
 prelude additions is spent against the one, not the twenty-six. *"About 6% of
@@ -241,6 +283,11 @@ spawned-thread default *"must not be treated as adequate -- it is
 (#2144), not a safe answer."* **So "the product has room for 26 more" is a
 statement about release code on a 2 MiB thread, which is not the configuration
 the product is specified to run in.** Read the table as CI-side only.
+
+**The product figure, computed in the product's own configuration:** release
+code on the stated 4 MiB minimum leaves headroom `[3744, 3776)` KiB, **at least
+58 more 64 KiB additions** -- not 26. The `26` was computed against 2048, the CI
+test thread, and attached to a product claim.
 
 **`1936` and `336` appeared here in the routed version and were never measured
 -- they are the midpoints of the two brackets, and every percentage on those
@@ -452,6 +499,23 @@ have caught all three of the above.
   **Recorded in advance because an unexpected empty result and a predicted empty
   result get acted on completely differently** -- the first reads as "we did not
   look hard enough" and gets repeated, at cost, forever.
+- **D5. Re-measure the optimized peak at HEAD by `2ca91a3a`'s own method**, and
+  state how that method bounds the run, so the range-restriction question above
+  is answered rather than argued. Both outcomes are fixed in advance:
+
+      ~280 returned        the comment is CURRENT and the release gap is real;
+                           different-program / different-quantity is the
+                           remaining candidate.
+      ~320-352 returned    the comment went stale SILENTLY over a month with
+                           nothing red -- precisely what `prelude.rs`'s own doc
+                           comment predicts about in-code figures. **This turns
+                           the propagation finding from theoretical into
+                           demonstrated: the one release number in the tree
+                           would have decayed WHILE BEING CITED.**
+
+  **Does not gate the brief**, which holds under either outcome: *no gate builds
+  release* and *the requirement is stated where nothing enforces it* are
+  untouched by it.
 - **D4. Separate the build profile. RUN THIS FIRST.** Re-bracket
   `nondecreasing_cycle_is_rejected_before_native_lowering` in release against
   its debug bracket, both readings pre-committed above. Last in the list and
