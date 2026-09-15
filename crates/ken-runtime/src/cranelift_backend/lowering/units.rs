@@ -9783,7 +9783,11 @@ impl ContinuationCandidateLedger {
             ));
         }
         for identity in &self.immediate_bridge_candidates {
-            if self.settled.get(identity) != Some(&CandidateDisposition::InlineNoCall) {
+            if !matches!(
+                self.settled.get(identity),
+                Some(&CandidateDisposition::InlineNoCall)
+                    | Some(&CandidateDisposition::ComposedCall)
+            ) {
                 return Err(backend_module(format!(
                     "a reached immediate bridge did not settle its exact identity \
                      InlineNoCall: settled {:?} for {:?}; {} of {} bridge candidates \
