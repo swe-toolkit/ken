@@ -12,6 +12,50 @@ github: null
 origin: "Measured by runtime-implementer 2026-09-15 while diagnosing the class-1 SIGABRT on PR #3676 (evt_3c8a5tzt0ksmx, evt_1bk3sktcha9vr, evt_5xtnkrqadf69d, evt_1yh3m79r5wdjb). Architect ruled the shave-the-increment arm is not a coherent stopping point and named the base-bracket narrowing as the deciding measurement (evt_29ph3z4a7661t), then withdrew a minimal-compile probe when the screen's fourth row answered it better. Steward found the merged precedents and filed. Funding is an operator scope call and is NOT taken here."
 ---
 
+## SUSPENDED: THE FLOOR-SIDE EVIDENCE MAY BE VACUOUS. READ THIS FIRST.
+
+**Both floor rows carry `#[ignore]` at the probe base `1dec48f33`** -- verified
+by the Steward directly against that tree, and by the Architect against
+`origin/main` (`evt_3zr83trkqgt3h`):
+
+    px8l_recursive_decl_native.rs      #[ignore = "RT-BORROWED-INPUT-CARRIER-
+                                        DURABILITY: ... traps ..."]
+    px7m_hostresult_computational...   #[ignore = "RT-SITEOP-CARRIED-WITNESS
+                                        D2: ... refuses ..."]
+
+**Every heavy row is live `#[test]`. Seven rows, six files, zero exceptions: the
+ignored/live split predicts the cheap/expensive split exactly.**
+
+⇒ **If those rows never executed, every number on the floor side of this node is
+vacuous**, and with it the thirtyfold spread, the refutation of a shared
+component, and this node's central claim. On live rows only the lowest
+measurement is `rt_branched` at `>512 KiB` and everything else is `>1024` --
+which is the **uniform** picture, the opposite of what the body below argues.
+
+**The one measurement that settles it** is the harness `running N tests ... X
+passed; Y failed; Z ignored` summary from any floor probe. `Z` counting the
+floor row means it never ran.
+
+**Why this was not caught by the rule that should have caught it.** The
+implementer's own standard -- *"a floor measured on a compile that did not happen
+is worth nothing"* -- was applied to `dasm_c2` on `rc=101` and missed these,
+because **`rc=0` is one number covering two facts: ran and passed, and never
+ran.** The rule caught the row that failed loudly and missed the two that
+succeed silently. `dasm_c2` is the control that proves the mechanism: live,
+executed, real non-zero code -- and it was the one discarded.
+
+**Provenance of the error, recorded because it crossed three seats.** The
+Architect asserted the floor row was a verified real compile from a **call-path
+read**, not an execution check; the Steward inherited that word and filed it as
+a measurement without asking how execution had been established; the
+implementer's discounting rule could not see it. **One unexamined word, three
+seats.** It is the Architect's own D5b ruling of the same night -- *an inert
+instrument is green-vs-green in the limit* -- arriving on this node's evidence.
+
+**Until the harness line is read, treat everything below the next heading as
+UNDER CHALLENGE.** If the rows never ran, this node is rewritten rather than
+amended: a claim whose evidence is withdrawn should not be patched.
+
 ## The finding, measured
 
 **The compile's own stack requirement is ambient, unmeasured, and discovered
