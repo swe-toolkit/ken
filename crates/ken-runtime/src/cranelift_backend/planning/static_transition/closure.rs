@@ -2052,10 +2052,23 @@ impl<'src> StaticTransitionPlan<'src> {
         // under continuation mutations instead of masking it with a derivative
         // transport error.
         //
-        // HS10's bridge relation is validated first because response-plan
-        // re-derivation consumes it when deciding the owner-less subcase.
-        validate_immediate_bridge_realization_plan(self)?;
+        // ⛔ The bridge relation is validated AFTER the continuation plane,
+        // and the paragraph above is the whole argument -- it was written for
+        // transports and it governs this validator identically.
+        //
+        // `7d35118da` inserted this call ABOVE the continuation plane, with
+        // the note "HS10's bridge relation is validated first because
+        // response-plan re-derivation consumes it when deciding the
+        // owner-less subcase". Measured: it does not need to run first, and
+        // running first masked a refusal. `contspec_assigned_key_mutation_
+        // plans_an_edge_to_the_wrong_alternative` corrupts a specialization
+        // key and expects the closed-derivation refusal; the bridge validator
+        // reaches `continuation_calls()` first, whose pre-existing token/key
+        // law then answers for a mutation that is the continuation plane's to
+        // refuse. A layer in front of the law must not preempt the law's own
+        // refusals: it derives from them, it does not speak for them.
         validate_continuation_specialization_plan(self)?;
+        validate_immediate_bridge_realization_plan(self)?;
         validate_aggregate_ownership_plan(self, &self.aggregate_ownership)?;
         validate_checked_ih_environment_transports(self, &self.checked_ih_environment_transports)?;
         validate_checked_ih_continuation_inheritances(
