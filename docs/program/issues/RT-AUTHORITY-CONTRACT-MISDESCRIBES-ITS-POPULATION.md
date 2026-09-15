@@ -1,6 +1,6 @@
 ---
 id: RT-AUTHORITY-CONTRACT-MISDESCRIBES-ITS-POPULATION
-title: "generated_constructor_authorities ranges over EVERY carried constructor -- a user's Result::Ok acquires an authority exactly like a generated-context one -- but the field name, its doc comment, and the registrar's own error string all say generated-context. The doc comment is the artifact the entire exclude-or-refuse obligation derives from, so a faithful derivation from it transmits the misdescription with full authority. That is what happened."
+title: "generated_constructor_authorities is NOT restricted to generated-context constructors -- a user's Result::Ok acquires an authority exactly like a generated-context one -- but the field name, its doc comment, and the registrar's own error string all say generated-context. The doc comment is the artifact the entire exclude-or-refuse obligation derives from, so a faithful derivation from it transmits the misdescription with full authority. That is what happened. (This title said 'ranges over EVERY carried constructor' until the Architect measured both writers: exit_failure returns early and the other registrar is gated, so the universal is false at a measured site while the finding is untouched.)"
 status: ready
 owner: runtime
 size: S
@@ -35,9 +35,27 @@ static transition plan, and its only early return is the process `exit_failure`
 special case. **There is no generated-context gate between the entry and the
 registrar.**
 
-⇒ **`generated_constructor_authorities` ranges over every carried constructor.**
-A user's `Result::Ok` acquires an authority exactly as a generated-context one
-does.
+⇒ **`generated_constructor_authorities` is NOT restricted to generated-context
+constructors.** A user's `Result::Ok` acquires an authority exactly as a
+generated-context one does. That is the whole finding, and every deliverable
+below rests on it.
+
+**The population stated exactly, because the obvious stronger reading is false
+at a measured site.** It is *every carried constructor reaching the registrar
+through `transfer_constructor_operands`*, **minus** the `exit_failure` case
+carrying a single `Carried` argument — which returns early, above — **plus** the
+synthesized-identity constructors from the other registrar.
+
+**Do not restate this as "ranges over every carried constructor."** This node
+said exactly that until the Architect measured both writers and corrected it
+(`evt_2k1de0ch6d7qa`, sites at `b0a7c2945`). The universal is refuted by the
+early return that this node's own code quote shows three lines above it — the
+node stated its counterexample and then wrote the claim it refutes. Nothing in
+D0-D3 or AC-1/AC-2 needs the universal; they need only that the population is
+wider than generated-context and contains ordinary user constructors. **A
+criterion built on the universal would be falsifiable by a reader who checks
+it**, and would look like the premise collapsing when the argument never rested
+there.
 
 **The two writers do not share a population.** The other registrar
 (`calls.rs:1895`) is gated on `Lowered::Constructor { synthesized_identity:
@@ -107,14 +125,15 @@ from this prose rather than from the code.
 
 ## What this does to RT-DISCHARGE-EXCLUDE-OR-REFUSE-BACKSTOP
 
-**It changes that node's premise, and the node has not yet been amended for
-it.** The backstop node's D0 requires a witness carrying a "foreign identity" —
-a producer authority whose identity differs from the demanded one, evaluated at
-`:3424` against `body.authorities`, which is this map.
+**It changes that node's premise. FOLDED there as of `48de11fe5`** — it is item
+1 of that node's "HELD AGAINST THE NEXT TOUCH" section, carrying the corrected
+population statement above. The backstop node's D0 requires a witness carrying a
+"foreign identity" — a producer authority whose identity differs from the
+demanded one, evaluated at `:3424` against `body.authorities`, which is this map.
 
-If the map holds every carried constructor, **an ordinary user constructor
-whose identity simply is not the demanded one satisfies that predicate.** So
-D0's first conjunct admits benign instances.
+Because the map is **not restricted to generated-context constructors**, an
+ordinary user constructor whose identity simply is not the demanded one
+satisfies that predicate. So D0's first conjunct admits benign instances.
 
 That is the mirror of the empty-search problem already recorded against D0: an
 **empty** witness search would be misread as establishing no witness exists, and

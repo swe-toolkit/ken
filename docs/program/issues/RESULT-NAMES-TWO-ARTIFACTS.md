@@ -93,7 +93,7 @@ on. **Four times in this arc a name has not told us its population:**
 
     the contract's two `demanded` artifacts, eighteen lines apart
     `Result` naming ITREE-RESULT and USER-RESULT          (this node)
-    `generated_constructor_authorities` ranging over EVERY carried constructor
+    `generated_constructor_authorities` not restricted to generated-context
         (RT-AUTHORITY-CONTRACT-MISDESCRIBES-ITS-POPULATION)
     `PlannedTrapIdentity`, a dedup index keyed on trap value with no origin
         (RT-TRAP-IDENTITY)
