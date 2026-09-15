@@ -9789,15 +9789,18 @@ impl ContinuationCandidateLedger {
                     | Some(&CandidateDisposition::ComposedCall)
             ) {
                 return Err(backend_module(format!(
-                    "a reached immediate bridge did not settle its exact identity \
-                     InlineNoCall: settled {:?} for {:?}; {} of {} bridge candidates \
-                     settled InlineNoCall",
+                    "a reached immediate bridge settled neither InlineNoCall nor \
+                     ComposedCall: settled {:?} for {:?}; {} of {} bridge candidates \
+                     settled one of the two",
                     self.settled.get(identity),
                     identity,
                     self.immediate_bridge_candidates
                         .iter()
-                        .filter(|c| self.settled.get(*c)
-                            == Some(&CandidateDisposition::InlineNoCall))
+                        .filter(|c| matches!(
+                            self.settled.get(*c),
+                            Some(&CandidateDisposition::InlineNoCall)
+                                | Some(&CandidateDisposition::ComposedCall)
+                        ))
                         .count(),
                     self.immediate_bridge_candidates.len(),
                 )));
