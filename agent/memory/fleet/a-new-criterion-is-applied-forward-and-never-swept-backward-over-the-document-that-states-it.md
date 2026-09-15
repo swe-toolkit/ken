@@ -77,6 +77,25 @@ it indexed.
 - **Expect your own instance to be the one you miss.** If you have just caught a
   colleague violating a criterion you both agreed to, that is the cue to grep
   your own last artifact for it, not evidence that you are clear.
+- **A DOCUMENT WITH AN INDEX ROW IS TWO ARTIFACTS. Sweep both.** The fifth
+  instance was applied forward into this file's body and not into the
+  `README.md` row that states its count, so the corpus indexed *four* while the
+  body documented five — the same omission one level out. **`parity N files /
+  N rows` cannot see this**: it counts rows, never what they say, so a row can
+  go stale under a green parity check indefinitely. When you change a fact a
+  row asserts — a count, a population, a named mechanism — the row is part of
+  the containing document.
+- **A relayed number can silently overwrite a measurement you already own, and
+  it is not flagged because it does not arrive as a contradiction — it arrives
+  as AGREEMENT.** Recorded 2026-09-15: a reviewer had measured "eight jobs" at
+  source and written it into their own notes, then read a relayed "(9 gates)"
+  in a post they agreed with, wrote the nine over their own eight, and
+  published it back as review. The refuting population was on the same line —
+  eight line numbers labelled nine. **Before quoting someone's number back, ask
+  whether you have measured that quantity yourself, and if so diff the two.**
+  This is the sibling of *an explanation that fits is the thing that stops you
+  running the census*: an agreement that fits is what stops you re-reading your
+  own file.
 
 ## The specific arithmetic rule, because it recurs
 
