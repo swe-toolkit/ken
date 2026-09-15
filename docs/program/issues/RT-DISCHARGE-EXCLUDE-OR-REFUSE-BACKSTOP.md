@@ -1,6 +1,6 @@
 ---
 id: RT-DISCHARGE-EXCLUDE-OR-REFUSE-BACKSTOP
-title: "The discharge path DETECTS a foreign producer identity and then silently discards the proof instead of refusing: the loop over proof.sources clears grounds and breaks at four sites, and an empty grounds falls through to `continue`, collapsing 'I could not prove this' into 'there is nothing here'. The arc's own contract forbids exactly that. It may NOT land without a witness that makes the check fire -- until then it is a documented invariant, not a check."
+title: "The discharge path DETECTS a foreign producer identity and then silently discards the proof instead of refusing. Four clear-and-break arms funnel into ONE sink -- `if grounds.is_empty() { continue; }` -- which cannot distinguish its four inputs, so 'I could not establish a ground' is indistinguishable from 'no ground was needed'. The repair belongs at the sink: fixing the foreign-identity arm alone relocates the fail-open rather than closing it. The arc's own contract forbids exactly this. It may NOT land without a witness that makes the check fire -- until then it is a documented invariant, not a check."
 status: draft
 owner: runtime
 size: M
@@ -9,7 +9,7 @@ tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Ruled out of the ABI-S6 D5b candidate by the Architect at evt_2ctrn25j8fe39 (2026-09-15) after runtime-implementer measured the repair inert on px8f (evt_6zww772af95c4). The Architect had ruled it the floor and riding the candidate at evt_2ptnm0dyjx4kw; the warrant was that it repairs the failure there, and that was refuted by measurement. Steward-filed per COORDINATION section 2. AMENDED 2026-09-15 after the Architect reported two coordinate/AC defects (evt_7wsf1z27e679a) and the Steward's verification of them found a third, which refutes the mechanism the first filing asserted. AMENDED AGAIN the same night: the Architect ruled the filter question the Steward routed back (evt_5ey9ngwwf0dz8) -- the filter is not a fail-open and :3429 is a dead arm -- and runtime-implementer answered the Steward's open question by measuring that the discharge seat covers two bodies while six functions emit the trap (evt_6k9xx4trry0hc), which makes D0 a conjunction."
+origin: "Ruled out of the ABI-S6 D5b candidate by the Architect at evt_2ctrn25j8fe39 (2026-09-15) after runtime-implementer measured the repair inert on px8f (evt_6zww772af95c4). The Architect had ruled it the floor and riding the candidate at evt_2ptnm0dyjx4kw; the warrant was that it repairs the failure there, and that was refuted by measurement. Steward-filed per COORDINATION section 2. AMENDED 2026-09-15 after the Architect reported two coordinate/AC defects (evt_7wsf1z27e679a) and the Steward's verification of them found a third, which refutes the mechanism the first filing asserted. AMENDED AGAIN the same night: the Architect ruled the filter question the Steward routed back (evt_5ey9ngwwf0dz8) -- the filter is not a fail-open and :3429 is a dead arm -- and runtime-implementer answered the Steward's open question by measuring that the discharge seat covers two bodies while six functions emit the trap (evt_6k9xx4trry0hc), which makes D0 a conjunction. AMENDED a third time: the Architect examined the two arms the Steward had marked unexamined (evt_1ka2n674qja4m) and established that all four arms share one sink, moving the repair target off the arm and onto the sink -- fixing the foreign-identity arm alone would relocate the fail-open rather than close it."
 ---
 
 > # FILED 2026-09-15 AS `draft`, DELIBERATELY NOT RELEASED.
@@ -61,20 +61,57 @@ True of the code independently of any particular program. All coordinates at
 keeping only `authority.identity == identity`, so foreign-identity producers
 are absent from it.
 
-**The loop.** Over `proof.sources` (`:3422` onward), each source reaches one of
-**four** `grounds.clear(); break;` sites — `:3425`, `:3429`, `:3437`, `:3445`.
-They are not one site and they do not have one cause:
+**The loop, and the sink every arm funnels into.** Over `proof.sources`, each
+source reaches one of **four** `grounds.clear(); break;` arms, and all four land
+on **one** exhaustion test. Verified line-by-line at `b0a7c2945`:
 
-    :3425   authority.identity != identity || authority.word != *source
-            -- the foreign identity, read from the UNFILTERED body.authorities
-            -- THIS IS THE NODE'S SUBJECT
-    :3429   authority_grounds.get(source) returned None
-            -- RULED DEAD (derived, not yet measured; see the filter ruling below)
-    :3437   value_def of a proof-call seed is not a Result       -- unexamined
-    :3445   source is neither an authority nor a proof-call seed -- unexamined
+    3421  for source in &proof.sources {
+    3423    if let Some(authority) = body.authorities.get(source) {
+    3424      if authority.identity != identity || authority.word != *source {
+    3425        grounds.clear(); break;     ARM 1 -- foreign identity, read from the
+                                           UNFILTERED map. THE LIVE FAIL-OPEN.
+    3428      let Some(ground) = authority_grounds.get(source) else {
+    3429        grounds.clear(); break;     ARM 2 -- DEAD (ruled; derived)
+    3433    } else if proof_call_seeds.get(source) == Some(&identity) {
+    3434      let ValueDef::Result(producer, _) = body.func.dfg.value_def(*source)
+    3436      else {
+    3437        grounds.clear(); break;     ARM 3 -- a MATCHING call seed whose value
+                                           is not an instruction result
+    3444    } else {
+    3445      grounds.clear(); break;       ARM 4 -- no recognised provenance at all
+    3448  }
+    3449  if grounds.is_empty() { continue; }        <-- THE SINK
 
-**Then the drop.** After the loop, `if grounds.is_empty() { continue; }` — the
-tag query yields no carrier fact and the next one is tried.
+## THE DEFECT IS AT THE SINK, NOT AT THE ARM. REPAIRING ARM 1 ALONE MOVES IT.
+
+**Arms 3 and 4 are silent discards of exactly Arm 1's class.** Arm 3 fires when
+a matching call seed's value is not defined by an instruction result — a block
+parameter being the obvious candidate, which is what a carrier value becomes
+when it crosses a branch. Arm 4 fires when the source has no recognised
+provenance at all. **Neither is a proof that nothing is there.** Both are *"I
+could not establish a ground"*, discarded without a word.
+
+So the outcome-collapse is **not a property of `:3424`. It is a property of the
+loop's exit discipline.** Four different reasons for not having a ground produce
+one observable, and that observable is identical to *"no ground was needed"*.
+
+⇒ **Fixing Arm 1 alone relocates the fail-open; it does not close it.** A source
+that would have been refused at Arm 1 can reach Arm 4 instead and be discarded
+just as silently. The three outcomes must be distinguished **at the sink** —
+where `grounds.is_empty()` is consumed — after which each arm either supplies a
+reason or is shown unreachable. That is a smaller change than four separate
+repairs and it is the only shape that cannot leave a hole.
+
+This is the arc's own standing line applied to the ruling that created this
+node: **a partial widening relocates a refusal rather than closing it.**
+
+**The bound, stated with the claim.** That Arm 3 or Arm 4 ever *fires* is **not
+measured** — the block-parameter reading of Arm 3 is derived from what
+`value_def` can return, not traced to a program that produces one. The claim
+that does not need a measurement is structural: **all four arms share one sink,
+and the sink cannot distinguish its four inputs.** That holds whether or not any
+given arm is reachable, and it is what makes the sink the right target.
+(Architect, `evt_1ka2n674qja4m`; structure Steward-verified at `b0a7c2945`.)
 
 Together these collapse two different facts: *"I could not prove this"* and
 *"I proved there is nothing here."* The site must distinguish three outcomes,
@@ -243,21 +280,28 @@ where it was correctly applied already.
   (Architect, `evt_7wsf1z27e679a`. Whether such a program is constructible is
   open, and is the same search as D0's — this may cost nothing beyond an AC
   recording that.)
-- **AC-4.** The three outcomes are distinguished at the site, and the
-  distinction is stated in prose there — a reader who meets `grounds.clear()`
-  later must find the reason it is no longer sufficient. **All four
-  clear-and-break sites are in scope**; state which of them the repair changes
-  and which it deliberately leaves, with the reason.
+- **AC-4 (THE REPAIR TARGETS THE SINK).** The three outcomes are distinguished
+  **where `grounds.is_empty()` is consumed**, not per-arm, and the distinction
+  is stated in prose there — a reader who meets `grounds.clear()` later must
+  find the reason it is no longer sufficient. **A repair that only changes Arm 1
+  does not satisfy this AC**, because a source refused at Arm 1 can reach Arm 4
+  and be discarded just as silently.
 
-  Two are already settled and must not be re-litigated: **`:3425` is the
-  subject** (detect-then-discard), and **`:3429` is ruled dead** by the census
-  above. `:3437` and `:3445` are unexamined — do not assume they pattern with
-  either.
-- **AC-4a (cheap, and it converts a derivation into a measurement).** Confirm
-  at runtime that **`:3429` never fires** across both staged bodies. The
-  standing instrumentation already reaches it. If it *does* fire, the census
-  derivation is wrong and the ruling above reopens — say so loudly rather than
-  quietly repairing it.
+  Then, and only then, each of the four arms **either supplies a reason into
+  the sink or is shown unreachable.** Their standing is: **Arm 2 (`:3429`)
+  dead** by the census below (derived, see AC-4a); **Arms 1, 3 and 4 live**, and
+  they share the sink. They are not one settled, one dead, and two unknown —
+  that framing is superseded.
+- **AC-4a (cheap, and it converts three derivations into measurements).**
+  Confirm at runtime, across both staged bodies, which of the arms fire. The
+  standing instrumentation already reaches all of them, so Arms 3 and 4 come
+  for free alongside the `:3429` check.
+  - If **`:3429` fires**, the census derivation is wrong and the filter ruling
+    below reopens — say so loudly rather than quietly repairing it.
+  - If **Arm 3 or Arm 4 fires**, that is a measured second fail-open of Arm 1's
+    class, and it is the direct evidence that the sink was the right target.
+  - If **neither fires**, say so: the sink repair still stands on the structural
+    argument, and *"unreached in this compile"* is not *"unreachable"*.
 - **AC-5.** State what drives the discard on each path actually repaired.
   The first filing named the `authority_grounds` filter; that was measured
   wrong for `:3425` and has since been **ruled not a fail-open at all**. Do not
