@@ -1,7 +1,7 @@
 ---
 id: RT-D5B-BRIDGE-REALIZATION-PLANE
 title: "Land the immediate-bridge realization plane -- the derivation, the plan field, and the feature-gated mutation harness -- on top of the classifier slice 1 landed, exercised by unit tests that fail without it and still NOT wired into the live planning path. Slice 2 of the PR #3676 re-cut."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,59 @@ github: null
 origin: "Steward, 2026-09-16, continuing the operator directive 2026-09-16: 'factor small mergeable pieces out of the long string of commits and merge those... Small achievable pieces, not one monolithic PR.' Successor to RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER, landed 10321a158bc69cf50e0cb753e1096fe10fa43ed1 and verified green on run 35055338045 (26 jobs, 26 success, full mode). Frame at docs/program/wp/RT-D5B-BRIDGE-REALIZATION-PLANE.md, landed 7abb681fab644fc13db4a85129e348cecdcbe6d0. Steward-filed per COORDINATION section 2."
 ---
 
+> ## MERGED 2026-09-16 at `49e5ebfbe501a80c6ff2cd7104e4115e0696ba49`
+>
+> **Verified by blob and by tree identity, not by ancestry** — the publisher
+> squashes, so a routed commit is an ancestor of nothing. All four paths are
+> byte-identical between the approved tip
+> `568d5d7eedad3d5ec957b0ee42189019b1cb0710` and `main`, and
+> `git merge-tree --write-tree origin/main 568d5d7ee` reproduces `main`'s own
+> tree exactly.
+>
+> ### The defining property holds at the LANDED tree
+>
+> `publish_immediate_bridge_realization_plan` and its three siblings have
+> **no production caller anywhere in the crate** at `49e5ebfbe`, which is the
+> property this slice was defined by. `StaticTransitionPlan` derives
+> **`Clone` only** — no `PartialEq`, `Hash`, `Ord` or `Debug` — so the new
+> `BTreeMap` field cannot alter any comparison, keying or rendering of the
+> plan. **The unwired claim is structural, not an inspection.**
+>
+> ### The section 3 traps, as built
+>
+> All three stand, verified at the reference; frame §3d is the durable record.
+> The candidate avoided `§3a` by construction — it left the `semantic_ir` and
+> `responses` re-export blocks alone and authored no classifier re-export —
+> which is why `static_transition.rs` came in at 2 hunks rather than the 3 §3
+> predicts. **2 is correct for a candidate that avoids the trap.**
+>
+> **`§3a` is larger than the frame states: NINETEEN live names, not five.**
+> The reference's `use` rewrite is two replacement hunks; `semantic_ir`
+> deletes 5 and `responses` deletes 14, all 19 live on `main`, and the two
+> replacement names have zero hits. Carried into slice 3's frame with the
+> per-name counts.
+>
+> ### Publisher note — THIRD instance of the same defect
+>
+> ```
+> PR #3750                        merged  2026-09-16T06:25:17Z
+> pull_request run 35063626351   created  2026-09-16T06:25:15Z, in_progress
+> ```
+>
+> Merged with `--doc-only` on a four-file `crates/` diff, **two seconds after
+> its own CI run was created**, bypassing the pre-merge matrix that was the
+> sole reason this candidate was sequenced last. Nothing unreviewed reached
+> `main` and the post-merge push run classifies from `main`'s own diff.
+> **The gap is that it ran after the merge instead of before it.** Third
+> instance; recorded on `PUB-DOC-ONLY-UNVALIDATED-AGAINST-ITS-DIFF`, which is
+> where the closure lives.
+>
+> ### Successor
+>
+> `RT-D5B-LIVE-WIRING` — slice 3, the live wiring, and the last of the re-cut.
+>
+> The release banner below is retained as the record of what was asked for.
+>
 > ## RELEASED to Team Runtime 2026-09-16 — `ready`, size M, tier T1
 >
 > **Implementation base is `origin/main` at
