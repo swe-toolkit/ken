@@ -471,12 +471,32 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  under --workspace. Refusing on divergence compares two
                  independently produced values and is immune to that.
                  => expected_ret CAN DIFFER FROM exact_ret_identity
-                 .tag_abi_word(). Registering exact_ret_identity would record
+                 .tag_abi_word(). That divergence is real and it is what the
+                 surviving comparison is built on.
+                 ### EVERYTHING FROM HERE TO THE END OF THIS FENCE-1 BLOCK IS
+                 ### WRITTEN FROM A REFUTED PREMISE. 2026-09-16, Architect
+                 ### evt_4g3tc46rqy2t1; marker re-scoped at evt_4kfrh0nzyxr1s.
+                 ### THERE IS NO DISCRIMINATING RECORD AT THAT SITE AT ALL --
+                 ### not a mis-sited one, not a weaker one. NONE. At that site
+                 ### the guard's result is a RUNTIME fact and the only
+                 ### COMPILE-TIME value available is the plan's own
+                 ### k_ret_identity(), so any record made there is necessarily
+                 ### a copy of the demand.
+                 ### WHAT SURVIVES IS THE COMPARISON, NEVER ITS ANCHORING:
+                 ### exact_ret_identity.tag_abi_word()? == ret_abi_word holds
+                 ### WHEREVER THE GUARD IS EMITTED, so it relocates to the
+                 ### guard-emission site and loses nothing. Its SITE and its
+                 ### RATIONALE are OPEN until the redesign.
+                 ### READ THE REST OF THIS BLOCK FOR THE CHECK AND FOR THE
+                 ### VaryRet CONTROL, NEVER FOR A LOCATION OR A RATIONALE.
+                 ### Full ruling: "FENCE 1'S REGISTRATION PREMISE IS REFUTED".
+                 AS WRITTEN, FROM THE REFUTED PREMISE -- RETAINED VERBATIM:
+                 Registering exact_ret_identity would record
                  an authority THE GUARD NEVER PROVED, into exactly the
                  population this node measures. The program still traps, so
                  nothing unsound executes; THE DAMAGE IS TO THE RECORD, AND
                  THE RECORD IS THE DELIVERABLE.
-                 THE AC, IN THE REFUSING FORM RATHER THAN THE TYING FORM:
+                 THE AC, IN THE REFUSING FORM RATHER THAN THE TYING FORM.
                    At the registration site, REQUIRE exact_ret_identity
                    .tag_abi_word()? == ret_abi_word, and REFUSE ON DIVERGENCE
                    RATHER THAN RECORDING.
@@ -487,8 +507,20 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  A CLEAN RECORD IS A MUTATION THAT PROVED NOTHING.
                  This is fence 1's general shape, not an exception to it:
                  dominance by both guards is STRUCTURAL; this clause makes it
-                 SEMANTIC -- the thing registered must be the thing GUARDED,
+                 SEMANTIC -- the thing RELIED UPON must be the thing GUARDED,
                  not merely downstream of a guard.
+                 ### READ "RELIED UPON", NOT "REGISTERED". CORRECTED 2026-09-16
+                 with the rest of fence 1's registration half; see "FENCE 1'S
+                 REGISTRATION PREMISE IS REFUTED" below. This line said
+                 "the thing REGISTERED" and registration is the thing that
+                 fell; "relied upon" is what it meant and it survives intact.
+                 FOUND BY THE STEWARD SWEEPING THE PHRASE, not by the review
+                 that ordered the correction -- the Architect named only the
+                 copy in AC D1-2 (evt_46ed87f2x8ra6), because a correction
+                 inherits the blind spot of the census that found it. Its
+                 census was one AC wide; this instance is 480 lines away in
+                 the row where the fence was originally stated, and a reader
+                 of the REPAIR row never reaches the AC.
                  DEPENDENCY, RULED IN PART 2026-09-16. Defect ownership is
                  SETTLED AND IT IS D1'S -- the arm that fired routes to the
                  call site, so depends_on can NO LONGER be justified on "this
@@ -872,6 +904,37 @@ tip you are on. `tag_abi_word` has the same hazard one level down — it has a
 second hit at `lowering/core/tests/control.rs`, inside a string literal in a
 test, not a second definition.
 
+> ### STOP. THIS GUESS AND THE DELIVERABLE LIST BELOW WERE BUILT AND REFUTED.
+>
+> **2026-09-16. Marker covers the best-guess paragraph and the three-edit
+> deliverable list that follows it — everything down to *Acceptance criteria for
+> D1*. Retained verbatim; DO NOT BUILD FROM IT.** An implementer starts reading
+> here, it says *"Build it"*, and the refutation is three hundred lines below —
+> so a reader who follows it rebuilds exactly what was already built and
+> refuted.
+>
+> **Edit 2 is the change that was built and measured VACUOUS.** Edit 1's seeding
+> is what takes the certificate arm off its `None` branch, and **under D0's
+> closure it is what makes the closure stop refusing** — the production supplies
+> exactly what the closure demands, cut from the same blank. Both are recorded
+> in *"FENCE 1'S REGISTRATION PREMISE IS REFUTED"* below; read that, **including
+> the withdrawn "cause 2 went green" framing and its corrected three-way
+> baseline**, before acting on any line in this section.
+>
+> **What is NOT withdrawn here:** the perishable-anchor clause above, the hard
+> stop below, the prohibition on synthesizing an identity, and **the one honest
+> try plus a handback** — that is the discipline that produced the refutation
+> and it worked exactly as written.
+>
+> **Also not withdrawn, and deliberately not marked anywhere in this node:**
+> everything about `body.authorities` — arm 1 never consulting it, and the
+> red-population census. **That map is the node's SUBJECT.** It predates fence 1
+> and survives it entirely, and marking it would refute the node instead of the
+> fence. (Architect `evt_5z4ep3bexsgxn`, which ran the exhaustive sweep and
+> stated its exclusions so the correction could not overshoot.)
+
+**AS WRITTEN, FROM THE REFUTED PREMISE — RETAINED VERBATIM:**
+
 **The best guess, stated so a reviewer can attack it directly:** the three
 coordinated edits named in the REPAIR and SITE rows are the whole repair, and
 the arm-1 consultation change at `realized_call_words.contains(&publication
@@ -901,8 +964,14 @@ prohibition extends to controls (Architect `evt_5gws0pnssfqch`).
 
 These are obligations, not hazards. Each names its control.
 
-**D1-1. STRUCTURAL DOMINANCE (fence 1).** Registration happens only at a point
-dominated by **BOTH** `require_i64` guards — the tag guard and the arity guard.
+**D1-1. REFUTED IN ITS PREMISE 2026-09-16 — NOT AN AC AWAITING DISCHARGE.** The
+registration it governs cannot produce a discriminating record at that site, for
+structural reasons; see *"FENCE 1'S REGISTRATION PREMISE IS REFUTED"* below
+before acting on any word of it. Retained verbatim because the refutation is
+about what the record can DISTINGUISH, not about where it sits, and a later
+design may re-use the dominance requirement over a different registration.
+**STRUCTURAL DOMINANCE (fence 1), as written:** Registration happens only at a
+point dominated by **BOTH** `require_i64` guards — the tag guard and the arity guard.
 Soundness depends on the trap having fired for any continuing execution.
 **Control:** name the guard pair and show the registration site sits below both
 on the straight-line path, with no intervening branch or early return. A
@@ -911,9 +980,23 @@ registration reachable without both guards having executed fails this. At
 whether or not the lookup matched; preserve that property, do not rely on the
 line numbers.
 
-**D1-2. SEMANTIC DOMINANCE — THE REFUSING FORM (fence 1, second clause).** At
-the registration site, require `exact_ret_identity.tag_abi_word()? ==
-ret_abi_word` and **REFUSE ON DIVERGENCE RATHER THAN RECORDING.**
+**D1-2. THE COMPARISON SURVIVES; ITS REGISTRATION-SITE ANCHORING DOES NOT.
+MARKED 2026-09-16, same refutation as `D1-1`.** Everything below is retained
+verbatim, and the part that stands is the **comparison** —
+`exact_ret_identity.tag_abi_word()? == ret_abi_word` sets a plan value against
+an independently emitted one, and that is true **wherever the guard is
+emitted**, since `ret_abi_word` is what `expected_ret` is built from and handed
+to `require_i64`. **So the check relocates to the guard-emission site and loses
+nothing.** What is **OPEN until the redesign** is its *site* and its
+*rationale*, both of which read as settled below: every phrase anchoring it to
+a registration — *"at the registration site"*, *"rather than recording"*, *"the
+record is the deliverable"* — is inherited from the refuted premise, and a
+reader who goes looking for a registration site to put this check at will not
+find one.
+
+**AS WRITTEN, from the refuted anchoring:** At the registration site, require
+`exact_ret_identity.tag_abi_word()? == ret_abi_word` and **REFUSE ON DIVERGENCE
+RATHER THAN RECORDING.**
 
 **NOT the tying form.** Deriving the registered identity *from* `ret_abi_word`
 would dutifully record the mutated identity and make the mutation invisible. The
@@ -964,8 +1047,14 @@ produces a clean record, the AC is **not** met. A mutation that produces a clean
 record is a mutation that proved nothing.
 
 D1-1 is structural, D1-2 is semantic, and D1-2 is not an exception to fence 1 —
-it is fence 1's general shape: **the thing registered must be the thing GUARDED,
-not merely something downstream of a guard.**
+it is fence 1's general shape: **the thing RELIED UPON must be the thing
+GUARDED, not merely something downstream of a guard.**
+
+**That sentence read "the thing REGISTERED" until 2026-09-16.** The Architect
+corrected it to what it had meant (`evt_46ed87f2x8ra6`): *relied upon*
+generalises cleanly and survives the refutation of the registration, where
+*registered* names the thing that fell. It is the one line of `D1-2` changed
+rather than merely marked.
 
 **D1-3. IDENTITY IS ARTIFACT-LOCAL (fence 2).** `pack_identity`'s own doc, at
 `planning/static_transition/semantic_ir.rs`, verbatim: *"Artifact-local only.
@@ -1144,6 +1233,146 @@ must **not** be used to re-scope SEED to six. Ownership of the absence and reach
 of the repair are different relations. **Control:** if the repair is proposed at
 narrower than 12, the proposal states which of those two relations it is
 arguing from.
+
+### SYMPTOM INVENTORY — §1b. APPEND ONE LINE PER HARD-STOP; NEVER REWRITE HISTORY.
+
+**Seeded by the Steward 2026-09-16 at the Architect's request
+(`evt_4g3tc46rqy2t1`). It should have been seeded at release — that omission is
+the Steward's.** The Architect appends one line per hard-stop **before it
+rules**. At the **3rd entry**, and every 3rd after, it must answer in-thread:
+*do these entries share a predicate?* If yes, the predicate is the defect and
+the fix is a structural closure over it, not a 4th entry.
+
+**This lives in the file because it is the only place it survives.** The §1a
+count is re-derivable from the thread; a **pattern across stops** is not — it
+exists only in resident context and is the first thing a compaction discards.
+
+    SYMPTOM INVENTORY
+    1. the repair records the value the guard was checked AGAINST, not that a
+       carrier was checked -- keyed on the plan's own identity.
+
+**§1a hard-stop count on this design question: 1 of 3.**
+
+### FENCE 1'S REGISTRATION PREMISE IS REFUTED. CLAUSE 2 IS NOW ALL OF IT.
+
+**Architect `evt_4g3tc46rqy2t1`, refuting its own ruling; the vacuity was found
+by runtime-implementer building the honest try and reported against their own
+repair before a passing suite could be read as progress.** Recorded here rather
+than left in the thread, because ACs `D1-1` and `D1-2` below were written from
+the refuted premise and a reader consults them, not the thread.
+
+**WHAT FELL.** *"A passing tag guard is an identity proof, therefore the site
+should RECORD the guard-proved identity."* The first half is true about the
+emitted program. **The second does not follow**, and the question that would
+have caught it was never asked: **what could the record DISTINGUISH?** At that
+site the guard's result is a **runtime** fact — a carrier's actual tag, a
+cranelift `Value`. The only **compile-time** value available is the plan's own
+`k_ret_identity()`.
+
+⇒ **Any record made there is necessarily a copy of the demand, and no care in
+writing it changes that.** Fence 1 as scoped **cannot produce a discriminating
+record at that site.** Structural, not an implementation gap.
+
+    :6962  let independent_contract = emission.row.k_ret_identity();
+    :6978  Some(independent_contract)
+    :4474  let proven = if body.independent_contract == Some(identity) {
+
+One expression, two copies — so `observed == Some(identity)` holds by
+construction, and the residual *presence at the published word* is keyed on the
+same word as the test already at `:4489`. **Edit 3 does not add a weak
+requirement to arm 1. It adds none.**
+
+**AND THE EFFECT WAS NOT IN ARM 1.** Before the edits `obligation.identity` was
+`None`, so the certificate arm took its `None` branch — no lookup, no seed.
+Seeding it takes the `Some` branch, a certificate is found, and `call_seeds` is
+populated; `call_seeds` is **arm 2's** input to `derive_certified_cuts`. **The
+change lands through arm 2's proof closing, not through arm 1 passing.**
+
+> ### THE "CAUSE 2 WENT GREEN" FRAMING IS WITHDRAWN. THE VACUITY IS NOT.
+>
+> **runtime-implementer `evt_abx3m3aha996`, correcting its own headline: the
+> first report compared an AFTER on one tree against a BEFORE on another.**
+> Every measurement in this arc was taken at `b0a7c2945` **with D0's closure
+> applied as an uncommitted diagnostic**. The ruled build base `0f71ab5b9`
+> **without** that closure does not refuse for this program at all.
+>
+>     BASE, no edits          NO emission refusal. Builds. Fails at
+>                             px8f_write_partition.rs:315, exit 1.
+>     CLOSURE ONLY (edit 3)   observed=None, new_passes=FALSE. REFUSES.
+>     FULL REPAIR (1-3)       observed=Some(id4362) == stamp, new_passes=TRUE.
+>                             No refusal. Builds. SAME failure as BASE --
+>                             line 315, exit 1, BYTE-IDENTICAL panic.
+>
+> ⇒ **The diff did not move this program from a refusal to a miscompile.** The
+> base already compiles and already fails identically. **Hard-stop 1 does not
+> rest on that sentence**, and `D1-5`'s diff check reads differently on each
+> baseline — **both readings stand, and neither is to be chosen over the
+> other:** against `0f71ab5b9` the diff removes **no** emission refusal, because
+> there is none for this program; against D0's closure it removes the refusal
+> and adds an identity requirement that is **measurably vacuous.**
+>
+> **WHAT THE THREE-WAY COMPARISON ESTABLISHES IS SHARPER THAN WHAT IT REPLACES,
+> because it carries the closure's own negative control.** The closure is **not
+> inert** — it genuinely refuses when nothing registers — and the repair's only
+> effect is to make it stop refusing. **The production supplies exactly what the
+> closure demands, and the value it supplies is a copy of the value the demand
+> is made of: the lock and its key are cut from one blank.**
+>
+> **AND THE LOOP IS CLOSED, WHICH IS THE ATTRIBUTION.** Seeding `funcid58`'s
+> obligation creates a demand on `funcid62` at the plan's own identity;
+> `funcid62`'s arm 2 grounds — it **never ran at base, because `funcid62` was
+> never demanded, and the demand exists only because the seed created it**; its
+> certificate is then located by a `find` keyed on that same identity; that
+> certificate seeds `v1751`; `funcid58` closes; its certificate lets `funcid60`
+> through the gate; `funcid60` closes; `funcid59` closes. **Nothing outside the
+> plan enters the loop at any point.**
+
+**WHY THAT CLOSURE IS ILLEGITIMATE — AND THIS IS THE RULING.**
+`certificate.identity == identity` reads as a two-value check and is not: it is
+a **`find` keyed on the value under test.** ⇒ **A lookup keyed on the identity
+you are trying to justify cannot refute that identity; it can only fail to
+locate one.** It answers *"does some finished certificate carrying this identity
+exist?"*, never *"is this the identity this call produced?"* The seed converts a
+plan **assertion** into a **search key**, and the search cannot say no. That is
+the whole mechanism by which the closure stops refusing — measured as a closed
+loop in which nothing outside the plan ever enters. (It read *"the mechanism of
+the regression"* until the baseline was corrected; there is no regression, and
+the mechanism is unchanged.)
+
+**WHAT SURVIVES IS THE COMPARISON IN `D1-2`, NOT ITS ANCHORING.** Requiring
+`exact_ret_identity.tag_abi_word()? == ret_abi_word` and refusing on divergence
+compares a plan value against an **independently emitted** one — a genuine
+two-value check, and one that holds **wherever the guard is emitted**, so it
+relocates to the guard-emission site and loses nothing. **Its SITE and its
+RATIONALE are open until the redesign**, because every phrase anchoring it to a
+registration is inherited from the premise that fell. **Read BOTH `D1-1` and
+`D1-2` as marked, not as ACs awaiting discharge.**
+
+> **THIS VERDICT FIRST EXEMPTED `D1-2` AND THE DIAGNOSIS THIRTY-NINE LINES
+> ABOVE IT NAMED BOTH.** The paragraph opening this section says the refutation
+> bears on *"ACs `D1-1` and `D1-2`"*; the verdict then said `D1-2` survives.
+> Caught by the Architect at `evt_46ed87f2x8ra6`, reviewing the commit that
+> recorded its own refutation.
+>
+> ⇒ **A refutation must be swept through every artifact written from the
+> premise — INCLUDING THE ONE YOU ARE ABOUT TO CALL UNAFFECTED.** The correction
+> inherits the blind spot of the census that found it, and here the census was
+> **one AC wide.** The tell was free and internal: the diagnosis and the verdict
+> disagreed inside one section, and the convenient half is the one that got
+> published.
+
+**NO REDESIGN IS RECORDED HERE, DELIBERATELY.** The Architect reserved it
+(*"I am not handing you a redesign in this message"*), and the question the
+repair now turns on — **where a second, independently derived identity exists at
+all**, with the callee's own completion as the candidate rather than the
+caller's plan — is a component-design call it will make **with the measurement
+in hand, not ahead of it.** The re-scope and the size are the Steward's and are
+**held** until it rules: re-scoping on an unruled design question is sizing on a
+number, which the SIZE row already refused once on this node.
+
+**`D1-5` FAILED ON THAT DIFF AND THAT IS THE CORRECT OUTCOME TO REPORT.** The
+three edits are **not sufficient — confirmed, not suspected.** Do not fix past
+it and do not synthesize an identity, **including in a control.**
 
 ### D1 MUST FIRST ASK WHETHER THE SPLIT IS A ROUTE SPLIT
 
