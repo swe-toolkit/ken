@@ -1229,22 +1229,37 @@ record is a mutation that proved nothing.
 > carried, or satisfied, and it must not sit here looking live — a reader who
 > finds it will try to satisfy it. **`D1-2` is NOT closed on the inert result.**
 >
-> **WHAT REPLACES IT IS A ROUTING MEASUREMENT, NOT AN ACCEPTANCE CRITERION.**
+> **WHAT REPLACES IT IS A ROUTING MEASUREMENT, NOT AN ACCEPTANCE CRITERION —
+> AND THE PRECONDITION QUESTION IS ALREADY ANSWERED IN THE FIXTURE TABLE.**
 > `rt_parity_native.rs:2394-2399` asserts
 > `!baseline_rows[0].all_static_response_rows.is_empty()`, but only
-> `if entry == "rt_write_writable_stage"`. Report the failing `label`/`entry`
-> and whether that precondition executed. It costs nothing not already run, and
-> **`D1-2`'s disposition BRANCHES on the answer:**
+> `if entry == "rt_write_writable_stage"`. That `entry` is
+> `owner_body_control`'s own parameter, and this control's arguments are fixed
+> at its `owner_body_control_test!` invocation rather than chosen at run time:
+> `static_response_owner_body_vary_ret_reds_and_restores` passes label
+> `"vary-ret"` and entry **`"rt_read_offset_stage"`** (the macro arm binds
+> `$label` before `$entry` and calls `owner_body_control($entry, $label, ...)`).
 >
-> - **Precondition ran and passed with `applications` still 0** ⇒ a qualifying
->   population was present and the site did not fire. `D1-2`'s question stays
->   unanswerable, and the unreachability is the **reportable finding** under
->   `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:365`. It goes to its own node.
-> - **The failing entry is not `rt_write_writable_stage`** ⇒ the precondition
->   never executed and the population is **unmeasured**. That is a fixture gap,
->   `D1-8` territory; once a qualifying fixture exists the original question
->   becomes askable again and `D1-2` is answered on its own terms rather than
->   replaced.
+> ⇒ **The precondition is statically unreachable for this control. It never
+> executed and no run could have said otherwise**, so the population is
+> unmeasured — but that fact does not isolate `VaryRet`. **Ten of the eleven
+> owner-body controls use `rt_read_offset_stage`**; only `context-zero` uses
+> `rt_write_writable_stage`, which is the entry that precondition guards. It is
+> that one control's fixture check, never a population gate here.
+>
+> **THE DISCRIMINATING MEASUREMENT IS ONE SIBLING'S `applications` COUNT ON THE
+> SAME ENTRY** — `static_response_owner_body_raw_worker_reds_and_restores`, same
+> entry, same harness, different mutation. Not yet run. **`D1-2`'s disposition
+> BRANCHES on it:**
+>
+> - **A sibling on `rt_read_offset_stage` reaches (`applications == 1`)** ⇒ the
+>   entry does carry a population owner-body mutations reach, and `VaryRet`'s
+>   `applications == 0` is specific to `VaryRet`. That is the **reportable
+>   finding** under `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:365`, on its own node.
+> - **No sibling reaches on that entry** ⇒ the entry carries no reachable
+>   owner-body population at all. That is a fixture gap, `D1-8` territory; once
+>   a qualifying fixture exists the original question becomes askable and
+>   `D1-2` is answered on its own terms rather than replaced.
 >
 > **The branch is not yet known, and this node says so** rather than recording
 > one open item that looks like it closes on one value.
