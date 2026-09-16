@@ -1,7 +1,7 @@
 ---
 id: SPEC-STANDARD-INFIX-BINDING
 title: "A1's spec prerequisite: a bounded standard-binding + use-site call-completion contract grounded in 33.5.4 (implicit argument/dictionary completion) and 39 (elaboration), specifying the STANDARD meanings of ∧ ∨ ≤ ≥ ≠ as ordinary checked standard-package functions (∧/∨ = bool_and/bool_or; ≤/≥ = Ord via an actual dictionary, ≥ reversing already-evaluated values; ≠ = negation of the exact NumericEnv `==` comparator on the SAME supported carriers), their standard fixities (∧ infixr 3, ∨ infixr 2, ≤ ≥ ≠ infix 4), and the completion policy bound to defining GlobalId + checked telescope; results Bool, no Ω connective, single left-to-right evaluation, no short-circuit guarantee; NO new Eq/DecEq instance, Float-equality law, or TCB entry"
-status: draft
+status: ready
 owner: spec
 size: S
 gate: none
@@ -12,8 +12,26 @@ tier: T1
 origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy), grounded at main 4fdd4f0ad. A1's Spec-owned prerequisite. Draft: released after SPEC-RESERVED-INFIX-NAMES lands (the enclave may pipeline). Full A1 design detail, including the exact binding shapes the Architect probed and the NumericEnv `==` carrier inventory to enumerate (Int/Float/Char accept, Nat/Bool/String reject in the sample -- include Float32 and Decimal's actual registered representation when framing the full inventory), is in evt_784ge2nq65dfy. IN-LANE: bounded normative surface, no new trust-root/TCB (Architect: no new Eq/DecEq instance, Float-equality law, or TCB entry needed). Architect is the design authority and reviewer."
 ---
 
-> # A1 SPEC PREREQUISITE (Architect evt_784ge2nq65dfy). Draft; release after
-> # [[SPEC-RESERVED-INFIX-NAMES]] lands. Full detail is in that event.
+> # READY. Frame:
+> `docs/program/wp/SPEC-STANDARD-INFIX-BINDING.md`.
+>
+> **The release condition this node set itself is MET.**
+> [[SPEC-RESERVED-INFIX-NAMES]] is `merged`; so is
+> [[SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION]]. Design authority remains the
+> Architect's final-A decomposition `evt_784ge2nq65dfy`.
+>
+> **This is the lane-2 critical path.** A1
+> ([[LANG-STANDARD-INFIX-CALL-COMPLETION]]) is held on this node, and
+> [[LANG-MEMBERSHIP-OPERATOR-SURFACE]] is held on A1. Lane 2 has one `ready`
+> node and it is in flight; when it lands the language ring goes idle unless
+> this contract has moved.
+>
+> **The `≠` carrier inventory is MEASURED, and the census closes** — frame §2b.
+> Five rows, and two of them are not what the prose above implies: **Decimal is
+> keyed on `decimalpair_id`, not `decimal_id`**, and there are **two distinct
+> refusals** (a table miss, and a head that is neither `Const` nor `IndFormer`),
+> which one "unsupported carrier" sentence would collapse. Read frame §2c before
+> writing the normative text.
 
 ## What this settles
 
