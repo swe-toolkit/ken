@@ -126,9 +126,66 @@ both runs.** A green that survives the module's removal proves only that the
 crate compiles, and this AC exists because that is precisely the failure mode
 the slice was designed against.
 
-**AC-3. No behavioural change to any existing path.** Control: the diff touches
-exactly two files — the new module and the one `mod` line. Any other
-`crates/**/src/` file in the diff fails this AC.
+**AC-3. No change to any file that compiles into a production build.** Control:
+for every `crates/**/src/` file in the diff other than the new module, resolve
+its module declaration chain and show it is `#[cfg(test)]`-gated. Files that
+compile into production are exactly the new module and the one `mod` line.
+
+> **AMENDED 2026-09-16, Architect `evt_1zd0dm5adbq74`, after the implementer hit
+> the conflict and escalated instead of picking a side (`evt_ef39ahrmv58k`).
+> This is a PREDICATE change, not an exception list — no carve-out for
+> "inventory pins" by name, because the cfg-gated formulation covers this case
+> and the next one without enumerating.**
+>
+> The original control read *"exactly two files"*. That was not too strict; it
+> **measured the wrong thing.** It is a **path** predicate standing in for a
+> **production-vs-test** predicate, and it over-reports on exactly one
+> population: `cfg(test)` code living under `src/`.
+>
+>     core.rs:55-56    #[cfg(test)]
+>                      pub(in crate::cranelift_backend::lowering) mod tests;
+>     tests/mod.rs:119 pub(in ...) mod control;
+>
+> **`control.rs` is `cfg(test)`-gated through its declaration chain, so it is
+> absent from every production build and cannot carry a behavioural change to
+> any path.** The amended control is *stronger* than the count, not weaker: it
+> catches a production file the count would admit if the count were ever
+> loosened, and it states the property directly instead of through a proxy.
+
+> **THE PIN UPDATE IS THREE COORDINATED EDITS, NOT ONE LINE.** `ken-runtime`'s
+> lib suite carries a closed-inventory pin,
+> `the_backend_production_surface_inventory_is_closed`
+> (`lowering/core/tests/control.rs:3806`). **Adding any backend module
+> necessarily reds it — that is the pin working, not breaking.**
+>
+>     1  the `declared` vec   ("planning/static_transition.rs",
+>                              "immediate_bridge")
+>     2  BACKEND_PRODUCTION_SOURCES -- `mod immediate_bridge;` is
+>        semicolon-delimited, so it increments `external_modules` and the
+>        `external_modules + 1 == len()` relation at :3941-3947 must be
+>        PRESERVED by growing this list in the same edit
+>     3  a CENSUS ROW for the new file, or AC-2's second clause reds
+>        at :3202-3222
+>
+> **`:3212-3213` names the failure mode of doing fewer:** *"It is a relation
+> between two rosters, not a count: adding a file to either list is fine, and
+> adding it to only ONE is the failure."* One line swaps a red pin for a
+> differently-red pin. **Measured by the implementer: all three, `1025 passed /
+> 0 failed`, and the census row is free.**
+
+> **WHY THIS IS REGISTRATION, NOT REPAIRING A WORKING GATE TOWARD GREEN.**
+> Recorded because this lane's standing prohibition — *cause 2 is the gate
+> working and nobody repairs it toward green* — superficially resembles it.
+>
+> **Every invariant the pin asserts stays asserted at the same strength; only
+> the population changes.** `declared` grows because the world grew;
+> `BACKEND_PRODUCTION_SOURCES` grows in lockstep so the `+1 == len()` relation
+> is preserved; the census gains a row so `roster ⊆ censused` is preserved.
+> **Nothing is relaxed, deleted, or excepted.** The pin's own failure text
+> prescribes it (`:3936-3939`, *"Add the new file to that list"*) and its doc
+> comment says the red is the mechanism (`:3466-3469`). **The prohibited move
+> would be deleting the `len()` assert, or adding to one list only** — and the
+> pin already names that second one.
 
 **AC-4. `InlineBridgeNoCall`, the `owns_seat` rewrite, the
 `immediate_bridge_realizations` field, and
@@ -139,8 +196,23 @@ each name greps to 0 hits across the diff. These are slices 2 and 3.
 accounted for explicitly** — see the open decision in §7. Control: build at the
 base and at the candidate, diff the warning lists, and attribute every new
 warning to a source file. **Warnings arising in files other than the new module
-fail this AC.** At the base measurement the delta was 12, all in the new module
-and none elsewhere.
+fail this AC.** At the base measurement the delta was **13**, all in the new
+module and none elsewhere.
+
+> **The figure was first recorded as 12 and that was an undercount by one: the
+> Steward's census matched `is never used` and missed `is never constructed`,
+> which two structs emit. The measured count delta was `101 - 88 = 13` in the
+> same output.** The implementer independently measured 13 (`0 -> 13`, no file
+> outside the module changing count) and is right.
+>
+> **The AC passed either way and no amendment was owed** — §7a's own reasoning
+> is that a frame pins the instrument, never the number. **The figure is
+> corrected anyway for one specific reason: §7a reason 2 makes the recorded
+> baseline a discriminator — *"a thirteenth warning or one outside the module is
+> a finding."* A baseline of 12 against a truth of 13 misfires that
+> discriminator on its very first use.** The number is not a bar, but it is
+> load-bearing as a reference point, and a wrong one is worse than a tolerant
+> one.
 
 **AC-6. Every test case carries its provenance.** A case whose expected verdict
 is **lifted** cites its ancestor as `file:line` at `0f71ab5b9`. A case with no
@@ -155,6 +227,25 @@ case has exactly one of the two.
 > exactly the size of `AC-6`. Same family as the entailment ruling on
 > `call_seeds`: a value and the thing it is offered to confirm, sharing one
 > producer. (Architect, `evt_5rbgwyamv4y2n`.)
+>
+> **MEASURED, and the gap is wider than the argument predicted.** The
+> implementer ran `AC-2`'s control: **`6 FAILED, 8 passed`**
+> (`evt_ef39ahrmv58k`). **The stub returns `None`, and a test that EXPECTS
+> `None` cannot be reddened by it** — so all seven `AC-7` refusal cases and the
+> one negative-predicate case survive it. **`AC-2` is structurally blind to the
+> refusal half: 6 of 14 coupled, 8 not.**
+>
+> This is not a defect in `AC-2` and it is not repairable by a better stub; it
+> is what a return-value control can see. **`AC-6` carries the entire weight on
+> those eight cases**, which is the concrete reason provenance is per-case and
+> not a documentation nicety.
+>
+> **The completion, priced but NOT a condition of this slice:** a second control
+> that reds the refusal half — replace each refusal with a panic rather than
+> stubbing the function (`return None` becomes `panic!("mutation")`, `?` becomes
+> `.expect("mutation")` at `:196`/`:197`). Each is a one-word edit, each
+> compiles, and each reds **exactly one** case. Seven mutations under the
+> `AC-1a` blob-verified revert protocol.
 
 **AC-7. Each refusal point has a case.** The classifier's refusals are the
 extraction-fragile part, and a suite authored by walking the `Some` arms will
