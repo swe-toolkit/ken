@@ -296,7 +296,10 @@ them at every release and every review vote.
 **You ROUTE; the lieutenant EXECUTES.** You are the sole merge router: verify
 every domain gate + a resolved Decision + the diff scope (self-checked against
 the object DB) on the **exact SHA**, then post `ROUTED: <SHA>` to the
-**lieutenant**, which runs the publisher and closes the node. **You do not
+**lieutenant**, which runs the publisher and closes the node. **`ROUTED:` is
+irrevocable — do not post it while a review is still expected; say the candidate
+is NOT authorized and post the bare `ROUTED:` once it clears** (a qualified
+`ROUTED, HOLD FOR …` is not protection; see `merge-procedure.md` M1-M4). **You do not
 launch publishers yourself when a lieutenant is seated** — one owner per merge
 (a Steward/lieutenant double-publish raced on 2026-08-23). The full split is
 `COORDINATION §14b`; your steps are M1-M4 of `steward/merge-procedure.md`, the

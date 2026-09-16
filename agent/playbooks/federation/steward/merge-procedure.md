@@ -18,6 +18,33 @@ None is conditional on how routine the merge feels.**
 > landed tree, flips the node, compacts the Adversary, and closes the loop with
 > the ring. **You do not launch the publisher when a lieutenant is seated.**
 >
+> #### `ROUTED:` IS IRREVOCABLE. DO NOT POST IT WHILE A REVIEW IS EXPECTED.
+>
+> **Posting `ROUTED: <SHA>` is the authorization and there is no way to recall
+> it.** The window between your post and the merge is exactly when review
+> findings arrive, and the executor is told to *"await the Steward's ROUTED
+> authorization"* (`moot.toml:562`) — **the unqualified concept.**
+>
+> ⇒ **If a reviewer is still expected on a candidate, do not post `ROUTED:` at
+> all.** Post the SHA, the gates and the scope, say plainly that it is **not
+> authorized**, and post a bare `ROUTED: <SHA>` once the review clears.
+>
+> **A qualified routing (`ROUTED, HOLD FOR <reviewer>`) is NOT the fix and must
+> not be used as protection.** It relies on the executor weighing a qualifier,
+> which is the same channel that already failed: on 2026-09-16 the Architect
+> asked the lieutenant to hold two candidates, both findings were correct, and
+> **both landed anyway and became follow-up corrections to `main`.** Withholding
+> the authorization is a mechanism; adding words to a message that was not acted
+> on is not. **An absent `ROUTED:` cannot be misread.**
+>
+> Measured the same day: **nothing matches the token programmatically** —
+> `grep -rn 'ROUTED' scripts/` is 0 (case-insensitive too), with reach proven by
+> a positive control. Every reader is an agent reading prose, so the safe state
+> when a candidate is not ready is that **no authorization exists**.
+>
+> Full account, with both measured instances:
+> `agent/memory/fleet/a-merge-is-two-seats-the-router-and-the-executor-and-only-one-owns-each-merge.md`
+>
 > **Why:** one owner per merge. Measured 2026-08-23 — a Steward-launched
 > publisher raced the lieutenant on the same PR (caught in the pre-lock wait).
 > Once you route a SHA, the lieutenant owns its execution end-to-end; you stop

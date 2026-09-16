@@ -47,3 +47,78 @@ executes that fresh authorization.
 
 Neither seat can merge alone: the Steward holds no GitHub credential, the
 lieutenant holds no gate authority. The split is what makes that safe.
+
+## A HOLD ASKED FOR IN A REVIEW POST IS NOT A HOLD (2026-09-16, twice in one hour)
+
+**Only the ROUTER can withdraw an authorization, because only `ROUTED: <SHA>`
+created it.** A reviewer who spots a defect after routing and writes *"@lieutenant
+hold this one for a one-line fix"* is asking the executor to un-act on an
+authorization it already holds.
+
+**MEASURED, because the first draft of this section asserted a mechanism I had
+not checked.** It said the publisher "is polling for `ROUTED:`". It is not:
+
+    grep -rn  'ROUTED' scripts/      ->  0     ANY extension, not just .sh/.py
+    grep -rni 'routed' scripts/      ->  0     case-insensitive
+    POSITIVE CONTROL, same tool and tree: scripts/scripted-pr-automerge.sh and
+    scripts/publisher-gate-probes.sh are hit by another key -- so the grep
+    REACHES the files that would matter. The zero is a measurement, not a miss.
+
+⇒ **There is no string matcher anywhere. Detection is a reading.** The
+lieutenant is an agent that reads the post and judges it, so there is no regex
+to fail open and no prefix to get right — **and the failure is fuzzier than a
+parser bug, not tidier.** A qualifier only works if the reader weighs it, and
+the reader is the same one that did not act on two plain-language holds.
+
+**The strongest evidence is not the absence — it is the executor's own standing
+instruction.** `moot.toml:562`, the lieutenant's `startup_prompt`:
+
+> *"…await the Steward's ROUTED authorization."*
+
+⇒ **The concept the executor is told to wait for is the UNQUALIFIED one.** That
+is a mechanism for the conclusion rather than merely the lack of a contrary
+one: a qualified `ROUTED, HOLD FOR …` is not a different token to the seat
+waiting on it, it is the thing it was told to await.
+
+**SIX documents carry instructions about `ROUTED`, not two** (measured at this
+file's own tree; records such as diary entries, issue/WP nodes and index rows
+are excluded, since they report rather than instruct):
+
+    agent/playbooks/federation/lieutenant.md                  6 sites
+    agent/COORDINATION.md §14b                          :1172, :1192
+    agent/playbooks/federation/steward.md                      :298
+    agent/playbooks/federation/steward/merge-procedure.md :15, :244
+    moot.toml                                                  :562
+
+Measured twice in one hour, both times the Architect, both times correct:
+
+    review asked to hold 9312aeab3   -> landed uncorrected at 235b49683
+    review asked to hold 577444432   -> landed as the +33/-0 shape at 2a0b1cf83
+
+**Both defects were real, both were named before the landing, and both became
+follow-up corrections to `main` instead** — including one the reviewer had
+explicitly predicted would become *"a `-N` correction to a memory file."*
+
+⇒ **The tell for a REVIEWER:** if your finding needs to stop a landing, address
+the **router**, not the executor, and say *"withdraw the routing"* rather than
+*"hold"*. The router is the only seat that can un-authorize.
+
+⇒ **The tell for the ROUTER, and it is the load-bearing one: DO NOT POST
+`ROUTED:` AT ALL until the review you expect has cleared.** The window between
+your authorization and the merge is exactly when reviews arrive, and you cannot
+recall it.
+
+**A qualified routing — `ROUTED, HOLD FOR <reviewer>` — is NOT the fix, and
+this file's first draft recommended it.** It rests on the executor reading a
+qualifier and weighing it correctly, which is the same fallible channel that
+swallowed both holds above. **Adding words to a message that was already not
+acted on is not a mechanism.** Withholding the authorization is, because an
+absent `ROUTED:` cannot be misread.
+
+Use a qualified routing only to say *"this exists and is gated"* for
+coordination; never treat it as protection. If it is not ready to merge,
+**the safe state is that no authorization exists.**
+
+**Do not read this as "the executor erred."** It executed exactly the
+authorization it was given, which is the protocol working. The defect is that a
+live authorization had no withdrawal mechanism, and that belongs to the router.
