@@ -1303,9 +1303,14 @@ struct ContinuationResultPositionWitness {
 /// outer consumer from depth two onward.
 ///
 /// The fields are private and there is no constructor outside planning.
-/// Lowering can only receive a value that the whole-plan validator has matched
-/// against [`derive_required_consumer_occurrence`].
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+///
+/// Lowering never receives this enum. It receives [`DirectOuterProjection`],
+/// which is the direct-outer arm's payload and nothing else — see
+/// `required_consumer_projection_for`. That return type is `R1a`'s enforcer:
+/// the detached arm is excluded by the type lowering is handed, not by a
+/// runtime filter and not by a panic, so the sentence above is true of what
+/// lowering can hold rather than of what it is trusted not to ask for.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum RequiredConsumerProjection {
     DirectOuter {
         source: ContinuationConsumingOccurrence,
@@ -1315,14 +1320,12 @@ pub(in crate::cranelift_backend) enum RequiredConsumerProjection {
 }
 
 impl RequiredConsumerProjection {
-    pub(in crate::cranelift_backend) fn direct_outer(
-        &self,
-    ) -> Option<(
-        ContinuationConsumingOccurrence,
-        ContinuationConsumingOccurrence,
-    )> {
+    pub(in crate::cranelift_backend) fn direct_outer(&self) -> Option<DirectOuterProjection> {
         match self {
-            Self::DirectOuter { source, required } => Some((*source, *required)),
+            Self::DirectOuter { source, required } => Some(DirectOuterProjection {
+                source: *source,
+                required: *required,
+            }),
             Self::DetachedReturnContext(_) => None,
         }
     }
@@ -1335,25 +1338,41 @@ impl RequiredConsumerProjection {
             Self::DetachedReturnContext(context) => Some(context),
         }
     }
+}
 
-    pub(in crate::cranelift_backend) fn source(&self) -> ContinuationConsumingOccurrence {
-        self.direct_outer()
-            .expect("a direct required-consumer route has direct-outer authority")
-            .0
+/// The direct-outer arm's payload, and the only projection shape lowering ever
+/// holds.
+///
+/// These are `main`'s two original fields, unchanged. The three accessors below
+/// are **total**: there is no variant they can be asked about and fail on,
+/// because the detached arm cannot be one of these values. `R1a` — the
+/// direct-outer route's authority is carried by the type rather than asserted
+/// by an `expect` at the point where the assertion would fail.
+///
+/// `R1c` — and so `main`'s original sentence holds again, of this type: the
+/// fields are private, there is no constructor outside planning, and **lowering
+/// can only receive a value that the whole-plan validator has matched against
+/// [`derive_required_consumer_occurrence`]**. That sentence was false while the
+/// enum was what lowering received, because the detached arm is matched against
+/// a different rule; it is true of `DirectOuterProjection`, which is reachable
+/// only through the `DirectOuter` arm the validator checks that way.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct DirectOuterProjection {
+    source: ContinuationConsumingOccurrence,
+    required: ContinuationConsumingOccurrence,
+}
+
+impl DirectOuterProjection {
+    pub(in crate::cranelift_backend) fn source(self) -> ContinuationConsumingOccurrence {
+        self.source
     }
 
-    pub(in crate::cranelift_backend) fn body_origin(&self) -> StaticOriginId {
-        self.direct_outer()
-            .expect("a direct required-consumer route has direct-outer authority")
-            .1
-            .body_origin
+    pub(in crate::cranelift_backend) fn body_origin(self) -> StaticOriginId {
+        self.required.body_origin
     }
 
-    pub(in crate::cranelift_backend) fn eliminator_origin(&self) -> StaticOriginId {
-        self.direct_outer()
-            .expect("a direct required-consumer route has direct-outer authority")
-            .1
-            .eliminator_origin
+    pub(in crate::cranelift_backend) fn eliminator_origin(self) -> StaticOriginId {
+        self.required.eliminator_origin
     }
 }
 
@@ -7417,11 +7436,10 @@ impl<'src> StaticTransitionPlan<'src> {
     pub(in crate::cranelift_backend) fn required_consumer_projection_for(
         &self,
         identity: &ContinuationCallIdentity,
-    ) -> Option<RequiredConsumerProjection> {
+    ) -> Option<DirectOuterProjection> {
         self.required_consumer_projections
             .get(identity)
-            .filter(|projection| projection.direct_outer().is_some())
-            .cloned()
+            .and_then(RequiredConsumerProjection::direct_outer)
     }
 
     /// The detached return-context proof for this call identity, if the planner

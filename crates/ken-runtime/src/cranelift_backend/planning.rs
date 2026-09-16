@@ -143,7 +143,7 @@ pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlan
 pub(super) use static_transition::{
     ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
     ContinuationConsumingOccurrence, ContinuationEmissionOwner,
-    ContinuationInputView, RequiredConsumerProjection,
+    ContinuationInputView, RequiredConsumerProjection, DirectOuterProjection,
     ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
     ContinuationWorkerCaptureSource,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches

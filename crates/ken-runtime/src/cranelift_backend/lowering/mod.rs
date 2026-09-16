@@ -270,7 +270,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
     ContinuationSpecializationId,
-    ContinuationUnitView, RequiredConsumerProjection, EmittableCallKind,
+    ContinuationUnitView, DirectOuterProjection, EmittableCallKind,
     FieldIdentity, JoinPlanToken,
     CaseEmissionStatus, PlannedReferentLifetime,
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
