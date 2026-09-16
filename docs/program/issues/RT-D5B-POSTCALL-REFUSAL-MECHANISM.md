@@ -91,6 +91,14 @@ distinct `Packaging` reason in the run and the cause of 8 of 11 base reds.**
 >     CTRL    COMPLETE   88893210a (the class assertion, ruled as D3)
 >     R3      BUILT      43e4451e3 + ff7638ff6, QA APPROVED
 >     ROUTE   DECLINED   evt_w1vnqexkhmxx -- a theorem, not a deferral
+>     MECH-2  OPEN       added 2026-09-16, AFTER this banner was written
+>
+> **`MECH-2` postdates the banner and the heading above is therefore no longer
+> literally true.** It is a read-only divergence measurement, framed at
+> runtime-leader's request on the Architect's `N` read; see its own section
+> below. **It does not change this node's disposition** — the node is held on
+> its base either way, and `MECH-2` produces a recorded answer rather than a
+> commit, so it cannot clear that hold.
 >
 > **"`R3` landed" means landed ON THE BRANCH, not on `origin/main`.** `43e4451e3`
 > and `ff7638ff6` sit on `wp/ABI-S6-d5b-file-backed`, 24 commits deep, on top of
@@ -568,17 +576,88 @@ specialized to mutations, and it caught a nearly-reported unsound `R3` on
 before it is measured.** Both refutations that landed today worked because the
 proposer named in advance what would refute them. Adopt it as the standard here.
 
-## COORDINATION §1a HAS FIRED ON THIS CHAIN
+## COORDINATION §1a FIRED ON THIS CHAIN AND IS NOW DISCHARGED
 
 **Chain: *"what is the mechanism of the `:7720` refusal."* Three stops, all
 refuted by measurement, 2026-09-14.** The Steward's tracker is the count of
 record and this is stop three. ⇒ **the Architect holds on proposing a fourth
 mechanism, and research is called for a prior-art advisory.**
 
-**The research seat is quota-dead** (fleet outage 2026-09-14, ~16 of 23 seats,
-recovery near 2026-09-19). **The advisory is therefore QUEUED UNCONSUMED**, and a
-participant line reading *"idle, awaiting a named research request"* is last-set
-status, not liveness.
+**DISCHARGED 2026-09-15 — the Architect is NOT held.** Research returned about
+four days early, delivered all three advisories, and the Architect dispositioned
+them in one pass. **Advisory 2 is this chain** — the D5b *"receipt `N` vs
+`M<N`"* question, which is this node's two-element receipt against one
+eliminator frame (`evt_1cp7w7w3qqpa`; advisories 3 and 1 at
+`evt_1x623f2dwats0` and `evt_96xz3xa5gvex`). Architect discharge:
+`evt_40ebfajeaf9j8`. Nothing is queued.
+
+This replaces a paragraph asserting the advisory was QUEUED UNCONSUMED against a
+~2026-09-19 research recovery. That was true when written on 2026-09-14 and
+stopped being true the next day; it is recorded here rather than deleted because
+an implementer who read the node in between concluded the Architect was held
+until the 19th.
+
+**What the advisory left was not a fourth mechanism but one decidable read —
+*what does `N` count* — and THAT READ IS NOW DONE** (Architect,
+`evt_245m3hv4r8h88`, measured on
+`origin/backup/ABI-S6-d5b-file-backed-0d94d58b6`; runtime-leader assigned it to
+the Architect at `evt_5105pq70kbwym`). It was `MECH`-shaped — a measurement over
+producers, not a ruling — so `§1a` would not have blocked it even while the hold
+stood.
+
+**THE DISSOLUTION HORN IS DEAD.** The fork's criterion was fixed before the
+measurement, per `AC-7`: the arm dissolves only if a receipt element is
+constructed one-per-resumption-step, and not if an element is built from a
+binder, an occurrence, or a frame.
+
+    N = expected.len()      CheckedIhPostCallConsumerStep, supplied as
+                            edge.executable_exits()      core.rs:9256
+    M = eliminators.len()   the AMBIENT local frame list at lowering
+
+Producer set closed at one site (`AC-3`): `continuations.rs:6217` is the only
+construction in `crates/`, and it pushes **one Step per `frame_origin`, with no
+skip and no filter** — an absent consumer aborts the whole chain with `Ok(None)`
+rather than omitting an element. So `N == frame_origins.len()` by construction.
+⇒ **`N` counts static source consumer occurrences, one per caller-supplied frame
+origin.** `spec/40-runtime/42-evaluation.md §6.2` — *"`k` is applied once, in
+tail position, so no continuation is reified and no stack of suspended
+resumptions is needed"* — is about **runtime resumption stacks**, which `N` was
+never counting. It does not bear on this comparison. Refuted on the criterion
+stated in advance.
+
+**THE READ CORROBORATES `R3` RATHER THAN DISPLACING IT, and the asymmetry is
+PHASE.** Both operands are now known internally exact — neither list skips — so
+the defect is not in either list's internal discipline:
+
+    N   planner-derived, FROZEN onto the edge at PLANNING time (executable_exits)
+    M   the LOWERING-time ambient local frame list
+
+Two enumerations of different populations, built in different phases, compared
+through a shared index convention. That is what `R3` — the frame list must carry
+its anchor — already addresses.
+
+**THE NAMING TRAP, which is a plausible common cause of all three refuted
+mechanisms.** The refusal text says *"a post-call consumer **receipt** is longer
+than…"* and a type named `CheckedIhStaticResponseReturnReceipt` exists. **It is
+not either operand.** It is five scalars — `boundary`, `selected_caller`,
+`call`, `emission_transport`, `returned_word` — and has no length at all. The
+word "receipt" in the message is loose prose for the *step list*. Anyone who
+reads the message and greps `receipt` lands on a type that cannot be either
+operand. **The message text is worth fixing**, and that repair belongs to
+`CTRL`.
+
+**WHAT IS STILL OPEN, and it is the node's next measurement:** why the two
+populations diverge at the failing site. Sharply: *what is in `frame_origins` at
+the failing call, and how does it relate to the ambient `eliminators` list?*
+Both are reachable without a hypothesis — which is what makes this the first
+step in the chain that is not a candidate mechanism.
+
+**STALE COORDINATE IN THIS NODE'S OWN `title`, not yet corrected here.** The
+title cites `lowering/core.rs:7720`; the guard is at `:9256`/`:9263`/`:9269` on
+the branch, which is what `AC-5` below already names correctly. The fix is
+deferred on purpose: `title` is frontmatter, so editing it regenerates
+`IMPLEMENTATION-PROGRESS.md`, and a header candidate touching that file is in
+flight. It lands as a separate edit once that candidate is on `main`.
 
 **This costs the lane nothing, and the reason is a distinction worth stating
 plainly: `§1a`'s hold binds the Architect's RULING, not the ring's
@@ -667,6 +746,55 @@ count of record and a decline that looks like a fourth refutation would otherwis
 be read as one: the mechanism chain's stops were accounts that measurement
 killed, whereas `ROUTE` was declined by DERIVATION from a fact `R3` had already
 established. **A closure holding is not a stop.**
+
+## `MECH-2` — THE DIVERGENCE MEASUREMENT. Released to Team Runtime 2026-09-16.
+
+Framed at runtime-leader's request (`evt_7hbthwggypwqr`) on the Architect's `N`
+read (`evt_245m3hv4r8h88`). **Size S. Tier T2 — this is a read, not a design
+call; the design question it feeds is `R3`, which is already ruled.**
+
+**No urgency on dispatch.** The runtime implementer ran the full `#3676` arc and
+the header fix in one night; runtime-leader flagged that explicitly. This is the
+lane's next item, not tonight's.
+
+**The question, and it is answerable without a hypothesis:** at the failing call,
+**what is in `frame_origins`, and how does it relate to the ambient
+`eliminators` list?** `MECH` established that neither list skips internally, so
+the divergence is between the populations, not inside either one.
+
+    N   planner-derived, FROZEN at PLANNING time   edge.executable_exits()
+    M   the LOWERING-time ambient local frame list
+
+**Read-only, on `origin/backup/ABI-S6-d5b-file-backed-0d94d58b6`.** Reading an
+unmerged ref is permitted; **building on one is not** — and this node's base is
+held (see the Deliverables banner), so there is nowhere for a fix to land even
+if the read suggested one. **The deliverable is a recorded answer in this node,
+not a code change.** A candidate arriving with a repair is out of scope and will
+be sent back.
+
+**`AC-M2-1`. The two populations are enumerated at the failing site**, each
+named with the phase that built it and the code that built it. Not a count —
+the members.
+
+**`AC-M2-2`. The relation between them is stated as one of: subset, disjoint,
+overlapping, or same-set-different-order** — and the evidence is the member
+lists from `AC-M2-1`, not a length comparison. `N` and `M` being unequal is the
+symptom already known; it is not an answer.
+
+**`AC-M2-3`. The criterion is fixed BEFORE the measurement** (`AC-7`, which this
+chain has now honoured twice). State in advance what result would show the
+divergence is *not* a phase artifact, so a green read cannot be retrofitted into
+whichever mechanism is convenient.
+
+**`AC-M2-4`. Coordinates are resolved to their enclosing function**, not cited
+as bare `file:LINE`. Three mechanisms died in this chain on premises that a
+line number made look checked. The guard is at `:9256`/`:9263`/`:9269`, the sole
+producer at `continuations.rs:6217`.
+
+**`AC-M2-5`. If the read corroborates `R3`, say so and stop.** Corroborating the
+standing ruling is a complete and successful outcome. This node exists to find
+the mechanism, not to produce a fourth candidate — `§1a` fired at three for that
+reason, and the discharge above did not reset the count.
 
 ## Obligations this node creates elsewhere
 
