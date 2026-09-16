@@ -35,6 +35,26 @@ const DECL_PARSER_SIGNATURE: &str = "expected 'const'";
 
 const UNGROUPED_IF_ARG: &str = "const k : Nat = keep if c then a else b";
 
+// Every behavioural fixture in this file, named once and shared with the
+// one-directional sweep below. Hoisted deliberately: a second hand-written list
+// in the sweep could drift from the fixtures the behavioural tests actually
+// run, and "every fixture is swept" would become a claim instead of a property.
+const GROUPED_IF_ARG: &str = "const k : Nat = keep (if c then a else b)";
+const LEADING_IF: &str = "const k : Nat = if c then a else b";
+const GUARDED_ARM: &str = "const k : Nat = match z { A x if c |-> b ; B |-> d }";
+const UNGUARDED_ARM: &str = "const k : Nat = match z { A x |-> b }";
+
+/// Fixtures whose behaviour other tests in this file assert. The sweep runs the
+/// one-directional check over exactly these, so no fixture can be exercised
+/// behaviourally without also being checked for a false negative.
+const FILE_FIXTURES: [&str; 5] = [
+    UNGROUPED_IF_ARG,
+    GROUPED_IF_ARG,
+    LEADING_IF,
+    GUARDED_ARM,
+    UNGUARDED_ARM,
+];
+
 fn parse_error(src: &str) -> (String, usize) {
     match parse_decls(src).expect_err("must reject") {
         ElabError::ParseError { msg, span } => (msg, span.start),
@@ -76,10 +96,8 @@ fn the_affirmative_rejection_is_located_at_the_if() {
 /// positions are asserted.
 #[test]
 fn grouped_and_leading_if_are_unaffected() {
-    parse_decls("const k : Nat = keep (if c then a else b)")
-        .expect("a GROUPED if is a legal application argument");
-    parse_decls("const k : Nat = if c then a else b")
-        .expect("a LEADING if is dispatched before the argument loop");
+    parse_decls(GROUPED_IF_ARG).expect("a GROUPED if is a legal application argument");
+    parse_decls(LEADING_IF).expect("a LEADING if is dispatched before the argument loop");
 }
 
 /// AC-GUARD-UNBROKEN. The negative control for the five-loop trap.
@@ -96,10 +114,8 @@ fn grouped_and_leading_if_are_unaffected() {
 /// both, and must exist even though nobody intends to touch that loop.
 #[test]
 fn ac_guard_unbroken_guarded_match_arms_still_parse() {
-    parse_decls("const k : Nat = match z { A x if c |-> b ; B |-> d }")
-        .expect("a guarded match arm must still parse");
-    parse_decls("const k : Nat = match z { A x |-> b }")
-        .expect("an unguarded arm must still parse");
+    parse_decls(GUARDED_ARM).expect("a guarded match arm must still parse");
+    parse_decls(UNGUARDED_ARM).expect("an unguarded arm must still parse");
 }
 
 /// AC-INLINE-KEN-CENSUS. The fixture population includes Ken written inside
@@ -370,7 +386,7 @@ fn predicate_never_misses_a_forbidden_shape() {
 /// fail loudly rather than silently mislead.
 #[test]
 fn match_guards_are_an_accepted_false_positive() {
-    let guard = "const k : Nat = match z { A x if c |-> b }";
+    let guard = GUARDED_ARM;
     assert!(
         parse_decls(guard).is_ok(),
         "the fixture must be LEGAL, or it is not a false positive"
@@ -426,3 +442,42 @@ fn no_false_negative_across_the_test_corpus() {
          demonstrated the absence of misses — the instrument did not reach"
     );
 }
+
+/// QA condition (2): EVERY fixture this file exercises behaviourally, run
+/// through the one-directional check — not only the match guard QA found.
+///
+/// It iterates `FILE_FIXTURES`, the same constants the behavioural tests use,
+/// so a fixture cannot be added to this file, asserted on, and left out of the
+/// soundness check. The classification of each is printed so a reader can see
+/// which are forbidden-shape and which are legal, rather than inferring it.
+#[test]
+fn every_file_fixture_passes_the_one_directional_check() {
+    let mut forbidden = 0usize;
+    for fixture in FILE_FIXTURES {
+        let rejected_from_loop = match parse_decls(fixture) {
+            Err(ElabError::ParseError { msg, .. }) => msg.contains(ARGUMENT_LOOP_MARKER),
+            _ => false,
+        };
+        if rejected_from_loop {
+            forbidden += 1;
+            assert!(
+                has_argument_position_if(fixture),
+                "FALSE NEGATIVE on a fixture this file asserts behaviour for: {fixture}"
+            );
+        }
+        println!(
+            "  {:<12} predicate={:<5} {}",
+            if rejected_from_loop { "FORBIDDEN" } else { "legal" },
+            has_argument_position_if(fixture),
+            fixture
+        );
+    }
+    // Reach control: if none of the file's fixtures is forbidden-shape, this
+    // test asserted nothing and must not read as evidence.
+    assert!(
+        forbidden > 0,
+        "no fixture in FILE_FIXTURES is forbidden-shape, so the one-directional \
+         check was vacuous over all of them"
+    );
+}
+
