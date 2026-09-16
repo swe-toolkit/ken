@@ -85,14 +85,35 @@ that is visibly *progressing* (checkpoints advancing, the failure moving strictl
 deeper) **still triggers** — "it's making progress" is not a reason to withhold
 the check.
 
-**Count across your own compaction.** You self-compact (§3), which can drop the
-running count. On pickup, **re-derive the count from the hard-stop chain in the
-thread** (it is durable). Treat the **Steward's tracker as the authoritative count
-of record** on any disagreement, and honor any operator count-anchor the Steward
-carries (e.g., "the research pull discharged the 6th; next re-trigger = the 9th").
-The Steward **backstops** this trigger: if you miss a 3rd (e.g., a post-compaction
-miscount), its watchdog catches it and holds you the old way. This is the
-negative-space sibling of [[playbooks-state-mechanism-not-intent]] — a
+**Count across your own compaction — and the count is YOURS ALONE to carry.**
+You self-compact (§3), which can drop the running count. **There is no Steward
+tracker of hard stops and no watchdog backstopping this trigger.** Measured
+2026-09-16: the node schema has no hard-stop field, hard stops appear only as
+free text in `title:`/`origin:` in inconsistent spellings, and a loose key over
+the corpus returns a number that is an artifact of the key. Earlier text here
+named both as authoritative; **citing them is what kept anyone from checking
+that they exist.** Do not defer to them, and do not offer them to another seat
+as an authority that can override you.
+
+**The thread is durable; the COUNT is not.** Re-deriving it means re-making
+every classification — was *this* event a hard stop? — from prose that never
+recorded them as classifications. So carry it in **two** places, both of which
+already exist:
+
+1. **`ARCHITECT-STATE.md`** (§3), where it survives your compaction.
+2. **Published in the ruling post itself, with the DELTA and the REASON**, every
+   time you rule on an event in a chain — *"the §1a count stays at 14: this is a
+   ruling question answered before building, not a hard stop."* This is the half
+   that matters: it makes each **classification durable as a classification**,
+   attributed and dated, in the record the next reader actually has, so
+   re-derivation becomes **reading** rather than **re-judging**.
+
+Do **not** add a schema field for it — a counter nobody is obliged to increment
+is a second authority that fails silently, which is the failure this rule exists
+to avoid. **Honor any operator count-anchor the Steward carries** (e.g., "the
+research pull discharged the 6th; next re-trigger = the 9th"); that provision is
+real and unaffected. This is the negative-space sibling of
+[[playbooks-state-mechanism-not-intent]] — a
 **mechanical count** defeats the "one more round will crack it" rationalization
 that let PX8-H reach ten before the pattern was made native to you.
 
@@ -121,11 +142,20 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 2. …
 ```
 
-**It lives in the file because that is the only place it survives.** §1a's
-count is re-derivable from the thread; a *pattern across stops* is not — it
-exists only in whatever context happens to be resident, and it is the first
-thing a compaction discards. **This is why the global picture was lost: nothing
-was holding it.**
+**It lives in the file because that is the only place it survives.** Neither
+§1a's count nor a *pattern across stops* survives on its own — both exist only
+in whatever context happens to be resident, and both are the first thing a
+compaction discards. **This is why the global picture was lost: nothing was
+holding it.**
+
+> **Corrected 2026-09-16.** This paragraph used to exempt §1a's count as
+> "re-derivable from the thread (it is durable)". **That exemption was false, and
+> it sat inside the very paragraph diagnosing that nothing was holding the
+> pattern.** The thread is durable; the count is a function of *classifications*
+> the thread does not record as classifications. §1a now carries the count in the
+> checkpoint and publishes it with its delta and reason. **The same applies to an
+> inventory entry below: an entry's classification is as unrecorded as a hard
+> stop's unless the post that appends it says why it is one.**
 
 ## 1b-ii. The trigger — at the 3rd entry, name the predicate or split them
 
