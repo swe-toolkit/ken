@@ -28,49 +28,84 @@ origin: "Steward, 2026-09-16, on operator directive 2026-09-15: 'The other tests
 
 Read the frame: `docs/program/wp/RT-IGNORED-FAILING-ROWS-INVENTORY.md`.
 
-## One measured instance of the banner's own warning: `px8ds`
+## `px8ds`: a RULED disposition that was never executed
 
-**The banner above says the sixteen are a hypothesis about the population, not
-the population. Here is a row that makes that concrete, and it is an ORDINARY
-member of the ledger — not an escalation and not a regression.**
+**This row is NOT a member of this node's ledger and must not be worked as
+one.** It is recorded here because this is where someone comparing rosters will
+come looking for it, and because the reason it is loose is worth more than the
+row is.
 
     row      px8ds_real_same_depth_path_runs_exact_edges
     file     crates/ken-cli/tests/px8ta_oriented_subcontinuation.rs:389
     label    "focused native resource-cost row; run outside default suite"
 
-**What is MEASURED**, all at `origin/main`
+**Its disposition is already ruled.**
+`docs/program/wp/RT-IGNORED-PASSING-ROWS-DISPOSITION.md` classifies it under
+**`D-REGISTER` — keep ignored, add to `.github/ignored-test-exemptions.toml`**,
+class **`policy-cost`**, *"exactly like the registered
+`b2v_ac10_..._at_thirty_thousand`"*, with the instruction that the implementer
+**confirms rather than re-decides**. That is an operative section of that frame,
+not a stale roster.
+
+**What is MEASURED**, at `origin/main`
 `89d33f74cbe8227580acc486df3f5879f40e31b3` unless stated:
 
-1. The row is `#[ignore]`d on `main` (`:388`).
-2. It is **not** in `.github/ignored-test-exemptions.toml` — that registry names
-   six rows and none of them is in `px8ta_oriented_subcontinuation`.
-3. The frame's §2 listing names `ken-cli::px8ta_oriented_subcontinuation` with
-   **one** row, `public_two_three_level_brackets_finish_and_release_lifo`.
-   **`px8ds` is a different row in the same binary and is not listed.**
-4. At `0f71ab5b9267781ae1d91bc654011cad42b926af` the row **passed** — it was a
-   member of that tree's twelve.
-5. It is absent from the eleven passing on run `34753101365` (2026-09-13) and
-   absent from today's eleven.
+1. `#[ignore]`d on `main` (`:388`), with the label above.
+2. **Not** in `.github/ignored-test-exemptions.toml` — the registry names six
+   rows and none is in `px8ta_oriented_subcontinuation`. **The ruled
+   registration has not happened.**
+3. Pre-classified `D-REGISTER`/`policy-cost` in the disposition frame, which
+   derived that population from the **twelve at `0f71ab5b9`**.
+4. Absent from the eleven passing on run `34753101365` (2026-09-13) and from
+   the eleven the disposition node actually executed against.
+5. That node completed **eleven of eleven — nine readmitted, two held.**
+   `px8ds` is in none of the three outcomes.
 
-**What is INFERRED, and labelled as such:** ignored plus un-exempted means the
-sweep selects it, and absent-from-the-passing-set then places it in the failing
-set. **That is an argument from two measurements, not a third measurement.**
-`D0` confirms or kills it, and if the row turns out not to be selected at all
-**that is the more interesting answer** — say so rather than forcing it into the
-ledger.
+⇒ **The row fell out of the population between the frame being written and the
+frame being executed.** The disposition was ruled against the twelve, the
+executing node correctly worked the eleven it measured at its own base, and
+**the ruling for the row that is in the first set and not the second was
+silently not carried out.** Nobody erred: the frame's pre-classification was
+sound, and the executing node was explicitly told to work its measured
+population and not manufacture a twelfth.
 
-**Do NOT write this up as a regression.** `0f71ab5b9` is **not an ancestor of
-`main`**. There is no shared history in which a status changed, so "moved from
-passing to failing" has no referent. The honest statement is **one row, two
-disjoint trees, two results** — and producing the signature on the tree that
-matters is exactly this node's job.
+**This node's §2 listing does not name it either** — §2 names
+`ken-cli::px8ta_oriented_subcontinuation` with
+`public_two_three_level_brackets_finish_and_release_lifo`, a different row in
+the same binary. **That binary holds three ignored rows** (`:256`, `:283`,
+`:389`) and the two frames between them name two.
 
-**First instruction for whoever takes this row: get its own failure output.**
-Every hypothesis about why it is not passing — unlanded work, a correctly
-failing assertion, the runner's thread/stack provisioning — is idle until the
-row has been run and read. Its label explicitly says it runs on a separately
-provisioned thread outside the default suite, so **the run conditions are part
-of the signature**, not background.
+## What to do with it, and what not to
+
+**Do not produce a failure signature for it and do not add it to the ledger.**
+Its `#[ignore]` reason is a standing policy cost, not a defect — the sweep
+should never have been reporting it, which is precisely what `D-REGISTER`
+exists to fix. Running it to get a signature answers a question nobody asked.
+
+**The action is registration, and it belongs to
+`RT-IGNORED-PASSING-ROWS-DISPOSITION`, not here.** One registry row,
+class `policy-cost`. Whoever picks that up should also re-check
+`d0_distinct_recursive_map_child`, the other row pre-classified `D-REGISTER` in
+the same passage, against the executed eleven.
+
+**Do NOT write it up as a regression.** `0f71ab5b9` is **not an ancestor of
+`main`**, so there is no shared history in which a status changed and "moved
+from passing to failing" has no referent. **One row, two disjoint trees, two
+results** — and since the ruled disposition is to keep it ignored, its colour on
+either tree is not the question.
+
+## The generalizable defect, which is the reason this section exists
+
+**A per-row ruling made against one measured population is silently dropped for
+any row that leaves the population before execution.** The executing node's
+completion report is honest — eleven of eleven — and the dropped row appears in
+no outcome, no diff, and no red. **There is no artifact in which its absence
+shows up**, which is why it took a set comparison between two rosters to find.
+
+**The cheap detector is a per-binary census rather than a better roster:** for
+each file containing `#[ignore]`, does every ignored row appear in exactly one
+operative disposition? `px8ta_oriented_subcontinuation.rs` returns **3 rows, 2
+claimed** on that query, with no hand comparison of sets.
 
 ## This node READS. It repairs nothing.
 
