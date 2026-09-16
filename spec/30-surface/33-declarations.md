@@ -406,6 +406,18 @@ structure `C : Type → Type` (its members carve out a subobject of the universe
 "typeclasses-as-subobjects" design is the most category-faithful account of open
 user typeclasses.
 
+> **That shape is the common case, not the formation rule.** The rule is `§5.2`
+> — a class elaborates to the right-nested Σ over its field telescope — and it
+> fixes no level; `§5.1` then keys the property/structure discriminant on the
+> record's kernel-computed **sort family**, not on a level. A class may
+> therefore depart from `C : Type → Type` on either axis and remain an ordinary
+> class. Both departures exist: `class Traversable (f : Type → Type)` (`§5.2`)
+> takes a higher-kinded **parameter**, and a class carrying a `Type`-valued
+> field lands one universe up, at `C : Type ℓ → Type (suc ℓ)`, because the
+> field's type is itself at `Type (suc ℓ)` (`12 §1`) and the Σ-sort takes the
+> maximum (`13 §4`). Read the shape above as orienting; read `§5.1`/`§5.2` as
+> binding.
+
 ```
 class DecEq (A : Type) {              -- a record of operations + their laws
   eq    : A → A → Bool                 -- (the propositional equality is the
