@@ -52,8 +52,21 @@ lieutenant holds no gate authority. The split is what makes that safe.
 
 **Only the ROUTER can withdraw an authorization, because only `ROUTED: <SHA>`
 created it.** A reviewer who spots a defect after routing and writes *"@lieutenant
-hold this one for a one-line fix"* has posted into a channel the publisher is not
-reading for instructions — it is polling for `ROUTED:`, and a review is not that.
+hold this one for a one-line fix"* is asking the executor to un-act on an
+authorization it already holds.
+
+**MEASURED, because the first draft of this section asserted a mechanism I had
+not checked.** It said the publisher "is polling for `ROUTED:`". It is not:
+
+    grep -rn 'ROUTED' scripts/ --include='*.sh' --include='*.py'   ->  0 hits
+    the only readers are agent/playbooks/federation/lieutenant.md
+    and agent/COORDINATION.md §14b -- both PROSE, read by an agent
+
+⇒ **There is no string matcher anywhere. Detection is a reading.** The
+lieutenant is an agent that reads the post and judges it, so there is no regex
+to fail open and no prefix to get right — **and the failure is fuzzier than a
+parser bug, not tidier.** A qualifier only works if the reader weighs it, and
+the reader is the same one that did not act on two plain-language holds.
 
 Measured twice in one hour, both times the Architect, both times correct:
 
@@ -68,11 +81,21 @@ explicitly predicted would become *"a `-N` correction to a memory file."*
 the **router**, not the executor, and say *"withdraw the routing"* rather than
 *"hold." The router is the only seat that can un-authorize.
 
-⇒ **The tell for the ROUTER:** the window between your `ROUTED:` and the merge is
-when reviews arrive, and you have no way to recall the authorization once the
-publisher picks it up. **On a doc-only candidate you expect commentary on, route
-it as `ROUTED, HOLD FOR <reviewer>` and post a bare `ROUTED: <SHA>` only after
-the review clears** — so the hold lives in the one channel the publisher acts on.
+⇒ **The tell for the ROUTER, and it is the load-bearing one: DO NOT POST
+`ROUTED:` AT ALL until the review you expect has cleared.** The window between
+your authorization and the merge is exactly when reviews arrive, and you cannot
+recall it.
+
+**A qualified routing — `ROUTED, HOLD FOR <reviewer>` — is NOT the fix, and
+this file's first draft recommended it.** It rests on the executor reading a
+qualifier and weighing it correctly, which is the same fallible channel that
+swallowed both holds above. **Adding words to a message that was already not
+acted on is not a mechanism.** Withholding the authorization is, because an
+absent `ROUTED:` cannot be misread.
+
+Use a qualified routing only to say *"this exists and is gated"* for
+coordination; never treat it as protection. If it is not ready to merge,
+**the safe state is that no authorization exists.**
 
 **Do not read this as "the executor erred."** It executed exactly the
 authorization it was given, which is the protocol working. The defect is that a
