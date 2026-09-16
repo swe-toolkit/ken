@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-16 04:13:04Z — from 629 issue file(s) in `docs/program/issues/`.
+2026-09-16 04:25:47Z — from 630 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -309,6 +309,7 @@ the committed file matches the generator's output.
 | `ORACLE-VIS-CHECK` | replace the text-pin oracle in px4b_native_production.rs with a real visibility check | merged | runtime | S | none | — |
 | `ORACLE-VIS-PACKAGING` | replace the text-pin visibility oracle on build_process_starter_executable_artifact | merged | runtime | XS | none | — |
 | `PROG-TRACKER-MERGE-DRIVER` | Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built | ready | steward | S | none | — |
+| `PUB-DOC-ONLY-UNVALIDATED-AGAINST-ITS-DIFF` | `--doc-only` names a content class and is never checked against the actual content class of the diff, so the publisher accepts an assertion ABOUT the tree in place of the tree and merges a crates/ change with zero CI; the closure is one refusal, not a policy change or a discipline reminder | ready | verify | S | none | — |
 | `PUB-VERIFY` | scripted-pr-automerge.sh exits 0 on a failed push | closed | steward | S | none | — |
 | `PX10` | processes — declarative spawn plan, deny-by-default inheritance, pidfd identity, typed child-exit observation | draft | runtime | L | none | — |
 | `PX11` | sockets — typed addresses, bounded send/receive, explicit option families, injected resolver capability | draft | runtime | L | none | — |
@@ -678,6 +679,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
 - `LANG-RESERVED-INFIX-NAMES` — A0 of the reserved-infix-glyph objective: admit the six currently-reserved glyph tokens (Le ≤/<=, Ge ≥/>=, Ne ≠//=, And ∧//\\, Or ∨/\\/, Member ∈) as ordinary symbolic GLOBAL names and infix/fixity targets through ONE shared parser token-to-canonical-name view reused at every consumer site, entering the existing neutral-spine + GlobalId-keyed fixity reassociation as ordinary RApp; NO standard semantic binding, NO Membership class, NO `!=`/`in` alias -- syntax/naming only
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
+- `PUB-DOC-ONLY-UNVALIDATED-AGAINST-ITS-DIFF` — `--doc-only` names a content class and is never checked against the actual content class of the diff, so the publisher accepts an assertion ABOUT the tree in place of the tree and merges a crates/ change with zero CI; the closure is one refusal, not a policy change or a discipline reminder
 - `RESULT-NAMES-TWO-ARTIFACTS` — 'Result' names two different declarations -- the ITree effect-monad's result and the user's Result type -- so every artifact in the ABI-S6 arc saying 'the demanded Result identity' is ambiguous between them, including the Architect's own rulings. The ambiguity already cost a hunt: three independent reasons the ruled repair could never have worked, and 'they are different types' was the cheapest to check and was checked last.
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-AUTHORITY-CONTRACT-MISDESCRIBES-ITS-POPULATION` — generated_constructor_authorities is NOT restricted to generated-context constructors -- a user's Result::Ok acquires an authority exactly like a generated-context one -- but the field name, its doc comment, and the registrar's own error string all say generated-context. The doc comment is the artifact the entire exclude-or-refuse obligation derives from, so a faithful derivation from it transmits the misdescription with full authority. That is what happened. (This title said 'ranges over EVERY carried constructor' until the Architect measured both writers: exit_failure returns early and the other registrar is gated, so the universal is false at a measured site while the finding is untouched.)
