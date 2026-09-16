@@ -5,30 +5,87 @@
 //! lowering re-runs this pure classifier to borrow the cases/default it needs,
 //! then checks every local coordinate against the stored descriptor.
 //!
-//! **Strata A and B of the `#3676` re-cut.** Stratum A is the plan-INDEPENDENT
-//! classifier: it names no plan type and defines no extension `impl`. Stratum B
-//! is the plan-coupled realization plane -- the deriving, building, publishing
-//! and validating half, its extension `impl`, and its cfg-gated mutation guard.
-//! The relation Stratum B builds is stored on `StaticTransitionPlan`; the field
-//! and its `BTreeMap::new()` initializer are the only edits the second slice
-//! makes outside this file.
+//! **Strata A and B of the `#3676` re-cut, and the plane is WIRED.** Stratum A
+//! is the plan-INDEPENDENT classifier: it names no plan type and defines no
+//! extension `impl`. Stratum B is the plan-coupled realization plane -- the
+//! deriving, building, publishing and validating half, its extension `impl`, and
+//! its cfg-gated mutation guard. The relation is stored on
+//! `StaticTransitionPlan`, and `construction.rs` assigns
+//! `publish_immediate_bridge_realization_plan`'s result into it immediately
+//! before response phase B.
 //!
-//! **NOTHING HERE IS ON A PRODUCTION PATH, and that is the property the slice
-//! is defined by.** The live wiring -- the assignment of
-//! `publish_immediate_bridge_realization_plan`'s result into the plan before
-//! response phase B -- is a successor slice and is deliberately absent, as are
-//! the deferred-response sub-case variant for a bridge realized without a
-//! physical call and the `owns_seat` rewrite that travels with it. THOSE NAMES
-//! ARE NOT SPELLED ANYWHERE IN THIS FILE, deliberately: a zero-hit grep for them
-//! is one of this slice's controls, and a mention in a comment turns that
-//! control into a count of its own prose. Slice 1's header made the same point;
-//! this sentence is where it is easiest to break it.
+//! **This header said the opposite until the wiring landed, and the two
+//! sentences it got wrong are recorded rather than quietly swapped:** it
+//! asserted nothing here was on a production path, and that the `never used`
+//! warnings would clear themselves when a successor wired the plane. The first
+//! is simply false now. The second is half true: the warnings DID clear for
+//! `publish_`, `derive_`, `relation_from_rows` and the Stratum A chain, and did
+//! NOT clear for anything else -- and the "anything else" is the interesting
+//! half, because it is the consumer-facing surface. The roster below is that
+//! half.
 //!
-//! Because nothing calls in from production, a production build reports
-//! `never used` here. That is not debris: it is the only live indicator that
-//! this module sits on no live path. Do NOT silence it with
-//! `#[allow(dead_code)]` -- the warnings clear themselves when the successor
-//! wires the plane in. Architect ruling, 2026-09-16.
+//! **Two things are still deliberately absent, and NEITHER NAME IS SPELLED
+//! ANYWHERE IN THIS FILE:** the deferred-response sub-case variant for a bridge
+//! realized without a physical call, and the seat-ownership rewrite that travels
+//! with it -- an existing site the successor rewrites rather than adds.
+//!
+//! That is deliberate: a zero-hit grep for each name is a live control, and one
+//! mention in a comment turns that control into a count of its own prose. **No
+//! file locator here either, for the same reason** -- a coordinate in this
+//! sentence rots exactly the way a name would, and this paragraph has already
+//! carried a wrong one. The successor's frame is where that site is located.
+//!
+//! **This sentence has broken that control twice.** Slice 2's header spelled the
+//! first name while explaining why it must not; the as-built rewrite then
+//! spelled the second while explaining the same thing. Describing a name is the
+//! whole discipline, and the describing sentence is the one place it keeps
+//! failing -- so if you edit this paragraph, grep both names in this file
+//! afterwards and expect 0.
+//!
+//! **What is still dead, and it is not debris. THE RULE IS DURABLE; THE ROSTER
+//! BELOW IS A SNAPSHOT AND WILL GO STALE.**
+//!
+//! THE INVARIANT: `ken-runtime`'s `never used` diagnostic names exactly the
+//! items in this module with no live root, and it is the module's own statement
+//! of which half is wired. **Read its NAMED ITEMS and never the warning count**
+//! -- a merged diagnostic that loses one subject leaves the tally unmoved. The
+//! set shrinks as consumers land; when it is empty the plane is fully consumed.
+//! To re-take it: `scripts/ken-cargo build -p ken-runtime` **with default
+//! features**, read the `(lib)` block, and take every `never used` /
+//! `never read` / `never constructed` whose location is this file.
+//!
+//! **The feature set is part of the measurement, not a detail.** Measured at
+//! `67684fa5d`: default features report SEVEN diagnostics here;
+//! `--features px8-ds-test-support` reports TEN. The extra three are the
+//! mutation harness -- its enum's variants, its guard struct, and
+//! `with_d5b_hs10_bridge_plan_mutation` -- which are gated out of a default
+//! build entirely and so cannot be dead in one. They are not exempt from the
+//! analysis; they are absent from it. A roster taken under the feature and
+//! compared against one taken without will disagree by exactly those three.
+//!
+//! THE ROSTER, re-taken that way at `67684fa5d` and true of nothing else:
+//!
+//! ```text
+//! build_immediate_bridge_realization_plan
+//! validate_immediate_bridge_realization_plan
+//! StaticTransitionPlan::immediate_bridge_realization
+//! StaticTransitionPlan::immediate_bridge_realization_identities
+//! impl ImmediateBridgeRealization -- every accessor, the diagnostic
+//!     names them individually
+//! ImmediateBridgeConsumer -- the borrowed `cases` / `default` fields
+//! ```
+//!
+//! Wiring `publish_` made `publish_`, `derive_`, `relation_from_rows` and the
+//! whole Stratum A chain reachable and left the rest. `validate_`'s only caller
+//! is a test and `build_`'s only non-test caller is `validate_` itself, so
+//! neither has a live root. **The two plan accessors are the consumer-facing
+//! half and are the telling pair: the plane is now BUILT on every plan and READ
+//! by nothing** -- which is exactly why the upper half of the ordering claim was
+//! not falsifiable at the wiring slice. Do NOT silence any of them with
+//! `#[allow(dead_code)]` -- that warning is the live indicator of which half of
+//! this module is on a production path, and it is read by the named items and
+//! never by the warning count, which does not move when a merged diagnostic
+//! loses one subject. Architect ruling, 2026-09-16.
 
 use std::collections::{BTreeMap, BTreeSet};
 
