@@ -89,7 +89,9 @@ pub(in crate::cranelift_backend) use semantic_ir::{
 // surface ahead of the slice that uses it.
 use immediate_bridge::ImmediateBridgeRealization;
 #[cfg(feature = "px8-ds-test-support")]
-pub use immediate_bridge::{with_d5b_hs10_bridge_plan_mutation, D5bHs10BridgePlanMutation};
+pub(in crate::cranelift_backend) use immediate_bridge::{
+    with_d5b_hs10_bridge_plan_mutation, D5bHs10BridgePlanMutation,
+};
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
