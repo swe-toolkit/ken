@@ -30,11 +30,18 @@ origin: "Steward cut 2026-09-16 at the Architect's naming, on their D0 REVERSAL 
 > deleted at origin — so no live candidate holds
 > `crates/ken-elaborator/src/parser.rs`.
 >
-> **One question is open and is NOT the implementer's to settle:** what
-> `box.value keep` parses as at the head position. The pin fixes the argument
-> position and is silent on the head. Frame §4 routes it to the Architect, and
-> it is to be asked **before** the postfix relocation is written, not inferred
-> from whichever patch is easiest.
+> **The head-position question is RULED and closed** (Architect
+> `evt_3n1q5324gsqjv`): `box.value keep` is `A(Proj(box, value), keep)`, and it
+> is **entailed** by `32-grammar.md:264`/`:270` rather than chosen, so **no Spec
+> escalation is owed.**
+>
+> **The ruling also reversed the patch shape.** The head position already
+> conforms on `main`; only the **argument** position diverges. Relocating the
+> postfix loop to after the argument run — which this node's first framing
+> implied — regresses `box.value keep` and `f a.b c` from correct to
+> **unparseable**. The implementable shape is one loop with two alternatives, in
+> **frame §2e**, with exact edits. Read §2d-§2f and §4 before touching the
+> parser.
 
 # Objective
 
@@ -150,7 +157,9 @@ the migration count.**
 
 ⇒ **The authoritative instrument is the AST walk the language-implementer
 already built** — `EApp(head, EProj(base, field))` over the parsed catalog,
-with `Expr::EProj` at `crates/ken-elaborator/src/ast.rs:650`. It decides
+with `Expr::EProj` at `crates/ken-elaborator/src/ast.rs:736` (this node
+originally cited `:650`; the A0 landing shifted it — re-measure before use). It
+decides
 `d.leq`-as-projection against `Module.name`-as-qualified-path, which no regex
 can. **That walk is this node's D0, and its result is the migration ledger.**
 
