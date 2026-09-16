@@ -268,10 +268,51 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  and they were in the census the whole time:
                  Response(StaticResponseOwnerId(0)) and (1), for funcid58 and
                  funcid59 respectively, identical in both binaries.
-                 STILL SETTLED BY MEASUREMENT, NEVER BY NUMBER. The linkage
-                 symbol is being printed alongside, so the claim rests on a
-                 measurement rather than on a reading of that comment.
-                 Architect evt_1vnsrqk27v53c; implementer evt_7v8vwk1w4bqgt.
+                 STILL SETTLED BY MEASUREMENT, NEVER BY NUMBER -- BUT THE
+                 SYMBOL READ IS NOT THAT MEASUREMENT, AND IT IS WITHDRAWN.
+                 2026-09-16, ran and retracted by the Architect who ordered it
+                 (evt_6psqbdtxd5jk6). The symbols came back exactly as minted:
+                   funcid58 Response(StaticResponseOwnerId(0))
+                            -> ken_static_response_0
+                   funcid59 Response(StaticResponseOwnerId(1))
+                            -> ken_static_response_1
+                   funcid60 Context(ContinuationContextId(0))
+                            -> ken_continuation_context_0
+                 EVERY SYMBOL IS THE PLANNER ORDINAL WITH A PREFIX, minted FROM
+                 the unit field that is already in the census. It therefore
+                 CANNOT DISAGREE with that field: it is a restatement, not a
+                 second source, and it cannot settle 2-versus-4. The instrument
+                 is ENTAILED BY the thing it was offered to confirm, which is
+                 the same entailment test this node had just applied elsewhere.
+                 A NAME IS A RENDERING OF AN IDENTITY, NOT A SOURCE OF ONE. The
+                 unit field -- Response(StaticResponseOwnerId),
+                 Context(ContinuationContextId) -- IS the identity the machinery
+                 keys on; it was in the census the whole time.
+                 THE DEFECT IS RECORDED AGAINST THE INSTRUMENT, NOT AGAINST THE
+                 SEAT THAT RAN IT. The Architect ordered the read and withdrew
+                 it; the implementer's report absorbed it as its own and that
+                 is generous rather than accurate. An inventory that files it
+                 under the implementer would mislead a later reader.
+                 THE INDEPENDENT REPLACEMENT IS A STRUCTURAL CLIF FINGERPRINT
+                 per staged body -- block count, instruction count, authority
+                 count, obligation count, published word -- computed from the
+                 CLIF, which the planner ordinal does not feed. That is the
+                 entailment test PASSED rather than restated.
+                 ITS TWO DIRECTIONS ARE NOT SYMMETRIC, and this shape is what
+                 survives retelling where prose does not:
+                   DIFFERENT fingerprint => DIFFERENT body.       Sound.
+                   IDENTICAL fingerprint => consistent with same. WEAKER than it
+                       looks: these are COUNTS, and two different bodies can
+                       share counts.
+                 THE WEAK DIRECTION FAILS SAFE -- understating the evidence
+                 concludes weight 1 where a little more was due, and nobody
+                 over-acts on an understatement. So it is not strengthened.
+                 THE CONTROL ARM IS THE LOAD-BEARING HALF: funcid58/funcid59
+                 MUST DIFFER across compiles. If all three come back identical
+                 the test is INCONCLUSIVE, not confirmatory -- that is also
+                 what (b), one body reported repeatedly, looks like.
+                 Architect evt_1vnsrqk27v53c, evt_6psqbdtxd5jk6; implementer
+                 evt_7v8vwk1w4bqgt, evt_2ncdwex1gvhmw.
                  THE FOURTH TERM, and it is the Architect's: it offered DISTINCT
                  BODIES as the right KIND of object to replace a count of
                  entries -- and that object is itself UNDER-DEFINED over this
@@ -390,11 +431,36 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  bit per (refusal, identity) pair for every identity = None
                  obligation, specifically funcid59's obligation on funcid60,
                  which is the row the partition turned on.
+                 BUILT 2026-09-16, AND BUILT WIDER THAN SPECIFIED. The tuple
+                 as prescribed above was (result_word, identity,
+                 realization_required); as built it carries a fourth element,
+                 CALLEE. Architect evt_6psqbdtxd5jk6, accepting the addition.
+                 CALLEE IS WHAT TURNS A SHAPE INTO A ROW. Without it the print
+                 says "an obligation lost its identity"; with it, "FUNCID59's
+                 obligation ON FUNCID60 lost its identity" -- the row the
+                 partition turns on, named without a second lookup.
+                 IT IS ALSO THE RIGHT KIND OF ADDITION, which is worth naming
+                 beside the withdrawn symbol read in BODIES: the callee is a
+                 FUNCID, an identity the system already carries, not a string
+                 minted to stand for one. Same test, opposite verdict.
+                 IT IS NESTED AT FIELD 8, NOT ADDED AS A THIRTEENTH. Rust's
+                 Debug derive tops out at 12 elements, so field 8 is now a
+                 PAIR: the old identity-filtered list, plus every obligation
+                 UNFILTERED. Nesting rather than dropping a field is correct --
+                 and it puts the unfiltered list directly beside the filter
+                 (identity == Some(*identity)) that excludes the evidence, so
+                 the gap this row describes is visible in one line of output.
     FIRST        D1 EVALUATES **PRODUCE AGAINST PROVE** BEFORE DESIGNING THE
                  REPAIR. "Production, not re-keying" was a TWO-way fork and
                  there is a third arm the code already implements; see below.
                  This does not resize D1 -- it stops D1 building the narrow
                  fix by default.
+                 THE SEED ARM HAS ONE MEASUREMENT AGAINST IT AND IT IS NOT THE
+                 OBVIOUS ONE. The seed-free control (below) proved funcid60
+                 with an EMPTY certificate set, so the seed is NOT LOAD-BEARING
+                 for the grounding. It is also NOT INERT: 6664 blocks / 7 cuts
+                 with it against 7762 / 6 without. Those are different claims
+                 and only the first bears on this fork.
     NOT-EXCLUDED the 5 arm-2 refusals. THIS EXCLUSION IS REFUSED ON MEASUREMENT
                  (Architect evt_2mw3vjp30yjbn). It read them as "the proving arm
                  declining, cause 2 is the gate working" -- but that gate NEVER
@@ -403,6 +469,12 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  own arm-1 population; see BOUNDARY.
                  THE PROHIBITION ON REPAIRING CAUSE 2 TOWARD GREEN IS UNTOUCHED.
                  What falls is the claim that these entries ARE cause 2.
+                 THEIR MECHANISM IS NOW NAMED, and it is recorded as an
+                 observation rather than cut as a node: :4467 over-demands, so
+                 these refusals are GATING ARTIFACTS rather than verdicts. See
+                 the recorded observation below, and note its THIRD FENCE,
+                 which binds this row: it explains the mechanism of the 5 and
+                 DOES NOT RE-OPEN THE COUNT. D1 stays at 12 + 5.
     EXCLUDED     the rt_parity (c1) entries -- PROVISIONALLY FOLDED, below. They
                  enter neither D1's scope nor its sizing.
     HOLE         abi_s6_mapping_file_backed_native is NOT MEASURED and is NOT
@@ -978,7 +1050,108 @@ the one pre-existing refusal that never carried `funcid60`. **That shape
 prediction came true without being aimed at**, which is worth more than the
 narrowing.
 
-**ONE PAIR IS NOT FIVE.** The BOUNDARY ruling rests on *arm 2 never RAN*, and
+> ### ALL SIX PAIRS RAN 2026-09-16. ALL SIX PROVE. POPULATION 17 -> 12.
+>
+> `ken-cli --test px8f_buffer_native`, same env-gated diagnostic, same three
+> fences. Bypass scope measured: exactly five triples fired, each twice, every
+> one the same shape (`demander=funcid60`,
+> `demander_unit=Context(ContinuationContextId(0))`).
+>
+> **The narrowing is real and measured: 17 entries to 12.** The 12 are 2 planner
+> roles across 6 compiles, one defect shape. Architect `evt_s8jr4hf5hb5w`.
+>
+> **SIX AND FIVE RANGE OVER DIFFERENT OBJECTS, AND BOTH ARE RIGHT. `17 - 6` IS
+> NOT THE ARITHMETIC.** Architect `evt_4rqft0c2k09s7`.
+>
+>     SIX   ranges over EVALUATIONS.   The diagnostic evaluated funcid60's
+>                                      arm 2 in six compiles.
+>     FIVE  ranges over CENSUS ENTRIES. funcid60 has a census entry in five.
+>
+>     arm-1   2 bodies x 6 compiles = 12
+>     arm-2   1 body   x 5 compiles =  5     <- FIVE, not six
+>                                      17 - 5 = 12
+>
+> **The sixth evaluation is the out-of-partition compile** — the one where
+> `funcid60` never refused, which is why it has no census entry to remove. This
+> is the same `sixth compile` held outside the partition below, stated here so
+> that a reader doing the subtraction does not land on 11 and conclude the
+> headline is wrong.
+>
+> ### AND THAT ASYMMETRY IS EVIDENCE, NOT BOOKKEEPING
+>
+> **The arm-1 bodies appear in 6 of 6 compiles; `funcid60` appears in 5 of 6.**
+> `12 = 2 x 6` against `5 = 1 x 5` **is the same fact as "funcid60 did not refuse
+> in one compile"** — and it is a COUNT, arrived at from the census, **not a
+> reading off the interleaved 8-thread stream whose attribution was retracted.**
+> The sixth compile's anomaly was sitting in the partition's own arithmetic the
+> whole time.
+>
+> **ITS WARRANT DEPENDS ON ONE UNANSWERED QUESTION, AND THE NODE MUST NOT BANK
+> THE UPGRADE BEFORE IT IS ANSWERED:** was the 17-entry census built from that
+> same interleaved output, or from a separate structured collection?
+>
+>     SEPARATE  => the sixth compile's absence has a warrant INDEPENDENT of the
+>                  retracted stream. (ii) stays refuted, (i) and (iii) stay live,
+>                  and the absence no longer rests on a disowned instrument.
+>     SAME      => the absence inherits the same defect, and FIVE-not-six is
+>                  itself suspect: the census could be missing an entry for the
+>                  same reason the stream lost a line. EVERY count in this node,
+>                  12 included, would rest on it -- a SECOND projection beneath
+>                  the one this node already established.
+>
+> **UNRESOLVED. Recorded as a question, not as the favourable arm.**
+>
+> ### AND "SIX OF SIX" MAY BE WORTH ONE OBSERVATION, NOT SIX.
+>
+> Every one of the six verdicts is **byte-identical apart from the identity**:
+>
+>     published=v26   def=Param(block7,0)   sources={v3653}
+>     reachable_blocks=6664   cuts=7
+>
+> **These are six DIFFERENT Ken programs.** They do not produce the same value
+> number, the same block, the same grounding source, the same 6664-block
+> reachable set and the same 7 cuts by coincidence. Two live readings:
+>
+>     (a) funcid60's Context body is the SAME GENERATED CONSTRUCT in every
+>         program -- continuation-context boilerplate, emitted identically
+>         regardless of the user program. BENIGN, and INFORMATIVE.
+>     (b) the instrument is reporting ONE BODY REPEATEDLY.
+>
+> ⇒ **If (a), the six proofs are ONE OBSERVATION WITH MULTIPLICITY SIX, and the
+> evidential weight of "uniform, no exceptions" is 1.** *"All six prove"* reads
+> as six independent confirmations; six runs of the same generated body through
+> the same walk is one confirmation repeated.
+>
+> **THIS IS THE SUMMARY-OBJECT LESSON APPLIED TO EVIDENCE RATHER THAN TO REPAIR
+> COUNTS.** A count of observations is not a count of things — the same shape
+> that made `12` read as twelve sites. **Fourth occurrence in this arc.**
+>
+> **The result is NOT weaker than its actual claim.** For *"funcid60's entries
+> were gating artifacts, not independent arm-2 refusals"*, one body proving six
+> times is entirely sufficient, because that claim is about `funcid60`. **The
+> multiplicity only misleads when "six of six, no exceptions" is later cited as
+> ROBUSTNESS**, which is work it cannot do. Do not cite it that way.
+>
+> **AND (a) WOULD CLOSE SOMETHING LEFT OPEN.** The earlier note that the same
+> three funcids in both binaries was *"suggestive but NOT evidence of identity —
+> deterministic numbering over a shared prelude would produce exactly that
+> coincidence"* is **that hypothesis confirmed** if (a) holds. It also settles
+> what *"the same body across compiles"* can mean: **not the same source
+> definition, but the same GENERATED CONSTRUCT** — cleaner than the planner-role
+> substitute in the BODIES row, and already present in the output.
+>
+> **THE INSTRUMENT THAT SETTLES (a) VERSUS (b) IS THE CLIF FINGERPRINT, NOT A
+> SYMBOL NAME.** The symbol read was ordered, run, and withdrawn as entailed —
+> it is minted from the `unit` field already in the census. The fingerprint is
+> computed from the CLIF, which the planner ordinal does not feed. **Its
+> asymmetry decides how this block may be read:** if `funcid58`/`funcid59`
+> differ across compiles and `funcid60` does not, that is (a). **If all three
+> come back identical the test is INCONCLUSIVE, not confirmatory** — identical
+> counts are also exactly what (b) looks like. Full statement in the BODIES row.
+
+**ONE PAIR IS NOT FIVE — the restraint below is SUPERSEDED by the six-pair pass
+above, and is kept because it is why the pass was demanded.** The BOUNDARY
+ruling rests on *arm 2 never RAN*, and
 that is measured for all five. *What arm 2 SAYS when it runs* has **one data
 point out of five**. If any of the remaining four REFUSES when let through, the
 exclusion revives **for that pair specifically and for no other**. Both halves
@@ -1066,13 +1239,145 @@ are per-`(refusal, identity)` pair, as the pair rule requires.
 > Architect `evt_1vnsrqk27v53c`. This sits alongside the standing cause-2
 > prohibition and is a SECOND entrance to the same prohibited move.
 
-**STILL OPEN AFTER THIS PASS:** the four remaining arm-2 pairs in
-`px8f_buffer_native`, the planner-identity/linkage print, and the sixth compile
-— all folded into one single-threaded re-run. **The sixth compile stays OUTSIDE
-the partition until it lands.** Its test does `expect` success
-(`px8f_buffer_native.rs:1185`), so explanation (i) is dead for whichever compile
-it is; what is unsound is only the compile-to-test **mapping**, read positionally
-off interleaved 8-thread output and retracted by its own author.
+**STILL OPEN AFTER THIS PASS:** the planner-identity/linkage print, the (a)/(b)
+generated-construct question above, and the sixth compile — all folded into one
+single-threaded re-run. **The four remaining arm-2 pairs have since RUN; see the
+six-pair block above.** The sixth compile stays OUTSIDE the partition.
+
+> ### THE SIXTH COMPILE'S SPLIT IS MISSING AN ARM, AND THE TELL IS A TENSION
+> ### BETWEEN TWO OF ITS OWN FINDINGS. Architect `evt_s8jr4hf5hb5w`.
+>
+>     (i)   a caller that SWALLOWS the refusal
+>     (ii)  funcid60's certificate was NEVER DEMANDED there
+>     (iii) THE REFUSAL WAS EMITTED AND NOT OBSERVED     <- MISSING
+>
+> **(ii) is refuted by measurement**: `id5242` appears in both the bypass list
+> and the verdict list, so `funcid60` was demanded and gated there.
+>
+> **But (i) as stated contradicts the source read.** A test that does
+> `result.expect("...")` does not *swallow* a refusal — **it PANICS on one.** So
+> `px8f_buffer_native.rs:1185` expecting success is in tension with (i), and **a
+> live tension between two of your own findings is the tell that the split is
+> incomplete**, not a puzzle to resolve within it.
+>
+> ⇒ **(iii): "printed no refusal" is a measurement taken through the SAME
+> 8-thread interleaved stream that was declared unsound for attribution.** An
+> instrument that misattributes output across threads is an instrument that can
+> **lose** it. The claim about *which* compile was retracted; the claim that **no
+> refusal appeared came from the same stream and was not.** Absence of a printed
+> refusal, read off interleaved output, is not absence of a refusal — **the union
+> again, at the level of the observation channel.**
+>
+> **(i) MUST NOT BE ADOPTED BY ELIMINATION.** Two arms refuted out of three named
+> is not a conclusion when the third was never on the list. The single-threaded
+> pass settles all three at once, so nothing changes in what is being run.
+
+**What is unsound is only the compile-to-test MAPPING**, read positionally off
+interleaved 8-thread output and retracted by its own author — the `expect`-
+success source read at `px8f_buffer_native.rs:1185` stands on its own.
+
+**NOTHING HERE MOVES THE FORK.** PRODUCE / PROVE / SEED is untouched by the
+six-pair result. The discriminator bit is still the only thing that closes it,
+and it is one field on an existing print.
+
+### THE SEED-FREE CONTROL PROVES, AND THE SEED WAS NOT INERT
+
+**Measured 2026-09-16 on `px8f_write_partition`, identity `id4362`; implementer
+`evt_2ncdwex1gvhmw`, accepted by the Architect at `evt_6psqbdtxd5jk6`.** The
+bypass **supplies nothing.** It only declines to break at `:4440`, so `funcid60`
+reaches `:4474` with no `call_seeds` entry from `funcid58` at all.
+
+    ARM2-EVAL target=funcid60 unit=Context(ContinuationContextId(0))
+              identity=id4362 published=v26 def=Param(block7, 0)
+              valid=true grounded=true sources={v3653}
+    missing   [(funcid58, id4362), (funcid59, id4362)]
+
+⇒ **`funcid60` needed only to be LET THROUGH.** It proved with an **empty
+certificate set**, grounding at the same authority word either way. The reading
+was pre-registered before the run, not chosen after it.
+
+**AND THE SEED WAS NOT INERT — the delta says so, and the distinction is the
+point of recording it:**
+
+    with seed    reachable_blocks=6664   cuts=7
+    seed-free    reachable_blocks=7762   cuts=6
+
+One fewer cut and 1098 more reachable blocks. The seed genuinely contributed a
+certified cut and shrank the walk; the **proof** simply did not depend on it.
+**"Not load-bearing" is the conclusion; "had no effect" would be false**, and the
+stronger claim was available for free and refused. That is this node's union
+caught *before* it formed rather than after.
+
+### RECORDED OBSERVATION — `:4467` OVER-DEMANDS. NOT A NODE YET
+
+Architect `evt_6psqbdtxd5jk6`; Steward scope ruling `evt_5k3r7anrwmr9j`.
+
+**`:4467` makes a body's proof attempt conditional on EVERY call obligation
+being finished**, so one unfinished obligation suppresses the attempt entirely
+and the resulting refusal is a **gating artifact rather than a verdict.**
+
+**The circular repair is "demand only what the proof turns out to need"** —
+circular before the proof runs, correctly refused by the implementer who found
+it, and not proposed. **The non-circular form does not demand less; it stops
+making the demand a PRECONDITION:**
+
+    Today     :4467 gates a body's proof on ALL its call obligations being
+              finished. One unfinished obligation suppresses the attempt.
+
+    Instead   attempt every staged body; any body that proves adds its
+              certificates; re-attempt the bodies that failed; repeat until a
+              round adds nothing.
+
+Nobody decides in advance what a proof needs. A body needing no certificates
+proves on round one; a body needing `funcid58`'s proves on round two; a body
+that genuinely cannot prove is refused **after** the fixpoint, and that refusal
+is then a real refusal. The seed-free control above is direct evidence it would
+work here: `funcid60` proved with an empty certificate set, so a fixpoint closes
+it on round one **whatever `funcid58` does.**
+
+**THREE FENCES, RECORDED VERBATIM, INCLUDING THE ONE THAT BINDS THE STEWARD:**
+
+1. **It does not close the fork and must not be offered as a substitute.** The
+   12 arm-1 entries refuse on a genuine zero-authority population. A fixpoint at
+   `:4467` does nothing for them. It eliminates the 5 gating artifacts and
+   nothing else.
+2. **It is not on the critical path**, because fixing the 12 makes the 5
+   disappear anyway. Its independent value is **instrument integrity** — it makes
+   every future refusal in this machinery honest.
+3. **It must not be used to argue D1's size down.** The 5 were already
+   partitioned out; this explains their mechanism and does not re-open the count.
+
+**WHY IT IS AN OBSERVATION AND NOT A NODE.** Not blocking, not on the critical
+path, no ring able to start it, no lane asking for it. And the deciding reason
+is fence 2 used harder than it was written: **cutting a node now frames scope,
+ACs and size over a population the in-flight work is expected to eliminate.**
+That is framing against a moving target, and the cost lands on whoever inherits
+the frame.
+
+> ### THE RE-CUT TRIGGER ASKS ABOUT POPULATION, NOT WARRANT
+>
+> Architect `evt_3d373pbgfy01r`.
+>
+> An earlier form of this said that if the 5 do not survive the arm-1 repair,
+> the observation stands as *"the explanation of why they were never real."*
+> **That is this node's own union one more time, at the level of the trigger:**
+>
+>     The 5 vanishing is CONSISTENT WITH the gate having over-demanded.
+>     It is EQUALLY CONSISTENT WITH the gate being exactly right and merely
+>     UNSATISFIED -- the arm-1 bodies start proving, that supplies the
+>     certificates, :4467 is now satisfied, and the 5 disappear with the
+>     gate never having been wrong about anything.
+>
+> **A disappearance under a repair that changes the gate's INPUT cannot tell you
+> the gate was too strict.**
+>
+> ⇒ **The warrant does not depend on the 5 and is already in hand.** The
+> seed-free control measured the over-demand directly: `funcid60` proved with an
+> empty certificate set, grounding at `v3653` with no `call_seeds` entry. The
+> finding is established **today**, whatever becomes of the 5 tomorrow.
+>
+> **So the trigger is sound as a question about POPULATION — do the 5 survive,
+> is there anything left to fix — and unsound as a question about WARRANT.**
 
 ### OPEN — THE ENUM HAS THREE VARIANTS; THE CENSUS MEASURED TWO
 
