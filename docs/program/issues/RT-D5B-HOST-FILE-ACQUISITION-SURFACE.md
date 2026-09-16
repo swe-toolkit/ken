@@ -1,7 +1,7 @@
 ---
 id: RT-D5B-HOST-FILE-ACQUISITION-SURFACE
 title: "Land the host and interpreter file-acquisition surface additively -- ken-host abi_v1/mapping_v1/lib, effect_v1, the PrivateMappingAcquireFile prelude global and the ken-interp dispatch path -- WITHOUT promoting MappingAcquireFile out of the represented-unavailable tail. Slice 4 of the wp/ABI-S6-d5b-file-backed drain and the one remaining cluster orthogonal to the contested HS18 backend surface: it touches zero cranelift files. The availability flip is four coordinated sites, two of them compiler-enforced and one of them inside cranelift_backend, so it is its own later slice gated on the artifact differential the code itself names."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,17 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-16, continuing operator directive 2026-09-16: 'factor small mergeable pieces out of the long string of commits and merge those... Focus on small incremental, achievable pieces. Must land as one commit is a trap that leads you to unworkable situations.' Slice 4 after RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER (slice 1, landed 10321a158), RT-D5B-BRIDGE-REALIZATION-PLANE (slice 2, landed 49e5ebfbe) and RT-D5B-LIVE-WIRING (slice 3, landed 67684fa5d), which together drained PR #3676's cranelift material. Fixed inputs measured by the Steward at backup tip 0d94d58b60e2e7bb045d7204efd138e17df68b7b against merge-base 4bf1ad362b5a5cfa512636087df5229ee57db706. The unflipped disposition is Architect ruling evt_3wtg8w8krmmt, grounded in ken-host/src/effect_v1.rs:249-251 -- 'Membership is a plan, not evidence' -- not in a reviewer's caution. Frame at docs/program/wp/RT-D5B-HOST-FILE-ACQUISITION-SURFACE.md."
 ---
+
+> ## MERGED 2026-09-16 at `d4e977a6af1083975665e587ed7e3e31f733785e`
+>
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. All seven touched paths are byte-identical
+> between the approved candidate `52153b5fe75f98fdc2a570e5105c171b44c5c52e`
+> and `main`, landed via PR #3766 with full-mode CI green. Architect verified
+> all four `AC-AVAIL` sites plus a negative control; QA re-verdicted on the
+> exact SHA after a Cargo.toml-only respin dropped a stray `[features]` table.
+> The availability bit did not move — this slice is additive and unreachable
+> natively until a later flip slice.
 
 # READ FIRST — THE AVAILABILITY BIT DOES NOT MOVE IN THIS SLICE
 
