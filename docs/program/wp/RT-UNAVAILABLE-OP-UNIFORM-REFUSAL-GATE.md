@@ -19,6 +19,21 @@ third option (`evt_1y4rvywv1y6fr`), and the Steward's sizing measurement
 (`evt_5sxcg2m9qah9j`) **withdrew the stop**: under the ruled design, condition
 2 does not bind. Size moves `S` to `S/M`. **Do not re-run D0.**
 
+**CORRECTED 2026-09-16, mid-build, on runtime-implementer's findings against a
+built candidate.** Four corrections, all to Steward-authored text, none changing
+the ruled design or the sizing:
+
+    §3a         a call-site population was read as a statement about REACH.
+                Two ken-interp tests reach the gate transitively.
+    §3d         the funnel is 23 call sites / 10 tests, not 21 / 8. The two
+                missed sites pass their op through a VARIABLE.
+    §4 point 6  "all of them dispatch available ops only" -- FALSE, withdrawn.
+    §4 point 8  NEW. The ruled disposition of the two ken-interp tests
+                (Architect evt_rsbhqs2tfamg, a REVISION of an earlier ruling),
+                and the unit-error-type trap that forces positive controls.
+    §9          NEW. The assertions this WP retires, verbatim, owed by
+                [[RT-CLOCK-OP-NATIVE-PROMOTION]].
+
 ## 1. Objective
 
 Make *"`RepresentedUnavailable` implies refused"* an **enforced** invariant
@@ -189,9 +204,30 @@ SHA.
     crates/ken-runtime/src/object_linker_packaging.rs :3802  :3834
     crates/ken-verify/src/scenario.rs                 :4988
 
-Four are production (§2a); eleven are test-only. **None of the fifteen
-dispatches an op that is `RepresentedUnavailable` today**, so none of them
-changes behaviour under the gate.
+Four are production (§2a); eleven are test-only. **None of the fifteen names a
+`RepresentedUnavailable` op at the call site.**
+
+> **CORRECTED — the clause that used to follow that sentence was wrong, and it
+> was the Steward's.** The withdrawn text read *"so none of them changes
+> behaviour under the gate."* **The population here is CALL SITES; the gate's
+> blast radius is TRANSITIVE REACH.** A test that never mentions
+> `dispatch_host_op_v1` still changes behaviour if it calls a helper that does.
+> Two `ken-interp` tests do exactly that, through `ambient_dispatch` (whose own
+> production dispatch sites are `eval.rs:5593`/`:5844`), with
+> `ClockMonotonicNow` and `ClockSleepUntil` — both `RepresentedUnavailable`:
+>
+>     eval.rs:8955   ac2_monotonic_readings_survive_a_wall_clock_step_backwards
+>     eval.rs:9039   ac3_the_deadline_a_caller_passes_is_the_deadline_honoured
+>
+> Found by runtime-implementer against a built candidate, not by re-reading the
+> census. **A census of call sites is complete and correct about call sites and
+> silent about reach** — the same shape §7 records against `AC-AVAIL`, one
+> layer over. §4 point 8 carries the ruled disposition; §9 carries what it
+> defers.
+>
+> ⇒ **The reachability question this WP is about is asked of the transitive
+> closure, never of a call-site roster.** Anyone re-deriving §3a's fifteen will
+> get fifteen; that is the right answer to the wrong question.
 
 **The method, because a text match gets it wrong.** Resolve each site by
 **`cfg` satisfiability under `test=false`**, not by a literal `cfg(test)` text
@@ -244,25 +280,60 @@ carries **four** `#[cfg(test)]` attributes and **three decorate a single `fn`**:
 Read the file as having "one `#[cfg(test)]`, on a `mod`" and you will be
 fractionally less careful in the one file where that care is the deliverable.
 
-### 3d. The eight tests, and why the sizing came back S/M
+### 3d. The TEN tests, and why the sizing came back S/M
 
-Eight tests, ~900 setup lines, 66 assertions dispatch unavailable ops today.
-**Six of the eight assert the executing arm's behaviour** — they are the
-implementation evidence the promotion protocol consumes, not incidental
-coverage. Under a naive gate they all die, which is what raised the fork.
+Ten tests in `effect_v1.rs`'s own test module dispatch unavailable ops today,
+across **23** of the 81 in-file call sites. Most of them assert the executing
+arm's behaviour — they are the implementation evidence the promotion protocol
+consumes, not incidental coverage. Under a naive gate they all die, which is
+what raised the fork.
 
-The Steward's funnel measurement (`evt_5sxcg2m9qah9j`) — **21 call sites**,
-concentrating in five named closures plus direct calls:
+The funnel, by enclosing test function, measured at the §2 blob:
 
-    :4958 1 (closure `dispatch`)   :6293 1 (`acquire`)      :6451 1 direct
-    :7431 5 direct                 :7565 2 direct           :7640 2 (`get`,`set`)
-    :7777 3 (`duplicate`,`get`, +1 direct)                  :8065 6 direct
+    fn @ :4783  all_pre_resource_operations_share_one_semantic_dispatch   1  :4912
+    fn @ :4958  ac4_entropy_reports_unavailable_rather_than_supplying...  1  :4965
+    fn @ :5039  ac3c_entropy_needs_no_capability_token_while_a_gated...   1  :5045
+    fn @ :6293  abi_s6_d4_file_acquire_enforces_rights_exact_length...    1  :6320
+    fn @ :6451  abi_s6_d4_file_acquire_reads_real_source_from_offset_zero 1  :6460
+    fn @ :7431  abi_s1_seek_and_set_length_preserve_cursor_extent...      5  :7460 :7477 :7498 :7518 :7536
+    fn @ :7565  abi_s1_sync_modes_execute_and_share_the_write_right       2  :7589 :7606
+    fn @ :7640  abi_s1_inheritance_get_set_are_typed_and_right_separated  2  :7669 :7686
+    fn @ :7777  abi_s1_duplicate_preserves_policy_rights_and_revocation   3  :7804 :7820 :7916
+    fn @ :8065  abi_s1_descriptor_failures_preserve_px9_file_error_ident  6  :8077 :8099 :8119 :8139 :8158 :8185
+    ----
+    10 tests, 23 call sites
 
-⇒ **Re-point 21 call sites at the inner entry. Zero of the ~900 setup lines and
-zero of the 66 assertions move.** That is why hard-stop condition 2 does not
-bind and why this is S/M rather than a recut.
+⇒ **Re-point 23 call sites at the inner entry. No setup line and no assertion
+moves.** That is why hard-stop condition 2 does not bind and why this is S/M
+rather than a recut.
 
-**One trap, named because both halves look alike.** `:4958`'s "unavailable" is
+> **CORRECTED from 21 sites / 8 tests, which was the Steward's number
+> (`evt_5sxcg2m9qah9j`) and the basis on which the hard stop was withdrawn.**
+> runtime-implementer measured 23/10 against a built candidate. The sizing
+> conclusion is unchanged; the roster was short by two.
+>
+> **The mechanism, because it will recur.** My classifier keyed on a
+> `HostOpV1::<Variant>` literal appearing at the call site. The two missed
+> sites carry the op **through a variable**, so no literal is adjacent to the
+> dispatch and nothing matched:
+>
+>     :4912   `for (operation, request) in requests` — a vector of pairs whose
+>             members include EntropyRandomBytes among many available ops
+>     :5045   inside `let dispatch = |operation, request| { ... }`, invoked with
+>             EntropyRandomBytes and with a gated op
+>
+> **A literal-keyed census cannot see an op that arrives as a binding**, and
+> both of these tests exist precisely to exercise *several* ops uniformly —
+> which is what makes them pass their op as data. The instrument that gets it
+> right is the enclosing-function one used above: find every call site, resolve
+> its enclosing `fn`, then ask whether that function's body mentions any of the
+> ten. It returns 23/10 with no hand-matching.
+>
+> The earlier `~900 setup lines / 66 assertions` figures were measured over the
+> eight-test population and are not re-derived here: nothing depends on them
+> since AC-TEST-DIFF-SHAPE replaced the assertion-count criterion.
+
+**One trap, named because both halves look alike.** `:4965`'s "unavailable" is
 **backend-level** (`EntropySource::Unavailable`), not op-level
 `RepresentedUnavailable`. Under a gate both halves die at
 `.expect("entropy dispatch is total")`. Re-point it; do not reason about it as
@@ -324,8 +395,20 @@ From `evt_21f23zmgqfxsc`, `evt_3ws5c4xzbfxa5`, `evt_17w6mab5k1y4a` and
 
    **Visibility is the enforcement, and it is a COMPILER enforcement (E0603)** —
    the same rule as point 5: enforce where the compiler can. The out-of-crate
-   callers cannot reach the inner entry and do not need to; all of them dispatch
-   available ops only.
+   callers cannot reach the inner entry.
+
+   > **CORRECTED. The clause that used to close that sentence — *"and do not
+   > need to; all of them dispatch available ops only"* — is FALSE, and it was
+   > the Steward's.** Two `ken-interp` tests reach `dispatch_host_op_v1`
+   > transitively through `ambient_dispatch` with `ClockMonotonicNow` and
+   > `ClockSleepUntil` (§3a). They are out-of-crate, so `pub(crate)` gives them
+   > **no evidence path at all** — E0603 is the enforcement working exactly as
+   > designed, and the two tests are its first casualties.
+   >
+   > **This does not reopen the split.** Widening the inner entry to `pub` is
+   > refused on the same mechanism as §4 point 7: `ambient_dispatch` is one of
+   > the production out-of-crate callers, so a `pub` inner entry hands the
+   > bypass to the very crate the gate is aimed at. The disposition is point 8.
 
    **Name it for what it is** — the unpromoted / implementation-evidence path.
    **Not** `unchecked`, `raw`, or `unsafe`: those name the absence of a check,
@@ -347,6 +430,59 @@ From `evt_21f23zmgqfxsc`, `evt_3ws5c4xzbfxa5`, `evt_17w6mab5k1y4a` and
    same thing in prose — *every operation remains `RepresentedUnavailable` until
    its artifact differential gates promote it explicitly* — but a comment loses
    to a plausible relabel proposal in three months, and this does not.)
+
+8. **THE TWO `ken-interp` TESTS BECOME REFUSAL TESTS, IN PLACE.** Architect,
+   `evt_rsbhqs2tfamg` (a revision of an earlier ruling that moved them into
+   `ken-host`; this text is the one that stands). Both stay in
+   `crates/ken-interp/src/eval.rs` and invert: each asserts that dispatching its
+   `RepresentedUnavailable` op through `ambient_dispatch` now **refuses**.
+
+   **Why they do not move, and it is not a preference.** `ken-host`'s test
+   backend is an **op-tag recorder, not a value recorder**:
+
+       clock_sleep_until(_deadline)  pushes the tag and DISCARDS the deadline
+       clock_monotonic_now()         pushes the tag and returns a CONSTANT
+
+   So *"the deadline a caller passes is the deadline honoured"* and *"monotonic
+   readings are non-decreasing under a backwards wall step"* are not merely
+   awkward to relocate — they are **inexpressible** in `ken-host` without
+   extending that backend to capture values. That is new surface in a WP
+   carrying AC-NATIVE-UNTOUCHED and a diff-shape AC written to prevent exactly
+   it. **The evidence is DEFERRED, not lost** (§9): the promotion WP must extend
+   the backend anyway, because a differential against a constant-returning
+   recorder is vacuous.
+
+   **`ac2`'s third property does not move and does not need to.** The
+   wall-vs-monotonic constructor distinction is a claim about two `GlobalId`s,
+   so it survives without dispatching anything:
+
+       assert_ne!(clock.mkinstant_id, clock.mk_monotonic_instant_id);
+
+   **POSITIVE CONTROLS ARE MANDATORY HERE, and the reason is a type.** Carry
+   this trap; it is the one nobody had named:
+
+       fn ambient_dispatch<H: HostHandler>(...) -> Result<EvalVal, ()>
+
+   **The error type is UNIT — the refusal REASON is erased at the `ken-interp`
+   boundary.** An inverted assertion there can say *"it refused"* and cannot say
+   *"because `OperationUnavailable`"*. It passes for **any** failure, including
+   one this WP introduces by accident. An inverted test with no available-op
+   companion is an unguarded negative.
+
+       ac2   control is FREE -- ClockWallNow is NativeTested and already read in
+             the same closure. Assert the wall reads still SUCCEED while the
+             monotonic read refuses. Two-sided, and a better test than the one
+             it replaces.
+       ac3   has NO available op in it. It MUST dispatch one through the same
+             helper and assert success alongside the refusal.
+
+   **Relocating a test means relocating the CLAIM, re-expressed in the
+   destination's observation vocabulary — never the test text.** The earlier
+   ruling was refuted on exactly this: `ac3`'s assertions are written in
+   `ClockTrace` / `CaptureHost` / `BigInt`, `ken-interp` types with zero
+   occurrences in `ken-host`, so moving the text does not compile. That is an
+   argument about vocabulary, and the backend measurement above is the
+   independent argument about *expressibility*. Both point the same way.
 
 ## 5. Acceptance
 
@@ -390,9 +526,31 @@ sites `pub(crate)` does not enforce, so naming them *is* the enforcement. An AC
 that names only `:2025` leaves the one site that can silently migrate later
 uncovered — and it is a test, so it would migrate with no production symptom.
 
-**AC-TEST-DIFF-SHAPE. The diff to the eight named tests touches only the
-dispatch entry name, at the 21 call sites in §3d. No assertion line and no setup
-line changes.** Checkable by `git diff` over eight named functions.
+**AC-TEST-DIFF-SHAPE. The diff to the ten named tests touches only the dispatch
+entry name, at the 23 call sites in §3d. No assertion line and no setup line
+changes.** Checkable by `git diff` over ten named functions. (**23/10, corrected
+from the Steward's 21/8** — see §3d for the two that a literal-keyed census
+cannot see.)
+
+**AC-INTERP-REFUSAL. The two `ken-interp` tests are inverted in place, each with
+a two-sided control.** `ac2_monotonic_readings_survive_a_wall_clock_step_backwards`
+(`eval.rs:8955`) and `ac3_the_deadline_a_caller_passes_is_the_deadline_honoured`
+(`eval.rs:9039`), per §4 point 8. Each must, in one test:
+
+    assert the RepresentedUnavailable op is REFUSED through ambient_dispatch
+    assert a NativeTested op SUCCEEDS through the same helper
+
+**The second half is not optional and it is not symmetry for its own sake.**
+`ambient_dispatch`'s error type is `()`, so a bare `.is_err()` passes for any
+failure whatsoever — including one this WP causes. A candidate whose inverted
+test has no adjacent success is a check that cannot fail. `ac2`'s control is its
+existing `ClockWallNow` reads; `ac3` has none and must add one.
+
+**AC-DEFERRAL-CARRIED. §9's retired assertions are reproduced verbatim in this
+node AND inherited by name in the node that will promote `ClockMonotonicNow` or
+`ClockSleepUntil`.** Not *"see the gate WP"* — the assertions, spelled out, in
+the promotion node. A deferral that is not carried by name evaporates, and the
+carrier here is [[RT-CLOCK-OP-NATIVE-PROMOTION]].
 
 > **Phrased this way on a finding against an earlier draft of it.** That draft
 > said *"the eight tests keep their assertion count at 66"* — and **a count
@@ -418,8 +576,15 @@ seats because the tree records it nowhere, and the next reader starts from zero.
 
 **AC-NO-REGRESSION. Workspace-green in CI**, never a local `--workspace` run.
 Local verification is targeted only, through `scripts/ken-cargo`: `-p ken-host`
-and `-p ken-interp`. D0 resolved `ken-runtime` and `ken-verify` as
-behaviourally unaffected (§3a), so neither is required.
+and `-p ken-interp`.
+
+> **`ken-runtime` and `ken-verify` are expected unaffected, and that
+> expectation is now CI's to confirm, not D0's.** §3a resolved them by call-site
+> population, and the correction there is that a call-site population is silent
+> about transitive reach — the same reasoning that missed the two `ken-interp`
+> tests covered these two crates. Nothing suggests they are affected; the point
+> is that the argument which said so does not hold, so **workspace-green in CI
+> is the evidence, and a local `-p` pass on the two touched crates is not.**
 
 > **A suite total is not evidence about a test whose subject it does not
 > exercise.** `122/0` on `ken-host` was reported as a gate result for slice 4 and
@@ -457,6 +622,12 @@ expected; **confirm rather than assume** — `git diff --name-only <base>..<cand
   earlier F4 advice to the contrary by name.
 - **Not a rewording of `effect_v1.rs:249-251`**, and **not** a removal of the
   native gate at `abi_v1.rs:1551`.
+- **Not a repair of `ambient_dispatch`'s erased refusal reason.** Its
+  `Result<EvalVal, ()>` means a Ken program cannot be told **why** an op was
+  refused — this WP makes that erasure more visible by adding a refusal, and
+  does not fix it. Filed as [[RT-INTERP-REFUSAL-REASON-ERASED]]. Architect ruled
+  it out of scope; a candidate that widens the error type here has taken work
+  this node does not carry. §4 point 8 is the local mitigation, not the fix.
 
 ## 8. The structural finding this node instances
 
@@ -474,3 +645,73 @@ that **a shared authority must name its consumers at its definition**, which is
 what AC-CONSUMERS-DOC does for `availability()` and what naming the inner entry
 does for `dispatch_host_op_v1`. Look for the next one wherever a single
 `availability()`-shaped classifier is read by two boundaries.
+
+## 9. DEFERRED EVIDENCE — retired here, owed by the promotion node
+
+**These assertions are removed by this WP and are not replaced by anything it
+lands.** They are reproduced verbatim, at their line numbers on `main`
+`050da9bcefb5a7251003071a7181ed7f473fbea9`, because a deferral carried as a
+pointer is a deferral that evaporates (Architect, `evt_rsbhqs2tfamg`, condition
+1). [[RT-CLOCK-OP-NATIVE-PROMOTION]] inherits them by name and must reproduce
+them — against a value-capturing backend — before promoting either op.
+
+**What is lost, in one line each:**
+
+    ClockMonotonicNow   monotonic readings stay non-decreasing while the wall
+                        clock is scripted BACKWARDS, with the backwards step
+                        asserted first so the result cannot be vacuous
+    ClockSleepUntil     the deadline a caller passes is the deadline the host
+                        observes, discriminated against a second deadline so it
+                        cannot hold for a host that ignores the argument
+
+### 9a. `eval.rs:9012-9030`
+
+From `ac2_monotonic_readings_survive_a_wall_clock_step_backwards`
+(`crates/ken-interp/src/eval.rs:8955`):
+
+```rust
+        assert!(
+            nanoseconds(&wall_second) < nanoseconds(&wall_first),
+            "positive control failed: the harness could not step the wall clock backwards, \
+             so the monotonic result is vacuous"
+        );
+
+        // The property under test: the same perturbation leaves monotonic
+        // readings non-decreasing.
+        assert!(nanoseconds(&monotonic_second) >= nanoseconds(&monotonic_first));
+
+        // D1 at the type layer: the two clocks do not merely differ in value,
+        // they reify to DIFFERENT constructors, so a wall reading cannot be
+        // substituted where a monotonic one is required.
+        assert_eq!(constructor(&wall_first), clock.mkinstant_id);
+        assert_eq!(
+            constructor(&monotonic_first),
+            clock.mk_monotonic_instant_id
+        );
+        assert_ne!(constructor(&wall_first), constructor(&monotonic_first));
+```
+
+**The last three lines are NOT deferred.** The constructor distinction survives
+in place, re-expressed without dispatching (§4 point 8). Only the two `assert!`s
+above them go.
+
+### 9b. `eval.rs:9061-9068`
+
+From `ac3_the_deadline_a_caller_passes_is_the_deadline_honoured`
+(`crates/ken-interp/src/eval.rs:9039`):
+
+```rust
+        assert_eq!(
+            sleep_with(4_242),
+            vec![ClockTrace::SleepUntil {
+                deadline: BigInt::from(4_242),
+            }]
+        );
+        // Discriminator: the observation tracks the argument.
+        assert_ne!(sleep_with(4_242), sleep_with(9_999));
+```
+
+**Both lines are deferred.** The `assert_ne!` is the half that matters: it is
+what distinguishes a host that honours the deadline from one that ignores it,
+and `ken-host`'s recorder discards the deadline, so reproducing it there is
+exactly the backend extension the promotion node owes.
