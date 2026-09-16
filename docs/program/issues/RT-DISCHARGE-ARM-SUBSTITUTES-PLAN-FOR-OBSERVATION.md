@@ -146,6 +146,13 @@ with this node in view, which is what makes it worth citing.
 > A seat that is woken, sees a red check, and reaches for the nearest fix lands
 > here. runtime-implementer named this hazard unprompted while holding
 > (`evt_6gwyey6pacv43`) and was right to hold.
+>
+> **2026-09-16: THE PROHIBITION IS UNTOUCHED. THE ATTRIBUTION ABOVE IS NOT.**
+> "Six of seventeen" says which entries *instance* cause 2, and the BOUNDARY
+> ruling measured that `funcid60`'s arm 2 **never runs in any compile** — so the
+> arm-2 entries cannot be instances of an arm-2 verdict. **Do not re-derive the
+> count from this block.** The rule "nobody repairs cause 2 toward green" is
+> standing law and does not depend on how many entries turn out to be cause 2.
 
 ## What the author already saw, and why the defect is one level above it
 
@@ -223,34 +230,63 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
     POPULATION   12 arm-1 hand-offs. Two published words, v1751 and v1386,
                  always at funcid58/funcid59, every table EMPTY.
                  4 demanded identities, 3 programs.
-    PARTITION    RAN, AND ITS NUMBER IS PROVISIONAL. 12 arm-1 hand-offs =
-                 7 ROOTS + 5 DOWNSTREAM, on the GROUNDING graph. A repair lands
-                 at a ROOT; a downstream pair closes when its root does. That
-                 twelve was a count of SYMPTOMS still holds and SUPERSEDES "one
-                 shape repeated" -- but 7 IS NOT YET A COUNT OF REPAIRS.
-                 DO NOT ACT ON 7 until GATE-BLOCK/GATE-NOPUB land: the join
-                 used the WRONG EDGE SET. See the two-graph block below.
+                 OPEN, NOT RECONCILED: this row says 3 PROGRAMS and the gating
+                 partition tallies 6 refusals over 2 BINARIES
+                 (px8f_write_partition 1, px8f_buffer_native 5). Those may be
+                 different units of count or a stale figure; NOBODY HAS
+                 MEASURED IT. Flagged rather than reconciled -- do not quietly
+                 pick whichever number a later argument needs. Relevant because
+                 BODIES (2 vs 4) turns on how many Modules are in play.
+    PARTITION    SETTLED, AND IT IS NOT A COUNT OF REPAIRS. Re-run on the
+                 GATING graph across BOTH binaries: 12 arm-1 + 5 arm-2, no
+                 exceptions. The 7+5 grounding-graph split is SUPERSEDED.
+                 ACCEPTED by the Architect (evt_2mw3vjp30yjbn); the partition
+                 itself is no longer provisional.
+                 BUT 12 IS 2 x 6, NOT TWELVE SITES. There are THREE distinct
+                 funcids in all 17 entries: the 12 arm-1 entries are TWO bodies
+                 once per refusal, the 5 arm-2 entries are ONE body in five.
+                 The multiplicity is over REFUSALS -- compiles and identities --
+                 not over places in the program where something is wrong.
+                 A REPAIR IS AN EDIT TO THE PROGRAM. 12 and 7 are both counts
+                 of OBSERVATIONS, i.e. (body, identity) pairs, and observations
+                 are not edits. The repair count is neither.
                  ROOT/DOWNSTREAM IS A PROPERTY OF A (refusal, identity) PAIR,
                  NEVER OF A funcid -- funcid59 is downstream in 4 refusals and
                  a ROOT in 1. Every count here is a count of PAIRS.
-                 Architect evt_9bz296v5099j, evt_18mtk5rr061nk.
-    SIZE         HELD AT M. The 12 -> 7 fall argued down, but 7 is PROVISIONAL
-                 (wrong edge set), so the evidence that moved it has itself
-                 moved -- which STRENGTHENS holding rather than weakening it.
-                 Re-sizing on a number now known to be measured over the wrong
-                 graph is exactly the guess this node exists to avoid.
-                 TRIGGER TO REVISIT, unchanged in shape and now gated on the
-                 GATING-graph count: when GATE-BLOCK/GATE-NOPUB land, if the
-                 downstream-of-EXCLUDED pairs are ruled correct propagations
-                 and the root count settles below ~5, re-cut to S.
+                 Architect evt_9bz296v5099j, evt_18mtk5rr061nk, evt_2mw3vjp30yjbn.
+    BODIES       2 OR 4, PENDING SYMBOL NAMES. FuncId is per-Module and the two
+                 binaries are different Modules, so funcid58 in one is NOT known
+                 to be funcid58 in the other. WITHIN px8f_buffer_native the
+                 claim is safe: 10 arm-1 entries = 2 bodies x 5 refusals.
+                 Across both it is 2 or 4, and it is settled BY SOURCE SYMBOL,
+                 never by number. Runtime-implementer owes the symbol names.
+    SIZE         HELD AT M, AND THE TRIGGER IS RETIRED OUTRIGHT, NOT RE-POINTED.
+                 The Architect retired its object (evt_2mw3vjp30yjbn): "roots
+                 below ~5 -> re-cut to S" cannot fire correctly on a count whose
+                 multiplicity is over compiles, and offered DISTINCT BODIES as
+                 the right kind of input.
+                 A COUNT IS THE WRONG KIND OF INPUT ALTOGETHER, whichever object
+                 it ranges over. D1's size is set by TWO OPEN DESIGN FORKS, not
+                 by how many sites the edit touches: the FIRST row's PRODUCE vs
+                 PROVE vs SEED evaluation, and a SITE still pending a
+                 declaration-path source read. Neither moves when the population
+                 count moves.
+                 Re-pointing the trigger at distinct bodies would have fired it
+                 IMMEDIATELY -- 2 and 4 are both below 5 -- and re-cut to S on a
+                 number the Architect explicitly declined to size on. That is
+                 the guess this node exists to avoid, arriving through a repaired
+                 trigger instead of a broken one.
+                 D1 RE-SIZES WHEN A FORK CLOSES, NOT WHEN A NUMBER LANDS.
                  Steward decision; the Architect declined to rule size
-                 (evt_18mtk5rr061nk).
-    BOUNDARY     AT LEAST ONE OF THE 12 IS DOWNSTREAM OF AN EXCLUDED ARM-2
-                 ENTRY. funcid59 is in scope; its callee funcid60 is in the
-                 EXCLUDED arm-2 population. D1 MUST DISPOSITION THAT BOUNDARY
-                 BEFORE REPAIRING ANY DOWNSTREAM ENTRY. Population NOT resized
-                 on this -- the remaining ten are still running.
-                 Architect evt_4s7beb7qyrhqz.
+                 (evt_18mtk5rr061nk, evt_2mw3vjp30yjbn).
+    BOUNDARY     RULED, AND IT INVERTS. Every funcid60 pair is GATE-BLOCK'd on
+                 funcid58 at the same identity, in every refusal where it
+                 appears, and ARM 2 NEVER RAN IN ANY COMPILE. So the 5 arm-2
+                 entries are DOWNSTREAM OF D1'S OWN ARM-1 POPULATION.
+                 The direction recorded-but-not-ruled is the direction it went.
+                 D1 MUST PARTITION ROOTS AND DOWNSTREAM, and the downstream half
+                 is now NAMED rather than assumed.
+                 Architect evt_4s7beb7qyrhqz, RULED at evt_2mw3vjp30yjbn.
     REPAIR       PRODUCE constructor authority.
                  NOT re-keying: there is nothing to re-key, the tables are empty.
     SITE         the RESPONSE STAGING PATH at :6971 -- NOT the two published
@@ -262,8 +298,14 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  there is a third arm the code already implements; see below.
                  This does not resize D1 -- it stops D1 building the narrow
                  fix by default.
-    EXCLUDED     the 5 arm-2 refusals -- the proving arm declining, unchanged by
-                 the closure, and cause 2 is the gate working.
+    NOT-EXCLUDED the 5 arm-2 refusals. THIS EXCLUSION IS REFUSED ON MEASUREMENT
+                 (Architect evt_2mw3vjp30yjbn). It read them as "the proving arm
+                 declining, cause 2 is the gate working" -- but that gate NEVER
+                 EXECUTED in any compile, so the ground credited for excluding
+                 them was never observed to operate. They are downstream of D1's
+                 own arm-1 population; see BOUNDARY.
+                 THE PROHIBITION ON REPAIRING CAUSE 2 TOWARD GREEN IS UNTOUCHED.
+                 What falls is the claim that these entries ARE cause 2.
     EXCLUDED     the rt_parity (c1) entries -- PROVISIONALLY FOLDED, below. They
                  enter neither D1's scope nor its sizing.
     HOLE         abi_s6_mapping_file_backed_native is NOT MEASURED and is NOT
@@ -534,23 +576,61 @@ that callee is itself in `missing`.
 > EXCLUDED arm-2 entries may be **downstream of D1's own arm-1 population**
 > rather than independent "gate working" evidence — which would reverse the
 > direction of the boundary question below. NOT RULED; waiting on the numbers.
+>
+> **RESOLVED 2026-09-16, AND IT DID INVERT.** The gating-graph re-run settled
+> both halves: `7+5` is superseded by `12+5`, and the arm-2 entries are indeed
+> downstream of D1's own arm-1 population. **This block's prediction was
+> correct and its number was still the wrong kind of thing** — see the SUMMARY
+> OBJECT block below, which is the term this block did not reach.
 
-**THE PARTITION RAN, ON THE GROUNDING GRAPH: 7 ROOTS + 5 DOWNSTREAM.**
+**SUPERSEDED — THE PARTITION RAN AGAIN ON THE GATING GRAPH: 12 + 5.**
 
-    12 arm-1 hand-offs   ->   7 ROOTS  +  5 DOWNSTREAM
-    plus 5 arm-2 roots (funcid60), which remain EXCLUDED
+    on the GROUNDING graph (2026-09-15)   12 arm-1  ->  7 ROOTS + 5 DOWNSTREAM
+    on the GATING   graph (2026-09-16)    12 arm-1 entries, ALL arm-1
+                                           5 arm-2 entries, ALL downstream
+                                          across BOTH binaries, no exceptions
 
 ⇒ **A repair lands at a root; a downstream pair closes when its root does. That
 twelve was a count of SYMPTOMS stands.** Architect ruling `evt_18mtk5rr061nk`.
 
-**BUT SEVEN IS NOT YET A COUNT OF REPAIRS**, because this join ran over the
-GROUNDING graph and "where does a repair land" is a question about the GATING
-graph — see the block above. It was published as the first hard number this
-population had; it is the first *approximate* one.
+**THE `7` IS RETIRED, NOT CORRECTED DOWNWARD.** The grounding-graph join asked
+"what would ground this value"; the question D1 needs answered is "what blocks
+this entry", and `:4467` gates over every obligation a body carries. The re-run
+reproduces the `12`/`5` splits exactly from the published `missing=` sets, which
+is the check that this is the same population re-measured rather than a
+re-description of it.
 
-**THE 5 DOWNSTREAM PAIRS ARE NOT REPAIRS; THEY ARE CONSEQUENCES**, and at least
-one is a consequence of an entry this node EXCLUDES — which is the boundary
-below, and it can take the count below 7 as well.
+**AND THE SURVIVING NUMBER IS STILL NOT A COUNT OF REPAIRS** — for a new reason
+that has nothing to do with which graph it was taken over. See below.
+
+> ### KEY, THEN GRAPH, THEN SUMMARY OBJECT. THE THIRD TERM.
+>
+> **Three repairs to one trigger, each one level up from the last, and all three
+> were repairs to WHICH COUNT.** Nobody asked whether a count was the right
+> object at all until the population was read by funcid.
+>
+>     KEY      a funcid            ->  a (refusal, identity) PAIR
+>     GRAPH    grounding edges     ->  GATING edges (:4420 loop, :4467 gate)
+>     OBJECT   a count of ENTRIES  ->  DISTINCT BODIES carrying the defect shape
+>
+> **THE TELL WAS AVAILABLE AT EVERY STAGE AND IS ONE LINE: there are three
+> funcids in all 17 entries.** A 17-row table over a 3-element domain is
+> announcing its own multiplicity, and the announcement survived two rounds of
+> people correcting the table.
+>
+> ⇒ **Getting the key and the graph both right does not save you from
+> summarizing over the wrong KIND of thing.** `12` and `7` are counts of
+> observations; a repair is an edit to the program. The two are different
+> objects and no arithmetic converts one into the other.
+>
+> **AND ALL THREE FAILURE MODES PRODUCE A COMPLETE, STABLE, PLAUSIBLE TABLE.**
+> None of them is visible from the output. **This one additionally survived
+> being explicitly marked PROVISIONAL**, which is the part worth carrying: the
+> provisional marker attached to the number's VALUE, and the defect was in its
+> KIND. *Marking a number uncertain does not put its units in question.*
+>
+> Architect `evt_2mw3vjp30yjbn`, correcting its own trigger twice and then the
+> premise under both repairs.
 
 > **"ROOT" MUST NOT QUIETLY BECOME "REPAIRABLE LOCALLY."** `funcid62 NOT IN
 > missing` inherits the exact ambiguity retracted above: **closed OR never
@@ -617,36 +697,94 @@ once the population is read as a graph.
 
 **D1 DISPOSITIONS THIS BOUNDARY BEFORE REPAIRING ANY DOWNSTREAM ENTRY.**
 
-**THE BOUNDARY IS NOW THE WHOLE BALLGAME.** All 5 arm-2 roots are `funcid60`,
-excluded as "the gate working", and some of the 5 downstream arm-1 pairs are
-downstream of those. **If those arm-2 refusals are correct, their downstream
-pairs are CORRECT PROPAGATIONS and must not be repaired at all** — which takes
-D1's population below 7 as well. That is what the `funcid60` ARM2-EVAL decides,
-and it is the highest-value measurement in the arc.
+**THE BOUNDARY WAS THE WHOLE BALLGAME, AND IT HAS NOW BEEN RULED — the block
+below settles it and SUPERSEDES the hypothetical in this paragraph.** Recorded
+as written because the ruling is best read against the question it answered:
+all 5 arm-2 roots are `funcid60`, excluded as "the gate working", and some of
+the 5 downstream arm-1 pairs are downstream of those. **If those arm-2 refusals
+are correct, their downstream pairs are CORRECT PROPAGATIONS and must not be
+repaired at all** — which would take D1's population below 7 as well. That was
+what the `funcid60` ARM2-EVAL was framed to decide.
 
-> **RAISED AS A QUESTION, EXPLICITLY NOT RULED (Architect).** The standing
-> ruling is that **cause 2 is the gate working and must not be repaired toward
-> green.** If `funcid60`'s arm-2 refusal is the proving arm correctly declining,
-> then `funcid59`'s failure is **the correct propagation of a correct refusal**,
-> and repairing `funcid59` would defeat a working gate one hop downstream —
-> exactly the move that was prohibited.
+> ### RULED 2026-09-16, AND IT WENT THE OTHER WAY. Architect `evt_2mw3vjp30yjbn`.
 >
-> It is **not ruled** because `funcid59` is **OVERDETERMINED**: it fails for its
-> own arm-1 reason *and* because its callee fails. Both would have to be
-> dispositioned separately.
+> **The question above presupposed that `funcid60`'s arm-2 refusal is a verdict.
+> It is not a verdict, because arm 2 never ran.** Measured across both binaries:
+> every `funcid60` pair is `GATE-BLOCK`'d on `funcid58` at the same identity, in
+> every refusal where it appears, and `:4467` sits before the arm split.
+>
+>     the hypothetical above   funcid60 arm-2 refuses CORRECTLY
+>                              => funcid59 is a correct propagation
+>                              => do not repair, population falls
+>
+>     what was MEASURED        funcid60 never REACHES arm 2
+>                              => the excluded entries are downstream of D1's
+>                                 own arm-1 population, not independent of it
+>                              => the direction REVERSES
+>
+> ⇒ **THE EXCLUSION IS REFUSED, AND THE PROHIBITION IS NOT.** "Cause 2 is the
+> gate working" remains standing law and nothing here licenses repairing it
+> toward green. What falls is the claim that **these particular entries are
+> cause 2** — a gate that never executed cannot be the gate working, and
+> crediting it with a correct refusal is the `[]` union one more time, at the
+> granularity of a whole arm.
+>
+> **`funcid59` IS STILL OVERDETERMINED** and that half is unchanged: it fails
+> for its own arm-1 reason *and* because its callee fails. Both still
+> disposition separately. What the ruling settles is the callee's side.
+
+**D1 PARTITIONS ROOTS AND DOWNSTREAM, AND THE DOWNSTREAM HALF IS NAMED.** It is
+the 5 `funcid60` arm-2 entries, plus whatever the arm-2 diagnostic returns for
+`funcid60`'s first actual evaluation. That diagnostic is **fenced: it must not
+land, it is not a repair, and a refusal is a first-class result** — see the
+observation plan.
 
 **`funcid60` IS NOW THE MOST INTERESTING BODY IN THE CENSUS.**
 
-    funcid60   ROOT. Publishes Param(block7,0) -- WALKABLE, unlike the Response
-               bodies. 593 authorities. Eleventh field Some(None): no obligation
-               names its published word, so it is blocked on no callee.
+    funcid60   DOWNSTREAM on the GATING graph. Publishes Param(block7,0) --
+               WALKABLE, unlike the Response bodies. 593 authorities.
+               Eleventh field Some(None): no obligation names its PUBLISHED
+               WORD -- which is a GROUNDING-graph fact and does NOT mean
+               "blocked on no callee". It carries an identity-bearing
+               obligation on funcid58 and is GATE-BLOCK'd on it at :4467.
                AND IT STILL FAILS TO CERTIFY {4362, 37}.
 
-Why does a walkable, authority-rich, callee-free body fail? Either the walk ran
-and found no grounding, or it hit `predecessors.is_empty()` under the cuts and
-returned the default. **Whichever it is, that is the arm-2 half — the half ruled
-to be the gate working — sitting directly upstream of an arm-1 entry D1 is
-scoped to fix.**
+> ### THIS ENTRY'S OWN QUESTION WAS A TWO-ARM FORK MISSING THE MEASURED ARM.
+>
+> It read: *"Why does a walkable, authority-rich, callee-free body fail? Either
+> the walk ran and found no grounding, or it hit `predecessors.is_empty()` under
+> the cuts and returned the default."*
+>
+> **Both arms presuppose the walk was entered. It was not.** `funcid60` is gated
+> out at `:4467`, before the arm split at `:4474`, in every compile — so the
+> missing third arm, *the walk never ran*, is the one that was measured. The
+> two-arm form also inherited `Some(None)` as "callee-free", reading a
+> grounding-graph field as a gating-graph fact.
+>
+> ⇒ **The question "why does it fail?" was never answerable from this data**, and
+> its two arms are the `[]` union again — this time wearing an exhaustive-looking
+> fork. See the SUMMARY OBJECT block: **an EXHAUSTIVE split over one variable is
+> not exhaustive over the thing you care about.**
+
+**WHAT ACTUALLY STANDS.** `funcid60` sits directly upstream of arm-1 entries D1
+is scoped to fix, and it has **never been observed to evaluate arm 2 at all**.
+Its refusal here is a PROPAGATION, not an independent arm-2 verdict. The
+arm-2 diagnostic is what would produce the first such verdict, and it is
+two-sided on its own merits: with `funcid58`'s certificate present,
+`:4455-4465` seeds `call_seeds[obligation.result_word]`, the third direct
+grounding condition at `:3139-3145` grounds on exactly that seed, and the first
+condition tests the 593-entry authority map. It can ground through authorities,
+ground through the seed, or refuse.
+
+> **These coordinates were RE-DERIVED at source here, not relayed.** `:4456-4459`
+> is `call_seeds.insert(obligation.result_word, certificate.identity)` guarded by
+> `if let Some(certificate)`; `:3139-3145` is a three-disjunct test whose first
+> arm is the `authorities` map, whose second is `detached_consumer_authorities`,
+> and whose third is `call_seeds.get(&value) == Some(&identity)`.
+> **Note the conjunction the prose smooths over:** the seed route grounds only if
+> the word being grounded IS `obligation.result_word` *and* the certificate's
+> identity matches the demanded one. "A proof path exists" is a claim about
+> two-sidedness, not a prediction that it grounds.
 
 ### OPEN — THE ENUM HAS THREE VARIANTS; THE CENSUS MEASURED TWO
 
