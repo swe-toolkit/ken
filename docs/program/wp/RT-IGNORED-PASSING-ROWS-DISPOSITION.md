@@ -316,6 +316,69 @@ A path-scoped precondition does **not** substitute for this. The mutations and
 the dispositions land on the *same* files, so no path partition separates a leak
 from legitimate work. The separation available here is temporal.
 
+### AC-1b. A GREEN UNDER MUTATION IS NOT A VERDICT. It is two facts, one number.
+
+**Added 2026-09-16 by the Steward, after row 1 refuted `AC-1` as written.**
+
+`AC-1` above says a row that stays green under the mutation *"is vacuous and
+must not be readmitted; report it as a finding with the mutation used."* **That
+is unsound, and row 1 is the counterexample.**
+
+    ken-cli::px7f_resource_native  linked_public_escape_is_exact_closed
+
+    attempt 1  resolve_fs_handle, Retired arm -> MalformedResource     GREEN
+    attempt 2  resolve_fs_handle, BOTH Closing and Retired arms        GREEN
+    attempt 3  lookup, stale-generation arm -> RightNotHeld            RED
+
+The row's `Closed` comes from the generation check in `lookup`, which **returns
+before the state match is ever reached** — so the resolver arms perturbed in
+attempts 1 and 2 are not on the row's path at all.
+
+⇒ **Reporting "vacuous, mutation used = the Retired arm" after attempt 1 would
+have SATISFIED `AC-1` exactly.** It requires the mutation to be named; it does
+not require the mutation to reach. The row is not vacuous, and the finding would
+have been confident, well-formed, and false.
+
+**A green under mutation has two causes and they produce one number:**
+
+    the row does not observe the behaviour          -> VACUOUS
+    the mutation never executed on the row's path   -> INERT MUTATION
+
+**Only evidence of reach separates them, and a green cannot supply it.**
+
+**THE DISCRIMINATOR, required before any row is reported vacuous:** show the
+mutation site is **executed** on the row's path. The cheap mechanical form is a
+**reach probe** — replace the semantic mutation with an unconditional
+`panic!("reach probe")` at the *same site*, and run the row:
+
+    row REDS on the probe    -> the site IS reached.
+                                A green on the semantic mutation then means the
+                                row genuinely does not observe it -> VACUOUS,
+                                and the finding is sound.
+
+    row GREEN on the probe   -> the site is NOT reached. The mutation was
+                                INERT and proves nothing about the row.
+                                Find a site on the row's actual path.
+                                DO NOT report vacuous.
+
+The probe reverts under `AC-1a`'s protocol like any other mutation — it is a
+mutation, and the blob-verified revert and commit ordering apply to it
+unchanged.
+
+**No row may be reported vacuous without a reach probe that reds.** A
+readmission needs no probe: a red on the semantic mutation already proves reach.
+**The probe is owed only by the arm that would otherwise be unfalsifiable.**
+
+**Record per row:** the mutation site, the probe result at that site, and the
+semantic-mutation result. Three facts, not one.
+
+> **Why this was worth stopping for.** The failure `AC-1` exists to prevent is a
+> row readmitted on a pass that proves nothing. **This defect is the same shape
+> pointed the other way** — a row *withheld* on a green that proves nothing —
+> and `AC-1`'s own two-sidedness claim did not cover it. Ten rows remain; the
+> implementer found this on the first one, and only because two mutations came
+> back green and the third was tried anyway.
+
 **A non-empty precondition is a finding to REPORT, not a state to clean up and
 continue from.** Every row measured after the leak began is suspect, and which
 rows those were is knowable only if the stop is loud.
