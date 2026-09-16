@@ -2288,8 +2288,25 @@ impl Parser {
             Token::KwMatch => self.parse_match_expr(),
             Token::KwIf => self.parse_if_expr(),
             _ => {
-                let mut f = self.parse_atom_expr()?;
+                // The application spine and the projection suffix are the SAME
+                // left-recursive postfix level (`32-grammar.md:264` and `:270`),
+                // so they share one accumulator and source order alone decides
+                // the nesting. Head and arguments take the BASE atom, which is
+                // what keeps `.field` off an argument:
+                //   keep box.value  ->  EProj(EApp(keep, box), value)
+                //   box.value keep  ->  EApp(EProj(box, value), keep)
+                // Two sequential loops cannot express that interleaving.
+                let mut f = self.parse_atom_expr_base()?;
                 loop {
+                    // Projection stays on the spine. Tested BEFORE the break
+                    // guards, so `Token::Dot` never has to look like an atom
+                    // start and `can_start_atom_expr` is unchanged.
+                    if matches!(self.peek(), Token::Dot)
+                        && matches!(self.lookahead(1), Token::Ident(_) | Token::Nat(1 | 2))
+                    {
+                        f = self.parse_projection_suffix(f)?;
+                        continue;
+                    }
                     // `eqn:` is a contextual modifier of the surrounding
                     // `match`, not an application argument to its scrutinee.
                     if self.is_contextual_ident("eqn") && matches!(self.lookahead(1), Token::Colon)
@@ -2311,7 +2328,7 @@ impl Parser {
                     if !self.can_start_atom_expr() {
                         break;
                     }
-                    let arg = self.parse_atom_expr()?;
+                    let arg = self.parse_atom_expr_base()?;
                     let span = Span::merge(f.span(), arg.span());
                     f = Expr::EApp(Box::new(f), Box::new(arg), span);
                 }
@@ -2347,6 +2364,14 @@ impl Parser {
         }
     }
 
+    /// Whether the next token can begin an application ARGUMENT.
+    ///
+    /// `Token::KwIf` is deliberately ABSENT: `32-grammar.md §3` does not admit
+    /// an ungrouped `if` as an `application_atom`, so `keep if c then a else b`
+    /// must reject at the `if`. A LEADING `if` is unaffected -- `parse_app_expr`
+    /// dispatches `Token::KwIf` in its opening `match`, before this predicate is
+    /// ever consulted -- and `keep (if ...)` still parses through `Token::LParen`.
+    /// This predicate has exactly one caller, the argument loop below.
     fn can_start_atom_expr(&self) -> bool {
         matches!(
             self.peek(),
@@ -2356,7 +2381,6 @@ impl Parser {
                 | Token::KwType
                 | Token::LParen
                 | Token::KwOld
-                | Token::KwIf
                 | Token::Nat(_)
                 | Token::IntLit(_)
                 | Token::FloatLit(_)
@@ -2810,6 +2834,35 @@ impl Parser {
     /// inside the `ConId` arm below), so this loop finds nothing left to
     /// consume there — it only fires for atoms that didn't already eat
     /// their own dots (`d.leq`, `(sort xs).leq`, etc).
+    /// One postfix projection suffix (`.field`, `.1`, `.2`) applied to an
+    /// already-parsed left expression. The body is lifted verbatim from
+    /// `parse_atom_expr`'s loop so the application spine builds `EProj` /
+    /// `EPosProj` and their spans identically to the atom path -- including the
+    /// positional `.1` / `.2` arm, without which positional projection would
+    /// silently leave the spine. Callers check the guard before calling.
+    fn parse_projection_suffix(&mut self, e: Expr) -> Result<Expr, ElabError> {
+        self.advance(); // consume '.'
+        let (field, index, projection_span) = match self.peek().clone() {
+            Token::Ident(s) => {
+                self.advance();
+                let field_span = self.tokens[self.pos - 1].1.clone();
+                (Some(s), None, field_span)
+            }
+            Token::Nat(index @ (1 | 2)) => {
+                self.advance();
+                let index_span = self.tokens[self.pos - 1].1.clone();
+                (None, Some(index as u8), index_span)
+            }
+            _ => unreachable!("guarded by the caller's lookahead"),
+        };
+        let span = Span::new(e.span().start, projection_span.end);
+        Ok(match (field, index) {
+            (Some(field), None) => Expr::EProj(Box::new(e), field, span),
+            (None, Some(index)) => Expr::EPosProj(Box::new(e), index, span),
+            _ => unreachable!("projection kind is exclusive"),
+        })
+    }
+
     fn parse_atom_expr(&mut self) -> Result<Expr, ElabError> {
         let mut e = self.parse_atom_expr_base()?;
         while matches!(self.peek(), Token::Dot)
