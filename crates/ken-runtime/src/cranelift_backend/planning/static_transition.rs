@@ -83,6 +83,13 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     BoolMatchCaseOrdinals, ConstructorIdentity, FieldIdentity, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,
 };
+// The immediate-bridge realization plane. Only the descriptor the plan field
+// stores is named here: the Stratum A classifier is still consumed by nobody
+// outside its own module, and re-exporting it now would put a name on the live
+// surface ahead of the slice that uses it.
+use immediate_bridge::ImmediateBridgeRealization;
+#[cfg(feature = "px8-ds-test-support")]
+pub use immediate_bridge::{with_d5b_hs10_bridge_plan_mutation, D5bHs10BridgePlanMutation};
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
@@ -575,6 +582,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// call identity, never by specialization identity or function provenance.
     required_consumer_projections:
         BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
+    /// Exact immediate producer/eliminator bridges, keyed by the complete call
+    /// identity whose call seat the bridge realizes without a physical call.
+    /// Built once before response phase B and re-derived exactly at closeout.
+    immediate_bridge_realizations: BTreeMap<ContinuationCallIdentity, ImmediateBridgeRealization>,
     /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts.
     /// Causal-call demands retain the exact prefix produced by specialization
     /// planning; validated static-response demands append through the same

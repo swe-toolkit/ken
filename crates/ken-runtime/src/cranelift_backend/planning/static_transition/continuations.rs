@@ -2161,6 +2161,17 @@ impl ContinuationCallView<'_> {
     pub(in crate::cranelift_backend) fn target(&self) -> ContinuationSpecializationId {
         self.target
     }
+    /// The complete call identity this view names: the whole opaque token plus
+    /// the recursive position, and nothing else.
+    ///
+    /// Minted here rather than assembled by consumers, so there is one
+    /// construction site for the key the plan's per-call relations are keyed on.
+    pub(in crate::cranelift_backend) fn identity(&self) -> ContinuationCallIdentity {
+        ContinuationCallIdentity {
+            token: self.token.clone(),
+            recursive_position: self.recursive_position,
+        }
+    }
 }
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a`** — one already-issued causal call, projected

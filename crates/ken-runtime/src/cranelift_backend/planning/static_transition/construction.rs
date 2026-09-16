@@ -293,6 +293,7 @@ impl<'src> Planner<'src> {
                 continuation_specializations: Vec::new(),
                 continuation_specialization_calls: Vec::new(),
                 required_consumer_projections: BTreeMap::new(),
+                immediate_bridge_realizations: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
                 static_response_continuations: Vec::new(),
                 static_response_plan_installed: false,
