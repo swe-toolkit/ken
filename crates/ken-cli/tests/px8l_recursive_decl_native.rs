@@ -191,6 +191,24 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
 //
 // The label named a trap the row would HIT; the row passes. Both cannot be true,
 // and the disposition is the label's, not the row's.
+//
+// WHICH ASSERTION CARRIES THE COUPLING. The readmission mutation (the C main
+// shim's terminal return, +1) reds at assert_agreement's native-vs-interpreted
+// comparison, so the exit_status literal on the line below it never executes.
+// That is the stronger of the two: the comparison's right-hand side is the
+// INTERPRETER running the same source -- an independent producer that recomputes
+// the answer -- where the literal is a number an author typed. The coupling to
+// the computed value is established by the interpreter, not by the literal.
+//
+// What the literal uniquely guards is common-mode failure, native and
+// interpreted wrong in the same way, which the comparison is blind to by
+// construction. The readmission mutation perturbs the native side only, so
+// "the row notices" is established for native-side breakage and not for that.
+//
+// And the mutation site is shared by every native row, so on its own it
+// discriminates "the row observes the native exit status" and nothing more.
+// What separates a covering row from a vacuous one here is the independent
+// producer plus the computed value, not the mutation.
 #[test]
 fn dynamic_zero_seed_takes_the_base_case() {
     assert_agreement(&[], 0);
@@ -208,6 +226,24 @@ fn dynamic_zero_seed_takes_the_base_case() {
 //
 // The label named a trap the row would HIT; the row passes. Both cannot be true,
 // and the disposition is the label's, not the row's.
+//
+// WHICH ASSERTION CARRIES THE COUPLING. The readmission mutation (the C main
+// shim's terminal return, +1) reds at assert_agreement's native-vs-interpreted
+// comparison, so the exit_status literal on the line below it never executes.
+// That is the stronger of the two: the comparison's right-hand side is the
+// INTERPRETER running the same source -- an independent producer that recomputes
+// the answer -- where the literal is a number an author typed. The coupling to
+// the computed value is established by the interpreter, not by the literal.
+//
+// What the literal uniquely guards is common-mode failure, native and
+// interpreted wrong in the same way, which the comparison is blind to by
+// construction. The readmission mutation perturbs the native side only, so
+// "the row notices" is established for native-side breakage and not for that.
+//
+// And the mutation site is shared by every native row, so on its own it
+// discriminates "the row observes the native exit status" and nothing more.
+// What separates a covering row from a vacuous one here is the independent
+// producer plus the computed value, not the mutation.
 #[test]
 fn dynamic_multistep_seed_preserves_updated_parameter_order() {
     assert_agreement(&["three"], 7);
