@@ -109,10 +109,69 @@ reached only through the generic path. This is an observation about today's
 elaborator, **not** something the contract should ratify — specify the carrier
 set, not the call sites.
 
-### 2e. `Core.Operators` does not exist
+### 2e. `Core.Operators` does not exist — and it RE-EXPORTS, it does not redefine
 
 `catalog/packages/Core/` holds `Classes/` and `Logic/` only. The home is
 **proposed** by this contract and **created** by A1. Do not write it as extant.
+
+**Three of the five standard meanings ALREADY EXIST** (Architect,
+`evt_3x7fd8ea7m04s`, measured at `ae890874c`):
+
+    pub fn bool_and   (a : Bool) (b : Bool) : Bool        LawfulClasses.ken.md:652   live in 7 files
+    pub fn bool_or    (a : Bool) (b : Bool) : Bool        LawfulClasses.ken.md:103   live in 5
+    pub fn ord_leq_at (a : Type) (d : Ord a) (x y : a)    LawfulClasses.ken.md:1052  live in 4
+                        : Bool = d.leq x y
+    ord_geq_at, any `≠` wrapper                           ABSENT
+      (a measurement, not a silence: the same grep hits `ord_leq_at`)
+
+> ### RULING — RE-EXPORT, DO NOT REDEFINE (Architect, `evt_3x7fd8ea7m04s`).
+>
+> `Core.Operators` is a **home, not a second definition**. The standard meaning
+> of `∧` **is** `bool_and`'s `GlobalId`, reached through a new import path.
+>
+> **This is load-bearing, not cosmetic, and §3b is why.** A re-export preserves
+> the `GlobalId`; a redefinition does not, **and a redefinition is not a
+> rename.** Under redefinition there are two `GlobalId`s for one meaning:
+> `x ∧ y` completes to the new one while sixteen files of live catalog code
+> call the old one — and §3b's first consequence (*"a renamed standard binding
+> still completes"*) is then **false between them**. Two functions that happen
+> to agree, one of which completes.
+>
+> Grounds: §3b's policy is precise only if one meaning has one `GlobalId`; the
+> extant bindings are in live use; and **subsume-don't-proliferate**
+> (`docs/PRINCIPLES.md`) governs when a second definition would agree with the
+> first by construction.
+
+`≥` and `≠` are the genuinely new ones, and **A1 authors them** — this contract
+says what they mean, not where their code lives.
+
+### 2f. A CLASS METHOD HAS NO `GlobalId`. §3a is §3b's PRECONDITION.
+
+Read this before writing a line of §3b's text (Architect, `evt_3x7fd8ea7m04s`):
+
+    crates/ken-elaborator/src/classes.rs:49    type_id: GlobalId       the class Sigma-record
+    crates/ken-elaborator/src/classes.rs:149   instance_id: GlobalId   the instance Sigma-record VALUE
+    crates/ken-elaborator/src/classes.rs:36    field_names: Vec<String>
+    crates/ken-elaborator/src/classes.rs:44    field_types: Vec<Term>
+
+`leq` is a **field name in a `Vec<String>`**. `ord_leq_at`'s body is
+`d.leq x y` — a projection. **Only the class record and the instance value have
+`GlobalId`s; the method does not.**
+
+⇒ **Do NOT write normative text describing `≤` as "the `leq` method of `Ord`".**
+That names something with no `GlobalId`, and §3b's policy then has nothing to
+key on. `≤`'s standard meaning is the **binding** `ord_leq_at` — a `GlobalId`
+plus a checked telescope — which projects `Ord`'s `leq` field in its body.
+
+**The distinction reads as pedantry in prose and is the difference between an
+implementable policy and one that cannot be written down.** §3b is implementable
+*only because* §3a makes the standard bindings ordinary top-level functions.
+
+**Corollary for `≥`:** `class Ord a` (`LawfulClasses.ken.md:119`) has `leq`,
+`refl`, `antisym`, `trans`, `total` — and **no `geq`**. So §3a's wrapper shape
+is not a preference, it is the only available one. **Say in the contract that
+`≥` is derived over `leq` rather than a class field**, so nobody later looks for
+a field that was never there.
 
 ## 3. Deliverables
 
@@ -169,6 +228,25 @@ so the tag is a gate rather than a dangling name.
 Each criterion names the control that can **fail** it. A criterion whose control
 cannot fail is not on this list.
 
+> ### THE CENSUS COMMAND RETURNS **SEVEN** LINES FOR **FIVE** CARRIERS.
+>
+> Read this before running §2b's command, or you will report a census that moved
+> when nothing did (Architect, `evt_3x7fd8ea7m04s`). At `ae890874c`:
+>
+>     numbers.rs:558,559,560     int_id, float_id, float32_id    REGISTRATIONS
+>     decimal_char.rs:211,268    decimalpair_id, char_id         REGISTRATIONS
+>     numbers.rs:187             pub(crate) fn set_eq_entry      the MECHANISM
+>     numbers.rs:188             self.eq_table.insert(...)       the MECHANISM
+>
+> **Five carriers, seven lines.** AC-CARRIER-INVENTORY-EXACT agrees **by name in
+> both directions**, which drops the two mechanism lines cleanly — but anyone
+> checking *"is it still five?"* **by counting** gets seven. Match names, never
+> the line count.
+>
+> The same three lines close the census and prove §2c's structural refusal in
+> code: `eq_table` is private at `:146`, `set_eq_entry` is its only mutator, and
+> the reads at `:209-210` match **only** `Term::Const` / `Term::IndFormer`.
+
 **AC-CARRIER-INVENTORY-EXACT.** The normative carrier set is exactly §2b's five,
 and no more. **Control:** re-run §2b's census at the candidate; the spec's list
 and the census agree by name in both directions. A spec listing four or six
@@ -201,7 +279,21 @@ adds **zero** rows to the TCB inventory — a `-0`/`+0` measurement on that file
 not an assurance.
 
 **AC-NO-SHIPPED-CODE.** Spec + conformance only. **Control:**
-`git diff <base> HEAD -- crates/` is **empty**.
+
+```sh
+# SUBSTITUTE THE LITERAL SHA YOU CUT FROM. Never `origin/main`, never `...`.
+BASE=<the 40-char sha this candidate's branch was cut from>
+git diff "$BASE" HEAD -- crates/        # MUST be empty
+```
+
+**A moving ref re-reads as a different claim every time `main` advances**, so
+`origin/main` here would red this AC on someone else's `crates/` work — and
+`...` collapses the base onto `HEAD` and passes vacuously. Architect,
+`evt_3x7fd8ea7m04s`. The worked form, including the guard that catches a
+degenerate range, is `§4a-pin` and `§4b` of
+`docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md`, which spent 2026-09-16 on
+exactly this failure — **and this frame reproduced it hours later, which is why
+the literal is spelled out here rather than left as a placeholder.**
 
 ## 5. Not this node
 
