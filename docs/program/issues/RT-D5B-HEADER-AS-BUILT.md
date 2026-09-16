@@ -18,7 +18,10 @@ origin: "Steward, 2026-09-16. Filed at runtime-leader's request (shape 2, standa
 > `67684fa5d9e960ebbdfba92f1a0d664115d73c25`** — the commit slice 3 landed at,
 > which is also the commit the roster below is measured at.
 >
-> **Comment-only, one file, zero compiled change.** `AC-5` is the control.
+> **Comment-only, one file, zero compiled change.** `AC-5` is the control —
+> **and it was repaired on 2026-09-16 after the first candidate went red.**
+> "Comment-only" does not imply "compiles nothing": an indented block inside
+> `//!` is a doctest. Read `AC-5` before writing the roster.
 
 ## The defect
 
@@ -147,8 +150,45 @@ wrong population and cannot be satisfied.
 
 **AC-4b. The `#[allow(dead_code)]` prohibition is intact.**
 
-**AC-5. Zero compiled change.** Control: the diff is `//!` lines only, and the
-crate's warning count is unchanged at 95.
+**AC-5. Zero compiled change, AND THE DOC COMMENT COMPILES NOTHING.** Targeted
+only, `COORDINATION §12`:
+
+    scripts/ken-cargo test --doc -p ken-runtime    -> passes
+    scripts/ken-cargo build -p ken-runtime         -> this file's diagnostic set
+                                                      unchanged, compared BY NAME
+
+**A `//!`-only diff is NOT evidence of zero compiled change, and the first
+version of this AC said it was.** A four-space-indented block inside `//!` is a
+Markdown code block, and rustdoc compiles an untagged code block **as Rust**.
+The first candidate, `dc6b1369d`, was `//!`-only in one hunk and still went red
+on `test shard 1/8` (PR #3754, run `35074374336`): the roster at `:68-74` was
+handed to the compiler as source, and rustc tried to lex `` `cases` `` as a
+token.
+
+⇒ **Write the roster as a fenced block tagged `text`** — `text`, not `ignore`,
+because `ignore` claims it is Rust that we choose not to run, and it is prose.
+
+    //! ```text
+    //!     build_immediate_bridge_realization_plan
+    //!     ...
+    //! ```
+
+**The old control could not fail in the presence of the defect it existed to
+catch**, because the diff *was* `//!` lines only. It encoded the premise *"a doc
+comment is inert"* and then measured the premise instead of the property. A
+control for "zero compiled change" has to **compile**.
+
+**Note on the rest of the file:** two further indented runs sit in `///`
+comments inside the `#[cfg(test)]` module that begins at `:760`. They do not
+fire because **rustdoc does not build `cfg(test)` code**, so they are never
+collected — that is a *condition they currently satisfy*, not a property of
+them. Leave them alone; they are outside this node.
+
+**And do not compare warning COUNTS.** The first version of this AC said *"the
+crate's warning count is unchanged at 95"* without naming the build unit; the
+implementer measured `94` on `(lib)` alone. Both numbers were right and the AC
+was the thing that was wrong. **Name the build unit and compare the named items
+for this file.**
 
 **AC-6. No decorative glyphs.**
 
