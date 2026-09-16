@@ -1,7 +1,7 @@
 ---
 id: SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION
 title: "Re-gate the application-atom contraction rows in seed-reserved-infix-names.md OFF LANG-RESERVED-INFIX-NAMES (A0) and ONTO LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE. The rows are CORRECT as written -- they transcribe the contract pin already on main at spec/30-surface/32-grammar.md §3 -- but they exceed A0's unchanged-syntax scope, and the catalog control they break is itself written against a non-conforming parser. D0 RULED RELOCATE (evt_5sf71fnjxpzmb), reversing the earlier WITHDRAW. Spec-author authors, CV validates, spec-leader Decision, Steward M1-M4."
-status: ready
+status: merged
 owner: spec
 size: S
 gate: none
@@ -11,6 +11,16 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-14 on the spec-leader's request (evt_1atgv5dm04ew4) and behavioral ruling (evt_234t0amx3ht7x). Language grounded (language-implementer evt_7x7th49xa2xv3) that the seed's application-atom contraction regresses the priority-queue catalog control priority_queue_actual_export_table_is_exactly_the_six_name_api; the clean bounded A0 checkpoint 2c63d409 omits the contraction and passes 47 focused tests + 10 mutation seams. The contraction also contradicts the Architect's A0 decomposition (evt_784ge2nq65dfy, 'unchanged syntax'). SPEC-RESERVED-INFIX-NAMES already merged (7dea59366), so this is a forward spec correction, not a withheld merge. Re-measure the exact seed rows at the cut."
 ---
+
+> ## MERGED 2026-09-16 at `98d98440da2215f33b654fd6b2ac9709c3d5ab2e`
+>
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. The single touched path
+> (`conformance/surface/operators/seed-reserved-infix-names.md`) is
+> byte-identical between the approved candidate
+> `12f3b4672eb35ba90ab0bd9795b33d30545910a6` and `main`, landed via PR #3768.
+> Six seats were parked behind this correction; both the language and spec
+> rings are kicked from this landed tree.
 
 > # CORRECTED 2026-09-16 -- the D0 was RULED, and it REVERSED. Read this first.
 >
