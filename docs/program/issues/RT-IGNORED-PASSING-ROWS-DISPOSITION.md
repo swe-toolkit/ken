@@ -1,7 +1,7 @@
 ---
 id: RT-IGNORED-PASSING-ROWS-DISPOSITION
 title: "Give every ignored row that now PASSES a disposition and act on it -- readmit, register, or relocate-and-delete -- so the ignored set holds only rows ignored for a reason that is still true. A pass is not evidence the defect closed: AC-1 requires a mutation showing each readmitted row goes red when the behaviour it covers is broken, because a closed defect and an assertion that stopped reaching the behaviour produce the same green."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,75 @@ github: null
 origin: "Steward, 2026-09-16, on operator directive 2026-09-15: 'Tests that pass should be verified to be functional and desirable and un-ignored... The test to determine that instant equality is wrong is just expensive documentation. That should be noted in code comments and/or spec and/or conformance and not in an ignored test.' Frame at docs/program/wp/RT-IGNORED-PASSING-ROWS-DISPOSITION.md, landed 507bd4bd1, base-fixed at ac08fb581 on Architect evt_4hba5yyec810x. CI-IGNORED-SWEEP (merged) supplies the instrument and its own origin names 'the good-news event this node exists to route, which nothing reported' -- this node consumes that accumulated backlog. Steward-filed per COORDINATION section 2."
 ---
 
+> ## MERGED 2026-09-16 at `10eed42912428d66c84533fe5cba88bcaf8c946f`
+>
+> **Verified by blob and by tree identity, not by ancestry** — the publisher
+> squashes, so a routed commit is an ancestor of nothing. All ten paths are
+> byte-identical between the approved tip
+> `74b4c6289c8fa06d8ccdd81c85b876efc8d0dbe6` and `main`, and
+> `git merge-tree --write-tree origin/main 74b4c6289` reproduces `main`'s own
+> tree exactly.
+>
+> **Run `35060326844`: 26 jobs, 26 success, full mode, 33m23s.**
+>
+> ### The sweep confirms the claim, and its VERDICT could not have
+>
+> The job is `ignored-row sweep (findings non-blocking)` — **it reports
+> `success` whatever it finds**, so the green matrix carries no information
+> about this node's central arithmetic. The number below comes from the job
+> log's own printed lines:
+>
+>     Ignored-row sweep completed: 15 selected; 0 passed.
+>     No ignored row passed in this run.
+>
+> **`0 passed` is this node's entire purpose.** Passing-while-ignored went
+> `11 -> 0`.
+>
+> ### The reconciliation, and the off-by-one that will trip the next reader
+>
+>     selected before   27
+>       9 readmitted    #[ignore] gone        -> not selected
+>       1 relocated     test deleted          -> not selected
+>       2 registered    registry exemption    -> not selected
+>                       ----
+>                        12
+>     selected now      27 - 12 = 15          sweep reports 15
+>
+> **The twelfth is `px8ds`.** It was ruled `D-REGISTER` in the frame's §4 and
+> executed on this candidate despite never being in the measured eleven.
+> **Anyone reconciling `27 - 11` will be off by one and should not go hunting
+> for a defect.**
+>
+> ### The falsifiable form of the census
+>
+>     attributes - registry == selected,  exactly, at both ends
+>     base    33 - 6 = 27    sweep: 27 selected
+>     main    23 - 8 = 15    sweep: 15 selected
+>
+> **`33 -> 23` is the census; `38 -> 28` is the loose count** and differs by
+> five prose lines at each end (`// #[ignore] removed, ...` is a real line in
+> this candidate's own readmission comments). Exclude them:
+>
+>     git grep -h '#\[ignore' <ref> -- crates/ \
+>       | sed 's/^[[:space:]]*//' | grep -v '^//' | wc -l
+>
+> ### What remains, and it is not this node's
+>
+> **All 15 selected rows FAIL.** That is the failing-while-ignored population
+> and the subject of `RT-IGNORED-FAILING-ROWS-INVENTORY` — **not a
+> regression.** That node's `AC-1` is answered before it starts: the measured
+> population at `main` is **15**, not the 16 its §2 hypothesised at
+> `0f71ab5b9`.
+>
+> **Publisher note.** This candidate was merged with `--doc-only` on a diff of
+> ten files, nine under `crates/` — PR #3747 merged at 05:38:31Z, its own CI
+> run created at 05:38:29Z. Nothing escaped validation: the post-merge push run
+> classifies from `main`'s own diff and completed green. **The gap is that it
+> ran after the merge instead of before it.** Second instance; recorded on
+> `PUB-DOC-ONLY-UNVALIDATED-AGAINST-ITS-DIFF`.
+>
+> The release banner below is retained as the record of what was asked for.
+>
 > ## RELEASED to Team Runtime 2026-09-16 — `ready`, size M, tier T1
 >
 > **Implementation base is `origin/main`, and that is a ruling, not a
