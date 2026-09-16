@@ -620,6 +620,21 @@ determine the numeric story (`35`):
 | **bytes** | `b"…"`, `0x[deadbeef]` | `Bytes` (`38`) |
 | **bool** | `true`, `false` | `Bool` |
 
+**A `.` immediately after a projection is never part of a float literal.** The
+lexer tracks whether the previous token was a `.`; when it was, a following
+`.digits` opens a **new projection** rather than continuing a numeric literal.
+So `p.1.2` lexes as **five tokens** — `Ident(p)`, `Dot`, `Nat(1)`, `Dot`,
+`Nat(2)` — which the grammar matches as `primary` followed by **two**
+projections, each a `Dot` and a numeric atom. An ordinary `3.14` remains **one**
+float token, and `p.1` and `3.14` are unaffected in isolation.
+
+This rule is a **precondition of `32 §3`'s postfix projection chain**, not a
+convenience. `application_atom ::= primary ("." ident | ".1" | ".2")*` makes
+chained numeric projection first-class, and without this the second `.2` of
+`p.1.2` would be absorbed into a float literal `1.2` — so the grammar would
+admit a form the lexer could not deliver. The two must be read together: the
+grammar says the chain exists, and this says the token stream can express it.
+
 ### Escape repertoire
 
 Ordinary string, character, and byte-string literals use the following closed
