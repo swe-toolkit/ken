@@ -254,12 +254,31 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  NEVER OF A funcid -- funcid59 is downstream in 4 refusals and
                  a ROOT in 1. Every count here is a count of PAIRS.
                  Architect evt_9bz296v5099j, evt_18mtk5rr061nk, evt_2mw3vjp30yjbn.
-    BODIES       2 OR 4, PENDING SYMBOL NAMES. FuncId is per-Module and the two
-                 binaries are different Modules, so funcid58 in one is NOT known
-                 to be funcid58 in the other. WITHIN px8f_buffer_native the
-                 claim is safe: 10 arm-1 entries = 2 bodies x 5 refusals.
-                 Across both it is 2 or 4, and it is settled BY SOURCE SYMBOL,
-                 never by number. Runtime-implementer owes the symbol names.
+    BODIES       TWO PLANNER ROLES. The "2 or 4 across two binaries" framing is
+                 RETIRED and the SOURCE-SYMBOL method it prescribed DOES NOT
+                 EXIST: units.rs:1562/:1594 mint ken_unit_{ordinal} and
+                 ken_continuation_{ordinal} synthetically, with a comment
+                 stating outright that the string is not an identity and that
+                 nothing resolves a unit by parsing it.
+                 THE QUESTION DISSOLVES RATHER THAN RESOLVING. The six compiles
+                 are SIX DIFFERENT KEN PROGRAMS, so "the same body across
+                 compiles" HAS NO REFERENT -- there is no shared source
+                 definition to be the same. The answer could never have been 2.
+                 THE WELL-DEFINED OBJECT IS THE PLANNER ROLE, and there are TWO,
+                 and they were in the census the whole time:
+                 Response(StaticResponseOwnerId(0)) and (1), for funcid58 and
+                 funcid59 respectively, identical in both binaries.
+                 STILL SETTLED BY MEASUREMENT, NEVER BY NUMBER. The linkage
+                 symbol is being printed alongside, so the claim rests on a
+                 measurement rather than on a reading of that comment.
+                 Architect evt_1vnsrqk27v53c; implementer evt_7v8vwk1w4bqgt.
+                 THE FOURTH TERM, and it is the Architect's: it offered DISTINCT
+                 BODIES as the right KIND of object to replace a count of
+                 entries -- and that object is itself UNDER-DEFINED over this
+                 population. Key, then graph, then summary object, and then the
+                 REPLACEMENT OBJECT HAD NO REFERENT EITHER. This is why SIZE
+                 retired its trigger outright instead of re-pointing it: the
+                 right thing to count turned out not to exist.
     SIZE         HELD AT M, AND THE TRIGGER IS RETIRED OUTRIGHT, NOT RE-POINTED.
                  The Architect retired its object (evt_2mw3vjp30yjbn): "roots
                  below ~5 -> re-cut to S" cannot fire correctly on a count whose
@@ -631,6 +650,44 @@ that has nothing to do with which graph it was taken over. See below.
 >
 > Architect `evt_2mw3vjp30yjbn`, correcting its own trigger twice and then the
 > premise under both repairs.
+>
+> ### THE FOURTH TERM: THE REPLACEMENT OBJECT HAD NO REFERENT EITHER.
+>
+> `DISTINCT BODIES` was offered as the right KIND of object to replace a count
+> of entries. **It is under-defined over this population** — the six compiles
+> are six different Ken programs, so "the same body across compiles" names
+> nothing. The well-defined object is the PLANNER ROLE, and there are two.
+>
+>     KEY      funcid              ->  (refusal, identity) PAIR
+>     GRAPH    grounding edges     ->  GATING edges
+>     OBJECT   count of ENTRIES    ->  distinct BODIES
+>     REFERENT distinct BODIES     ->  no referent. PLANNER ROLE, and there are 2.
+>
+> ⇒ **Three successive repairs asked WHICH COUNT; the fourth found that the
+> thing being counted did not exist.** This is the warrant for retiring the size
+> trigger outright rather than re-pointing it: not merely that a count is the
+> wrong kind of input, but that **the search for a better object to count can
+> itself terminate in nothing.** Architect `evt_1vnsrqk27v53c`.
+
+> ### WHY AN UNEXECUTABLE INSTRUCTION WAS ALLOWED TO LAND. IT FAILS SAFE.
+>
+> The `BODIES` row landed at `0929deedd` prescribing a source-symbol read that
+> was measured, minutes later, not to exist. It was **not** pulled, and the
+> durable reason is **not** that the only seat who would act on it had already
+> superseded it — that was true that day and is a claim about the fleet, not
+> about the artifact.
+>
+> **The row FAILS SAFE.** Its operative force is a PROHIBITION — *never settle
+> this by number* — and that half was correct and protective. The prescription
+> bolted to it was unexecutable, so the outcome of trying to follow it is **"not
+> settled"**, which is exactly the state the row exists to enforce.
+>
+> ⇒ **An unexecutable instruction whose prohibition half is sound cannot produce
+> a wrong answer; it can only produce a wasted lookup. That is a CHURN cost, not
+> a CORRECTNESS cost**, and it does not warrant pulling a gated candidate.
+> Architect `evt_4cs2zghzcwggt`. **The test is which half is load-bearing** — had
+> the row's operative force been the prescription rather than the prohibition,
+> the same defect would have been a correctness hazard and the answer would flip.
 
 > **"ROOT" MUST NOT QUIETLY BECOME "REPAIRABLE LOCALLY."** `funcid62 NOT IN
 > missing` inherits the exact ambiguity retracted above: **closed OR never
@@ -785,6 +842,126 @@ ground through the seed, or refuse.
 > the word being grounded IS `obligation.result_word` *and* the certificate's
 > identity matches the demanded one. "A proof path exists" is a claim about
 > two-sidedness, not a prediction that it grounds.
+
+### RAN 2026-09-16 — ARM 2 EVALUATED FOR THE FIRST TIME, AND IT PROVED. ONE PAIR.
+
+**Diagnostic only.** Env-gated on `KEN_DIAG_ARM2_BYPASS`, uncommitted, never
+landed, supplying nothing but the `call_seeds` entry a real certificate would
+have produced, at the `:4440` break only. **Bypass scope MEASURED, not
+asserted:** exactly one triple fired, twice (two fixpoint iterations), nothing
+else. Keyed to the `(refusal, identity)` pair over the GATING graph —
+`ken-verify --test px8f_write_partition`, identity `id4362`.
+
+    ARM2-EVAL  funcid60  Context(ContinuationContextId(0))  id4362
+               published=v26  def=Param(block7,0)
+               valid=true  grounded=true  sources={v3653}  cuts=7
+
+    missing BEFORE   [(60,id4362), (58,id4362), (59,id4362)]
+    missing AFTER    [(58,id4362), (59,id4362)]
+
+⇒ **`funcid60`'s entry was a GATING ARTIFACT of `funcid58`'s arm-1 refusal.**
+The exclusion "cause 2 is the gate working" is refuted for this pair by two
+independent facts: the gate never executed, **and** when made to execute it
+PROVES. The refusal narrows to exactly the two arm-1 bodies — the same shape as
+the one pre-existing refusal that never carried `funcid60`. **That shape
+prediction came true without being aimed at**, which is worth more than the
+narrowing.
+
+**ONE PAIR IS NOT FIVE.** The BOUNDARY ruling rests on *arm 2 never RAN*, and
+that is measured for all five. *What arm 2 SAYS when it runs* has **one data
+point out of five**. If any of the remaining four REFUSES when let through, the
+exclusion revives **for that pair specifically and for no other**. Both halves
+are per-`(refusal, identity)` pair, as the pair rule requires.
+
+> ### THE TRANSFER FENCE. IT PROVED THROUGH THE ONE INPUT D1'S POPULATION LACKS.
+>
+> `sources={v3653}` — one of `funcid60`'s own eight demand-matching authority
+> words. The injected seed is keyed on `v451` and **is absent from `sources`**.
+> So the **593 authorities** carried it, through the FIRST direct grounding
+> condition at `:3139-3145`, which tests `authorities.get(&value)`.
+>
+>     funcid60   Context    authorities = 593    GROUNDED through them
+>     funcid58   Response   authorities = 0
+>     funcid59   Response   authorities = 0      every table EMPTY
+>
+> ⇒ **"Arm 2 proves" is a fact about a body with 593 authorities and DOES NOT
+> TRANSFER to a population with zero.** The reading to refuse is *"the proving
+> arm works, so PROVE is viable for D1."* The walk succeeded through the one
+> input the arm-1 bodies do not have. **PRODUCE vs PROVE vs SEED STAYS OPEN.**
+
+> ### IT ADDS ALMOST NOTHING TO THE ROUTE-LOCALIZATION CLAIM. Architect
+> ### `evt_4cs2zghzcwggt`, correcting its own prior paragraph.
+>
+> It was first credited as *"a working mechanism demonstrated on one side of"*
+> the claim that authority production does not run on the Response-owner route.
+> **That credit is withdrawn as mostly ENTAILED.** What upgraded the
+> localization was **`593` versus `0`, and that was in the census before this
+> diagnostic ran.** Given a non-empty authority map holding a demand-matching
+> entry, condition 1 at `:3139-3145` firing is close to definitional.
+>
+> **WHAT IT DOES ADD, STATED NARROWLY SO IT CANNOT BE STRETCHED.**
+> `reachable_blocks=6664`, `cuts=7`, `def=Param(block7,0)`, grounded at `v3653`:
+> the walk was entered, the cut derivation ran, reachability was computed over a
+> real CFG, and the walk reached the published word and terminated at a
+> demand-matching authority. **That is the end-to-end arm-2 MACHINERY
+> functioning, never before observed on a non-Response body.** It is a fact about
+> the machinery. It is **not** a fact about a population whose map is empty.
+>
+> **arm-taken and authority-count are BOTH functions of the ROUTE**, so their
+> perfect correlation across the 17 entries is **entailed by the route split, not
+> independent evidence for it.** Discriminating *"production does not run on the
+> Response route"* from *"Response bodies lack authorities for some other
+> reason"* needs **a Response body WITH authorities, or a Context body WITHOUT.**
+> **NOTHING SO FAR HAS PRODUCED EITHER. THAT MEASUREMENT IS STILL UNRUN.**
+
+> ### DO NOT READ THE ACCUMULATION OF FENCES AS ACCUMULATING EVIDENCE.
+>
+> The Architect and the Steward flagged the same correlation from two sides
+> within minutes — *arm-taken and authority-count are both functions of route*,
+> and *a grounding condition succeeding on the body that has the input is
+> entailed by having the input.* **Those are one defect at two granularities,
+> and NEITHER WAS DISCOVERED FROM THE DATA.** Each of us recognised a shape we
+> had just finished writing about.
+>
+> ⇒ **Two independent-looking fences on the same claim are not two findings, and
+> a growing list of caveats is not a growing case.** The discriminating
+> measurement has not moved an inch: a Response body with authorities, or a
+> Context body without. Recognition is cheap and reproducible; it is not
+> evidence. Architect `evt_4cs2zghzcwggt`.
+
+> ### PRE-REGISTERED: WHAT THE SEED-FREE CONTROL MEANS, FIXED BEFORE IT RUNS.
+>
+> `cuts=7` and `derive_certified_cuts` reads `call_seeds`, so the seed may have
+> contributed EDGES even though `v451` is not the grounding source. **A grounding
+> SOURCE and a graph EDGE are different roles; one value can fail one and serve
+> the other.** The control is the bypass WITHOUT the seed — let `funcid60`
+> through the gate and nothing more.
+>
+>     PROVES seed-free    funcid60 needed only to be LET THROUGH. The gate at
+>                         :4467 demanded a certificate its proof never consumed:
+>                         the precondition is STRONGER than the proof requires.
+>                         A STRUCTURAL OBSERVATION.
+>     REFUSES seed-free   the seed was load-bearing through the CUTS though not
+>                         the grounding source. The certificate really was a
+>                         dependency and the gate is correct as written.
+>
+> **NEITHER OUTCOME LICENSES "RELAX THE GATE." THIS IS A NEW DOOR TO REPAIRING
+> TOWARD GREEN AND IT IS CLOSED.** If it proves seed-free, the honest statement
+> is that the gate **over-demands relative to this proof** — not that it should
+> be weakened. A gate that demands all certificates before proving is a
+> **fixpoint-ORDERING discipline**: it cannot know what a proof will consume
+> before running it, and *"only demand what the proof turns out to need"* is
+> circular on its face. **Name the observation, file it, do not act on it.**
+> Architect `evt_1vnsrqk27v53c`. This sits alongside the standing cause-2
+> prohibition and is a SECOND entrance to the same prohibited move.
+
+**STILL OPEN AFTER THIS PASS:** the four remaining arm-2 pairs in
+`px8f_buffer_native`, the planner-identity/linkage print, and the sixth compile
+— all folded into one single-threaded re-run. **The sixth compile stays OUTSIDE
+the partition until it lands.** Its test does `expect` success
+(`px8f_buffer_native.rs:1185`), so explanation (i) is dead for whichever compile
+it is; what is unsound is only the compile-to-test **mapping**, read positionally
+off interleaved 8-thread output and retracted by its own author.
 
 ### OPEN — THE ENUM HAS THREE VARIANTS; THE CENSUS MEASURED TWO
 
