@@ -1201,6 +1201,48 @@ property-class coherence is the landed **Ω-PI** (`16 §1`). The net-new logic i
 the *desugaring, the orphan/overlap check, and the search*; the *trust root it
 rests on is landed and unchanged* — subsume-don't-proliferate.
 
+### 6.9 Standard-operator call completion
+
+An occurrence of a standard operator (`33 §6.1`) is written with two operands,
+while the bindings behind `≤` and `≥` take four arguments — a carrier, a
+dictionary, and the two values. The elaborator **completes the omitted prefix**
+at the use site and then checks a **fully saturated ordinary application** in
+the kernel. No new term former, no special call shape, and nothing reaches the
+kernel that an explicit fully-applied call could not have written by hand.
+
+Completion proceeds in the order: infer the operand carrier; then resolve the
+required dictionary by the ordinary instance search of `§6.2`, or, for `≠`,
+select the registered comparator for that carrier (`33 §6.2`); then check the
+saturated application. A failure at any step is an ordinary elaboration error
+at the occurrence, never a silent fallback to a different meaning.
+
+**The policy binds to the defining `GlobalId` and its checked telescope, never
+to the occurrence's glyph text.** Three consequences follow, and each is a way
+an implementation gets this wrong:
+
+- **A renamed standard binding still completes.** Import aliasing and
+  re-export republish the same canonical identity (`33 §4.3`), so an occurrence
+  reaching `ord_leq_at` under any path or alias completes. The glyph is not
+  what is recognised.
+- **An unrelated local `≤` stays ordinary.** A user's own operator with that
+  spelling has a **different** `GlobalId` and receives no completion. It
+  elaborates exactly as its own declaration says, and shadowing or importing it
+  does not capture the standard meaning.
+- **A partially applied standard binding stays partially applied.**
+  `ord_leq_at Nat d` is a valid two-argument application yielding a function,
+  and completion does **not** reinterpret it as a four-argument call in need of
+  a prefix. Completion supplies a prefix for an occurrence written in operator
+  position; it does not rewrite explicit applications.
+
+This policy is implementable **only because** `33 §6.1` makes the standard
+meanings ordinary top-level bindings. A class **method** has no `GlobalId`: a
+class elaborates to a record type (`33 §5.2`) whose fields are names within it,
+and `d.leq` is a projection out of a dictionary value, not a global. Text that
+described `≤` as *"the `leq` method of `Ord`"* would name something the policy
+has nothing to key on. `ord_leq_at` is a binding with a canonical identity
+whose **body** projects `leq`; the identity is what completion recognises, and
+the projection is an implementation detail of that binding.
+
 ## 7. What WS-L/WS-V must deliver here (V0, then L-stream)
 
 The elaborator: scope resolution, implicit insertion, bidirectional HM+dependent
