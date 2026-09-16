@@ -5,7 +5,8 @@
 has moved on `main`, and the line it came from carries a refused capability
 grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 
-**Base:** `origin/main` `6f49f852141a66571c6126a569b954f63e2b6bde`.
+**Base (increment A):** `origin/main` `6f49f852141a66571c6126a569b954f63e2b6bde`.
+Increments B and C pin their own cut points in §4a-pin. This header is A's.
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
 direction (*"do not build on an unmerged commit... the base commit needs to be
@@ -176,11 +177,56 @@ session — by subtraction, with no new line and a green build.
 ⇒ **An omission has no complainant.** Every instrument aimed at what a diff
 *adds* is structurally blind to site 3.
 
+### 4a-pin. THE PIN. Bound ONCE here; §4b and §4d reference it and never re-type it.
+
+```sh
+# ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
+BASE=6f49f852141a66571c6126a569b954f63e2b6bde   # increment A's cut point
+PATHS='-- crates/'                               # the domain, all three crates
+```
+
+> **Why this is a block and not two comments.** The base and the domain were
+> each typed at two sites, coupled only by a prose assertion that they agreed.
+> **Nothing enforced it.** The frame's own rule is that each increment pins the
+> literal SHA it was cut from, so at increment B **both copies must change
+> together** — and if only the gate's does, the diagnostic silently measures
+> against increment A's base.
+>
+> **That failure lands at the worst possible moment: §4d is what you consult
+> WHEN §4b REDS.** A stale copy does not go quiet. It hands you a confidently
+> wrong location while you are debugging a real red — a diagnostic that lies
+> precisely when it is load-bearing. (Architect, `evt_1pndtv06xqbx2`.)
+>
+>     a pin TYPED AT EACH SITE can diverge.
+>     a pin BOUND ONCE and referenced cannot.
+>
+> ### SIX COPIES OF THIS SHA EXIST IN THE NODE. ONLY TWO ARE PINS.
+>
+> **Updating all six at increment B is exactly as wrong as updating none**, and
+> that is why "de-duplicate the SHA" is the wrong instruction:
+>
+>     PIN -- tracks the increment, MUST change at B
+>       §4a-pin `BASE=`                          the only executable copy
+>       frame header "Base:", node banner        statements of A's cut point
+>
+>     RECORD -- names when a measurement was taken, MUST NOT change at B
+>       §4b's "Steward-verified at <sha>"        a guard case table
+>       node frontmatter `origin:`               the cut's provenance
+>
+> **A pin and a record are the same 40 characters and they age in opposite
+> directions.** A reader running "update the base" over the node corrupts the
+> two records into claims about measurements that were never taken at that
+> commit — and nothing downstream can detect it, because the result is a
+> well-formed SHA in a plausible place.
+>
+> ⇒ **Bind the pins; date the records.** The frame header and the node banner
+> both say **increment A's** base explicitly, so a reader at increment B knows
+> to re-read §4a-pin rather than trust a header.
+
 ### 4b. `AC-PREDICATE` — the gate. Keyed on the OPERATION, not on any site.
 
 ```sh
-# Increment A. Each increment pins the LITERAL SHA it was cut from.
-BASE=6f49f852141a66571c6126a569b954f63e2b6bde
+# BASE and PATHS come from §4a-pin. Do not re-type either.
 
 # The base must be a SHA that CANNOT BECOME THE CANDIDATE.
 # Keyed on the EFFECTIVE base, never the WRITTEN one -- see the block below.
@@ -193,14 +239,25 @@ if git merge-base --is-ancestor HEAD "$BASE"; then
 fi
 echo "base=$(git rev-parse "$BASE")  head=$(git rev-parse HEAD)"
 
-git diff "$BASE" HEAD -- crates/ | grep -c '^[+-].*MappingAcquireFile'
+git diff "$BASE" HEAD $PATHS | grep -c '^[+-].*MappingAcquireFile'
 # MUST be 0
 ```
 
 **Three things are pinned independently, and getting one right says nothing
 about the other two:** the **key** (the operation, not a site list), the
-**domain** (pathspec `crates/`, below), and the **base** (§4f). **Each failed
-once in this node's drafting while the other two were correct.**
+**domain** (pathspec `crates/`, below), and the **base** (§4f).
+
+**The DOMAIN failed three times in one day, at three different scales, and the
+third failure was inside a sweep run because it had already failed twice:**
+
+    1  the AC scoped `crates/ken-host/`     population spans THREE crates
+    2  §4d scoped whole-tree                matched the frame that defines it
+    3  the verifying sweep scoped ONE FILE  the candidate is FIVE files
+
+⇒ **Every one was a correct, complete answer about the wrong population.** The
+key and the base each failed once. **A pin that has failed three times is not
+three slips; it is the pin nobody checks**, because a domain reads as scope
+rather than as a claim — and a claim is what it is.
 
 The key/domain distinction is the Architect's, written as their own
 self-diagnosis at `evt_5fhxfxvwrmyzh`: *"A pathspec is an enumeration that does
@@ -212,11 +269,16 @@ gate over the wrong population is not an operation-keyed gate.**
 (runtime-implementer, `evt_68akgs73am580`). `origin/main` and `merge-base(...)`
 both fail that, silently and later — see §4f, which is not optional reading.
 
-> ### THE TWO-DOT BAN AND THE GUARD ARE ONE PROTECTION, NOT TWO.
+> ### WHY THE BASE IS PINNED AS A LITERAL, AND WHY THE GUARD KEYS ON THE EFFECTIVE BASE.
 >
-> **`...` is rejected syntactically in this AC.** It is not a style preference
-> sitting beside the guard — **it is what makes the guard sound**, and dropping
-> it leaves a check that cannot fire. Measured, not reasoned (Architect,
+> **`...` is rejected syntactically in this AC**, for legibility — a reader
+> should not have to derive the effective base to know what the command
+> compares.
+>
+> **It used to be load-bearing and no longer is.** Against the *written-base*
+> guard the ban was the only thing standing between this AC and a silent zero;
+> the corrected *effective-base* guard below is syntax-independent and subsumes
+> it as a vacuity protection. The measurement that retired it (Architect,
 > `evt_12m48m4q5x7wr`):
 >
 >     git diff origin/main...dcb848eaa -- crates/          0    VACUOUS
@@ -225,7 +287,7 @@ both fail that, silently and later — see §4f, which is not optional reading.
 >     HEAD                                   = dcb848eaa...
 >
 >     GUARD keyed on WRITTEN base     SILENT   no warning
->     GUARD keyed on EFFECTIVE base   FIRES    VACUOUS BASE
+>     GUARD keyed on EFFECTIVE base   FIRES    STOP: HEAD is at or behind BASE
 >
 > `origin/main` and `HEAD` differ, so the `rev-parse` comparison **passes**,
 > while `...` has already collapsed the effective base onto `HEAD`. **The guard
@@ -421,8 +483,8 @@ rebased one.
 **Two distinct failures, and the frame ships a mechanism for one and prose for
 the other** (runtime-implementer, `evt_4g3e88radqsar`):
 
-    base == candidate            VACUOUS -- the `A..A` degenerate case.
-                                 Caught mechanically by §4b's rev-parse guard,
+    base == candidate            DEGENERATE -- the `A..A` case.
+                                 Caught mechanically by §4b's merge-base guard,
                                  which fires exactly when the bad repair is made.
     base behind an unlanded main WIDER CLAIM, not vacuous. Not caught by the
                                  guard; this is the disposition line's job.
@@ -439,13 +501,42 @@ deserves the location. Both checks are diagnostics beside the gate, not the
 gate:
 
 ```sh
-BASE=6f49f852141a66571c6126a569b954f63e2b6bde     # literal, same pin as §4b
+# BASE comes from §4a-pin. Do not re-type it -- this block used to, and a
+# comment asserting "same pin as §4b" is not a coupling.
 sel='/^        HostOpV1::ClockMonotonicNow$/,/^    };$/p'
 diff <(git show "$BASE":crates/ken-host/src/effect_v1.rs | sed -n "$sel") \
      <(sed -n "$sel" crates/ken-host/src/effect_v1.rs)          # must be EMPTY
 
-git grep -c 'Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested'   # must be 0
+# Scoped to crates/. Unscoped, this pattern MATCHES THE FRAME THAT DEFINES IT.
+# `git grep -c` prints per-file counts and NOTHING when there are no matches,
+# so pipe through `wc -l` -- the literal 0 is otherwise unreachable.
+git grep -c 'Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested' \
+  -- crates/ | wc -l                                          # must be 0
 ```
+
+> **Both defects above were live in the landed frame and are fixed here.**
+> Found by the Architect at `evt_6a2cjmcag3vvd`, verified by the Steward at
+> `c7f4a0bd6ea2111a514d8be89ea5a273f1887165`:
+>
+>     unscoped   -> docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md:1   exit 0
+>     -- crates/ -> (no output)                                           exit 1
+>     positive control, 5d977ac79 -- crates/
+>                -> crates/ken-host/src/effect_v1.rs:1                    fires
+>
+> **The instrument was never inert, only mis-scoped** — which is why the
+> positive control is what separates the two readings.
+>
+> **This is the DOMAIN pin failing a second time, one section below where it was
+> fixed.** §4b rejects whole-tree because *"an AC that reds because a tracker
+> node discusses the op by name is a false-positive machine"* — and §4d then
+> shipped whole-tree, in a document that discusses the op by name. **A rule
+> stated in one section does not travel to the next on its own.**
+>
+> **And `# must be 0` described an output `git grep -c` never produces.** It
+> emits per-file counts for matching files and nothing at all otherwise, so the
+> documented expectation was unreachable and the exit code inverted — **1 on the
+> healthy case.** A reader checking the stated expectation could never see it
+> satisfied.
 
 **`git show origin/main:...` carries the same defect as §4b's original and gets
 the same fix** — a moving ref makes the diagnostic re-read as a different claim
