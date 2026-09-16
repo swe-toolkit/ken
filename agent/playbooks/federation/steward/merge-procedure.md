@@ -6,14 +6,16 @@ Steward task procedure. Read at the point of use. Governing playbook:
 `COORDINATION §14` defines the gate; this is the mechanics. **Run every step.
 None is conditional on how routine the merge feels.**
 
-**M1-M3 run before you publish, M4-M5 publish, M6-M9 run after it lands.**
+**M1-M3a run before you publish (M3a is the authorization and is where a
+seated lieutenant takes over), M4-M5 publish, M6-M9 run after it lands.**
 
-> ### THE SPLIT: you ROUTE (M1-M4), the lieutenant EXECUTES (M5-M9)
+> ### THE SPLIT: you ROUTE (M1-M3a), the lieutenant EXECUTES (M4-M9)
 >
-> `COORDINATION §14b` is binding. **M1-M4 are your routing work** — verify the
+> `COORDINATION §14b` is binding. **M1-M3a are your routing work** — verify the
 > Decision (M1), the exact SHA and its shape (M2), the cited sources (M3), then
-> **post the exact-SHA authorization** (`ROUTED: <SHA>` with the gates, Decision,
-> base, and self-verified diff scope, mentioning the **lieutenant**). M4's token
+> **post the exact-SHA authorization at M3a** (`ROUTED: <SHA>` with the gates,
+> Decision, base, and self-verified diff scope, mentioning the **lieutenant**).
+> M4's token
 > mint and **M5-M9 are the lieutenant's** — it runs the publisher, verifies the
 > landed tree, flips the node, compacts the Adversary, and closes the loop with
 > the ring. **You do not launch the publisher when a lieutenant is seated.**
@@ -257,7 +259,43 @@ Hits route to the **Librarian, after the merge**. Never into the ring's frame.
 Rationale and the already-red-`main` question are in
 `release-and-handoff.md`, step 7.
 
+## M3a — POST THE AUTHORIZATION. This is the irrevocable act.
+
+**When a lieutenant is seated this is your LAST step, and it is the only one
+that cannot be undone.** M1-M3 are measurements; you can redo a measurement.
+**You cannot recall a `ROUTED:`.**
+
+Post `ROUTED: <SHA>` mentioning the lieutenant, carrying the gates, the
+resolved Decision, the base, and the self-verified diff scope **taken at the
+merge-base, not at `origin/main`** (see M2).
+
+**Before you post, ask the one question the other steps do not:**
+
+> **Is a reviewer still expected on this candidate?**
+
+**If yes, DO NOT POST `ROUTED:` AT ALL.** Post the SHA, the gates and the
+scope, say plainly that it is **not authorized**, and post a bare
+`ROUTED: <SHA>` once the review clears.
+
+**A qualified routing (`ROUTED, HOLD FOR <reviewer>`) is NOT protection and
+must not be used as such** — the executor is told to *"await the Steward's
+ROUTED authorization"* (`moot.toml:562`), the unqualified concept, so a
+qualifier is not a different token to the seat waiting on it. **Withholding the
+authorization is a mechanism; adding words to a message is not.** Measured
+2026-09-16: two review-post holds were correct and both landed anyway, while
+withholding the authorization held a candidate that a qualifier would not have.
+
+> **Why this is a numbered step and was not before.** This file's enforcement
+> clause is *"Run every step"* — **keyed on the step as its unit.** The post had
+> no step number, so it sat outside the only mechanism the file has: a Steward
+> could complete every step the procedure contained without passing one that
+> said *post now, and not while a review is expected.* **An enforcement
+> mechanism keyed on a unit is blind to anything that is not one of those
+> units** (Architect, `evt_2mks4ydn9ps1a`).
+
 ## M4 — Mint a token
+
+**M4 onward is the LIEUTENANT's when one is seated** — you stop after M3a.
 
 Agents hold no GitHub credential.
 
