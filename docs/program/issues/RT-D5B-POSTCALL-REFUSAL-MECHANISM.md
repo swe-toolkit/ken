@@ -91,7 +91,8 @@ distinct `Packaging` reason in the run and the cause of 8 of 11 base reds.**
 >     CTRL    COMPLETE   88893210a (the class assertion, ruled as D3)
 >     R3      BUILT      43e4451e3 + ff7638ff6, QA APPROVED
 >     ROUTE   DECLINED   evt_w1vnqexkhmxx -- a theorem, not a deferral
->     MECH-2  OPEN       added 2026-09-16, AFTER this banner was written
+>     MECH-2  ANSWERED   2026-09-16, answer section below -- a SCOPE
+>                          difference, not a phase artifact; corroborates `R3`
 >
 > **`MECH-2` postdates the banner and the heading above is therefore no longer
 > literally true.** It is a read-only divergence measurement, framed at
@@ -782,6 +783,13 @@ overlapping, or same-set-different-order** — and the evidence is the member
 lists from `AC-M2-1`, not a length comparison. `N` and `M` being unequal is the
 symptom already known; it is not an answer.
 
+> **DISCHARGED 2026-09-16 BY THE PRODUCERS, NOT BY MEMBER LISTS.** The evidence
+> clause above names `AC-M2-1`, which was retired as subsumed. The relation was
+> established from the two producers and their ordering rules instead — which is
+> the stronger route, universal in provenance where member lists from one run
+> would be one instance. Read the evidence clause as superseded, not unmet: the
+> answer section below supplies what it was asking for.
+
 **`AC-M2-3`. The criterion is fixed BEFORE the measurement** (`AC-7`, which this
 chain has now honoured twice). State in advance what result would show the
 divergence is *not* a phase artifact, so a green read cannot be retrofitted into
@@ -863,6 +871,146 @@ survives, and here is its carry argument:
 ⇒ **A closed producer set for the ELEMENT TYPE does not close the population of
 a particular FIELD.** Two fields of one struct hold
 `[CheckedIhPostCallConsumerStep]`; state which one the site reads.
+
+### `MECH-2` ANSWERED 2026-09-16 — not a phase artifact, and it corroborates `R3`
+
+Measured read-only on `origin/backup/ABI-S6-d5b-file-backed-0d94d58b6`. No code
+change; `AC-M2-5` invoked, `§1a` stays at three.
+
+**The projection and the criterion were fixed BEFORE either population was
+enumerated** (`AC-M2-3`, `AC-M2-6`), posted at `evt_axawb6te9h2w`, with the
+Architect's shape (d) added at `evt_9tsyt5hmzez5` before the measurement:
+
+    M side   (frame.static_origin,                    frame.checked_frame_id)
+    N side   (step.occurrence().eliminator_origin(),  step.checked_frame_id())
+
+`Option<u64>` on both `checked_frame_id` halves, `None` a value and never a
+wildcard. A phase artifact requires `N` to be a positionwise prefix of `M` under
+the full pair, with the difference explained by WHEN a list was captured. The
+four shapes that are not a phase artifact, named in advance: (a) disjoint,
+(b) overlapping without containment, (c) agreeing on `StaticOriginId` and
+differing on `checked_frame_id` including `Some`/`None`, (d) same members under
+the full pair but not in positionwise prefix order.
+
+#### The guard asks an ORDERED question, which is what (d) exists for
+
+`checked_ih_post_call_residual`, `lowering/core.rs:9251-9279`:
+
+```text
+:9256   if eliminators.len() < expected.len()                     -> refuse
+:9262   for (frame, step) in eliminators.iter().zip(expected)
+:9269   frame.static_origin != step.occurrence().eliminator_origin()
+        || frame.checked_frame_id != step.checked_frame_id()      -> refuse
+:9277   Ok(&eliminators[expected.len()..])
+```
+
+Positionwise from index 0, residual taken after `expected.len()`. **Set
+containment is necessary and not sufficient.**
+
+#### The two populations, by producer and by ordering rule
+
+`AC-M2-4`, enclosing function and caller: the site is the CALL at `core.rs:7720`
+inside `lower_computational_producer_construct` (spans `6735-7766`), not the
+guard's four other callers.
+
+`AC-M2-6`, the field rather than the type: at `responses.rs:2189` one vector is
+routed by a switch, and `selected_case_exits` is non-empty only when
+`detached_return_context.is_some()`. The failing site reads that field, so
+`frame_origins` came from `detached_post_call_consumer_frames` and **not** from
+`checked_ih_post_call_consumer_frames`.
+
+```text
+M   eliminators
+    a PARAMETER of lower_computational_producer_construct, used from
+    eliminators[0], not assembled or reordered between :7663 and :7720.
+    One function's local lowering-time eliminator stack.
+
+N   consumer.selected_case_exits()
+    derive_checked_ih_post_call_consumer_chain, continuations.rs:6188-6224.
+    ONE step per entry of frame_origins, in frame_origins order:
+      occurrence       = post_call_consumer_in_frame(plan, frame_origin, actual)
+      checked_frame_id = checked_frame_for_consumer(plan, frame_origin)
+
+    frame_origins built by detached_post_call_consumer_frames,
+    responses.rs:2065-2111, pushing in this order:
+      :2070/:2075  context.steps() REVERSED, the ComputationalMatchCase parents
+      :2095        target.key.continuation_origin
+      :2098        source.eliminator_origin()        conditional
+      :2104        required.eliminator_origin()      conditional
+      :2108        RECURSES into boundary.caller_context()
+```
+
+#### `AC-M2-2`: the relation, and why no re-timing reaches it
+
+**`N`'s last action is to recurse across the worker-return boundary into the
+CALLER's context and keep appending.** `N` is an ordered chain assembled by an
+outward walk across contexts; `M` is one function's local slice in lowering
+order.
+
+**AND THE RECURSION IS ENTAILED, NOT GUARDED.** The `:2078` test
+`if let Some(boundary) = context.worker_return()` reads as contingent and is
+not, for the context the failing site supplies. At `continuations.rs:6626` the
+registration is
+
+```text
+} else if result_position.return_context.worker_return.is_some() {
+    let detached = result_position.return_context.clone();
+    ... insert into pending_detached_return_contexts ...
+```
+
+so `worker_return.is_some()` is the **condition under which a detached return
+context exists at all**; and `selected_case_exits` is non-empty only when
+`detached_return_context.is_some()` (`responses.rs:2189`). ⇒ **`N` crosses the
+boundary by definition of the field the failing site reads**, not as a path the
+code usually takes. The recursion fires at least once on every population this
+site can present. (The walk terminates where an inner `caller_context()` has no
+`worker_return`; the entailment is about the registered top-level context.)
+
+Nothing constructs `N` as a prefix of `M`. The guard asserts the relation by
+zipping and refuses when it does not hold. **Two lists built by different
+traversals over different structures, one of which leaves the function, have no
+reason to agree positionwise from index 0.**
+
+Against the pre-registered criterion this is **not a phase artifact**: the extra
+`N` members are not frames lowering has yet to install, they belong to a
+different context reached by recursion. That is a scope difference, not a timing
+one. It also fails (d) independently — even with membership equalized, `N` is in
+outward-walk order and `M` is in local lowering order.
+
+**`:68-70` is the confirming experiment already in this node.** Equalizing the
+counts moved the refusal to `:9269`, the positionwise pair arm. Count-equality
+did not deliver prefix agreement, which is what (d) predicts.
+
+#### `AC-M2-5`: this corroborates `R3`, and that is the outcome
+
+`R3` requires the eliminator slice to carry which receipt element its element 0
+answers to, as a type. **This read supplies the mechanism behind that
+requirement:** element 0 cannot be assumed to correspond because the two lists
+are produced by different walks over different structures, and one of them
+crosses a function boundary. The anchor is needed because the positional
+presupposition is false **by construction**, not by timing — which is also why
+`R1`'s constructed list and `R2`'s `index + 1` cannot substitute for it.
+
+#### `AC-M2-1` — RETIRED AS SUBSUMED. Do not re-dispatch a run for it.
+
+Ruled independently and identically by the Steward, who authored it at
+`57d049190`, and by the Architect, who holds this node's gate.
+
+`AC-M2-1` asks for the MEMBERS. The concrete `(StaticOriginId, Option<u64>)`
+pairs are plan values at the failing site, obtainable only from a run, and this
+node forbids building on the backup ref; the recorded receipts carry counts and
+no member list.
+
+**It is subsumed rather than undischarged because the relation was obtained by
+the stronger route.** The two producers and their ordering rules are universal
+in provenance: they fix what `N` and `M` can contain and in what order, for every
+population this site can present. **An enumeration from one run would corroborate
+a single instance and could not generalize past what the by-construction answer
+already covers.**
+
+⇒ A later reader should not read the absent member list as a gap. There is no
+run to dispatch, and `AC-M2-2`'s answer does not depend on the concrete values.
+
 
 ## Obligations this node creates elsewhere
 
