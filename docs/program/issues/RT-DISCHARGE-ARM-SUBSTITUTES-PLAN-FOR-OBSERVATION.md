@@ -448,10 +448,28 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                    let ret_abi_word = if body_mutation == Some(VaryRet) {
                        exact_ret_abi_word.checked_add(1)?   DELIBERATELY WRONG
                    } else { exact_ret_abi_word };
-                 and the feature is LIVE in these runs: ken-cli/Cargo.toml:28
-                 takes ken-runtime with features = ["px8-ds-test-support"] on a
-                 REGULAR dependency edge, so every ken-verify px8f fixture
-                 compiles that branch in.
+                 and the feature is LIVE in the runs that matter -- BUT NOT BY
+                 THE ROUTE THIS ROW FIRST CLAIMED. CORRECTED 2026-09-16,
+                 Architect evt_5pxyvg17me2bv, re-verified at source by the
+                 Steward against origin/main. AS FIRST WRITTEN: "ken-cli/
+                 Cargo.toml:28 takes ken-runtime with features =
+                 ["px8-ds-test-support"] on a REGULAR dependency edge, so every
+                 ken-verify px8f fixture compiles that branch in." BOTH HALVES
+                 ARE WRONG. The line number was right and the SECTION was not --
+                 :28 is under [dev-dependencies]; the regular edge at :25 takes
+                 no features, and ken-verify has only a plain [dependencies]
+                 edge with no features and no dev edge at all.
+                 => feature ON for ken-cli's OWN test targets, so
+                 crates/ken-cli/tests/px8f_buffer_native.rs does compile the
+                 VaryRet branch; OFF for crates/ken-verify/tests/
+                 px8f_write_partition.rs under a -p-scoped run; ON for it under
+                 CI's --workspace (resolver-2 unification, measured at fb99d0fc).
+                 THE CORRECTION STRENGTHENS CLAUSE 2 RATHER THAN WEAKENING IT:
+                 ret_abi_word is CORRUPTIBLE IN CI AND INCORRUPTIBLE IN THE
+                 MANDATORY LOCAL RUN, from the same source, so a tying-form
+                 repair would be silently correct under -p and silently wrong
+                 under --workspace. Refusing on divergence compares two
+                 independently produced values and is immune to that.
                  => expected_ret CAN DIFFER FROM exact_ret_identity
                  .tag_abi_word(). Registering exact_ret_identity would record
                  an authority THE GUARD NEVER PROVED, into exactly the
@@ -773,6 +791,296 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  before producing a hand-off. Zero executions and never-ran are
                  two facts and one number; do not let this population enter D1
                  as a zero.
+
+### D1 DISPATCH — BUILD THE SEED REPAIR. Steward, 2026-09-16.
+
+**Both design forks are closed and the ring builds.** SITE closed toward more
+work (three steps, not one line); PRODUCE-vs-PROVE-vs-SEED closed on the
+measured bit at `evt_193ekcwm21t7w`. Owner runtime, size M, tier T1,
+`depends_on: []` — nothing is held in front of this.
+
+**TREAT EVERY ANCHOR IN THIS NODE AS PERISHABLE.** If a fixed input below turns
+out false against the code you are on, say so and escalate — do not quietly
+build around it. The banner at the head of this file is the sharpest case: every
+coordinate here is on the unlanded candidate, and `k_ret_identity` resolves on
+`main` in unrelated code, so name-presence is a false reassurance rather than a
+wrong-tree detector. Lead with the symbol name; re-measure line numbers at the
+tip you are on. `tag_abi_word` has the same hazard one level down — it has a
+second hit at `lowering/core/tests/control.rs`, inside a string literal in a
+test, not a second definition.
+
+**The best guess, stated so a reviewer can attack it directly:** the three
+coordinated edits named in the REPAIR and SITE rows are the whole repair, and
+the arm-1 consultation change at `realized_call_words.contains(&publication
+.returned_word)` is the one with design content. Build it. **One honest try plus
+a handback** — if the repair cannot be made to work as scoped, report the
+structure you found from inside the attempt; that is a better measurement than a
+standalone probe and it is an accepted outcome.
+
+**THE HARD STOP THAT IS A RESULT, NOT A FAILURE.** If the repaired arm 1 cannot
+be made to refuse by permitted means, say so and stop. `RT-CONSTRUCTOR-AUTHORITY
+-DISCHARGE:332` governs — *"if either is unavailable in principle at some site,
+THAT IS THE FINDING."* Do not reach for a synthesized identity to close it; that
+prohibition extends to controls (Architect `evt_5gws0pnssfqch`).
+
+#### The deliverable: three coordinated edits
+
+1. **The drop.** Stop the discard at `obligation.identity = None` /
+   `realization_required = true` in the response-owner K-call block, or seed what
+   it drops. (At `b0a7c2945`, around `units.rs:6874`/`:6877`.)
+2. **Arm 1.** Make it consult what SEED produces rather than
+   `realized_call_words` membership alone. (Around `units.rs:4489`.)
+3. **The stamp.** Disposition the `independent_contract` stamp explicitly. It is
+   **not automatically correct once the drop is fixed.** (Around
+   `units.rs:6962-6971`.)
+
+#### Acceptance criteria for D1
+
+These are obligations, not hazards. Each names its control.
+
+**D1-1. STRUCTURAL DOMINANCE (fence 1).** Registration happens only at a point
+dominated by **BOTH** `require_i64` guards — the tag guard and the arity guard.
+Soundness depends on the trap having fired for any continuing execution.
+**Control:** name the guard pair and show the registration site sits below both
+on the straight-line path, with no intervening branch or early return. A
+registration reachable without both guards having executed fails this. At
+`0f71ab5b9` both guards sit outside the `find` block precisely so that they run
+whether or not the lookup matched; preserve that property, do not rely on the
+line numbers.
+
+**D1-2. SEMANTIC DOMINANCE — THE REFUSING FORM (fence 1, second clause).** At
+the registration site, require `exact_ret_identity.tag_abi_word()? ==
+ret_abi_word` and **REFUSE ON DIVERGENCE RATHER THAN RECORDING.**
+
+**NOT the tying form.** Deriving the registered identity *from* `ret_abi_word`
+would dutifully record the mutated identity and make the mutation invisible. The
+program still traps either way, so nothing unsound executes — **the damage is to
+the record, and the record is the deliverable.**
+
+**THE FEATURE PROFILE IS THE STRONGER ARGUMENT FOR THE REFUSING FORM, AND IT IS
+NOT THE ONE FIRST GIVEN.** An earlier statement of this fence — in this node's
+REPAIR row, and in the Architect's ruling it came from — said
+`ken-cli/Cargo.toml` puts `px8-ds-test-support` on a **regular** dependency edge
+and that the `VaryRet` branch therefore compiles into every `ken-verify` px8f
+fixture. **Both halves are wrong; the line number was right and the section was
+not.** Corrected by the Architect at `evt_5pxyvg17me2bv`, re-verified at source
+by the Steward against `origin/main`:
+
+    ken-cli     [dependencies]      ken-runtime = { path = ... }   no features
+                [dev-dependencies]  ken-runtime = { path = ...,
+                                      features = ["px8-ds-test-support"] }
+    ken-verify  [dependencies]      ken-runtime = { path = ... }   no features,
+                                                                   no dev edge
+
+⇒ The feature is **ON** for `ken-cli`'s own test targets, so
+`crates/ken-cli/tests/px8f_buffer_native.rs` does compile the `VaryRet` branch.
+It is **OFF** for `crates/ken-verify/tests/px8f_write_partition.rs` under a
+`-p`-scoped run, and **ON** for it under CI's `--workspace` (resolver-2 feature
+unification; the fleet measured this exact feature on this exact edge at
+`fb99d0fc`).
+
+⇒ **`ret_abi_word` is corruptible in CI and incorruptible in the mandatory local
+run, from the same source.** A repair that *derived* the recorded identity from
+`ret_abi_word` would be **silently correct under `-p` and silently wrong under
+`--workspace`.** The REFUSE-on-divergence form is immune, because it compares
+two independently produced values instead of trusting one.
+
+**THE SWEEP, WITH ITS SCOPE AND ITS RESULT, BECAUSE A CLEAN SWEEP AND A SKIPPED
+ONE LOOK THE SAME.** Swept `docs/` and `agent/` for the refuted phrase: **one
+hit, and it is this node's own corrected quotation of itself above.** No other
+artifact asserts that `ken-verify` carries the feature. **And the tree carries a
+guard for the opposite claim** — `RT-MATCH-RECURSOR-CONSUMERS`'s `AC-9a` pins
+that no `[workspace] members` entry enables `px8-ds-test-support` **on a normal
+edge** to `ken-runtime`, with a mutation of the `ken-verify` normal edge as its
+positive control. So the corrected reading is not merely re-read from
+`Cargo.toml`; a live pin elsewhere in the tree exists to red if anyone makes the
+refuted statement true.
+
+**Control:** a `VaryRet` compile must fail loudly at this exact seam. If it
+produces a clean record, the AC is **not** met. A mutation that produces a clean
+record is a mutation that proved nothing.
+
+D1-1 is structural, D1-2 is semantic, and D1-2 is not an exception to fence 1 —
+it is fence 1's general shape: **the thing registered must be the thing GUARDED,
+not merely something downstream of a guard.**
+
+**D1-3. IDENTITY IS ARTIFACT-LOCAL (fence 2).** `pack_identity`'s own doc, at
+`planning/static_transition/semantic_ir.rs`, verbatim: *"Artifact-local only.
+This number is stable within one artifact's plane and carries no cross-artifact
+meaning — spans depend on that artifact's own interning order. Do not persist
+it, compare it across artifacts, or read it as a portable name."* The authority
+map is function-local, so the repair satisfies this by construction.
+**Control:** the artifact says so explicitly. A property that holds silently is
+one nobody can check later.
+
+**D1-4. DO NOT FOLD IN THE `:6874` QUESTION (fence 3).** Why the drop forces
+`realization_required = true` on a callee that declared nothing is a **separate
+node, not yet cut.** **Control:** the diff changes nothing about that mechanism,
+and the report does not claim the upstream absence is closed. Ownership of the
+absence is deliberately left open; the `:6874` node must not inherit a closure
+it was never given.
+
+**D1-5. THE RED POPULATION IS THE DELIVERABLE.** Cause 2's six checks are NOT
+made green, and the diff is checked for it: no change removes an emission
+refusal without adding an identity requirement. **Do not write a
+workspace-green acceptance criterion on this increment and do not read its red
+as a regression** — the closure makes the tree redder, and that surfacing is the
+output. This restates arc-level AC-3 at the deliverable because a constraint
+that lives only in a section two screens away is a constraint the build does not
+fail.
+
+**D1-6. THE RESIDUAL — DO NOT QUANTIFY OVER COMPILES, AND DO NOT POOL THE
+DENOMINATOR.** **"`v1386` is always handed a declaration" is NOT what was
+measured**, and no AC or report may assume it. Nor is the pooled eight-compile
+figure the right denominator — **half of it is deliberately broken programs.**
+
+**THE EIGHT COMPILES, CLASSIFIED RATHER THAN SUMMED.** runtime-implementer
+`evt_4c3q2bae76c99`, after the Architect raised the attribution non-blocking at
+`evt_5pxyvg17me2bv`; Steward re-verified three call sites at `b0a7c2945` —
+`:997` plain, and `:1185`/`:1482` both wrapped in `Mutation::Exact` with
+`applications == 0` asserted, which is the class the number turns on. The three
+remaining mutant rows and `px8f_write_partition:509` were **not** independently
+re-verified by the Steward.
+
+    NO MUTATION APPLIED
+      unmutated, no wrapper   px8f_write_all_native         ken-cli
+                              px8f_write_partition          ken-verify
+      exact arm               px8f_hs11_restored            ken-cli
+                              px8f_write_all_plane_closed   ken-cli
+    MUTANT, wrapper present, mutation applied, applications > 0
+                              px8f_hs11_materialize_immediate
+                              px8f_write_all_handler_owned_response_control
+                              px8f_write_all_retained_result_closure_control
+                              px8f_write_all_hs17_control
+
+    v1751 (None, false)    2/2 unmutated, 2/2 exact-arm, 4/4 mutant = 8 of 8
+    v1386 (Some(id), true) 2/2 unmutated, 2/2 exact-arm, 3/4 mutant = 7 of 8
+          the sole (None, false) is hs17_control, A MUTANT
+
+⇒ **THE SENTENCE THAT MAY BE WRITTEN: `v1386` is not always handed a
+declaration UNDER AN INJECTED MUTATION, and it is handed one 4 of 4 over
+compiles with no mutation applied.** Not 7 of 8 over a pooled population half of
+which is mutant.
+
+**THE EXACT ARM IS NOT A THIRD CONFIGURATION, AND THAT IS WHY 4 OF 4 IS NOT
+ITSELF A RE-POOLING.** Grouping 2 unmutated with 2 exact-arm would otherwise
+repeat the pooling one paragraph after withdrawing it, and `applications == 0`
+is a **negative assert** — zero-applied and never-reached are one number, so it
+cannot carry the claim. **The claim does not rest on the counter; it rests on
+the default.** Architect `evt_56y19eg439rvr`, verified at source by the Steward
+at `b0a7c2945` in `lowering/mod.rs`:
+
+    thread_local D5B_HS11_MATERIALIZER_MUTATION
+        = const { Cell::new(D5bHs11MaterializerMutation::Exact) }   the DEFAULT
+    with_d5b_hs11_materializer_mutation  sets the cell to `mutation`
+    its Restore drop guard               resets the cell to Exact
+
+⇒ `with_..._mutation(Exact, body)` sets the selector to **the value an
+unwrapped compile already holds.** An `Exact`-wrapped compile and a no-wrapper
+compile are in the **identical selector state** on the HS11 axis. **Report the
+structural fact, not the counter.**
+
+**THE CLAIM IS PER-AXIS, NOT PER-CONFIGURATION.** A configuration is a vector,
+not a scalar: the identity above is proved on the axis the wrapper *names*, and
+*"at default on every axis"* is a different and unmade claim. What generalizes
+is structural — every wrapper in `lowering/mod.rs` that sets a selector carries
+a `Restore` that puts it back.
+
+> **THE RECHECK TRAP, AND IT SITS ON THE COORDINATE ABOVE. "AT DEFAULT" IS
+> DECIDED BY THE `Cell::new` INITIALIZER, NEVER BY THE TOKEN `Exact`.** Most
+> selectors default to a variant spelled `Exact`, but not all —
+> `D3cPositionSelection::MeasuredImmediate` and
+> `BoundaryTransferInvokingSite::Direct` are at *their* defaults while matching
+> no `Exact`. A reader re-deriving this by the obvious method (scan the
+> selectors, confirm each reads `Exact`) gets a false negative and concludes
+> axes are perturbed when they are not. **Carry the discriminator; this node
+> deliberately states NO COUNT of the exceptions**, because a count is the part
+> that manufactures the alarm it is trying to prevent.
+>
+> **Two independent ways a recheck returns a clean-looking wrong number, both
+> measured tonight on this exact sweep:** the wrong discriminator (the token),
+> and **line-local matching over a wrapped declaration.** These statics wrap —
+> a name on one line, its type or its `const { Cell::new(...) }` on the next —
+> so a line-local scan both **misses** a selector whose type wrapped
+> (`D2K_BOUNDARY_TRANSFER_INVOKING_SITE`) and **over-counts** by attributing a
+> wrapped initializer to the static declared above it (`D3C_ARMED`, which is a
+> `Cell<bool>` defaulting to `false`, not a position selector). Same failure as
+> the hard-wrapped-phrase grep already in the fleet corpus. **Read the
+> declaration, not the line.**
+>
+> **NON-FINDING, RECORDED BECAUSE THE SWEEP HAPPENED.**
+> `D3C_POSITION_SELECTION` is the one selector whose setter has no `Restore`
+> guard, so it would be sticky across later compiles on the thread. It cannot
+> reach these runs, and by a gate rather than an argument: it is `#[cfg(test)]`
+> **alone** — not `any(test, feature = "px8-ds-test-support")` — and
+> `pub(in crate::cranelift_backend)`, with zero callers under
+> `crates/ken-cli/tests` or `crates/ken-verify/tests`. It does not exist in an
+> integration-test build. No finding.
+
+**THE `_control` SUFFIX NAMES THE CONTROL PROGRAM OF A MUTATION, NOT AN
+UNMUTATED CONTROL** — on every one of these. `px8f_write_all_hs17_control` is
+not a fixture file but an artifact name passed to `build_native_program` at
+exactly one site, inside `assert_hs17_static_response_return_mutation_child`,
+wrapped in `with_d5b_hs17_post_call_consumer_mutation(mutation, || ...)` with
+`applications > 0` asserted. Single occurrence, so that attribution is total
+rather than sampled.
+
+⇒ **On that compile the two instruments AGREE; they do not CORROBORATE.**
+`SEED-DECL` reads `target.result_contract` at the push site in `calls.rs`;
+`KDROP` reads the obligation's own fields at the mutating site in `units.rs`. On
+an unmutated compile their agreement is genuine corroboration — two sites, two
+values, and they could have disagreed. **Here both sit downstream of one
+injected divergence, so the agreement carries no independent weight.** The
+earlier corroboration claim is withdrawn as written.
+
+**THE FEATURE PROFILES ARE ALSO NOT POOLED.** Seven of the eight are `ken-cli`
+test targets (`px8-ds-test-support` ON via the dev-dependency edge); one is
+`ken-verify` (OFF under `-p`) — see D1-2. `v1386`'s exception sits entirely in
+the feature-ON profile **and** in the mutant class at once, so those two
+attributions are **not independent** and must not be reported as two facts.
+
+> **DO NOT BANK `v1751` 8-OF-8 AS A ROBUSTNESS RESULT. IT IS NOT ONE, AND THE
+> MEASUREMENT THAT WOULD SETTLE IT IS DELIBERATELY NOT ORDERED.** Architect
+> `evt_56y19eg439rvr`. That `v1751` is `(None, false)` across unmutated,
+> exact-arm and mutant reads as span, but if none of the four mutations can
+> perturb the push site in `calls.rs`, then **six of those eight observations
+> are ENTAILED by the mutations being downstream** — and an observation entailed
+> by what it is offered to confirm carries no information. The coordinate's real
+> support is the unmutated and exact-arm rows.
+>
+> ⇒ **It changes nothing, because the `v1751` coordinate discharged an
+> EXISTENTIAL fence, not a universal one.** The pre-registered condition was
+> *"if `v1751` is ABSENT the ruling is refuted"* — PRINTS needed **one**
+> appearance where ABSENT would have needed all eight. **A denominator that is a
+> harness artifact cannot damage an existential claim; it can only fail to
+> support a universal one nobody made.** The bad denominator went into a
+> sentence, not into the ruling, and the sentence is corrected here.
+>
+> **THE GENERAL TELL, and it is the reason this was hard to catch: a population
+> you CHOSE has an EXCLUDED SET. A harness artifact excludes nothing, which is
+> exactly why it looks complete.** Every row in it was real; what was missing
+> was a criterion. State the inclusion criterion before the run and report what
+> it rejected — *"eight compiles, four excluded as mutants"* is a population,
+> *"eight compiles"* is whatever printed. **A denominator with no excluded set
+> has been observed, not defined.**
+
+**Nothing in the repair turns on any of this**, because the repair reads the
+guard-proved identity rather than the constructed pair: `require_i64` checks the
+carrier's actual tag against `k_ret_identity()`, and `tag_abi_word` is
+injective, so **a passing guard is an identity proof, not a plan assertion.** A
+compile where `v1386` also arrives `(None, false)` is just the other body's
+shape appearing on that word. **This is one sentence in a frame, not a scope
+change — fence 3 holds and it must not grow SEED.**
+
+**Control:** every quantified claim in the report names its population, its
+instrument, and its feature profile.
+
+**D1-7. SEED REACHES 12 OF 12, NOT 6.** The split is real in the inputs and
+dissolves at the repair — same edit on both halves. A `(None, false)` reading
+must **not** be used to re-scope SEED to six. Ownership of the absence and reach
+of the repair are different relations. **Control:** if the repair is proposed at
+narrower than 12, the proposal states which of those two relations it is
+arguing from.
 
 ### D1 MUST FIRST ASK WHETHER THE SPLIT IS A ROUTE SPLIT
 
@@ -1828,6 +2136,12 @@ control at this SHA. The stack-overflow population is its own node. **A baseline
 becomes owed the moment anyone claims the closure caused it.**
 
 ## Acceptance
+
+**THESE ARE THE ARC'S ACCEPTANCE CRITERIA AND THEY ARE NOT THE WHOLE SET.** The
+D1 repair carries seven more, `D1-1` through `D1-7`, in the **D1 DISPATCH**
+block above — the three fences, the red-population prohibition, and the
+population bound on the residual. `AC-3` and `D1-5` are the same requirement
+stated at both levels deliberately; that is not a duplicate to tidy away.
 
 **AC-1. The refusal is OBSERVED, not argued for.** An input on which the
 repaired arm 1 refuses, run and recorded. The parent arc has one node already
