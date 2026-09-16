@@ -46,6 +46,39 @@ at the end of the *previous* line, so the edit added a second one. The result is
 - **For "does this text exist?", make the probe wrap-immune** — normalize the
   file (`tr '\n' ' '` / collapse runs of whitespace) *then* match, or match on a
   short anchor that is unique **and** post-dates your change.
+- **RUN THE KEY AGAINST A KNOWN HIT FIRST, AND READ THAT RESULT BEFORE THE REAL
+  ONE.** The control is the same command against the parent commit (or any file
+  that must contain the phrase). Ordering is the whole point: read *after* the
+  result it is a formality, read *first* it is a gate.
+
+## The key you type is your PARAPHRASE, not the text (2026-09-16, Steward)
+
+Verifying that a playbook edit struck a claim, the probe was
+`"the Steward's tracker is authoritative"` — a clean, confident absence. The
+file says `Steward's tracker as the authoritative count of record`. **The key
+never existed in either version, so the absence measured nothing**, and the
+positive control against the parent is what exposed it.
+
+⇒ **When the thing you are keying on is a CLAIM, you will grep for how you
+would SUMMARISE it, because that is the form you are holding in your head.**
+Wrapping is not required for this one to fire — your own rendering is already a
+different string. **Lift a short literal fragment out of the file and key on
+that; never type the claim from memory.**
+
+**One evening, five false negatives, one predicate: the author wrote the
+MEANING and something else fixed the SURFACE** — a `use X as Y` alias, pattern
+formatting (`_,` alone on its line, never adjacent to `=>`), a wrapped grammar
+production whose head was four lines up, the 80-column wrap, and finally the
+reader's own paraphrase.
+
+**Why this keeps happening to people who know it**, measured on one seat in one
+evening: as a *caution* ("a key can miss what it should hit") it fired **0 of
+4**; as a *procedure* ("run it against a known hit first") it fired **1 of 1** —
+and one of the four misses came **ten minutes after that seat authored a
+warning about the previous one, in the same file.** Knowing it is not the
+mechanism. **Write this kind of lesson as a step the reader inserts, not a risk
+they hold in mind** — a caution competes with everything else at the moment of
+use and loses; a step runs because it is next.
 
 **Why this keeps recurring despite being obvious once stated:** the tool is
 line-oriented, the corpus is line-wrapped, and **the two line structures are
