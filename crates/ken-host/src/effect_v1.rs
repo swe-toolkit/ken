@@ -2694,39 +2694,33 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
         ) | (
             HostOpV1::MappingReadView | HostOpV1::MappingWriteView,
             ResourceInputsV1::MappingSpanTarget { .. }
-        ) | (
-            HostOpV1::MappingAcquireFile,
-            ResourceInputsV1::Target(_)
-        ) | (
-            HostOpV1::FsReadAt,
-            ResourceInputsV1::FileBuffer { .. }
-        ) | (
-            HostOpV1::FsWriteAt,
-            ResourceInputsV1::FileBufferSpan { .. }
-        ) | (
-            HostOpV1::BufferAllocate
-                | HostOpV1::MappingAllocate
-                | HostOpV1::ConsoleRead
-                | HostOpV1::ConsoleWrite
-                | HostOpV1::ConsoleFlush
-                | HostOpV1::ConsoleIsTerminal
-                | HostOpV1::ClockWallNow
-                | HostOpV1::ClockMonotonicNow
-                | HostOpV1::ClockSleepUntil
-                | HostOpV1::EntropyRandomBytes
-                | HostOpV1::FsReadFile
-                | HostOpV1::FsWriteFile
-                | HostOpV1::FsAppendFile
-                | HostOpV1::FsMetadata
-                | HostOpV1::FsReadDirectory
-                | HostOpV1::FsCreateDirectory
-                | HostOpV1::FsRemoveFile
-                | HostOpV1::FsRemoveDirectory
-                | HostOpV1::FsRename
-                | HostOpV1::FsChangeMode
-                | HostOpV1::FsOpen,
-            ResourceInputsV1::None
-        )
+        ) | (HostOpV1::MappingAcquireFile, ResourceInputsV1::Target(_))
+            | (HostOpV1::FsReadAt, ResourceInputsV1::FileBuffer { .. })
+            | (HostOpV1::FsWriteAt, ResourceInputsV1::FileBufferSpan { .. })
+            | (
+                HostOpV1::BufferAllocate
+                    | HostOpV1::MappingAllocate
+                    | HostOpV1::ConsoleRead
+                    | HostOpV1::ConsoleWrite
+                    | HostOpV1::ConsoleFlush
+                    | HostOpV1::ConsoleIsTerminal
+                    | HostOpV1::ClockWallNow
+                    | HostOpV1::ClockMonotonicNow
+                    | HostOpV1::ClockSleepUntil
+                    | HostOpV1::EntropyRandomBytes
+                    | HostOpV1::FsReadFile
+                    | HostOpV1::FsWriteFile
+                    | HostOpV1::FsAppendFile
+                    | HostOpV1::FsMetadata
+                    | HostOpV1::FsReadDirectory
+                    | HostOpV1::FsCreateDirectory
+                    | HostOpV1::FsRemoveFile
+                    | HostOpV1::FsRemoveDirectory
+                    | HostOpV1::FsRename
+                    | HostOpV1::FsChangeMode
+                    | HostOpV1::FsOpen,
+                ResourceInputsV1::None
+            )
     );
     if !resource_shape_matches {
         return Ok(resource_denied(
