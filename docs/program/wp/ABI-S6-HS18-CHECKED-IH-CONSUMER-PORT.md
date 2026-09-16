@@ -285,6 +285,17 @@ Two bounds on what this AC actually licenses:
   standing default.** Use `-j 1` when this node's port actually compiles
   through; use up to `-j 3` while the tree still aborts early. Re-measure once a
   full build exists, and only then promote a wider default.
+
+- **`-j` DOES throttle within-crate codegen — do not reach for a different knob
+  on the belief that it does not.** Cargo and rustc share a GNU-make jobserver,
+  and cargo allocates tokens to rustc **including the tokens for parallel LLVM
+  work**, which is specifically what stops LLVM optimization threads exceeding
+  the set value. `[profile.dev]` sets no `codegen-units` and no `incremental`,
+  so one crate is many units of work rather than one. **A single-crate `-p
+  ken-runtime` probe therefore had real parallelism to throttle, and lowering
+  `-j` is the right lever.** The phase `-j` does **not** govern at any value is
+  **linking**, which is largely one process — and linking is untested here,
+  which is a second reason the bound above is not yet a standing default.
 - **The real home for this is `.cargo/config.toml`, not this frame.** A frame
   protects readers of this frame; the over-subscription is a property of
   `jobs = 6` against this box's RAM, not of `ken-runtime`, so **any other

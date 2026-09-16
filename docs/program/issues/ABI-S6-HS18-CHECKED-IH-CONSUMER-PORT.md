@@ -145,12 +145,21 @@ five greps did not, which is the whole case for census-first.
 > encloses each hit before the count is allowed to mean anything.** All three of
 > today's instances were caught by opening the matches, and none by a control.
 
-**The retracted claim was:** *"The symbol is on `main`. One `impl` of it is
-not."* That was a materially
-different repair from porting an absent method, and it is a **different shape
-from the other five entries** — those are absent symbols; this is an absent
-impl of a present symbol. **Do not assume the census's remaining hits all have
-the first shape.**
+> **RETRACTED, recorded so it is not re-derived:** an earlier revision of this
+> node asserted *"The symbol is on `main`. One `impl` of it is not"*, and
+> concluded that the census therefore contained a third repair shape — an absent
+> impl of a present symbol — distinct from the five absent symbols. **Both
+> sentences are false.** Both impls are on `main`; the closure.rs body is
+> byte-identical to the port source; the third apparent def was the string
+> literal named above. **There is no third repair shape in this census, and no
+> part of that claim survives.**
+
+**What DOES survive, and it is the reason the section is still here:** the seed
+list did not name the sixth error, and nothing surfaced it except attempting a
+compile. **Do not assume the census's remaining hits all have the same shape as
+the five** — not because a third shape has been found, but because **no one has
+established what shapes are there.** That is a statement about ignorance, which
+is what the census is for.
 
 # THE SCOPE BOUNDARY IS A PREDICATE. THE LIST IS A SEED.
 
