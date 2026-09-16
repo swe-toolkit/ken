@@ -1,14 +1,16 @@
 ---
 name: a-pattern-match-is-evidence-about-what-encloses-it
-description: A grep hit, a line number, an attribute position, a row's neighbours — each is evidence about the ITEM THAT ENCLOSES IT, and you do not have a finding until you have resolved that item. Stated as "check before you report" the rule excludes its own best instance, because a prevention produces no artifact. Four instances in one hour, three seats, three artifacts; the one that cost nothing is the one that never became a claim.
+description: A grep hit, a line number, an attribute position, a row's neighbours — each is evidence about the ITEM THAT ENCLOSES IT, and you do not have a finding until you have resolved that item. Stated as "check before you report" the rule excludes its own best instance, because a prevention produces no artifact. Six instances in ninety minutes across three seats; the one that cost nothing is the one that never became a claim. A negative control has two readings - absence MAINTAINED (the finding is refuted) versus absence UNEXAMINED (it is unasked, and belongs to the artifact's owner) - and the same failure runs on RULES, whose enclosing item is the precondition they are scoped to.
 metadata:
   type: feedback
 ---
 
 # A pattern match is evidence about what encloses it
 
-**Measured 2026-09-16, across one hour of the `RT-D5B` refusal-gate thread.**
-Four instances, three seats, three unrelated artifacts, one shape:
+**Measured 2026-09-16, across ninety minutes of the `RT-D5B` refusal-gate
+thread.** Six instances, three seats, one shape. The first four are pattern
+matches whose answer turned on the enclosing item — three caught after the
+number existed, one before:
 
     census keyed on a spelling      grepping ten Rust op-variant names against
     the subject does not use        the prelude returned "1 of 10 reachable".
@@ -61,6 +63,47 @@ round zero, an empty grep — which everyone instinctively re-runs.
 it looks.** The ones that cost you are the ones that arrive already shaped like
 the answer you were looking for.
 
+## A container that LACKS the property has two readings, not one
+
+Running the control is only half the move. When it comes back *"the container
+does not have that property"*:
+
+> **"No invariant exists" refutes the defect claim. It is NOT evidence that
+> anyone decided against one.**
+
+Absence of a rule is consistent with *examined and rejected* and with *never
+examined*, and those license different next steps. The discriminator is whether
+the absence is **maintained**:
+
+    README rows      12 pairs already out of order -> sortedness is actively
+                     NOT maintained. A decision by practice. The finding is
+                     genuinely REFUTED and there is nothing to escalate.
+
+    cross-scope      23 links thinly spread over 5 target scopes, while the
+    links            corpus rule says reading your own scopes is COMPLETE
+                     -> more likely a convention nobody has examined. The
+                     finding is not refuted, it is UNASKED -- and it belongs
+                     to whoever owns the artifact, not to you.
+
+The second case is the trap, because it feels identical to the first from
+inside: you ran a control, it came back negative, and you moved on. **Say which
+of the two you established.** Then hand the unasked one to its owner as a
+measurement rather than converting it into a finding or silently dropping it.
+
+## The enclosing item of a RULE is its precondition
+
+The same failure runs on **rules**, not only on matches, and it is harder to see
+because a rule carries no line number to resolve. A `do-not-respin` convention
+is scoped to *a candidate that has been handed to a publisher*; cited by analogy
+at an unrouted branch, its precondition does not hold and it forbids nothing.
+The citation was made one message after helping write this lesson.
+
+⇒ **Before applying a rule you did not write, resolve what it is scoped to** —
+the same act as resolving the function that encloses a line. And note that
+**deferral is itself an act with its own failure mode**: the deferred good
+answer keeps living in the thread, which is what makes "fold it later" feel
+free when it is not.
+
 ## What to actually do
 
 - **Resolve the enclosing item before the hit becomes a claim** — the enclosing
@@ -75,6 +118,8 @@ the answer you were looking for.
 - **When you do catch one, say whether it was a recovery or a prevention.** The
   preventions are the ones the next reader needs and the ones no artifact
   records.
+- **After a negative control, say whether the absence is maintained or merely
+  unexamined**, and route the unexamined one to the artifact's owner.
 
 Sibling of
 [[repairing-a-census-completeness-does-not-re-aim-its-subject]] — that one is
