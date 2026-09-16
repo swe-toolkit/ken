@@ -68,9 +68,9 @@ fn dictionaries_scope_over_contracts_refinement_and_body_but_not_siblings() {
 
     let scoped = elab(
         &mut env,
-        "fn contract_scope (x : Bool) : { r : Bool | Equal Bool r chosen.tag } \
-         requires Equal Bool chosen.tag True \
-         ensures Equal Bool result chosen.tag \
+        "fn contract_scope (x : Bool) : { r : Bool | Equal Bool r (chosen.tag) } \
+         requires Equal Bool (chosen.tag) True \
+         ensures Equal Bool result (chosen.tag) \
          where (chosen : Flag Int) = chosen.tag",
     );
     assert!(
