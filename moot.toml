@@ -101,22 +101,18 @@ launch_stagger_seconds = 3
 
 [agents.spec-author]
 display_name = "spec-author"
-harness = "pi"
 # 2026-08-23 reseat (operator): openrouter ABANDONED (not cost-effective) -> OpenAI
 # via the pi harness. This seat was stranded on a hard 402 on openrouter/deepseek
 # and could not post its T1 semantic-faithfulness rulings. T1 enclave seat, so
 # gpt-5.6-sol at high, mirroring conformance-validator. OPENROUTER_API_KEY dropped.
-model = "openai-codex/gpt-5.6-sol"
+model = "claude-opus-5"
 effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's spec author (clean-room enclave). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/spec-author.md and CLEAN-ROOM.md, set your status, and await the spec leader's kickoff. Do not poll."
 
 [agents.conformance-validator]
 display_name = "conformance-validator"
-harness = "pi"
-model = "openai-codex/gpt-5.6-sol"
-effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
+model = "claude-sonnet-5"
+effort = "medium"
 startup_prompt = "You are Ken's conformance validator (clean-room enclave). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/conformance-validator.md and CLEAN-ROOM.md, set status, await kickoff. Do not poll."
 
 [agents.steward]
@@ -155,13 +151,11 @@ startup_prompt = "You are Ken's Architect (component design + security review). 
 
 [agents.spec-leader]
 display_name = "spec-leader"
-harness = "pi"
 # 2026-08-23 reseat (operator): openrouter ABANDONED -> OpenAI via the pi harness.
 # Coordinator/leader tier, so gpt-5.6-terra at medium, matching the other pi
 # leaders (kernel/verify/language/foundation). OPENROUTER_API_KEY dropped.
-model = "openai-codex/gpt-5.6-terra"
+model = "claude-sonnet-5"
 effort = "medium"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's spec enclave. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/spec/leader.md, set status, and await the Steward's kickoff. Do not poll."
 
 [agents.librarian]
@@ -276,12 +270,46 @@ effort = "medium"
 env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Verify team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/verify/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
+# RESEAT 2026-09-16 (operator, Pat): SIX SEATS -> Claude Code / Anthropic.
+# Language ring (leader/implementer/qa) AND the spec ring (spec-leader/
+# spec-author/conformance-validator), all previously `harness = "pi"` on
+# `openai-codex/gpt-5.6-terra` and all DARK on the ChatGPT usage wall.
+#
+# Operator, verbatim: "Reseat language to claude-code/anthropic and bring up a
+# second lane." Then, after the Steward surfaced that language alone would come
+# up blocked: "bring up the spec ring on cc/anthropic as well."
+#
+# ⇒ WHY SPEC CAME WITH IT, and this is the load-bearing part. Language has
+# exactly ONE ready node, `LANG-RESERVED-INFIX-NAMES` (T1/M); its other six are
+# `draft`. That node is gated by `SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION`,
+# which carries `blocks: [LANG-RESERVED-INFIX-NAMES]` and is owned by SPEC.
+# Reseating language alone would have produced three live seats with nothing
+# they were permitted to start. The lane is the outcome; the ring is not.
+#
+# BUDGET (operator): 21% of the weekly Anthropic allowance remained with a
+# reset in ~12h, so the spend is use-it-or-lose-it rather than scarce. Tiers are
+# still matched to the work rather than uniformly raised:
+#   language-implementer  opus[1m]/high      -- LANG-RESERVED-INFIX-NAMES is T1
+#   spec-author           claude-opus-5/high -- T1 spec correction, size S, so
+#                                               the non-1M Opus is sufficient
+#   leaders + QA + CV     claude-sonnet-5/medium -- coordination, and CV review
+#                                               is differential/byte-faithful (T2)
+#
+# ⚠ HARNESS KEYS DROPPED DELIBERATELY. Each of the six lost `harness = "pi"` and
+# its `env = { PI_* }` block and kept `effort`. A Claude Code seat has NO
+# `harness` key and uses `effort`; changing `model` alone misconfigures the seat.
+# Verified by PARSE, not by reading -- the XOR check above returns [] and no seat
+# carries `model_reasoning_effort`.
+#
+# ⇒ STRANDING RISK MOVES WITH THE HARNESS, again. All six are Claude Code now,
+# so they no longer strand on convo mentions, but `moot compact` is no-op-prone
+# there -- prefer `send-keys`. The per-tick composer check no longer belongs on
+# `language-implementer`.
+
 [agents.language-leader]
 display_name = "Language leader"
-model = "openai-codex/gpt-5.6-terra"
-harness = "pi"
+model = "claude-sonnet-5"
 effort = "medium"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Language team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/language/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.language-implementer]
@@ -352,18 +380,14 @@ display_name = "Language implementer"
 # seat, reseat back to Anthropic (standing operator authority). Current work
 # (item-8 LANG-TRUNC D1 grammar) is not that subject. RESEAT TIMING: this seat is
 # ACTIVE, so it relaunches at its next seam (candidate or hard-stop), not now.
-model = "openai-codex/gpt-5.6-sol"
-harness = "pi"
+model = "opus[1m]"
 effort = "high"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Language team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/language/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.language-qa]
 display_name = "Language QA"
-model = "openai-codex/gpt-5.6-terra"
-harness = "pi"
+model = "claude-sonnet-5"
 effort = "medium"
-env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Language team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/language/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-leader]
