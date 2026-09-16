@@ -251,21 +251,23 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIED-RESOURCE-SCALAR.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 1 of 11, at 36f95b6f2.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsHandleMetadata needs ResourceScalar, which it cannot observe in CarriedWord
+// The prior label read: "RT-CARRIED-RESOURCE-SCALAR: the FsHandleMetadata seat
+// cannot observe a carried word as a resource scalar; fails at base 21fd46dc",
+// on the signature "Effect: seat Argument(0) of FsHandleMetadata needs
+// ResourceScalar, which it cannot observe in CarriedWord", and asserted that the
+// row "refuses at object emission, so the program never executes". None of that
+// still holds: the program emits, executes, and the row passes un-ignored.
 //
-// Owner node: RT-CARRIED-RESOURCE-SCALAR.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// Same refusal SHAPE as its byte-span siblings in this file, different
-// need -- this seat wants ResourceScalar, not BytesPointerLength, so it
-// is not a byte-span row and must not be filed under one.
-// Annotation only -- test body and expectations are unchanged.
+// The readmission does NOT rest on that green. Mutating the stale-generation arm
+// of ken-host effect_v1.rs fn lookup (Err(Closed) -> Err(RightNotHeld{0,0})) reds
+// the row with the perturbation visible AT the assertion -- event 2 outcome
+// Error(Resource(RightNotHeld{0,0})) where Closed is asserted, exit_status 91
+// rather than 0. Two earlier mutations of resolve_fs_handle's state-match arms
+// left it green because lookup's generation check returns before that match is
+// reached; a green under mutation is "vacuous row" OR "mutation did not reach",
+// and only the third mutation separated them.
 #[test]
 fn linked_public_escape_is_exact_closed() {
     let observation = run("escape-closed", ESCAPE_CLOSED);
