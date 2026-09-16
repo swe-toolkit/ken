@@ -155,6 +155,28 @@ impl HostOpV1 {
     /// fallback, so a new operation was silently classified
     /// `RepresentedUnavailable` -- a plausible-looking default, which is what
     /// let it survive review. Classification is now explicit per operation.
+    ///
+    /// **`RepresentedUnavailable` is a claim about NATIVE PARITY EVIDENCE, not
+    /// about executability.** It means the artifact differential that would
+    /// promote the operation has not been produced yet. Every one of the ten
+    /// has a real executing arm in the switch below; the label records what has
+    /// not been *proven*, never what has not been *built*.
+    ///
+    /// **Two boundaries read this, and they ask different questions:**
+    ///
+    /// - `abi_v1::require_native_operation_v1` (consumed at the FFI entry) asks
+    ///   *has native/interpreter parity been differentially confirmed?* — ten
+    ///   operations answer no.
+    /// - [`dispatch_host_op_v1`] asks *may a Ken program cause this to
+    ///   execute?* — and uses this classifier because `ken-host` cannot depend
+    ///   on the language surface without a layering inversion. Only four of the
+    ///   ten are reachable from Ken source today, so the executor gate is
+    ///   deliberately wider than the reachable set.
+    ///
+    /// Relabelling an operation therefore does not merely relabel it: it opens
+    /// the native ABI path on the strength of a label whose job is to record
+    /// that the evidence does not exist. Promotion produces the differential
+    /// first; the label follows.
     pub const fn availability(self) -> HostOpAvailabilityV1 {
         match self {
             Self::ConsoleRead => HostOpAvailabilityV1::NativeTested,
@@ -2623,9 +2645,57 @@ impl HostOpV1 {
     }
 }
 
+/// The executor entry: every path by which a Ken program can cause a host
+/// operation to run arrives here, and a `RepresentedUnavailable` operation is
+/// refused before any validation, admission, or backend leaf is reached.
+///
+/// The refusal is `TerminalErrorV1::OperationUnavailable`, the same variant and
+/// payload the other two refusal sites produce (`host_effect_wire_layout_v1`
+/// and `require_native_operation_v1`). Two paths refusing with different values
+/// would hold the uniform-refusal invariant only in the weak sense.
+///
+/// The operation switch itself lives in
+/// [`dispatch_host_op_v1_for_promotion_evidence`], which is `pub(crate)` so the
+/// in-crate differential-evidence tests can reach the implemented arms of
+/// operations that are not yet promoted. Out-of-crate callers cannot, and do
+/// not need to.
+pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
+    backend: &mut B,
+    capabilities: &CapabilityTableV1,
+    revocation: &crate::RevocationDomain,
+    resources: &mut ResourceTableV1,
+    operation: HostOpV1,
+    capability: Option<CapabilityTokenV1>,
+    resource: ResourceInputsV1,
+    request: &CanonicalRequestV1,
+) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
+    if operation.availability() == HostOpAvailabilityV1::RepresentedUnavailable {
+        return Err(TerminalErrorV1::OperationUnavailable(operation));
+    }
+    dispatch_host_op_v1_for_promotion_evidence(
+        backend,
+        capabilities,
+        revocation,
+        resources,
+        operation,
+        capability,
+        resource,
+        request,
+    )
+}
+
 /// The only V1 semantic operation switch. Validation, live-lineage admission,
 /// and capability denial happen before a backend leaf is invoked.
-pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
+///
+/// **This entry is not gated on [`HostOpV1::availability`], and that is its
+/// purpose.** An operation stays `RepresentedUnavailable` until its artifact
+/// differential gates promote it, and the differential is produced by exercising
+/// the implemented arm — so the evidence path must be able to reach an arm the
+/// executor entry refuses. `pub(crate)` is what keeps that reachable to
+/// `ken-host`'s own evidence tests and unreachable to everyone else (`E0603`).
+///
+/// Callers outside that purpose want [`dispatch_host_op_v1`].
+pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>(
     backend: &mut B,
     capabilities: &CapabilityTableV1,
     revocation: &crate::RevocationDomain,
@@ -4909,7 +4979,7 @@ mod tests {
         let mut resources = ResourceTableV1::default();
         for (operation, request) in requests {
             let capability = (!operation.is_ambient()).then_some(token);
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 &mut backend,
                 &capabilities,
                 &revocation,
@@ -4962,7 +5032,7 @@ mod tests {
         let dispatch = |source: EntropySource, count: u64| {
             let mut backend = AllOpsBackend(Vec::new(), source);
             let mut resources = ResourceTableV1::default();
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 &mut backend,
                 &capabilities,
                 &revocation,
@@ -5042,7 +5112,7 @@ mod tests {
         let dispatch = |operation, request: &CanonicalRequestV1| {
             let mut backend = AllOpsBackend::default();
             let mut resources = ResourceTableV1::default();
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 &mut backend,
                 &capabilities,
                 &revocation,
@@ -5146,6 +5216,74 @@ mod tests {
             ]
         );
     }
+
+    /// `AC-GATE` + `AC-PREDICATE`. Every `RepresentedUnavailable` operation is
+    /// refused by the executor entry.
+    ///
+    /// **The population is DERIVED from `availability()`, never named.** An
+    /// eleventh unavailable operation is covered by this test with zero edits;
+    /// naming even one operation here would reproduce the enumeration defect
+    /// filed against `AC-AVAIL`, because a list cannot fail for a member it
+    /// does not contain. That is also why `AC-NATIVE-UNTOUCHED` needs no
+    /// allow-list: the 25 `NativeTested` operations are excluded by the
+    /// predicate's shape rather than by an exception.
+    ///
+    /// **The request is the same for every operation and matches almost none of
+    /// them, and that is an assertion rather than a shortcut.** The gate sits
+    /// above the capability match and above request-shape validation, so an
+    /// unavailable operation must be refused before anything else in the
+    /// function can have an opinion. A gate that refused only well-formed
+    /// requests would leave the malformed path executing.
+    #[test]
+    fn every_represented_unavailable_operation_is_refused_by_the_executor_entry() {
+        let capabilities = CapabilityTableV1::default();
+        let revocation = RevocationDomain::default();
+        let mut backend = AllOpsBackend::default();
+        let mut refused = 0usize;
+
+        for operation in HostOpV1::ALL {
+            if operation.availability() != HostOpAvailabilityV1::RepresentedUnavailable {
+                continue;
+            }
+            let mut resources = ResourceTableV1::default();
+            let result = dispatch_host_op_v1(
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                operation,
+                None,
+                ResourceInputsV1::None,
+                &CanonicalRequestV1::ClockMonotonicNow,
+            );
+            assert_eq!(
+                result,
+                Err(TerminalErrorV1::OperationUnavailable(operation)),
+                "{operation:?} is RepresentedUnavailable, so dispatch_host_op_v1 \
+                 must refuse it before any other check"
+            );
+            refused += 1;
+        }
+
+        // Vacuity control: a predicate that selects nothing passes without
+        // asserting anything. This is the only line that may name a number,
+        // and it is a floor on the population rather than a pin on it.
+        assert!(
+            refused > 0,
+            "the predicate selected an empty set, so this test proved nothing"
+        );
+
+        // The refusal happens ABOVE the backend, not inside it. AllOpsBackend
+        // records every leaf it is asked to perform; the gate must mean it was
+        // asked for none of them.
+        assert!(
+            backend.0.is_empty(),
+            "the gate must refuse before a backend leaf runs, but the backend \
+             observed {:?}",
+            backend.0
+        );
+    }
+
 
     #[test]
     fn catalog_is_closed_and_availability_is_exact() {
@@ -6317,7 +6455,7 @@ mod tests {
                        source,
                        length,
                        protection| {
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 backend,
                 &capabilities,
                 &revocation,
@@ -6457,7 +6595,7 @@ mod tests {
         );
         let (source, _) = resources.insert_fs_handle(owner, crate::RightSet::READ, lineage);
         let mut backend = AllOpsBackend::default();
-        let acquired = dispatch_host_op_v1(
+        let acquired = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &CapabilityTableV1::default(),
             &revocation,
@@ -7457,7 +7595,7 @@ mod tests {
             (FsSeekFromV1::Current(2), 3),
             (FsSeekFromV1::End(-1), 5),
         ] {
-            let reply = dispatch_host_op_v1(
+            let reply = dispatch_host_op_v1_for_promotion_evidence(
                 &mut backend,
                 &capabilities,
                 &revocation,
@@ -7474,7 +7612,7 @@ mod tests {
             );
         }
 
-        let seek_without_read = dispatch_host_op_v1(
+        let seek_without_read = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -7495,7 +7633,7 @@ mod tests {
             }))
         );
 
-        let truncate_without_write = dispatch_host_op_v1(
+        let truncate_without_write = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -7515,7 +7653,7 @@ mod tests {
         );
 
         for (length, expected) in [(3, b"abc".as_slice()), (5, b"abc\0\0".as_slice())] {
-            let reply = dispatch_host_op_v1(
+            let reply = dispatch_host_op_v1_for_promotion_evidence(
                 &mut backend,
                 &capabilities,
                 &revocation,
@@ -7533,7 +7671,7 @@ mod tests {
             assert_eq!(std::fs::read(root.join("held.bin")).unwrap(), expected);
         }
 
-        let end_after_resize = dispatch_host_op_v1(
+        let end_after_resize = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -7586,7 +7724,7 @@ mod tests {
         };
 
         for mode in [FsSyncModeV1::SyncFull, FsSyncModeV1::SyncData] {
-            let reply = dispatch_host_op_v1(
+            let reply = dispatch_host_op_v1_for_promotion_evidence(
                 &mut backend,
                 &capabilities,
                 &revocation,
@@ -7603,7 +7741,7 @@ mod tests {
             );
         }
 
-        let denied = dispatch_host_op_v1(
+        let denied = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -7666,7 +7804,7 @@ mod tests {
         let get = |backend: &mut RealResourceBackend,
                    resources: &mut ResourceTableV1,
                    token: ResourceTokenV1| {
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 backend,
                 &capabilities,
                 &revocation,
@@ -7683,7 +7821,7 @@ mod tests {
                    resources: &mut ResourceTableV1,
                    token: ResourceTokenV1,
                    policy: FdInheritancePolicyV1| {
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 backend,
                 &capabilities,
                 &revocation,
@@ -7801,7 +7939,7 @@ mod tests {
                          resources: &mut ResourceTableV1,
                          token: ResourceTokenV1,
                          policy: FdInheritancePolicyV1| {
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 backend,
                 &capabilities,
                 revocation,
@@ -7817,7 +7955,7 @@ mod tests {
                    revocation: &RevocationDomain,
                    resources: &mut ResourceTableV1,
                    token: ResourceTokenV1| {
-            dispatch_host_op_v1(
+            dispatch_host_op_v1_for_promotion_evidence(
                 backend,
                 &capabilities,
                 revocation,
@@ -7913,7 +8051,7 @@ mod tests {
         };
         assert_eq!(*rights, source_rights);
         assert_eq!(*provenance, Some(lineage));
-        let no_write_escalation = dispatch_host_op_v1(
+        let no_write_escalation = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -8074,7 +8212,7 @@ mod tests {
         let capabilities = CapabilityTableV1::default();
         let mut backend = DescriptorErrorBackend::default();
 
-        let seek = dispatch_host_op_v1(
+        let seek = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -8096,7 +8234,7 @@ mod tests {
             }))
         );
 
-        let set_length = dispatch_host_op_v1(
+        let set_length = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -8116,7 +8254,7 @@ mod tests {
             }))
         );
         for (mode, raw) in [(FsSyncModeV1::SyncFull, 903), (FsSyncModeV1::SyncData, 904)] {
-            let sync = dispatch_host_op_v1(
+            let sync = dispatch_host_op_v1_for_promotion_evidence(
                 &mut backend,
                 &capabilities,
                 &revocation,
@@ -8136,7 +8274,7 @@ mod tests {
                 }))
             );
         }
-        let get = dispatch_host_op_v1(
+        let get = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -8155,7 +8293,7 @@ mod tests {
                 cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(905)),
             }))
         );
-        let set = dispatch_host_op_v1(
+        let set = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
@@ -8182,7 +8320,7 @@ mod tests {
             backend.sync_modes,
             [FsSyncModeV1::SyncFull, FsSyncModeV1::SyncData]
         );
-        let duplicate = dispatch_host_op_v1(
+        let duplicate = dispatch_host_op_v1_for_promotion_evidence(
             &mut backend,
             &capabilities,
             &revocation,
