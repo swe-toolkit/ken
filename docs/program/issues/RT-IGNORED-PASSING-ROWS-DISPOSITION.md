@@ -69,9 +69,11 @@ Nine of the twelve rows carry labels naming a failure that no longer happens.
 A stale label and a vacuous test produce the same green. **The mutation
 separates them only if it reaches** (`AC-1b`) — and it is not the only
 instrument: **where a label names an observable diagnostic, that diagnostic's
-absence separates them directly and costs nothing.** Rows 2 and 3 were
-dispositioned exactly that way, with no mutation: the label named a trap string
-that occurred zero times in the un-mutated output.
+absence separates them directly and costs nothing.** Rows 2 and 3's **labels**
+were refuted exactly that way, with no mutation — the label named a trap string
+that occurred zero times in the un-mutated output. **The readmissions themselves
+still went through `AC-1`'s mutation**; the label check retired the label, not
+the coupling requirement.
 
 ## The recurring instrument hazard on this surface, stated once
 
