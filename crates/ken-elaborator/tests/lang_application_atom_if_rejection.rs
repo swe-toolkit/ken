@@ -18,6 +18,7 @@
 //! vector only in the marker below — tests key on `ARGUMENT_LOOP_MARKER`, so
 //! the prose may be reworded without touching the assertions.
 
+use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::ElabError;
 use std::path::{Path, PathBuf};
@@ -156,52 +157,75 @@ fn ac_inline_ken_census_reaches_rust_test_sources() {
 /// An application head followed by an UNGROUPED `if` — the shape `32 §3`
 /// forbids as an application argument.
 ///
-/// Not `" if "` minus `"(if "`. That test admitted three populations it should
-/// not have: a leading `if` (`= if c then ...`), an `else if` chain, and Rust's
-/// own `match` guards. The head must be a run of ordinary identifiers, so a
-/// keyword in it disqualifies the occurrence.
+/// **Driven by the real lexer, not a char-class approximation.** Three rounds
+/// of this control failed the same way: `" if "` minus `"(if "` admitted
+/// leading `if`, `else if` chains and Rust match guards; the repair then
+/// dropped every dotted head; the repair after that would have dropped the six
+/// reserved glyph names. A text heuristic has as many failure shapes as the
+/// grammar has atom productions, and each fix was "add the spelling I just
+/// found" rather than closing the class.
+///
+/// The structural characterisation closes it: **the token immediately before
+/// `KwIf` must be one that ENDS AN ATOM.** Then
+///
+///   `keep if …`      Ident   before KwIf  -> forbidden
+///   `M.f if …`       Ident   (dotted names lex as segments) -> forbidden
+///   `f::g Bool if …` ConId   -> forbidden
+///   `x ≤ y if …`     Ident   -> forbidden
+///   `keep (if …)`    LParen  before KwIf  -> legal, grouped
+///   `= if …`         Eq      -> legal, leading
+///   `… else if …`    KwElse  -> legal, chain
+///
+/// and the spelling of the head never enters the test at all.
 fn has_argument_position_if(fragment: &str) -> bool {
-    let Some(equals) = fragment.find("= ") else {
+    let Ok(tokens) = Lexer::lex(fragment) else {
+        // Not lexable as Ken (a Rust line, a `{placeholder}` template). Not a
+        // Ken fixture of this shape.
         return false;
     };
-    let rest = &fragment[equals + 2..];
-    // Every occurrence, not just the first: an excluded one earlier in the
-    // fragment must not hide a real one after it.
-    rest.match_indices(" if ").any(|(at, _)| {
-        let head = rest[..at].trim();
-        !head.is_empty() && head.split_whitespace().all(is_qualified_identifier)
-    })
+    tokens
+        .windows(2)
+        .any(|pair| matches!(pair[1].0, Token::KwIf) && ends_an_atom(&pair[0].0))
 }
 
-/// One token of an application head: an identifier, or a QUALIFIED one.
+/// Whether a token can END an application atom — i.e. whether an argument list
+/// could legitimately continue after it.
 ///
-/// A flat `is_alphanumeric() || '_'` test over the whole head silently drops
-/// every dotted head — `Data.Numeric.Nat.Arithmetic if c then a else b` parses
-/// to the forbidden-shape rejection and the predicate reported `false`, which
-/// is the same class of blind spot this node exists to close. Qualified names
-/// are ordinary Ken (dotted-name joining from `LANG-RESERVED-INFIX-NAMES`), not
-/// an edge case.
+/// Enumerated over the token alphabet rather than over source spellings, which
+/// is what makes this closed against SPELLING: a name lexes to `Ident` /
+/// `ConId` however it is written — plain, dotted, `::`-qualified.
 ///
-/// `::` is included on the same reasoning rather than on a second report:
-/// attached-proof heads like `compare_raw::eq_sound Bool bool_leq …` occur in
-/// the corpus and would have been invisible for an identical reason.
+/// **Every arm is backed by a parser-verified case, and two candidate arms were
+/// REMOVED because the parser refuted them:**
 ///
-/// Validating SEGMENT-BY-SEGMENT is what keeps the keyword check biting: a
-/// keyword may not appear as any segment, so `if`/`then`/`else` cannot enter
-/// through a dotted spelling.
-fn is_qualified_identifier(token: &str) -> bool {
-    const KEN_KEYWORDS: [&str; 10] = [
-        "if", "then", "else", "let", "in", "match", "fn", "proc", "const", "where",
-    ];
-    !token.is_empty()
-        && token
-            .split("::")
-            .flat_map(|part| part.split('.'))
-            .all(|segment| {
-                !segment.is_empty()
-                    && segment.chars().all(|c| c.is_alphanumeric() || c == '_')
-                    && !KEN_KEYWORDS.contains(&segment)
-            })
+///   `f ≤ if …`     the six glyph names, and `Operator` — parser ACCEPTS,
+///                  so a glyph before `if` is NOT this shape. Including them
+///                  made the predicate over-broad.
+///   `f [1] if …`   `RBracket` — rejects from a DIFFERENT producer, so it is
+///                  not evidence for this one.
+///
+/// Honest residual: `Nat`, `Str`, `CharLit` are verified representatives of the
+/// literal class; `IntLit`, `FloatLit`, `DecimalLit`, `Float32Lit`, `ByteStr`
+/// are the same atom production and are carried on that class argument, not on
+/// their own cases.
+fn ends_an_atom(token: &Token) -> bool {
+    matches!(
+        token,
+        Token::Ident(_)
+            | Token::ConId(_)
+            // literals
+            | Token::Nat(_)
+            | Token::IntLit(_)
+            | Token::FloatLit(_)
+            | Token::DecimalLit(_, _)
+            | Token::Float32Lit(_)
+            | Token::Str(_)
+            | Token::CharLit(_)
+            | Token::ByteStr(_)
+            // closers of a grouped / record atom
+            | Token::RParen
+            | Token::RBrace
+    )
 }
 
 /// The predicate's discriminating table — the evidence that the repaired
@@ -228,6 +252,17 @@ fn argument_position_predicate_admits_only_the_forbidden_shape() {
     assert!(has_argument_position_if(
         "const k : Nat = compare_raw::eq_sound Bool if c then a else b"
     ));
+    // QA's reserved-glyph fragment. NOTE what this does and does not test: the
+    // token before `KwIf` is `y`, an Ident — so it exercises the Ident arm, not
+    // any glyph arm. It was added believing it covered the glyphs, and a
+    // mutation dropping every glyph arm left it GREEN, which is what exposed
+    // both the decorative fixture and the wrongness of those arms.
+    assert!(has_argument_position_if(
+        "const k : Nat = x \u{2264} y if c then a else b"
+    ));
+    assert!(has_argument_position_if(
+        "const k : Nat = f (g x) if c then a else b"
+    ));
 
     for legal in [
         // leading `if` — legal, and the largest false population before
@@ -249,6 +284,60 @@ fn argument_position_predicate_admits_only_the_forbidden_shape() {
         assert!(
             !has_argument_position_if(legal),
             "must NOT be flagged as an argument-position `if`: {legal}"
+        );
+    }
+}
+
+/// The closure argument: the predicate must agree with the PRODUCTION it
+/// approximates, not with a table of spellings I thought of.
+///
+/// Every prior version of this control was an enumeration without a proven
+/// closure — it passed its own table and missed a spelling the grammar admits.
+/// This test removes the table's authority: for each fragment, the predicate's
+/// answer must equal what the parser actually does, where "actually does" means
+/// rejecting with `ARGUMENT_LOOP_MARKER`. A fragment added here is checked in
+/// both directions automatically, so a future spelling cannot be admitted to
+/// the table without also being verified against the parser.
+#[test]
+fn predicate_agrees_with_the_parser_it_approximates() {
+    for fragment in [
+        // forbidden shapes, across every head spelling found so far
+        "const k : Nat = keep if c then a else b",
+        "const k : Nat = f x if c then a else b",
+        "const k : Nat = Data.Numeric.Nat.Arithmetic if c then a else b",
+        "const k : Nat = Module.func if c then a else b",
+        "const k : Nat = compare_raw::eq_sound Bool if c then a else b",
+        "const k : Nat = x \u{2264} y if c then a else b",
+        "const k : Nat = f (g x) if c then a else b",
+        "const k : Nat = f 42 if c then a else b",
+        "const k : Nat = f True if c then a else b",
+        "const k : Nat = f \"s\" if c then a else b",
+        "const k : Nat = f 'c' if c then a else b",
+        "const k : Nat = f { a = 1 } if c then a else b",
+        "const k : Nat = f (g x) if c then a else b",
+        // legal shapes
+        // a glyph immediately before `if` is ACCEPTED by the parser — the case
+        // that refuted the glyph arms. Without this row the predicate could go
+        // over-broad again and the differential would not notice.
+        "const k : Nat = f \u{2264} if c then a else b",
+        // rejects, but from a DIFFERENT producer, so the predicate must say no
+        "const k : Nat = f [1] if c then a else b",
+        "const k : Nat = keep (if c then a else b)",
+        "const when_true : Int = if True then 11 else 22",
+        "const outer_else : Int = if False then 1 else if True then 2 else 3",
+        "const let_if : Int = let x : Int = if False then 7 else 8 in x",
+        "const plain : Nat = f x y",
+    ] {
+        let predicted = has_argument_position_if(fragment);
+        let parser_rejects_from_the_loop = match parse_decls(fragment) {
+            Err(ElabError::ParseError { msg, .. }) => msg.contains(ARGUMENT_LOOP_MARKER),
+            _ => false,
+        };
+        assert_eq!(
+            predicted, parser_rejects_from_the_loop,
+            "the census predicate disagrees with the parser on: {fragment}\n  \
+             predicate said {predicted}, parser-rejects-from-loop is \
+             {parser_rejects_from_the_loop}"
         );
     }
 }
