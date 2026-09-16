@@ -1,6 +1,6 @@
 ---
 id: RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE
-title: "Enforce the RepresentedUnavailable invariant uniformly across BOTH executors by gating dispatch_host_op_v1, with a control that is a PREDICATE over availability() rather than an assertion about any named op. The invariant is STATED at effect_v1.rs:193 and native-enforced at abi_v1.rs:1551, but the interpreter path consults availability() nowhere -- so a RepresentedUnavailable op currently executes interpreted and refuses natively. Architect ruling evt_21f23zmgqfxsc: the interpreter MUST refuse; RepresentedUnavailable is a language-surface claim, not a native-backend one. Its SUBJECT IS REACHABILITY, which is a different question from AC-AVAIL's availability census -- do not fold the two together."
+title: "Enforce the RepresentedUnavailable invariant uniformly across BOTH executors by gating dispatch_host_op_v1 at the convergence, with a control that is a PREDICATE over availability() rather than an assertion about any named op. The invariant is STATED at effect_v1.rs:193 and native-enforced at abi_v1.rs:1551, but the interpreter consults availability() nowhere -- so FOUR of the ten unavailable ops (ClockMonotonicNow, ClockSleepUntil, EntropyRandomBytes, MappingAcquireFile) execute interpreted and refuse natively on main TODAY, and the availability flip moves only one of them. REMEDIAL, not preventive. Architect ruling evt_21f23zmgqfxsc: the interpreter MUST refuse; RepresentedUnavailable is a language-surface claim, not a native-backend one. The gate must sit at the convergence and NOT in a caller -- the interpreter's two production callers are in different helpers (fs_dispatch, ambient_dispatch), so the natural-looking fs_dispatch placement misses clock and entropy entirely. Its SUBJECT IS REACHABILITY, a different question from AC-AVAIL's availability census -- do not fold the two together."
 status: draft
 owner: runtime
 size: S
@@ -14,10 +14,12 @@ origin: "Adversary Finding 1 on the landed slice 4 (statements != enforcements),
 
 > # DRAFT. Not framed, not released. Do not start.
 >
-> The design is RULED and is not open. What is unmeasured is the blast radius
-> (see D0) and the reachability of the other nine ops. The Steward frames and
-> releases this when the runtime lane reaches it — which, per the sequencing
-> ruling below, is BEFORE the availability flip.
+> The design is RULED and is not open. **D1 is CLOSED at four-of-ten reachable**,
+> which makes this node REMEDIAL — it closes a divergence live on `main` today,
+> not a hazard that future unflipped surfaces might create. D0, the blast
+> radius, is the one thing still unmeasured and it is what sizes the node. The
+> Steward frames and releases this when the runtime lane reaches it — which,
+> per the sequencing ruling below, is BEFORE the availability flip.
 
 # Objective
 
@@ -75,6 +77,17 @@ From `evt_21f23zmgqfxsc`, adopted verbatim:
    native gate at `abi_v1.rs:1551` **stays**: it sits at the FFI boundary and
    returns an ABI-shaped code, correct for that layer. Double-gating is
    defense in depth and the two return shapes belong to their own layers.
+
+   **The convergence is load-bearing, and the natural-looking alternative
+   silently misses three of the four reachable ops.** The interpreter's two
+   production callers do not sit in one helper: `eval.rs:5593` is inside
+   `fs_dispatch` (`:5147`) and `eval.rs:5844` is inside `ambient_dispatch`
+   (`:5833`), reached from two different arms of the evaluator. A gate in
+   `fs_dispatch` — which is where the `MappingAcquireFile` finding pointed, and
+   the obvious place to put it — covers the op that started this and **misses
+   clock and entropy entirely** (Architect, `evt_3ws5c4xzbfxa5` point 4). The
+   ruling names the convergence; the two-helper split is *why*, not merely that
+   one location is tidier. **Do not relocate this gate to a caller.**
 3. **The control must be a PREDICATE**, never a list:
 
        for every op in HostOpV1::ALL with availability() == RepresentedUnavailable,
@@ -155,25 +168,78 @@ do will change behaviour under the gate. That set is the node's real size; if
 it is large or crosses into `ken-verify` production paths, the cut is wrong and
 comes back to the Steward rather than being absorbed.
 
-# D1 — are the other nine ops currently reachable?
+**One constraint the Architect's D1 measurement adds, and it is not an answer to
+D0** (`evt_3ws5c4xzbfxa5` point 5): at least two of the production sites are the
+`eval.rs` pair, and a gate at the convergence must leave `ClockWallNow` and the
+other 24 `NativeTested` ops **untouched**. The predicate control gives that by
+construction — it derives the refusal set from `availability()` rather than
+listing it, so the 25 are correct without being enumerated. The blast-radius
+question stands open regardless.
 
-`MappingAcquireFile` is one of ten. The others are `ClockMonotonicNow`,
-`ClockSleepUntil`, `FsSeek`, `FsSetLength`, `FsSync`, `FsGetInheritance`,
-`FsSetInheritance`, `FsDuplicate`, `EntropyRandomBytes`
-(`effect_v1.rs:165-194`).
+# D1 — ANSWERED: FOUR of the ten are reachable today. This node is REMEDIAL.
 
-**Whether any of the nine is reachable from Ken source through the interpreter
-today is UNMEASURED, and this node must not assume either answer.** No
-`..._unavailable` prelude stub of the deleted form survives at `d4e977a6a`, but
-absence of that *spelling* is not absence of enforcement — the concept may be
-spelled another way, or the op may simply have no Ken-level surface to be
-invoked from, which refuses by inaccessibility rather than by a guard.
+**Closed 2026-09-16** by runtime-implementer (`evt_228edjqb8z29m`, the partition
+and its key) and the Architect (`evt_3ws5c4xzbfxa5`, the traces). Measured at
+`origin/main` `d4e977a6af1083975665e587ed7e3e31f733785e`.
 
-This bears directly on urgency and on how the runtime-implementer's question is
-answered: *"bounded until the flip"* bounds the divergence for **one** op. If
-any of the nine is reachable, there is a live divergence the flip does not
-touch. Report a count and the method; a zero from a grep that could not have
-fired is not a measurement.
+    ClockMonotonicNow    reachable, EXECUTES interpreted, refused natively
+    ClockSleepUntil      reachable, EXECUTES interpreted, refused natively
+    EntropyRandomBytes   reachable, EXECUTES interpreted, refused natively
+    MappingAcquireFile   reachable, EXECUTES interpreted, refused natively
+    FsSeek FsSetLength FsSync FsGetInheritance FsSetInheritance FsDuplicate
+                         no Ken-level surface in prelude.rs under any of the
+                         three spellings -- refuse by INACCESSIBILITY, not by
+                         a guard. Re-check on any op that later gains a surface.
+
+Trace coordinates, so no reader re-derives them:
+
+    Ken surface       prelude.rs:592  data ClockOp = WallNow | MonotonicNow
+                                                   | SleepUntil Deadline
+                      prelude.rs:594  data EntropyOp = RandomBytes Int
+                      handlers at prelude.rs:1653, :1659, :1678
+    decode            eval.rs:4576    decode_clock_request (production -- the
+                                      #[cfg(test)] at :4449 decorates the single
+                                      fn io_error_value, NOT a module)
+    call site         eval.rs:6247    inside the EvalVal::Ctor arm
+    helper            eval.rs:5833    ambient_dispatch
+    host entry        eval.rs:5844    dispatch_host_op_v1, its SECOND statement
+    implemented arms  effect_v1.rs:2895 / :2898 / :2902 -> backend.clock_*,
+                                      backend.entropy_random_bytes
+    native refusal    effect_v1.rs:558-569, the ten-op arm whose body is
+                      return Err(TerminalErrorV1::OperationUnavailable(operation))
+
+**The sharpest form, and the reason no further trace is owed.** `ClockWallNow`
+is `NativeTested` (`:164`); `MonotonicNow` (`:165`) and `SleepUntil` (`:166`) are
+not — three consecutive lines. All three are constructors of **one** Ken data
+declaration, decoded by **one** function, on **consecutive branches of one
+if-else chain** (`decode_clock_request` `:4581`/`:4586`/`:4592`). `WallNow`
+proves the whole path is exercised end to end; the other two differ from it only
+by which arm they take. The surface is not hypothetically live.
+
+**Stated with its limit:** the backend is `InterpreterHostBackend { handler }`,
+so what the handler ultimately does is the handler's business. The divergence
+does not depend on that — the interpreter **executes and returns a value** where
+native returns `OperationUnavailable`. Execute-versus-refuse is the property,
+and it is settled.
+
+⇒ **"Bounded until the flip" bounds nothing.** Four of ten are reachable and the
+flip moves exactly one of them. **This node is REMEDIAL, not preventive:** it
+closes a divergence live on `main` today that the flip leaves in place for three
+ops. Frame it that way — "hardening a pattern for future unflipped surfaces" is
+true and it is the smaller half.
+
+**How D1 was nearly answered wrongly, kept because the gate's own control has
+the same failure mode.** The naive census — grepping the ten Rust variant names
+against `prelude.rs` — returns `MappingAcquireFile` 5, all nine others 0, which
+reads as a clean "only one op has a Ken surface, the divergence is bounded." It
+is an artifact of spelling: one concept carries three names with no mechanical
+transformation between them, and the direction disagrees (`MappingAcquireFile`
+*gains* a `Private` prefix as `PrivateMappingAcquireFile`; `ClockMonotonicNow`
+*loses* its `Clock` as `MonotonicNow`). Even the five hits are substring matches
+inside the Ken identifier, not the Rust variant. The authoritative key is the
+prelude's own `op_* => "<KenName>"` intern table. **A census keyed on a spelling
+its subject does not use returns a confident wrong number, and this node's
+control must derive its set from `availability()` for exactly that reason.**
 
 # The decisive consequence, recorded so it is not re-derived
 
