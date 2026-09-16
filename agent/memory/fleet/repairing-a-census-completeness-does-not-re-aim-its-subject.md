@@ -74,3 +74,9 @@ untouched) is what gets filed under the wrong lesson. Sibling of
 (same "the members share a shape" tell, but there the list was genuinely short;
 here it was not) and of
 [[a-differential-over-an-aggregate-is-an-existential-not-a-universal]].
+
+**Filed the same hour, and caught using this one:**
+[[a-pattern-match-is-evidence-about-what-encloses-it]] — a distinct sentence
+rather than an elaboration of this file. Here the census's SUBJECT is the wrong
+question; there a hit's SCOPE is unresolved. This lesson's detector ("what do
+all my members have in common?") is what caught that one's first instance.
