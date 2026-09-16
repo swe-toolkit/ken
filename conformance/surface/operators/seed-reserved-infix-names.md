@@ -37,7 +37,8 @@ is not yet accepted even when grouped.
 [[LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE]], which also owns the catalog
 migration. Grounding: the rows state `spec/30-surface/32-grammar.md §3`'s
 contract pin (`:362-363` for the operator-name restriction, `:371-376` for the
-five leading forms and for `(keep Nat) -> Nat` / `(keep box).value`), so they
+five leading forms and for `(keep Nat) -> Nat`; the projection half of that pin
+has since been retired — see the projection row), so they
 are not an A0 over-reach; A0 admits reserved names and cannot satisfy a claim
 about sources containing none, which is why the gate was mis-attributed rather
 than merely premature. The priority-queue catalog control's failure measures
@@ -160,7 +161,7 @@ add a tree node.
   | match | `keep (match flag { true ↦ Zero; false ↦ Zero })` | `A(keep, Match(flag, {true ↦ Zero; false ↦ Zero}))` | `keep match flag { true ↦ Zero; false ↦ Zero }` | reject at the leading `match`; no complete tree |
   | temporal | `keep (temporal { Top })` | **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** — `A(keep, Temporal(Top))` | `keep temporal { Top }` | reject at the leading `temporal`; no complete tree |
   | arrow | `keep (Nat -> Nat)` | `A(keep, Arrow(Nat, Nat))` | `keep Nat -> Nat` | accept as `Arrow(A(keep, Nat), Nat)`, not as the grouped tree |
-  | projection | `keep (box.value)` | `A(keep, Proj(box, value))` | `keep box.value` | accept as `Proj(A(keep, box), value)`, not as the grouped tree |
+  | projection | `keep (box.value)` | `A(keep, Proj(box, value))` | `keep box.value` | accept as `A(keep, Proj(box, value))` — the same tree as grouped; projection binds tighter than application |
 
 - expect-grouped: every grouped non-temporal source has exactly the stated
   application tree. Live on this base for all six non-temporal classes.
@@ -176,25 +177,35 @@ add a tree node.
 - expect-arrow: the ungrouped arrow row accepts with exactly its stated outer
   tree and does not silently acquire the grouped interpretation. Live on this
   base; conforms to `32 §3`'s `(keep Nat) -> Nat` and carries no gate.
-- expect-projection: **RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE** —
-  `32 §3` fixes the ungrouped projection as `(keep box).value`, the application
-  nested in the projection's left `expr`. **MEASURED on this base:** `keep
-  box.value` yields the grouped reading instead, so the parser diverges from
-  the pin here. The row states the spec and is red until the successor closes
-  the divergence.
+- expect-projection: `32 §3` fixes the ungrouped projection as
+  `keep (box.value)` — projection is a postfix form on `primary` and therefore
+  part of `application_atom`, so it binds tighter than the application and the
+  ungrouped source has the **same** tree as the grouped one. Live on this base;
+  no gate.
+
+  **This row previously asserted the opposite** and was red against
+  `LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE`: `32 §3` then fixed the
+  ungrouped form as `(keep box).value`, and the base parser's grouped reading
+  was recorded here as a divergence from the pin. The amendment retiring that
+  pin inverts the row — what was measured as a divergence **is** the specified
+  behaviour, so the row conforms rather than closing a gap.
 - expect-temporal: **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** — once the
   separately deferred grouped expression form exists, it has the tabled tree
   and its ungrouped twin rejects at `temporal`. This row is not an A0 exit
   condition and does not turn green merely because reserved infix names land.
-- why: each row varies only grouping around one named non-atom class. Restoring
+- why: each row varies only grouping around one named class. Restoring
   unrestricted `expr expr` makes the three currently enforced rejection rows,
-  and eventually the temporal row, accept as applications; treating arrow or
-  projection as an argument atom changes its named outer tree. **MEASURED on
-  this base:** seven independent grouped/ungrouped pairs expose three enforced
-  reject boundaries (`lambda`, `let`, `match`), one spec-required reject
-  boundary this base does not enforce (`if`), one deferred reject boundary
-  (`temporal`), one conforming precedence boundary (`arrow`), and one
-  spec-required precedence boundary this base does not enforce (`projection`).
+  and eventually the temporal row, accept as applications; treating **arrow**
+  as an argument atom changes its named outer tree. **Projection is no longer
+  in that class** — `32 §3` now derives it inside `application_atom`, so
+  `keep box.value` and `keep (box.value)` are the same tree by construction
+  and the row is a conforming-precedence control, not a grouping requirement.
+  **MEASURED on this base:** seven independent grouped/ungrouped pairs expose
+  three enforced reject boundaries (`lambda`, `let`, `match`), one
+  spec-required reject boundary this base does not enforce (`if`), one
+  deferred reject boundary (`temporal`), and **two** conforming precedence
+  boundaries (`arrow`, `projection`). `if` is now the **only** row where the
+  spec requires a boundary this base does not enforce.
   **CLAIMED:** the `expr application_atom` production admits only atoms in bare
   identifier-headed argument position. **THE GAP:** these are parser
   observations only; the ordinary-application elaboration path is covered

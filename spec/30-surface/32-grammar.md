@@ -269,13 +269,13 @@ expr ::=
   | let_expr  -- sequential local binding group
   | "if" expr "then" expr "else" expr  -- = match on Bool
   | match_expr  -- pattern match (34); single-scrutinee eqn: modifier (34 §3.6)
-  | expr "." ident | expr ".1" | expr ".2"  -- field / projection
   | "temporal" "{" expr "}"  -- temporal obligation → Temporal data (72) [OQ-syntax]
   | application_atom
 operator_prefix ::= operator_name application_atom+
 binop ::= operator_name | fixed_binop
 fixed_binop ::= "+" | "-" | "*" | "+%" | "-%" | "*%" | "=="
-application_atom ::=
+application_atom ::= primary ("." ident | ".1" | ".2")*  -- postfix projection chain
+primary ::=
     literal | ident | ConId | qualified_global_ref
   | path "::" ident  -- canonical attached-proof path
   | proof_ref  -- attached-proof selector atom
@@ -333,6 +333,26 @@ its mandatory `in` closes the binding list before the surrounding arm can end.
 Nested-let and arrow RHS expressions likewise complete under their own
 productions before the enclosing binding-list separator is considered.
 
+Projection is a **postfix form on `primary`** and therefore binds more tightly
+than application or any infix operator — the second member of the category
+`proof_ref` names below. That is why it is written inside `application_atom`
+rather than as its own `expr` arm: `keep box.value` is `keep (box.value)`
+because `box.value` is one atom, and `keep Nat -> Nat` is `(keep Nat) -> Nat`
+because arrow is infix and deliberately loose. The two read as opposite
+directions and follow from one rule — **projection is tightest, arrow is
+loosest, application sits between them.**
+
+> **Provenance, because the obvious account of this is wrong.** The standalone
+> `expr "." ident` arm **predates** the commit that created `application_atom`
+> and was **byte-identical** across it: at `7dea59366^` the arms read
+> `| expr expr` and `| expr "." ident | expr ".1" | expr ".2"`, and at
+> `7dea59366` they read `| expr application_atom` and the **same** projection
+> line, unchanged. Only the atom class and the sentence pairing them are new.
+> So projection was **inherited by omission rather than introduced by an act** —
+> the application arm was narrowed and the projection arm was never touched.
+> It is not the case that the two entered together and were considered jointly,
+> and an amendment reasoning from that would be repairing a decision nobody made.
+
 `proof_ref` is a primary expression atom and therefore binds more tightly than
 application or any infix operator. Its subject is exactly one `path`; subsequent
 expressions are arguments to the selector result. Thus `proof p for s a b`
@@ -368,14 +388,22 @@ name.
 Both application arms — `expr application_atom` and `operator_prefix` with its
 `application_atom+` tail — intentionally restrict bare arguments to atoms. An
 expression not admitted by `application_atom` — including an
-ungrouped lambda, `let`, `if`, `match`, temporal form, arrow, or projection —
-must be grouped before it is used as an application argument. Consequently the
-five leading forms — lambda and `let`, `if`, `match`, and `temporal` — reject at
-their leading token when ungrouped after an application head, whereas arrow and
-projection remain well-formed with that application nested in their left
-`expr`, as `(keep Nat) -> Nat` and `(keep box).value` respectively. This removes
-the former ambiguous bare `expr expr` shape and is part of §3's contract pin; an
-implementation must not restore a second unrestricted application production.
+ungrouped lambda, `let`, `if`, `match`, temporal form, or arrow — must be
+grouped before it is used as an application argument. Consequently the five
+leading forms — lambda and `let`, `if`, `match`, and `temporal` — reject at
+their leading token when ungrouped after an application head, whereas arrow
+remains well-formed with that application nested in its left `expr`, as
+`(keep Nat) -> Nat`. This removes the former ambiguous bare `expr expr` shape
+and is part of §3's contract pin; an implementation must not restore a second
+unrestricted application production.
+
+**Projection is not in that set, and this paragraph previously said it was.**
+It is a postfix form *on* `primary` and therefore part of `application_atom`
+itself, so it never needs grouping to appear as an argument: `keep box.value`
+is `keep (box.value)`, the projection binding tighter than the application.
+The superseded reading gave `(keep box).value` — application first, projection
+applied to its result — which is the opposite association and is retired here
+rather than left standing beside the new rule.
 
 In an infix run, the `operator_name` arm of `binop` puts the name in the
 existing fixity-neutral spine. After name resolution, the defining
@@ -473,7 +501,9 @@ contract is part of `fn`/`proc` (§1); refinements `{x:A|φ}` are types (§2).
 
 ## 6. Precedence and associativity (defaults)
 
-Application binds tightest; `@` (label / annotation prefix) tight; `->` and `×`
+Application binds tightest among the operator forms, and postfix projection —
+being inside `application_atom` (§3) — binds tighter still; `@` (label /
+annotation prefix) tight; `->` and `×`
 are right-associative and looser than the arithmetic operators; user operators,
 including every `reserved_infix_name`, take declared fixity
 (`infixl`/`infixr`/`infix N`, default `infixl 9`); `:` (ascription) loosest.
