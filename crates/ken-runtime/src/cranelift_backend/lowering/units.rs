@@ -6928,19 +6928,33 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 // identity = None)` -- measured at 12 census entries across both
                 // binaries and at none of the other 105 obligations.
                 //
-                // WHAT IT WAS THROWING AWAY IS THE INDEPENDENT VALUE. At
-                // `calls.rs:2478` the obligation is born carrying
-                // `target.result_contract.map(DeclaredResultContract::identity)`
-                // -- THE CALLEE'S OWN DECLARED RESULT CONTRACT. It is not
-                // derived from `emission.row`, it is not in scope at this
-                // owner's emission site, and it belongs to a different unit.
-                // Keeping it is what gives arm 1 a second value to compare
-                // against this owner's own `k_ret_identity()`.
+                // WHAT IT WAS THROWING AWAY IS ARM 1'S ONLY ROUTE TO A
+                // CERTIFICATE. At `calls.rs:2478` the obligation is born
+                // carrying `target.result_contract.map(
+                // DeclaredResultContract::identity)`. That value's CONTENT is
+                // plan-derived -- `checked_ih_generated_context_result_contract`
+                // builds it from `k_ret_identity` on
+                // `static_response_continuations` rows, the same field `:7031`
+                // reads for `independent_contract`, and the planner errors
+                // rather than let two rows on one context disagree. Do NOT read
+                // this as recovering an independent value. THE PLAN CANNOT
+                // CORROBORATE THE PLAN.
                 //
-                // ⛔ It is NOT overwritten with anything of this body's. Seeding
-                // the owner's planned identity here would put one value on both
-                // sides of the comparison, which is the vacuity this repair
-                // exists to avoid.
+                // ⛔ WHAT THE DROP SEVERS IS THE MECHANISM, NOT A COMPARISON.
+                // With `identity = None` the obligation is skipped at `:4301`,
+                // so the callee is never entered into `required` at `:4307`, so
+                // no certificate is ever demanded for it, so `call_seeds` is
+                // never populated at that word -- and arm 1 has nothing to
+                // consult. Keeping the identity is what lets a certificate be
+                // demanded and a seed be placed. The seed's EXISTENCE is the
+                // evidence, and it is grounded in the CALLEE'S OWN
+                // `authorities`, never in this owner's plan row.
+                //
+                // ⛔ It is NOT overwritten with anything of this body's. The
+                // value must remain the CALLEE'S declaration: it is the key the
+                // certificate demand at `:4307` is raised under, and
+                // substituting this owner's planned identity would raise the
+                // demand under an identity the callee never declared.
                 //
                 // `realization_required` is left exactly as it was. Why this
                 // site forces it true on a callee that declared nothing is a
@@ -7048,9 +7062,11 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         // WHAT IT IS NO LONGER: the discharge's evidence. Before `D1` this
         // planned value was compared against the demand and, with a realization
         // fact about the word, DISCHARGED a constructor-identity obligation -- a
-        // plan standing in for an observation. It is now ONE SIDE of a two-value
-        // comparison whose other side is the callee's own declared result
-        // contract, reaching arm 1 through `call_seeds`.
+        // plan standing in for an observation. It is now one side of a
+        // comparison that is VACUOUS-WHEN-PRESENT: wherever a seed exists it
+        // necessarily equals this value (see the arm-1 comment). The
+        // discharge's content is the SEED'S EXISTENCE, reaching arm 1 through
+        // `call_seeds`. This line is not the evidence.
         let independent_contract = emission.row.k_ret_identity();
         let publication = FunctionResultPublication {
             frame: finished_body.frame,
