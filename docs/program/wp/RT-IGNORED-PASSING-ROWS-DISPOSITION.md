@@ -27,19 +27,44 @@ Measured at PR #3676 head `0f71ab5b9267781ae1d91bc654011cad42b926af`, from the
 `ignored-row sweep` job (GitHub job id `104224384914`), plus a source census
 using `scripts/ci-ignored-sweep.py`'s own upward-walk algorithm.
 
-    33   real `#[ignore]` attributes in crates/, all on `#[test] fn`
-    +1   macro-generated (discharge_ledger_refuses_one_word_discharging_two_obligations)
-    34   nextest --run-ignored=only population   (GROUND TRUTH, carries to main)
-    -6   registry run-exemptions                 (carries to main)
-    28   selected and executed                   (carries to main)
-         -> 12 PASSED / 16 failed  **AT `0f71ab5b9` ONLY. NOT A FIXED INPUT.
-            RE-DERIVE AT THE IMPLEMENTATION BASE — see below.**
+                                      at 0f71ab5b9    on main
+    real `#[ignore]` attributes           34            33
+      all at column 0, all on `#[test] fn`
+    macro-generated                        0             0
+    nextest --run-ignored=only population  34            33
+    registry run-exemptions                -6            -6
+    selected and executed                  28            27
 
-> **THE POPULATION CARRIES TO `main`; THE PASS/FAIL SPLIT DOES NOT.** Verified
-> between `0f71ab5b9` and `origin/main`: `#[ignore]` attribute lines differing
-> across `crates/` is **zero**, `.github/ignored-test-exemptions.toml` is
-> **identical**, and ten of the eleven named test files are identical. So
-> `34`, `-6` and `28` are properties of the population and are safe to pin.
+    at 0f71ab5b9  -> 12 PASSED / 16 failed
+    on main       -> RE-DERIVE. Not predicted here. See below.
+
+**CORRECTED 2026-09-16 — the earlier table read `33 real + 1 macro-generated`
+and pinned `34` and `28` as carrying to `main`. Both pins are refuted by the
+tree; section 1a below is the correction and the reason it mattered.**
+
+> **NEITHER THE POPULATION NOR THE SPLIT CARRIES TO `main`. ONLY `-6` DOES.**
+> The earlier text claimed the `#[ignore]` attribute-line diff between
+> `0f71ab5b9` and `origin/main` was **zero** and pinned `34` and `28` on that
+> basis. **The diff is one line, and it was one line when the claim was
+> written:**
+>
+>     git diff 0f71ab5b9267781ae1d91bc654011cad42b926af origin/main -- 'crates/*' \
+>       | grep '#\[ignore'
+>     -#[ignore = "IGNORED BECAUSE ITS SHAPE IS ABSENT HERE, NOT BECAUSE IT IS
+>                  UNFINISHED. ..."
+>
+> That is `discharge_ledger_refuses_one_word_discharging_two_obligations`, and
+> it **never landed on `main`** — `git log -S` over `origin/main` returns only
+> the commits that file the frames naming it, never the test.
+>
+> `.github/ignored-test-exemptions.toml` **is** identical, so **`-6` carries**
+> and is the one pin that survives. The corrected population on `main` is `33`
+> and the corrected selected figure is `27`.
+>
+> **`27` is not a prediction — it is a measurement.** Run `34753101365` at
+> `7663ad9b924e7b1cb2c0111215b997b085465aa1` (2026-09-13) reported
+> `Ignored-row sweep completed: 27 selected; 11 passed.` **The frame's own
+> ground-truth instrument has contradicted the frame's pin since 09-13.**
 >
 > **`12 / 16` is not.** It is a property of the tree the sweep ran on, and that
 > tree is PR #3676's head — **36 commits ahead of `origin/main` and 53 behind
@@ -62,13 +87,86 @@ using `scripts/ci-ignored-sweep.py`'s own upward-walk algorithm.
 > gap as 2363, and a sweep result is no more a property of a row than a label is.
 
 **A source grep is the wrong instrument and must not be used to re-derive this.**
-`grep -c '#\[ignore'` returns 38: five of those are doc-comment prose *about*
-`#[ignore]` (`recursor_fusion.rs` x2, `r3_c1_source_arrival.rs` x1,
-`boundary_value_clif.rs` x2), and a grep is simultaneously blind to the
-macro-generated row. `scripts/ci-ignored-sweep.py` derives its population from
-nextest for exactly this reason.
+`grep -c '#\[ignore'` returns 38 on `main`: five of those are doc-comment prose
+*about* `#[ignore]` (`recursor_fusion.rs` x2, `r3_c1_source_arrival.rs` x1,
+`boundary_value_clif.rs` x2), leaving 33 real attributes.
+`scripts/ci-ignored-sweep.py` derives its population from nextest because prose
+hits and cfg-excluded rows both defeat a source census.
+
+**The earlier text added "and a grep is simultaneously blind to the
+macro-generated row." That rationale is withdrawn — it cited a row the grep sees
+fine.** `discharge_ledger`'s attribute is at column 0 on a plain `#[test] fn`
+(`crates/ken-cli/tests/px8f_buffer_native.rs`, `#[test]` then `#[ignore = "..."`
+then `fn`, at `0f71ab5b9`). The grep finds it; the raw counts show it as
+`39 -> 38` across the boundary.
+
+## 1a. Why the misclassification was load-bearing, not cosmetic
+
+**Calling that row macro-generated is what made the carry verification appear to
+pass.** A macro-generated row is by construction invisible to a grep for
+attribute lines. Labelling it that way let the frame add `+1` to the population
+**and** report the attribute-line delta as zero, with no visible contradiction —
+the single counterexample had been classified out of the instrument's view.
+
+Relabel it as what the tree shows and every dependent claim moves at once:
+
+    34 real at 0f71ab5b9, not 33 + 1
+    attribute-line delta to main is ONE, not zero
+    34 does not carry; main's population is 33
+    28 does not carry; main's selected is 27
+
+⇒ **`34` was never wrong as a measurement. It was wrong as a PIN.** It is a true
+property of PR #3676's head, promoted to a property of `main` by a verification
+that could not see the one row responsible for the difference.
+
+**The general shape, which is the part worth keeping:** a classification error
+made a verification vacuous, and that verification was the only thing standing
+between a tree-local measurement and a pinned cross-tree claim. **A number
+measured correctly on tree A becomes a claim about tree B only through a carry
+argument.** The measurement was never in question; only its passport was.
+
+Attribution: refuted by the Architect (`evt_2j2dghfrxx0p3`), independently
+confirmed by `runtime-implementer`, coordinates re-verified at source by the
+Steward before this amendment.
 
 ### 2a. The twelve rows, with the ignore reason each currently carries
+
+**A NEARER ROSTER EXISTS AND IS THE BETTER STARTING POINT.** The twelve below
+were measured at `0f71ab5b9`, which is 36 commits off `main`'s lineage. Run
+`34753101365` at `7663ad9b924e7b1cb2c0111215b997b085465aa1` (2026-09-13) is on
+`main`'s own lineage and reported **eleven**:
+
+    ken-cli::px7f_resource_native            linked_public_escape_is_exact_closed
+    ken-cli::px8l_recursive_decl_native      dynamic_multistep_seed_preserves_updated_parameter_order
+    ken-cli::px8l_recursive_decl_native      dynamic_zero_seed_takes_the_base_case
+    ken-cli::px8ta_oriented_subcontinuation  public_one_level_bracket_finishes_and_releases
+    ken-cli::px8x_single_schema_observation  linked_route_exposes_real_ordered_bindings_and_filters_reserved_input
+    ken-cli::rt_escape_second_resource_native  escape_one_used_matches_interpreter
+    ken-cli::rt_escape_second_resource_native  escape_resource_plus_plain_matches_interpreter
+    ken-kernel::recursive_head_totality_d0   d0_distinct_recursive_map_child
+    ken-runtime  cranelift_backend::lowering::core::tests::constructors::two_same_shape_workers_are_distinguished
+    ken-verify   scenario::tests::clock_wall_now_naive_exact_equality_is_wrong_on_correct_real_clocks
+    ken-cli::rt_parity_native                buffer_allocate_malformed_capacity_narrows_to_invalid_bounds
+
+**This is still not the bar.** It is a third tree, and `AC-2` governs: the count
+is whatever D0 measures at the implementation base. It is offered because it is
+nearer than the twelve and because it makes the delta legible.
+
+> **READING THE ROSTER — TWO SURFACES GIVE THE WRONG ANSWER, ONE SILENTLY.**
+> Measured on run `34753101365`:
+>
+>     grep '::notice title='  on the job log        ->  0     WRONG
+>     annotations API                               ->  10    WRONG, silent
+>     :628 "N selected; M passed"                   ->  11
+>     '##[notice]' lines in the job log             ->  11
+>     '- <identity>' roster lines in the job log    ->  11
+>
+> The runner rewrites `::notice title=X::body` to `##[notice]body`, so the
+> literal source form never reaches the log. **The annotations API is capped at
+> 10 per level per job** and dropped the eleventh row
+> (`rt_parity_native buffer_allocate_malformed_capacity_narrows_to_invalid_bounds`)
+> reporting no error. **Take the worklist from the job log's `- <identity>`
+> lines, which are uncapped, and take the count from `:628`.**
 
     ken-cli::px7f_resource_native
       linked_public_escape_is_exact_closed
@@ -160,9 +258,18 @@ the implementer picks which and says why.
 **AC-1 (the bar, and it is two-sided). A row may be READMITted only if it is
 shown to FAIL when the behaviour it covers is broken.** Perturb the production
 path the row asserts over — a deliberate local mutation, reverted before the
-diff — and record that the row goes red. A row that stays green under that
-mutation is **vacuous** and must not be readmitted; report it as a finding with
-the mutation used.
+diff — and record that the row goes red.
+
+**CORRECTED 2026-09-16. This sentence formerly read: *"A row that stays green
+under that mutation is vacuous and must not be readmitted; report it as a
+finding with the mutation used."* IT IS REFUTED AND MUST NOT BE APPLIED.** It
+required the mutation to be **named**, never to **reach**, so a green produced
+by a mutation that never executed was a fully compliant vacuity finding — and
+false. Row 1 hit exactly that on its first attempt. **Replaced by `AC-1b`
+below, which governs both arms; read it before disposing of any row.**
+
+**Neither arm may be decided on the row's colour, and a green alone decides
+nothing.**
 
 This AC exists because a pass is not evidence the defect is closed. Nine of
 these rows are labelled with a failure they no longer exhibit, and "the defect
@@ -217,6 +324,147 @@ live.
 A path-scoped precondition does **not** substitute for this. The mutations and
 the dispositions land on the *same* files, so no path partition separates a leak
 from legitimate work. The separation available here is temporal.
+
+### AC-1b. A GREEN UNDER MUTATION IS NOT A VERDICT. It is two facts, one number.
+
+**Added 2026-09-16 by the Steward, after row 1 refuted `AC-1` as written.**
+
+`AC-1` above says a row that stays green under the mutation *"is vacuous and
+must not be readmitted; report it as a finding with the mutation used."* **That
+is unsound, and row 1 is the counterexample.**
+
+    ken-cli::px7f_resource_native  linked_public_escape_is_exact_closed
+
+    attempt 1  resolve_fs_handle, Retired arm -> MalformedResource     GREEN
+    attempt 2  resolve_fs_handle, BOTH Closing and Retired arms        GREEN
+    attempt 3  lookup, stale-generation arm -> RightNotHeld            RED
+
+The row's `Closed` comes from the generation check in `lookup`, which **returns
+before the state match is ever reached** — so the resolver arms perturbed in
+attempts 1 and 2 are not on the row's path at all.
+
+⇒ **Reporting "vacuous, mutation used = the Retired arm" after attempt 1 would
+have SATISFIED `AC-1` exactly.** It requires the mutation to be named; it does
+not require the mutation to reach. The row is not vacuous, and the finding would
+have been confident, well-formed, and false.
+
+**A green under mutation has two causes and they produce one number:**
+
+    the row does not observe the behaviour          -> VACUOUS
+    the mutation never executed on the row's path   -> INERT MUTATION
+
+**Only evidence of reach separates them, and a green cannot supply it.**
+
+**THE DISCRIMINATOR, required before any row is reported vacuous:** show the
+mutation site is **executed** on the row's path. The cheap mechanical form is a
+**reach probe** — replace the semantic mutation with an unconditional
+`panic!("reach probe")` at the *same site*, and run the row:
+
+    row REDS on the probe    -> the site IS reached.
+                                A green on the semantic mutation then means the
+                                row genuinely does not observe it -> VACUOUS,
+                                and the finding is sound.
+
+    row GREEN on the probe   -> the site is NOT reached. The mutation was
+                                INERT and proves nothing about the row.
+                                Find a site on the row's actual path.
+                                DO NOT report vacuous.
+
+The probe reverts under `AC-1a`'s protocol like any other mutation — it is a
+mutation, and the blob-verified revert and commit ordering apply to it
+unchanged.
+
+**No row may be reported vacuous without a reach probe that reds.** A
+readmission needs no probe: a red on the semantic mutation already proves reach.
+**The probe is owed only by the arm that would otherwise be unfalsifiable.**
+
+#### THE PROBE PROVES EXECUTION. IT DOES NOT PROVE OBSERVABILITY.
+
+**Narrowed 2026-09-16 on the implementer's objection, before any row was
+withheld on it.** A `panic!` reds if the site executed **at least once in the
+run** — not if it executed **on the path the assertion depends on.** Those come
+apart whenever a site serves more than one caller:
+
+    site executed during SETUP but not during the asserted operation
+      probe                REDS   (it was reached)
+      semantic mutation    GREEN  (the assertion never observes it)
+      naive reading        "reach proven + semantic green => VACUOUS"
+      truth                the row may be perfectly well coupled elsewhere
+
+**Row 1 is the live example.** `lookup` is called by every resolver, so a probe
+there reds on the `FsOpen` at sequence 0 — long before the assertion's
+`FsHandleMetadata` at sequence 2. **Reach at `lookup` was never in doubt; which
+of its three exits the assertion observes was the entire question.**
+
+⇒ **A red probe kills exactly one hypothesis: "the site never executed."** That
+is the hypothesis attempt 1 died of, and it is worth a required check. **It does
+not establish that the mutated value was observable by the assertion**, which is
+the stronger property a vacuity verdict actually needs, and **no probe can
+supply it** — it is an argument about the data path, not a measurement.
+
+**So the record carries the argument explicitly rather than letting a red probe
+stand in for it.**
+
+**Record per row — FOUR facts, not one:**
+
+    1  the mutation site
+    2  the probe result at that site        MEASUREMENT: did it execute
+    3  the semantic-mutation result         MEASUREMENT: did the row notice
+    4  the path from the mutated value to the assertion that reads it
+                                            ARGUMENT: why it should have
+
+**Item 4 is weaker than items 2 and 3 and is labelled so.** It is required
+because it is the piece the probe structurally cannot supply. **A vacuity
+finding missing item 4 is incomplete even with a red probe** — the point of
+writing it down is that the gap becomes visible instead of hiding behind a
+measurement that does not cover it.
+
+#### AC-1b FINAL. Architect ruling `evt_78h2ygj75jeqg`, three amendments.
+
+**The probe proves EXECUTION, not OBSERVABILITY.** A red probe shows the site
+runs on the row's path. It does not show the mutated value is *visible to the
+assertion* — a site serving setup as well as the asserted operation reds the
+probe without ever reaching the assertion. **A vacuity verdict therefore reads
+"the row does not observe SITE X", never "the row is vacuous".** To report a row
+vacuous outright, state item 4 above and name the site as the one the assertion
+depends on.
+
+**Neither arm may be decided on the row's colour.** A red row and a green row
+each have several producers, and only one of them is the mutation.
+**Readmission** requires the mutated value observed at the assertion (row 1:
+`event 2 outcome Error(Resource(RightNotHeld{0,0}))` where `Closed` is
+asserted). **Vacuity** requires the probe's own signature in the output — the
+literal `reach probe` string, or exit status 101 where the row's own outcomes
+are 0 / 91. **A red row without the signature is not a probe result.**
+
+**"The same site" means the same EXPRESSION — the exact match arm replaced,
+recorded as `file:line`.** Not the same function and not the same file: a probe
+on a neighbouring arm proves reach for code the mutation never touched.
+
+**Record per row, four facts:** the mutation site; the probe result *and its
+signature* at that site; the semantic-mutation result; and the path from the
+mutated value to the assertion that reads it.
+
+> **Why this needed three passes.** `AC-1` did not require the mutation to
+> reach. `AC-1b`'s first draft required reach but licensed a row-level verdict
+> from a site-level fact. Its second draft still **read the probe off the row's
+> colour** — specifying a one-bit measurement with four producers, inside an
+> amendment whose whole rationale is that a one-bit measurement with two
+> producers cannot discriminate. **Each pass fixed the previous one's version of
+> the same error.** The signature requirement is what finally makes the probe a
+> measurement of the probe rather than of the run.
+>
+> `panic!` is confirmed safe as the instrument: it diverges, so it type-checks
+> wherever the mutated expression did, and there is **no `deny(warnings)` and no
+> `[workspace.lints]` in the repo**, so its `unreachable_code` warning cannot
+> break the build (Architect, verified).
+
+> **Why this was worth stopping for.** The failure `AC-1` exists to prevent is a
+> row readmitted on a pass that proves nothing. **This defect is the same shape
+> pointed the other way** — a row *withheld* on a green that proves nothing —
+> and `AC-1`'s own two-sidedness claim did not cover it. Ten rows remain; the
+> implementer found this on the first one, and only because two mutations came
+> back green and the third was tried anyway.
 
 **A non-empty precondition is a finding to REPORT, not a state to clean up and
 continue from.** Every row measured after the leak began is suspect, and which

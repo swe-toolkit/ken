@@ -39,12 +39,41 @@ operator-pre-decided row — is mechanical. `AC-1` is not. It requires
 perturbing the production path each candidate readmission asserts over and
 showing the row goes red, then reverting the perturbation before the diff.
 That is a judgment about what the assertion actually reaches, per row, and
-the judgment is the deliverable: a row that stays green under the mutation is
-**vacuous** and is reported as a finding rather than readmitted.
+the judgment is the deliverable.
+
+**CORRECTED 2026-09-16. This passage formerly ended: *"a row that stays green
+under the mutation is vacuous and is reported as a finding rather than
+readmitted."* REFUTED — do not apply it.** A green has two causes and one
+number: the row does not observe the behaviour, or **the mutation never executed
+on the row's path.** Row 1 hit the second on its first two attempts and would
+have been reported vacuous under this wording. **`AC-1b` in the frame governs
+both arms** — neither may be decided on the row's colour; vacuity needs the
+probe's own signature, readmission needs the mutated value observed at the
+assertion.
+
+**The related principle below is NOT this rule, and the difference is the
+lesson.** "The recurring instrument hazard on this surface" says *"Do not read a
+**red** as evidence the mutation reached, and do not read a **green** as
+evidence the defect closed."* **Neither clause covers `AC-1`'s defect.** The
+reach principle is stated **for reds**; `AC-1` read a **green** as evidence of
+**non-reach**. The green clause is about a different inference entirely — *defect
+closed*, not *mutation reached*.
+
+⇒ **This file did not contain the rule that was broken. It contained the same
+principle pointed the other way, and nobody generalized it** — which is harder
+to catch than an outright omission, because the file reads as though the hazard
+is already covered. **When you write a hazard for one direction of a symmetric
+relation, write both directions, or say which one you are not claiming.**
 
 Nine of the twelve rows carry labels naming a failure that no longer happens.
-A stale label and a vacuous test produce the same green, and only the mutation
-separates them.
+A stale label and a vacuous test produce the same green. **The mutation
+separates them only if it reaches** (`AC-1b`) — and it is not the only
+instrument: **where a label names an observable diagnostic, that diagnostic's
+absence separates them directly and costs nothing.** Rows 2 and 3's **labels**
+were refuted exactly that way, with no mutation — the label named a trap string
+that occurred zero times in the un-mutated output. **The readmissions themselves
+still went through `AC-1`'s mutation**; the label check retired the label, not
+the coupling requirement.
 
 ## The recurring instrument hazard on this surface, stated once
 
