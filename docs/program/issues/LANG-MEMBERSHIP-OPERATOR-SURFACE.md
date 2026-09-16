@@ -5,12 +5,35 @@ status: draft
 owner: language
 size: L
 gate: none
-depends_on: [SPEC-MEMBERSHIP-CLASS-CONTRACT, LANG-RESERVED-INFIX-NAMES, LANG-STANDARD-INFIX-CALL-COMPLETION]
+depends_on: [SPEC-MEMBERSHIP-CLASS-CONTRACT, LANG-RESERVED-INFIX-NAMES, LANG-STANDARD-INFIX-CALL-COMPLETION, LANG-TYPE-PROJECTION-SURFACE-FORM]
 blocks: []
 github: null
 tier: T1
 origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. RE-CUT AGAIN 2026-09-13 (Steward) on the operator directive (Pat, this session): the deferred split-(B) trigger has fired -- the typeclass-method-dispatch capability is now being cut for real demand (A1's factored resolver LANG-STANDARD-INFIX-CALL-COMPLETION + the SPEC-MEMBERSHIP-CLASS-CONTRACT contract), so this node is re-cut as the membership BUILD against them. Stays draft, HELD until its three deps land; then the Steward frames the full ACs and releases. See the 2026-09-13 banner."
 ---
+
+> # FOURTH DEPENDENCY ADDED 2026-09-16: [[LANG-TYPE-PROJECTION-SURFACE-FORM]].
+> # THIS NODE CANNOT WRITE ITS OWN SIGNATURE UNTIL THAT LANDS.
+>
+> **Architect `evt_4tmt0n7era4w3`, ruling `SPEC-MEMBERSHIP-CLASS-CONTRACT`'s
+> D0-1.** The `∈` binding is `membership_member_at (c : Type) (d : Membership c)
+> (q : d.Query) (x : c) : Bool` — **a parameter typed by a projection from an
+> earlier parameter.** The kernel admits the telescope (`Proj1(d)` is closed by
+> `d`) and the spec contract specifies it, but **Ken's surface type grammar has
+> no projection form**: `RType` has eleven variants and none of them is a
+> projection (`RType::RProj`, 0 hits; control `RExpr::RProj`, 4 files —
+> Steward-verified at `24e9ce039`).
+>
+> **So the catalog binding this node must author is currently UNSPELLABLE.**
+> The dependency is recorded now, at framing, rather than being met by an
+> implementer who cannot write the signature.
+>
+> **And the obvious way around it is CLOSED:** `∈` must not become an elaborator
+> builtin. `33 §6.1` requires standard meanings to be ordinary top-level
+> bindings, and a builtin would falsify the precondition A-track's completion
+> policy rests on (`39 §6.9`, `SPEC-STANDARD-INFIX-BINDING §2f`) — **in a way no
+> test on this node would catch.** When this node is framed, that is a criterion
+> with a control, not a note.
 
 > # RE-CUT 2026-09-13 -- THE DEFERRED (B) TRIGGER HAS FIRED (operator directive,
 > # Pat, this session: "Frame the L2 binop typeclass work to support membership").
