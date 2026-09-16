@@ -1,7 +1,7 @@
 ---
 id: SPEC-MEMBERSHIP-CLASS-CONTRACT
 title: "the L2 membership-operator typeclass contract: specify a standard Membership class and the standard binding of the (already glyph-admitted) `∈` to it -- a unary `class Membership (container) { Query : Type; member : Query -> container -> Bool }` with `member_holds := IsTrue (member ..)` as the Prop view, dispatched at use-site through the SAME class resolver A1 factors (no second operator dispatcher), over nominal witness-bound carrier VIEWS (a list view, one ordered-key view serving Map and Set, a distinct relation-edge view) so distinct roles do not collide under today's outer-head-name registry key and the comparator/validity witness lives in the view value not an implicit lookup; a shared `SameMembers` observational law plus a per-provider adapter-fidelity obligation, with container-specific laws kept container-specific; NO multi-parameter class machinery, NO `Membership Tree` instance, NO Prop-to-Bool elimination, NO new trust-root/TCB"
-status: ready
+status: active
 owner: spec
 size: M
 gate: none
@@ -12,15 +12,38 @@ tier: T1
 origin: "Steward cut 2026-09-13 on the operator directive (Pat, this session): 'Frame the L2 binop typeclass work to support membership ... a spec-enclave elaboration task after the frame.' This is the B track of the reserved-infix-glyph objective (Pat, 2026-09-12: 'membership seems categorically different since it involves some typeclass machinery not required by the others ... dig into typeclass dispatch for member'), which Pat set to run in PARALLEL with the A-track glyph fix. Grounded in the membership class/carrier Research advisory (research evt_10xwbzfz9vz77 + evt_62nsr14rm3zd0, thr_60s5rhqdh4ht8), itself recommended by the Architect (evt_5dar8wmwpxj8x). The Architect is the design authority for the class/carrier ruling and a required reviewer; that ruling is the first design step of the enclave elaboration. Advisory anchors were measured at main 5fb21c419; re-measure at the cut (main is now 5d1347aaf). IN-LANE, spec-enclave-owned: bounded normative surface, no new language/kernel mechanism (the dispatch reuses the existing dictionary-passing resolver that A1 factors), no new trust-root, no TCB -- same posture as SPEC-RESERVED-INFIX-NAMES / SPEC-STANDARD-INFIX-BINDING; no operator sign-off beyond the directive that authorized the work."
 ---
 
-> # READY, FRAMED, NOT YET KICKED. Frame:
+> # ACTIVE — KICKED 2026-09-16, anchor `evt_72kh7zbht4pa2`. Frame:
 > `docs/program/wp/SPEC-MEMBERSHIP-CLASS-CONTRACT.md`.
 >
-> **`ready` is a dependency statement, not a start signal.**
-> [[SPEC-RESERVED-INFIX-NAMES]] is `merged`, so nothing blocks this node's
-> premise. What holds it is **seat contention, not a dependency**:
-> @spec-leader ruled the enclave runs one WP at a time (`evt_7crxbr742ddpm`),
-> so [[SPEC-STANDARD-INFIX-BINDING]] goes first and this is kicked when that
-> candidate reaches CV. **Do not open a branch before the kick.**
+> **The seat-contention hold is LIFTED.** @spec-leader ruled the enclave runs
+> one WP at a time (`evt_7crxbr742ddpm`), so [[SPEC-STANDARD-INFIX-BINDING]]
+> went first; its candidate `653c3444d` is CV-approved, Architect-approved,
+> Decision-resolved and routed, so the seat is free and this is kicked.
+>
+> **D0-1 IS RULED IN FULL — NOTHING IS HELD.** The unary associated-`Query`
+> class shape is adopted (`evt_6y241yhbamnhf`) and the binding shape is **MINT
+> IT** (`evt_4tmt0n7era4w3`, superseding a hold the same author raised and
+> retracted within the hour). **Author the completion policy normally**, keyed
+> on `membership_member_at`'s `GlobalId` in the `ord_leq_at` shape.
+>
+> **Three things the frame's top banner carries that change what you write:**
+>
+> - **A paste-ready clause the contract MUST include:** the binding's surface
+>   form needs a projection in type position, which `RType` does not have; that
+>   is a prerequisite of [[LANG-TYPE-PROJECTION-SURFACE-FORM]] /
+>   [[LANG-MEMBERSHIP-OPERATOR-SURFACE]], **and it must not be discharged by
+>   making `∈` an elaborator builtin** — a builtin would falsify the premise
+>   A-track's whole completion policy rests on, and no test here would catch it.
+> - **`SameMembers` must be stated as a CLASS FIELD**, not as a standalone over
+>   a dictionary (`evt_34fgmaq13mz07`). Point 6 below writes it the unspellable
+>   way. The fix is where the law lives, not what it says.
+> - **The universe level is RULED, not open** (`evt_3krx0gyr74t5h`). The
+>   Architect routed it to the enclave (`evt_475nxrksyyxk9`) and the enclave had
+>   already answered: `Membership : Type ℓ → Type (suc ℓ)` is `33 §5.2`'s class
+>   former **operating, not new mechanism**. `§5`'s introductory
+>   `C : Type → Type` (`33-declarations.md:404`) is a motivating description
+>   already exceeded on the parameter axis. **A candidate that decides this is
+>   not over-reaching.**
 >
 > **Two of the node's code anchors below have MOVED** — `parse_class_decl` by
 > 21 lines, the `classes.rs` canonical-instance map by six. Every catalog and
@@ -34,10 +57,18 @@ origin: "Steward cut 2026-09-13 on the operator directive (Pat, this session): '
 > **Point 4 below says the binding is to "the defining class-method GlobalId".
 > That clause is STRUCK** (Architect `evt_6dyqef1q4t6av`; frame §2c). A class
 > method has no `GlobalId` — `member` is a field name in a `Vec<String>`, as
-> `leq` is. **`class Membership` does not exist on `main` at all**, so this node
-> mints `membership_member_at` as a top-level binding in the `ord_leq_at` shape
-> and keys on **its** `GlobalId`. The frame carries the rejected alternative
-> and why, because it is the one a careful author reaches for.
+> `leq` is. **`class Membership` does not exist on `main` at all.**
+>
+> **The REPLACEMENT STANDS: mint `membership_member_at` in the `ord_leq_at`
+> shape and key on its `GlobalId`** (`evt_4tmt0n7era4w3`). A hold on this was
+> raised and retracted; **`∈` turns out to be the sharpest case FOR the mint
+> rule, not a counterexample to it** — with `Query` as field 0, `d.Query` is
+> `Proj1(d)` and the telescope `[c : Type, d : Membership c, Proj1(d), c]` is
+> closed by the binding's own parameter `d`, hence kernel-checkable today. What
+> is missing is only **surface syntax**, and that lands on the build node. The
+> `(type_id, field)` alternative **stays rejected on its original reason**: a
+> class field closes only once a dictionary is resolved, and resolution is what
+> completion is doing — circular.
 >
 > # B-TRACK SPEC CONTRACT for the membership operator. Spec-enclave elaboration
 > # (operator directive, Pat, this session). Design authority: the Architect's
