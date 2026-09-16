@@ -2837,6 +2837,20 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
         },
         // `RT-PLANNER-OCCURRENCES-SPLIT` `D1` — the occurrence owner. A
         // planning module with no emission, so every count is zero.
+        // `RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER` slice 1 -- the plan-independent
+        // classifier. Pure structural dispatch over `RuntimeExpr` with no
+        // emission at all, so every count is zero. ⭐ The zeros are MEASURED,
+        // not assumed: the census test compares them against the file and this
+        // suite is green with them, so a non-zero count would have red here.
+        Census {
+            file: "planning/static_transition/immediate_bridge.rs",
+            source: include_str!("../../../planning/static_transition/immediate_bridge.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "planning/static_transition/occurrences.rs",
             source: include_str!("../../../planning/static_transition/occurrences.rs"),
@@ -3571,6 +3585,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
         "planning/static_transition/effects.rs",
         include_str!("../../../planning/static_transition/effects.rs"),
     ),
+    (
+        "planning/static_transition/immediate_bridge.rs",
+        include_str!("../../../planning/static_transition/immediate_bridge.rs"),
+    ),
     // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — join disposition and trap
     // identity. Registered here the moment the module exists, for the same
     // reason as every sibling: a production module absent from this roster
@@ -3911,6 +3929,7 @@ fn the_backend_production_surface_inventory_is_closed() {
             // `EffectSeatVisitMutation`, `EffectSeatDispatchMutation`) stays
             // in `lowering/mod.rs` for item 16.
             ("planning/static_transition.rs", "effects"),
+            ("planning/static_transition.rs", "immediate_bridge"),
             // `RT-PLANNER-JOINS-TRAPS-SPLIT` `D1` — join disposition (which
             // representation a source join's result takes) and trap
             // identity (a value-keyed dedup catalog), factored into its own

@@ -16,6 +16,7 @@ mod continuations;
 #[cfg(test)]
 pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_owned_worker_captures_fixture;
 mod effects;
+mod immediate_bridge;
 mod joins_traps;
 mod occurrences;
 mod responses;
