@@ -56,13 +56,37 @@ dependency is the method that produces it:
       let constructor_identity = self.static_transition_plan
                                      .constructor_symbol_identity(origin)?;
 
-    constructor_symbol_identity, ken-runtime   main:      52 refs / 2 defs
-                                               b601e2ec7: 53 refs / 3 defs
+**That method is PRESENT on `main`** — same receiver, byte-identical signature
+and body (`closure.rs:1202`, `impl<'src> StaticTransitionPlan<'src>`). The
+apparent third `impl` at `b601e2ec7` is a **string literal** in an
+allowed-inventory test (`lowering/core/tests/mod.rs:1249`), not a definition.
 
-⇒ **The symbol is on `main`; one `impl` of it is not.** That is a **different
-shape** from the other five, which are absent symbols. **Do not assume the
-census's remaining hits all have the first shape**, and do not treat a non-zero
-count on `main` as proving a symbol is present in the sense this node needs.
+⇒ **`constructor_symbol_identity` has NO Category B content, and the sixth
+error's cause is UNESTABLISHED.** It is not an absent symbol and not an absent
+impl. **Do not carry a third repair shape into the port on this example** —
+resolve it in the census. What the sixth error proves is only that the seed list
+was short and a compile found what five greps did not.
+
+> **Why the retracted claim matters more than the correction.** A `fn +NAME`
+> grep counted a **quoted string** as a definition. That is the same class as
+> the `constructor_identity = 70` substring count in §2a — **an instrument that
+> passed a reach control and was wrong on SPECIFICITY, in the inflating
+> direction, both times.**
+>
+> ⇒ **A GREP KEY THAT MATCHES TEXT CANNOT DISTINGUISH A DEFINITION FROM A
+> MENTION OF ONE** — doc comment, test fixture, inventory assertion,
+> error-message string. The remedy is not a better regex; it is **resolving what
+> encloses each hit before the count means anything.** `AC-ENCLOSING-UNIT`
+> below exists for this.
+
+**AC-ENCLOSING-UNIT.** A count that distinguishes definitions from references
+is not reported until its matches have been **opened** and their enclosing
+construct identified.
+
+> **Control — re-run the census's own definition key and open every hit.** A hit
+> inside a string literal, a comment, a macro body, or a test fixture is a
+> **mention**, not a definition, and must not be counted as one. Three separate
+> census errors today were caught this way and none by a control.
 
 ## 3. Fixed inputs, measured at named refs
 
@@ -247,11 +271,20 @@ so nobody has been wrong out loud.**
 
 Two bounds on what this AC actually licenses:
 
-- **`-j 1` is known to work and is NOT known to be the largest value that
-  works.** Only two points exist: 6 kills, 1 builds. If `-j 2` or `-j 3` fits,
-  the throughput cost of this instruction is several times smaller than written.
-  **An implementer who has slots to spare may binary-search it and report the
-  result**; one who does not should use `-j 1` and move on.
+- **The `-j` bound was measured and it is WIDER than `-j 1` — but only for an
+  ABORTING build, and that qualification is load-bearing.**
+
+      -j 1   builds     -j 2   builds     -j 3   builds     -j 6   KILLED
+      protocol: `touch units.rs` first, so cargo did real codegen rather than
+      replaying a cache; every probe reached the same 11 Category B errors
+
+  **Every probe stopped at those eleven errors, so none of them measured a full
+  compile.** A tree that compiles through peaks higher than one that aborts
+  partway — more crates reach codegen and link, which is the worst RAM spike.
+  **So `-j 3` is a sound bound for the shape measured and is NOT yet a safe
+  standing default.** Use `-j 1` when this node's port actually compiles
+  through; use up to `-j 3` while the tree still aborts early. Re-measure once a
+  full build exists, and only then promote a wider default.
 - **The real home for this is `.cargo/config.toml`, not this frame.** A frame
   protects readers of this frame; the over-subscription is a property of
   `jobs = 6` against this box's RAM, not of `ken-runtime`, so **any other

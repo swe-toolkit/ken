@@ -117,14 +117,36 @@ claim holds once the domain is `crates/ken-runtime/`, and a census run over
 DOMAIN pinned as explicitly as its REF.** Two correct measurements that
 disagree are a coordinate problem before they are an instrument problem.
 
-**And the local variable is not the dependency — the method that produces it
-is.** `b601e2ec7:lowering/core.rs:14247` reads
-`self.static_transition_plan.constructor_symbol_identity(origin)?`, so:
+**And the local variable is not the dependency — but the method that produces
+it is NOT the gap either.** `b601e2ec7:lowering/core.rs:14247` reads
+`self.static_transition_plan.constructor_symbol_identity(origin)?`, and that
+method is **present on `main`**, on the same receiver, with a byte-identical
+signature and body (`closure.rs:1202`, `impl<'src> StaticTransitionPlan<'src>`).
+The apparent third `impl` at `b601e2ec7` is a **string literal** in an
+allowed-inventory test (`lowering/core/tests/mod.rs:1249`), not a definition.
 
-    constructor_symbol_identity, ken-runtime   main: 52 refs / 2 defs
-                                               b601e2ec7: 53 refs / 3 defs
+⇒ **The sixth error's cause is UNESTABLISHED.** It is not an absent symbol and
+it is not an absent impl. **Do not carry a third repair shape into the port on
+this example** — resolve it in the census, where it belongs. What the sixth
+error proves is only that the seed list was short, and that a compile found what
+five greps did not, which is the whole case for census-first.
 
-**The symbol is on `main`. One `impl` of it is not.** That is a materially
+> **The defect in the retracted claim, recorded because it is the third of its
+> kind today.** A `fn +NAME` grep counted `"pub(in crate::cranelift_backend) fn
+> constructor_symbol_identity("` — a quoted string in a source-text inventory
+> test — as a definition, producing "3 defs" where there are 2. That is the same
+> class as the `constructor_identity = 70` substring count above: **an
+> instrument that passed a reach control and was wrong on SPECIFICITY, in the
+> inflating direction, both times.**
+>
+> ⇒ **A GREP KEY THAT MATCHES TEXT CANNOT DISTINGUISH A DEFINITION FROM A
+> MENTION OF ONE** — a doc comment, a test fixture, an inventory assertion, an
+> error-message string. The fix is not a better regex; it is **resolving what
+> encloses each hit before the count is allowed to mean anything.** All three of
+> today's instances were caught by opening the matches, and none by a control.
+
+**The retracted claim was:** *"The symbol is on `main`. One `impl` of it is
+not."* That was a materially
 different repair from porting an absent method, and it is a **different shape
 from the other five entries** — those are absent symbols; this is an absent
 impl of a present symbol. **Do not assume the census's remaining hits all have
