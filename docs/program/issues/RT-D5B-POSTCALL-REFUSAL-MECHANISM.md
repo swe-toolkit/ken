@@ -668,7 +668,7 @@ be read as one: the mechanism chain's stops were accounts that measurement
 killed, whereas `ROUTE` was declined by DERIVATION from a fact `R3` had already
 established. **A closure holding is not a stop.**
 
-## A re-measure obligation this node creates elsewhere
+## Obligations this node creates elsewhere
 
 **The 11 base reds were never a stable population.** Every measurement over
 `abi_s6_mapping_file_backed_native` on 2026-09-14 inherited this refusal as a
@@ -676,6 +676,44 @@ mask. [[RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY]] records a venue
 finding *"the mapping fixture cannot reach the code at all — zero population"* —
 **a compile dying early here produces exactly that reading.** Re-take it after
 this node lands, **before** that node's `D1` is answered from it.
+
+### CLOSEOUT DELIVERABLE — DELETE ANOTHER NODE'S BANNER WHEN THIS ONE LANDS
+
+**[[RT-DISCHARGE-ARM-SUBSTITUTES-PLAN-FOR-OBSERVATION]] opens with a banner
+saying every coordinate in it is on an UNLANDED candidate and none of the code
+is on `main`** — `independent_contract` 0 hits, `realized_call_words` 0 hits,
+the arm-1 conditional absent. **That banner becomes FALSE the moment this node
+lands**, and it is the first thing a reader of that node sees.
+
+⇒ **Delete it after this node lands, BEFORE any team pulls that node.** Replace
+it with the landed SHA, or strike it; either way it does not survive this merge.
+
+**WHY IT LIVES HERE RATHER THAN THERE.** That banner is not machine-checkable
+and nothing detects it going stale — the issue schema has only `depends_on` and
+`blocks`, both ranging over issue ids, so *"written against an unlanded base"*
+has nowhere to live in frontmatter, and a migration across 626 files for one
+instance is not worth it.
+
+**So the obligation is filed against the node that CAUSES the staleness rather
+than the node that SUFFERS it.** Whoever lands D5b is reading this node at the
+moment the banner goes false; a reader of the other node has no reason to be.
+
+> **THE GENERAL FORM, AND ONE CLAUSE OF IT IS NOT TRUE.** When a fact in A goes
+> stale because of an event in B, move the obligation into B's own closeout —
+> **not because that removes the dependence on someone looking, but because it
+> re-points it at the party who cannot avoid looking.**
+>
+> **It still relies on a reader's attention.** What changed is WHICH reader,
+> and "no reliance on attention" or "guaranteed to be looking" would be
+> **dressing a reduced reliance as an eliminated one** — the same overclaim as
+> the fourth cell's *"the independent test that the grep missed no writer"* and
+> as `parent == origin/main`. Three in one evening, all in the direction of
+> describing a check as CLOSING what it only NARROWS.
+
+Architect `evt_227hnhfawfeqs`, `evt_7v53ykjzp94gc`; Steward-filed. **Not filed
+under `Deliverables`**, whose own header at `:122` reads *"a RECORD, never a
+queue... none is pullable"* — an obligation filed in a list marked
+non-actionable gets read, not done.
 
 ## Sizing
 
