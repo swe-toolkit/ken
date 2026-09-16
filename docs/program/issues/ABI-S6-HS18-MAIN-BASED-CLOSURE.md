@@ -9,13 +9,15 @@ depends_on: []
 blocks: []
 github: null
 tier: T1
-origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. Base origin/main 6f49f852141a66571c6126a569b954f63e2b6bde."
+origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. CUT FROM origin/main 6f49f852141a66571c6126a569b954f63e2b6bde on 2026-09-16 -- this is a provenance RECORD of where the node was cut and must never be re-pointed; increment A's operative base is the same SHA and lives in frame 4a-pin, which is what increments B and C edit."
 ---
 
 > # READY. Frame:
 > `docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md`.
 >
-> **Base is `origin/main` `6f49f852141a66571c6126a569b954f63e2b6bde`.** The two
+> **Increment A's base is `origin/main` `6f49f852141a66571c6126a569b954f63e2b6bde`**
+> — B and C pin their own cut points in frame 4a-pin, which is the only place
+> either value is written. The two
 > `preserve/` refs are **EVIDENCE, NOT BASES**. Their `-not-a-candidate`
 > names stay, and neither may become an ancestor of a candidate.
 >
