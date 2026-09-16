@@ -132,8 +132,10 @@ refs.
 1. **The transitive census** (D0), posted before any port work begins, with its
    ref and domain pinned and a positive control on every zero.
 2. **The ported definitions**, based on `origin/main`.
-3. **The `constructor_symbol_identity` impl** — resolved per whatever shape the
-   census determines it to have, not assumed to be a straight port.
+3. **A disposition for the sixth error**, whose cause is unestablished.
+   `constructor_symbol_identity` is **not** it — that method is on `main`,
+   byte-identical (§2a) — so this deliverable is to find what the sixth error
+   actually is, not to port a symbol already believed absent.
 4. A statement of what the census found **beyond** the seed, by name, including
    "nothing" if that is the answer — stated as a measurement, not a silence.
 
@@ -247,61 +249,67 @@ it is the reason this node is sequenced first. **The runtime ring holds
 increment A until this lands**, and its own Category A work is complete, so
 there is no concurrent authoring in those paths.
 
-## 7. The box, and why `-j 1` is in the frame rather than in folklore
+## 7. The box: what is measured, and the cost class this node MOVES INTO
 
-Measured 2026-09-16. Two `-p ken-runtime` builds were OOM-killed at ~5.5 GB
-available on a 15995 MB box with fourteen resident seats. **The same build, run
-alone at `-j 1`, succeeded at the same ~5.5 GB.**
+**There is no `-j` recommendation here, and the earlier one is withdrawn.**
+An earlier revision of this frame recorded `-j 1/2/3 build, -j 6 kills` as a
+measured bound. **It was not a bound.** Instrumented (@runtime-implementer,
+`evt_7y3efwmhjbxea`):
 
-⇒ **The binding constraint is codegen parallelism, not machine size.**
+                         -j 1        -j 3
+    rustc processes         1           1
+    max threads/rustc       4           4
+    peak summed RSS     960 MB      948 MB
+    crates compiled         1           1
+    terminus            11 errors   11 errors
 
-**The parallelism that killed it was CONFIGURED, not cargo's default**
-(@research, `evt_23z2ydmvh8t5e`; Steward-verified):
+**`-j 1` and `-j 3` are not two points on a curve; they are the same measurement
+taken twice.** A crate that fails type-check never reaches LLVM codegen, so
+there were no codegen threads for the jobserver to bound and no CGUs to
+distribute. **The flag was not the variable.**
 
-    .cargo/config.toml  [build] jobs = 6
-    nproc                              6
-    cores left over                    0
+⇒ **BEFORE ARGUING WHICH KNOB GOVERNS A PHASE, VERIFY THE RUN REACHED THAT
+PHASE.** Two seats spent three exchanges arguing which knob governs codegen
+parallelism in a build that does no codegen, and neither asked. That is the
+durable lesson; the numbers are not.
 
-**And the comment directly above that number is falsified by it.** It claims the
-cap *"leaves cores for the OS, the agent harness, and a scoped test"*; at
-`jobs = 6` on a 6-core box it leaves none. `scripts/ken-cargo`'s header carries
-the matching tell — *"correct for an 8-core / 16 GB laptop"*. **Both artifacts
-are tuned for a machine this is not, and neither claim is executed by anything,
-so nobody has been wrong out loud.**
+### 7a. What is actually known
 
-Two bounds on what this AC actually licenses:
+- **The ABORTING shape** — what every seat hitting these eleven errors runs —
+  costs about **950 MB in one rustc process and is independent of `-j`.** There
+  is no `-j` decision to make while the tree aborts at type-check.
+- **The `-j 6` kills are real events that remain UNATTRIBUTED to the flag.** The
+  work differed (multi-crate, cold-ish, after large edits), not just the setting.
+- **Codegen and link are UNMEASURED at every `-j`.** One attempt to force
+  codegen on a single green crate (`cargo rustc -p ken-host --lib -- -C
+  opt-level=3`) was **killed for system memory pressure at `-j 1`.**
 
-- **The `-j` bound was measured and it is WIDER than `-j 1` — but only for an
-  ABORTING build, and that qualification is load-bearing.**
+### 7b. THE RISK THIS NODE CARRIES, and it is the reason §7 still exists
 
-      -j 1   builds     -j 2   builds     -j 3   builds     -j 6   KILLED
-      protocol: `touch units.rs` first, so cargo did real codegen rather than
-      replaying a cache; every probe reached the same 11 Category B errors
+**@runtime-leader's forward implication (`evt_6jfc6j2z1s7aa`), and it is a
+sizing risk rather than a build tip.** Increment A currently aborts at
+type-check. **The whole point of this node is to make it stop aborting.** So the
+moment this port lands, increment A moves:
 
-  **Every probe stopped at those eleven errors, so none of them measured a full
-  compile.** A tree that compiles through peaks higher than one that aborts
-  partway — more crates reach codegen and link, which is the worst RAM spike.
-  **So `-j 3` is a sound bound for the shape measured and is NOT yet a safe
-  standing default.** Use `-j 1` when this node's port actually compiles
-  through; use up to `-j 3` while the tree still aborts early. Re-measure once a
-  full build exists, and only then promote a wider default.
+    ABORTING shape     ~950 MB, one process, -j-independent      SURVIVABLE
+    COMPLETING shape   codegen + link, UNMEASURED at every -j,
+                       and one green crate was already killed
+                       at -j 1                                   UNKNOWN
 
-- **`-j` DOES throttle within-crate codegen — do not reach for a different knob
-  on the belief that it does not.** Cargo and rustc share a GNU-make jobserver,
-  and cargo allocates tokens to rustc **including the tokens for parallel LLVM
-  work**, which is specifically what stops LLVM optimization threads exceeding
-  the set value. `[profile.dev]` sets no `codegen-units` and no `incremental`,
-  so one crate is many units of work rather than one. **A single-crate `-p
-  ken-runtime` probe therefore had real parallelism to throttle, and lowering
-  `-j` is the right lever.** The phase `-j` does **not** govern at any value is
-  **linking**, which is largely one process — and linking is untested here,
-  which is a second reason the bound above is not yet a standing default.
-- **The real home for this is `.cargo/config.toml`, not this frame.** A frame
-  protects readers of this frame; the over-subscription is a property of
-  `jobs = 6` against this box's RAM, not of `ken-runtime`, so **any other
-  memory-heavy crate gets no protection at all and the next kill will look like
-  a new discovery.** Changing a fleet-wide throughput knob is a Steward call
-  with an unmeasured cost, so it is flagged here and not taken here.
+⇒ **This node is currently priced on the wrong cost class.** The box may not fit
+the very build that closes the parent WP, **regardless of `-j`** — and nothing
+measured so far bears on that, because everything measured so far was an
+eight-second frontend abort.
+
+**The implementer must surface this as a hard stop rather than absorb it.** If
+the first build that compiles through gets killed, that is **not** a `-j`
+problem to tune around and **not** the implementer's to solve: it is a box
+capacity question for the Steward and the operator. Say so and stop.
+
+**`COORDINATION §12` is untouched by all of this.** Targeted builds only,
+through `scripts/ken-cargo`, `-p ken-runtime`; workspace/locked/conformance in
+CI. What changed is that the throughput cost once claimed for a `-j 1`
+constraint is withdrawn along with the constraint.
 
 ## 8. Not this node
 
