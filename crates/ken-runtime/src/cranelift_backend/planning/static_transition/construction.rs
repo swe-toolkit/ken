@@ -103,6 +103,7 @@ use super::effects::{
     EffectSeatAvail, EffectSeatNeed, EffectSeatOperation, EffectSeatPhase, EffectSeatSlot,
     PlannedEffectSeat, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
+use super::immediate_bridge::publish_immediate_bridge_realization_plan;
 #[allow(unused_imports)]
 use super::joins_traps::{
     build_join_result_plan, planned_partiality_trap, JoinPlanToken, JoinResultRepresentation,
@@ -1452,6 +1453,11 @@ impl<'src> Planner<'src> {
         let transport_sources_before_response_owners = self
             .plan
             .checked_ih_environment_transport_source_identities();
+        // HS10: continuation identities, source occurrences, and transports are
+        // now final. Classify the immediate bridge population once before
+        // response phase B can decide whether an owner exists.
+        self.plan.immediate_bridge_realizations =
+            publish_immediate_bridge_realization_plan(&self.plan)?;
         self.plan.install_static_response_context_plan_phase_b()?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
