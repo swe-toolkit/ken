@@ -20,6 +20,75 @@ substance's call sites resolve.
 `evt_6mptkrtvysd8s`). The eleven compile errors are a symptom that located it;
 they are not its scope.
 
+### 1b. SYMPTOM INVENTORY — the populations this node's model failed to predict
+
+**Seeded by the Steward 2026-09-16 on the Architect's ruling
+`evt_7wm7z1t416y0p`. This section was missing from both the node and the frame,
+so the running count lived only in one seat's working context — which is exactly
+what a compaction discards.** Append here as they occur; do not keep them in a
+thread.
+
+**The predicate, and it is the point of the section** (Architect, same ruling):
+
+> **The frame modelled this node as "what is ABSENT from `main`," and every
+> surprise so far has been something PRESENT on `main` that CHANGES.**
+
+⇒ **An absent-definitions census cannot see a shape change, by construction.**
+It keys on names that are *not* in `main`; every surprise below is a name that
+**is**. Widening that census (the seed of 5 closing to 29) made it complete
+without re-aiming it — its *subject* is still absence. The shape change was
+found by **reading**, not by the census, which is why the next one is the same
+class unless a differently-subjected instrument runs. See `§2b` (D0b).
+
+| # | population | how it was found |
+|---|---|---|
+| 1-3 | the first three, from `thr_6azxdz555c2qy` | appended by runtime-implementer |
+| 4 | seed of 5 closes to **29 items** (130 reached, 59 zero-ref, minus 19 variants + 10 fields + 1 doc-comment token) | D0 census |
+| 5 | `RequiredConsumerProjection` is **resident on `main` and reshaping** — struct at `main:1204`, enum at port `:1318`; 13 refs / 7 files | read, NOT the census |
+| 6 | `Copy` **dropped** from the same derive; `Ord`/`PartialOrd` added | read, NOT the census |
+| 7 | the three accessors go **TOTAL to PARTIAL** with unchanged signatures | read, NOT the census |
+| 8 | ten variants live behind a **dev-dependency feature** invisible to every permitted local build | manifest read |
+| 9 | a **26th host-effect consumer** at the port (`HostOpV1::MappingAcquireFile`) — **ROUTED OUT**, see `§3b`; kept here because the inventory records what the model failed to predict, not only what this node carries | D0b |
+| 10 | a **second `Copy` drop**, `EliminatorRole` (`lowering/mod.rs` main `:10648` / port `:11212`) | D0b — the first row an instrument found rather than a read |
+
+**Rows 5-8 were all found by reading and none by an instrument.** That is the
+finding about the method, not about the tree.
+
+**Row numbers above are THIS SECTION's, not the thread's.** Append by
+description, never by a number carried from `thr_6azxdz555c2qy` — the two
+sequences have already diverged.
+
+### REFUTED — proposed for this inventory and MUST NOT be added
+
+Recorded here because an inventory is appended to by people who were not in the
+thread, and **silence is a weak guard against a claim that was already
+circulating.**
+
+| proposed | verdict |
+|---|---|
+| "two `observation_ordinal` fns LOSE their `cfg` gate — a capability flip" | **FALSE** (Architect, `evt_5a4fsmm3wx8wk`, verified at port `aggregates.rs:73-78` and `occurrences.rs:47-52`) |
+
+The gate was **widened, not removed** — by exactly `px8-ds-test-support`, the
+feature that is ON in the nextest job and OFF in the build job. Nothing becomes
+unconditional.
+
+**Why it read as a removal, and this is the part worth keeping.** The reader
+took the single line preceding the `fn` and got `))]`, which matches no `cfg`
+pattern, so it reported absence. **That is the wrapped-declaration defect
+recurring in a channel its fix never reached** — signatures wrap, and so do
+attributes, `where` clauses, and derives.
+
+⇒ **A fix to an instrument must be applied to every channel sharing the
+defect's MECHANISM, not only the channel where it was found.**
+
+**And note the direction, because it inverts.** On signatures the same defect
+*inflated* a count (69 raw to 15 real) — noisy but safe, and controls caught it.
+On attributes it produced a **qualitatively wrong finding in the alarming
+direction**: a REMOVAL reported where there is a WIDENING. A removal reads as a
+capability flip someone must adjudicate. **A defective instrument returns not
+only a small number that looks like good news, but a FINDING that looks like bad
+news — and a finding gets acted on.**
+
 ## 2. D0 — the question this node answers BEFORE it ports anything
 
 **D0. What is the transitive closure of machinery absent from `main` that the
@@ -88,6 +157,99 @@ construct identified.
 > **mention**, not a definition, and must not be counted as one. Three separate
 > census errors today were caught this way and none by a control.
 
+### 2b. D0b — REQUIREMENT 0. Runs before any port work, and gates it as D0 did.
+
+**Added 2026-09-16 (Steward) on the Architect's ruling `evt_7wm7z1t416y0p`.**
+
+> **For every symbol the port and `main` SHARE in the domain, diff the
+> declaration.**
+
+**This is the complement of D0's query, and the two have different subjects.**
+D0 asks *what is absent from `main`* — it keys on names that are not there.
+D0b asks *what is present in both and DIFFERS* — it keys on names that are.
+
+⇒ **No amount of completing D0 can find a shape change.** Widening the seed from
+5 to 29 made D0 complete and left it aimed at the wrong question. Every
+surprise in `§1b` rows 5-8 is a shared symbol whose declaration differs, and
+every one was found by **reading** rather than by an instrument. D0b is the only
+instrument in this node that can return that class as a **measurement**.
+
+**Acceptance for D0b, same standard as D0:** the domain pinned, both refs named,
+a positive control on every zero, and the **enclosing construct** resolved for
+each hit rather than the line reported. Report it before porting.
+
+*Control that it is aimed correctly:* D0b must return `RequiredConsumerProjection`
+(struct to enum) and its `Copy` drop. **Those are known members.** A D0b that
+does not return them is measuring the wrong set, and that is a stronger check
+than a positive control on a symbol nobody disputes — it fails on the exact
+class the instrument exists to catch.
+
+> **THE CONTROL ABOVE FIRED ON THE FIRST BUILD, exactly as intended.** D0b's
+> first instrument keyed on `(path, kind, name)` — and a struct-to-enum change
+> makes `kind` differ, so **the example that motivated D0b was invisible to
+> D0b.** It was caught because the control names a known member rather than a
+> symbol nobody disputes. Keep the control in place for every rebuild.
+
+**Three requirements on D0b's instrument, each from a measured defect
+(runtime-implementer, `evt_2ermmnnpkg58r`). All three failed in the SAME
+direction — toward a smaller number that reads as good news.**
+
+1. **`kind` is part of the compared VALUE, never part of the key.** Anything in
+   the key cannot be observed to change.
+2. **Accumulate a declaration to its terminating `{` or `;`.** Rust signatures
+   wrap, so a first-line comparison reports rustfmt reflow as signature change.
+3. **Normalize trailing commas as well as whitespace.** Without it, 68 of 83
+   hits were formatting and the real 15 sat at the bottom of a list nobody
+   reads to the end of.
+
+**AND THE KEY MUST BE THE ENCLOSING ITEM — `(path, impl-or-type, name)`, not
+`(path, name)`.** This is `AC-ENCLOSING-UNIT` applied to the census itself
+rather than to its hits, and it is not optional:
+
+> **186 shared keys — 3% of the domain — were SKIPPED because the name is
+> declared more than once in the same file. The skip FAILS OPEN, and R1's three
+> accessors are inside it** (`source` 3x, `body_origin` 3x, `eliminator_origin`
+> 2x in `continuations.rs`).
+
+**A skipped key is not a residual, it is an EXEMPTION, because it fails open.**
+Any count D0b reports must state its skipped set with the cause; a census that
+silently drops what it cannot key is reporting its own blind spot as a clean
+result.
+
+> ### RE-KEYING CLOSES THE 186. IT DOES NOT REACH R1, AND THE REASON IS DEEPER
+> ### THAN THE SKIP (Architect, `evt_5a4fsmm3wx8wk`).
+>
+> The tempting reading — mine, in this section's first draft — is *"D0b missed
+> R1 because the three accessors were in the 186; re-key and it is covered."*
+> **That is true about the skip and false about the coverage.** Ask what a
+> perfectly re-keyed D0b reports on them:
+>
+>     fn source(self) -> X   ->   fn source(&self) -> X      SIGNATURE DIFFERS
+>
+> **It reports a RECEIVER change. It can never report the totality loss, because
+> the `expect` is in the BODY and D0b compares DECLARATIONS.** Re-keying closes
+> the 186 and leaves R1 exactly as unreachable as before.
+>
+> **Three instruments, three subjects, and their UNION still does not contain
+> R1:**
+>
+> | instrument | sees | blind to |
+> |---|---|---|
+> | name census (D0) | NAMES absent from `main` | any line that never names the type |
+> | compiler census (Experiment C) | TYPE ERRORS | type-checked semantic change |
+> | declaration census (D0b) | SIGNATURES | **bodies** |
+>
+> Each was correctly built, and **each one's blind spot is its own definition.**
+> ⇒ **R1 and R2 are gated on a READING, and no number discharges them.** Do not
+> let any census's completion be read as covering them.
+>
+> *Positive control on the re-key, stated so it cannot be misread:* the rebuilt
+> instrument must **report** the three accessors as changed, not merely stop
+> skipping them — and what it then reports is `self` → `&self`, **a different
+> fact from the totality loss.** Mistaking the one for the other is the
+> complete-correct-wrong-subject failure, and it would be the second time this
+> op family produced it.
+
 ## 3. Fixed inputs, measured at named refs
 
 Steward-measured 2026-09-16 at `origin/main`
@@ -111,11 +273,73 @@ Steward-measured 2026-09-16 at `origin/main`
 because *"port these definitions"* and *"write this machinery"* are very
 different sizes and the second is the wrong one.
 
-### 3b. The shape is narrower than "planner machinery absent"
+### 3b. THIS NODE CONVERTS A LIVE TYPE. It is not only an addition.
 
-**`StaticTransitionPlan` is on `main`** at 291 references. It is not a missing
-layer. Absent is: one type family (`CheckedIhPostCallConsumer{,Step}`, 48 refs
-at base), two accessors on that existing type, and one on `Lowering`.
+> **REWRITTEN 2026-09-16 (Steward) on the Architect's ruling
+> `evt_7wm7z1t416y0p`. The previous text was REFUTED BY MEASUREMENT and is
+> replaced, not annotated.** It read:
+>
+> > *"`StaticTransitionPlan` is on `main` at 291 references. It is not a missing
+> > layer. Absent is: one type family (`CheckedIhPostCallConsumer{,Step}`, 48
+> > refs at base), two accessors on that existing type, and one on `Lowering`."*
+>
+> **Three things in it are false.** `RequiredConsumerProjection` is not absent —
+> it is resident and changing shape. Two of the "accessors" are not additions —
+> `source()`, `body_origin()` and `eliminator_origin()` already exist on `main`
+> and are being **re-expressed**. And "not a missing layer" was written as a
+> *bound* and has been **functioning as a floor**: it is the sentence that made
+> every subsequent surprise surprising.
+
+**`StaticTransitionPlan` is on `main`** at 291 references, and that part stands.
+
+**What this node does is not only "add what is absent."** At least three
+resident things change, measured at `origin/main` `432d36254` against port
+`b601e2ec7`:
+
+    RequiredConsumerProjection   struct (main :1204)  ->  enum (port :1318)
+                                 13 references across 7 files
+                                 main :6349 constructs it as a struct literal
+
+    its derive                   Copy DROPPED; Ord/PartialOrd added
+                                 (carry Ord only with a named consumer — see R3)
+
+    source() / body_origin() /   TOTAL on main  ->  PARTIAL at the port,
+    eliminator_origin()          signatures UNCHANGED
+
+**The full shape, now that D0b is answered for declarations** (Architect,
+`evt_5a4fsmm3wx8wk`):
+
+    29    items absent from `main`                       (D0)
+     1    live type reshaping, struct -> enum            RequiredConsumerProjection
+     2    `Copy` drops                                   the above, and EliminatorRole
+     6    resident functions GAINING parameters          caller-visible
+     3    resident functions with changed parameter types
+     2    resident functions with changed return types
+     0    host-effect consumers                          RULED OUT, see below
+
+**`EliminatorRole` is the second `Copy` drop and nobody named it until D0b ran**
+(`lowering/mod.rs` main `:10648` vs port `:11212`). It is the argument for D0b
+in one line.
+
+**The 26th host-effect consumer is OUT of this node** (Architect, same ruling).
+`HostOpV1::MappingAcquireFile`'s array-length delta 25 → 26 is the one line a
+census sees; the change is a whole host-file-acquisition lowering — capability
+checking, protection validation, resource tagging — owned by
+`RT-D5B-HOST-FILE-ACQUISITION-SURFACE`. Excluding it is verified safe: the
+port's `planning/static_transition/effects.rs` carries **zero** checked-IH
+references, so the table and this node's machinery are disjoint. **Do not carry
+the array entry and do not carry `lowering/effects.rs`'s `MappingAcquireFile`
+arms. The array length is the part that will tempt you, because it is the part
+that looks small.**
+
+**These counts bound the DECLARATION work and they do not bound R1 or R2.** The
+totality loss lives in bodies, which no census here reads (`§2b`). **Do not
+report a number as discharging them.**
+
+⇒ **Do not size this node from a count of absent definitions.** A struct-to-enum
+conversion of a live type touches every construction and every field access on
+`main`, and the totality change touches call sites that the compiler will not
+flag at all (`§5`, R1).
 
 ### 3c. `b601e2ec7` IS EVIDENCE, NOT A BASE
 
