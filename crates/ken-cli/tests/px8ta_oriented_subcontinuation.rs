@@ -387,6 +387,11 @@ const PX8DS_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
 // separately provisioned thread. It is invoked explicitly by targeted Runtime
 // validation rather than by the default package suite. The assertions pin a
 // successful false branch with one Console observation and one release.
+//
+// Registered in .github/ignored-test-exemptions.toml as `policy-cost` under
+// RT-IGNORED-PASSING-ROWS, the disposition the frame pre-classified for it
+// (D-REGISTER). Its ignore is a standing cost decision, not a defect, so it
+// should never have been a sweep finding in either direction.
 #[test]
 #[ignore = "focused native resource-cost row; run outside default suite"]
 fn px8ds_real_same_depth_path_runs_exact_edges() {
