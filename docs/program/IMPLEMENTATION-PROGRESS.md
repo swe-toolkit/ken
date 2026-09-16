@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-16 18:51:26Z — from 647 issue file(s) in `docs/program/issues/`.
+2026-09-16 19:00:52Z — from 649 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -56,6 +56,7 @@ the committed file matches the generator's output.
 | `ABI-S3` | monotonic clocks, sleep/deadlines, and secure kernel entropy | merged | runtime | L | none | — |
 | `ABI-S4` | statx-shaped metadata with field-availability bits | draft | runtime | M | none | — |
 | `ABI-S5` | terminal basics and process signal disposition at the executable edge | draft | runtime | M | none | — |
+| `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` | Port the checked-IH post-call consumer machinery that main never grew, so ABI-S6-HS18 increment A can compile: one type family (CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep) plus three accessors on existing types (StaticTransitionPlan::checked_ih_generated_context_result_contract, StaticTransitionPlan::static_response_forwarded_result_identity, Lowering::checked_post_call_consumer_frame). Increment A holds the call sites and none of the definitions, so it cannot build without this. FIRST DELIVERABLE IS THE TRANSITIVE CENSUS, NOT THE PORT -- whether the consumer machinery itself calls anything else that is absent from main is UNMEASURED, and finding a fourth population after the port is the failure this node exists to prevent. | draft | runtime | M | none | — |
 | `ABI-S6-HS18-MAIN-BASED-CLOSURE` | Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation. | ready | runtime | L | none | — |
 | `ABI-S6` | ordinary anonymous and file-backed mappings as opaque runtime-owned regions and bounded byte views | active | runtime | L | none | — |
 | `BUDGET-EFF` | TransferCount.remaining must be bounded by the effective request | merged | verify | M | none | — |
@@ -633,6 +634,7 @@ the committed file matches the generator's output.
 | `SPEC-ALIGN-B1` | Split the frozen interoperability and provenance schemas into versioned protocol profiles, under a per-edge threat audit rather than a field count | draft | spec | L | none | — |
 | `SPEC-AUTH-EX` | 62-authority section 7 is the spec's only worked example of the authority discipline and almost none of it elaborates -- four stale axes rather than the three recorded, the fourth being a RESULT TYPE that changed shape, and two examples that cannot be respelled at all because v1 lacks the quantification one needs and moved the write boundary the other turns on | merged | spec-enclave | S | none | — |
 | `SPEC-CLOSURE-BOUNDARY` | Revise the runtime value spec to remove the closure-identity inconsistency and state the closure/value boundary with minimum constraints on the implementation | merged | spec | M | none | — |
+| `SPEC-ELABORATION-COMPLETION-PRECONDITION-ERRATA` | Three owed clauses in one paragraph of spec/30-surface/39-elaboration.md section 6.9, all spec-author's own text, none of which any completed WP collected: (1) replace the CBV/left-to-right argument for Bool arm-laziness with the 18a section 5.4 citation that settles it without coupling 33 section 6.1 to the evaluation strategy; (2) justify the SECOND half of the completion key -- the policy binds to the defining GlobalId AND its checked telescope, and only the identity half is argued; (3) state the precondition section 6.9 silently carries, that the policy applies where the binding's argument types are closed by the class parameter, which the membership operator is the first case to violate | draft | spec | S | none | — |
 | `SPEC-ERRATUM-39-2-3-CITATION` | Erratum: 34-data-match.md:625 still cites `39 §2.3` for higher-order pattern abstraction, a coordinate the structural-result merge reassigned to Structural-result association | merged | spec-enclave | S | none | — |
 | `SPEC-IDENT-BLESSED` | Settle the identifier character set: 31-lexical promises a bounded blessed-Unicode-letter table that does not exist, cites a security chapter that carries no such claim, and states a confusable gate the landed lexer does not implement | merged | spec-enclave | M | none | https://github.com/swe-toolkit/ken/pull/1147 |
 | `SPEC-MATCH-LITERAL-COMPARATOR-REALIZATION` | spec 34 §3.2 pins each literal-pattern comparison RESULT but is silent on the IMPLEMENTATION FLOOR: whether exact, total, already-landed lossless views (fixed-width `*_to_int`, `string_to_list_char`, `bytes_to_list`) may realize the comparison internally, or whether direct per-carrier comparators are required -- and the current 'does not widen or narrow' sentence reads as forbidding the view composition the emitted checked core would contain, so the contained literal-pattern core cannot be built without the enclave stating which realization is admitted | merged | spec | S | none | — |
@@ -691,7 +693,6 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `ABI-S6-HS18-MAIN-BASED-CLOSURE` — Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation.
 - `CAT-PROOF-COMPLETENESS-SURVEY` — Survey every catalog package for incomplete proofs and dependence on computational tests: classify each package as fully-proven, tested-only-with-deferred-proofs, or no-proof-obligation, citing the exact intrinsics vs tests per package; produce the ledger from which the Steward frames the missing *-LAWS follow-ons. Grounded in PRINCIPLES #16 (a package is finished only when proven).
 - `CI-MAIN-RUNS-CANCEL-EACH-OTHER` — Every push to main shares one concurrency group with cancel-in-progress, so each merge kills the CI still running for the previous merge; post-merge runs on main are a record of a specific tree, not a superseded attempt at the same one, and the fix is to stop cancelling them
 - `CI-WRITE-PARTITION-JOB-COMMENT-STALE` — ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red.
@@ -731,6 +732,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
+- `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` (status: draft)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-BARE-OPERATOR-ATOM-REJECTION` blocked by `LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE` (status: ready)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: active)
@@ -740,6 +742,7 @@ is itself not yet `merged`/`closed`:
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `SPEC-ELABORATION-COMPLETION-PRECONDITION-ERRATA` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: active)
 
 ## Gate progress
 

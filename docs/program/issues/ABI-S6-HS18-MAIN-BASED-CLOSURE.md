@@ -5,12 +5,35 @@ status: ready
 owner: runtime
 size: L
 gate: none
-depends_on: []
+depends_on: [ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT]
 blocks: []
 github: null
 tier: T1
 origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. CUT FROM origin/main 6f49f852141a66571c6126a569b954f63e2b6bde on 2026-09-16 -- this is a provenance RECORD of where the node was cut and must never be re-pointed; increment A's OPERATIVE base is a separate value living in frame 4a-pin and MAY DIFFER from this SHA -- it already does."
 ---
+
+> # INCREMENT A IS BLOCKED. `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` LANDS FIRST.
+>
+> **Added 2026-09-16 on the Architect's category-B ruling
+> (`evt_6mptkrtvysd8s`).** Increment A's D0-2 characterisation found 21 compile
+> errors splitting 11 / 10: the eleven were incomplete re-derivation and are
+> **now fixed** (`bd3e1ff676444f48771d261371982a8f289ce26a`, still not green,
+> not a candidate). **Every remaining error is planner machinery `main` never
+> grew**, which increment A holds the call sites for and none of the
+> definitions.
+>
+> **The ordering is structural, not a preference: increment A cannot compile
+> without that node.** It is therefore not increment C (C is sequenced after A,
+> so A would never reach green and its build gate could never fire) and it is
+> not folded into A (that would make A the whole substance again, which is what
+> the increment split exists to prevent).
+>
+> **Increment A's exit criterion is ZERO ERRORS, never "the eleven are gone."**
+> The category-B inventory was already short by one — `constructor_identity`,
+> found only by attempting a fix — so it may grow when re-attempted. That is
+> expected under the predicate and is not a defect in it.
+>
+> B and C are unaffected.
 
 > # READY. Frame:
 > `docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md`.
