@@ -1,7 +1,7 @@
 ---
 id: LANG-RESERVED-INFIX-NAMES
 title: "A0 of the reserved-infix-glyph objective: admit the six currently-reserved glyph tokens (Le ≤/<=, Ge ≥/>=, Ne ≠//=, And ∧//\\, Or ∨/\\/, Member ∈) as ordinary symbolic GLOBAL names and infix/fixity targets through ONE shared parser token-to-canonical-name view reused at every consumer site, entering the existing neutral-spine + GlobalId-keyed fixity reassociation as ordinary RApp; NO standard semantic binding, NO Membership class, NO `!=`/`in` alias -- syntax/naming only"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
@@ -11,6 +11,19 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy, grounding corrections evt_7z907rns84e6n), grounded at main 4fdd4f0ad; Architect probe SHA e0434d58 (temporary token-normalization probe of five representative definitions, all six names reached). Operator objective (Pat, 2026-09-12): full reserved infix glyphs. status draft: HELD until SPEC-RESERVED-INFIX-NAMES lands, then the Steward flips it ready and releases to the language ring. Architect is the required reviewer. IN-LANE: elaborator/parser surface, no new kernel mechanism/trust-root/TCB. Re-measure the seven consumer sites and lexer/formatter anchors at the cut."
 ---
+
+> ## MERGED 2026-09-16 at `a631e4fb27351074bb7d4fcbc719c2fb6673df69`
+>
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. Both touched paths
+> (`crates/ken-elaborator/src/parser.rs`,
+> `crates/ken-elaborator/tests/lang_reserved_infix_names.rs`) are
+> byte-identical between the approved candidate
+> `3ba6e8b04298917089069b414676c7664a8f37b7` and `main`, landed via PR #3773
+> with full-mode CI green. Decision `dec_5q8bxa1hfxcbw` resolved;
+> language-qa and the Architect (sole required reviewer) both approved exact.
+> The application-atom contraction is deliberately excluded from this A0 —
+> see [[LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE]].
 
 > # RELEASED to the language ring (Steward, 2026-09-14). [[SPEC-RESERVED-INFIX-NAMES]] landed.
 >
