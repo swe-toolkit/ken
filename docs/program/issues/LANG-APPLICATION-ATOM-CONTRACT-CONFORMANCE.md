@@ -1,9 +1,9 @@
 ---
 id: LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE
 title: "Bring the parser into conformance with spec/30-surface/32-grammar.md §3's application-atom contract pin -- the five ungrouped leading forms reject at their leading token, and arrow/projection nest the application in their left expr ((keep Nat) -> Nat, (keep box).value) -- and migrate the catalog source written against the current non-conforming parse. Two measured divergences, in opposite directions: `if` is ACCEPTED as a bare application argument where the pin requires rejection, and `keep box.value` parses A(keep, Proj(box, value)) where the pin requires Proj(A(keep, box), value)."
-status: draft
+status: ready
 owner: language
-size: L
+size: M
 gate: none
 depends_on: [SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION]
 blocks: []
@@ -12,24 +12,29 @@ tier: T1
 origin: "Steward cut 2026-09-16 at the Architect's naming, on their D0 REVERSAL (evt_5sf71fnjxpzmb), which vacates the earlier WITHDRAW ruling (evt_64avxs9ashqqk). The divergences were measured by spec-author under the SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION hard stop (evt_7p78v6qb429rz) and read against the spec by the Architect. Steward verified the two quoted spec passages verbatim at origin/main e11341c7b9d11cd74879d27d555d2a5729837847: 32-grammar.md :357-363 (ungrouped operator_name is not a general application_atom, 'applies equally to generic and reserved operator names') and :368-378 (the five leading forms reject; arrow and projection nest, as `(keep Nat) -> Nat` and `(keep box).value`; 'part of §3's contract pin; an implementation must not restore a second unrestricted application production'). The catalog-source extent is UNMEASURED -- see Sizing. Not yet framed; the Steward frames and releases it when the language lane reaches it."
 ---
 
-> # DRAFT -- cut so the seed rows have a real node to point at.
+> # READY. Frame:
+> `docs/program/wp/LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE.md`.
 >
 > This node exists because [[SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION]]
 > re-gates two row groups of `seed-reserved-infix-names.md` onto a named
 > successor, and a `RED-UNTIL-<node>` tag naming a node that does not exist is
-> not a gate. It is **not released**: it has no frame. Do not start it.
+> not a gate.
 >
-> **The census IS RUN (2026-09-16) — it is no longer the blocking unknown.**
-> See "The census" below: the migration is of order twenty sites with more than
-> 90% of them in one file, the `if` row has zero catalog tail, and the node does
-> **not** decompose on size. What remains before a frame is the D0 AST ledger,
-> not a measurement of whether this is tractable.
+> **The census is RUN** (below), and it is what moved the size from `L` to `M`:
+> the migration is of order twenty sites with more than 90% in one file, and the
+> `if` row has zero catalog tail. **The node does not decompose on size.**
 >
-> **Two release preconditions, neither of them about the frame.** Its dependency
-> [[SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION]] is routed and **not landed**;
-> and it shares `crates/ken-elaborator/src/parser.rs` with
-> [[LANG-RESERVED-INFIX-NAMES]], whose A0 candidate is **live**. Check both at
-> `origin/main`, by node status and by blob — never by branch ref.
+> **Both release preconditions cleared at `a631e4fb2`, measured not assumed.**
+> [[SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION]] is `status: merged`, and
+> [[LANG-RESERVED-INFIX-NAMES]]'s A0 landed blob-identical with its `wp/` branch
+> deleted at origin — so no live candidate holds
+> `crates/ken-elaborator/src/parser.rs`.
+>
+> **One question is open and is NOT the implementer's to settle:** what
+> `box.value keep` parses as at the head position. The pin fixes the argument
+> position and is silent on the head. Frame §4 routes it to the Architect, and
+> it is to be asked **before** the postfix relocation is written, not inferred
+> from whichever patch is easiest.
 
 # Objective
 
