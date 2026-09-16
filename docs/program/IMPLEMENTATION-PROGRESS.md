@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-16 21:55:00Z — from 650 issue file(s) in `docs/program/issues/`.
+2026-09-16 22:46:51Z — from 653 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -629,6 +629,9 @@ the committed file matches the generator's output.
 | `SEC4-TCB` | Sec4's trust-model conformance seed is fully authored and nothing executes it — Sec1/Sec1ct/Sec2 each have an acceptance suite bound to their seed, Sec4 has none | merged | verify | M | G5 | — |
 | `SPAN-SEAL` | seal the BufferSpan producer surface | merged | foundation | M | none | — |
 | `SPEC-31-WIDTH-ERRATUM` | spec 31-lexical mandates a 96-column canonical width while the formatting conformance suite asserts 88 in 18 places and cites 31 §1d as its source — rule the exact value and reconcile | closed | spec | S | none | https://github.com/swe-toolkit/ken/pull/1054 |
+| `SPEC-32-PATH-VS-PROJECTION-CHAIN` | 32 §3 now has TWO productions that both match an ident-headed dot chain -- `path ::= ident (\".\" ident)*` (:86, the attached-proof subject) and the postfix projection chain `application_atom ::= primary (\".\" ident | \".1\" | \".2\")*` (:277) added by SPEC-32-PROJECTION-PRECEDENCE -- so `a.b.c` is admitted by both and the grammar does not say which wins or where the choice is made; rule the overlap explicitly (position-determined, or a precedence, or a restriction on one side) rather than leaving it to whichever production an implementation reaches first; NO change to projection's precedence, NO parser work in this node | draft | spec | S | none | — |
+| `SPEC-32-PROJECTION-PRECEDENCE` | amend 32 §3 so projection is a POSTFIX form on `primary` rather than an application arm -- `application_atom ::= primary (\".\" ident | \".1\" | \".2\")*`, making `keep box.value` read `keep (box.value)` with projection binding tighter than application, and strike `and projection` from the five-leading-forms rejection clause it was inherited into by omission; NO change to the five leading forms themselves, NO parser work | merged | spec | S | none | — |
+| `SPEC-32-QUALIFIED-GLOBAL-REF-VS-PROJECTION` | `qualified_global_ref ::= ModPath \".\" global_name` (:87) and the postfix projection chain (:277) both match `M.f`, and the overlap CANNOT BE RULED because `ModPath` has SIX uses and ZERO productions in all of spec/ -- with no definition of which strings ModPath matches there is no way to say where the two productions overlap; the blocker is therefore to GIVE ModPath a production, and this node stays blocked until that exists | draft | spec | S | none | — |
 | `SPEC-38-ERRATUM` | spec 38-ffi-io self-contradicts on the transfer bound — rule and reconcile | closed | spec | S | none | 827 |
 | `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` | Does 45 section 3's 'functions lower to ordinary closures' admit an exception for a function value held in a constructor field with no statically visible consumer -- if not, the native backend's current refusal is a defect against AC3 rather than a permitted narrowing | ready | spec-enclave | M | none | — |
 | `SPEC-ALIGN-A1` | Scope the landed-code authority convention out of the normative status blocks, and census every private-mechanism constraint against its conformance consumers before relaxing any of them | merged | spec | M | none | 1028 |
