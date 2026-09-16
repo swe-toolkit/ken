@@ -29,15 +29,24 @@ numbers move.
 
 ### 2a. The spec pin, verbatim
 
-`spec/30-surface/32-grammar.md:373`:
+`spec/30-surface/32-grammar.md:393`:
+
+> **Citation corrected 2026-09-16.** This frame originally cited `:373`,
+> measured before `SPEC-32-PROJECTION-PRECEDENCE` (`f1bda0c5b`) landed and
+> inserted twenty lines above it. The quoted sentence is unchanged; only its
+> coordinate moved. Re-measure rather than trusting either number.
 
 > five leading forms — lambda and `let`, `if`, `match`, and `temporal` — reject
 > at their leading token when ungrouped after an application head
 
-**This sentence is byte-stable across the pending `32 §3` amendment.** The
-amendment strikes `and projection` from the clause that follows it and leaves
-the quoted text alone. So this node is **not** gated on that amendment landing,
-and must not wait for it.
+**This sentence is byte-stable across the `32 §3` amendment, which has now
+LANDED** (`f1bda0c5b`, `SPEC-32-PROJECTION-PRECEDENCE`). The amendment struck
+`and projection` from the clause that follows it and left the quoted text alone.
+
+The original form of this paragraph said the node was "not gated on that
+amendment landing, and must not wait for it." That was the load-bearing claim
+and it held: the amendment landed independently, and nothing in this node's
+scope moved when it did.
 
 ### 2b. The divergence
 
