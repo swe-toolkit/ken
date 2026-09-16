@@ -555,7 +555,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // program never executes". Refuted POSITIVELY, not just by absence: the native
 // effect-operation sequence for this row is [FsOpen, ResourceRelease,
 // FsHandleMetadata]. The seat the label says cannot observe a carried word
-// appears in the trace, having observed one.//
+// appears in the trace, having observed one.
+//
 // READMITTED ON A MUTATION, NOT ON THE GREEN. Duplicating the live native
 // dispatch event push in ken-host abi_v1.rs (the sole producer of the native
 // effect trace, in ken_host_dispatch after dispatch_host_op_v1 returns) reds the
@@ -589,7 +590,8 @@ fn escape_one_used_matches_interpreter() {
 // row "next refuses because a carried recursive hypothesis is an eliminated
 // value, not a callable". None reproduces. The program emits, executes, exits 0,
 // and its native effect-operation sequence is [FsOpen, ResourceRelease],
-// matching the interpreter's.//
+// matching the interpreter's.
+//
 // READMITTED ON A MUTATION, NOT ON THE GREEN. Duplicating the live native
 // dispatch event push in ken-host abi_v1.rs (the sole producer of the native
 // effect trace, in ken_host_dispatch after dispatch_host_op_v1 returns) reds the

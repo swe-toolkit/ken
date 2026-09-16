@@ -972,8 +972,9 @@ fn uint64_checked_wrapper_admits_max_and_rejects_both_neighbors() {
 //
 // READMITTED ON A MUTATION, NOT ON THE GREEN, and the mutation is native-lane
 // only by construction. Changing the BufferAllocate arm's narrow-failure detail
-// in the cranelift lowering (effects.rs, RESOURCE_ERROR_INVALID_BOUNDS ->
-// RESOURCE_ERROR_INVALID_OFFSET) reds this row at the native axis-1 assertion:
+// in crates/ken-runtime/src/cranelift_backend/lowering/effects.rs
+// (RESOURCE_ERROR_INVALID_BOUNDS -> RESOURCE_ERROR_INVALID_OFFSET) reds this row
+// at the native axis-1 assertion:
 //
 //   buffer-allocate-single: native must observe exactly InvalidBounds;
 //     got EffectObservation { ..., terminal_exit: ReturnedError,

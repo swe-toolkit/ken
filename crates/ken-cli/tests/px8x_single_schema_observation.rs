@@ -78,7 +78,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // "reached and unobserved", not "never reached".
 //
 // AND THE ARRANGEMENT WAS INERT, not merely unasserted. In
-// object_linker_packaging.rs run_bound_process_effect_observation_with_stdin,
+// crates/ken-runtime/src/object_linker_packaging.rs,
+// run_bound_process_effect_observation_with_stdin,
 // .envs(options.environment) is followed by .env("KEN_HOST_OBSERVATION_PATH",
 // &trace_path) -- the launcher overwrites the caller's value before the child
 // starts, so no process on this path ever saw "caller-controlled". The setup

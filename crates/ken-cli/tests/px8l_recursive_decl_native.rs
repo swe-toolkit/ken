@@ -186,8 +186,8 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
 // as \"ken native trap: malformed borrowed process input\"". That does not
 // reproduce. The native process returns the computed value the row names, not
 // -1, and the trap string is absent from the captured output -- the shim at
-// object_linker_packaging.rs:2303 emits it only on value == -1, and no run of
-// either row emits it.
+// crates/ken-runtime/src/object_linker_packaging.rs:2303 emits it only on
+// value == -1, and no run of either row emits it.
 //
 // The label named a trap the row would HIT; the row passes. Both cannot be true,
 // and the disposition is the label's, not the row's.
@@ -221,8 +221,8 @@ fn dynamic_zero_seed_takes_the_base_case() {
 // as \"ken native trap: malformed borrowed process input\"". That does not
 // reproduce. The native process returns the computed value the row names, not
 // -1, and the trap string is absent from the captured output -- the shim at
-// object_linker_packaging.rs:2303 emits it only on value == -1, and no run of
-// either row emits it.
+// crates/ken-runtime/src/object_linker_packaging.rs:2303 emits it only on
+// value == -1, and no run of either row emits it.
 //
 // The label named a trap the row would HIT; the row passes. Both cannot be true,
 // and the disposition is the label's, not the row's.

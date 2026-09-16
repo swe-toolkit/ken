@@ -251,7 +251,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
 #[cfg(target_os = "linux")]
-// Readmitted under RT-IGNORED-PASSING-ROWS, row 1 of 11, at 36f95b6f2.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 1 of 11.
 //
 // The prior label read: "RT-CARRIED-RESOURCE-SCALAR: the FsHandleMetadata seat
 // cannot observe a carried word as a resource scalar; fails at base 21fd46dc",

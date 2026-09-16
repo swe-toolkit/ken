@@ -7385,7 +7385,8 @@ fn run_worker_fixture(expr: &RuntimeExpr) -> RuntimeObservation {
 // is an end-to-end distinguishability property rather than a resolution check.
 //
 // READMITTED ON A MUTATION, NOT ON THE GREEN. Broadcasting the first stored
-// capture across the worker call's capture run in the lowering (calls.rs, the
+// capture across the worker call's capture run in
+// crates/ken-runtime/src/cranelift_backend/lowering/calls.rs (the
 // single `inputs.extend(worker.captures...)` that appends stored captures) reds
 // the first comparison with the collapse visible in it:
 //
