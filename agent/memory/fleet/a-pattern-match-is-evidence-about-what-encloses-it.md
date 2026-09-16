@@ -135,3 +135,23 @@ rule independently, from different incidents, and each had carried it in a
 private store for months without promoting it. The trigger that would have
 caught that is in
 [[citing-a-private-lesson-to-another-seat-is-the-promotion-signal]].
+
+## The stage-later form: evidence RETRIEVED, then narrowed at interpretation
+
+Three seats misread one comment the same hour, and two of the three had the
+whole thing in front of them:
+
+    seat 1   read the comment from :552, quoting its second half
+    seat 2   had :545-551 in its own tool output and used only :555
+    seat 3   read it from :545 -- and the meaning INVERTED
+
+The first half said the enumeration below it replaced a `_` wildcard **so that
+adding a variant becomes a build break**. Quoted from its second half, the same
+words read as a frozen list to be tidied away.
+
+⇒ **This is not a missing measurement. The data was retrieved and correct; the
+reading was formed from a subset of it** — which is why no re-run catches it.
+Every existing control asks whether the measurement was right, and it was.
+
+**A comment's enclosing item is the comment**, not the line your grep landed
+on. Read from the item's first line, not from the hit.
