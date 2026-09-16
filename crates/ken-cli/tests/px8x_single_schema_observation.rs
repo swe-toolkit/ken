@@ -41,24 +41,44 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 5 of 11.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength,
-//     which it cannot observe in CarriedWord
+// Three annotation layers are struck here, the same stack this row's sibling in
+// px8ta_oriented_subcontinuation carried: a byte-span block claiming the row
+// "refuses at object emission, so the program never executes"; a D1a/D2 note
+// three lines below it saying the byte-span observation "was not the blocker";
+// and a live label claiming the row "next refuses because a carried recursive
+// hypothesis is an eliminated value, not a callable". None reproduces. The
+// program emits, executes, exits 0, and neither signature appears in any run.
 //
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// Annotation only -- test body and expectations are unchanged.
+// READMITTED ON A MUTATION, NOT ON THE GREEN. Perturbing the ResourceRelease
+// arm of ken-host effect_v1.rs dispatch (the Target binding pushed from
+// pending.identity, +1000) reds the acquired-equals-released assertion with the
+// perturbation visible in it -- left ResourceTraceIdentityV1(1) against right
+// ResourceTraceIdentityV1(1001).
+//
+// WHAT THIS ROW DOES NOT OBSERVE, and its name says it does. The name claims
+// two properties. The ordered-bindings half is covered, as above. The
+// filters-reserved-input half is NOT, and that is measured rather than
+// supposed:
+//
+//   - Removing the KEN_HOST_OBSERVATION_PATH filter from the C shim's
+//     environment() loop alone reds the row -- but at the harness's
+//     run_bound_process_effect_observation expect, with Io(NotFound): the
+//     arena capacity is sized by main's separate count, so the two disagree,
+//     the process returns 1, and no trace file is written. The row noticed a
+//     crash, not a filtering decision.
+//   - Removing the filter CONSISTENTLY from both loops leaves the row GREEN.
+//     The Ken program then sees the reserved key in its environment and nothing
+//     in this row reads the program's view of its environment.
+//
+// The first mutation is what makes the second conclusive: it proves the filter
+// branch is TAKEN on this row's path (deleting a branch never taken cannot
+// change the arena accounting). So the second green is "reached and
+// unobserved", not "never reached". The finding is site-relative -- the row
+// does not observe the reserved-key filter -- and the row is covered elsewhere,
+// which is why it is readmitted rather than reported vacuous.
 #[test]
-// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
-// FileError SiteOperand(0) could not project its carried word. D5 byte-span
-// observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
 fn linked_route_exposes_real_ordered_bindings_and_filters_reserved_input() {
     let dir = output_dir();
     std::fs::write(dir.path().join("held.bin"), b"held").unwrap();
