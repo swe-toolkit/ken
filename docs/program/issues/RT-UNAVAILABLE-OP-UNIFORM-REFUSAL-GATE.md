@@ -1,7 +1,7 @@
 ---
 id: RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE
 title: "Enforce the RepresentedUnavailable invariant uniformly across BOTH executors by gating dispatch_host_op_v1 at the convergence, with a control that is a PREDICATE over availability() rather than an assertion about any named op. The invariant is STATED at effect_v1.rs:193 and native-enforced at abi_v1.rs:1551, but the interpreter consults availability() nowhere -- so FOUR of the ten unavailable ops (ClockMonotonicNow, ClockSleepUntil, EntropyRandomBytes, MappingAcquireFile) execute interpreted and refuse natively on main TODAY, and the availability flip moves only one of them. REMEDIAL, not preventive. Architect ruling evt_21f23zmgqfxsc: the interpreter MUST refuse; RepresentedUnavailable is a language-surface claim, not a native-backend one. The gate must sit at the convergence and NOT in a caller -- the interpreter's two production callers are in different helpers (fs_dispatch, ambient_dispatch), so the natural-looking fs_dispatch placement misses clock and entropy entirely. Its SUBJECT IS REACHABILITY, a different question from AC-AVAIL's availability census -- do not fold the two together."
-status: draft
+status: ready
 owner: runtime
 size: S
 gate: none
@@ -12,14 +12,15 @@ tier: T1
 origin: "Adversary Finding 1 on the landed slice 4 (statements != enforcements), routed by the Steward to the Architect as a design question rather than ruled; Architect RULED evt_21f23zmgqfxsc. Steward cut 2026-09-16 as its OWN node rather than as a rider on the flip slice -- a sequencing/packaging call (steward.md §3), not a departure from the ruling's design content, which is adopted verbatim. Fixed inputs measured at origin/main d4e977a6af1083975665e587ed7e3e31f733785e."
 ---
 
-> # DRAFT. Not framed, not released. Do not start.
+> # READY. Framed and RELEASED 2026-09-16. Frame:
+> `docs/program/wp/RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE.md`.
 >
 > The design is RULED and is not open. **D1 is CLOSED at four-of-ten reachable**,
 > which makes this node REMEDIAL — it closes a divergence live on `main` today,
 > not a hazard that future unflipped surfaces might create. D0, the blast
-> radius, is the one thing still unmeasured and it is what sizes the node. The
-> Steward frames and releases this when the runtime lane reaches it — which,
-> per the sequencing ruling below, is BEFORE the availability flip.
+> radius, is the one thing still unmeasured and it is what sizes the node — it
+> is **D0, the WP's first act**, and a hard stop there is a successful turn.
+> Per the sequencing ruling below, this lands BEFORE the availability flip.
 
 # Objective
 
