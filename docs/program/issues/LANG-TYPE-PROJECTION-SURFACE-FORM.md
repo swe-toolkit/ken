@@ -99,6 +99,41 @@ not as advice.
 - Projection in expression position — it already exists (`RExpr::RProj`).
 - Any kernel change. `Term::Proj1`/`Proj2` are the target, unchanged.
 
+# The consumers: THREE bindings, ONE production (added 2026-09-16, Steward)
+
+`SPEC-MEMBERSHIP-CLASS-CONTRACT` landed at `origin/main` `a63eebe3e` (candidate
+`9b9586dc0`, 6/6 blobs verified), and it settles both the count and the shape of
+what this node has to serve. Measured at that ref, not taken from the ruling:
+
+| binding | where the projection sits | spec |
+|---|---|---|
+| `membership_member_at (q : d.Query) … : Bool` | parameter telescope | `58b §2` |
+| `member_holds (q : d.Query) … : Ω` | parameter telescope | `58b §2` |
+| `same_members … : Ω`, body `(q : d.Query) -> …` | **Π domain in the body** | `58b §4` |
+
+**This node's title names only the first case.** That was written before the
+contract landed and understates the consumer set: `58b:148-150` says **three**
+projection-typed bindings, and a fix that serves `membership_member_at` alone
+leaves two of three unwritable.
+
+**`same_members` sits in a different place, and the question of whether that
+makes it a second grammar requirement is CLOSED — it does not.** Its signature
+carries no projection at all; the `d.Query` is the domain of a `Π` in an
+expression-position definition body. Measured at `a63eebe3e`:
+
+    RType::RPi (String, Box<RType>, Box<RType>, Span)    domain is RType
+    RExpr::RPi (String, Box<RType>, Box<RExpr>, Span)    domain is RType
+
+**Both Π forms annotate their domain with an `RType`**, so a single projection
+variant on `RType` reaches all three. The scope stated elsewhere in this node —
+one variant, resolved to `Term::Proj1`/`Proj2` — is correct as written; what
+changes is only that it has three consumers rather than one, and the acceptance
+surface should exercise all three rather than the telescope case alone.
+
+**Re-measure before relying on this.** `RType`'s variant list is perishable, and
+the two-productions worry was live until the enum was opened. The finding is
+recorded so it is not re-derived, not so it is trusted.
+
 # Open, and stated as open rather than assumed
 
 **Whether the instance registry and `resolve_instance_dictionary` handle a class

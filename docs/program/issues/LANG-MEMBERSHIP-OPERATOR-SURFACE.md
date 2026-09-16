@@ -13,7 +13,7 @@ origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with t
 ---
 
 > # FOURTH DEPENDENCY ADDED 2026-09-16: [[LANG-TYPE-PROJECTION-SURFACE-FORM]].
-> # THIS NODE CANNOT WRITE ITS OWN SIGNATURE UNTIL THAT LANDS.
+> # THIS NODE CANNOT WRITE ITS OWN SIGNATURES UNTIL THAT LANDS.
 >
 > **Architect `evt_4tmt0n7era4w3`, ruling `SPEC-MEMBERSHIP-CLASS-CONTRACT`'s
 > D0-1.** The `∈` binding is `membership_member_at (c : Type) (d : Membership c)
@@ -24,9 +24,51 @@ origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with t
 > projection (`RType::RProj`, 0 hits; control `RExpr::RProj`, 4 files —
 > Steward-verified at `24e9ce039`).
 >
-> **So the catalog binding this node must author is currently UNSPELLABLE.**
+> **So the catalog bindings this node must author are currently UNSPELLABLE.**
 > The dependency is recorded now, at framing, rather than being met by an
-> implementer who cannot write the signature.
+> implementer who cannot write the signatures.
+>
+> ## CORRECTED 2026-09-16 (Steward): THIS NODE AUTHORS **THREE** PROJECTION-TYPED
+> ## BINDINGS, NOT ONE. The banner above said "the `∈` binding" and "its own
+> ## signature", singular, and that was written before the contract landed.
+>
+> `SPEC-MEMBERSHIP-CLASS-CONTRACT` merged as `origin/main`
+> `a63eebe3e7582c71a2c59624786a39705cf9a0e0` (candidate `9b9586dc0`, 6/6 blobs
+> verified). `spec/50-stdlib/58b-membership.md:148-150` says it in the spec's own
+> words: **three** projection-typed bindings — `membership_member_at`,
+> `member_holds` and `same_members`.
+>
+>     membership_member_at (c) (d : Membership c) (q : d.Query) (x : c) : Bool
+>     member_holds         (c) (d : Membership c) (q : d.Query) (x : c) : Ω
+>     same_members         (c) (d : Membership c) (x : c) (y : c)       : Ω
+>       same_members c d x y := (q : d.Query) -> Equal Bool (d.member q x)
+>                                                           (d.member q y)
+>
+> ⇒ **`LANG-TYPE-PROJECTION-SURFACE-FORM` gates strictly more than this node
+> previously said**, and a frame that satisfies only `membership_member_at`
+> leaves two of three bindings unwritable.
+>
+> **`same_members` puts its projection in a different PLACE, and I checked
+> whether that is a second grammar requirement. It is not.** Its signature
+> carries no projection; the `d.Query` sits in the **body**, as the domain of a
+> `Π` in an expression-position definition. That could have meant the surface
+> fix needed two productions rather than one, and a fix scoped to parameter
+> telescopes would then have satisfied two of three bindings and left this one
+> unspellable. Measured at `a63eebe3e`, it is one production:
+>
+>     RType::RPi (String, Box<RType>, Box<RType>, Span)    domain is RType
+>     RExpr::RPi (String, Box<RType>, Box<RExpr>, Span)    domain is RType
+>
+> **Both Π forms annotate their domain with an `RType`.** So all three bindings
+> are unblocked by the same single change — a projection variant on `RType` —
+> and the spec's *"writes `d.Query` in type position, exactly as `§2`'s
+> `member_holds` does"* (`58b §4`) is exact rather than approximate.
+>
+> **This is recorded because it is the kind of thing that gets half-done.** The
+> count (three, not one) is the correction; the one-production finding is what
+> stops the correction from being read as "three separate surface problems".
+> Neither is the language ring's to rediscover, and neither should be taken from
+> this banner without re-measuring — `RType`'s shape is perishable.
 >
 > **And the obvious way around it is CLOSED:** `∈` must not become an elaborator
 > builtin. `33 §6.1` requires standard meanings to be ordinary top-level
