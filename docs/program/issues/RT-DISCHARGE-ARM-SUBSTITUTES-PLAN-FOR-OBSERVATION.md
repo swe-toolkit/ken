@@ -479,11 +479,14 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  ### READ 2026-09-16. TRUE / None. ARM (b). FORK CLOSED.
                  Architect evt_193ekcwm21t7w, against meanings unchanged
                  since they were fixed above.
-                   TRUE / None   at 10 arm-1 entries, and at NONE of the
-                                 other 84 obligations in the population.
-                   TRUE / Some   32. The DISCRIMINATION: realization and
-                                 identity travel together everywhere else,
-                                 so the bit is not a constant.
+                   TRUE / None   at 12 arm-1 entries across BOTH binaries, and
+                                 at NONE of the other 105 obligations.
+                                 (First read, px8f_buffer_native alone: 10, and
+                                 none of that binary's other 84.)
+                   TRUE / Some   40 combined (32 buffer_native + 8
+                                 write_partition). The DISCRIMINATION:
+                                 realization and identity travel together
+                                 everywhere else, so the bit is not a constant.
                    FALSE / Some  EMPTY, AND IT IS A MEASURED ZERO. A fourth
                                  cell the construction invariant predicts
                                  must be empty and no site can produce. It
@@ -491,17 +494,30 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                                  pre-registration; Architect
                                  evt_1c971mqdjffam, evt_4m71wxrbs704c.
                  THAT CELL IS THE ONE EMPIRICAL CHECK ON THE MUTATION-SITE
-                 CENSUS, which is what upgrades the bit from a plausible site
-                 to an ENTAILED one. The census is a GREP; greps have blind
-                 spots; a measured (false, Some) = 0 is the independent test
-                 that the grep missed no writer.
+                 CENSUS. THE CENSUS is what upgrades the bit from a plausible
+                 site to an ENTAILED one. The census is a GREP and greps have
+                 blind spots, so a measured (false, Some) = 0 is an
+                 independent test that the grep missed no writer OF THE SHAPE
+                 THE INVARIANT FORBIDS.
+                 AND THAT IS THE LIMIT OF WHAT THE CELL CAN DO -- IT IS SILENT
+                 ON A MISSED (true, None) WRITER, WHICH IS THE SHAPE THE SITE
+                 CLAIM RESTS ON. The entailment is "units.rs:6874/6877 is the
+                 ONLY producer of (true, None)", so a grep that missed a
+                 second (true, None) writer would break it, and this cell
+                 would not notice. ⇒ THE CENSUS, NOT THIS CELL, IS WHAT
+                 ENTAILS THE SITE. Do not cite the cell to argue the census
+                 is verified.
+                 THIS IS THE parent == origin/main SHAPE, ONE ARTIFACT LATER:
+                 a control at its strongest exactly where a failure would be
+                 harmless, and silent exactly where one would be fatal.
+                 Architect evt_227hnhfawfeqs.
                  AND THE ZERO IS ONLY WORTH THAT BECAUSE THE PARSE IS SHOWN
                  COMPLETE. A zero from a parser is worth nothing until you
                  show the parser saw everything, so the parsed totals are
                  cross-footed against the census's OWN obligation counts:
                    px8f_buffer_native    52+32+10 = 94
                                          4x(21+1+1) + 1x(1+1) = 94
-                   px8f_write_partition  13+2+8   = 23
+                   px8f_write_partition  13+8+2   = 23
                                          1x(21+1+1)           = 23
                    combined              94+23    = 117
                                          65+0+40+12           = 117
