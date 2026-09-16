@@ -115,7 +115,7 @@ fn argument_let_and_nested_else_binding_are_reachable() {
     let ids = env
         .elaborate_file(
             "fn id_int (x : Int) : Int = x\n\
-             const arg_if : Int = id_int if True then 5 else 6\n\
+             const arg_if : Int = id_int (if True then 5 else 6)\n\
              const let_if : Int = let x : Int = if False then 7 else 8 in x\n\
              const outer_else : Int = if False then 1 else if True then 2 else 3\n\
              const inner_else : Int = if True then if False then 1 else 2 else 3",
