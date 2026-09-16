@@ -87,7 +87,7 @@ pub fn source_id (s : Source) : SourceId = s.source_id_field
 
 pub fn source_bytes (s : Source) : Bytes = s.source_bytes_field
 
-pub fn source_length (s : Source) : Nat = bytes_nat_length s.source_bytes_field
+pub fn source_length (s : Source) : Nat = bytes_nat_length (s.source_bytes_field)
 
 pub proof utf8 for source_bytes (s : Source) : IsUtf8 (source_bytes s) = s.source_utf8_field
 ```

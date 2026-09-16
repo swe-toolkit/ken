@@ -68,7 +68,7 @@ fn raw_compare_discriminates_all_results_and_strict_negatives() {
 
     assert_decl(
         &mut env,
-        "theorem raw_eq_positive : Equal Bool True True = compare_raw::eq_sound Bool bool_leq (Ord_instance_Bool).antisym True True Proved",
+        "theorem raw_eq_positive : Equal Bool True True = compare_raw::eq_sound Bool bool_leq ((Ord_instance_Bool).antisym) True True Proved",
     );
     assert_decl(
         &mut env,
@@ -76,7 +76,7 @@ fn raw_compare_discriminates_all_results_and_strict_negatives() {
     );
     assert_decl(
         &mut env,
-        "theorem raw_gt_positive : Equal Bool (bool_leq False True) True = compare_raw::gt_sound Bool bool_leq (Ord_instance_Bool).total True False Proved",
+        "theorem raw_gt_positive : Equal Bool (bool_leq False True) True = compare_raw::gt_sound Bool bool_leq ((Ord_instance_Bool).total) True False Proved",
     );
     assert_decl(
         &mut env,

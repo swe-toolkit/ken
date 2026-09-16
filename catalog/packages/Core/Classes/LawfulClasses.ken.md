@@ -750,7 +750,7 @@ fn compare_result_of (a : Bool) (b : Bool) : OrdResult =
 fn compare_raw (a : Type) (leq : a → a → Bool) (x : a) (y : a) : OrdResult =
   compare_result_of (leq x y) (leq y x)
 
-fn compare_with (a : Type) (d : Ord a) (x : a) (y : a) : OrdResult = compare_raw a d.leq x y
+fn compare_with (a : Type) (d : Ord a) (x : a) (y : a) : OrdResult = compare_raw a (d.leq) x y
 
 fn compare (a : Type) (d : Ord a) (x : a) (y : a) : OrdResult = compare_with a d x y
 
@@ -915,7 +915,7 @@ proof eq_complete for compare_raw
 proof eq_sound for compare_with
       (a : Type) (d : Ord a) (x : a) (y : a)
     : Equal OrdResult (compare_with a d x y) ord_eq → Equal a x y =
-  proof eq_sound for compare_raw a d.leq d.antisym x y
+  proof eq_sound for compare_raw a (d.leq) (d.antisym) x y
 
 proof lt_sound for compare_raw
       (a : Type) (leq : a → a → Bool) (x : a) (y : a)
@@ -1085,14 +1085,14 @@ proof refl for pair_ord_leq
         x
         ((proof eq_complete for compare_raw)
           a
-          da.leq
+          (da.leq)
           (pair_fst a b x)
           (pair_fst a b x)
           (da.refl (pair_fst a b x))
           (da.refl (pair_fst a b x)))
         ((proof eq_complete for compare_raw)
           b
-          db.leq
+          (db.leq)
           (pair_snd a b x)
           (pair_snd a b x)
           (db.refl (pair_snd a b x))
@@ -1154,7 +1154,7 @@ theorem pair_ord_head_sound
       Equal OrdResult (compare a da (pair_fst a b x) (pair_fst a b y)) r
       → Equal Bool (ord_leq_at a da (pair_fst a b x) (pair_fst a b y)) True)
     (compare a da (pair_fst a b x) (pair_fst a b y))
-    (λp. proof lt_sound for compare_raw a da.leq (pair_fst a b x) (pair_fst a b y) p)
+    (λp. proof lt_sound for compare_raw a (da.leq) (pair_fst a b x) (pair_fst a b y) p)
     (λp.
       proof true_of_equal for ord_leq_at
         a
@@ -1187,14 +1187,14 @@ theorem pair_ord_tail_sound
           hyx
           ((proof lt_reverse_false for compare_raw)
             a
-            da.leq
+            (da.leq)
             (pair_fst a b x)
             (pair_fst a b y)
             p)))
     (λp.
       proof leq_sound for compare_raw
         b
-        db.leq
+        (db.leq)
         (pair_snd a b x)
         (pair_snd a b y)
         (pair_ord_leq_transport_head a b da db x y ord_eq p h))
@@ -1239,7 +1239,7 @@ theorem pair_ord_complete_head_strict
           hxy
           ((proof gt_forward_false for compare_raw)
             a
-            da.leq
+            (da.leq)
             (pair_fst a b x)
             (pair_fst a b y)
             p)))
@@ -1272,7 +1272,7 @@ theorem pair_ord_complete_tail
         y
         ord_eq
         p
-        ((proof leq_complete for compare_raw) b db.leq (pair_snd a b x) (pair_snd a b y) htail))
+        ((proof leq_complete for compare_raw) b (db.leq) (pair_snd a b x) (pair_snd a b y) htail))
     (λp.
       absurd
         (bool_true_false_absurd
@@ -1280,7 +1280,7 @@ theorem pair_ord_complete_tail
           hxy
           ((proof gt_forward_false for compare_raw)
             a
-            da.leq
+            (da.leq)
             (pair_fst a b x)
             (pair_fst a b y)
             p)))
@@ -1316,8 +1316,8 @@ theorem compare_lt_lt_absurd
     : Bottom =
   bool_true_false_absurd
     (ord_leq_at a d x y)
-    ((proof lt_sound for compare_raw) a d.leq x y hxy)
-    ((proof lt_reverse_false for compare_raw) a d.leq y x hyx)
+    ((proof lt_sound for compare_raw) a (d.leq) x y hxy)
+    ((proof lt_reverse_false for compare_raw) a (d.leq) y x hyx)
 
 theorem compare_lt_eq_absurd
       (a : Type)
@@ -1335,7 +1335,7 @@ theorem compare_lt_eq_absurd
       y
       x
       ((proof eq_sound for compare_with) a d y x hyx))
-    ((proof lt_reverse_false for compare_raw) a d.leq x y hxy)
+    ((proof lt_reverse_false for compare_raw) a (d.leq) x y hxy)
 
 theorem compare_eq_lt_absurd
       (a : Type)
@@ -1353,7 +1353,7 @@ theorem compare_eq_lt_absurd
       x
       y
       ((proof eq_sound for compare_with) a d x y hxy))
-    ((proof lt_reverse_false for compare_raw) a d.leq y x hyx)
+    ((proof lt_reverse_false for compare_raw) a (d.leq) y x hyx)
 
 theorem pair_compare_eq_sound
       (a : Type)
@@ -1723,7 +1723,7 @@ theorem lex_head_sound
   ord_result_elim
     (λr. Equal OrdResult (compare a d x y) r → Equal Bool (ord_leq_at a d x y) True)
     (compare a d x y)
-    (λp. proof lt_sound for compare_raw a d.leq x y p)
+    (λp. proof lt_sound for compare_raw a (d.leq) x y p)
     (λp.
       proof true_of_equal for ord_leq_at a d x y ((proof eq_sound for compare_with) a d x y p))
     (λp. absurd (lex_transport_head tail (compare a d x y) ord_gt p h))
@@ -1746,7 +1746,7 @@ theorem lex_tail_sound
         (bool_true_false_absurd
           (ord_leq_at a d y x)
           hyx
-          ((proof lt_reverse_false for compare_raw) a d.leq x y p)))
+          ((proof lt_reverse_false for compare_raw) a (d.leq) x y p)))
     (λp. lex_transport_head tail (compare a d x y) ord_eq p h)
     (λp. absurd (lex_transport_head tail (compare a d x y) ord_gt p h))
     Refl
@@ -1780,7 +1780,7 @@ theorem lex_complete_head_strict
         (bool_true_false_absurd
           (ord_leq_at a d x y)
           hxy
-          ((proof gt_forward_false for compare_raw) a d.leq x y p)))
+          ((proof gt_forward_false for compare_raw) a (d.leq) x y p)))
     Refl
 
 theorem lex_complete_tail
@@ -1803,7 +1803,7 @@ theorem lex_complete_tail
         (bool_true_false_absurd
           (ord_leq_at a d x y)
           hxy
-          ((proof gt_forward_false for compare_raw) a d.leq x y p)))
+          ((proof gt_forward_false for compare_raw) a (d.leq) x y p)))
     Refl
 
 fn list_ord_leq (a : Type) (d : Ord a) (xs : List a) (ys : List a) : Bool =
@@ -2133,7 +2133,7 @@ instance Ord (List a) where Ord a {
 }
 
 fn list_deceq_eq (a : Type) (da : DecEq a) (xs : List a) (ys : List a) : Bool =
-  list_eq a da.eq xs ys
+  list_eq a (da.eq) xs ys
 
 fn list_deceq_head_eq (a : Type) (da : DecEq a) (x : a) (y : a) : Bool = da.eq x y
 
@@ -2142,7 +2142,7 @@ fn list_deceq_cons_result
     : Prop =
   IsTrue
     (match b {
-      True ↦ list_eq a da.eq xs ys;
+      True ↦ list_eq a (da.eq) xs ys;
       False ↦ False
     })
 
@@ -2180,7 +2180,7 @@ theorem list_deceq_complete_cons
     (λb _.
       IsTrue
         (match b {
-          True ↦ list_eq a da.eq xs ys;
+          True ↦ list_eq a (da.eq) xs ys;
           False ↦ False
         }))
     tail_true

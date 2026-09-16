@@ -317,7 +317,7 @@ fn option_foldr (a : Type) (b : Type) (k : a → b → b) (z : b) (x : Option a)
 fn option_fold_map (a : Type) (m : Type) (mon : Monoid m) (g : a → m) (x : Option a) : m =
   match x {
     None ↦ mon.mempty;
-    Some v ↦ mon.op (g v) mon.mempty
+    Some v ↦ mon.op (g v) (mon.mempty)
   }
 
 fn option_to_list (a : Type) (x : Option a) : List a =

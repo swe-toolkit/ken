@@ -15,7 +15,7 @@ fn constrained_pair_instance_binds_two_dicts_and_resolves_at_use_site() {
     elab(&mut env, "instance Pick Int { select = 0 }").unwrap();
     elab(&mut env, "instance Pick Bool { select = True }").unwrap();
     let source = "instance Pick (Pair a b) where Pick a, Pick b { \
-         select = mk_pair a b da.select db.select \
+         select = mk_pair a b (da.select) (db.select) \
          }";
     let instance_id = elab(&mut env, source).unwrap();
 
@@ -71,7 +71,7 @@ fn constraint_names_are_deterministic_and_surface_misuse_rejects() {
     elab(
         &mut env,
         "instance Single (Pair a Bool) where Single a { \
-         selected = mk_pair a Bool d.selected True \
+         selected = mk_pair a Bool (d.selected) True \
          }",
     )
     .unwrap();
