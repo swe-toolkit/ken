@@ -83,10 +83,11 @@ pub(in crate::cranelift_backend) use semantic_ir::{
     BoolMatchCaseOrdinals, ConstructorIdentity, FieldIdentity, SynthesizedConstructorRole,
     SynthesizedFixedConstructorRole,
 };
-// The immediate-bridge realization plane. Only the descriptor the plan field
-// stores is named here: the Stratum A classifier is still consumed by nobody
-// outside its own module, and re-exporting it now would put a name on the live
-// surface ahead of the slice that uses it.
+// The immediate-bridge realization plane. The plan field's descriptor is the
+// only name needed here even now that the plane is wired: `construction.rs` is
+// a sibling module and reaches `publish_immediate_bridge_realization_plan`
+// through `use super::immediate_bridge::...`, so the classifier stays off this
+// module's surface entirely.
 use immediate_bridge::ImmediateBridgeRealization;
 #[cfg(feature = "px8-ds-test-support")]
 pub(in crate::cranelift_backend) use immediate_bridge::{

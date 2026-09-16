@@ -1183,21 +1183,100 @@ mod tests {
     /// Validation compares the STORED plane against a fresh derivation, so a
     /// plan that never installed the plane is refused the moment a row exists.
     ///
-    /// STRUCTURAL, and this is the strongest anti-stub case in the group: the
-    /// field is `BTreeMap::new()` at construction and this slice does not wire
-    /// the publish, so the bridge fixture's plan holds an EMPTY plane against a
-    /// one-row derivation. A `validate_` that returns `Ok(())`, or a `build_`
-    /// that returns an empty relation, both make this green.
+    /// STRUCTURAL, and it is this slice's ORDERING assertion rather than a
+    /// presence check.
+    ///
+    /// `validate_` compares the STORED plane against a re-derivation taken from
+    /// the plan's final state. The stored plane was written by the wired call in
+    /// `construction.rs`. So this passes only if the classification ran at a
+    /// point where its inputs already held their final values -- and it goes red
+    /// if the call is moved above them, because the plane installed from
+    /// `Vec::new()` inputs is empty while the final re-derivation is not.
+    ///
+    /// **The non-empty assertion is what stops it being vacuous**, and it is also
+    /// the assertion that CARRIES the red: measured, a relocation above the
+    /// specialization installs reds here with `left: 0, right: 1`, and
+    /// `validate_` below never runs. The two are one line apart and they catch
+    /// different faults -- the count catches a plane derived from ABSENT inputs,
+    /// `validate_` catches one derived from DIFFERENT inputs.
+    ///
+    /// **Three positions measured, and the boundary is the specialization ABI
+    /// install -- not the assignments and not the context ABI install:**
+    ///
+    ///     above the specialization assignments      RED, here, left 0 right 1
+    ///     above install_continuation_specialization_abi
+    ///                                               RED, every case, hard Err
+    ///                                               "continuation ABI descriptor
+    ///                                                count disagrees with the
+    ///                                                planned specialization
+    ///                                                population"
+    ///     above install_continuation_context_abi    GREEN, 26/26
+    ///
+    /// The middle position is LATER in the file than the first, so the call's
+    /// true lower bound is the specialization ABI install; the assignments are
+    /// merely another position above it. The second red is the `:6867` guard in
+    /// `continuation_units()` firing, which is a hard planner refusal rather
+    /// than a wrong answer.
+    ///
+    /// The green is structural, not a property of this fixture. `derive_` reads
+    /// the plan only through `continuation_units()` and `continuation_calls()`,
+    /// and **neither function body references `continuation_contexts` or
+    /// `abi.context_descriptors` anywhere** -- checked over their whole
+    /// brace-balanced ranges, not by a nearest-declaration scan. The consistency
+    /// guard on `context_descriptors` lives in `continuation_contexts()`, which
+    /// is a different function that nothing on this path calls. So the
+    /// context-ABI install writes fields this derivation never reads, and a
+    /// context-bearing fixture would be green at that position too.
+    ///
+    /// What `continuation_units()` DOES guard is
+    /// `abi.continuation_descriptors.len() == continuation_specializations.len()`
+    /// -- and `install_continuation_specialization_abi` is what populates the
+    /// left side, which is why the boundary sits there.
+    ///
+    /// **Fixture-scoped, and stated separately:** the two reds are this
+    /// fixture's results, and a different fixture could red earlier still on an
+    /// input this one does not depend on. The claim proved universal here is the
+    /// negative one -- the context-ABI install is not a bound for any fixture,
+    /// because the fields are disjoint from what this derivation reads.
+    ///
+    /// The upper bound is NOT tested here and cannot be at this slice: nothing
+    /// on a live path reads the plane, so moving the call later changes nothing
+    /// observable. See the module header.
     #[test]
-    fn validation_refuses_a_plan_whose_stored_plane_is_not_its_re_derivation() {
+    fn the_installed_plane_is_a_re_derivation_from_final_inputs() {
         let expr = heterogeneous_bridge_plan_fixture();
         let plan = crate::cranelift_backend::planning::static_transition::tests::b2r_plan(&expr);
-        assert!(
-            plan.immediate_bridge_realization_identities().is_empty(),
-            "this slice installs no plane; the field must still be empty"
+        assert_eq!(
+            plan.immediate_bridge_realization_identities().len(),
+            1,
+            "the fixture must install a non-empty plane, or this case is vacuous"
         );
+        validate_immediate_bridge_realization_plan(&plan).expect(
+            "the installed plane must equal its re-derivation from the plan's final inputs",
+        );
+    }
+
+    /// `validate_` REFUSES a stored plane that is not the re-derivation.
+    ///
+    /// STRUCTURAL, and it exists because the ordering case above cannot carry
+    /// this: its red is taken by the non-empty assertion, so `validate_` never
+    /// runs there and a stubbed `validate_` returning `Ok(())` would be green
+    /// everywhere. The mismatch is hand-built rather than planned -- clearing
+    /// the installed plane is the smallest perturbation that is definitely not
+    /// a re-derivation of a non-empty one.
+    #[test]
+    fn validation_refuses_a_stored_plane_that_is_not_the_re_derivation() {
+        let expr = heterogeneous_bridge_plan_fixture();
+        let mut plan =
+            crate::cranelift_backend::planning::static_transition::tests::b2r_plan(&expr);
+        assert_eq!(
+            plan.immediate_bridge_realizations.len(),
+            1,
+            "the planner must install a non-empty plane, or clearing it is a no-op"
+        );
+        plan.immediate_bridge_realizations.clear();
         let error = validate_immediate_bridge_realization_plan(&plan)
-            .expect_err("an empty plane against a one-row derivation is not valid");
+            .expect_err("an emptied plane against a one-row derivation is not valid");
         assert!(
             format!("{error:?}").contains("not its exact structural re-derivation"),
             "{error:?}"
@@ -1216,22 +1295,56 @@ mod tests {
             .expect("an empty plane against an empty derivation is valid");
     }
 
-    /// The plan-level accessors read the stored field, which is the only thing
-    /// a consumer will ever see.
+    /// The plan-level accessors return the INSTALLED row, which is the only
+    /// thing a consumer will ever see.
     ///
-    /// STRUCTURAL. On an uninstalled plane both must report absence rather than
-    /// fall back to a derivation -- a lookup that silently re-derives would make
-    /// the validation above unfalsifiable.
+    /// STRUCTURAL. Before the wiring these asserted absence; the wiring is
+    /// exactly what turns them into presence assertions, which is why they
+    /// changed in this slice rather than being deleted.
     #[test]
-    fn the_plan_accessors_read_the_stored_plane_and_never_re_derive() {
+    fn the_plan_accessors_return_the_installed_row() {
         let expr = heterogeneous_bridge_plan_fixture();
         let plan = crate::cranelift_backend::planning::static_transition::tests::b2r_plan(&expr);
         let derived = derive_immediate_bridge_realizations(&plan).expect("derives");
         assert_eq!(derived.len(), 1);
-        assert!(plan.immediate_bridge_realization_identities().is_empty());
-        assert!(plan
-            .immediate_bridge_realization(derived[0].identity())
-            .is_none());
+        assert_eq!(plan.immediate_bridge_realization_identities().len(), 1);
+        assert_eq!(
+            plan.immediate_bridge_realization(derived[0].identity()),
+            Some(&derived[0])
+        );
+    }
+
+    /// The accessors read the STORED plane and never fall back to a derivation.
+    ///
+    /// STRUCTURAL, and it needs the mutation hook now that the planner installs
+    /// a plane: with `DropRow` applied at the wired call, the stored plane is
+    /// empty while a fresh derivation still yields the row. An accessor that
+    /// re-derived would find it anyway.
+    ///
+    /// It also MEASURES what the hook reaches through the live wiring, which was
+    /// the one thing the Architect's inertness argument left unmeasured: the
+    /// mutation does reach the stored plane, and nothing downstream observes it.
+    #[cfg(feature = "px8-ds-test-support")]
+    #[test]
+    fn the_accessors_read_the_stored_plane_and_never_re_derive() {
+        let expr = heterogeneous_bridge_plan_fixture();
+        let (identities, applications) =
+            with_d5b_hs10_bridge_plan_mutation(D5bHs10BridgePlanMutation::DropRow, || {
+                let plan =
+                    crate::cranelift_backend::planning::static_transition::tests::b2r_plan(&expr);
+                let derived = derive_immediate_bridge_realizations(&plan).expect("derives");
+                (
+                    plan.immediate_bridge_realization_identities(),
+                    derived.len(),
+                )
+            });
+        assert_eq!(applications, 1, "the drop never fired");
+        assert_eq!(
+            identities.0.len(),
+            0,
+            "the stored plane must be the mutated one"
+        );
+        assert_eq!(identities.1, 1, "a fresh derivation still finds the row");
     }
 
     /// Publishing with no mutation installed is exactly the build, and it
