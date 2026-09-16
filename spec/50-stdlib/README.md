@@ -168,6 +168,25 @@ extract-min proofs remain separately deferred to
 chapter 57's all-laws-land-together posture and freezes no private leftist node
 layout.
 
+The **`Membership` provider class behind `∈`** is pinned in the dedicated
+**`58b-membership.md`** contract. It is a unary structure class over the
+container with the query type as an associated field, so it lands one universe
+up at `Type ℓ → Type (suc ℓ)` — the class former of `33 §5.2` operating, not a
+new kind of declaration. Because instance resolution is canonical per outermost
+head, the standard providers are **nominal, witness-bound views** rather than
+raw heads, and installing `Membership Tree` is forbidden: key, set and
+relation-edge membership are three meanings over one head. The comparator
+travels in the view value, so an implicit resolver choosing a fresh `Ord` at the
+use site is non-conforming. `Bool` is primary and the `Ω` view is read off it,
+never eliminated from. The shared observational relation `same_members` is a
+**definition**, not a law — a standalone over a dictionary, not a class field,
+carrying no obligation and discharged by nothing. The whole of
+the nonvacuous content is the per-provider adapter-fidelity obligation, so the
+chapter records that the class's shared law layer is **empty** rather than
+manufacturing content for it. The standard `∈`
+binding, its fixity and the use-site completion policy are fixed with the
+standard operator bindings, not here.
+
 The **Layer-3 parsing/syntax/diagnostics contract** — source artifacts as byte
 identity, half-open byte spans, total parser result values, small package-owned
 grammars, parser/printer and formatter laws, and diagnostic primary/secondary

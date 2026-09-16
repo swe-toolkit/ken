@@ -406,6 +406,18 @@ structure `C : Type → Type` (its members carve out a subobject of the universe
 "typeclasses-as-subobjects" design is the most category-faithful account of open
 user typeclasses.
 
+> **That shape is the common case, not the formation rule.** The rule is `§5.2`
+> — a class elaborates to the right-nested Σ over its field telescope — and it
+> fixes no level; `§5.1` then keys the property/structure discriminant on the
+> record's kernel-computed **sort family**, not on a level. A class may
+> therefore depart from `C : Type → Type` on either axis and remain an ordinary
+> class. Both departures exist: `class Traversable (f : Type → Type)` (`§5.2`)
+> takes a higher-kinded **parameter**, and a class carrying a `Type`-valued
+> field lands one universe up, at `C : Type ℓ → Type (suc ℓ)`, because the
+> field's type is itself at `Type (suc ℓ)` (`12 §1`) and the Σ-sort takes the
+> maximum (`13 §4`). Read the shape above as orienting; read `§5.1`/`§5.2` as
+> binding.
+
 ```
 class DecEq (A : Type) {              -- a record of operations + their laws
   eq    : A → A → Bool                 -- (the propositional equality is the
@@ -863,7 +875,7 @@ to `trusted_base()`.
 `31 §1c` admits the spellings `≤`/`<=`, `≥`/`>=`, `≠`/`/=`, `∧`/`/\`, `∨`/`\/`
 and `∈` as ordinary symbolic names, each paired spelling one token. Admission
 fixes **names**, not meanings. This section fixes the standard **meanings** of
-five of them. `∈` is not bound here.
+five of them here, and `∈`'s in `§6.3`.
 
 Each standard meaning is an ordinary checked top-level function reached by
 ordinary import. None is a built-in, a kernel rule, or a primitive, and this
@@ -916,9 +928,9 @@ operands moves it from one to the other.
 Standard fixities, declared of the **bindings** and therefore travelling with
 import and re-export exactly as `§6` states:
 
-    ∧        infixr 3
-    ∨        infixr 2
-    ≤ ≥ ≠    infix 4
+    ∧          infixr 3
+    ∨          infixr 2
+    ≤ ≥ ≠ ∈    infix 4
 
 ### 6.2 The `≠` carrier inventory, and its two distinct refusals
 
@@ -962,6 +974,40 @@ Two refusals follow, and they are **not the same refusal**:
 An implementation that collapses these into one "unsupported carrier" outcome
 is non-conforming even when both inputs are rejected, because the two states
 differ in what would change them.
+
+### 6.3 `∈` — the membership binding
+
+`∈`'s standard meaning is the binding `membership_member_at`, whose dictionary
+is a `Membership` provider (`../50-stdlib/58b §1`):
+
+    membership_member_at (c : Type) (d : Membership c) (q : d.Query) (x : c) : Bool
+
+It is an ordinary checked top-level binding, exactly as `§6.1`'s other four
+are, and `§6.9`'s completion policy keys on its `GlobalId` on the same terms.
+It is **not** a class method: `d.member` is a field projection and has no
+`GlobalId` for the policy to key on (`39 §6.9`, `../50-stdlib/58b §5`).
+
+`∈` takes `infix 4`, in the comparison band with `≤ ≥ ≠`.
+
+**The query type is reached as a projection from an earlier parameter.** The
+kernel admits this — with `Query` as the provider's first field the telescope
+`[c, d, Proj1(d), c]` is closed by the binding's own parameter `d`, ordinary
+dependency exactly like `(a : Type) (x : a)` — and this section specifies the
+binding at that level.
+
+> **Ken's surface type grammar has no projection form**, so the catalog
+> binding cannot be *written* until one exists. That is a prerequisite of
+> `LANG-MEMBERSHIP-OPERATOR-SURFACE`, the build node that authors the binding,
+> not of this contract, and the distinction is
+> real: the telescope is closed and kernel-checkable today, and only its
+> spelling is missing.
+>
+> **It must not be discharged by making `∈` an elaborator builtin.** `§6.1`
+> requires every standard meaning to be an ordinary top-level binding, and
+> `§6.9`'s policy rests on that premise — a builtin would have no `GlobalId`
+> to key on and would falsify the precondition the whole completion policy is
+> built on, for `∈` and by precedent for every operator after it. The escape
+> hatch is the one thing this clause exists to close.
 
 ## 7. What WS-L must deliver here
 

@@ -1243,6 +1243,33 @@ has nothing to key on. `ord_leq_at` is a binding with a canonical identity
 whose **body** projects `leq`; the identity is what completion recognises, and
 the projection is an implementation detail of that binding.
 
+### 6.10 `∈` — carrier-first completion
+
+`∈` completes by the policy of `§6.9` and adds no second dispatcher. One rule
+is specific to it, and it is load-bearing:
+
+**Infer the RHS carrier FIRST.** For `q ∈ c`, elaborate `c`, resolve the one
+canonical `Membership` dictionary for its head by the ordinary search of
+`§6.2`, project the provider's `Query`, and only then check `q` against that
+type. **The LHS is never used to guess among carrier meanings.**
+
+The order is not a preference. A provider is keyed on the container's head
+(`33 §5.5`), and the query type is determined *by* the provider — so inferring
+from the LHS would have to guess which carrier was meant in order to know what
+the LHS should be, which is the circularity carrier-first avoids. An
+implementation that infers from the LHS will appear to work wherever the query
+type happens to be unambiguous and will diverge exactly where two providers
+accept the same query type over different containers.
+
+A missing provider, an ambiguous one, or a container with no admitted provider
+is an **ordinary instance-resolution error** at the occurrence (`§6.7`), never
+a fallback to a different meaning and never a silent acceptance.
+
+Completion keys on `membership_member_at`'s `GlobalId` and its checked
+telescope, on exactly the terms `§6.9` states — so a renamed or re-exported
+membership binding still completes, a user's own `∈` does not, and an explicit
+partial application stays partially applied.
+
 ## 7. What WS-L/WS-V must deliver here (V0, then L-stream)
 
 The elaborator: scope resolution, implicit insertion, bidirectional HM+dependent

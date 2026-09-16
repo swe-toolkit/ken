@@ -130,6 +130,19 @@ claim with no conformance case is a claim no one can rely on
   structural refusal that no registration closes). Rows needing completion are
   red until `LANG-STANDARD-INFIX-CALL-COMPLETION`; the identity, class-field
   and inventory rows are live.
+- `surface/operators/seed-membership-binding.md` — `∈`'s standard meaning, its
+  carrier-first completion, and the provider discipline. Resolution rows cover
+  all four standard views over three heads (the set arm shares the ordered-key
+  head, so a coarser key collapses two of them); the inference-order row uses a
+  query type two providers accept, the one arrangement where LHS-first and
+  carrier-first disagree; the witness row pairs a view validated under one
+  comparator with a second that orders differently, because a single-comparator
+  fixture is green under both implementations. `Membership Tree` is refused with
+  the canonical-one-per-head conflict named as the reason, and missing versus
+  ambiguous providers must be distinguishable. `Bool`-primary is asserted
+  structurally, since no value-level case separates it from an `Ω` elimination.
+  Completion rows are red until `LANG-MEMBERSHIP-OPERATOR-SURFACE`; the
+  `Bool`-primary and fixity rows are live.
 - `surface/data-match/seed-data-match.md` — L2 sum types + `match` + refinements
   (`34`): real constructors + a computing `elim_D`, `match`→`elim_D` (nested),
   the **required exhaustiveness** safety (non-exhaustive rejects naming the
