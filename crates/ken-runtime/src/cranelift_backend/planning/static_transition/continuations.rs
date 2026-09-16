@@ -1188,6 +1188,111 @@ impl ContinuationConsumingOccurrence {
     }
 }
 
+/// One exact forward edge from a result-flow root toward a result position.
+///
+/// The role is closed because lowering must be able to reject a template whose
+/// recorded source child no longer has the semantics under which it was issued.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum SourceReturnContextRole {
+    CheckedBody,
+    LetBody,
+    IfThen,
+    IfElse,
+    MatchCase(u32),
+    ComputationalMatchCase(u32),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceReturnContextStep {
+    parent_origin: StaticOriginId,
+    child_origin: StaticOriginId,
+    child_position: u32,
+    role: SourceReturnContextRole,
+}
+
+impl SourceReturnContextStep {
+    pub(in crate::cranelift_backend) fn parent_origin(self) -> StaticOriginId {
+        self.parent_origin
+    }
+
+    pub(in crate::cranelift_backend) fn child_origin(self) -> StaticOriginId {
+        self.child_origin
+    }
+
+    pub(in crate::cranelift_backend) fn child_position(self) -> u32 {
+        self.child_position
+    }
+
+    pub(in crate::cranelift_backend) fn role(self) -> SourceReturnContextRole {
+        self.role
+    }
+}
+
+/// A generated worker's result returns through the exact call that selected it
+/// before it reaches the caller-owned suffix. This is a symbolic boundary: it
+/// contains no lowering activation, cursor, selected scope, or runtime value.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceWorkerReturnBoundary {
+    selecting_call: ContinuationCallIdentity,
+    caller_context: Box<SourceReturnContextTemplate>,
+}
+
+impl SourceWorkerReturnBoundary {
+    pub(in crate::cranelift_backend) fn selecting_call(&self) -> &ContinuationCallIdentity {
+        &self.selecting_call
+    }
+
+    pub(in crate::cranelift_backend) fn caller_context(&self) -> &SourceReturnContextTemplate {
+        &self.caller_context
+    }
+}
+
+/// The exact static result-position-to-return-boundary path retained by the
+/// common forward result traversal. `steps` run root-to-result; lowering binds
+/// their reverse against the continuation it actually owns. The optional
+/// worker boundary composes one generated result domain with its exact caller
+/// without inventing a concrete source-machine continuation.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceReturnContextTemplate {
+    root_origin: StaticOriginId,
+    result_origin: StaticOriginId,
+    steps: Vec<SourceReturnContextStep>,
+    /// Computational consumers already pending outside this result root, in
+    /// exact inner-to-outer return order.
+    caller_suffix: Vec<StaticOriginId>,
+    worker_return: Option<Box<SourceWorkerReturnBoundary>>,
+}
+
+impl SourceReturnContextTemplate {
+    pub(in crate::cranelift_backend) fn root_origin(&self) -> StaticOriginId {
+        self.root_origin
+    }
+
+    pub(in crate::cranelift_backend) fn result_origin(&self) -> StaticOriginId {
+        self.result_origin
+    }
+
+    pub(in crate::cranelift_backend) fn steps(&self) -> &[SourceReturnContextStep] {
+        &self.steps
+    }
+
+    pub(in crate::cranelift_backend) fn caller_suffix(&self) -> &[StaticOriginId] {
+        &self.caller_suffix
+    }
+
+    pub(in crate::cranelift_backend) fn worker_return(
+        &self,
+    ) -> Option<&SourceWorkerReturnBoundary> {
+        self.worker_return.as_deref()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ContinuationResultPositionWitness {
+    origin: StaticOriginId,
+    return_context: SourceReturnContextTemplate,
+}
+
 /// A continuation call's independently derived consumer-level occurrence.
 ///
 /// This is deliberately separate from
@@ -1200,23 +1305,80 @@ impl ContinuationConsumingOccurrence {
 /// The fields are private and there is no constructor outside planning.
 /// Lowering can only receive a value that the whole-plan validator has matched
 /// against [`derive_required_consumer_occurrence`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) struct RequiredConsumerProjection {
-    pub(super) source: ContinuationConsumingOccurrence,
-    pub(super) required: ContinuationConsumingOccurrence,
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum RequiredConsumerProjection {
+    DirectOuter {
+        source: ContinuationConsumingOccurrence,
+        required: ContinuationConsumingOccurrence,
+    },
+    DetachedReturnContext(SourceReturnContextTemplate),
 }
 
 impl RequiredConsumerProjection {
-    pub(in crate::cranelift_backend) fn source(self) -> ContinuationConsumingOccurrence {
-        self.source
+    pub(in crate::cranelift_backend) fn direct_outer(
+        &self,
+    ) -> Option<(
+        ContinuationConsumingOccurrence,
+        ContinuationConsumingOccurrence,
+    )> {
+        match self {
+            Self::DirectOuter { source, required } => Some((*source, *required)),
+            Self::DetachedReturnContext(_) => None,
+        }
     }
 
-    pub(in crate::cranelift_backend) fn body_origin(self) -> StaticOriginId {
-        self.required.body_origin
+    pub(in crate::cranelift_backend) fn detached_return_context(
+        &self,
+    ) -> Option<&SourceReturnContextTemplate> {
+        match self {
+            Self::DirectOuter { .. } => None,
+            Self::DetachedReturnContext(context) => Some(context),
+        }
     }
 
-    pub(in crate::cranelift_backend) fn eliminator_origin(self) -> StaticOriginId {
-        self.required.eliminator_origin
+    pub(in crate::cranelift_backend) fn source(&self) -> ContinuationConsumingOccurrence {
+        self.direct_outer()
+            .expect("a direct required-consumer route has direct-outer authority")
+            .0
+    }
+
+    pub(in crate::cranelift_backend) fn body_origin(&self) -> StaticOriginId {
+        self.direct_outer()
+            .expect("a direct required-consumer route has direct-outer authority")
+            .1
+            .body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn eliminator_origin(&self) -> StaticOriginId {
+        self.direct_outer()
+            .expect("a direct required-consumer route has direct-outer authority")
+            .1
+            .eliminator_origin
+    }
+}
+
+/// One exact source computational consumer in a checked-IH transport result
+/// chain. The optional frame marker is derived from the source wrapper whose
+/// sole body is this occurrence; lowering re-enters that existing marker rather
+/// than minting a new checked frame.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumerStep {
+    occurrence: ContinuationConsumingOccurrence,
+    demanded_body_origin: StaticOriginId,
+    checked_frame_id: Option<u64>,
+}
+
+impl CheckedIhPostCallConsumerStep {
+    pub(in crate::cranelift_backend) fn occurrence(self) -> ContinuationConsumingOccurrence {
+        self.occurrence
+    }
+
+    pub(in crate::cranelift_backend) fn demanded_body_origin(self) -> StaticOriginId {
+        self.demanded_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn checked_frame_id(self) -> Option<u64> {
+        self.checked_frame_id
     }
 }
 
@@ -1319,6 +1481,14 @@ impl ContinuationCallIdentity {
     /// conflation `evt_609am4v7cdt5b` ruled against.
     pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
         self.token.emission_owner
+    }
+
+    pub(in crate::cranelift_backend) fn producer_result_origin(&self) -> StaticOriginId {
+        self.token.producer_result_origin
+    }
+
+    pub(in crate::cranelift_backend) fn producer_construct_origin(&self) -> StaticOriginId {
+        self.token.producer_construct_origin
     }
 }
 
@@ -6346,9 +6516,9 @@ pub(super) fn build_continuation_specialization_plan(
         #[cfg(test)]
         let projection_minted = required != source;
         if required != source {
-            let projection = RequiredConsumerProjection { source, required };
+            let projection = RequiredConsumerProjection::DirectOuter { source, required };
             if required_consumer_projections
-                .insert(identity, projection)
+                .insert(identity, projection.clone())
                 .is_some_and(|prior| prior != projection)
             {
                 return Err(planner_error(
@@ -6569,6 +6739,86 @@ pub(super) fn validate_continuation_specialization_closure(
     Ok(())
 }
 
+fn validate_source_return_context(
+    plan: &StaticTransitionPlan<'_>,
+    context: &SourceReturnContextTemplate,
+    call_identities: &BTreeSet<ContinuationCallIdentity>,
+) -> Result<(), CraneliftBackendError> {
+    let mut current = context.root_origin;
+    for step in &context.steps {
+        if step.parent_origin != current
+            || plan
+                .semantic
+                .child_origin(step.parent_origin, step.child_position as usize)?
+                != step.child_origin
+        {
+            return Err(planner_error(
+                "a detached source return context does not follow its exact forward source child",
+            ));
+        }
+        let expr = plan.planned_occurrence_expr(step.parent_origin)?;
+        let role_matches = match (step.role, expr) {
+            (
+                SourceReturnContextRole::CheckedBody,
+                RuntimeExpr::CheckedJoinSite { .. }
+                | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. }
+                | RuntimeExpr::CheckedComputationalIHSlots { .. }
+                | RuntimeExpr::CheckedComputationalIHInvocation { .. },
+            ) => step.child_position == 0,
+            (SourceReturnContextRole::LetBody, RuntimeExpr::Let { .. }) => step.child_position == 1,
+            (SourceReturnContextRole::IfThen, RuntimeExpr::If { .. }) => step.child_position == 1,
+            (SourceReturnContextRole::IfElse, RuntimeExpr::If { .. }) => step.child_position == 2,
+            (SourceReturnContextRole::MatchCase(index), RuntimeExpr::Match { cases, .. }) => {
+                (index as usize) < cases.len() && step.child_position as usize == 1 + index as usize
+            }
+            (
+                SourceReturnContextRole::ComputationalMatchCase(index),
+                RuntimeExpr::ComputationalMatch { cases, .. },
+            ) => {
+                (index as usize) < cases.len() && step.child_position as usize == 1 + index as usize
+            }
+            _ => false,
+        };
+        if !role_matches {
+            return Err(planner_error(
+                "a detached source return context role disagrees with its source expression",
+            ));
+        }
+        current = step.child_origin;
+    }
+    if current != context.result_origin {
+        return Err(planner_error(
+            "a detached source return context does not end at its claimed result position",
+        ));
+    }
+    let mut suffix_seen = BTreeSet::new();
+    for origin in &context.caller_suffix {
+        if !suffix_seen.insert(*origin)
+            || !matches!(
+                plan.planned_occurrence_expr(*origin)?,
+                RuntimeExpr::ComputationalMatch { .. }
+            )
+        {
+            return Err(planner_error(
+                "a detached source return context has a duplicate or non-computational caller suffix",
+            ));
+        }
+    }
+    if let Some(boundary) = context.worker_return.as_deref() {
+        if !call_identities.contains(&boundary.selecting_call)
+            || boundary.caller_context.result_origin
+                != boundary.selecting_call.producer_construct_origin()
+        {
+            return Err(planner_error(
+                "a detached worker return boundary is not bound to its exact selecting call",
+            ));
+        }
+        validate_source_return_context(plan, &boundary.caller_context, call_identities)?;
+    }
+    Ok(())
+}
+
 pub(super) fn validate_required_consumer_projections(
     plan: &StaticTransitionPlan<'_>,
     units: &[PlannedContinuationSpecialization],
@@ -6599,32 +6849,64 @@ pub(super) fn validate_required_consumer_projections(
                 "a required-consumer projection's call position disagrees with its target",
             ));
         }
-        let derived = derive_required_consumer_occurrence(plan, &target.key)?;
-        let source = rederive_consuming_occurrence(plan, &target.key, projection.source)?;
-        if source != Some(projection.source) {
-            return Err(planner_error(
-                "a required-consumer projection's source occurrence does not match the exact \
-                 source-level occurrence independently derived from its target",
-            ));
-        }
-        if derived != Some(projection.required) {
-            #[cfg(test)]
-            {
-                let reason = match derived {
-                    Some(expected)
-                        if expected.eliminator_origin != projection.required.eliminator_origin =>
+        match projection {
+            RequiredConsumerProjection::DirectOuter { source, required } => {
+                let derived = derive_required_consumer_occurrence(plan, &target.key)?;
+                let rederived = rederive_consuming_occurrence(plan, &target.key, *source)?;
+                if rederived != Some(*source) {
+                    return Err(planner_error(
+                        "a required-consumer projection's source occurrence does not match the exact \
+                         source-level occurrence independently derived from its target",
+                    ));
+                }
+                if derived != Some(*required) {
+                    #[cfg(test)]
                     {
-                        "a required-consumer projection has a mismatched eliminator_origin"
+                        let reason = match derived {
+                            Some(expected)
+                                if expected.eliminator_origin != required.eliminator_origin =>
+                            {
+                                "a required-consumer projection has a mismatched eliminator_origin"
+                            }
+                            _ => "a required-consumer projection has a mismatched body_origin",
+                        };
+                        return Err(planner_error(reason));
                     }
-                    _ => "a required-consumer projection has a mismatched body_origin",
-                };
-                return Err(planner_error(reason));
+                    #[cfg(not(test))]
+                    return Err(planner_error(
+                        "a required-consumer projection is not the exact consumer-level occurrence \
+                         independently derived from its target",
+                    ));
+                }
             }
-            #[cfg(not(test))]
-            return Err(planner_error(
-                "a required-consumer projection is not the exact consumer-level occurrence \
-                 independently derived from its target",
-            ));
+            RequiredConsumerProjection::DetachedReturnContext(context) => {
+                if target.key.consuming_occurrence.is_some()
+                    || context.root_origin != identity.token.producer_result_origin
+                    || context.result_origin != identity.token.producer_construct_origin
+                {
+                    return Err(planner_error(
+                        "a detached return-context proof is not bound to an absent source consumer and its exact call result position",
+                    ));
+                }
+                let ContinuationEmissionOwner::Specialization(enclosing) =
+                    identity.token.emission_owner
+                else {
+                    return Err(planner_error(
+                        "a detached return-context proof was issued outside a generated context",
+                    ));
+                };
+                let Some(boundary) = context.worker_return.as_deref() else {
+                    return Err(planner_error(
+                        "a detached return-context proof has no generated-worker return boundary",
+                    ));
+                };
+                if boundary.selecting_call.target() != enclosing {
+                    return Err(planner_error(
+                        "a detached return-context proof's selecting call does not own its generated context",
+                    ));
+                }
+                validate_source_return_context(plan, context, &call_identities)?;
+            }
         }
     }
     Ok(())
@@ -7136,7 +7418,29 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
         identity: &ContinuationCallIdentity,
     ) -> Option<RequiredConsumerProjection> {
-        self.required_consumer_projections.get(identity).copied()
+        self.required_consumer_projections
+            .get(identity)
+            .filter(|projection| projection.direct_outer().is_some())
+            .cloned()
+    }
+
+    /// The detached return-context proof for this call identity, if the planner
+    /// issued one.
+    ///
+    /// Deliberately a second accessor rather than a variant test on the value
+    /// returned above: `required_consumer_projection_for` is the direct-outer
+    /// path and filters this variant out, so the two consumers of a projection
+    /// never share one funnel. That filter is what makes the direct-outer
+    /// accessors on [`RequiredConsumerProjection`] total at every reachable
+    /// call; it is load-bearing and pinned by
+    /// `a_detached_projection_is_never_handed_to_the_direct_outer_route`.
+    pub(in crate::cranelift_backend) fn detached_return_context_for(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<&SourceReturnContextTemplate> {
+        self.required_consumer_projections
+            .get(identity)
+            .and_then(RequiredConsumerProjection::detached_return_context)
     }
 
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D7a` — the planner-issued composed worker
