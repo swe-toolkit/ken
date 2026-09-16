@@ -1191,6 +1191,84 @@ refuted statement true.
 produces a clean record, the AC is **not** met. A mutation that produces a clean
 record is a mutation that proved nothing.
 
+> ### THAT CONTROL WAS RUN 2026-09-16. IT IS INERT, AND IT FAILS RED.
+>
+> **Measured on BOTH trees by runtime-implementer (`evt_145jhy9x607wd`), which
+> is what makes it a finding rather than a complaint:**
+>
+>     CANDIDATE   0 passed; 1 failed; 160 filtered out; 510s
+>     BASE        0 passed; 1 failed; 160 filtered out; 518s
+>     both        rt_parity_native.rs:2403
+>                 "vary-ret: owner mutation did not reach"   left 0, right 1
+>
+> ⇒ **`applications == 0`. The mutation never reaches production**, on the base
+> as much as on the candidate. The control does not apply its own mutation, so
+> it cannot distinguish a working guard from a missing one **in either
+> direction.** An inert control is a STOP, not a pass.
+>
+> **IT FAILS RED, WHICH IS WHY IT WOULD HAVE BEEN BELIEVED.** An inert control
+> that goes green gets suspected eventually; one that goes red looks like it is
+> doing its job. Reporting the COUNT rather than the verdict is what made it
+> diagnosable at all — a pass/fail alone cannot separate *inapplicable* from
+> *false*.
+>
+> **THE BUILD-PROFILE EXPLANATION IS CLOSED, NOT LEFT OPEN.** The obvious
+> objection is that `applications == 0` is an artifact of `-p` versus
+> `--workspace` feature unification — which would make it one more instance of
+> the paragraph above, and is the reading this node is primed for. Refuted by
+> the test's own compilability (Architect, `evt_7erz5svdcz1fz`):
+> `StaticResponseOwnerBodyMutation` (`units.rs:490`, `VaryRet`) and
+> `with_static_response_owner_body_mutation` are **both**
+> `#[cfg(feature = "px8-ds-test-support")]`; the test names both symbols, so it
+> could not have built with the feature off — **and it built and reached an
+> assertion.** The feature was on. `applications == 0` is a real measurement.
+>
+> **THE DISPOSITION: THE QUESTION'S FORM IS VOID; THE MATTER IS OPEN.** *"Does a
+> `VaryRet` compile still fail loudly at this seam?"* presupposes that a
+> `VaryRet` compile happens. It does not. The question cannot be answered,
+> carried, or satisfied, and it must not sit here looking live — a reader who
+> finds it will try to satisfy it. **`D1-2` is NOT closed on the inert result.**
+>
+> **WHAT REPLACES IT IS A ROUTING MEASUREMENT, NOT AN ACCEPTANCE CRITERION —
+> AND THE PRECONDITION QUESTION IS ALREADY ANSWERED IN THE FIXTURE TABLE.**
+> `rt_parity_native.rs:2394-2399` asserts
+> `!baseline_rows[0].all_static_response_rows.is_empty()`, but only
+> `if entry == "rt_write_writable_stage"`. That `entry` is
+> `owner_body_control`'s own parameter, and this control's arguments are fixed
+> at its `owner_body_control_test!` invocation rather than chosen at run time:
+> `static_response_owner_body_vary_ret_reds_and_restores` passes label
+> `"vary-ret"` and entry **`"rt_read_offset_stage"`** (the macro arm binds
+> `$label` before `$entry` and calls `owner_body_control($entry, $label, ...)`).
+>
+> ⇒ **The precondition is statically unreachable for this control. It never
+> executed and no run could have said otherwise**, so the population is
+> unmeasured — but that fact does not isolate `VaryRet`. **Ten of the eleven
+> owner-body controls use `rt_read_offset_stage`**; only `context-zero` uses
+> `rt_write_writable_stage`, which is the entry that precondition guards. It is
+> that one control's fixture check, never a population gate here.
+>
+> **THE DISCRIMINATING MEASUREMENT IS ONE SIBLING'S `applications` COUNT ON THE
+> SAME ENTRY** — `static_response_owner_body_raw_worker_reds_and_restores`, same
+> entry, same harness, different mutation. Not yet run. **`D1-2`'s disposition
+> BRANCHES on it:**
+>
+> - **A sibling on `rt_read_offset_stage` reaches (`applications == 1`)** ⇒ the
+>   entry does carry a population owner-body mutations reach, and `VaryRet`'s
+>   `applications == 0` is specific to `VaryRet`. That is the **reportable
+>   finding** under `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:365`, on its own node.
+> - **No sibling reaches on that entry** ⇒ the entry carries no reachable
+>   owner-body population at all. That is a fixture gap, `D1-8` territory; once
+>   a qualifying fixture exists the original question becomes askable and
+>   `D1-2` is answered on its own terms rather than replaced.
+>
+> **The branch is not yet known, and this node says so** rather than recording
+> one open item that looks like it closes on one value.
+>
+> **DO NOT MANUFACTURE A REACH.** Making the mutation apply in order to satisfy
+> this control is exactly what `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:366-371`
+> forbids and what the Architect extended to controls at `evt_5gws0pnssfqch`.
+> **The unreachability IS the finding.**
+
 D1-1 is structural, D1-2 is semantic, and D1-2 is not an exception to fence 1 —
 it is fence 1's general shape: **the thing RELIED UPON must be the thing
 GUARDED, not merely something downstream of a guard.**
