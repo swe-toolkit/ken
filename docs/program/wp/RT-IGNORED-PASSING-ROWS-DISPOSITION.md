@@ -369,8 +369,46 @@ unchanged.
 readmission needs no probe: a red on the semantic mutation already proves reach.
 **The probe is owed only by the arm that would otherwise be unfalsifiable.**
 
-**Record per row:** the mutation site, the probe result at that site, and the
-semantic-mutation result. Three facts, not one.
+#### THE PROBE PROVES EXECUTION. IT DOES NOT PROVE OBSERVABILITY.
+
+**Narrowed 2026-09-16 on the implementer's objection, before any row was
+withheld on it.** A `panic!` reds if the site executed **at least once in the
+run** — not if it executed **on the path the assertion depends on.** Those come
+apart whenever a site serves more than one caller:
+
+    site executed during SETUP but not during the asserted operation
+      probe                REDS   (it was reached)
+      semantic mutation    GREEN  (the assertion never observes it)
+      naive reading        "reach proven + semantic green => VACUOUS"
+      truth                the row may be perfectly well coupled elsewhere
+
+**Row 1 is the live example.** `lookup` is called by every resolver, so a probe
+there reds on the `FsOpen` at sequence 0 — long before the assertion's
+`FsHandleMetadata` at sequence 2. **Reach at `lookup` was never in doubt; which
+of its three exits the assertion observes was the entire question.**
+
+⇒ **A red probe kills exactly one hypothesis: "the site never executed."** That
+is the hypothesis attempt 1 died of, and it is worth a required check. **It does
+not establish that the mutated value was observable by the assertion**, which is
+the stronger property a vacuity verdict actually needs, and **no probe can
+supply it** — it is an argument about the data path, not a measurement.
+
+**So the record carries the argument explicitly rather than letting a red probe
+stand in for it.**
+
+**Record per row — FOUR facts, not one:**
+
+    1  the mutation site
+    2  the probe result at that site        MEASUREMENT: did it execute
+    3  the semantic-mutation result         MEASUREMENT: did the row notice
+    4  the path from the mutated value to the assertion that reads it
+                                            ARGUMENT: why it should have
+
+**Item 4 is weaker than items 2 and 3 and is labelled so.** It is required
+because it is the piece the probe structurally cannot supply. **A vacuity
+finding missing item 4 is incomplete even with a red probe** — the point of
+writing it down is that the gap becomes visible instead of hiding behind a
+measurement that does not cover it.
 
 > **Why this was worth stopping for.** The failure `AC-1` exists to prevent is a
 > row readmitted on a pass that proves nothing. **This defect is the same shape
