@@ -96,6 +96,7 @@ pub(in crate::cranelift_backend) use immediate_bridge::{
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
+    CheckedIhPostCallConsumer,
     DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
@@ -689,6 +690,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// every admitted host effect occurrence. Read by lowering, which claims
     /// exactly one of these per seat it consumes.
     host_effect_seats: Vec<PlannedEffectSeat>,
+    /// Exact post-call source consumers for checked-IH transports whose actual
+    /// continuation result differs from the response context's demanded Result.
+    /// Compiler-only: no ABI descriptor or runtime frame references this plane.
+    checked_ih_post_call_consumers: Vec<CheckedIhPostCallConsumer>,
 }
 
 fn planner_error(detail: impl Into<String>) -> CraneliftBackendError {

@@ -8079,6 +8079,50 @@ impl<'a> Lowering<'a> {
     }
 
 
+
+    fn checked_post_call_consumer_frame(
+        &self,
+        planned_id: Option<u64>,
+        cases: &[crate::RuntimeComputationalMatchCase],
+        default: &RuntimeTrap,
+    ) -> Result<CheckedComputationalFrame, CraneliftBackendError> {
+        if let Some(frame_id) = planned_id {
+            let frame = self
+                .oriented_subcontinuation_plan
+                .as_ref()
+                .and_then(|plan| plan.frame(frame_id))
+                .ok_or_else(|| {
+                    unsupported(
+                        "OrientedSubcontinuationPlanV1",
+                        "a planned post-call consumer has no checked frame entry",
+                    )
+                })?;
+            if frame.runtime_frame_fingerprint
+                != crate::compiler_private_computational_match_frame_fingerprint(cases, default)
+            {
+                return Err(unsupported(
+                    "OrientedSubcontinuationPlanV1",
+                    "a planned post-call consumer no longer denotes its exact checked frame",
+                ));
+            }
+        }
+        Ok(CheckedComputationalFrame {
+            id: planned_id,
+            invocation_id: planned_id.map(|_| {
+                self.active_recursive_invocations
+                    .last()
+                    .map_or(0, |instance| instance.invocation_instance_id)
+            }),
+            invocation_source: self
+                .active_recursive_invocations
+                .last()
+                .map(|instance| instance.source),
+            invocation_depth: self
+                .active_recursive_invocations
+                .last()
+                .map_or(0, |instance| instance.semantic_depth),
+        })
+    }
 }
 
 impl Lowered {

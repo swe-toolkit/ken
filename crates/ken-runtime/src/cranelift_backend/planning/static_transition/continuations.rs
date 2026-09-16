@@ -10945,3 +10945,114 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
         );
     }
 }
+
+
+/// Derive the complete ordered source-consumer chain from one continuation
+/// target's actual selected-case Result to the independently demanded context
+/// Result. Every hop is a position-zero computational consumer selected by the
+/// prior hop's exact constructor identity. Absence or ambiguity refuses.
+pub(super) fn derive_checked_ih_post_call_consumer_chain(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+    frame_origins: &[StaticOriginId],
+    actual: ConstructorIdentity,
+    demanded: ConstructorIdentity,
+) -> Result<Option<Vec<CheckedIhPostCallConsumerStep>>, CraneliftBackendError> {
+    let rederived_actual = continuation_call_selected_result_identity(plan, identity)?;
+    if rederived_actual != actual {
+        return Err(planner_error(
+            "a checked-IH post-call consumer's actual Result identity disagrees with its target's selected source case",
+        ));
+    }
+    if actual == demanded {
+        return Ok(Some(Vec::new()));
+    }
+
+    if frame_origins.is_empty() {
+        return Ok(None);
+    }
+    let mut consumers = Vec::with_capacity(frame_origins.len());
+    for frame_origin in frame_origins {
+        let Some(consumer) = post_call_consumer_in_frame(plan, *frame_origin, actual)? else {
+            return Ok(None);
+        };
+        let Some(demanded_case) = post_call_consumer_in_frame(plan, *frame_origin, demanded)?
+        else {
+            return Ok(None);
+        };
+        consumers.push(CheckedIhPostCallConsumerStep {
+            occurrence: consumer,
+            demanded_body_origin: demanded_case.body_origin,
+            checked_frame_id: checked_frame_for_consumer(plan, *frame_origin)?,
+        });
+    }
+    Ok(Some(consumers))
+}
+
+/// Derive the successful identity actually produced by a continuation target's
+/// selected source case. This is the source half of the post-call contract; it
+/// does not inspect the demanded response identity.
+pub(super) fn continuation_call_selected_result_identity(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+) -> Result<ConstructorIdentity, CraneliftBackendError> {
+    let unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == identity.target())
+        .ok_or_else(|| {
+            planner_error("a checked-IH post-call consumer names no target specialization")
+        })?;
+    let body = plan.semantic.child_origin(
+        unit.continuation_origin(),
+        1 + unit.producer_alternative() as usize,
+    )?;
+    exact_result_identity(plan, body, "a continuation target's selected source case")
+}
+
+fn post_call_consumer_in_frame(
+    plan: &StaticTransitionPlan<'_>,
+    frame_origin: StaticOriginId,
+    result_identity: ConstructorIdentity,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(frame_origin)?
+    else {
+        return Ok(None);
+    };
+    let mut matching = Vec::new();
+    for alternative in 0..cases.len() {
+        let case_identity = plan.case_constructor_identity(frame_origin, alternative)?;
+        if case_identity != result_identity {
+            continue;
+        }
+        matching.push(ContinuationConsumingOccurrence {
+            body_origin: plan.semantic.child_origin(frame_origin, 1 + alternative)?,
+            eliminator_origin: frame_origin,
+        });
+    }
+    match matching.as_slice() {
+        [] => Ok(None),
+        [consumer] => Ok(Some(*consumer)),
+        _ => Err(planner_error(
+            "one checked-IH transport result selects more than one case in its source consumer",
+        )),
+    }
+}
+
+fn exact_result_identity(
+    plan: &StaticTransitionPlan<'_>,
+    body: StaticOriginId,
+    context: &'static str,
+) -> Result<ConstructorIdentity, CraneliftBackendError> {
+    let identities = continuation_result_constructor_identities(plan, body)?;
+    match identities.as_slice() {
+        [identity] => Ok(*identity),
+        [] => Err(planner_error(format!(
+            "{context} has no successful constructor result identity"
+        ))),
+        _ => Err(planner_error(format!(
+            "{context} has more than one successful constructor result identity"
+        ))),
+    }
+}

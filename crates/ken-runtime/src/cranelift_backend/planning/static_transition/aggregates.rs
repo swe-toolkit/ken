@@ -1168,6 +1168,10 @@ impl CheckedIhEnvironmentTransport {
     pub(in crate::cranelift_backend) fn continuation_input_count(&self) -> usize {
         self.continuation_input_morphism.len()
     }
+
+    pub(in crate::cranelift_backend) fn destination_body_origin(&self) -> StaticOriginId {
+        self.destination_body_origin
+    }
 }
 /// Which aggregate shape one producer occurrence builds.
 ///
@@ -12729,5 +12733,112 @@ mod checked_ih_captured_env_schema {
             "an envelope integrity defect must fail plan construction; swallowing it and \
              issuing no record is the fail-open shape this slice exists to close"
         );
+    }
+}
+
+
+pub(in crate::cranelift_backend::planning::static_transition) fn checked_ih_post_call_consumer_frames(
+    plan: &StaticTransitionPlan<'_>,
+    transport: &CheckedIhEnvironmentTransport,
+) -> Result<Option<Vec<StaticOriginId>>, CraneliftBackendError> {
+    let source_identity = transport.source_call_identity();
+    let source_unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == source_identity.target())
+        .ok_or_else(|| {
+            planner_error("a mismatched checked-IH transport's target has no continuation unit")
+        })?;
+    let consumer_frame = source_unit.continuation_origin();
+    if source_unit
+        .consuming_occurrence()
+        .is_some_and(|occurrence| occurrence.eliminator_origin() != consumer_frame)
+    {
+        return Err(planner_error(
+            "a checked-IH target's exact consuming occurrence disagrees with its continuation origin",
+        ));
+    }
+    let own = plan
+        .checked_ih_continuation_inheritances
+        .iter()
+        .filter(|inheritance| inheritance.transport == *transport)
+        .collect::<Vec<_>>();
+    match own.as_slice() {
+        [inheritance] => {
+            let final_step = inheritance
+                .capability
+                .self_resumption_steps
+                .last()
+                .ok_or_else(|| {
+                    planner_error(
+                        "a checked-IH transport's canonical inheritance has no final step",
+                    )
+                })?;
+            return Ok(
+                match checked_ih_fresh_result_route(plan, inheritance, final_step)? {
+                    CheckedIhFreshResultRoute::TailProducerToRet {
+                        active_frame_origin,
+                        ..
+                    } => {
+                        if active_frame_origin != consumer_frame {
+                            return Err(planner_error(
+                            "a checked-IH Tail route disagrees with its exact source consumer frame",
+                        ));
+                        }
+                        Some(vec![consumer_frame])
+                    }
+                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => None,
+                },
+            );
+        }
+        [] => {}
+        _ => {
+            return Err(planner_error(
+                "one checked-IH transport has more than one canonical inheritance",
+            ))
+        }
+    }
+
+    let binder_provenance = build_checked_binder_provenance(plan)?;
+    let identity = &transport.source_call_identity;
+    let worker = &identity.token.worker;
+    let mut matching = Vec::new();
+    for inheritance in &plan.checked_ih_continuation_inheritances {
+        let destination = &inheritance.fresh_result_destination;
+        if destination.ret_case_body_origin != identity.token.producer_construct_origin
+            || destination.closure_origin != worker.closure_origin
+            || destination.closure_body_origin != worker.body_origin
+            || destination.closure_parameter_count != worker.declared_arity
+        {
+            continue;
+        }
+        let Some(capture) = worker.captures.get(destination.capture_ordinal as usize) else {
+            continue;
+        };
+        if capture.owner != identity.token.producer_owner
+            || capture.closure_origin != destination.closure_origin
+            || capture.source
+                != ContinuationWorkerCaptureSource::Lexical(destination.capture_occurrence)
+            || !destination.body_capture_reads.iter().all(|origin| {
+                binder_provenance.get(origin).is_some_and(|resolution| {
+                    resolution.provenance
+                        == CheckedBinderProvenance::LexicalClosureCapture {
+                            closure_origin: destination.closure_origin,
+                            capture_ordinal: destination.capture_ordinal,
+                            source_origin: destination.capture_occurrence,
+                        }
+                })
+            })
+        {
+            continue;
+        }
+        matching.push(vec![destination.active_frame_origin]);
+    }
+    match matching.as_slice() {
+        [] => Ok(None),
+        [frames] => Ok(Some(frames.clone())),
+        _ => Err(planner_error(
+            "one checked-IH transport has more than one exact fresh-result predecessor",
+        )),
     }
 }

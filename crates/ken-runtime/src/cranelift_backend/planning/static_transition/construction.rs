@@ -262,6 +262,7 @@ impl<'src> Planner<'src> {
         };
         let mut planner = Self {
             plan: StaticTransitionPlan {
+                checked_ih_post_call_consumers: Vec::new(),
                 entries: Vec::new(),
                 planned_entry_bodies: Vec::new(),
                 nodes: Vec::new(),
