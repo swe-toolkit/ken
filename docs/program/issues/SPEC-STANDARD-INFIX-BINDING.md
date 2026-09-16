@@ -1,7 +1,7 @@
 ---
 id: SPEC-STANDARD-INFIX-BINDING
 title: "A1's spec prerequisite: a bounded standard-binding + use-site call-completion contract grounded in 33.5.4 (implicit argument/dictionary completion) and 39 (elaboration), specifying the STANDARD meanings of ∧ ∨ ≤ ≥ ≠ as ordinary checked standard-package functions (∧/∨ = bool_and/bool_or; ≤/≥ = Ord via an actual dictionary, ≥ reversing already-evaluated values; ≠ = negation of the exact NumericEnv `==` comparator on the SAME supported carriers), their standard fixities (∧ infixr 3, ∨ infixr 2, ≤ ≥ ≠ infix 4), and the completion policy bound to defining GlobalId + checked telescope; results Bool, no Ω connective, single left-to-right evaluation, no short-circuit guarantee; NO new Eq/DecEq instance, Float-equality law, or TCB entry"
-status: ready
+status: merged
 owner: spec
 size: S
 gate: none
@@ -11,6 +11,19 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy), grounded at main 4fdd4f0ad. A1's Spec-owned prerequisite. Draft: released after SPEC-RESERVED-INFIX-NAMES lands (the enclave may pipeline). Full A1 design detail, including the exact binding shapes the Architect probed and the NumericEnv `==` carrier inventory to enumerate (Int/Float/Char accept, Nat/Bool/String reject in the sample -- include Float32 and Decimal's actual registered representation when framing the full inventory), is in evt_784ge2nq65dfy. IN-LANE: bounded normative surface, no new trust-root/TCB (Architect: no new Eq/DecEq instance, Float-equality law, or TCB entry needed). Architect is the design authority and reviewer."
 ---
+
+> ## MERGED 2026-09-16 at `9a56f81b9a4c095140d85b30a03fb10c25e46a85`
+>
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. All four touched paths
+> (`conformance/README.md`,
+> `conformance/surface/operators/seed-standard-infix-binding.md`,
+> `spec/30-surface/33-declarations.md`, `spec/30-surface/39-elaboration.md`)
+> are byte-identical between the approved candidate
+> `653c3444d107a6daf016d0d6ffc21f536642134e` and `main`, landed via PR #3787
+> with full-mode CI green. Decision `dec_6bhhzhqd8kwnr` resolved; Architect
+> and CV both approved with independent re-derivation. The `∈` half of
+> `SPEC-MEMBERSHIP-CLASS-CONTRACT` (B-track) is unblocked from this landing.
 
 > # READY. Frame:
 > `docs/program/wp/SPEC-STANDARD-INFIX-BINDING.md`.
