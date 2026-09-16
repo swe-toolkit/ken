@@ -12,11 +12,15 @@ six dedicated notation tokens, but the ordinary global-name, prefix, infix, and
 fixity consumers accept only the generic symbolic-operator token. The tokens
 therefore dead-end before the ordinary name path. The generic-operator and
 `let … in` controls below are live on that base and must remain green. The
-non-temporal rows of the application-atom boundary cases form a
-**RED-UNTIL-LANG-RESERVED-INFIX-NAMES** aggregate. Their temporal rows instead
-carry **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** (`OQ-syntax`; no build WP is
-framed in this candidate): landing the reserved-name build cannot clear a
-grouped expression form that is not yet available. The reserved-head temporal
+application-atom boundary cases are not an A0 aggregate: they state
+`32 §3`'s contract pin, which is independent of reserved-name admission. The
+rows this base does not yet satisfy carry
+**RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE**: the `if` row, the
+projection row, and the bare-operator negatives. The lambda, `let`, `match`,
+and arrow rows conform on this base and carry no gate. Their temporal rows
+instead carry **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** (`OQ-syntax`; no build
+WP is framed in this candidate): landing the reserved-name build cannot clear
+a grouped expression form that is not yet available. The reserved-head temporal
 row also retains its reserved-name dependency until A0 lands. Executed parser
 observations on the authorized re-anchor base
 `cb646c784b2dc480bdae703473055481ca6b5e44` show that generic `(<+>)`,
@@ -26,6 +30,20 @@ application. Some identifier-head rows already have their
 target shape, but ungrouped `if` is still accepted as an argument, a bare
 projection still attaches inside the argument, and expression-level `temporal`
 is not yet accepted even when grouped.
+
+**Disposition (2026-09-16).** The application-atom boundary rows are
+**relocated**, not withdrawn and not deferred: they move off
+[[LANG-RESERVED-INFIX-NAMES]] onto
+[[LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE]], which also owns the catalog
+migration. Grounding: the rows state `spec/30-surface/32-grammar.md §3`'s
+contract pin (`:362-363` for the operator-name restriction, `:371-376` for the
+five leading forms and for `(keep Nat) -> Nat` / `(keep box).value`), so they
+are not an A0 over-reach; A0 admits reserved names and cannot satisfy a claim
+about sources containing none, which is why the gate was mis-attributed rather
+than merely premature. The priority-queue catalog control's failure measures
+that catalog source was written against a non-conforming parser, and is not
+evidence against the rows. Architect ruling `evt_5sf71fnjxpzmb`; the earlier
+WITHDRAW ruling `evt_64avxs9ashqqk` is void.
 
 **Promise class.** The exact six-name inventory and its five alias pairs are a
 normative compatibility vector. Ordinary application, resolved-identity fixity,
@@ -104,12 +122,19 @@ add a tree node.
   `A(G(OP), Zero)`. The generic grouped and applied arms are live before A0 and
   must remain so; the reserved arms turn green when A0 admits `Le` to the same
   grammar.
-- expect-negative: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — bare `<+>` and bare
-  `≤` each reject syntactically before resolution: neither is an
-  `application_atom` or a complete `operator_prefix`, because each has zero
-  following atoms. Neither may produce a global-value tree for its `G(OP)`.
-  The generic refusal is a required behavior change, not a pre-existing token
-  dead end; the reserved refusal must occur after `Le` reaches `operator_name`.
+- expect-negative: **RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE** —
+  bare `<+>` and bare `≤` each reject syntactically before resolution: neither
+  is an `application_atom` or a complete `operator_prefix`, because each has
+  zero following atoms. Neither may produce a global-value tree for its
+  `G(OP)`. This is `32 §3`'s restriction, which `:362-363` states applies
+  equally to generic and reserved operator names — so the row's target is the
+  spec's, not A0's. The generic refusal is a required behavior change, not a
+  pre-existing token dead end; the reserved refusal must occur after `Le`
+  reaches `operator_name`, so the reserved arm additionally presupposes A0.
+  **MEASURED on this base:** bare `<+>` parses as an ordinary global-value
+  reference rather than rejecting, so the generic arm is red against the
+  successor; bare `≤` rejects at the `Le` token, which is the pre-A0 dead end
+  and not yet this restriction being enforced.
 - why: rejecting every ungrouped operator would make both negatives pass for the
   wrong reason, while special-casing only one token class would make one triple
   pass. The adjacent grouped and nonzero-application positives keep each route
@@ -137,22 +162,39 @@ add a tree node.
   | arrow | `keep (Nat -> Nat)` | `A(keep, Arrow(Nat, Nat))` | `keep Nat -> Nat` | accept as `Arrow(A(keep, Nat), Nat)`, not as the grouped tree |
   | projection | `keep (box.value)` | `A(keep, Proj(box, value))` | `keep box.value` | accept as `Proj(A(keep, box), value)`, not as the grouped tree |
 
-- expect-nontemporal: **RED-UNTIL-LANG-RESERVED-INFIX-NAMES** — every grouped
-  non-temporal source has exactly the stated application tree. The four
-  available ungrouped leading-form rows reject with a primary span covering
-  exactly the named leading token. The arrow and projection rows accept with
-  exactly their stated outer trees; they do not silently acquire the grouped
-  interpretation.
+- expect-grouped: every grouped non-temporal source has exactly the stated
+  application tree. Live on this base for all six non-temporal classes.
+- expect-leading-conforming: the ungrouped `lambda`, `let`, and `match` rows
+  reject with a primary span covering exactly the named leading token. Live on
+  this base; these three conform to `32 §3` today and carry no gate.
+- expect-leading-if: **RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE** —
+  `32 §3` names `if` among the five leading forms that must reject at their
+  leading token when ungrouped after an application head. **MEASURED on this
+  base:** `keep if true then Zero else Zero` is accepted and yields exactly the
+  grouped tree, so the parser diverges from the pin here. The row states the
+  spec and is red until the successor closes the divergence.
+- expect-arrow: the ungrouped arrow row accepts with exactly its stated outer
+  tree and does not silently acquire the grouped interpretation. Live on this
+  base; conforms to `32 §3`'s `(keep Nat) -> Nat` and carries no gate.
+- expect-projection: **RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE** —
+  `32 §3` fixes the ungrouped projection as `(keep box).value`, the application
+  nested in the projection's left `expr`. **MEASURED on this base:** `keep
+  box.value` yields the grouped reading instead, so the parser diverges from
+  the pin here. The row states the spec and is red until the successor closes
+  the divergence.
 - expect-temporal: **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** — once the
   separately deferred grouped expression form exists, it has the tabled tree
   and its ungrouped twin rejects at `temporal`. This row is not an A0 exit
   condition and does not turn green merely because reserved infix names land.
 - why: each row varies only grouping around one named non-atom class. Restoring
-  unrestricted `expr expr` makes the four currently available rejection rows,
+  unrestricted `expr expr` makes the three currently enforced rejection rows,
   and eventually the temporal row, accept as applications; treating arrow or
-  projection as an argument atom changes its named outer tree. **MEASURED:**
-  seven independent grouped/ungrouped pairs expose four current reject
-  boundaries, one deferred reject boundary, and two precedence boundaries.
+  projection as an argument atom changes its named outer tree. **MEASURED on
+  this base:** seven independent grouped/ungrouped pairs expose three enforced
+  reject boundaries (`lambda`, `let`, `match`), one spec-required reject
+  boundary this base does not enforce (`if`), one deferred reject boundary
+  (`temporal`), one conforming precedence boundary (`arrow`), and one
+  spec-required precedence boundary this base does not enforce (`projection`).
   **CLAIMED:** the `expr application_atom` production admits only atoms in bare
   identifier-headed argument position. **THE GAP:** these are parser
   observations only; the ordinary-application elaboration path is covered
