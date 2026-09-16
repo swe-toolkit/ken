@@ -2309,6 +2309,23 @@ impl Parser {
                         break;
                     }
                     if !self.can_start_atom_expr() {
+                        // `32 §3`: an ungrouped leading form is not an
+                        // `application_atom` and must reject AT its leading
+                        // token. A bare `break` cannot do that -- a
+                        // continuation predicate can only stop, and the
+                        // leftover token is then reported as a stray by
+                        // whatever production runs next, at the same
+                        // coordinate. So the rejection has to be raised HERE,
+                        // affirmatively, before the loop yields the token.
+                        if matches!(self.peek(), Token::KwIf) {
+                            return Err(ElabError::ParseError {
+                                msg: "`if` is not an application_atom: group it \
+                                      as `(if ... then ... else ...)` to pass it \
+                                      as an argument"
+                                    .to_owned(),
+                                span: self.peek_span().clone(),
+                            });
+                        }
                         break;
                     }
                     let arg = self.parse_atom_expr()?;
@@ -2356,7 +2373,6 @@ impl Parser {
                 | Token::KwType
                 | Token::LParen
                 | Token::KwOld
-                | Token::KwIf
                 | Token::Nat(_)
                 | Token::IntLit(_)
                 | Token::FloatLit(_)
