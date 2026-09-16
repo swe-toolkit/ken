@@ -1,7 +1,7 @@
 ---
 id: RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE
 title: "Enforce the RepresentedUnavailable invariant uniformly across BOTH executors by gating dispatch_host_op_v1 at the convergence, with a control that is a PREDICATE over availability() rather than an assertion about any named op. The invariant is STATED at effect_v1.rs:193 and native-enforced at abi_v1.rs:1551, but the interpreter consults availability() nowhere -- so of the ten unavailable ops, THREE reachable via the op_* intern table (ClockMonotonicNow, ClockSleepUntil, EntropyRandomBytes) PLUS ONE reachable via the separately interned PrivateMappingAcquireFile global (MappingAcquireFile) execute interpreted and refuse natively on main TODAY, and the availability flip moves only that last one. State the split, never the sum of four: the obvious re-derivation reads the intern table alone and returns three, dropping the very op the flip is about. REMEDIAL, not preventive. Architect ruling evt_21f23zmgqfxsc: the interpreter MUST refuse; RepresentedUnavailable is a language-surface claim, not a native-backend one. The gate must sit at the convergence and NOT in a caller -- the interpreter's two production callers are in different helpers (fs_dispatch, ambient_dispatch), so the natural-looking fs_dispatch placement misses clock and entropy entirely. Its SUBJECT IS REACHABILITY, a different question from AC-AVAIL's availability census -- do not fold the two together."
-status: ready
+status: merged
 owner: runtime
 size: S/M
 gate: none
@@ -11,6 +11,17 @@ github: null
 tier: T1
 origin: "Adversary Finding 1 on the landed slice 4 (statements != enforcements), routed by the Steward to the Architect as a design question rather than ruled; Architect RULED evt_21f23zmgqfxsc. Steward cut 2026-09-16 as its OWN node rather than as a rider on the flip slice -- a sequencing/packaging call (steward.md §3), not a departure from the ruling's design content, which is adopted verbatim. Fixed inputs measured at origin/main d4e977a6af1083975665e587ed7e3e31f733785e."
 ---
+
+> ## MERGED 2026-09-16 at `dcb848eaa68111a32f6bb135afbbba1d8e862ad1`
+>
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. Both touched paths
+> (`crates/ken-host/src/effect_v1.rs`, `crates/ken-interp/src/eval.rs`) are
+> byte-identical between the approved candidate
+> `1dd556c58f5407ddb87fdec76c8d0f69fb8db4e6` and `main`, landed via PR #3776
+> with full-mode CI green. Mutation-proven twice on both crates (ken-host
+> 122/1 -> 123/0, ken-interp 80/2 -> 82/0, both reverts blob-verified).
+> Decision resolved, QA and Architect both approved exact.
 
 > # READY, and RE-FRAMED 2026-09-16 after D0. Frame:
 > `docs/program/wp/RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE.md`.
