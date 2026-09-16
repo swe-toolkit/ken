@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-MAIN-BASED-CLOSURE
 title: "Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation."
-status: ready
+status: draft
 owner: runtime
 size: L
 gate: none
@@ -13,6 +13,15 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 ---
 
 > # INCREMENT A IS BLOCKED. `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` LANDS FIRST.
+>
+> **`status:` corrected `ready` -> `draft`, Steward 2026-09-16.** This banner
+> said BLOCKED while the frontmatter said `ready`, and `ready` is what a team
+> pulls on. `check-issue-schema` had been reporting the contradiction on every
+> run -- *"depends_on ... is 'ready' (nothing has landed) -- a team pulling this
+> node will find its premise false"* -- and the Steward dismissed it twice as
+> pre-existing. It is not pre-existing to anyone; it is this lane. **Flip back to
+> `ready` when the port LANDS, measured by blob compare, not when it is
+> approved-as-built.**
 >
 > **Added 2026-09-16 on the Architect's category-B ruling
 > (`evt_6mptkrtvysd8s`).** Increment A's D0-2 characterisation found 21 compile
