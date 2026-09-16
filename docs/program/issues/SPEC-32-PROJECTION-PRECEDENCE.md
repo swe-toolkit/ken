@@ -9,7 +9,7 @@ depends_on: [SPEC-RESERVED-INFIX-NAMES]
 blocks: []
 github: null
 tier: T1
-origin: "Steward filed 2026-09-16, RETROACTIVELY, after the work had already landed. The amendment was authored by spec-author, routed by the Steward as candidate `ed0c02412`, and landed as `f1bda0c5b` -- with no tracker node at any point. Measured at main b34ffd182: 10 of the 12 most recent spec landings carry a node; this was one of two that did not. Filed so the tracker records work that is done, and so the two follow-up nodes it spawned have a named origin rather than a commit SHA."
+origin: "Steward filed 2026-09-16, RETROACTIVELY, after the work had already landed. The amendment was authored by spec-author, routed by the Steward as candidate `ed0c02412`, and landed as `f1bda0c5b` -- with no tracker node at any point. Measured at main b34ffd182: ELEVEN of the 12 most recent spec landings carry a node, and this is the ONLY one that does not. (The first pass reported 10 of 12. The second apparent gap, `5c283a88e LANG-TRUNC-SURFACE-spec`, was a FALSE ABSENCE: its node is `LANG-TRUNCATION-SURFACE-SYNTAX.md`, status merged. A key derived from the commit subject cannot match a node filed under a different spelling -- spec-author caught it, and the control for this finding had the very defect the finding is about.) Filed so the tracker records work that is done, and so the two follow-up nodes it spawned have a named origin rather than a commit SHA."
 ---
 
 > # FILED AFTER THE FACT. The amendment LANDED at `f1bda0c5b`; this node is the
