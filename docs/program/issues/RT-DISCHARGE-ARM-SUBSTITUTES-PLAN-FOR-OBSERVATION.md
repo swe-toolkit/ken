@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 tier: T1
-depends_on: [RT-CONSTRUCTOR-AUTHORITY-DISCHARGE]
+depends_on: []
 blocks: []
 github: null
 origin: "Architect ruling evt_20wvshayvhvxj (2026-09-15, the two-exits predicate, and the standing prohibition on repairing cause 2 toward green), completed by evt_4tb8wvsdc93f after the Architect ran its own gating premise check at source and found the mechanism sharper than the ruling had it. The Architect directed the filing and will vote the node. The reduction that produced the evidence is runtime-implementer's: a 139-line program reaching three distinct failures by single-line edits, plus a native-vs-interpreter harness showing identical effect traces with different exit status. Steward-verified at source on 0f71ab5b9267781ae1d91bc654011cad42b926af before filing; the base-tree measurement in the banner below is the Steward's and refutes nothing in the ruling."
@@ -417,6 +417,60 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  THE PROHIBITION IS UNCHANGED AND IT BINDS THE REPAIR: cause 2
                  must NOT be repaired toward green. The closure makes the tree
                  REDDER and that red population IS the deliverable.
+                 ### SEED REACHES 12 OF 12, NOT 6. RULED 2026-09-16, Architect
+                 evt_2qhwv3ywjaswp. THE SPLIT IS REAL IN THE INPUTS AND
+                 DISSOLVES AT THE REPAIR.
+                   funcid59's six  callee DOES declare; :6877 discards it.
+                                   KDROP: constructed=(Some(id4362), true)
+                   funcid58's six  callee declares NOTHING (8 of 8 compiles).
+                                   KDROP: constructed=(None, false)
+                                   Nothing was ever handed over to restore.
+                 BOTH observe (None, true) at the same site in the same
+                 compile. THE (true, None) THE CENSUS READS IS A UNION OF TWO
+                 CONSTRUCTIONS, now MEASURED rather than argued.
+                 THE REPAIR DOES NOT READ THE CONSTRUCTED PAIR AT ALL. It
+                 reads the identity the emitted guards PROVE four lines below
+                 the drop: require_i64 checks the carrier's ACTUAL tag against
+                 k_ret_identity(), and tag_abi_word is INJECTIVE, so A PASSING
+                 GUARD IS AN IDENTITY PROOF, not a plan assertion. The plan
+                 supplies the HYPOTHESIS; the emitted guard is the
+                 OBSERVATION. Same edit on both halves.
+                 => OWNERSHIP OF THE ABSENCE AND REACH OF THE REPAIR ARE
+                 DIFFERENT RELATIONS. funcid58's six can be genuinely upstream
+                 in ORIGIN and still fully covered by SEED at the call site.
+                 Do NOT let a (None, false) reading re-scope SEED to six.
+                 ### FENCE 1 HAS A SECOND CLAUSE AND IT IS LOAD-BEARING FOR
+                 THE AC. Architect evt_2yyn38q8hdtgb; Steward verified the cfg
+                 block at source independently. THE PATH IS UNCONDITIONAL --
+                 no runtime branch between the drop and the guards, only cfg
+                 selection and `?` propagation. THE GUARDED VALUE IS NOT:
+                   #[cfg(feature = "px8-ds-test-support")]
+                   let ret_abi_word = if body_mutation == Some(VaryRet) {
+                       exact_ret_abi_word.checked_add(1)?   DELIBERATELY WRONG
+                   } else { exact_ret_abi_word };
+                 and the feature is LIVE in these runs: ken-cli/Cargo.toml:28
+                 takes ken-runtime with features = ["px8-ds-test-support"] on a
+                 REGULAR dependency edge, so every ken-verify px8f fixture
+                 compiles that branch in.
+                 => expected_ret CAN DIFFER FROM exact_ret_identity
+                 .tag_abi_word(). Registering exact_ret_identity would record
+                 an authority THE GUARD NEVER PROVED, into exactly the
+                 population this node measures. The program still traps, so
+                 nothing unsound executes; THE DAMAGE IS TO THE RECORD, AND
+                 THE RECORD IS THE DELIVERABLE.
+                 THE AC, IN THE REFUSING FORM RATHER THAN THE TYING FORM:
+                   At the registration site, REQUIRE exact_ret_identity
+                   .tag_abi_word()? == ret_abi_word, and REFUSE ON DIVERGENCE
+                   RATHER THAN RECORDING.
+                 NOT "derive the registered identity from ret_abi_word" --
+                 that would dutifully record the mutated identity and MAKE THE
+                 MUTATION INVISIBLE. Refusing fails a VaryRet compile loudly at
+                 the exact seam the mutation targets. A MUTATION THAT PRODUCES
+                 A CLEAN RECORD IS A MUTATION THAT PROVED NOTHING.
+                 This is fence 1's general shape, not an exception to it:
+                 dominance by both guards is STRUCTURAL; this clause makes it
+                 SEMANTIC -- the thing registered must be the thing GUARDED,
+                 not merely downstream of a guard.
                  DEPENDENCY, RULED IN PART 2026-09-16. Defect ownership is
                  SETTLED AND IT IS D1'S -- the arm that fired routes to the
                  call site, so depends_on can NO LONGER be justified on "this
@@ -429,6 +483,73 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  If the parent builds it, the edge is real AS A BUILD
                  DEPENDENCY and must say so in those terms; if D1 builds its
                  own, the edge goes.
+                 ### CLOSED 2026-09-16. BOTH HALVES OF THIS ROW'S OWN
+                 PRECONDITION ARE CLOSED. depends_on IS NOW [].
+                 BUILD ORDER: NEITHER NODE BUILDS THE PRODUCER -- IT PRE-EXISTS
+                 BOTH. A THIRD ARM THIS ROW NEVER ENUMERATED.
+                   fn register_generated_constructor_authority
+                       lowering/mod.rs:4080 on candidate 0f71ab5b9
+                   live callers   calls.rs 1, core.rs 1 -- and NEITHER covers a
+                       word produced by a CALL, which is why both arm-1 bodies
+                       carry authorities = 0.
+                   the PARENT describes it at its OWN :124 as machinery it
+                       MEASURED at 5d977ac79, not as a deliverable it builds.
+                       Its deliverable is what discharge MEANS (consumption at
+                       the consumer), not creating the producer.
+                 Three INDEPENDENT source reads: Architect evt_332b3rwem87jy,
+                 runtime-implementer evt_3ahwb990vmg07, Steward at source.
+                 OWNERSHIP OF THE REPAIR: SETTLED BY IT REACHING 12 OF 12 (see
+                 the REPAIR row above), not by the census. The census reads the
+                 bit AFTER :6874 mutates it and therefore cannot speak to
+                 construction at all.
+                 OWNERSHIP OF THE ABSENCE IS DELIBERATELY LEFT OPEN, exactly
+                 where the ruling left it. funcid58's six may well be upstream
+                 IN ORIGIN; that does not bear on the edge, because the edge
+                 encodes build order and the repair's reach, not provenance.
+                 Do NOT read "ownership settled" as covering the upstream
+                 absence -- the :6874 node (fence 3) is still to be cut and
+                 must not inherit a closure it was never given.
+                 ### THE REFUTATION CONDITION THIS TURNED ON WAS DEFECTIVE, AND
+                 THE CORRECTED TABLE IS RECORDED HERE RATHER THAN THE ONE
+                 FIRST OFFERED. Architect withdrew it at evt_5wspvc2mf3kwg
+                 BEFORE it gated this commit. As offered:
+                   v1751 PRINTS -> ruling holds;  ABSENT -> ruling refuted.
+                 THE SECOND ARM IS WRONG. KDROP prints from INSIDE the
+                 `if let Some(obligation) = ...find(...)` body, so an absent
+                 line means THE FIND DID NOT MATCH -- an instrument failure --
+                 and the census already entails that the body ran on that
+                 obligation. CORRECTED:
+                   v1751 PRESENT  instrument sound; fence discharged.
+                   v1751 ABSENT   KDROP CONTRADICTS THE CENSUS. One of the two
+                                  is wrong and the RULING IS NOT WHAT THAT
+                                  DECIDES. The v1386 reading would go with it,
+                                  drawn from the same lookup. Fix the probe.
+                 => THE v1751 LINE IS A CONTROL ON KDROP, NOT A TEST OF THE
+                 RULING. What tests the ruling is CONTENT: whether the guards
+                 are on that path and derive expected_ret from
+                 k_ret_identity(). Steward verified that at source
+                 (units.rs:6879-6897 on 0f71ab5b9): both guards sit OUTSIDE
+                 the find block, on the straight-line path, so they run whether
+                 or not the find matched.
+                 THE RUN AGREEING IS NOT WHAT MAKES A CONDITION SOUND. The
+                 favourable branch fired, so the defect cost nothing -- which
+                 is the reason to record it rather than the reason not to.
+                 WHAT REMOVING THE EDGE COSTS, STATED RATHER THAN ELIDED. The
+                 schema WARN it raised was the only frontmatter-level brake on
+                 pulling this node, and it goes with the edge. That brake was
+                 MIS-KEYED: it releases when the PARENT lands, an event
+                 unrelated to the real constraint, which is that every
+                 coordinate here is on the UNLANDED candidate 0f71ab5b9. A
+                 guard keyed on a ref other than the one its measurement is
+                 taken at cannot fire correctly, and keeping it because it
+                 happens to sit in the braking position is worse than removing
+                 it and saying so.
+                 THE REAL CONSTRAINT STAYS IN THE BANNER, which has no schema
+                 home: the schema carries only depends_on and blocks, both over
+                 issue ids, so "written against an unlanded base" is not
+                 expressible. Its deletion obligation is filed in
+                 RT-D5B-POSTCALL-REFUSAL-MECHANISM's "Obligations this node
+                 creates elsewhere".
     SITE         CONFIRMED AND WIDENED 2026-09-16. It is NOT one line. It is a
                  THREE-STEP SEQUENCE on ONE emission path, spanning ~90 lines,
                  and :6971 is the SECOND step, not the site:
