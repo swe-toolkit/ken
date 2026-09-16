@@ -2598,6 +2598,140 @@ fn record_worker_prefix_deferral(row: WorkerPrefixDeferral) {
     });
 }
 
+fn continuation_result_positions(
+    plan: &StaticTransitionPlan<'_>,
+    root_context: &SourceReturnContextTemplate,
+) -> Result<Vec<ContinuationResultPositionWitness>, CraneliftBackendError> {
+    if root_context.root_origin != root_context.result_origin || !root_context.steps.is_empty() {
+        return Err(planner_error(
+            "a continuation result-flow seed is not the empty context at its exact root",
+        ));
+    }
+    let root = root_context.root_origin;
+    let owner = occurrence_authority(plan, root)?.owner;
+    let mut pending = vec![(root, Vec::<SourceReturnContextStep>::new())];
+    let mut results = BTreeMap::<StaticOriginId, SourceReturnContextTemplate>::new();
+    while let Some((origin, steps)) = pending.pop() {
+        let authority = occurrence_authority(plan, origin)?;
+        if authority.owner != owner {
+            continue;
+        }
+        let context = SourceReturnContextTemplate {
+            root_origin: root,
+            result_origin: origin,
+            steps: steps.clone(),
+            caller_suffix: root_context.caller_suffix.clone(),
+            worker_return: root_context.worker_return.clone(),
+        };
+        if let Some(prior) = results.insert(origin, context.clone()) {
+            if prior != context {
+                return Err(planner_error(
+                    "one continuation result position has two incompatible source return contexts",
+                ));
+            }
+            continue;
+        }
+        let expr = plan.planned_occurrence_expr(origin)?;
+        let mut push =
+            |position: usize, role: SourceReturnContextRole| -> Result<(), CraneliftBackendError> {
+                let child_origin = plan.semantic.child_origin(origin, position)?;
+                let mut child_steps = steps.clone();
+                child_steps.push(SourceReturnContextStep {
+                    parent_origin: origin,
+                    child_origin,
+                    child_position: u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("source return-context child position exhausted")
+                    })?,
+                    role,
+                });
+                pending.push((child_origin, child_steps));
+                Ok(())
+            };
+        match expr {
+            RuntimeExpr::CheckedJoinSite { .. }
+            | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedRecursiveInvocation { .. }
+            | RuntimeExpr::CheckedComputationalIHSlots { .. }
+            | RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
+                push(0, SourceReturnContextRole::CheckedBody)?;
+            }
+            RuntimeExpr::Let { .. } => push(1, SourceReturnContextRole::LetBody)?,
+            RuntimeExpr::If { .. } => {
+                push(1, SourceReturnContextRole::IfThen)?;
+                push(2, SourceReturnContextRole::IfElse)?;
+            }
+            RuntimeExpr::Match { cases, .. } => {
+                let records = plan
+                    .case_emissions
+                    .iter()
+                    .filter(|record| record.match_origin == origin)
+                    .collect::<Vec<_>>();
+                if records.len() != cases.len() {
+                    return Err(planner_error(
+                        "continuation result flow has no exact D1 case population",
+                    ));
+                }
+                for (index, record) in records.into_iter().enumerate() {
+                    if record.status == CaseEmissionStatus::Reachable {
+                        let position = 1 + index;
+                        if plan.semantic.child_origin(origin, position)? != record.body_origin {
+                            return Err(planner_error(
+                                "a continuation result-flow case record disagrees with source child authority",
+                            ));
+                        }
+                        push(
+                            position,
+                            SourceReturnContextRole::MatchCase(u32::try_from(index).map_err(
+                                |_| {
+                                    planner_capacity_error(
+                                        "source return-context match alternative exhausted",
+                                    )
+                                },
+                            )?),
+                        )?;
+                    }
+                }
+            }
+            RuntimeExpr::ComputationalMatch { cases, .. } => {
+                for index in 0..cases.len() {
+                    push(
+                        1 + index,
+                        SourceReturnContextRole::ComputationalMatchCase(
+                            u32::try_from(index).map_err(|_| {
+                                planner_capacity_error(
+                                    "source return-context computational alternative exhausted",
+                                )
+                            })?,
+                        ),
+                    )?;
+                }
+            }
+            RuntimeExpr::Value(_)
+            | RuntimeExpr::Var(_)
+            | RuntimeExpr::PrimitiveCall { .. }
+            | RuntimeExpr::Construct { .. }
+            | RuntimeExpr::Record { .. }
+            | RuntimeExpr::Project { .. }
+            | RuntimeExpr::Closure { .. }
+            | RuntimeExpr::LexicalClosure { .. }
+            | RuntimeExpr::DeclarationRef { .. }
+            | RuntimeExpr::ImportedDeclarationRef { .. }
+            | RuntimeExpr::Call { .. }
+            | RuntimeExpr::Effect { .. }
+            | RuntimeExpr::Trap(_) => {}
+        }
+    }
+    Ok(results
+        .into_iter()
+        .map(
+            |(origin, return_context)| ContinuationResultPositionWitness {
+                origin,
+                return_context,
+            },
+        )
+        .collect())
+}
+
 pub(super) fn continuation_result_origins(
     plan: &StaticTransitionPlan<'_>,
     root: StaticOriginId,
@@ -4765,6 +4899,9 @@ pub(super) enum ContinuationRequiredConsumingOccurrence {
 pub(super) struct ContinuationDiscovery {
     pub(super) continuation_origin: StaticOriginId,
     pub(super) result_root: StaticOriginId,
+    /// Symbolic result-root-to-caller return context retained from the forward
+    /// traversal that still owned the exact source child relation.
+    pub(super) return_context: SourceReturnContextTemplate,
     /// **`D5a` — the enclosing generated emission context, retained across
     /// descent.**
     ///
@@ -5745,15 +5882,17 @@ pub(super) fn initial_continuation_discoveries(
         .declaration_occurrences
         .values()
         .copied()
-        .map(|origin| (origin, None, None))
+        .map(|origin| (origin, None, None, Vec::<StaticOriginId>::new()))
         .collect::<Vec<_>>();
     if let Some(root) = plan.root_occurrence {
-        roots.push((root, None, None));
+        roots.push((root, None, None, Vec::new()));
     }
 
     let mut walked = BTreeSet::new();
     let mut pending = Vec::new();
-    while let Some((origin, consuming_occurrences, required_consuming_occurrence)) = roots.pop() {
+    while let Some((origin, consuming_occurrences, required_consuming_occurrence, caller_suffix)) =
+        roots.pop()
+    {
         if !walked.insert(origin) {
             return Err(planner_error(
                 "the forward continuation seed walk reached one source occurrence twice",
@@ -5772,6 +5911,13 @@ pub(super) fn initial_continuation_discoveries(
             pending.push(ContinuationDiscovery {
                 continuation_origin: origin,
                 result_root: scrutinee,
+                return_context: SourceReturnContextTemplate {
+                    root_origin: scrutinee,
+                    result_origin: scrutinee,
+                    steps: Vec::new(),
+                    caller_suffix: caller_suffix.clone(),
+                    worker_return: None,
+                },
                 enclosing_specialization: None,
                 consuming_occurrences: consuming_occurrences.clone(),
                 required_consuming_occurrence,
@@ -5781,8 +5927,7 @@ pub(super) fn initial_continuation_discoveries(
             for alternative in 0..cases.len() {
                 let body_origin = plan.semantic.child_origin(origin, 1 + alternative)?;
                 #[cfg(test)]
-                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED
-                    .with(Cell::get)
+                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(Cell::get)
                     == Some(ContinuationConsumingOccurrenceSeedMutation::BodyOrigin)
                 {
                     // The exact wrong relation from AC-2: the continuation's
@@ -5814,16 +5959,47 @@ pub(super) fn initial_continuation_discoveries(
                         },
                     ))
                 });
+            let mut scrutinee_suffix = Vec::with_capacity(1 + caller_suffix.len());
+            scrutinee_suffix.push(origin);
+            scrutinee_suffix.extend(caller_suffix.iter().copied());
             roots.push((
                 scrutinee,
                 Some(ContinuationConsumingOccurrenceSeeds { candidates }),
                 required_consuming_occurrence,
+                scrutinee_suffix,
             ));
             for child in children.into_iter().skip(1) {
-                roots.push((child, None, None));
+                roots.push((child, None, None, caller_suffix.clone()));
             }
         } else {
-            roots.extend(children.into_iter().map(|child| (child, None, None)));
+            match expr {
+                RuntimeExpr::CheckedComputationalIHInvocation { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. } => {
+                    for (position, child) in children.into_iter().enumerate() {
+                        let suffix = if position == 0 {
+                            Vec::new()
+                        } else {
+                            caller_suffix.clone()
+                        };
+                        roots.push((child, None, None, suffix));
+                    }
+                }
+                RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {
+                    for (position, child) in children.into_iter().enumerate() {
+                        let suffix = if position == 0 {
+                            Vec::new()
+                        } else {
+                            caller_suffix.clone()
+                        };
+                        roots.push((child, None, None, suffix));
+                    }
+                }
+                _ => roots.extend(
+                    children
+                        .into_iter()
+                        .map(|child| (child, None, None, caller_suffix.clone())),
+                ),
+            }
         }
     }
 
@@ -6112,6 +6288,7 @@ pub(super) fn build_continuation_specialization_plan(
     let mut calls = BTreeSet::new();
     let mut required_consumer_projections = BTreeMap::new();
     let mut pending_required_consumer_projections = Vec::new();
+    let mut pending_detached_return_contexts = BTreeMap::new();
     let mut sequences = BTreeMap::<
         (PredeclaredFunctionId, StaticOriginId, StaticOriginId),
         u32,
@@ -6152,9 +6329,8 @@ pub(super) fn build_continuation_specialization_plan(
             ));
         };
         let consumer_owner = occurrence_authority(plan, discovery.continuation_origin)?.owner;
-        for producer_construct_origin in
-            continuation_result_origins(plan, discovery.result_root)?
-        {
+        for result_position in continuation_result_positions(plan, &discovery.return_context)? {
+            let producer_construct_origin = result_position.origin;
             let producer = plan.planned_occurrence_expr(producer_construct_origin)?;
             let RuntimeExpr::Construct { args, .. } = producer else {
                 continue;
@@ -6399,11 +6575,21 @@ pub(super) fn build_continuation_specialization_plan(
                     }
                     if let Some(required) = required_consuming_occurrence {
                         pending_required_consumer_projections.push((
-                            identity,
+                            identity.clone(),
                             required,
                             discovery.continuation_origin,
                             discovery.result_root,
                         ));
+                    } else if result_position.return_context.worker_return.is_some() {
+                        let detached = result_position.return_context.clone();
+                        if pending_detached_return_contexts
+                            .insert(identity.clone(), detached.clone())
+                            .is_some_and(|prior| prior != detached)
+                        {
+                            return Err(planner_error(
+                                "one continuation call identity has two incompatible detached source return contexts",
+                            ));
+                        }
                     }
                     let call = PlannedContinuationSpecializationCall { token };
                     if calls.insert(call) {
@@ -6475,6 +6661,18 @@ pub(super) fn build_continuation_specialization_plan(
                             pending.push(ContinuationDiscovery {
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
+                                return_context: SourceReturnContextTemplate {
+                                    root_origin: worker.body_origin,
+                                    result_origin: worker.body_origin,
+                                    steps: Vec::new(),
+                                    caller_suffix: Vec::new(),
+                                    worker_return: Some(Box::new(SourceWorkerReturnBoundary {
+                                        selecting_call: identity.clone(),
+                                        caller_context: Box::new(
+                                            result_position.return_context.clone(),
+                                        ),
+                                    })),
+                                },
                                 enclosing_specialization: Some(target),
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
                                 required_consuming_occurrence,
@@ -6495,6 +6693,13 @@ pub(super) fn build_continuation_specialization_plan(
                             pending.push(ContinuationDiscovery {
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
+                                return_context: SourceReturnContextTemplate {
+                                    root_origin: worker.body_origin,
+                                    result_origin: worker.body_origin,
+                                    steps: Vec::new(),
+                                    caller_suffix: Vec::new(),
+                                    worker_return: None,
+                                },
                                 enclosing_specialization: None,
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
                                 required_consuming_occurrence: discovery
@@ -6563,6 +6768,18 @@ pub(super) fn build_continuation_specialization_plan(
                     projection_disposition: Some(projection_disposition),
                 });
         });
+    }
+
+    for (identity, context) in pending_detached_return_contexts {
+        let projection = RequiredConsumerProjection::DetachedReturnContext(context);
+        if required_consumer_projections
+            .insert(identity, projection.clone())
+            .is_some_and(|prior| prior != projection)
+        {
+            return Err(planner_error(
+                "one continuation call identity claims incompatible direct and detached consumer proofs",
+            ));
+        }
     }
     #[cfg(test)]
     if let Some(mutation) = REQUIRED_CONSUMER_PROJECTION_MUTATION.with(Cell::get) {
