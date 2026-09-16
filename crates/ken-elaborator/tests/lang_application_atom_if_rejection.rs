@@ -105,13 +105,22 @@ fn ac_guard_unbroken_guarded_match_arms_still_parse() {
 /// Rust test files, which a sweep keyed on `.ken` / `.ken.md` cannot reach.
 ///
 /// Four such files were found by four separate CI failures on the previous
-/// candidate and never by a census. The known-answer control is
-/// `lang_surface_if.rs`: it contains an `if` in application-argument position,
-/// so a census that does not return it is measured blind rather than clean.
+/// candidate and never by a census.
+///
+/// **The known answer is this suite's own `UNGROUPED_IF_ARG`, deliberately.**
+/// The first version of this control keyed on `lang_surface_if.rs` "because it
+/// contains an `if` in application-argument position" — and the same commit
+/// that shipped the control MIGRATED that `if` to the grouped form, so the
+/// control went on passing on legal leading-position `if`s and on one Rust
+/// `match` guard. **A known answer that the node's own fix can migrate away is
+/// not a known answer.** Worse, tightening the predicate correctly would have
+/// REDDENED it, so it was wired to fail on its own improvement.
+/// `UNGROUPED_IF_ARG` carries an argument-position `if` for exactly as long as
+/// this node exists and no fix of this node can remove it.
 #[test]
 fn ac_inline_ken_census_reaches_rust_test_sources() {
     let tests_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let mut with_inline_if_argument: Vec<PathBuf> = Vec::new();
+    let mut sites: Vec<(String, usize, String)> = Vec::new();
 
     for entry in std::fs::read_dir(&tests_dir).expect("tests dir").flatten() {
         let path = entry.path();
@@ -121,29 +130,89 @@ fn ac_inline_ken_census_reaches_rust_test_sources() {
         let Ok(text) = std::fs::read_to_string(&path) else {
             continue;
         };
-        // An application head followed by an ungrouped `if`, inside a Rust
-        // string literal. Deliberately NOT anchored on a leading quote: the
-        // shape routinely sits on a `\`-continuation line that carries none,
-        // which is one of the two blind spots that made the earlier grep for
-        // this population return zero against files that demonstrably had it.
-        if text.contains(" if ")
-            && text
-                .lines()
-                .any(|l| l.contains("= ") && l.contains(" if ") && !l.contains("(if "))
-        {
-            with_inline_if_argument.push(path);
+        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        for (number, line) in text.lines().enumerate() {
+            // Test the KEN inside the string literals, not the Rust line. The
+            // Rust syntax around it (`:`, `"`, `=`) is what let a Rust `match`
+            // guard satisfy the previous version.
+            for fragment in line.split('"').skip(1).step_by(2) {
+                if has_argument_position_if(fragment) {
+                    sites.push((name.clone(), number + 1, fragment.to_owned()));
+                }
+            }
         }
     }
 
-    let names: Vec<String> = with_inline_if_argument
-        .iter()
-        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
-        .collect();
-
+    // The control is on the matching LINE, not the filename: the occurrence is
+    // the evidence, and a file can stop carrying one without anything failing.
     assert!(
-        names.iter().any(|n| n == "lang_surface_if.rs"),
-        "KNOWN-ANSWER CONTROL FAILED: the census must reach lang_surface_if.rs, \
-         which carries `if` in application-argument position. A census that \
-         misses it is blind, and its zero is not a measurement. Found: {names:?}"
+        sites.iter().any(|(_, _, frag)| frag.contains(UNGROUPED_IF_ARG)),
+        "KNOWN-ANSWER CONTROL FAILED: the census must return the line carrying \
+         UNGROUPED_IF_ARG. A census that misses a member it is guaranteed to \
+         contain is blind, and its zero is not a measurement. Found: {sites:?}"
     );
 }
+
+/// An application head followed by an UNGROUPED `if` — the shape `32 §3`
+/// forbids as an application argument.
+///
+/// Not `" if "` minus `"(if "`. That test admitted three populations it should
+/// not have: a leading `if` (`= if c then ...`), an `else if` chain, and Rust's
+/// own `match` guards. The head must be a run of ordinary identifiers, so a
+/// keyword in it disqualifies the occurrence.
+fn has_argument_position_if(fragment: &str) -> bool {
+    const KEN_KEYWORDS: [&str; 10] = [
+        "if", "then", "else", "let", "in", "match", "fn", "proc", "const", "where",
+    ];
+    let Some(equals) = fragment.find("= ") else {
+        return false;
+    };
+    let rest = &fragment[equals + 2..];
+    // Every occurrence, not just the first: an excluded one earlier in the
+    // fragment must not hide a real one after it.
+    rest.match_indices(" if ").any(|(at, _)| {
+        let head = rest[..at].trim();
+        !head.is_empty()
+            && head
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == ' ')
+            && head.split_whitespace().all(|t| !KEN_KEYWORDS.contains(&t))
+    })
+}
+
+/// The predicate's discriminating table — the evidence that the repaired
+/// control does not merely PASS but passes for its stated reason.
+///
+/// Each negative is a population that satisfied the previous version. They are
+/// listed as cases rather than described, so a future loosening reddens here
+/// instead of silently re-admitting them.
+#[test]
+fn argument_position_predicate_admits_only_the_forbidden_shape() {
+    assert!(
+        has_argument_position_if(UNGROUPED_IF_ARG),
+        "the forbidden shape must be admitted"
+    );
+    assert!(has_argument_position_if("const k : Nat = f x if c then a else b"));
+
+    for legal in [
+        // leading `if` — legal, and the largest false population before
+        "const when_true : Int = if True then 11 else 22",
+        // `else if` chain — the head before ` if ` is all-alphanumeric, so
+        // only the keyword check excludes it
+        "const outer_else : Int = if False then 1 else if True then 2 else 3",
+        // grouped — the migration target; must not be re-flagged
+        "const k : Nat = keep (if c then a else b)",
+        // `let` RHS in leading position
+        "const let_if : Int = let x : Int = if False then 7 else 8 in x",
+        // a RUST match guard, which the previous version counted as Ken
+        "matches!(e, ElabError::AmbiguousReference { ref name, .. } if name == \"True\")",
+        // no `if` at all
+        "const plain : Nat = f x y",
+    ] {
+        assert!(
+            !has_argument_position_if(legal),
+            "must NOT be flagged as an argument-position `if`: {legal}"
+        );
+    }
+}
+
