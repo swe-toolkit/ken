@@ -82,11 +82,23 @@ Its `#[ignore]` reason is a standing policy cost, not a defect — the sweep
 should never have been reporting it, which is precisely what `D-REGISTER`
 exists to fix. Running it to get a signature answers a question nobody asked.
 
-**The action is registration, and it belongs to
-`RT-IGNORED-PASSING-ROWS-DISPOSITION`, not here.** One registry row,
-class `policy-cost`. Whoever picks that up should also re-check
-`d0_distinct_recursive_map_child`, the other row pre-classified `D-REGISTER` in
-the same passage, against the executed eleven.
+**The action was registration, it belonged to
+`RT-IGNORED-PASSING-ROWS-DISPOSITION`, and it is DONE** — carried on that node's
+candidate at `31723cffa16e181efd6e57aebc1f2e225bdcdd96`:
+
+    [[exemption]]
+    test_path = "ken-cli::px8ta_oriented_subcontinuation::
+                 px8ds_real_same_depth_path_runs_exact_edges"
+    class     = "policy-cost"
+
+with a readmission string naming the standing gate for the same lowering
+(`px8ds_retired_flat_order_does_not_gain_m4_representation`, non-ignored, same
+binary). `d0_distinct_recursive_map_child`, the other `D-REGISTER` row in that
+passage, was registered on the same candidate.
+
+**So this section is a record, not a work item.** Nothing here is owed. It is
+retained because the mechanism below outlived the row, and because a reader
+comparing rosters will otherwise re-derive the whole thing from scratch.
 
 **Do NOT write it up as a regression.** `0f71ab5b9` is **not an ancestor of
 `main`**, so there is no shared history in which a status changed and "moved
@@ -102,10 +114,32 @@ completion report is honest — eleven of eleven — and the dropped row appears
 no outcome, no diff, and no red. **There is no artifact in which its absence
 shows up**, which is why it took a set comparison between two rosters to find.
 
-**The cheap detector is a per-binary census rather than a better roster:** for
-each file containing `#[ignore]`, does every ignored row appear in exactly one
-operative disposition? `px8ta_oriented_subcontinuation.rs` returns **3 rows, 2
-claimed** on that query, with no hand comparison of sets.
+**A coverage census does NOT detect it, and that is worth stating because it is
+the obvious thing to reach for.** The query *"does every ignored row appear in
+exactly one operative disposition?"* returns **yes** for `px8ds` — it is claimed,
+by name, in `§4`. The row is not unclaimed; **its claim was never executed.** A
+detector built on the coverage question is blind to exactly this defect.
+
+**The detector has to key on EXECUTION, not on coverage:** for each row
+pre-classified in a frame's disposition section, **does the tree show the
+disposition carried out?** Each class has a one-command check:
+
+| ruled | executed iff |
+|---|---|
+| `D-REGISTER` | a row for it exists in `.github/ignored-test-exemptions.toml` |
+| `D-RELOCATE` | the test is **absent** from the tree |
+| `D-READMIT` | the row's `#[ignore]` is gone |
+
+Run against `main` today that returns `px8ds: D-REGISTER, ruled, NOT executed`
+— and it returns it **without knowing anything about populations, rosters, or
+which node was supposed to do it.** That is the property a detector needs here,
+because the row went missing precisely by falling between two nodes' scopes.
+
+**The confirming pair is in-tree.** `§4` names two `D-REGISTER` rows;
+`d0_distinct_recursive_map_child` was in the executing node's measured eleven
+and now has its registry row, `px8ds` was not and does not. **Same section, same
+class, same author, same hour** — the only difference is population membership,
+which is the mechanism this section names.
 
 ## This node READS. It repairs nothing.
 
