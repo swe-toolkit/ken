@@ -1489,9 +1489,29 @@ against `git show 0f71ab5b9:<file>`**:
                          bundle.context(emission.owner.k_context())
     units.rs:6034      if facts.context_calls.len() != 1 {
     units.rs:6041      if decode_direct_callee(func, call)? != expected_context {
+    units.rs:6225-6227 let rows = compiler.static_transition_plan
+                         .static_response_feasibility_ledger_all()?
+    units.rs:6260      for (owner, row) in owners.into_iter().zip(rows)
     units.rs:6264      || owner.k_context() != row.k_context()
-    responses.rs:3815  fn static_response_feasibility_ledger_filtered(
     responses.rs:2747  checked_ih_generated_context_result_contract
+
+**THE BINDING PREMISE IS A SUBSET, NOT "THE FILTER PASSES EVERY ROW."** This is
+the link that ties `emission.row` to `static_response_continuations`, and it
+spans two files, which is why it went missing: no single file contains it.
+`:6225-6227` binds `rows` from `static_response_feasibility_ledger_all()`, which
+is `ledger_filtered(None)` (`responses.rs:3842-3846`); `ledger_filtered` reads
+`self.static_response_continuations`, filters, **clones and collects**
+(`responses.rs:3827-3832`). So **`rows` is a SUBSET of
+`static_response_continuations` for *any* filter argument**, and `:6260` pairs
+each `owner` with a member of `rows` — so `emission.row` is one of them.
+`checked_ih_generated_context_result_contract` scans that raw field directly and
+never goes through the ledger, so it scans a SUPERSET of `rows`.
+
+Narrowing the `ledger_all` call to `Some(operation)` would drop rows *from*
+`rows` and could never remove the owner's row from what `:2747` sees. **State it
+as subset. The stronger phrasing is true today and would read as broken the
+moment someone tightens that filter** — an over-strong premise is a tripwire
+wired to nothing, and it is invisible precisely because it is true.
 
 ⇒ **The verified K-call target IS the context named by the owner's own
 `k_context()`, and each direction is guarded by an explicit refusal.** So the
