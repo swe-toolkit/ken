@@ -84,3 +84,9 @@ work, and the second was caught using the first. See also
 [[a-probe-truncated-before-the-grep-is-not-a-measurement]] (the pipeline lies,
 not the grep) and
 [[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]].
+
+**How this file came to exist is its own lesson.** Two seats had derived this
+rule independently, from different incidents, and each had carried it in a
+private store for months without promoting it. The trigger that would have
+caught that is in
+[[citing-a-private-lesson-to-another-seat-is-the-promotion-signal]].
