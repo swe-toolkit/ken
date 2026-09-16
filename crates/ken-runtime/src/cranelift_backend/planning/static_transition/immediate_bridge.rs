@@ -14,7 +14,7 @@
 //! that a zero-hit grep for them is a real control rather than a count of
 //! mentions in a comment.
 //!
-//! ⛔ The classifier has NO CONSUMER until that successor lands, so a
+//! The classifier has NO CONSUMER until that successor lands, so a
 //! production build reports `never used` here. That is not debris: it is the
 //! only live indicator that this module sits on no live path, which is the
 //! property this slice is defined by. Do NOT silence it with
@@ -356,7 +356,7 @@ mod tests {
     use super::*;
     use crate::{RuntimeMatchCase, RuntimeTrapCode};
 
-    // ⭐ PROVENANCE RULE (`AC-6`). Every case below is one of two kinds and says
+    // PROVENANCE RULE (`AC-6`). Every case below is one of two kinds and says
     // which in its own doc comment:
     //
     //   LIFTED      its expected verdict is attested by a named site on the
@@ -387,7 +387,29 @@ mod tests {
     /// scrutinee through `lower_computational_producer_expr` when the scrutinee
     /// `requires_heterogeneous_deforestation` -- which a `Call` whose callee is
     /// a closure returning a `Construct` satisfies."*
+    ///
+    /// THE SPELLING IS THE ANCESTOR'S, NOT A CONVENIENT EQUIVALENT. That
+    /// fixture builds the value through `nullary_closure` (`mod.rs:1471-1480`),
+    /// which uses **`LexicalClosure`**. `Closure` reaches the same verdict, but
+    /// only by a reading of the predicate's `Call` arm -- which is the
+    /// implementation, not the ancestor. The `Closure` spelling is carried
+    /// separately below and labelled as authored.
     fn heterogeneous_call_producer() -> RuntimeExpr {
+        RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: Vec::new(),
+                body: Box::new(construct("ctor:fixture::Pair::Mk", Vec::new())),
+            }),
+            args: Vec::new(),
+        }
+    }
+
+    /// NEW INTENT. No plan-level ancestor attests the `Closure` spelling; the
+    /// attested one is `LexicalClosure` (see above). That the predicate treats
+    /// the two identically is read off its `Call` arm, so this case is the
+    /// author's reading and is labelled rather than presented as a lift.
+    fn heterogeneous_call_producer_ordinary_closure_spelling() -> RuntimeExpr {
         RuntimeExpr::Call {
             callee: Box::new(RuntimeExpr::Closure {
                 captures: Vec::new(),
@@ -444,6 +466,14 @@ mod tests {
     }
 
     #[test]
+    fn new_intent_the_ordinary_closure_spelling_is_also_heterogeneous() {
+        // NEW INTENT, see the helper: the attested spelling is `LexicalClosure`.
+        assert!(requires_heterogeneous_deforestation(
+            &heterogeneous_call_producer_ordinary_closure_spelling()
+        ));
+    }
+
+    #[test]
     fn lifted_compile_time_constructor_match_producer_is_heterogeneous() {
         assert!(requires_heterogeneous_deforestation(
             &heterogeneous_match_producer()
@@ -462,7 +492,7 @@ mod tests {
     ///     produces_deforestable_aggregate_with_ih(expr, &recursive_hypotheses)
     ///         && !produces_deforestable_aggregate_with_ih(expr, &BTreeSet::new())
     ///
-    /// ⭐ The shape CROSSES A BINDER on purpose. `shifted_aggregate_ihs` shifts
+    /// The shape CROSSES A BINDER on purpose. `shifted_aggregate_ihs` shifts
     /// the IH set by binder depth, and the `Let` arm recurses WITH the shift
     /// while other arms recurse WITHOUT it. A single-point case that never
     /// crosses a binder cannot tell those arms apart, so an off-by-one in the
