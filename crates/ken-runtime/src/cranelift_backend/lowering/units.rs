@@ -4506,19 +4506,29 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     // the same key -- so it is the well-typed lookup on a key
                     // this arm already has in hand.
                     //
-                    // AND IT IS A TWO-VALUE CHECK, WITH TWO PRODUCERS:
-                    //   call_seeds[word]  the CALLEE's declared result contract,
-                    //                     carried by a certificate arm 2 proved
-                    //                     against the CALLEE's own authorities
-                    //   identity          this body's own
-                    //                     `emission.row.k_ret_identity()`, since
-                    //                     arm 1 is selected on
-                    //                     `independent_contract == Some(identity)`
-                    // Two bodies, two declarations. It refutes exactly when a
-                    // response owner publishes a word from a K call whose proved
-                    // identity differs from the identity the owner declares it
-                    // returns. Nothing is synthesized: every value here was put
-                    // there by a real declaration.
+                    // ⛔ THE CONTENT IS THE SEED'S EXISTENCE, NOT THE EQUALITY.
+                    // Do not read this as two independent values agreeing. Both
+                    // sides resolve to `k_ret_identity` on a plan row -- the
+                    // demand directly at `:6962`, and the seed through the
+                    // callee's `result_contract`, which
+                    // `checked_ih_generated_context_result_contract` builds from
+                    // `k_ret_identity` on `static_response_continuations` rows
+                    // and errors rather than allow two rows on one context to
+                    // disagree. THE PLAN CANNOT CORROBORATE THE PLAN.
+                    //
+                    // What is not plan-derived is that a seed exists AT ALL. A
+                    // seed is placed only from a finished certificate, and a
+                    // certificate exists only where arm 2 proved that callee's
+                    // body against the CALLEE'S OWN `authorities` -- the
+                    // emitter's record of what that body actually constructed,
+                    // which `prove_forwarded_value` is the only thing that
+                    // grounds on. That is the observation the plan cannot
+                    // manufacture, and it is why the refutation channel here is
+                    // ABSENCE rather than disagreement. MEASURED: the one body
+                    // that refuses does so on `seeded=None`.
+                    //
+                    // The equality is kept as a defensive check, not as the
+                    // load-bearing half.
                     //
                     // Realization stays NECESSARY and stops being SUFFICIENT,
                     // and an absent or disagreeing seed REFUSES rather than
@@ -7029,7 +7039,11 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         // Context sites, so `is_some()` holds exactly when `unit` is `Response`.
         // At the arm split the test is an EQUALITY, not a presence test, so it
         // also separates a demand matching this owner's own Ret identity from
-        // one that does not -- the `Some(other)` case is live, not dead code.
+        // one that does not. The `Some(other)` case is STRUCTURALLY REACHABLE --
+        // nothing in the code bars a Response body from arm 2 when
+        // `k_ret_identity()` differs from a demand -- but WHETHER ANY PROGRAM
+        // REACHES IT IS UNMEASURED. That is `D1-8`'s question and this comment
+        // does not answer it; do not read this line as discharging it.
         //
         // WHAT IT IS NO LONGER: the discharge's evidence. Before `D1` this
         // planned value was compared against the demand and, with a realization
