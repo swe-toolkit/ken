@@ -1,10 +1,10 @@
 ---
 id: RT-D5B-HEADER-AS-BUILT
 title: "Correct immediate_bridge.rs's module header to the as-built state. Slice 3 falsified two of its sentences: it calls the live wiring a deliberately absent successor while that wiring is on main at construction.rs:1460, and it explains the never-used warnings by 'nothing calls in from production' when production now calls in. Comment-only, one file. The durable form is a PREDICATE plus a dated roster: an item warns never-used exactly when it has no live root, and the seven diagnostics measured at 67684fa5d are a snapshot, not a promise."
-status: ready
+status: merged
 owner: runtime
 size: S
-gate: architect
+gate: none
 depends_on: [RT-D5B-LIVE-WIRING]
 blocks: []
 github: null
@@ -12,11 +12,15 @@ tier: T2
 origin: "Steward, 2026-09-16. Filed at runtime-leader's request (shape 2, standalone rather than folded into RT-D5B-POSTCALL-REFUSAL-MECHANISM) after the Architect observed that folding it there lands the correction on the same commit that falsifies it. Defect found by the Architect at immediate_bridge.rs:27; second false sentence found by the Steward at :18-22. Dead-set roster measured by the Steward on origin/main 67684fa5d with scripts/ken-cargo build -p ken-runtime, corroborated by the runtime-implementer's own (lib) build. Steward-filed per COORDINATION section 2."
 ---
 
-> ## RELEASED to Team Runtime 2026-09-16 — `ready`, size S, tier T2
+> ## MERGED 2026-09-16 at `7ebbc34fafb12bd9f0460106cd14077137ad9104`
 >
-> **Implementation base is `origin/main`
-> `67684fa5d9e960ebbdfba92f1a0d664115d73c25`** — the commit slice 3 landed at,
-> which is also the commit the roster below is measured at.
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. `immediate_bridge.rs` is byte-identical
+> between the approved candidate `a799ddca61cb0a3eebea5c48aafd984be5928e50`
+> and `main`, landed via PR #3754 (a respin of `dc6b1369d`, which went red on
+> a doctest compile failure the header's own unfenced roster caused). The
+> AC-5 control that missed that failure was repaired separately at
+> `cc7a2d77d0cc43bf1adb507b15a787696d7c0cf1` (squash `7f8fa2497`).
 >
 > **Comment-only, one file, zero compiled change.** `AC-5` is the control —
 > **and it was repaired on 2026-09-16 after the first candidate went red.**
