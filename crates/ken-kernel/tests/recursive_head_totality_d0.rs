@@ -390,7 +390,7 @@ fn run_query() {
 // CONVERSION_STACK_BYTES worker, and its normal exit is the measurement.
 //
 // READMITTING IT WOULD MAKE THE PARENT VACUOUS. Measured, not argued -- with the
-// #[ignore] removed, the child process the parent spawns reports
+// ignore attribute removed, the child process the parent spawns reports
 //
 //   test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out
 //
@@ -401,6 +401,12 @@ fn run_query() {
 // is not the fixed 2 MiB instrument the traceability above names.
 //
 // So this row is not a stale label to dispose of. Do not readmit it.
+//
+// Registered in .github/ignored-test-exemptions.toml as `policy-cost`, which is
+// the disposition the frame pre-classified for it (D-REGISTER). It is registered
+// rather than merely held so the sweep stops selecting it: a row that keeps
+// appearing in the passing-ignored population is a row somebody eventually
+// readmits.
 #[test]
 #[ignore = "fixed-2MiB-stack worker; run via d0_..._requires_normal_child_exit, \
             which asserts it now exits normally (it stack-overflowed pre-repair)"]
