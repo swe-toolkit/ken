@@ -2164,8 +2164,16 @@ impl ContinuationCallView<'_> {
     /// The complete call identity this view names: the whole opaque token plus
     /// the recursive position, and nothing else.
     ///
-    /// Minted here rather than assembled by consumers, so there is one
-    /// construction site for the key the plan's per-call relations are keyed on.
+    /// NOT a first construction site, and the count is measured rather than
+    /// claimed: three struct literals of `ContinuationCallIdentity` already
+    /// exist, at `:6153`, `:6549` and here at `continuation_call_binding_for`,
+    /// and all three are inside this module. `continuation_call_binding_for`
+    /// builds this exact pair from this exact view.
+    ///
+    /// What this accessor buys is that the construction stays INSIDE the module
+    /// that owns the type. A consumer assembling it would be the first site
+    /// outside, reaching across into two `pub(super)` fields to do by hand what
+    /// the owner already does three times.
     pub(in crate::cranelift_backend) fn identity(&self) -> ContinuationCallIdentity {
         ContinuationCallIdentity {
             token: self.token.clone(),
