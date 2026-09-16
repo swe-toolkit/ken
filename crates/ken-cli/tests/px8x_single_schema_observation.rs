@@ -57,29 +57,35 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // perturbation visible in it -- left ResourceTraceIdentityV1(1) against right
 // ResourceTraceIdentityV1(1001).
 //
-// WHAT THIS ROW DOES NOT OBSERVE, and its name says it does. The name claims
-// two properties. The ordered-bindings half is covered, as above. The
-// filters-reserved-input half is NOT, and that is measured rather than
-// supposed:
+// WHAT THIS ROW DOES NOT OBSERVE. It was named
+// ..._and_filters_reserved_input and it arranged a caller-supplied
+// KEN_HOST_OBSERVATION_PATH of "caller-controlled". Both are removed, because
+// the reserved-input half was never observable here and the arrangement that
+// suggested it was was inert:
 //
 //   - Removing the KEN_HOST_OBSERVATION_PATH filter from the C shim's
 //     environment() loop alone reds the row -- but at the harness's
 //     run_bound_process_effect_observation expect, with Io(NotFound): the
-//     arena capacity is sized by main's separate count, so the two disagree,
-//     the process returns 1, and no trace file is written. The row noticed a
-//     crash, not a filtering decision.
+//     arena capacity is sized by main's separate count of the same key, so the
+//     two disagree, the process returns 1, and no trace file is written. The
+//     row noticed a crash, not a filtering decision.
 //   - Removing the filter CONSISTENTLY from both loops leaves the row GREEN.
-//     The Ken program then sees the reserved key in its environment and nothing
-//     in this row reads the program's view of its environment.
+//     Nothing here reads the Ken program's view of its environment.
 //
-// The first mutation is what makes the second conclusive: it proves the filter
-// branch is TAKEN on this row's path (deleting a branch never taken cannot
-// change the arena accounting). So the second green is "reached and
-// unobserved", not "never reached". The finding is site-relative -- the row
-// does not observe the reserved-key filter -- and the row is covered elsewhere,
-// which is why it is readmitted rather than reported vacuous.
+// The first mutation is what makes the second conclusive: deleting a branch
+// that is never taken cannot change the arena accounting, so the red proves the
+// filter branch is TAKEN on this row's path. The second green is therefore
+// "reached and unobserved", not "never reached".
+//
+// AND THE ARRANGEMENT WAS INERT, not merely unasserted. In
+// object_linker_packaging.rs run_bound_process_effect_observation_with_stdin,
+// .envs(options.environment) is followed by .env("KEN_HOST_OBSERVATION_PATH",
+// &trace_path) -- the launcher overwrites the caller's value before the child
+// starts, so no process on this path ever saw "caller-controlled". The setup
+// could not have been observed even by an assertion that tried. Deleting it is
+// what removes the defect; renaming alone would have left it in the body.
 #[test]
-fn linked_route_exposes_real_ordered_bindings_and_filters_reserved_input() {
+fn linked_route_exposes_real_ordered_role_labelled_bindings() {
     let dir = output_dir();
     std::fs::write(dir.path().join("held.bin"), b"held").unwrap();
     let output = ken_cli::build_native_program(
@@ -91,10 +97,7 @@ fn linked_route_exposes_real_ordered_bindings_and_filters_reserved_input() {
     .expect("checked resource program reaches the linked artifact");
     let options = ken_runtime::NativeEffectRunOptionsV1 {
         arguments: Vec::new(),
-        environment: vec![(
-            "KEN_HOST_OBSERVATION_PATH".into(),
-            "caller-controlled".into(),
-        )],
+        environment: Vec::new(),
         cwd: dir.path().to_owned(),
         plan_hash: output.plan_transport_hash,
     };
