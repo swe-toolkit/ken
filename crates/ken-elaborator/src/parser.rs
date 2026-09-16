@@ -18,6 +18,24 @@ use crate::error::{ElabError, Span};
 use crate::lexer::Token;
 use crate::temporal::TemporalExpr;
 
+/// The single parser-side view of an ordinary symbolic global name.
+///
+/// Generic `Operator` tokens retain their carried spelling. The six dedicated
+/// notation tokens admitted by `31 §1c` collapse their ASCII/Unicode source
+/// twins to one canonical glyph identity. No other fixed token is a name.
+fn canonical_operator_name(token: &Token) -> Option<&str> {
+    match token {
+        Token::Operator(name) => Some(name.as_str()),
+        Token::Le => Some("≤"),
+        Token::Ge => Some("≥"),
+        Token::Ne => Some("≠"),
+        Token::And => Some("∧"),
+        Token::Or => Some("∨"),
+        Token::Member => Some("∈"),
+        _ => None,
+    }
+}
+
 pub struct Parser {
     tokens: Vec<(Token, Span)>,
     pos: usize,
@@ -36,7 +54,7 @@ impl Parser {
     pub fn new(tokens: Vec<(Token, Span)>, src: String) -> Self {
         let contains_user_operator = tokens
             .iter()
-            .any(|(token, _)| matches!(token, Token::Operator(_)));
+            .any(|(token, _)| canonical_operator_name(token).is_some());
         Self {
             tokens,
             pos: 0,
@@ -98,11 +116,13 @@ impl Parser {
     fn expect_global_name(&mut self) -> Result<(String, Span), ElabError> {
         let (tok, span) = self.advance();
         match tok {
-            Token::Ident(s) | Token::ConId(s) | Token::Operator(s) => Ok((s, span)),
-            other => Err(ElabError::ParseError {
-                msg: format!("expected global name, found {:?}", other),
-                span,
-            }),
+            Token::Ident(s) | Token::ConId(s) => Ok((s, span)),
+            other => canonical_operator_name(&other)
+                .map(|name| (name.to_owned(), span.clone()))
+                .ok_or_else(|| ElabError::ParseError {
+                    msg: format!("expected global name, found {:?}", other),
+                    span,
+                }),
         }
     }
 
@@ -133,19 +153,19 @@ impl Parser {
         let mut joined = first;
         let mut end = first_span.end;
         while matches!(self.peek(), Token::Dot)
-            && matches!(
-                self.lookahead(1),
-                Token::Ident(_) | Token::ConId(_) | Token::Operator(_)
-            )
+            && (matches!(self.lookahead(1), Token::Ident(_) | Token::ConId(_))
+                || canonical_operator_name(self.lookahead(1)).is_some())
         {
             self.advance(); // consume '.'
-            let (seg, seg_span) = match self.peek().clone() {
-                Token::Ident(s) | Token::ConId(s) | Token::Operator(s) => {
-                    self.advance();
-                    (s, self.tokens[self.pos - 1].1.clone())
-                }
-                _ => unreachable!("guarded by lookahead above"),
+            let token = self.peek().clone();
+            let seg_span = self.peek_span().clone();
+            let seg = match token {
+                Token::Ident(s) | Token::ConId(s) => s,
+                other => canonical_operator_name(&other)
+                    .expect("guarded by the global-name lookahead")
+                    .to_owned(),
             };
+            self.advance();
             joined.push('.');
             joined.push_str(&seg);
             end = seg_span.end;
@@ -354,14 +374,15 @@ impl Parser {
             }
         };
         let _ = precedence_span;
-        let (operator, operator_span) = match self.advance() {
-            (Token::Operator(operator), span) => (operator, span),
-            (other, span) => {
-                return Err(ElabError::ParseError {
-                    msg: format!("expected user-defined symbolic operator, found {:?}", other),
-                    span,
-                });
-            }
+        let (operator_token, operator_span) = self.advance();
+        let Some(operator) = canonical_operator_name(&operator_token).map(str::to_owned) else {
+            return Err(ElabError::ParseError {
+                msg: format!(
+                    "expected user-defined symbolic operator, found {:?}",
+                    operator_token
+                ),
+                span: operator_span,
+            });
         };
         let span = Span::new(start, operator_span.end);
         Ok(Decl::FixityDecl {
@@ -1363,7 +1384,7 @@ impl Parser {
     fn parse_item_rename(&mut self, name: String) -> Result<crate::ast::ImportItem, ElabError> {
         let rename = if matches!(self.peek(), Token::Ident(s) if s == "as") {
             self.advance();
-            Some(self.expect_ident()?.0)
+            Some(self.expect_global_name()?.0)
         } else {
             None
         };
@@ -2230,8 +2251,10 @@ impl Parser {
                 }
                 Token::Minus => InfixOperator::Builtin(BinOp::Sub, self.peek_span().clone()),
                 Token::Star => InfixOperator::Builtin(BinOp::Mul, self.peek_span().clone()),
-                Token::Operator(name) => InfixOperator::User(name, self.peek_span().clone()),
-                _ => break,
+                other => match canonical_operator_name(&other) {
+                    Some(name) => InfixOperator::User(name.to_owned(), self.peek_span().clone()),
+                    None => break,
+                },
             };
             self.advance();
             operators.push(operator);
@@ -2923,10 +2946,13 @@ impl Parser {
                     Ok(Expr::EVar(s, span))
                 }
             }
-            Token::Operator(s) => {
+            operator if canonical_operator_name(&operator).is_some() => {
                 let span = self.peek_span().clone();
+                let name = canonical_operator_name(&operator)
+                    .expect("guarded by operator-name recognition")
+                    .to_owned();
                 self.advance();
-                Ok(Expr::EVar(s, span))
+                Ok(Expr::EVar(name, span))
             }
             Token::ConId(s) => {
                 let span = self.peek_span().clone();
