@@ -1,10 +1,10 @@
 ---
 id: RT-D5B-LIVE-WIRING
 title: "Wire the immediate-bridge realization plane into the live planning path -- one import and one assignment before response phase B -- so the classifier and derivation stop being reachable only from tests. The deliverable is two lines; the work is AC-2a, a test that goes red when the call moves ABOVE the specialization installs at construction.rs:1382-1387 rather than one showing it runs -- red by EMPTINESS, since above them continuation_units() returns empty. Two earlier forms of AC-2a named construction.rs:1406 as the bound; both are refuted in frame section 6 and :1406 is not a partition point at all, so a context-bearing fixture would not pin it. The comment's upper bound (before phase B) is AC-2b and is DEFERRED: derive_'s read set and phase B's write set are disjoint and nothing live reads the field, so no test can go red for that move until the consumer exists"
-status: ready
+status: merged
 owner: runtime
 size: S
-gate: architect
+gate: none
 depends_on: [RT-D5B-BRIDGE-REALIZATION-PLANE]
 blocks: []
 github: null
@@ -12,16 +12,22 @@ tier: T1
 origin: "Steward, 2026-09-16. Slice 3 and the last of the PR #3676 re-cut, after RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER (slice 1, landed 10321a158) and RT-D5B-BRIDGE-REALIZATION-PLANE (slice 2, landed 49e5ebfbe). Frame at docs/program/wp/RT-D5B-LIVE-WIRING.md, cut from main 49e5ebfbe. Absorbs the slice-3 carry-forward drafted as a section 5a block on the slice-2 frame while slice 2 was publishing (Architect evt_pyt8pmshvq9z, runtime-implementer evt_yht7xmkpxhsy, Architect evt_3k27pn82x36es, Steward evt_a6zk62tzb9mg) -- that block's rationale was that this frame did not exist, so it is superseded rather than landed. Steward-filed per COORDINATION section 2."
 ---
 
-> ## RELEASED to Team Runtime 2026-09-16 — `ready`, size S, tier T1
+> ## MERGED 2026-09-16 at `67684fa5d9e960ebbdfba92f1a0d664115d73c25`
 >
-> **Implementation base is `origin/main`
-> `49e5ebfbe501a80c6ff2cd7104e4115e0696ba49`** — the commit slice 2 landed at.
-> Do not stack on any unmerged commit and do not cut from the reference.
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. All three touched paths are byte-identical
+> between the approved candidate `1bcc359dc33148d42900ed6ca5e8779a12936d02`
+> and `main` (`static_transition.rs`, `static_transition/construction.rs`,
+> `static_transition/immediate_bridge.rs`), landed via PR #3752 with full-mode
+> CI green (all 8 test shards, `rt_parity_native` 1-6, z3, conformance).
 >
-> **Two lines of deliverable, and it is still T1.** The diff is one import plus
-> one assignment in `construction.rs`. The hour goes into `AC-2a` and `AC-3`,
-> both of which are judgments rather than ports. If that ratio looks wrong,
-> read §7 of the frame before re-sizing it.
+> This closes the PR #3676 re-cut arc: slice 1
+> (`RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER`, `10321a158`), slice 2
+> (`RT-D5B-BRIDGE-REALIZATION-PLANE`, `49e5ebfbe`), and this slice 3 are all on
+> `main`. Adversary verdict: NO DEFECT (evt_4mfzx89c4ncdj) — the wired plane is
+> correctly inert in production (no consumer yet; that is
+> `RT-D5B-POSTCALL-REFUSAL-MECHANISM`'s subject) and the new fallible call is
+> fail-closed only on planner self-inconsistency, never on a valid program.
 
 Read the frame: `docs/program/wp/RT-D5B-LIVE-WIRING.md`.
 
