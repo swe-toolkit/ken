@@ -17,8 +17,19 @@ origin: "Steward cut 2026-09-16 at the Architect's naming, on their D0 REVERSAL 
 > This node exists because [[SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION]]
 > re-gates two row groups of `seed-reserved-infix-names.md` onto a named
 > successor, and a `RED-UNTIL-<node>` tag naming a node that does not exist is
-> not a gate. It is **not released**: it has no frame, and the catalog
-> migration is unmeasured. Do not start it.
+> not a gate. It is **not released**: it has no frame. Do not start it.
+>
+> **The census IS RUN (2026-09-16) — it is no longer the blocking unknown.**
+> See "The census" below: the migration is of order twenty sites with more than
+> 90% of them in one file, the `if` row has zero catalog tail, and the node does
+> **not** decompose on size. What remains before a frame is the D0 AST ledger,
+> not a measurement of whether this is tractable.
+>
+> **Two release preconditions, neither of them about the frame.** Its dependency
+> [[SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION]] is routed and **not landed**;
+> and it shares `crates/ken-elaborator/src/parser.rs` with
+> [[LANG-RESERVED-INFIX-NAMES]], whose A0 candidate is **live**. Check both at
+> `origin/main`, by node status and by blob — never by branch ref.
 
 # Objective
 
@@ -83,18 +94,95 @@ syntax.
 - The temporal rows (`RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE`), a separate gate.
 - The lambda/`let`/`match` and arrow rows, which conform today.
 
+# The census — RUN (Steward, 2026-09-16). Read the instrument before the number.
+
+The section below used to say *"the first framing act is that census."* It has
+been run. **It does not decompose on size, and the reason is that the migration
+is concentrated in a single file.**
+
+**Roots swept — both of them.** Catalog source is literate `.ken.md`, and it
+lives under **two** roots, not one: `library/` (4 files) and `catalog/` (53).
+A sweep of either alone is a clean wrong answer.
+
+**Only ```` ```ken ```` blocks are compiled.** `crates/ken-elaborator/src/
+literate.rs:345` classifies fence openers: bare `ken` is `Source`; `ken ignore`,
+`ken reject`, and `ken example` are not. Prose is blanked out by
+`extract_ken_md` before the parser sees it (`modules.rs:700-712`), so a
+whole-file grep counts English sentences as catalog sites.
+
+## By divergence class
+
+    class                                    candidate sites   distribution
+    ungrouped `if` as an application arg              0        none
+    ungrouped PROJECTION as an application arg       16        15 in one file, 1 elsewhere
+    bare ungrouped operator_name as an atom           ?        instrument produced nothing
+
+**The `if` row costs nothing to migrate.** Zero catalog sites, in either root,
+in any `ken` fence. It is a parser fix with no migration tail — which makes it
+the cheapest of the three and separable from the rest if anyone wants it early.
+
+**The projection row is the whole migration, and it is one file.**
+
+    catalog/packages/Core/Classes/LawfulClasses.ken.md      15
+    catalog/packages/Capability/Parsing/Parsing.ken.md       1
+
+Two confirmed in context, so the class is real and not a regex artifact:
+
+    LawfulClasses.ken.md:753   compare_raw a d.leq x y
+    Parsing.ken.md:90          bytes_nat_length s.source_bytes_field
+
+Both are exactly `keep box.value`. Under `32 §3` each re-parses as a projection
+of the application — `Proj(A(compare_raw, a, d), leq)` — and must become
+`(d.leq)` / `(s.source_bytes_field)`.
+
+## What this census does NOT establish, stated because the numbers look tidy
+
+**16 is a candidate set from a source-level scan, not the population.** An
+earlier Steward scan of the same class returned **24**. Both are correct about
+their own extraction: the two differ in whether the head, base, and field are
+required to be lowercase, and in comment stripping. **Do not quote either as
+the migration count.**
+
+⇒ **The authoritative instrument is the AST walk the language-implementer
+already built** — `EApp(head, EProj(base, field))` over the parsed catalog,
+with `Expr::EProj` at `crates/ken-elaborator/src/ast.rs:650`. It decides
+`d.leq`-as-projection against `Module.name`-as-qualified-path, which no regex
+can. **That walk is this node's D0, and its result is the migration ledger.**
+
+**What both scans agree on is the only thing the sizing needs:** the population
+is of order twenty and **more than 90% of it is in one file.**
+
+**The operator-name row is UNMEASURED and my probe is not evidence it is
+empty.** A source scan cannot separate `x + y` (ordinary infix, fine) from an
+operator passed bare as an argument (the defect). My probe returned zero
+matches of any shape inside `ken` fences, which is a reading on the probe, not
+a measurement of the catalog. The AST walk covers this row too; until it runs,
+treat this row's extent as unknown rather than as zero.
+
 # Sizing / tier
 
-**Size L, tier T1 -- and the L is a placeholder over an unmeasured quantity.**
-The two parser divergences are bounded and well-specified. The catalog
-migration is not: its extent is the number of catalog-source sites relying on
-ungrouped projected arguments, and **nobody has counted them.** Exactly one is
-known, from the control that failed.
+**Size L, tier T1. The L now stands over a measured quantity, and the answer is
+that this node does NOT decompose on size.**
 
-⇒ **The first framing act is that census**, not a frame. If it returns a large
-or heterogeneous set, this node decomposes -- parser conformance and catalog
-migration may not be one deliverable, and "must land as one commit" is not a
-constraint anyone has established here.
+The catalog migration is ~16-24 mechanical grouping edits, 15 of them in
+`LawfulClasses.ken.md`. That is not a second deliverable; it is the tail of the
+first. **Splitting parser conformance from catalog migration would land a
+parser that the catalog cannot compile against** — the A0 checkpoint measured
+exactly that (`priority_queue_actual_export_table_is_exactly_the_six_name_api`
+failed candidate-only, and restoring the legacy parse returned it to 1/1). The
+two are coupled by construction, and the coupling is the reason the contraction
+was out of scope for A0.
+
+⇒ **One node, one candidate.** If it decomposes at all it decomposes by ROW, not
+by parser-versus-catalog: the `if` row has zero migration tail and could ship
+alone. That is an option for the framer, not a recommendation — three rows in
+one diff against one pin reviews better than three candidates against the same
+pin.
+
+**What the frame still owes**, and none of it is blocked: the D0 ledger from the
+AST walk, the operator-name row's extent, and whether the re-gated
+`seed-reserved-infix-names.md` rows go green as a consequence or need their own
+act.
 
 # Contention
 
