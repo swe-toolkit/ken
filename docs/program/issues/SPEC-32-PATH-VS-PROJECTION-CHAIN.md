@@ -33,41 +33,75 @@ time the two have been in contact.
 
 # What is actually unspecified
 
+> ## CORRECTION 2026-09-16 (Steward, on spec-author's measurement). THE FIRST
+> ## VERSION OF THIS SECTION ASSERTED A PREMISE THAT IS FALSE.
+>
+> It said: *"Every `path` use site sits after a keyword ... That is very likely
+> the intended discriminator."* **Two of the three do. `:280` does not, and
+> `:280` is the site the whole node is about.** The wrong text is replaced below
+> rather than annotated, because a likely-answer hint that is false exactly
+> where the ambiguity is live is worse than no hint.
+>
+> **How it survived a re-measure:** the premise was checked by grepping `path`
+> and reading the hit lines. A grep returns a coordinate; membership in a
+> production requires resolving the **enclosing** right-hand side, which is
+> upward of the hit and was never read. The two-of-three half confirmed, so the
+> check stopped.
+
 **Not "which is correct."** Both readings are wanted, in different places. The
-gap is that the grammar never says the choice is position-determined, so an
-implementation is free to resolve it either way and still claim conformance.
+gap is that the grammar never says how the choice is made, so an implementation
+is free to resolve it either way and still claim conformance.
 
-The two positions that already exist, measured:
+The three `path` use sites, measured at `b34ffd182` with each hit's **enclosing
+production** resolved, not just its line:
 
-    :52    | "proof" ident "for" path binder* ":" type "=" expr   -- attached proof theorem
-    :280   | path "::" ident                                       -- canonical attached-proof path
-    :293   proof_ref ::= "proof" ident "for" path
+    :52    | "proof" ident "for" path binder* ":" type "=" expr    in decl      AFTER A KEYWORD
+    :293   proof_ref ::= "proof" ident "for" path                  own rule     AFTER A KEYWORD
+    :280   | path "::" ident                                       an arm of `primary`   NO KEYWORD
 
     :357   ... Its subject is exactly one `path`; subsequent ...
 
-⇒ Every `path` use site sits after a **keyword** (`for`, or the `::`-suffixed
-canonical form). Every projection-chain use site sits in **expression
-position**. That is very likely the intended discriminator, and if so the
-amendment is that saying it costs one sentence.
+**`:280` is an arm of `primary`, and that is the whole finding.** The two
+productions are not adjacent, they are **nested**:
 
-**Do not treat "it is obviously position-determined" as the answer.** It is the
-likely answer and it is unstated, and an unstated discriminator is what a second
-implementation gets wrong. `:357`'s "exactly one `path`" is the sentence closest
-to ruling it, and it constrains the count, not the production.
+    application_atom ::= primary ("." ident | ".1" | ".2")*
+    primary          ::= literal | ident | ConId | qualified_global_ref
+                       | path "::" ident
+                       | ...
+
+⇒ **`path` sits inside `primary`, and `primary` is the head of the projection
+chain.** Parsing `a.b::c`, the choice at `a` is between taking the
+`path "::" ident` arm (so `path` consumes `a.b`) and taking the `ident` arm (so
+the postfix chain consumes `.b`) — and it cannot be made until the `::`, or its
+absence, is seen **after the dotted run has already ended**.
+
+⇒ **The discriminator at the live site is a TRAILING token at unbounded
+distance, not a leading keyword.** Position-determined is therefore not merely
+unstated; **it is not available as the ruling where it is needed.**
+
+`:357`'s "exactly one `path`" is the sentence closest to ruling any of this, and
+it constrains the count, not the production.
 
 # The three shapes an amendment could take
 
-Named so the framing does not re-derive them, not to pre-empt the ruling:
+Named so the framing does not re-derive them, not to pre-empt the ruling.
+**Shape 1 was the recommended one before the correction above; it is now the
+one shape known not to work.**
 
-1. **Position-determined.** `path` is reachable only after `for` / in the `::`
-   form; expression position always takes the projection chain. Cheapest, and
-   matches every existing use site.
-2. **A precedence.** One production is preferred where both apply. More
-   machinery than the situation needs unless a use site exists where both are
-   genuinely reachable -- and none was found.
+1. **Position-determined. RULED OUT, not merely disfavoured.** `path` would be
+   reachable only after a keyword. It is not: `:280` is an arm of `primary`,
+   in expression position. Retained here so the framing does not re-propose it.
+2. **Longest-match / lookahead on the trailing `::`.** Commit to
+   `path "::" ident` only if a `::` follows the dotted run; otherwise take the
+   projection chain. This is what the grammar appears to *intend*, and it is a
+   real cost to state: unbounded lookahead, or backtracking, or a lexical
+   rule that makes `::` decidable earlier.
 3. **Restrict `path`.** Spell the attached-proof subject so it cannot collide
    (a distinct separator, or a non-terminal that is not ident-headed). Largest
-   blast radius; touches `37 §6` compatibility spellings at `:203-204`.
+   blast radius; touches `37 §6` compatibility spellings at `:203-204`. **This
+   becomes materially more attractive under the correction** — it is the only
+   shape that removes the unbounded-lookahead requirement rather than
+   specifying it.
 
 # Not this node
 
@@ -86,9 +120,13 @@ Named so the framing does not re-derive them, not to pre-empt the ruling:
 # Acceptance, indicative
 
 Whatever it rules, the amendment owes a statement of **where the choice is
-made** that a reader can apply to `a.b.c` without knowing the implementation.
-The control: an example of an ident-headed dot chain in each position, with its
-required reading given.
+made** that a reader can apply without knowing the implementation.
+
+*Control, and it must include the hard case:* give the required reading for
+`a.b` (no trailing `::`, so projection chain) **and** for `a.b::c` (the
+`primary` arm). A statement that only covers the first is satisfied by the
+reading that was already assumed and does not discriminate — it is the same
+blindness that put a false premise in this node's first version.
 
 # Related
 
