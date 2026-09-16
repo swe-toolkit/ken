@@ -16,6 +16,27 @@ unmeasured catalog migration. It is measured (§3): the migration is of order
 twenty grouping edits with more than 90% of them in one file, and the `if` row
 has no migration tail at all.
 
+> ## CORRECTED after landing — read §2d, §2e, §2f and §4 before starting
+>
+> Architect ruling `evt_3n1q5324gsqjv` closed §4's open question **and reversed
+> the patch shape this frame implied.** Four changes, all folded here so the
+> frame is the durable record:
+>
+> 1. **§4 is RULED, not open.** Candidate A, and it is *entailed* by
+>    `32-grammar.md:264`/`:270` rather than chosen — candidate B has no
+>    derivation. **No Spec escalation is owed.**
+> 2. **§2d's "relocation of the loop" was the Steward's and was wrong.** The
+>    head position already conforms on `main`; only the argument position is
+>    defective.
+> 3. **§2e is new and is the implementable shape** — one loop, two alternatives.
+>    The relocation §2d implied regresses `box.value keep` and `f a.b c` from
+>    correct to **unparseable**.
+> 4. **§2f: do not sweep the third caller** of `parse_atom_expr` (`:2987`,
+>    `old`). New AC-OLD-UNCHANGED makes that checkable.
+>
+> The Architect reviewed the D0 walk plan and would not change it. Nothing here
+> blocks D0; it bears on the parser edit that follows it.
+
 ## 1. Objective
 
 Make the parser conform to the application-atom contract pin in
@@ -92,7 +113,14 @@ well-formed and stays so. **The pin is about the argument position only.**
 a shared predicate; the AC is about the argument position, and a caller that
 uses it to mean something else would be changed as a side effect.
 
-### 2d. The projection divergence is WHERE the postfix loop lives
+### 2d. The projection divergence is in the ARGUMENT position ONLY
+
+> **CORRECTED, and the withdrawn sentence was the Steward's.** This section used
+> to end *"This is a relocation of the loop, not a deletion of it."* The
+> Architect measured that reading and it is **wrong in a way that breaks working
+> code** — see §2e. Relocating the postfix loop to fire after the whole
+> `head args*` run regresses two expressions that parse correctly today. The
+> corrected shape is §2e; do not implement this section without it.
 
     crates/ken-elaborator/src/parser.rs:2813   fn parse_atom_expr
                                                = parse_atom_expr_base, then a
@@ -101,13 +129,92 @@ uses it to mean something else would be changed as a side effect.
     crates/ken-elaborator/src/parser.rs:2842   fn parse_atom_expr_base
                                                the atom proper, no projection
 
-`parse_app_expr` calls `parse_atom_expr` for **both** the head and each
-argument. So an argument absorbs its own `.field` and yields
-`A(keep, Proj(box, value))`. The pin wants the application built first and the
-projection applied to it: `Proj(A(keep, box), value)`.
+`parse_app_expr` calls `parse_atom_expr` for **both** the head (`:2291`) and each
+argument (`:2314`). The two positions behave differently, and only one of them
+is defective:
 
-**This is a relocation of the loop, not a deletion of it.** Projection stays;
-what changes is the expression it attaches to.
+    box.value keep   TODAY   head -> EProj(box, value); the arg loop then takes
+                             `keep` -> EApp(EProj(box,value), keep)   CORRECT
+    keep box.value   TODAY   head -> keep; the argument absorbs its own `.field`
+                             -> EApp(keep, EProj(box,value))    VIOLATES THE PIN
+
+⇒ **The head position already conforms on `main`. The defect is confined to the
+argument position**, where an argument absorbs a `.field` that the pin says
+belongs to the application spine.
+
+### 2e. The correct shape: ONE loop, TWO alternatives — not a relocated loop
+
+Architect ruling `evt_3n1q5324gsqjv`, measured at `origin/main`
+`7bac1de18356901f207e5585f4ac55ad8c8f8cc0` and re-verified by the Steward at
+`d7596ac68301edbf9ec190c97408cd908aed1fc6` (no parser change between them).
+
+**Why the obvious patch is wrong.** The tempting site is
+`atom (atom)* ("." field)*` — postfix after the argument run. Traced:
+
+    box.value keep   head `box`; the arg loop tests can_start_atom_expr on
+                     Token::Dot -> FALSE, so the arg run is EMPTY; postfix then
+                     gives EProj(box,value) and `keep` is never consumed
+    f a.b c          head `f`, arg `a`; `.` ends the arg run; postfix gives
+                     EProj(EApp(f,a),b) and `c` falls out the same way
+
+A trailing argument after a projection has no site left to be consumed at. That
+patch fixes `keep box.value` and **regresses `box.value keep` from correct to
+unparseable** — the very expression §4's question was about.
+
+**The shape that works.** Application and projection are the same
+left-associative postfix loop at the same level, so both arms fold into one
+accumulator and source order is preserved by construction:
+
+```rust
+// parse_app_expr, the `_` arm at :2290 — the head now takes the BASE
+let mut f = self.parse_atom_expr_base()?;
+loop {
+    // projection: same spine, same level. Guard copied verbatim from :2815-2816.
+    if matches!(self.peek(), Token::Dot)
+        && matches!(self.lookahead(1), Token::Ident(_) | Token::Nat(1 | 2))
+    {
+        f = self.parse_projection_suffix(f)?;   // body lifted from :2817-2838
+        continue;
+    }
+    if self.is_contextual_ident("eqn") && matches!(self.lookahead(1), Token::Colon) { break; }
+    if self.is_contextual_ident("visits") && matches!(self.lookahead(1), Token::LBracket) { break; }
+    if self.brace_starts_match_arms() { break; }
+    if !self.can_start_atom_expr() { break; }
+    let arg = self.parse_atom_expr_base()?;     // :2314 — BASE, so `.` never rides an argument
+    let span = Span::merge(f.span(), arg.span());
+    f = Expr::EApp(Box::new(f), Box::new(arg), span);
+}
+Ok(f)
+```
+
+Three edits: `:2291` and `:2314` move to `parse_atom_expr_base`, and the dot arm
+is added at the top of the loop. **Lift `:2817-2838` verbatim** into
+`parse_projection_suffix(&mut self, e: Expr)` rather than re-deriving it — the
+`.1`/`.2` arm with its `Nat(1 | 2)` guard and the
+`Span::new(e.span().start, projection_span.end)` construction must come along,
+or positional projection silently leaves the spine.
+
+**`can_start_atom_expr` stays unchanged, and `Token::Dot` must remain a
+non-member.** The dot arm is tested *before* the break guards, so the loop
+continues on `.` without Dot ever needing to look like an atom start.
+
+### 2f. The third consumer of `parse_atom_expr` — do NOT sweep it
+
+`parse_atom_expr` has exactly three call sites, verified at `d7596ac68`:
+
+    :2291   parse_app_expr, head       -> becomes parse_atom_expr_base
+    :2314   parse_app_expr, argument   -> becomes parse_atom_expr_base
+    :2987   `old` (Token::KwOld, spec 21 §6.4)   -> UNCHANGED
+
+After the two edits `parse_atom_expr` has one caller left, and the tempting
+cleanup is to inline or delete it. **Do not.** `old x.f` is `EOld(EProj(x,f))`
+today; whether it should be `EProj(EOld(x),f)` is a different question that
+`32 §3`'s pin does not reach, because `old` is not an `application_atom`.
+
+⇒ **Leave `:2813` byte-identical** so the diff cannot move `old`'s binding, and
+let the one-caller smell stand. If that reading wants settling it is a Spec
+question on `21 §6.4` and its own node — the Architect has flagged it to
+spec-leader — not a rider on this one.
 
 ## 3. D0 — the migration ledger. Run it FIRST; it is small.
 
@@ -169,19 +276,42 @@ name occurring as an `application_atom` outside `operator_prefix` head position.
 If D0 returns zero for it, that is a result; the current absence of a number
 is not.
 
-## 4. Open, and NOT for the implementer to settle
+## 4. RULED — projection at the HEAD position. Closed; no Spec action owed.
 
-**Projection at the HEAD position.** The pin fixes `keep box.value` as
-`Proj(A(keep, box), value)`. It does not say what `box.value keep` is —
-`A(Proj(box, value), keep)` (projection binds tighter at the head) or
-`Proj(box, A(value, keep))` (which is not well-formed). The natural reading is
-the first, and the natural implementation of §2d produces it, but **the pin does
-not state it.**
+This section was open when the frame landed. It is now **ruled**, and the ruling
+is folded here because an in-thread ruling is not a durable deliverable and the
+frame is the artifact the implementer meets first.
 
-⇒ **Route this to the Architect as a spec-reading question before writing the
-postfix relocation**, not after. If the answer is the natural one, it costs a
-sentence; if it is not, it changes where the loop goes. Do not infer it from
-what the easiest patch happens to do.
+**Architect `evt_3n1q5324gsqjv`: candidate A — `box.value keep` is
+`A(Proj(box, value), keep)`.** And it is **entailed by the pin, not chosen over
+an alternative**, so there is no spec gap and nothing to escalate to Spec.
+
+**The derivation.** Both forms are left-recursive postfix productions over
+`expr`, `spec/30-surface/32-grammar.md:264` and `:270`:
+
+    | expr application_atom                      -- application (left assoc)
+    | expr "." ident | expr ".1" | expr ".2"     -- field / projection
+
+`box.value keep` derives as `expr application_atom` with `expr = box.value`,
+itself `expr "." ident`.
+
+⇒ **Candidate B was never the losing side of a fork — it has no derivation at
+all.** The right operand of `.` is the terminal `ident`, not an `expr`, so
+`Proj(box, A(value, keep))` is unexpressible. A fork with one well-formed member
+is not a fork, which is why this could not have been the real question.
+
+`application_atom` (`:278-288`) does not list projection, so `.field` is never an
+argument and is always a suffix on the spine. **One rule yields both facts:
+application and projection are the same left-associative postfix loop at the
+same level, and source order alone decides.**
+
+    keep box.value   =  Proj(A(keep, box), value)
+    box.value keep   =  A(Proj(box, value), keep)
+
+**What this cost.** The question was worth asking and the answer was cheap; what
+it bought was §2e, which is not cheap. The frame's original instruction was not
+to infer the reading from the easiest patch. **The inference that actually
+slipped was the converse — that the easiest patch implements the reading.**
 
 ## 5. Acceptance
 
@@ -191,12 +321,34 @@ leading token.** `keep if c then a else b` is a parse error whose span is the
 `if c then a else b` still parses. A candidate that makes `if` unparseable
 everywhere has satisfied the first half and broken the language.
 
-**AC-PROJ-NESTS. `keep box.value` parses as `Proj(A(keep, box), value)`.**
-Asserted on the AST, not on a round-tripped string — a printer that re-emits the
-same source cannot distinguish the two trees, which is the whole defect.
-**Control:** `(keep box).value` produces the same tree, and `keep (box.value)`
-produces the old one. Both must be stated, because a candidate that collapses
-all three has removed the distinction rather than fixed it.
+**AC-PROJ-NESTS. THREE separate assertions, and they must be separate
+criteria.** Asserted on the AST, not on a round-tripped string — a printer that
+re-emits the same source cannot distinguish the two trees, which is the whole
+defect.
+
+    keep box.value   ->  EProj(EApp(keep, box), value)     the pin's own case
+    box.value keep   ->  EApp(EProj(box, value), keep)     CORRECT TODAY
+    f a.b c          ->  EApp(EProj(EApp(f, a), b), c)     the interleaving case
+
+**Why all three, and why not one criterion.** The second parses correctly on
+`main` already, so it is a **regression guard, not a new behaviour** — and §2e
+records a patch shape that satisfies the first while breaking the second. A
+suite carrying only the pin's own example cannot fail for that. The third is the
+case no single-alternation grammar reaches: it needs the one-loop-two-alternatives
+shape, and it discriminates that shape from any sequential arrangement of the two
+loops.
+
+**Control:** `(keep box).value` produces the same tree as the first row, and
+`keep (box.value)` produces the legacy one. Both must be stated, because a
+candidate that collapses all of them has removed the distinction rather than
+fixed it.
+
+**AC-OLD-UNCHANGED. `old x.f` still parses as `EOld(EProj(x, f))`, and
+`parser.rs:2813` `fn parse_atom_expr` is byte-identical in the diff.** §2f: the
+third caller at `:2987` is out of scope, and leaving the function untouched is
+what makes that checkable rather than argued. A candidate that inlines or
+deletes `parse_atom_expr` has moved `old`'s binding as a side effect of a
+cleanup.
 
 **AC-MIGRATION-LEDGER. Every site the D0 walk returns is migrated, and the diff
 touches no site outside it.** The ledger is the population; the AC is over named

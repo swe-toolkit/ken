@@ -71,7 +71,18 @@ deferral imposes on it. The deferral rides work this node already had.
 
 **Neither op has a real-artifact differential. This is a build.**
 
-A promoted op needs three things in `crates/ken-verify`: a
+> **CORRECTED by Architect `evt_11kc7kd57v10b`: the three artifacts below are a
+> CONFIRMATION, not a promotion gate.** `confirm_native_tested_transition`
+> requires the op to be `NativeTested` *already* before it reads any evidence
+> (`catalog.rs:315-322`; its doc comment at `:313-314` says so outright).
+> **Consequence for this node: the availability flip and the differential must
+> land in ONE change, flip first within it.** Built differential-first, the
+> evidence test exits at `OutsideNativeTestedSet` — a failure that has nothing
+> to do with the evidence and does not look like an ordering problem. The full
+> correction, the four-step ordering, and the negative-control shape are in
+> [[RT-D5B-MAPPING-AVAILABILITY-FLIP]]; they apply here unchanged.
+
+A promoted op is confirmed by three things in `crates/ken-verify`: a
 `CanonicalDifferentialRun` (native vs interp), a
 `NativeTestedEvidence::from_<op>_run(&run)`, and
 `confirm_native_tested_transition(op, evidence) == Ok(NativeTested)` — plus, in
@@ -82,6 +93,21 @@ requires the confirmation to fail.
 clock op with a differential is `ClockWallNow`
 (`from_clock_wall_now_run`, asserted in `scenario.rs`), which is a useful
 template and is **not** evidence about either of these.
+
+## `ClockMonotonicNow` needs a COMPARATOR, not just a scenario
+
+Architect `evt_11kc7kd57v10b`, recorded as a sizing input and not a new
+requirement. `from_clock_wall_now_run` exists as its own constructor for a
+reason: `ClockWallNow` is **nondeterministic**, so it uses
+`compare_clock_wall_now()` rather than the generic `compare_exact()`.
+
+**`ClockMonotonicNow` has the same property.** A monotonic reading is not
+byte-equal across lanes either, so `from_run`'s `compare_exact()` is the wrong
+comparator for it, and the generic table-driven route is not available. This op
+needs its own constructor and its own comparator, on the `ClockWallNow` model.
+
+⇒ **Whoever sizes this: that is a third build, not a third scenario row.**
+`ClockSleepUntil` may be exact-comparable; `ClockMonotonicNow` is not.
 
 ⇒ **Two builds converge here and they are the same build.** The deferred
 assertions above need a value-capturing test backend; the differential needs a
@@ -96,17 +122,19 @@ occur in exactly two files tree-wide (`ken-verify/src/scenario.rs`,
 hard-coded `ConsoleFlush` with synthesized booleans. The absence above is a
 measurement, not a silence.
 
-**See also** [[RT-D5B-MAPPING-AVAILABILITY-FLIP]], which carries the open
-question this measurement raised: **ten** of the 25 `NativeTested` ops have no
-real-artifact differential either. Whether the protocol is the real bar or was
-never swept backward is the Architect's to answer, and it changes what both
-promotion nodes owe.
+**See also** [[RT-D5B-MAPPING-AVAILABILITY-FLIP]], which carries the ten-op
+finding this measurement raised — **ten** of the 25 `NativeTested` ops have no
+real-artifact differential either — now **answered**: the confirmation protocol
+was never a promotion bar, so no backward sweep was owed and nothing about those
+ten changes what this node owes.
 
 # Sizing note, for whoever frames this
 
-Unsized, and no longer for want of a measurement. What decides the size is the
-shape of the test-backend extension plus the Architect's answer on the ten-op
-question — not whether the differential exists, which is now known.
+Unsized, and no longer for want of a measurement. **Three things decide the
+size, and all three are now known inputs rather than open questions:** the
+value-capturing test-backend extension, the `ClockMonotonicNow` comparator, and
+the one-change ordering. Whether the differential exists is settled — it does
+not.
 
 # Related
 
