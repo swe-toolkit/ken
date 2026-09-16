@@ -39,8 +39,23 @@ operator-pre-decided row — is mechanical. `AC-1` is not. It requires
 perturbing the production path each candidate readmission asserts over and
 showing the row goes red, then reverting the perturbation before the diff.
 That is a judgment about what the assertion actually reaches, per row, and
-the judgment is the deliverable: a row that stays green under the mutation is
-**vacuous** and is reported as a finding rather than readmitted.
+the judgment is the deliverable.
+
+**CORRECTED 2026-09-16. This passage formerly ended: *"a row that stays green
+under the mutation is vacuous and is reported as a finding rather than
+readmitted."* REFUTED — do not apply it.** A green has two causes and one
+number: the row does not observe the behaviour, or **the mutation never executed
+on the row's path.** Row 1 hit the second on its first two attempts and would
+have been reported vacuous under this wording. **`AC-1b` in the frame governs
+both arms** — neither may be decided on the row's colour; vacuity needs the
+probe's own signature, readmission needs the mutated value observed at the
+assertion.
+
+**Note that the correct rule was already three paragraphs below, in "The
+recurring instrument hazard on this surface" — *"Do not read a red as evidence
+the mutation reached."*** The node stated the principle and then contradicted it
+above, and the contradicted half is the one that became `AC-1`. **The
+counterexample was in this file before the WP began.**
 
 Nine of the twelve rows carry labels naming a failure that no longer happens.
 A stale label and a vacuous test produce the same green, and only the mutation
