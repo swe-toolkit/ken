@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-16 20:27:08Z — from 649 issue file(s) in `docs/program/issues/`.
+2026-09-16 21:15:41Z — from 650 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -186,6 +186,7 @@ the committed file matches the generator's output.
 | `DOC-W5C-CARDS-CAPABILITY` | Wave 5 slice 3 — apply the settled card format to Capability (19): nineteen complete cards, closing the 39-package set | merged | doc | M | none | — |
 | `DOC-W5D-INDEXES` | Wave 5 closeout — build the four cross-package indexes the cards can support (declaration/type, law, effect/capability, assurance) and record why the four held-class indexes cannot be built | merged | doc | M | none | — |
 | `DOC-W6-AGENT-EVAL` | Wave 6 residual — the cold-context agent evaluation certifies agent_core_ready against a corpus 3.4x smaller than today's, and three of the four pack-selected core modules have changed since | merged | doc | M | none | — |
+| `DOC-WRAP-RULE-EXEMPTION-COLOCATION` | the 80-column rule and its exemption list are stated at different levels in five documents, three of which state the rule with no exemption at all and two of which carry lists that disagree, so two seats applied the rule to exempt front matter and one was about to degrade a file that held the refuting measurement | ready | doc | S | none | — |
 | `DS-9` | lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections | active | foundation | L | none | — |
 | `EFF-SPACE-ENSURES-PRESTATE` | `old` is transparent, so a space operation's `ensures` cannot express the pre/post distinction `36 §4.3` is built on | closed | language | M | none | — |
 | `F1-37` | F1 [task-list #37] — bignum Int soundness review for K3 trusted-base promotion | draft | runtime | TBD | none | — |
@@ -698,6 +699,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `CI-MAIN-RUNS-CANCEL-EACH-OTHER` — Every push to main shares one concurrency group with cancel-in-progress, so each merge kills the CI still running for the previous merge; post-merge runs on main are a record of a specific tree, not a superseded attempt at the same one, and the fix is to stop cancelling them
 - `CI-WRITE-PARTITION-JOB-COMMENT-STALE` — ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
+- `DOC-WRAP-RULE-EXEMPTION-COLOCATION` — the 80-column rule and its exemption list are stated at different levels in five documents, three of which state the rule with no exemption at all and two of which carry lists that disagree, so two seats applied the rule to exempt front matter and one was about to degrade a file that held the refuting measurement
 - `LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE` — RE-CUT to the `if` half alone: make an ungrouped `if` after an application head reject AFFIRMATIVELY at the `if`, raised by the argument loop itself rather than by whatever parses next. The projection half is GONE -- the operator rejected the contraction (PR #3792 closed) and the 32 §3 amendment retires the pin it existed to enforce, so the parser's existing grouped reading is now the specified one and there is NO catalog migration. Scope is one continuation loop of five: removing a token from a can_start_* predicate makes the loop BREAK, never reject, so this needs re-implementing rather than re-basing.
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `PUB-DOC-ONLY-UNVALIDATED-AGAINST-ITS-DIFF` — `--doc-only` names a content class and is never checked against the actual content class of the diff, so the publisher accepts an assertion ABOUT the tree in place of the tree and merges a crates/ change with zero CI; the closure is one refusal, not a policy change or a discipline reminder
