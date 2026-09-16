@@ -69,14 +69,15 @@ than a sentence in a commit message.
    bodies carrying an `independent_contract` are demanded under exactly one
    identity, and that identity **is** their own contract, so arm 2 never runs.
 3. A mutation **cannot manufacture** the shape without synthesizing an identity,
-   which `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:333-335` forbids in terms — a
+   which `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:366-368` forbids in terms — a
    prohibition the Architect **extended to controls as a ruling** at
    `evt_5gws0pnssfqch`, rather than treating it as already applying there.
 
-**The governing frame line is `:332`** — *"if either is unavailable in principle
+**The governing frame line is `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:365`** —
+*"if either is unavailable in principle
 at some site, THAT IS THE FINDING."* An in-principle unavailability is a result
 to report, not an obstacle to work around. **Do not close this node by citing
-`:334`'s preference clause**; that clause governs the METHOD (why we do not
+`:367`'s preference clause**; that clause governs the METHOD (why we do not
 manufacture) and says nothing about SUFFICIENCY.
 
 ## Deliverables
@@ -116,7 +117,7 @@ constructible."* An instrument that returns a verdict cannot distinguish "not
 applicable here" from "measured false."
 
 **`AC-3` — no identity or demand is synthesized**, in a fixture or in a control.
-`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:333-338`, extended to controls by the
+`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:366-371`, extended to controls by the
 Architect at `evt_5gws0pnssfqch`. A synthesized identity is indistinguishable
 from a real one at the type level, so a control built on one tests the guard
 against a shape no Ken program can present and reports it as evidence about Ken

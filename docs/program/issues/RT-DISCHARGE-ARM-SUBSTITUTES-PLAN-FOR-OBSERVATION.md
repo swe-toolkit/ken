@@ -868,6 +868,23 @@ rather than alongside it, so the repair lands with the arc. It is also the
 newest, the least behind `main` by nearly half, and the tree every AC coordinate
 in this block cites — including D1-1's own control.
 
+**THE LANDING TARGET IS `wp/ABI-S6-d5b-file-backed`, NOT `main`. Steward ruling
+2026-09-16, on the Architect's route finding (`evt_6tdbfvncv69qk`).** *"Lands
+with the arc"* above states the intent and is not specific enough to route on —
+so it is made a value here, because the scope a gate votes on and the scope a
+merge moves have to be the same scope.
+
+    D1 branch = 0f71ab5b9 + EXACTLY TWO commits   07d22db4a, 2649bf5bf
+    origin/wp/ABI-S6-d5b-file-backed == 0f71ab5b9  0 ahead / 0 behind, IDENTICAL
+    merge-base(origin/main, candidate)            1dec48f33
+    commits in merge-base..candidate              38
+
+⇒ **A merge of `wp/RT-DISCHARGE-D1-seed-repair` into `main` moves 38 commits
+under a comment-only label.** D1's increment lands onto the #3676 branch; **#3676
+lands to `main` as ONE unit**, gated on the operator's ordering of its three
+causes. Cause 2 must not be made green. No merge Decision on this node names
+`main` as a target.
+
 > **USE AN ABSENCE-BASED WRONG-TREE DETECTOR, NEVER A PRESENCE-BASED ONE.**
 > This is the reusable half of the escalation that produced this ruling.
 > `k_ret_identity` is present on `main` in unrelated code, so checking for it
@@ -1048,10 +1065,11 @@ structure you found from inside the attempt; that is a better measurement than a
 standalone probe and it is an accepted outcome.
 
 **THE HARD STOP THAT IS A RESULT, NOT A FAILURE.** If the repaired arm 1 cannot
-be made to refuse by permitted means, say so and stop. `RT-CONSTRUCTOR-AUTHORITY
--DISCHARGE:332` governs — *"if either is unavailable in principle at some site,
-THAT IS THE FINDING."* Do not reach for a synthesized identity to close it; that
-prohibition extends to controls (Architect `evt_5gws0pnssfqch`).
+be made to refuse by permitted means, say so and stop.
+`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:365` governs — *"if either is unavailable in
+principle at some site, THAT IS THE FINDING."* Do not reach for a synthesized
+identity to close it; that prohibition extends to controls (Architect
+`evt_5gws0pnssfqch`).
 
 #### The deliverable: three coordinated edits
 
@@ -2780,14 +2798,14 @@ native-vs-interpreter harness in the scratchpad. A node with a witness in hand
 is a check; a node without one is a documented invariant.
 
 **AND THE WITNESS MAY NOT BE MANUFACTURED BY SYNTHESIZING AN IDENTITY.**
-`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:333-335` forbids it in terms, and the
+`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:366-368` forbids it in terms, and the
 Architect **extended that prohibition to controls** as a ruling
 (`evt_5gws0pnssfqch`) rather than leaving it to be read across. This is exactly
 what stalled `RT-DISCHARGE-LEDGER-COLLISION-SOURCE-REACHABILITY`: a mutation
 could not produce its shape without synthesizing an identity, so the shape
 stayed unreachable by any permitted instrument.
 
-The governing line is that node's `:332` — *"if either is unavailable in
+The governing line is that node's `:365` — *"if either is unavailable in
 principle at some site, THAT IS THE FINDING."* **An in-principle unavailability
 is a result to report, not an obstacle to engineer around.** If the repaired
 arm 1 cannot be made to refuse by permitted means, say so and stop; do not
