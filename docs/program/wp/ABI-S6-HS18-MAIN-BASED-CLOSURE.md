@@ -5,8 +5,8 @@
 has moved on `main`, and the line it came from carries a refused capability
 grant) · **Tier:** T1 · **Gate:** none · **Deps:** none — cut from `main`
 
-**Base (increment A):** `origin/main` `6f49f852141a66571c6126a569b954f63e2b6bde`.
-Increments B and C pin their own cut points in §4a-pin. This header is A's.
+**Base (increment A):** `origin/main` `537fa2afbdab8962717d43640afbd04719d1b258`.
+Increments B and C pin their own bases in §4a-pin. This header is A's.
 
 **Origin:** Steward cut 2026-09-16, executing the operator's 2026-09-16
 direction (*"do not build on an unmerged commit... the base commit needs to be
@@ -181,16 +181,54 @@ session — by subtraction, with no new line and a green build.
 
 ```sh
 # ---- THE ONLY PLACE EITHER VALUE IS WRITTEN. Increment B and C edit HERE. ----
-BASE=6f49f852141a66571c6126a569b954f63e2b6bde   # increment A's cut point
+BASE=537fa2afbdab8962717d43640afbd04719d1b258   # increment A's pinned base
 PATHS='-- crates/'                               # the domain, all three crates
+
+# THE PIN NEED NOT EQUAL THE CUT POINT -- requiring that regresses, because
+# every commit that corrects the pin moves main, which moves the cut point.
+# It must satisfy this instead. Run ONCE in the fresh checkout, BEFORE
+# authoring anything:
+#
+#     git diff "$BASE" HEAD $PATHS        MUST be empty
+#
+# Nothing in the DOMAIN may separate the pin from the cut point. That makes
+# the pin's adequacy a MEASUREMENT taken when it is adopted, not an argument
+# quoted from when it was proposed.
 ```
+
+> ### THE PIN IS A PROPERTY, NOT AN IDENTITY. The identity is UNSATISFIABLE.
+>
+> The rule this block used to imply — *each increment pins the literal SHA it
+> was cut from* — **regresses, and it regresses on its own first use**
+> (Architect, `evt_3d0d4stwbwppx`). Land a commit that corrects the pin: that
+> commit **is** the new `main`, so the next cut point is past the value just
+> written, and correcting it again moves the tip again. **No finite sequence of
+> commits satisfies `pin == cut point`.**
+>
+> The three conditions that replace it, all checkable, and they **terminate**:
+>
+>     (i)   BASE is a literal SHA on main
+>     (ii)  BASE is an ancestor of the candidate
+>     (iii) git diff "$BASE" <cut point> $PATHS   is EMPTY
+>
+> **(iii) is the whole of it, and WHEN it is evaluated is the point.** A pin
+> that lags the tip across docs-only commits is *correct*, not tolerated —
+> `crates/` cannot distinguish them. A pin that lags across a `crates/` commit
+> is *wrong*, and §4f describes exactly how it fails: a wider claim than the
+> candidate authored, reddening the gate on someone else's content.
+>
+> ⇒ **Do not quote a past measurement of (iii) — re-run it.** The pin is
+> proposed at one moment and consumed at a later one, after the candidate is
+> written and after more `main` has landed. **A present-tense measurement
+> cannot license a pin that is read in the future.** This is the sibling of the
+> pin/record axis below: that one asks what an occurrence *denotes*, this one
+> asks *when its truth condition is evaluated*.
 
 > **Why this is a block and not two comments.** The base and the domain were
 > each typed at two sites, coupled only by a prose assertion that they agreed.
-> **Nothing enforced it.** The frame's own rule is that each increment pins the
-> literal SHA it was cut from, so at increment B **both copies must change
-> together** — and if only the gate's does, the diagnostic silently measures
-> against increment A's base.
+> **Nothing enforced it.** Each increment carries its own base, so at increment
+> B **both copies must change together** — and if only the gate's does, the
+> diagnostic silently measures against increment A's base.
 >
 > **That failure lands at the worst possible moment: §4d is what you consult
 > WHEN §4b REDS.** A stale copy does not go quiet. It hands you a confidently
@@ -200,24 +238,59 @@ PATHS='-- crates/'                               # the domain, all three crates
 >     a pin TYPED AT EACH SITE can diverge.
 >     a pin BOUND ONCE and referenced cannot.
 >
-> ### SIX COPIES OF THIS SHA EXIST IN THE NODE. ONLY TWO ARE PINS.
+> ### TAKE THE PREDICATE, NOT THE COUNT. Every enumeration of this has been short.
 >
-> **Updating all six at increment B is exactly as wrong as updating none**, and
-> that is why "de-duplicate the SHA" is the wrong instruction:
+> **An occurrence is a PIN if and only if it asserts what increment A's base
+> IS. Every other occurrence names where a measurement WAS TAKEN or what a
+> historical guard case WAS — those are RECORDS and do not move.**
+>
+> **Updating every copy at increment B is exactly as wrong as updating none**,
+> and that is why "de-duplicate the SHA" is the wrong instruction:
 >
 >     PIN -- tracks the increment, MUST change at B
 >       §4a-pin `BASE=`                          the only executable copy
->       frame header "Base:", node banner        statements of A's cut point
+>       frame header "Base:", node banner        statements of A's base
 >
 >     RECORD -- names when a measurement was taken, MUST NOT change at B
 >       §4b's "Steward-verified at <sha>"        a guard case table
+>       §4b's "written base ... = <sha>"         the retired-ban measurement
+>       §4b's degenerate-fixture narration       what main equalled that day
+>       §2a's heading "measured at <sha>"        where the extent was counted
 >       node frontmatter `origin:`               the cut's provenance
+>
+> **Run the sweep rather than trusting that table.** At the A pin-move it had
+> been enumerated twice and was short both times — *"six copies, two are pins"*
+> (this block, originally) and *"five, three pins and two records"* (Architect,
+> `evt_6n2244wqy9txj`) — against **eight** occurrences: 3 pins, 5 records. The
+> miss was the same miss both times, and it is the one the instrument causes: a
+> **full-length**-SHA grep does not see the abbreviated `6f49f8521` in prose,
+> and all three of those are records.
+>
+> **Sweep BOTH spellings and BOTH SHAs**, because after a pin move the node
+> carries two — the pin's current value and the historical one the records
+> keep. At increment B, sweep for the value `BASE=` holds when you start:
+>
+>     git grep -nE '537fa2af|6f49f852' \
+>       -- docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md \
+>          docs/program/issues/ABI-S6-HS18-MAIN-BASED-CLOSURE.md
+>
+> That returns this block's own prose too. **Matches inside this block are not
+> sites** — it is the only place in the node that names a SHA without asserting
+> anything about the tree.
 >
 > **A pin and a record are the same 40 characters and they age in opposite
 > directions.** A reader running "update the base" over the node corrupts the
-> two records into claims about measurements that were never taken at that
-> commit — and nothing downstream can detect it, because the result is a
-> well-formed SHA in a plausible place.
+> records into claims about measurements that were never taken at that commit —
+> and nothing downstream can detect it, because the result is a well-formed SHA
+> in a plausible place.
+>
+> **The subtler corruption runs the other way, and it needs no SHA edit at
+> all.** A record that asserts its *agreement* with the pin — "the operative
+> base is the same SHA", "`origin/main` equals the pinned literal" — has a
+> pin's lifetime while looking like a record's. It goes false the moment the
+> pin legitimately moves, and it then reads as evidence the pin was moved in
+> error. **Both instances in this node have been de-coupled**; if you add a
+> record, do not let it quote a pin's value in the present tense.
 >
 > ⇒ **Bind the pins; date the records.** The frame header and the node banner
 > both say **increment A's** base explicitly, so a reader at increment B knows
@@ -375,9 +448,11 @@ both fail that, silently and later — see §4f, which is not optional reading.
 >
 > **This guard produced a confident wrong answer for two different people inside
 > ten minutes, and both times the command was fine and the FIXTURE was
-> degenerate.** Both used `origin/main` as the "good case" base while
-> `origin/main` *equals* the pinned literal `6f49f8521...` — so both arms named
-> the same tree, and what got built was case 4 wearing case 3's label.
+> degenerate.** Both used `origin/main` as the "good case" base on a day when
+> `origin/main` *equalled* the then-pinned literal `6f49f8521...` — so both arms
+> named the same tree, and what got built was case 4 wearing case 3's label.
+> (Past tense deliberately: this is a RECORD of that day, not a claim about the
+> current pin, which has since moved.)
 >
 > ⇒ **A degenerate fixture returns a confident wrong answer with no outward
 > sign.** The check is one `rev-parse` of each arm, and it costs nothing. The
