@@ -70,3 +70,26 @@ conversation is not a durable deliverable. Deliberately described rather than
 linked: a `fleet` reader does not load `enclave`, so the link would not resolve
 for most of this file's audience. That is this file's choice, not a corpus
 invariant — 23 such cross-scope links exist across 18 `fleet` files today.
+
+## The wider trigger: re-measure when a claim becomes LOAD-BEARING
+
+The citation trigger above is one case of a bigger one, named the same day by a
+third seat after catching itself:
+
+> *"The verification was a property of what I was DOING with the claim, not of
+> my scepticism about it."*
+
+They re-measured a borrowed premise because they were about to author a frame;
+another seat let the identical premise through because they were only writing a
+status post. Neither was careless — they were doing different things with one
+sentence, and only one of those things had a gate on it.
+
+⇒ **If re-measurement fires on "am I about to copy this into an artifact I
+author", then verification coverage is shaped like the AUTHORING GRAPH rather
+than like the risk.** A claim that is consumed and acted on but never
+re-published passes through untouched — and in a federation that is most
+claims. A ruling gets read and applied; it does not get re-derived on the way.
+
+**The trigger that covers both:** re-measure a claim when you are about to make
+it load-bearing — **by republishing it OR by acting on it.** Still a single
+observable moment, still nothing to notice across time.
