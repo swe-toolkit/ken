@@ -33,6 +33,23 @@ thread.
 > **The frame modelled this node as "what is ABSENT from `main`," and every
 > surprise so far has been something PRESENT on `main` that CHANGES.**
 
+**WIDENED 2026-09-16 (Architect `evt_2qqye3tdnh4b1`, row 11).** That predicate
+was itself too narrow, and a purely additive row under it would have buried the
+new case. There are now **three** shapes, not two:
+
+| shape | what the census sees | what it misses |
+|---|---|---|
+| ABSENT from `main` | this is its subject | — |
+| PRESENT on `main` and CHANGING | the name is there, so it is not reported | the shape change (rows 5-8, 10) |
+| **PRESENT at the port and UNREACHABLE** | **YES on all four — every census PASSES them** | **the module edge** (row 11) |
+
+⇒ **Porting an item and making it REACHABLE are two obligations, and no
+item-keyed instrument can see the second.** Visibility is a property of the
+**edge between modules**, not of the item, so an instrument whose unit is the
+item is blind to it by construction. **Only a consumer outside the module can
+distinguish present-and-reachable from present** — which is why the measurement
+had to be increment A's build rather than any list.
+
 ⇒ **An absent-definitions census cannot see a shape change, by construction.**
 It keys on names that are *not* in `main`; every surprise below is a name that
 **is**. Widening that census (the seed of 5 closing to 29) made it complete
@@ -50,9 +67,23 @@ class unless a differently-subjected instrument runs. See `§2b` (D0b).
 | 8 | ten variants live behind a **dev-dependency feature** invisible to every permitted local build | manifest read |
 | 9 | a **26th host-effect consumer** at the port (`HostOpV1::MappingAcquireFile`) — **ROUTED OUT**, see `§3b`; kept here because the inventory records what the model failed to predict, not only what this node carries | D0b |
 | 10 | a **second `Copy` drop**, `EliminatorRole` (`lowering/mod.rs` main `:10648` / port `:11212`) | D0b — the first row an instrument found rather than a read |
+| 11 | **four types PRESENT at the port but UNREACHABLE from lowering** — `CheckedIhPostCallConsumerStep` / `CheckedIhPostCallConsumer` at `lowering/core.rs` `:8421`, `:8451`, `:8513`, `:8566`. Not missing: resident, and refused at the **module edge**, the compiler printing their definition sites as secondary spans while declining them | **increment A's BUILD** — the first row no census of any subject could have produced |
 
 **Rows 5-8 were all found by reading and none by an instrument.** That is the
 finding about the method, not about the tree.
+
+**Row 11 is a third method, and the sharpest one.** A by-name completeness audit
+answers *"is `CheckedIhPostCallConsumer` in my tree?"* with **YES on all four** —
+**every census in `thr_6azxdz555c2qy` would have passed them.** Neither reading
+nor an item-keyed instrument reaches it, because the missing thing is not in any
+item; it is in the edge. **Only a CONSUMER'S BUILD, outside the module, can
+distinguish present-and-reachable from present.**
+
+Worth recording that the Architect's `evt_z4759` reason was **narrower than the
+result it correctly predicted**: it said the compiler cannot demand what nothing
+REFERENCES, which predicts *missing* items. These were present. **The ruling was
+right for a reason that does not cover the case that fired** — and that gap, not
+the confirmation, is the reusable part.
 
 **Row numbers above are THIS SECTION's, not the thread's.** Append by
 description, never by a number carried from `thr_6azxdz555c2qy` — the two
