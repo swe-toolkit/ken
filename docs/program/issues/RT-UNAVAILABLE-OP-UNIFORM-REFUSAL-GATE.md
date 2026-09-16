@@ -6,7 +6,7 @@ owner: runtime
 size: S/M
 gate: none
 depends_on: []
-blocks: [RT-D5B-MAPPING-AVAILABILITY-FLIP]
+blocks: [RT-D5B-MAPPING-AVAILABILITY-FLIP, RT-CLOCK-OP-NATIVE-PROMOTION]
 github: null
 tier: T1
 origin: "Adversary Finding 1 on the landed slice 4 (statements != enforcements), routed by the Steward to the Architect as a design question rather than ruled; Architect RULED evt_21f23zmgqfxsc. Steward cut 2026-09-16 as its OWN node rather than as a rider on the flip slice -- a sequencing/packaging call (steward.md §3), not a departure from the ruling's design content, which is adopted verbatim. Fixed inputs measured at origin/main d4e977a6af1083975665e587ed7e3e31f733785e."
@@ -25,10 +25,25 @@ origin: "Adversary Finding 1 on the landed slice 4 (statements != enforcements),
 > rather than absorbed (`evt_4w12zca5j1g03`), the Architect closed the design
 > fork it raised with a third option — **split the entry**, not relocate the
 > gate and not delete the arms (`evt_1y4rvywv1y6fr`) — and the Steward's funnel
-> measurement showed the remedy moves 21 call sites while touching **zero**
+> measurement showed the remedy moves the call sites while touching **zero**
 > setup lines and **zero** assertions (`evt_5sxcg2m9qah9j`). Size S to **S/M**;
 > no recut, no blocking node. **D0's results are now fixed inputs in the frame's
 > §3.** Per the sequencing ruling below, this lands BEFORE the availability flip.
+>
+> **FRAME CORRECTED 2026-09-16, mid-build.** runtime-implementer's findings
+> against a built candidate corrected four pieces of Steward-authored frame
+> text; the ruled design and the S/M sizing are unchanged. The funnel is **23
+> call sites / 10 tests**, not 21 / 8 — two sites pass their op through a
+> variable and a literal-keyed census cannot see them. A call-site population
+> was read as a claim about **reach**, and two `ken-interp` tests reach the gate
+> transitively through `ambient_dispatch`. Their disposition is
+> Architect `evt_rsbhqs2tfamg` (a **revision**): both invert in place as refusal
+> tests with two-sided controls, and the clock properties they carried are
+> **deferred, not lost** — `ken-host`'s test backend is an op-tag recorder that
+> cannot express them. The frame's new §9 records the retired assertions
+> verbatim and [[RT-CLOCK-OP-NATIVE-PROMOTION]] inherits them by name.
+> [[RT-INTERP-REFUSAL-REASON-ERASED]] carries the out-of-scope boundary defect
+> the build surfaced.
 
 # Objective
 
