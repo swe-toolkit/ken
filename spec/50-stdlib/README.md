@@ -178,10 +178,12 @@ raw heads, and installing `Membership Tree` is forbidden: key, set and
 relation-edge membership are three meanings over one head. The comparator
 travels in the view value, so an implicit resolver choosing a fresh `Ord` at the
 use site is non-conforming. `Bool` is primary and the `Ω` view is read off it,
-never eliminated from. The nonvacuous shared law is the observational quotient
-`same_members`, stated as a class field where `Query` is in scope unqualified;
-the chapter records that there is **no** nonvacuous algebraic law inside the
-minimal two-field class rather than manufacturing one. The standard `∈`
+never eliminated from. The shared observational relation `same_members` is a
+**definition**, not a law — a standalone over a dictionary, not a class field,
+carrying no obligation and discharged by nothing. The whole of
+the nonvacuous content is the per-provider adapter-fidelity obligation, so the
+chapter records that the class's shared law layer is **empty** rather than
+manufacturing content for it. The standard `∈`
 binding, its fixity and the use-site completion policy are fixed with the
 standard operator bindings, not here.
 

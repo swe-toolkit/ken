@@ -25,7 +25,7 @@ This section fixes the class, its providers and its law model. The standard
 `∈` binding, its fixity and the use-site completion policy are fixed where the
 standard operator bindings are specified, and are not restated here.
 
-## 1 The class — unary, with an associated query type
+## 1. The class — unary, with an associated query type
 
 ```
 class Membership (container : Type) {
@@ -72,21 +72,34 @@ who expects the `C : Type → Type` shape has never yet had cause to doubt it.
 Being a structure class, `Membership` is subject to the canonical-one-per-head
 resolver convention (`33 §5.5`). That is what forces `§3`'s nominal views.
 
-## 2 The proposition view — `Bool` is primary
+## 2. The proposition view — `Bool` is primary
 
 ```
-member_holds d q c := IsTrue (d.member q c)
+member_holds (c : Type) (d : Membership c) (q : d.Query) (x : c) : Ω
+member_holds c d q x := IsTrue (d.member q x)
 ```
 
-`IsTrue b := Eq Bool b True : Ω` (`§2`), so `member_holds` is an `Ω`
-proposition and is proof-irrelevant. **It is a definition over the `Bool`
-result, never an elimination from `Ω`.** There is no law recovering a `Bool`
-from a proof of `member_holds`, and a provider must not be given one: the
-checked `Bool` computation is the primary artifact and the proposition is read
-off it. An implementation that derives membership by eliminating an `Ω`-valued
-predicate is non-conforming even where it computes the same answers.
+`IsTrue b := Equal Bool b True : Ω` (`51 §2`), so `member_holds` is an `Ω`
+proposition and is proof-irrelevant.
 
-## 3 Providers are nominal, witness-bound views — never raw heads
+**Its signature is given in full because its third parameter is typed by a
+projection**, `d.Query`, exactly as `membership_member_at`'s is (`33 §6.3`).
+It is a standalone binding over a dictionary, not a class field, so the class
+stays at its two fields — and it therefore carries the **same** surface
+prerequisite: Ken's type grammar has no projection form, so this binding cannot
+be *written* until one exists, and `LANG-MEMBERSHIP-OPERATOR-SURFACE` authors
+**three** projection-typed bindings rather than one — this, `§4`'s
+`same_members`, and `membership_member_at`. A defining equation with no
+ascription would have hidden that, which is why the type is stated.
+
+**`member_holds` is a definition over the `Bool` result, never an elimination
+from `Ω`.** There is no law recovering a `Bool` from a proof of `member_holds`,
+and a provider must not be given one: the checked `Bool` computation is the
+primary artifact and the proposition is read off it. An implementation that
+derives membership by eliminating an `Ω`-valued predicate is non-conforming
+even where it computes the same answers.
+
+## 3. Providers are nominal, witness-bound views — never raw heads
 
 Because the resolver is canonical per outermost head, distinct membership roles
 over the *same* raw head collide. **Installing `Membership Tree` is therefore
@@ -113,25 +126,39 @@ the one the tree is `Ordered` under, and answer wrongly on a well-typed input.
 The witness travels in the view value for exactly this reason; **an implicit
 resolver choosing a fresh `Ord` at the use site is non-conforming.**
 
-## 4 The law model, and where it honestly stops
+## 4. The law model, and where it honestly stops
 
-The nonvacuous shared law is an **observational quotient**: two containers are
-indistinguishable when every query agrees.
+The shared **observational relation** says two containers are indistinguishable
+when every query agrees. It is a **definition, not a law** — it states no
+obligation and nothing discharges it:
 
-    same_members : (x : container) → (y : container)
-                 → ((q : Query) → Equal Bool (member q x) (member q y)) → …
+    same_members (c : Type) (d : Membership c) (x : c) (y : c) : Ω
+    same_members c d x y := (q : d.Query) → Equal Bool (d.member q x) (d.member q y)
 
-**It is stated as a class field, where `Query` and `member` are in scope by
-bare name.** That is the ordinary Σ-telescope of `33 §5.2` — a later field's
-type may name earlier fields, exactly as `Ord`'s `refl : (x : a) → IsTrue
-(leq x x)` names `leq`. Stated instead as a standalone definition over a
-dictionary it would have to write `d.Query`, a projection in type position,
-which is a different construct and not the one specified here.
+**It is a standalone definition, not a class field**, and `§1`'s two-field
+declaration is what settles that. A class elaborates to a right-nested Σ over
+its field telescope (`33 §5.2`), so a field is a component an instance must
+**supply** — that is, precisely a thing that *is* discharged — and a record
+declares fields rather than defining them, leaving nowhere for the `:=`. Read
+as a field this would be a slot each provider fills with **any** relation, with
+nothing tying it to the observational one.
 
-The law is `Ω`-clean with no truncation: `Equal Bool _ _ : Ω`, and a `Π` whose
-codomain is `Ω` is itself `Ω` (`13 §4`), so the quantified statement is a
-proposition. Its reflexivity, symmetry and transitivity follow from `Bool`
-equality and are reusable across providers.
+Being standalone, it takes the dictionary as a parameter and so writes
+`d.Query` in type position, exactly as `§2`'s `member_holds` does. **It carries
+the same surface prerequisite**, which brings the count in `§2` to **three**
+projection-typed bindings: `membership_member_at`, `member_holds` and
+`same_members`.
+
+It is `Ω`-clean with no truncation: `Equal Bool _ _ : Ω`, and a `Π` whose
+codomain is `Ω` is itself `Ω` (`13 §4`). Its reflexivity, symmetry and
+transitivity follow from `Bool` equality and are reusable across providers.
+
+> **It is deliberately NOT an equality obligation.** A definition concluding
+> `Equal container x y` from pointwise agreement would be **uninhabitable by
+> the first standard provider**: over the list view `[1,2]` and `[2,1]` agree
+> on every query and are not `Equal`. That is the same fact recorded below as
+> permutation being container-specific — so the conclusion a reader might
+> supply is one the chapter already knows to be false.
 
 **Each provider additionally carries an adapter-fidelity obligation:** its
 class `member` equals the existing explicit worker under the exact stored
@@ -139,8 +166,11 @@ witness. This is the obligation that has to be nonvacuous — a wrong
 comparator, a swapped relation endpoint, a value-pair query where a key query
 was meant, or a duplicated worker must each falsify it.
 
-**There is no nonvacuous algebraic law inside the minimal two-field class, and
-the contract records that rather than manufacturing one.** Empty/insert/lookup
+**The class's shared law layer is therefore empty, and the contract records
+that rather than manufacturing content for it.** `same_members` is a
+definition; the whole of the nonvacuous obligation is the per-provider
+adapter fidelity above. There is no nonvacuous algebraic law inside the
+minimal two-field class either. Empty/insert/lookup
 laws cannot even be stated without structure the class does not have, and a
 `Belongs` field proven equal to `IsTrue (member ..)` is vacuous — it restates
 `§2`'s definition and discharges by `Refl`. Container-specific laws stay
