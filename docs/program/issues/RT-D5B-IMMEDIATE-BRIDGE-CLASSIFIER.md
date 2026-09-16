@@ -1,7 +1,7 @@
 ---
 id: RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER
 title: "Land the plan-independent immediate-bridge classifier as a standalone module on main, exercised by unit tests over RuntimeExpr that fail without it. Slice 1 of the PR #3676 re-cut: the stack admits no leaf extraction because its dependency root is 17 files and +3194/-648, so the mechanism is re-cut from main with the closed PR's branch kept as a read-only reference."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -12,6 +12,25 @@ github: null
 origin: "Steward, 2026-09-16, on operator directive 2026-09-16: 'factor small mergeable pieces out of the long string of commits and merge those... Small achievable pieces, not one monolithic PR.' Architect decomposition ruling evt_2a3q52kafnsvw fixes the Stratum A / Stratum B seam and rules that inert is the WRONG criterion for a first slice. Steward build measurement evt_5rgn3rhnm25ts confirms Stratum A compiles at origin/main 80d3ff78042d47b841ad64165f3ee4f50b524f4c with a non-vacuity control. Frame at docs/program/wp/RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER.md. Steward-filed per COORDINATION section 2."
 ---
 
+> ## MERGED 2026-09-16 at `10321a158bc69cf50e0cb753e1096fe10fa43ed1`
+>
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is never an ancestor of `main`.
+> `crates/ken-runtime/src/cranelift_backend/planning/static_transition/immediate_bridge.rs`
+> is `9c2f6f46eb7bb82a54a31f13fedc28fe8e5c0e61`, 677 lines, identical at
+> `10321a158` and at `main`.
+>
+> **Run `35055338045`: 26 jobs, 26 success, full mode.** That run was cancelled
+> on its first attempt thirteen minutes in by an unrelated doc-only merge
+> sharing `main`'s concurrency group, and was re-run by id to replay the
+> original event payload. The structural cause is filed as
+> `CI-MAIN-RUNS-CANCEL-EACH-OTHER`.
+>
+> **Successor: `RT-D5B-BRIDGE-REALIZATION-PLANE`** (slice 2), released against
+> `7abb681fab644fc13db4a85129e348cecdcbe6d0`.
+>
+> The release banner below is retained as the record of what was asked for.
+>
 > ## RELEASED to Team Runtime 2026-09-16 — `ready`, size M, tier T1
 >
 > **Implementation base is `origin/main` at
