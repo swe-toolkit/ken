@@ -117,7 +117,7 @@ constructible."* An instrument that returns a verdict cannot distinguish "not
 applicable here" from "measured false."
 
 **`AC-3` — no identity or demand is synthesized**, in a fixture or in a control.
-`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:333-338`, extended to controls by the
+`RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:366-371`, extended to controls by the
 Architect at `evt_5gws0pnssfqch`. A synthesized identity is indistinguishable
 from a real one at the type level, so a control built on one tests the guard
 against a shape no Ken program can present and reports it as evidence about Ken
