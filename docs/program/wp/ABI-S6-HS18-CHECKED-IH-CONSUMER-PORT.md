@@ -142,6 +142,44 @@ returning non-zero from the same instrument, ref and domain.
 > returns 2239/2350 beside them.** A census with no live positive result cannot
 > distinguish "absent" from "my pattern was wrong."
 
+**AC-EVERY-MEMBER-MEASURED.** Every symbol the census *reports on* has its own
+measurement. A member that entered the list from a compiler diagnostic, a
+grep of error text, or an inference is **not** measured, and the report must
+not cover it with a collective claim.
+
+> **Control — compare the census's MEMBER list against its MEASUREMENT list by
+> name and by cardinality.** They must be the same set. If the report says "all
+> N are absent from `main`" while N-1 rows carry counts, it fails.
+>
+> **This AC exists because that is exactly what happened** (runtime-implementer,
+> `evt_5bcs52n4x7rdj`, self-reported): five symbols were measured with a pinned
+> domain, per-file counts and a positive control; `constructor_identity`
+> entered the list **from the error message text** and was never measured at
+> all; and the summary sentence — *"all 11 are Category B, all 0 on main"* —
+> covered six symbols on evidence for five.
+>
+> ⇒ **AN UNMEASURED MEMBER INSIDE A MEASURED LIST INHERITS THE LIST'S
+> CREDIBILITY.** Nothing in the presentation distinguishes the row that was
+> measured from the row that was assumed. `AC-CONTROL-ON-EVERY-ZERO` does not
+> catch this: a census can control every zero it reports and still carry a
+> member it never measured.
+
+**AC-WORD-BOUNDARY-OR-JUSTIFY.** Symbol counts use word-boundary matching
+(`\bNAME\b`), or the report states why substring matching is correct for that
+symbol.
+
+> **Control — `constructor_identity` on `main` in `crates/ken-runtime/src/`:**
+>
+>     substring grep    70
+>     word boundary      0
+>
+> The 70 are longer identifiers — `case_constructor_identity` (34),
+> `synthesized_constructor_identity` (17), and others. **A substring census
+> reports 70 and concludes the symbol is PRESENT on `main`, which is the exact
+> inverse of the truth**, and it fails in the direction that silently removes a
+> symbol from this node's scope. The symbol survived only because nobody ran the
+> careless instrument on it.
+
 **AC-NOT-A-BASE.** `b601e2ec7` is not an ancestor of the candidate.
 
 ```sh
@@ -187,14 +225,39 @@ there is no concurrent authoring in those paths.
 
 ## 7. The box, and why `-j 1` is in the frame rather than in folklore
 
-Measured 2026-09-16. Two `-p ken-runtime` builds were OOM-killed while a
-concurrent `-p ken-elaborator` suite ran; the box has 15995 MB total with
-~5.5 GB available and fourteen resident seats. **The same build, run alone at
-`-j 1`, succeeded at the same ~5.5 GB.**
+Measured 2026-09-16. Two `-p ken-runtime` builds were OOM-killed at ~5.5 GB
+available on a 15995 MB box with fourteen resident seats. **The same build, run
+alone at `-j 1`, succeeded at the same ~5.5 GB.**
 
-⇒ **The binding constraint is codegen parallelism, not machine size.** `-j 1`
-uses one codegen job and no parallel `rustc` instances. Build that way here
-rather than rediscovering it through a kill.
+⇒ **The binding constraint is codegen parallelism, not machine size.**
+
+**The parallelism that killed it was CONFIGURED, not cargo's default**
+(@research, `evt_23z2ydmvh8t5e`; Steward-verified):
+
+    .cargo/config.toml  [build] jobs = 6
+    nproc                              6
+    cores left over                    0
+
+**And the comment directly above that number is falsified by it.** It claims the
+cap *"leaves cores for the OS, the agent harness, and a scoped test"*; at
+`jobs = 6` on a 6-core box it leaves none. `scripts/ken-cargo`'s header carries
+the matching tell — *"correct for an 8-core / 16 GB laptop"*. **Both artifacts
+are tuned for a machine this is not, and neither claim is executed by anything,
+so nobody has been wrong out loud.**
+
+Two bounds on what this AC actually licenses:
+
+- **`-j 1` is known to work and is NOT known to be the largest value that
+  works.** Only two points exist: 6 kills, 1 builds. If `-j 2` or `-j 3` fits,
+  the throughput cost of this instruction is several times smaller than written.
+  **An implementer who has slots to spare may binary-search it and report the
+  result**; one who does not should use `-j 1` and move on.
+- **The real home for this is `.cargo/config.toml`, not this frame.** A frame
+  protects readers of this frame; the over-subscription is a property of
+  `jobs = 6` against this box's RAM, not of `ken-runtime`, so **any other
+  memory-heavy crate gets no protection at all and the next kill will look like
+  a new discovery.** Changing a fleet-wide throughput knob is a Steward call
+  with an unmeasured cost, so it is flagged here and not taken here.
 
 ## 8. Not this node
 
