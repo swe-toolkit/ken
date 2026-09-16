@@ -20,6 +20,38 @@ substance's call sites resolve.
 `evt_6mptkrtvysd8s`). The eleven compile errors are a symptom that located it;
 they are not its scope.
 
+### 1b. SYMPTOM INVENTORY — the populations this node's model failed to predict
+
+**Seeded by the Steward 2026-09-16 on the Architect's ruling
+`evt_7wm7z1t416y0p`. This section was missing from both the node and the frame,
+so the running count lived only in one seat's working context — which is exactly
+what a compaction discards.** Append here as they occur; do not keep them in a
+thread.
+
+**The predicate, and it is the point of the section** (Architect, same ruling):
+
+> **The frame modelled this node as "what is ABSENT from `main`," and every
+> surprise so far has been something PRESENT on `main` that CHANGES.**
+
+⇒ **An absent-definitions census cannot see a shape change, by construction.**
+It keys on names that are *not* in `main`; every surprise below is a name that
+**is**. Widening that census (the seed of 5 closing to 29) made it complete
+without re-aiming it — its *subject* is still absence. The shape change was
+found by **reading**, not by the census, which is why the next one is the same
+class unless a differently-subjected instrument runs. See `§2b` (D0b).
+
+| # | population | how it was found |
+|---|---|---|
+| 1-3 | the first three, from `thr_6azxdz555c2qy` | appended by runtime-implementer |
+| 4 | seed of 5 closes to **29 items** (130 reached, 59 zero-ref, minus 19 variants + 10 fields + 1 doc-comment token) | D0 census |
+| 5 | `RequiredConsumerProjection` is **resident on `main` and reshaping** — struct at `main:1204`, enum at port `:1318`; 13 refs / 7 files | read, NOT the census |
+| 6 | `Copy` **dropped** from the same derive; `Ord`/`PartialOrd` added | read, NOT the census |
+| 7 | the three accessors go **TOTAL to PARTIAL** with unchanged signatures | read, NOT the census |
+| 8 | ten variants live behind a **dev-dependency feature** invisible to every permitted local build | manifest read |
+
+**Rows 5-8 were all found by reading and none by an instrument.** That is the
+finding about the method, not about the tree.
+
 ## 2. D0 — the question this node answers BEFORE it ports anything
 
 **D0. What is the transitive closure of machinery absent from `main` that the
@@ -88,6 +120,33 @@ construct identified.
 > **mention**, not a definition, and must not be counted as one. Three separate
 > census errors today were caught this way and none by a control.
 
+### 2b. D0b — REQUIREMENT 0. Runs before any port work, and gates it as D0 did.
+
+**Added 2026-09-16 (Steward) on the Architect's ruling `evt_7wm7z1t416y0p`.**
+
+> **For every symbol the port and `main` SHARE in the domain, diff the
+> declaration.**
+
+**This is the complement of D0's query, and the two have different subjects.**
+D0 asks *what is absent from `main`* — it keys on names that are not there.
+D0b asks *what is present in both and DIFFERS* — it keys on names that are.
+
+⇒ **No amount of completing D0 can find a shape change.** Widening the seed from
+5 to 29 made D0 complete and left it aimed at the wrong question. Every
+surprise in `§1b` rows 5-8 is a shared symbol whose declaration differs, and
+every one was found by **reading** rather than by an instrument. D0b is the only
+instrument in this node that can return that class as a **measurement**.
+
+**Acceptance for D0b, same standard as D0:** the domain pinned, both refs named,
+a positive control on every zero, and the **enclosing construct** resolved for
+each hit rather than the line reported. Report it before porting.
+
+*Control that it is aimed correctly:* D0b must return `RequiredConsumerProjection`
+(struct to enum) and its `Copy` drop. **Those are known members.** A D0b that
+does not return them is measuring the wrong set, and that is a stronger check
+than a positive control on a symbol nobody disputes — it fails on the exact
+class the instrument exists to catch.
+
 ## 3. Fixed inputs, measured at named refs
 
 Steward-measured 2026-09-16 at `origin/main`
@@ -111,11 +170,49 @@ Steward-measured 2026-09-16 at `origin/main`
 because *"port these definitions"* and *"write this machinery"* are very
 different sizes and the second is the wrong one.
 
-### 3b. The shape is narrower than "planner machinery absent"
+### 3b. THIS NODE CONVERTS A LIVE TYPE. It is not only an addition.
 
-**`StaticTransitionPlan` is on `main`** at 291 references. It is not a missing
-layer. Absent is: one type family (`CheckedIhPostCallConsumer{,Step}`, 48 refs
-at base), two accessors on that existing type, and one on `Lowering`.
+> **REWRITTEN 2026-09-16 (Steward) on the Architect's ruling
+> `evt_7wm7z1t416y0p`. The previous text was REFUTED BY MEASUREMENT and is
+> replaced, not annotated.** It read:
+>
+> > *"`StaticTransitionPlan` is on `main` at 291 references. It is not a missing
+> > layer. Absent is: one type family (`CheckedIhPostCallConsumer{,Step}`, 48
+> > refs at base), two accessors on that existing type, and one on `Lowering`."*
+>
+> **Three things in it are false.** `RequiredConsumerProjection` is not absent —
+> it is resident and changing shape. Two of the "accessors" are not additions —
+> `source()`, `body_origin()` and `eliminator_origin()` already exist on `main`
+> and are being **re-expressed**. And "not a missing layer" was written as a
+> *bound* and has been **functioning as a floor**: it is the sentence that made
+> every subsequent surprise surprising.
+
+**`StaticTransitionPlan` is on `main`** at 291 references, and that part stands.
+
+**What this node does is not only "add what is absent."** At least three
+resident things change, measured at `origin/main` `432d36254` against port
+`b601e2ec7`:
+
+    RequiredConsumerProjection   struct (main :1204)  ->  enum (port :1318)
+                                 13 references across 7 files
+                                 main :6349 constructs it as a struct literal
+
+    its derive                   Copy DROPPED; Ord/PartialOrd added
+                                 (carry Ord only with a named consumer — see R3)
+
+    source() / body_origin() /   TOTAL on main  ->  PARTIAL at the port,
+    eliminator_origin()          signatures UNCHANGED
+
+**The population is NOT restated to a final number here, deliberately.** D0
+measured 29 items, but D0's subject is *absence* and `§2b`'s D0b is outstanding
+and is expected to move the count. **Writing "29" as the scope now would repeat
+this section's original defect in a new number** — a figure that reads as a
+bound and functions as a floor. The bound is D0 plus D0b, and it is not closed.
+
+⇒ **Do not size this node from a count of absent definitions.** A struct-to-enum
+conversion of a live type touches every construction and every field access on
+`main`, and the totality change touches call sites that the compiler will not
+flag at all (`§5`, R1).
 
 ### 3c. `b601e2ec7` IS EVIDENCE, NOT A BASE
 
