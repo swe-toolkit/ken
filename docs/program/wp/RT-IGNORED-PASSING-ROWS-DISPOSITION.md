@@ -29,9 +29,37 @@ using `scripts/ci-ignored-sweep.py`'s own upward-walk algorithm.
 
     33   real `#[ignore]` attributes in crates/, all on `#[test] fn`
     +1   macro-generated (discharge_ledger_refuses_one_word_discharging_two_obligations)
-    34   nextest --run-ignored=only population   (GROUND TRUTH)
-    -6   registry run-exemptions
-    28   selected and executed  ->  12 PASSED, 16 failed
+    34   nextest --run-ignored=only population   (GROUND TRUTH, carries to main)
+    -6   registry run-exemptions                 (carries to main)
+    28   selected and executed                   (carries to main)
+         -> 12 PASSED / 16 failed  **AT `0f71ab5b9` ONLY. NOT A FIXED INPUT.
+            RE-DERIVE AT THE IMPLEMENTATION BASE — see below.**
+
+> **THE POPULATION CARRIES TO `main`; THE PASS/FAIL SPLIT DOES NOT.** Verified
+> between `0f71ab5b9` and `origin/main`: `#[ignore]` attribute lines differing
+> across `crates/` is **zero**, `.github/ignored-test-exemptions.toml` is
+> **identical**, and ten of the eleven named test files are identical. So
+> `34`, `-6` and `28` are properties of the population and are safe to pin.
+>
+> **`12 / 16` is not.** It is a property of the tree the sweep ran on, and that
+> tree is PR #3676's head — **36 commits ahead of `origin/main` and 53 behind
+> it.** A row that passes there may pass **because of work that is not on
+> `main`**, which is the base this WP is routed onto and will be implemented
+> from. **Un-ignoring such a row on `main` turns `main` red**, which is exactly
+> what `D-READMIT` would do and what `AC-5` would then catch — after the work.
+> `px8f_buffer_native.rs` is the one named file that **differs** between the two
+> trees, and it holds one of the failing rows.
+>
+> ⇒ **D0 OF THIS WP IS TO RE-RUN THE SWEEP AT THE IMPLEMENTATION BASE AND
+> RE-DERIVE THE SPLIT THERE.** Every count below keyed to "the twelve" or "the
+> sixteen" means *the passing set / the failing set as measured at that base*,
+> not these numbers. If the implementation base is deliberately `0f71ab5b9`'s
+> lineage rather than `main`, say so in the dispatch and these numbers stand as
+> written — but that is a decision, not a default.
+>
+> **This frame's own epistemics already demand it.** *"A label is not evidence
+> about current behaviour"* is the same argument: 53 commits is the same kind of
+> gap as 2363, and a sweep result is no more a property of a row than a label is.
 
 **A source grep is the wrong instrument and must not be used to re-derive this.**
 `grep -c '#\[ignore'` returns 38: five of those are doc-comment prose *about*
@@ -141,10 +169,15 @@ these rows are labelled with a failure they no longer exhibit, and "the defect
 was fixed" and "the assertion stopped reaching the behaviour" produce the same
 green. Only the mutation separates them.
 
-**AC-2. Every one of the twelve rows has a disposition, and the dispositions
-partition the twelve.** No row is left as a passing ignored row.
+**AC-2. Every row in the PASSING SET AS MEASURED AT THE IMPLEMENTATION BASE has
+a disposition, and the dispositions partition that set.** No row is left as a
+passing ignored row. **The count is whatever D0 measures — twelve is what
+`0f71ab5b9` gave and it is not the bar.** An implementer who measures thirteen
+must disposition thirteen; one who measures eleven must not manufacture a
+twelfth. **An AC that pins a count taken on another tree is unsatisfiable
+honestly, and forcing it is the likelier outcome than failing it.**
 
-**AC-3. No row outside the twelve changes disposition.** The sixteen failing
+**AC-3. No row outside the passing set changes disposition.** The failing
 rows and the six registry exemptions are out of scope; a diff that touches them
 fails this AC. Control: the sweep's own selected count must still reconcile —
 `selected + registry == nextest ignored population` — with the registry total
