@@ -912,29 +912,106 @@ test, not a second definition.
 > briefly read *"BUILD IT"*, and neither was right. The list below is partly
 > live:
 >
->     LIVE, BUILD IT      the drop and its seeding. The circularity ruling
+>     BUILD               EDIT 1 -- stop the discard at units.rs:6877. The
+>                         obligation keeps the CALLEE's declared
+>                         result_contract identity. The circularity ruling
 >                         over the seed/certificate mechanism is withdrawn and
 >                         that mechanism is sound.
->     HELD, DO NOT BUILD  register_generated_constructor_authority(
->                         exact_ret_identity, returned)  -- the record is a
->                         copy of the stamp; fence 1's registration premise
->                         stands.
->     HELD, DO NOT BUILD  the refusing divergence check on
+>     BUILD               EDIT 2 -- arm 1 consults call_seeds at
+>                         publication.returned_word, NOT body.authorities.
+>                         Around units.rs:4489. COUPLED TO EDIT 1: inert
+>                         without it, because call_seeds is populated only for
+>                         obligations whose identity is Some.
+>     HOLD, DO NOT BUILD  register_generated_constructor_authority(
+>                         exact_ret_identity, returned) -- NOT NEEDED under
+>                         (ii) and vacuous under (i). It was a workaround for
+>                         consulting the wrong map.
+>     HOLD, DO NOT BUILD  the refusing divergence check on
 >                         exact_ret_identity.tag_abi_word()? != ret_abi_word
 >                         -- it is x != x in the -p build and acquires content
 >                         only under px8-ds-test-support with VaryRet. See the
 >                         block added to D1-2.
+>     OPEN, STILL OWED    EDIT 3 -- the independent_contract stamp
+>                         disposition. Untouched by the (ii) ruling.
 >
-> **AN OPEN QUESTION THE SCOPING DOES NOT SETTLE, AND IT IS THE STEWARD'S TO
-> ROUTE, NOT THE IMPLEMENTER'S TO GUESS.** Arm 1's new clause as built reads
-> `body.authorities`, which only the held-back registration writes. With the
-> registration held, `observed == None` always and **arm 1 always refuses** —
-> which is the closure-alone configuration already measured. So *"build the
-> seeding, hold the registration"* either means the increment is deliberately a
-> refusing one (consistent with `D1-5`: the red population IS the deliverable),
-> or it means arm 1 should consult **`call_seeds`** — what SEED actually
-> produces — rather than `body.authorities`. **Those are different repairs.**
-> Do not pick one from this marker.
+> **RULED (ii) 2026-09-16, Architect `evt_5kbssge40ycrj`, at source. ARM 1
+> CONSULTS `call_seeds`, NOT `body.authorities`.** The question this marker
+> briefly left open — whether *"seed but hold the registration"* meant a
+> deliberately-refusing increment (i) or meant arm 1 was reading the wrong map
+> (ii) — is closed, and the reason dissolves the fork rather than picking a
+> side.
+>
+> **`publication.returned_word` IS A CALL RESULT WORD, and the arm's own
+> existing check proves it.** `realized_call_words.contains(&publication
+> .returned_word)` passes today, and `realized_call_words` is populated at
+> `:4429` from nothing but `obligation.result_word`. So the word this body
+> publishes **came back from a call; this body did not construct it.**
+>
+> ⇒ **`body.authorities` records what THIS BODY CONSTRUCTED. Consulting it for a
+> call-result word is a CATEGORY ERROR**, and it is `None` by construction —
+> which is exactly the `observed == None` that was measured and read as a
+> refusal. **The registration was invented to make that lookup non-empty**, and
+> the only value in scope at `:6879` to register with is the stamp. **The
+> registration is a workaround for having consulted the wrong map, and the
+> vacuity is the symptom rather than the disease.**
+>
+> **`call_seeds` IS KEYED ON THE SAME THING** — inserted at `:4456` under
+> `obligation.result_word`, the same key `realized_call_words` uses. So
+> `call_seeds.get(&publication.returned_word)` is the well-typed lookup, on a
+> key the arm already holds.
+>
+> **THE "TWO PRODUCERS" JUSTIFICATION FOR (ii) IS REFUTED. THE REPAIR IS NOT.**
+> `obligation.identity` is born at `calls.rs:2478` as
+> `target.result_contract.map(DeclaredResultContract::identity)`, and `:6877` is
+> where it is thrown on the floor — **that much stands, and it is why the drop
+> must stop.** What does not stand is the claim that it is an *independent*
+> value. Traced one hop further (Architect `evt_5m430tz7v1kdj`, at
+> `responses.rs:2747`), `checked_ih_generated_context_result_contract` builds it
+> from `static_response_continuations` rows by `.map(|row| row.k_ret_identity)`
+> — **the same field `independent_contract` is read from at `units.rs:6962`** —
+> and its `_ =>` arm makes the planner **error** rather than permit two rows on
+> one context to disagree. **It is another read of the same plan field, with
+> agreement actively guaranteed wherever it is `Some`.**
+>
+> ⇒ **STOP LOOKING FOR A BETTER SECOND VALUE. THERE ISN'T ONE. THE PLAN CANNOT
+> CORROBORATE THE PLAN.** See the §1b closure in the SYMPTOM INVENTORY below,
+> which names this as the predicate shared by all three entries.
+>
+> **WHAT ARM 1 ACTUALLY REQUIRES, AND THE BUILD ALREADY SATISFIES IT: THE
+> CERTIFICATE'S EXISTENCE.** `body.authorities` is the one kind of evidence in
+> this system that is not plan-derived — the emitter's record of what a body
+> ACTUALLY CONSTRUCTED — and the certificate mechanism is what carries it across
+> a call boundary. `prove_forwarded_value` grounds only at `:3139-3151` against
+> the **callee's own** authorities, with seeds relaying and bottoming out there.
+> **A seed is present only if some body was proven, against its own emission
+> records, to construct that identity.** That is the observation the plan cannot
+> manufacture.
+>
+> **The refutation channel is ABSENCE, not disagreement**, and the measurement
+> says so: `funcid58` refuses on `seeded=None`. The equality
+> `seeded == Some(identity)` stays as defence, but **it is not where the content
+> is and no comment may claim it is.**
+>
+> **(i) IS NOT A REPAIR.** An arm that always refuses is a permanent refusal
+> wearing a check's clothes — the same switch as the always-passing version with
+> the sign flipped. **`D1-5`'s "the red population IS the deliverable" is about
+> SURFACING an unproved discharge, not about shipping an arm that cannot
+> discharge anything**; reading it as licence for (i) turns an observation
+> criterion into an architecture.
+>
+> **EDITS 1 AND 2 ARE COUPLED AND MUST LAND TOGETHER.** `call_seeds` is
+> populated only for obligations whose `identity` is `Some`, so (ii) is **inert**
+> until the drop at `:6877` stops discarding it. The seeding is not a separate
+> nicety; **it is what supplies arm 1's operand.**
+>
+> **THE FRAME WAS ALREADY RIGHT, AND THAT IS THE PART WORTH RECORDING.** The
+> deliverable below says *"Make it consult what SEED produces"* — and SEED
+> produces `call_seeds`. **(ii) is not a new design; it is the scoped design,
+> and the implementation reached for a neighbouring map.** A correct frame plus
+> a near-miss implementation plus accurate measurement yields a finding that is
+> wrong and has **no dissenting instrument** — every number reported was true.
+> Two rulings were erected on the honest result of the wrong lookup before
+> anyone asked what `body.authorities` is a map OF.
 >
 > **AND THE ORDINALS DO NOT AGREE ACROSS DOCUMENTS.** This node numbers the
 > arm-1 change EDIT 2 and the stamp EDIT 3; runtime-implementer's report numbers
@@ -1364,8 +1441,81 @@ exists only in resident context and is the first thing a compaction discards.
     SYMPTOM INVENTORY
     1. the repair records the value the guard was checked AGAINST, not that a
        carrier was checked -- keyed on the plan's own identity.
+    2. arm 1 consults body.authorities plus a registration -- and the only
+       value in scope to register with is the plan's k_ret_identity.
+    3. arm 1 consults call_seeds, carrying obligation.identity -- which
+       responses.rs:2747 builds from static_response_continuations rows by
+       .map(|row| row.k_ret_identity). THE SAME PLAN FIELD, one hop out.
+       Entry 3 is the ARCHITECT'S OWN RULING, one hour old, and they filed
+       it against themselves before anyone asked.
 
-**§1a hard-stop count on this design question: 1 of 3.**
+### §1b FIRES. THREE ENTRIES, ONE PREDICATE, AND THE FIX IS A CLOSURE.
+
+**Architect `evt_5m430tz7v1kdj`, invoking the 3rd-entry check written above and
+declining to rule a fourth time.** This is the trigger working exactly as it was
+designed to: it fires on the INVENTORY, not on the hard-stop chain.
+
+**THE PREDICATE: EVERY CANDIDATE FOR THE "SECOND VALUE" RESOLVES TO
+`k_ret_identity` ON A PLAN ROW.**
+
+⇒ **THE PLAN CANNOT CORROBORATE THE PLAN. Stop looking for a better second
+value; there is not one.** Each of the three was locally correct and each was a
+reasonable answer to *"what should arm 1 compare against?"* — **and that local
+correctness is precisely what kept the shared predicate invisible across all
+three attempts.** No single entry looks like this one.
+
+**THE STRUCTURAL CLOSURE — THE ARM'S REQUIREMENT IS THE CERTIFICATE'S
+EXISTENCE.** There is exactly one kind of evidence here that is not
+plan-derived: `body.authorities`, the emitter's record of what a body actually
+constructed. The certificate mechanism carries it across a call boundary, and
+`prove_forwarded_value` grounds only at `:3139-3151` against the callee's own
+authorities. **So the discharge depends on a certificate EXISTING, never on an
+equality between two plan-derived values.** The refutation channel is ABSENCE.
+
+**THE BUILD AT `07d22db4a` ALREADY SATISFIES THIS** — `funcid58` refuses on
+`seeded=None`, an absence, not a disagreement. The closure is a re-description
+of what the repair does, not a new repair. **Remaining work is comment-only plus
+one coordinate read; the increment is S.** The frame stays `size: M` for D1 as
+originally cut, because that is what was sized and what was spent.
+
+**THAT COORDINATE IS NOW READ, AND THE ANSWER IS YES.** The question the
+Architect declined to guess — whether the owner's `emission.row` appears among
+`static_response_continuations` filtered by `k_context == <the context this
+owner calls>` — was answered by runtime-implementer (`evt_4v8p25swnaf1m`),
+re-derived by the Architect, and **re-verified line by line by the Steward
+against `git show 0f71ab5b9:<file>`**:
+
+    units.rs:6372      let expected_context_target =
+                         bundle.context(emission.owner.k_context())
+    units.rs:6034      if facts.context_calls.len() != 1 {
+    units.rs:6041      if decode_direct_callee(func, call)? != expected_context {
+    units.rs:6264      || owner.k_context() != row.k_context()
+    responses.rs:3815  fn static_response_feasibility_ledger_filtered(
+    responses.rs:2747  checked_ih_generated_context_result_contract
+
+⇒ **The verified K-call target IS the context named by the owner's own
+`k_context()`, and each direction is guarded by an explicit refusal.** So the
+owner's row is in the filtered set **structurally, not merely possibly**, and
+**arm 1's equality is VACUOUS-WHEN-PRESENT: `seeded.is_some()` is equivalent.**
+The equality can fire only if the planner's own agreement invariant is already
+broken, which `responses.rs:2747`'s `_ =>` arm makes an error.
+
+**This CONFIRMS the closure rather than merely being consistent with it.** The
+equality clause is defence, `seeded.is_some()` is the content, and the second
+clause of the original (ii) rationale — *"two producers, two declarations"* — is
+**refuted by measurement**, not left unestablished.
+
+> **THE COORDINATES ABOVE ARE THE CORRECTED ONES. The first chain posted was
+> off by 49-51 lines** because it was read from a working tree carrying ~51
+> lines of new comments while being labelled *"read at source on `0f71ab5b9`"*
+> (self-reported, `evt_67ye5mjsgxbz9`). The old `units.rs:6423` and `:6085` land
+> on `}` and `));` at the base — **checked, because a stale coordinate that
+> lands on a plausible line is the one that survives.** `responses.rs` was never
+> touched, so its coordinates were unaffected. **The finding is unchanged; only
+> the line numbers moved.**
+
+**§1a hard-stop count on this design question: 1 of 3, UNCHANGED.** §1b is a
+different trigger and firing it consumes no hard stop.
 
 ### FENCE 1'S REGISTRATION PREMISE IS REFUTED. CLAUSE 2 IS NOW ALL OF IT.
 
