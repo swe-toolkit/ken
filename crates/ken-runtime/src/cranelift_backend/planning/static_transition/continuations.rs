@@ -6807,13 +6807,24 @@ pub(super) fn build_continuation_specialization_plan(
     }
     #[cfg(test)]
     if let Some(mutation) = REQUIRED_CONSUMER_PROJECTION_MUTATION.with(Cell::get) {
-        if let Some(projection) = required_consumer_projections.values_mut().next() {
+        // The mutation targets a DIRECT-OUTER projection specifically. `.next()`
+        // was sound while every projection had these two fields; now that a
+        // detached proof can sit in this map, taking the first entry could land
+        // on one that has neither, and the mutation would silently not apply --
+        // a control that stops firing rather than failing.
+        if let Some(RequiredConsumerProjection::DirectOuter { source, required }) =
+            required_consumer_projections
+                .values_mut()
+                .find(|projection| {
+                    matches!(projection, RequiredConsumerProjection::DirectOuter { .. })
+                })
+        {
             match mutation {
                 RequiredConsumerProjectionMutation::BodyOrigin => {
-                    projection.required.body_origin = projection.source.body_origin;
+                    required.body_origin = source.body_origin;
                 }
                 RequiredConsumerProjectionMutation::EliminatorOrigin => {
-                    projection.required.eliminator_origin = projection.source.eliminator_origin;
+                    required.eliminator_origin = source.eliminator_origin;
                 }
             }
             REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS

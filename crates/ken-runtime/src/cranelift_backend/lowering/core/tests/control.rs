@@ -3950,6 +3950,10 @@ fn the_backend_production_surface_inventory_is_closed() {
             // `RT-PLANNER-CONTINUATIONS-SPLIT` `D1` sub-split — the fusion
             // identity plane, a child of continuations (declared by
             // continuations.rs, which the roster scans after static_transition.rs).
+            (
+                "planning/static_transition/aggregates.rs",
+                "required_consumer_destination",
+            ),
             ("planning/static_transition/continuations.rs", "fusion"),
         ],
         "AC-4 -- the backend's module inventory changed, so \
