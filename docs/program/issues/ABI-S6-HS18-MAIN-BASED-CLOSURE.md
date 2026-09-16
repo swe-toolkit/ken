@@ -93,6 +93,32 @@ makes zero textual reference to Q1's three types
 semantic independence** — that is increment A's D0, answered by witnesses run,
 not by a grep.
 
+# REFERRED IN: increment A's re-derivation DROPPED A BINDING
+
+**Recorded by the Steward 2026-09-16 from the port ring's referral
+(runtime-implementer `evt_5vqstf7w037sh`, ruled by the Architect
+`evt_2qqye3tdnh4b1`). It is filed here because increment A is this node's, and
+the ruling was that the port must NOT repair it.**
+
+    error[E0425] cannot find value `constructor_identity`
+                 lowering/core.rs:13266, in increment A's re-derivation
+    constructor_symbol_identity      52 refs / 12 files, RESIDENT on `main`
+
+⇒ **The producer is on `main` and byte-identical. The defect is a USE without
+its `let`** — increment A's own re-derivation dropped the binding. `§2a` called
+this cause unestablished; it is established now.
+
+**Why the port was forbidden to fix it, and why that matters here.** Repairing
+it there would put a fix on `main` whose motivating error is not on `main`, and
+**would hide from this node's own review that the re-derivation dropped a
+binding.** That is a finding about increment A's METHOD, not a compile error to
+clear — it is the one measurement anyone has of whether re-derivation loses
+things, and it must be read that way when increment A is built.
+
+**It is the residual of `11 -> 1`**: increment A against the ported tree went
+from eleven errors to one, and the one left is this. **The port is not what is
+blocking increment A.**
+
 # Q1 never landed, and that changes what a control means
 
 Amendment 8's control 5 pins `lowering/source.rs` to blob
