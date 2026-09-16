@@ -66,7 +66,7 @@ distinct `Packaging` reason in the run and the cause of 8 of 11 base reds.**
   does not admit an invalid one. Rests on the `:9256` bounds guard and the
   `#[track_caller]` counts, which survived every correction.
 - **The guard works and must not be weakened.** When a probe equalized the
-  counts, the refusal **moved** to the per-frame content arm at `:9268` and the
+  counts, the refusal **moved** to the per-frame content arm at `:9269` and the
   wrong defining call still failed to compile.
 - **No length-derived trim, at any of the five call sites, ever.** Architect,
   `evt_41r81fdj0741f`: `caller_exit_index` is an alignment witness; a difference
@@ -189,7 +189,7 @@ reason strings**, all emitted as `CheckedIhDetachedCallerCut`:
 
     :9256   "is longer than the exact local eliminator prefix"
     :9263   "does not match a computational local prefix"
-    :9268   "does not match the exact local eliminator prefix"
+    :9269   "does not match the exact local eliminator prefix"
 
 All three mean *the edge broke*, so the control **cannot distinguish "the guard
 fell" from "the guard moved"** — and on 2026-09-14 it reported the second as the
@@ -557,7 +557,7 @@ matches — belong in the asserted refusal class.** The residual above makes thi
 the check that carries the guard's remaining teeth at a length-1 frame list.
 
 **`AC-5` — the guard is untouched.** No change to the conditions at `:9256`,
-`:9263`, `:9268`.
+`:9263`, `:9269`.
 
 **`AC-6` — nothing is synthesized to make two counts agree.** No fabricated
 receipt, step, eliminator frame, or index. Manufacturing either operand is
@@ -580,8 +580,9 @@ proposer named in advance what would refute them. Adopt it as the standard here.
 
 **Chain: *"what is the mechanism of the `:7720` refusal."* Three stops, all
 refuted by measurement, 2026-09-14.** The Steward's tracker is the count of
-record and this is stop three. ⇒ **the Architect holds on proposing a fourth
-mechanism, and research is called for a prior-art advisory.**
+record and this is stop three. ⇒ **the Architect HELD on proposing a fourth
+mechanism, and research was called for a prior-art advisory.** Both are
+discharged; see immediately below.
 
 **DISCHARGED 2026-09-15 — the Architect is NOT held.** Research returned about
 four days early, delivered all three advisories, and the Architect dispositioned
@@ -686,7 +687,7 @@ theirs.
 >
 > | chain | count | advisory | status |
 > |---|---|---|---|
-> | *"what is the mechanism of the `:7720` refusal"* — THIS node | stop **3** | **QUEUED UNCONSUMED** at the quota-dead research seat | moot: measurement settled the question; revisit near 2026-09-19 only if the advisory CONTRADICTS it |
+> | *"what is the mechanism of the `:7720` refusal"* — THIS node | stop **3** | **DELIVERED 2026-09-15 AND DISPOSITIONED** — advisory 2, `evt_1cp7w7w3qqpa`. The cell formerly read *"QUEUED UNCONSUMED at the quota-dead research seat"*; research returned about four days early. | it did NOT contradict the measurement. It left one decidable read — *what does `N` count* — now taken (`evt_245m3hv4r8h88`): the dissolution horn is dead and the result corroborates `R3`. |
 > | *"how does `D2` obtain discriminating evidence"* — [[RT-CONSTRUCTOR-AUTHORITY-DISCHARGE]] | stop **2** | none called | separate |
 > | ABI-S6's HS chain, of which **HS18** is a member | HS18 is stop **18**; its `§1a` was the **6th** trigger | **DELIVERED in three parts and CONSUMED** (`evt_2qdk2a3qwa4hs`, `evt_71qmyd36rwygd`, `evt_72yy838768mgk`) | the Architect states it is RULED TWICE — `evt_4ms8rwyhnvgs9`, `evt_1hnd8tta02f59`, plus a corrected Deliverable 2 at `evt_7eqc0hmbanyzm` |
 >
@@ -795,6 +796,73 @@ producer at `continuations.rs:6217`.
 standing ruling is a complete and successful outcome. This node exists to find
 the mechanism, not to produce a fourth candidate — `§1a` fired at three for that
 reason, and the discharge above did not reset the count.
+
+**`AC-M2-6`. Name the comparison projection BEFORE enumerating either
+population, and it must be the pair the guard actually uses.** At
+`core.rs:9269-9270`, inside `checked_ih_post_call_residual`:
+
+    M side   (frame.static_origin,                    frame.checked_frame_id)
+    N side   (step.occurrence().eliminator_origin(),  step.checked_frame_id())
+
+Both `checked_frame_id` components are `Option<u64>`. **Enumerating under
+`StaticOriginId` alone can report "same set, different order" while the
+`checked_frame_id` half diverges** — including the `Some`/`None` distinction,
+which carries meaning: a Step's marker is derived from the source wrapper whose
+sole body is that occurrence, so `None` asserts there is no such wrapper. A
+relation stated under a partial projection is the defect class this chain
+already died of three times — a comparison that looks checked.
+
+**`AC-M2-6` is load-bearing rather than defensive, and this node already holds
+the evidence** — `:68-70` above: *"when a probe equalized the counts, the
+refusal moved to the per-frame content arm and the wrong defining call still
+failed to compile."* ⇒ **Equalizing `N` and `M` does not clear the refusal.**
+The count divergence is a symptom, not the defect, and the pair arm is where the
+defect goes once the count arm is satisfied. *"Same set, different order"* is
+not a hypothetical wrong answer here; it is the answer this site has already
+produced once under a probe, and `AC-M2-5` would not catch it because it
+corroborates nothing.
+
+**`AC-M2-4` extends from enclosing FUNCTION to enclosing CALLER**, because the
+guard is a shared callee. `checked_ih_post_call_residual` has four distinct call
+sites, one of them duplicated across a `cfg`:
+
+    :4345   replayed.as_slice()              behind d5b_hs17 mutation support
+    :4351   caller_completed_exits()         cfg(px8-ds-test-support)
+    :4360   caller_completed_exits()         cfg(not(...))  -- same call, cfg twin
+    :7720   selected_case_exits()            THE FAILING SITE
+    :9239   executable_exits()
+
+⇒ **Naming an arm is not naming a site.** `:9256`/`:9263`/`:9269` name behaviour
+reached from five places with three different `expected` slices. And **`:7720`
+is the CALL SITE, not a stale coordinate for the guard** — it is the line that
+calls this function, the node uses it as the site throughout, and `:56` carries
+the diagnostic's own emitted `site=7720` field.
+
+**Population provenance, which closes a gap rather than opening one.** The `N`
+read was taken at `:9239`, where the argument is `edge.executable_exits()`,
+while the failing site passes `consumer.selected_case_exits()`. The conclusion
+survives, and here is its carry argument:
+
+- `executable_exits()` is a **suffix** of `selected_case_exits` only under
+  `CallerCompleted`; under `SelfDefining` it returns the same slice. This node
+  records at `:22-30` that `:7720` is reached **only** under `SelfDefining` and
+  that `CallerCompleted` is unconstructible (`evt_5ycnn29hy38qs`).
+- At `responses.rs:2189` the two fields are one vector routed by a switch:
+
+      let (consumers, selected_case_exits) = if detached_return_context.is_some() {
+          (Vec::new(), derived_steps)      // DETACHED  -> selected_case_exits
+      } else {
+          (derived_steps, Vec::new())      // ordinary  -> consumers
+      };
+
+  **Exactly one is ever non-empty**, and the failing site reads the detached
+  branch — which is what the refusal class `CheckedIhDetachedCallerCut` is
+  named for. So `N`'s population is the **detached** step list while `M` is the
+  ambient lowering frame list, which is not partitioned that way at all.
+
+⇒ **A closed producer set for the ELEMENT TYPE does not close the population of
+a particular FIELD.** Two fields of one struct hold
+`[CheckedIhPostCallConsumerStep]`; state which one the site reads.
 
 ## Obligations this node creates elsewhere
 
