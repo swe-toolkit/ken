@@ -410,6 +410,46 @@ finding missing item 4 is incomplete even with a red probe** — the point of
 writing it down is that the gap becomes visible instead of hiding behind a
 measurement that does not cover it.
 
+#### AC-1b FINAL. Architect ruling `evt_78h2ygj75jeqg`, three amendments.
+
+**The probe proves EXECUTION, not OBSERVABILITY.** A red probe shows the site
+runs on the row's path. It does not show the mutated value is *visible to the
+assertion* — a site serving setup as well as the asserted operation reds the
+probe without ever reaching the assertion. **A vacuity verdict therefore reads
+"the row does not observe SITE X", never "the row is vacuous".** To report a row
+vacuous outright, state item 4 above and name the site as the one the assertion
+depends on.
+
+**Neither arm may be decided on the row's colour.** A red row and a green row
+each have several producers, and only one of them is the mutation.
+**Readmission** requires the mutated value observed at the assertion (row 1:
+`event 2 outcome Error(Resource(RightNotHeld{0,0}))` where `Closed` is
+asserted). **Vacuity** requires the probe's own signature in the output — the
+literal `reach probe` string, or exit status 101 where the row's own outcomes
+are 0 / 91. **A red row without the signature is not a probe result.**
+
+**"The same site" means the same EXPRESSION — the exact match arm replaced,
+recorded as `file:line`.** Not the same function and not the same file: a probe
+on a neighbouring arm proves reach for code the mutation never touched.
+
+**Record per row, four facts:** the mutation site; the probe result *and its
+signature* at that site; the semantic-mutation result; and the path from the
+mutated value to the assertion that reads it.
+
+> **Why this needed three passes.** `AC-1` did not require the mutation to
+> reach. `AC-1b`'s first draft required reach but licensed a row-level verdict
+> from a site-level fact. Its second draft still **read the probe off the row's
+> colour** — specifying a one-bit measurement with four producers, inside an
+> amendment whose whole rationale is that a one-bit measurement with two
+> producers cannot discriminate. **Each pass fixed the previous one's version of
+> the same error.** The signature requirement is what finally makes the probe a
+> measurement of the probe rather than of the run.
+>
+> `panic!` is confirmed safe as the instrument: it diverges, so it type-checks
+> wherever the mutated expression did, and there is **no `deny(warnings)` and no
+> `[workspace.lints]` in the repo**, so its `unreachable_code` warning cannot
+> break the build (Architect, verified).
+
 > **Why this was worth stopping for.** The failure `AC-1` exists to prevent is a
 > row readmitted on a pass that proves nothing. **This defect is the same shape
 > pointed the other way** — a row *withheld* on a green that proves nothing —
