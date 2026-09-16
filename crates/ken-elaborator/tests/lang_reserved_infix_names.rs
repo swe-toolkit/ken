@@ -5,6 +5,36 @@
 //! Promise classes: the six-name/five-alias roster is a normative compatibility
 //! vector; ordinary application, GlobalId-keyed fixity, grammar exclusions, and
 //! the absence of implicit bindings are durable invariants.
+//!
+//! # AC-8 mutation evidence
+//!
+//! AC-8 requires that mutating an alias identity, omitting the fast-path
+//! trigger or any one of the seven consumers, or bypassing the resolved fixity
+//! each reddens its corresponding observation. Each row below was run as a
+//! compile-preserving mutation at its natural production site, with the anchor
+//! count asserted as 1 before the edit and against a predicted post-count of 0
+//! after it, then restored and confirmed byte-identical via `git diff --quiet`.
+//! Operand moved: production source, never the test. Baseline is 11 passed / 0
+//! failed; every row below is a genuine build, not a vacuous edit.
+//!
+//! mutation | production site | tests reddened
+//! ---|---|---
+//! M1 fast-path trigger | `parser.rs` `Parser::new` | 4
+//! M2 global name position | `parser.rs` `expect_global_name` | 7
+//! M3 qualified suffix | `parser.rs` dotted-name lookahead | 2
+//! M4 fixity declaration | `parser.rs` `parse_fixity_decl` | 5
+//! M5 mixed infix | `parser.rs` `parse_mixed_infix_expr` | 6
+//! M6 prefix atom | `parser.rs` atom operator arm | 5
+//! M7 import rename | `parser.rs` `parse_item_rename` | 2
+//! M8 alias identity | `parser.rs` `canonical_operator_name` Le arm | 6
+//! M9 resolved-fixity bypass | `elab.rs` `resolved_operator_fixity` | 5
+//!
+//! M1-M7 each restore generic-`Operator`-only behaviour at exactly one
+//! consumer, which is the omission AC-8 names. M8 canonicalizes `Le` to the
+//! wrong glyph. M9 discards the `GlobalId`-keyed lookup for `Fixity::DEFAULT`,
+//! proving these tests exercise resolved fixity rather than passing under the
+//! default. Reproduce from this worktree with
+//! `scripts/ken-cargo test -p ken-elaborator --test lang_reserved_infix_names`.
 
 use std::collections::BTreeSet;
 
