@@ -77,6 +77,43 @@ paths must still be classified by what the squash actually lands. See
 **AC-5. No new decorative glyphs.** The surrounding file predates the
 2026-08-01 rule and carries several; that is not a licence to add more.
 
+## SECOND INSTANCE, 2026-09-16 05:38Z — within the hour of this node being filed
+
+**`10eed42912428d66c84533fe5cba88bcaf8c946f`
+(`RT-IGNORED-PASSING-ROWS-DISPOSITION`) landed the same way**, on a diff of ten
+files of which nine are under `crates/`. Measured from GitHub, not relayed:
+
+```
+PR #3747                       merged   2026-09-16T05:38:31Z
+pull_request CI run 35060321484 created 2026-09-16T05:38:29Z, still in_progress
+```
+
+**Two seconds.** The publisher did not wait for the run it had just triggered —
+which is the `--doc-only` fast path behaving exactly as documented, on a diff
+that is not doc-only.
+
+**What makes this instance stronger evidence than the first:** the route post
+for this candidate (`evt_37hqhj4ya8hgm`) **stated the classification
+explicitly** — *"it touches `.github/ignored-test-exemptions.toml`, so it
+classifies `full` and takes the whole matrix"* — and the flag was mis-set
+anyway.
+
+⇒ **The procedural signal was present, correct, and ahead of the invocation, and
+it did not prevent the defect.** So the remaining "the router should be clearer"
+mitigation is refuted by measurement rather than by argument: it was already
+done. **A caller-declared mode that nothing validates is the defect, and only a
+check in the tool closes it.** Two instances sharing one predicate is where
+enumeration stops paying (Architect, `evt_7fsxkxbns0j09`).
+
+**No content was lost.** All ten paths are byte-identical between the approved
+tip `74b4c6289c8fa06d8ccdd81c85b876efc8d0dbe6` and `main`, and the post-merge
+push run `35060326844` classifies from `main`'s own diff, so the full matrix —
+all eight test shards, the ignored-row sweep, the six `rt_parity_native` and two
+`px8f` native-slow shards, the conformance suite — is running now. **The gap is
+that it ran AFTER the merge instead of before it**, which is a different and
+smaller defect than the first instance, where the pending jobs were simply never
+reconciled.
+
 ## Why this is worth a node rather than a reminder
 
 **The error is not a discipline failure and will not be fixed by care.** The
