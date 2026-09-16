@@ -728,3 +728,62 @@ stated acceptable outcome, not a failure.
 - **Not `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` or its discharge ledger.** The nine
   *"finished generated-Result proof graph is not closed"* refusals behind this
   one are that mechanism — adjacent, and not evidence about the collision shape.
+
+## INHERITED OBLIGATION from `RT-D5B-LIVE-WIRING` (slice 3): `AC-2b`
+
+**This is not a new requirement on the investigation. It is one acceptance
+criterion that could not be discharged where it was written, parked at the node
+whose work makes it dischargeable.**
+
+Slice 3 wires `publish_immediate_bridge_realization_plan` into
+`construction.rs` immediately before
+`install_static_response_context_plan_phase_b()`. The reference's comment at
+that site claims **an ordering with two bounds**:
+
+    lower   after continuation identities, source occurrences and transports
+            are final          -> FALSIFIABLE at slice 3, and tested there
+                                  (AC-2a: red when moved above :1406)
+
+    upper   before response phase B "can decide whether an owner exists"
+            -> NOT falsifiable at slice 3
+
+**Why the upper bound is inert today**, measured at `main`:
+
+    derive_ reads   abi, continuation_contexts, continuation_specializations,
+                    continuation_specialization_calls, child_static_origin,
+                    planned_occurrence_expr
+    phase B writes  static_response_plan_installed,
+                    static_response_continuations, static_response_deferred
+                                                       (responses.rs:2296-2330)
+    => DISJOINT
+
+    production references to immediate_bridge_realizations:
+      static_transition.rs:590  declaration      construction.rs:296  init
+      immediate_bridge.rs:679   inside validate_, DEAD
+      immediate_bridge.rs:694, :701   accessors
+    => NOTHING on the live path reads the field
+
+⇒ Moving the call after phase B changes no input and no observable output.
+**The consumer that would make the upper bound matter is
+`CheckedIhPostCallConsumer` — this node's subject.**
+
+### The enabling condition, stated so it is checkable
+
+**`AC-2b` becomes due when a live consumer reads
+`immediate_bridge_realizations`.** At that point a test that moves the wiring
+to after phase B must go red. Until then it cannot, and a candidate that
+appears to satisfy it is testing something else.
+
+**The wrong repair, named in advance.** A test-only ordering probe — a hook
+recording that the call happened before phase B — satisfies the words while
+testing the probe, because there is no behaviour on the other end of it. **Ask
+what observable differs, not whether the assertion passes.**
+
+### One open measurement that could pull `AC-2b` forward
+
+`with_d5b_hs10_bridge_plan_mutation` (`immediate_bridge.rs:559`) is a
+feature-gated plan mutation hook. **If it can perturb the plan between the
+wiring point and phase B, an ordering observation with a real behavioural end
+may be constructible without this node's mechanism.** Nobody has measured what
+it reaches; slice 3 is asked to report it. If slice 3 finds it does reach,
+`AC-2b` is discharged there and this section is struck.
