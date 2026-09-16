@@ -50,23 +50,46 @@ of it.
 file set greps `cranelift` at count 0. If a candidate's file set puts a
 cranelift path in this slice, the cut was wrong and the slice stops.
 
-### 2a. The `-262` is NOT bookkeeping, and the frame will not pretend it is
+**AS-BUILT: the slice landed SMALLER than this input, and that is D0's answer
+rather than a measurement error.** Landed at `d4e977a6a`:
 
-`effect_v1.rs` carries **47 hunks**, and they are not confined to the
-promotion. Several rewrite `ResourceTableV1` lifecycle internals — admission
-leases (`finish_admission`), slot states (`Vacant`/`Closing`/`Retired`), and
-release readiness (`ResourceReleaseReadinessV1`). **Those are a resource-table
-change that happens to share a file with a file-acquisition change**, which is
-exactly the shape the operator directive exists to break up.
+    7 files, +241 / -63         cranelift files touched: ZERO (confirmed)
 
-The promotion's own deletions are small and legible:
+The two file rows that fell away are `crates/ken-host/Cargo.toml` (dropped in
+the F5 respin — an unused `[features]` table) and
+`crates/ken-host/effect_abi_v1.catalog` (unchanged, because the availability bit
+does not move here). **The numbers above are retained as the framed input, not
+corrected in place**, because §2a's argument was built on `-262` and rewriting
+the figure would leave that argument citing a number no longer in the frame.
 
-    -  Self::MappingAcquireFile => HostOpAvailabilityV1::RepresentedUnavailable
-    -  pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 25]     (array grows by one)
+### 2a. RESOLVED: the `-262` was not bookkeeping, and D0 removed it from the slice
 
-⇒ **D0 of this WP is a separability determination, and it may shrink the
-slice.** See §3 D0. Do not assume the resource-table material has to ride
-along; do not assume it can be left behind either. Measure it.
+**The framed question was whether `-262` could be treated as bookkeeping. It
+could not, and the D0 it forced came back SEPARABLE, so the deletions left with
+it.** This section is kept as the record of a question that was answered, not
+renumbered against the as-built — renumbering would silently convert a resolved
+D0 into a restated premise.
+
+What the framed figure contained: `effect_v1.rs` carried **47 hunks** at the
+backup tip, not confined to the promotion. Several rewrote `ResourceTableV1`
+lifecycle internals — admission leases (`finish_admission`), slot states
+(`Vacant`/`Closing`/`Retired`), and release readiness
+(`ResourceReleaseReadinessV1`). **Those were a resource-table change sharing a
+file with a file-acquisition change**, which is exactly the shape the operator
+directive exists to break up.
+
+**D0's determination, and what discharged it.** Static disjointness was
+necessary and not sufficient — zero hunk overlap, no call dependency, no
+signature coupling — and the deciding evidence was **compilation**: slice 4
+built and its suites passed with none of the lifecycle cluster present. The
+cluster is now [[RT-D5B-RESOURCE-TABLE-LIFECYCLE]]. The landed `-63` is the
+file-acquisition surface's own deletions; the rest of the framed `-262` went
+with the cluster.
+
+⇒ **The general form, which is the part worth carrying to the next slice:** a
+deletion count is not evidence of bookkeeping *or* of substance. It is a
+question about what is being deleted, and the only instrument that settles it is
+one that can fail — here, a build with the disputed material absent.
 
 ## 3. Deliverables
 
@@ -130,11 +153,25 @@ so the list being short made the AC short.**
     5  effect_v1.rs:558-568   host_effect_wire_layout_v1's 10-op arm, op NAMED,
                               body is `return Err(OperationUnavailable(operation))`
 
-All five agree at 10/25. Two enforce themselves: site 3's length is part of the
-array's type, and site 4 names its members rather than wildcarding them — its
-own comment says *"naming them is what makes promoting one to the admitted set
-a compile error here rather than an operation whose seats silently answer
-`None`."* A partial promotion does not compile.
+All five agree at 10/25. Two enforce themselves, **but not in the way an earlier
+draft of this paragraph said, and the difference matters.**
+
+**Site 3's compiler enforcement is the LENGTH, not the membership.**
+`NATIVE_TESTED_TARGETS_V1: [HostOpV1; 25]` is a fixed-length array type, so the
+compiler rejects a candidate that adds an element without changing the `25`. It
+does **not** check *which* 25. Swapping one op for another type-checks
+perfectly. The membership claim is grounded **structurally** instead, and this is
+the Architect's grounding rather than a second hand count: `HostOpV1` has
+exactly **35** variants, the availability match has **no wildcard arm**, and the
+unavailable arm names **10**. Exhaustiveness then forces the remaining **25** —
+the partition is derived, not tallied. **Do not replace one hand count with
+another here**; if the number is ever in doubt, re-derive it from the variant
+count and the absence of a wildcard, which is a property a reader can check.
+
+Site 4 is the one that enforces *membership*: it names its members rather than
+wildcarding them — its own comment says *"naming them is what makes promoting one
+to the admitted set a compile error here rather than an operation whose seats
+silently answer `None`."* A partial promotion does not compile.
 
 #### The real defect was the LIST, and the fix is a PREDICATE
 
@@ -157,7 +194,15 @@ qualify — `:442` co-lists `ConsoleRead`, which is `native`, so membership ther
 is compatible with either availability and determines nothing. Run it on site 5
 and it qualifies: the entire body is
 `return Err(OperationUnavailable(operation))`, so membership *is* the unavailable
-claim, and a control at `:5960-5965` asserts exactly that for this op.
+claim, and a control asserts exactly that for this op — **at `:6000-6005` as
+landed**, inside
+`abi_s6_d4_file_acquire_identity_and_unavailable_posture_are_pinned`
+(`:5979-6006`). Earlier drafts of this frame cited `:5960-5965`; that was the
+pre-landing coordinate and it now points inside a different test
+(`abi_s6_d5a_promotes_the_atomic_anonymous_mapping_operation_set`). **The
+coordinate decayed when the slice landed, which is the ordinary fate of a line
+number in a frame — cite the enclosing test by name, and treat the line as the
+perishable half.**
 
 ⇒ **Judge an arm by what its body means for the op, never by whether the op
 appears in it.** Shape is not the criterion: sites 4 and 5 and the `:442` arm are
@@ -175,7 +220,35 @@ the second yields an op that falls through to no layout. That is why this slice
 takes neither, and why `host_effect_wire_layout_v1(MappingAcquireFile)` keeps
 returning `OperationUnavailable` after it lands. **That is intended, not an
 oversight** — the slice lands the types and dispatch plumbing while the op stays
-unreachable through the wire layout, which is what an unflipped surface means.
+unreachable **natively**, which is what an unflipped surface means.
+
+> #### CORRECTED AS-BUILT: "unreachable" was NATIVELY unreachable all along
+>
+> This frame said "unreachable" unqualified, and the node's own title says
+> *"unreachable from the interpreter until a later flip."* **That is false as
+> landed**, and it is the adversary's Finding 1 (Architect ruling
+> `evt_21f23zmgqfxsc`). The interpreter consults `availability()` **nowhere**, so
+> after this slice a Ken program using `withMapping ... FileBacked` **succeeds
+> interpreted and refuses natively.**
+>
+> **Every one of the five sites above is a native-availability site.** That is
+> why the corrected membership predicate — a genuine improvement over the
+> enumeration it replaced — still passes against this defect: the census was
+> complete and answering a different question than it was read as answering.
+> *Availability* asks "is this op marked and gated as unavailable?"
+> *Reachability* asks "can a Ken program get here?" They coincided only for as
+> long as the prelude stub refused, and this slice is where they came apart.
+>
+> **What the flip must know:** at flip time, changing site 2 **alone** opens the
+> C ABI, and the interpreter path is already open. The remedy is the uniform
+> refusal gate in `dispatch_host_op_v1` —
+> [[RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE]] — which lands **before**
+> [[RT-D5B-MAPPING-AVAILABILITY-FLIP]] precisely so that site 2 becomes the
+> single flip point rather than one of two acts, the second unwritten.
+>
+> **Architect F3 — the SAFETY-precondition split and the irreducible TOCTOU —
+> is carried to [[RT-D5B-MAPPING-AVAILABILITY-FLIP]]**, not actioned here. It
+> bears on what is safe to make *available*, not on what is safe to compile.
 
 **Unrelated stale count, found while verifying this and recorded so the flip
 slice does not inherit it.** Site 5's own comment (`:554-557`) reads *"the
@@ -227,8 +300,10 @@ agreeing classifiers with one disagreeing is exactly this defect's shape.
 The instances at `origin/main` `e11341c7b9d1`, **five of them**:
 
     1  effect_abi_v1.catalog       byte-identical to its origin/main blob
-       control: git rev-parse <cand>:crates/ken-host/effect_abi_v1.catalog
-                == the origin/main blob   (and row 0407 still reads `unavailable`)
+       control: git cat-file -e <cand>:crates/ken-host/effect_abi_v1.catalog \
+                  && git cat-file -e origin/main:crates/...   FIRST, then compare
+                git rev-parse <cand>:... == the origin/main blob
+                (and row 0407 still reads `unavailable`)
     2  effect_v1.rs:193            MappingAcquireFile => RepresentedUnavailable
     3  NATIVE_TESTED_TARGETS_V1    still [HostOpV1; 25], MappingAcquireFile absent
     4  static_transition/effects.rs  MappingAcquireFile still named in the
@@ -238,11 +313,24 @@ The instances at `origin/main` `e11341c7b9d1`, **five of them**:
                                    OperationUnavailable arm; and
                                    host_effect_wire_layout_v1(MappingAcquireFile)
                                    still returns Err(OperationUnavailable),
-                                   asserted at :5960-5965
+                                   asserted in the test named below
 
-Counts stay at **10 unavailable / 25 native** on every side. Note sites 3 and 4
-are compiler-enforced, so a candidate that breaks them fails to build rather
-than failing review — the AC exists to catch the three that are not.
+**The `git rev-parse` in site 1's control FAILS OPEN and must be guarded.** Given
+a path that does not exist at that rev it echoes its own input rather than
+erroring, so an ABSENT file reads as DIFFERS — a false red, and worse, a shape
+that reads as a genuine finding. Run `git cat-file -e` on both sides first; only
+then is a `rev-parse` inequality a measurement.
+
+Counts stay at **10 unavailable / 25 native** on every side, and that partition
+is derived from exhaustiveness over 35 variants with no wildcard arm — see §4a;
+do not re-tally it by hand. Sites 3 and 4 are compiler-enforced, **but note what
+each compiler-enforces**: site 3's array type pins the *length* only, so the
+membership half of site 3 rests on `:5999`
+(`!NATIVE_TESTED_TARGETS_V1.contains(&MappingAcquireFile)`) and site 5's on
+`:6000-6005`, both inside
+`abi_s6_d4_file_acquire_identity_and_unavailable_posture_are_pinned`. **Those two
+assertions are the sole non-compiler guard for sites 3 and 5.** Cite the test by
+name; the line numbers moved once already when this slice landed.
 
 **Site 5's held state is explicitly in scope, and its consequence is intended.**
 After this slice, `host_effect_wire_layout_v1(MappingAcquireFile)` still refuses:
@@ -265,6 +353,21 @@ hits. It must be present and passing in the candidate, and under the **hold**
 branch of `AC-AVAIL` it must be adjusted to assert the held state rather than
 deleted. A control that is dropped because it contradicts the chosen branch is
 the defect, not the fix.
+
+> **CORRECTED: this AC presupposed its own remedy, and the correct discharge was
+> ZERO TEST CHURN.** "It must be adjusted to assert the held state" assumes an
+> adjustment is owed. It was not: the base's tests **already** assert the held
+> state, so under the hold branch the right action was *none*, and the candidate
+> landed with no churn in that control. **That is strictly stronger than an
+> adjustment** — an untouched control that still passes is evidence about the
+> candidate, whereas a control edited in the same diff it is meant to check is
+> evidence about the editor.
+>
+> The general form: **an AC that names the remedy cannot report that no remedy
+> was needed.** Phrase the criterion on the state to be true at the end
+> (*"the control asserts the held state and passes"*), never on the act the
+> author expects to be performed — otherwise "nothing needed doing" reads as
+> a missed deliverable.
 
 **AC-NO-BACKEND. The candidate's file set contains no cranelift path.**
 Control: `git diff --name-only origin/main..<cand> | grep -c cranelift` is `0`.
