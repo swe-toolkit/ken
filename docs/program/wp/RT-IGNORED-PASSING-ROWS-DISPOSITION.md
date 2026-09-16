@@ -169,6 +169,51 @@ these rows are labelled with a failure they no longer exhibit, and "the defect
 was fixed" and "the assertion stopped reaching the behaviour" produce the same
 green. Only the mutation separates them.
 
+### AC-1a. The mutation protocol, and the clean check is a PRECONDITION
+
+**Architect ruling, `evt_3faqxqkxynm57`.** *"Reverted before the diff"* above is
+six words with no check attached to it. This is the check, and it belongs to the
+**arriving** row rather than the departing one.
+
+    # PRECONDITION of row N's measurement, before touching anything:
+    git status --porcelain              # MUST be empty. Non-empty = STOP.
+
+    BEFORE=$(git rev-parse HEAD:<path>)
+    ...mutate, run the row, record red/green...
+
+    git checkout -- <path>              # the one file, NAMED. Never `checkout <ref> -- .`
+    AFTER=$(git hash-object <path>)
+    [ "$AFTER" = "$BEFORE" ] || echo "REVERT DID NOT RESTORE -- STOP"
+    git status --porcelain              # empty again
+
+**An UNCOMMITTED leftover does not lose a measurement, it FABRICATES one in the
+readmit direction.** Row N's mutation is still live when row N+1 is perturbed,
+so row N+1 goes red — and red under mutation is exactly the evidence `AC-1`
+accepts for readmission. **A genuinely vacuous row acquires an affirmative,
+well-formed `AC-1` record, and the two-sidedness this AC exists to enforce is
+defeated on its own terms.** It produces a plausible result rather than a diff,
+which is why no downstream gate can see it. A *committed* leftover is the safe
+arm: it appears in the candidate's `diff(merge-base, cand)` and `AC-5`'s CI run
+almost certainly reds.
+
+**A non-empty precondition is a finding to REPORT, not a state to clean up and
+continue from.** Every row measured after the leak began is suspect, and which
+rows those were is knowable only if the stop is loud.
+
+**"I ran the revert" and "the file is back" are two claims**, and only the blob
+comparison settles the second.
+
+**Why a precondition and not a postcondition:** a postcondition runs only when
+something remembers a revert is owed, so it fires exactly in the cases that were
+already going to be fine. As a precondition it fires whether or not anything
+remembers, and a compaction mid-row is harmless because the check belongs to the
+next row. **A check that runs only when you remember the condition it is
+checking for is not a check.**
+
+**This hazard does not require a compaction** — an ordering slip inside one turn
+does it just as well. Landing `D0` separately and compacting at a seam reduce
+the exposure; only the precondition closes it.
+
 **AC-2. Every row in the PASSING SET AS MEASURED AT THE IMPLEMENTATION BASE has
 a disposition, and the dispositions partition that set.** No row is left as a
 passing ignored row. **The count is whatever D0 measures — twelve is what
