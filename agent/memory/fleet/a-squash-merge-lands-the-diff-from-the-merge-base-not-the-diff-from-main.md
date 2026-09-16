@@ -71,3 +71,21 @@ until you have confirmed the base is current.
 **When a mechanism claim is checkable by running it, run it.** `git merge-tree
 --write-tree <main> <candidate>` produces the exact tree the merge would land,
 costs one command, and needs no worktree.
+
+**Read its EXIT CODE, not just its first line. `merge-tree` exits non-zero on
+conflict and emits conflict information instead of a tree.** A router who reads
+a non-zero exit as *"no tree came back, so there is nothing to check"* has it
+exactly backwards: it means **the merge does not apply cleanly**, which is a
+stronger and more urgent finding than any diff would have produced. Zero means
+the tree above is what lands.
+
+    git merge-tree --write-tree origin/main <cand>; echo "exit=$?"
+    #  0 -> clean; the printed tree is the merge result
+    #  1 -> CONFLICT; the candidate needs a rebase before it can be routed
+
+**This clause exists because the first version of this lesson omitted it and I
+had already asserted a candidate was "clean" from line 1 of the output alone.**
+The assertion happened to hold — exit was 0 — but nothing I had run at the time
+distinguished that from a conflict. Reported by the Architect
+(`evt_5gxxg3mb7aqbz`), who verified the lesson by running it rather than
+reading it.
