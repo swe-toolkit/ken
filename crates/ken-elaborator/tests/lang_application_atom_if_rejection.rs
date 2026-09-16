@@ -161,9 +161,6 @@ fn ac_inline_ken_census_reaches_rust_test_sources() {
 /// own `match` guards. The head must be a run of ordinary identifiers, so a
 /// keyword in it disqualifies the occurrence.
 fn has_argument_position_if(fragment: &str) -> bool {
-    const KEN_KEYWORDS: [&str; 10] = [
-        "if", "then", "else", "let", "in", "match", "fn", "proc", "const", "where",
-    ];
     let Some(equals) = fragment.find("= ") else {
         return false;
     };
@@ -172,12 +169,39 @@ fn has_argument_position_if(fragment: &str) -> bool {
     // fragment must not hide a real one after it.
     rest.match_indices(" if ").any(|(at, _)| {
         let head = rest[..at].trim();
-        !head.is_empty()
-            && head
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_' || c == ' ')
-            && head.split_whitespace().all(|t| !KEN_KEYWORDS.contains(&t))
+        !head.is_empty() && head.split_whitespace().all(is_qualified_identifier)
     })
+}
+
+/// One token of an application head: an identifier, or a QUALIFIED one.
+///
+/// A flat `is_alphanumeric() || '_'` test over the whole head silently drops
+/// every dotted head — `Data.Numeric.Nat.Arithmetic if c then a else b` parses
+/// to the forbidden-shape rejection and the predicate reported `false`, which
+/// is the same class of blind spot this node exists to close. Qualified names
+/// are ordinary Ken (dotted-name joining from `LANG-RESERVED-INFIX-NAMES`), not
+/// an edge case.
+///
+/// `::` is included on the same reasoning rather than on a second report:
+/// attached-proof heads like `compare_raw::eq_sound Bool bool_leq …` occur in
+/// the corpus and would have been invisible for an identical reason.
+///
+/// Validating SEGMENT-BY-SEGMENT is what keeps the keyword check biting: a
+/// keyword may not appear as any segment, so `if`/`then`/`else` cannot enter
+/// through a dotted spelling.
+fn is_qualified_identifier(token: &str) -> bool {
+    const KEN_KEYWORDS: [&str; 10] = [
+        "if", "then", "else", "let", "in", "match", "fn", "proc", "const", "where",
+    ];
+    !token.is_empty()
+        && token
+            .split("::")
+            .flat_map(|part| part.split('.'))
+            .all(|segment| {
+                !segment.is_empty()
+                    && segment.chars().all(|c| c.is_alphanumeric() || c == '_')
+                    && !KEN_KEYWORDS.contains(&segment)
+            })
 }
 
 /// The predicate's discriminating table — the evidence that the repaired
@@ -193,6 +217,17 @@ fn argument_position_predicate_admits_only_the_forbidden_shape() {
         "the forbidden shape must be admitted"
     );
     assert!(has_argument_position_if("const k : Nat = f x if c then a else b"));
+    // QUALIFIED heads. The flat char test dropped these silently; QA built the
+    // first and it genuinely reaches the rejection.
+    assert!(has_argument_position_if(
+        "const k : Nat = Data.Numeric.Nat.Arithmetic if c then a else b"
+    ));
+    assert!(has_argument_position_if(
+        "const k : Nat = Module.func if c then a else b"
+    ));
+    assert!(has_argument_position_if(
+        "const k : Nat = compare_raw::eq_sound Bool if c then a else b"
+    ));
 
     for legal in [
         // leading `if` — legal, and the largest false population before
@@ -208,6 +243,8 @@ fn argument_position_predicate_admits_only_the_forbidden_shape() {
         "matches!(e, ElabError::AmbiguousReference { ref name, .. } if name == \"True\")",
         // no `if` at all
         "const plain : Nat = f x y",
+        // a keyword must not enter through a dotted spelling either
+        "const k : Nat = if.then if c then a else b",
     ] {
         assert!(
             !has_argument_position_if(legal),
