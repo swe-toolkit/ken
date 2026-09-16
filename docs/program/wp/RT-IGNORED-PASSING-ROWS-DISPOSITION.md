@@ -28,17 +28,63 @@ Measured at PR #3676 head `0f71ab5b9267781ae1d91bc654011cad42b926af`, from the
 using `scripts/ci-ignored-sweep.py`'s own upward-walk algorithm.
 
     33   real `#[ignore]` attributes in crates/, all on `#[test] fn`
+         SOURCE census -- cfg-BLIND, counts text
     +1   macro-generated (discharge_ledger_refuses_one_word_discharging_two_obligations)
-    34   nextest --run-ignored=only population   (GROUND TRUTH)
+    34   nextest --run-ignored=only population
+         the COMPILED population under this sweep's cfg + feature set
     -6   registry run-exemptions
     28   selected and executed  ->  12 PASSED, 16 failed
 
-**A source grep is the wrong instrument and must not be used to re-derive this.**
-`grep -c '#\[ignore'` returns 38: five of those are doc-comment prose *about*
-`#[ignore]` (`recursor_fusion.rs` x2, `r3_c1_source_arrival.rs` x1,
-`boundary_value_clif.rs` x2), and a grep is simultaneously blind to the
-macro-generated row. `scripts/ci-ignored-sweep.py` derives its population from
-nextest for exactly this reason.
+**`34` is not ground truth for "what ignored tests exist", and an earlier
+revision of this block called it that.** The two populations answer different
+questions and move in opposite directions:
+
+    macro-generated rows   push nextest UP    (compiled, absent from source text)
+    cfg-excluded rows      push nextest DOWN  (in source text, never compiled)
+
+A test that is both `#[ignore]`d and cfg-excluded is invisible to
+`--run-ignored=only`, which is the instrument people reach for to ask *"what are
+we not running?"*. **A gated-out item is ABSENT from the analysis, not EXEMPT
+from it.**
+
+**What that arithmetic already bounds, and it is the cheapest finding in this
+frame.** Both numbers above were taken at the same SHA, so the subtraction is
+legal. If `k` is the cfg-excluded population, nextest should read `34 - k`. It
+reads exactly `34`, so **`k = 0` at `0f71ab5b9` under that sweep's profile.**
+
+Two limits, both load-bearing:
+
+- **Evidence, not proof.** The identity also holds if one cfg-excluded row
+  (`-1`) coincides with one uncounted macro-generated row (`+1`). A total cannot
+  separate them — which is why the control below is required rather than nice to
+  have.
+- **One SHA, one profile.** This is *measured zero at `0f71ab5b9`, unverified
+  since*, not *structurally zero*. A re-check is one subtraction off any later
+  `mode=full` sweep; no local build, no `--workspace`.
+
+**REQUIRED CONTROL — one expected member per profile.** Name, in this block, one
+test already known to be gated each way (platform cfg; feature not enabled by
+the sweep). Each named member must appear in the gap. Without this a zero result
+is indistinguishable from *"the instrument could not see any of them"*, and on
+this instrument that is a live possibility rather than a pedantic one — the whole
+finding is that nextest's view is narrower than the source census's.
+
+**Report the gap ATTRIBUTED TO CFG PROFILE, never as a total.** A row excluded by
+a feature the sweep does not enable and a row excluded by a platform cfg land in
+the gap identically and are different findings: the first is includable by
+flipping a feature, the second is not. A bare count says *how many* are
+invisible; the frame needs *which, and what would include them*. Only the second
+can be acted on.
+
+**A source grep alone is still the wrong instrument for the executed population
+and must not be used to re-derive `28`.** `grep -c '#\[ignore'` returns 38: five
+are doc-comment prose *about* `#[ignore]` (`recursor_fusion.rs` x2,
+`r3_c1_source_arrival.rs` x1, `boundary_value_clif.rs` x2), and a grep is blind
+to the macro-generated row. `scripts/ci-ignored-sweep.py` derives its population
+from nextest for exactly that reason. **The source census earns its place beside
+nextest, not instead of it** — it is the only side that can see a cfg-excluded
+row, and that is precisely why the two are compared rather than one being
+preferred.
 
 ### 2a. The twelve rows, with the ignore reason each currently carries
 

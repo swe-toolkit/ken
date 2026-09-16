@@ -20,6 +20,14 @@ Same measurement as `RT-IGNORED-PASSING-ROWS-DISPOSITION` §2: PR #3676 head
 `0f71ab5b9267781ae1d91bc654011cad42b926af`, `ignored-row sweep` job id
 `104224384914`. 28 selected, 12 passed, **16 failed**.
 
+**The population caveat in that §2 applies here in full and is not restated:**
+these 16 are 16 of the rows that **compiled** under that sweep's cfg and feature
+set. A row that is both `#[ignore]`d and cfg-excluded never reaches this list,
+so this inventory is complete for the compiled population and silent about the
+excluded one. That gap is bounded at zero at this SHA and the control for it
+lives in the other frame's §2 — do not re-derive it here, and do not describe
+this list as "all the failing ignored rows" without the qualifier.
+
     ken-cli::px7f_resource_native
       linked_public_right_denial_preserves_exact_masks
       linked_public_second_release_is_closed_and_the_handle_closes_once
