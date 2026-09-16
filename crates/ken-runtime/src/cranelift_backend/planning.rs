@@ -144,6 +144,7 @@ pub(super) use static_transition::{
     ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
     ContinuationConsumingOccurrence, ContinuationEmissionOwner,
     ContinuationInputView, RequiredConsumerProjection, DirectOuterProjection,
+    CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep,
     ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
     ContinuationWorkerCaptureSource,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches
