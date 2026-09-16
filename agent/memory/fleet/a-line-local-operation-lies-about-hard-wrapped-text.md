@@ -3,15 +3,39 @@ scope: fleet
 audience: all agents
 source: DOC-LIBRARY-STYLE-01-ANATOMY retro (doc-author, evt_cenj495hxkx9) +
   Steward PR #955 verification failure + the RT-FNSPLIT-B2O route sweep — three
-  independent occurrences in three different roles
+  independent occurrences in three different roles; CAUSE 2 (paraphrase) added
+  2026-09-16 from a Steward playbook-strike verification, Architect
+  evt_3f14qw9vyfrqq
 related: markdown-80col-reflow, an-enumeration-needs-a-proven-closure-not-a-better-grep
 ---
 
-# A line-local operation lies about hard-wrapped text — in BOTH directions
+# A key can fail to match text that is plainly there — TWO causes, TWO remedies
+
+**The file name says wrapping because wrapping was the first cause found. The
+subject is wider: your key is not the text.** Two independent causes produce
+the same symptom — a confident, wrong answer from a `grep`, a line-anchored
+regex, a line-scoped edit, or a `sed` address — and **neither remedy covers the
+other**:
+
+| cause | what defeats the key | remedy |
+|---|---|---|
+| **1. LINE-LOCALITY** vs an 80-column wrap | the text is right, your *unit* is wrong | normalize: `tr '\n' ' ' \| tr -s ' '` |
+| **2. PARAPHRASE** — the key was never the text | your *key* is wrong; wrapping is irrelevant | lift a LITERAL FRAGMENT; never type a claim from memory |
+
+⇒ **Run `tr '\n' ' '` against a paraphrased key and you still get zero.** They
+share a *consequence* (a false negative from a grep) and filing by consequence
+is what makes a corpus unsearchable by cause. Diagnose which one you have
+before reaching for a fix.
+
+**One remedy does cover both, and it is the only one that also works on someone
+else's measurement:** run the key against a case it MUST hit, read that control
+FIRST, and **report the absence with its control attached** — *"zero at ref R;
+key K hits N times at ref R′"*, never a bare "I measured zero."
+
+## CAUSE 1 — line-locality. A sentence is not a line.
 
 This corpus is hard-wrapped at 80 columns, so **a sentence is not a line.** Any
-operation whose unit is *the line* — a `grep`, a line-anchored regex, a
-line-scoped edit, a `sed` address — is asking a question about a unit the
+operation whose unit is *the line* is asking a question about a unit the
 content does not respect. It answers confidently and wrongly.
 
 **Both failure directions are real, and they were measured in one day:**
@@ -51,7 +75,10 @@ at the end of the *previous* line, so the edit added a second one. The result is
   that must contain the phrase). Ordering is the whole point: read *after* the
   result it is a formality, read *first* it is a gate.
 
-## The key you type is your PARAPHRASE, not the text (2026-09-16, Steward)
+## CAUSE 2 — the key you type is your PARAPHRASE, not the text
+
+**Added 2026-09-16, Steward. Wrapping plays NO part in this one** — that is why
+it is a second cause and not another example of the first.
 
 Verifying that a playbook edit struck a claim, the probe was
 `"the Steward's tracker is authoritative"` — a clean, confident absence. The
