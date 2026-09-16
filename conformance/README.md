@@ -118,6 +118,18 @@ claim with no conformance case is a claim no one can rely on
   non-temporal application-atom arms are red until
   `LANG-RESERVED-INFIX-NAMES`; the temporal rows separately wait on the
   unavailable `RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE`.
+- `surface/operators/seed-standard-infix-binding.md` — the standard **meanings**
+  of `∧ ∨ ≤ ≥ ≠`, their standard fixities, and the use-site call-completion
+  contract. Identity rows pin that `∧ ∨ ≤` are re-exports of the extant
+  standard bindings rather than second definitions, and that `≥` is derived
+  over `leq` rather than an `Ord` field the class never declared; the
+  completion rows pin the policy to the defining `GlobalId` across an alias, a
+  user's own `≤`, and an explicit partial application; the `≠` rows pin the
+  closed five-carrier comparator inventory, `Decimal` keyed on its registered
+  representation, and the two distinct refusals (a closable table miss versus a
+  structural refusal that no registration closes). Rows needing completion are
+  red until `LANG-STANDARD-INFIX-CALL-COMPLETION`; the identity, class-field
+  and inventory rows are live.
 - `surface/data-match/seed-data-match.md` — L2 sum types + `match` + refinements
   (`34`): real constructors + a computing `elim_D`, `match`→`elim_D` (nested),
   the **required exhaustiveness** safety (non-exhaustive rejects naming the

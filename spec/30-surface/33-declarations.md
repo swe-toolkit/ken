@@ -858,6 +858,111 @@ surface-and-elaboration only: fixity guides parsing into the same core term the
 kernel re-checks regardless of which path named the operator, so it adds nothing
 to `trusted_base()`.
 
+### 6.1 Standard operator bindings
+
+`31 §1c` admits the spellings `≤`/`<=`, `≥`/`>=`, `≠`/`/=`, `∧`/`/\`, `∨`/`\/`
+and `∈` as ordinary symbolic names, each paired spelling one token. Admission
+fixes **names**, not meanings. This section fixes the standard **meanings** of
+five of them. `∈` is not bound here.
+
+Each standard meaning is an ordinary checked top-level function reached by
+ordinary import. None is a built-in, a kernel rule, or a primitive, and this
+section adds nothing to `trusted_base()`.
+
+    ∧   bool_and     (a : Bool) (b : Bool) : Bool
+    ∨   bool_or      (a : Bool) (b : Bool) : Bool
+    ≤   ord_leq_at   (a : Type) (d : Ord a) (x : a) (y : a) : Bool
+    ≥   ord_geq_at   (a : Type) (d : Ord a) (x : a) (y : a) : Bool
+    ≠   the negation of the comparator the `==` path selects (§6.2)
+
+`bool_and`, `bool_or` and `ord_leq_at` **already exist** as ordinary public
+functions in the standard package. The standard-operator home **re-exports**
+them; it does not define second copies. By `§4.3` a re-export republishes the
+existing `GlobalId` and never mints another, whereas *"a same-shaped source
+declaration has a different identity"* — so a redefinition would give one
+meaning two identities, and a policy keyed on identity (`39 §6.9`) would then
+hold between an occurrence and only one of them. The standard meaning of `∧`
+**is** `bool_and`'s canonical identity, reached through an additional public
+path.
+
+`≥` is **derived over `leq`, not a class field.** `class Ord a` (`§5.2`)
+declares `leq`, `refl`, `antisym`, `trans` and `total`; there is no `geq`
+member, and none is added here. `ord_geq_at` **reverses its two
+already-evaluated argument values inside its own body** and never reverses the
+operand expressions at the use site. The distinction is observable: operand
+evaluation stays single and left-to-right, so a `≥` occurrence evaluates its
+left operand first exactly as every other application does. A definition that
+rewrites `x ≥ y` into `y ≤ x` at the surface is **not** this binding and
+changes evaluation order.
+
+Every standard meaning here yields `Bool`. None yields an `Ω` proposition, none
+introduces an equality refinement, and none converts a `Bool` result into a
+proof witness. `∧` and `∨` are ordinary saturated applications: both operands
+are evaluated, left to right, and **no short-circuit is guaranteed**. Legacy
+`==` is unchanged by this section.
+
+That is consistent with the `Bool` eliminator's arm laziness recorded at
+`18a §5.4`, and the two are easy to conflate. `bool_and`'s body is a `match` on
+its first argument, so exactly one arm is forced and the untaken arm is not.
+But `x ∧ y` is a saturated application under call-by-value: **both operands are
+already evaluated when the body runs**, and the arms then range over values.
+The eliminator's non-forcing is therefore a property of the **body's arms**,
+never of the occurrence's **operands**, and it yields no operand
+short-circuiting at a use site. This is the same distinction `≥` turns on
+above — a property of already-evaluated values is not a property of the operand
+expressions — and reading `18a`'s "short-circuit inherent" as a claim about
+operands moves it from one to the other.
+
+Standard fixities, declared of the **bindings** and therefore travelling with
+import and re-export exactly as `§6` states:
+
+    ∧        infixr 3
+    ∨        infixr 2
+    ≤ ≥ ≠    infix 4
+
+### 6.2 The `≠` carrier inventory, and its two distinct refusals
+
+`≠` is the negation of **the exact comparator the existing `==` path selects**,
+on the same carriers, with the same refusals. It is **not** universal
+disequality and **not** `DecEq`: it is carrier-directed, and a carrier with no
+registered comparator has no `≠`.
+
+The comparator registry is closed by construction rather than by survey — the
+table is a private field with a single mutator — and its rows are:
+
+    carrier   key identity     comparator     availability
+    Int       int_id           eq_int         always
+    Float     float_id         eq_float       always
+    Float32   float32_id       eq_float32     always
+    Decimal   decimalpair_id   decimal_eq     when the decimal/char registration runs
+    Char      char_id          eq_char        when the decimal/char registration runs
+
+**Decimal is keyed on its registered representation, `decimalpair_id`.**
+`Decimal := DecimalPair` is a transparent alias (`18a §5.6.1`), so
+normalisation delivers the *representation's* identity and a lookup keyed on a
+`decimal_id` is never performed. A rule naming only "Decimal" would describe a
+key nothing looks up.
+
+`Nat`, `Bool` and `String` are **absent** from the registry. That is the
+measured inventory, not a sample.
+
+Two refusals follow, and they are **not the same refusal**:
+
+- **Table miss.** The operand carrier's head *is* a constant or an inductive
+  former, and the registry has no row for it — `Nat`, `Bool`, `String` today.
+  This is a **closable gap**: registering a comparator for that carrier closes
+  it, and doing so is a separate decision this section does not take.
+- **Structural refusal.** The operand carrier's head is neither a constant nor
+  an inductive former — a bound type variable, an application, a `Π`. **No
+  lookup is attempted at all.** This is not a gap and no future registration
+  closes it: it is what `≠` *is*. Disequality at an abstract carrier is not
+  expressible as a comparator selection, and a program that needs it must say
+  which carrier it means.
+
+An implementation that collapses these into one "unsupported carrier" outcome
+is non-conforming even when both inputs are rejected, because the two states
+differ in what would change them.
+
 ## 7. What WS-L must deliver here
 
 Definitions (incl. generic + mutually recursive under SCT), records (dependent +
