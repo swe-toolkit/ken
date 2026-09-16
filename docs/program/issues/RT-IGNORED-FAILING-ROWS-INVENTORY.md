@@ -25,6 +25,53 @@ origin: "Steward, 2026-09-16, on operator directive 2026-09-15: 'The other tests
 > measures at the base — fifteen or seventeen satisfies it with that number.
 > `px8f_buffer_native.rs` is the one named test file that differs between the
 > two trees and it holds one of the listed rows.
+>
+> ### THE POPULATION IS MEASURED. IT IS 15, AND `AC-1` IS ALREADY ANSWERED.
+>
+> **Run `35060326844` on `main` `10eed42912428d66c84533fe5cba88bcaf8c946f`**,
+> from the sweep job's own printed lines — **not** from its conclusion, which is
+> `findings non-blocking` and reports `success` regardless:
+>
+>     Ignored-row sweep completed: 15 selected; 0 passed.
+>
+> **Fifteen, not the sixteen §2 hypothesised.** The banner above already admits
+> whatever the sweep measures, so this is an **input to the node, not a
+> correction of it** — and it arrives before the node starts because
+> `RT-IGNORED-PASSING-ROWS-DISPOSITION` drove passing-while-ignored to zero in
+> the same run.
+>
+> **`0 passed` means every selected row fails, so the selected set and this
+> node's ledger population are now the same set.** That was not true at the
+> frame's base, where 11 of the 27 selected were passing.
+>
+> The fifteen, by binary:
+>
+>     ken-cli::px7l_checked_host_recursive_bind          2
+>     ken-cli::px7f_resource_native                      2
+>     ken-cli::px7m_hostresult_computational_match       2
+>     ken-cli::px7n_nested_computational_eliminator      2
+>     ken-cli::px8ta_oriented_subcontinuation            1
+>     ken-cli::rt_escape_second_resource_native          4
+>     ken-cli::rt_span_prov_native                       1
+>     ken-runtime  lowering::core::tests::constructors   1
+>
+> **Cross-check before trusting the number**, because it is the check that makes
+> the census falsifiable rather than asserted:
+>
+>     attributes - registry == selected,  exactly, at both ends
+>     base   33 - 6 = 27     sweep: 27 selected
+>     main   23 - 8 = 15     sweep: 15 selected
+>
+> **Count attributes excluding comment lines.** `38 -> 28` is the loose count and
+> is inflated by five at each end — `// #[ignore] removed, ...` is a real line in
+> the disposition candidate's readmission comments:
+>
+>     git grep -h '#\[ignore' <ref> -- crates/ \
+>       | sed 's/^[[:space:]]*//' | grep -v '^//' | wc -l
+>
+> **`AC-1` still requires the signature per row, read from a run.** Having the
+> population does not supply the signatures, which is the node's actual
+> deliverable. It removes the census step, not the ledger.
 
 Read the frame: `docs/program/wp/RT-IGNORED-FAILING-ROWS-INVENTORY.md`.
 

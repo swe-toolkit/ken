@@ -115,6 +115,45 @@ The reference's `+31` hunk on `static_transition.rs` still carries
 `InlineBridgeNoCall` and the `owns_seat` rewrite. It was excluded from slice 1
 and it is excluded here. See section 5.
 
+### 3d. AS BUILT — all three traps STAND, and the hunk count came in at 2
+
+**Resolved 2026-09-16 against candidate `568d5d7eedad3d5ec957b0ee42189019b1cb0710`.
+Do not read this as a retraction of §3a-§3c. Every claim in them reproduces at
+the reference:**
+
+    git diff -U0 1dec48f33 0f71ab5b9 -- .../static_transition.rs | grep -c '^@@'
+      -> 69                                                    §3 says 69
+    git diff --shortstat 1dec48f33 0f71ab5b9 -- .../static_transition.rs
+      -> +192 / -119                                           §3 says +192/-119
+    git grep -c 'CheckedIhPostCallConsumer' origin/main -- crates/
+      -> no hits                                               §3b says ZERO
+
+**§3b is the one most likely to be waved away, so state it plainly.** §3b names
+two fields and warns about **the second**. `ImmediateBridgeRealization` — the
+**first** field's type — resolves fine on `main`, because slice 1 landed it.
+That is not §3b's subject. **`CheckedIhPostCallConsumer` still has zero hits,
+so a verbatim lift of that hunk still does not compile.**
+
+**As built, `static_transition.rs` is 2 hunks, not the 3 §3 predicts, and the
+missing hunk IS §3a's.** The candidate leaves the `semantic_ir` re-export block
+alone and does not author the classifier re-export at all, so the two remaining
+additions coalesce into one contiguous block. **2 is the correct count for a
+candidate that avoids the trap §3a forbids** — it is not a shortfall.
+
+**All hunk counts here are `-U0`.** The same diff reads differently at other
+context widths, so a reader reconciling against git's default will be off:
+
+    -U0   69 hunks,  6 mentioning immediate-bridge     <- §3's numbers
+    -U1   53         5
+    -U3   41         5                                 <- git's default
+
+**The general point, because it cost four separate re-derivations here.** A trap
+warns about a hazard in the artifact you might lift. **Confirming the candidate
+did not fall into it is evidence the warning WORKED, not evidence the hazard was
+imaginary** — and at the candidate the two are indistinguishable. Only the
+reference tells them apart. Three separate "refutations" of §3 were each a
+correct measurement of the candidate read as a claim about the reference.
+
 ## 4. Why this slice is still not wired, and why that is not "inert"
 
 At the reference, `construction.rs:1463` contains the live wiring:
