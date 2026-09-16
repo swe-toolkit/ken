@@ -2161,6 +2161,40 @@ impl ContinuationCallView<'_> {
     pub(in crate::cranelift_backend) fn target(&self) -> ContinuationSpecializationId {
         self.target
     }
+    /// The complete call identity this view names: the whole opaque token plus
+    /// the recursive position, and nothing else.
+    ///
+    /// NOT a first construction site, and the count is measured rather than
+    /// claimed: three struct literals of `ContinuationCallIdentity` already
+    /// exist -- in `build_continuation_specialization_plan`, in
+    /// `validate_required_consumer_projections`, and in
+    /// `continuation_call_binding_for` -- and all three are inside this module.
+    /// The last of those builds this exact pair from this exact view type.
+    ///
+    /// Cited by enclosing function rather than by line, because a line citation
+    /// in a comment whose whole claim is "measured rather than claimed" rots
+    /// silently: an earlier draft of this sentence carried the base tree's
+    /// numbers and they were already nineteen lines stale in the file it
+    /// shipped in, two of which this very comment inserted.
+    ///
+    /// What this accessor buys is that the construction stays INSIDE the module
+    /// that owns the type. A consumer assembling it would be the first site
+    /// outside, reaching across into two `pub(super)` fields to do by hand what
+    /// the owner already does three times.
+    ///
+    /// `continuation_call_binding_for` is deliberately LEFT hand-built here.
+    /// `found = Some(call.identity())` is an exact field-for-field
+    /// substitution, and it is a change to live production code: measured, it
+    /// takes `identity` out of the `never used` warning set. That set is the
+    /// only live indicator that this slice's additions sit on no production
+    /// path, so the substitution belongs to the slice that wires the plane in
+    /// and legitimately changes it, not to this one.
+    pub(in crate::cranelift_backend) fn identity(&self) -> ContinuationCallIdentity {
+        ContinuationCallIdentity {
+            token: self.token.clone(),
+            recursive_position: self.recursive_position,
+        }
+    }
 }
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a`** — one already-issued causal call, projected
