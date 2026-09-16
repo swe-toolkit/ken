@@ -258,9 +258,18 @@ the implementer picks which and says why.
 **AC-1 (the bar, and it is two-sided). A row may be READMITted only if it is
 shown to FAIL when the behaviour it covers is broken.** Perturb the production
 path the row asserts over — a deliberate local mutation, reverted before the
-diff — and record that the row goes red. A row that stays green under that
-mutation is **vacuous** and must not be readmitted; report it as a finding with
-the mutation used.
+diff — and record that the row goes red.
+
+**CORRECTED 2026-09-16. This sentence formerly read: *"A row that stays green
+under that mutation is vacuous and must not be readmitted; report it as a
+finding with the mutation used."* IT IS REFUTED AND MUST NOT BE APPLIED.** It
+required the mutation to be **named**, never to **reach**, so a green produced
+by a mutation that never executed was a fully compliant vacuity finding — and
+false. Row 1 hit exactly that on its first attempt. **Replaced by `AC-1b`
+below, which governs both arms; read it before disposing of any row.**
+
+**Neither arm may be decided on the row's colour, and a green alone decides
+nothing.**
 
 This AC exists because a pass is not evidence the defect is closed. Nine of
 these rows are labelled with a failure they no longer exhibit, and "the defect
