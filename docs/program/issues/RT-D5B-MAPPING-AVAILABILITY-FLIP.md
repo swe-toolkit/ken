@@ -14,12 +14,15 @@ origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks 
 
 > # DRAFT. Not framed, not released. Do not start.
 >
-> Two things gate the frame, and neither is scheduling slack:
-> [[RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE]] must land first (see below), and
-> the artifact differential that `effect_v1.rs:250` conditions promotion upon
-> must exist. **Do not size this node before the differential's state is
-> measured** — it is the input that decides whether this is a small flip or a
-> build.
+> **Gate 1 is CLEARED.** [[RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE]] landed at
+> `dcb848eaa68111a32f6bb135afbbba1d8e862ad1`, so site 2 is now the single flip
+> point as a checkable property rather than an end state.
+>
+> **Gate 2 is MEASURED, and the answer is "unbuilt".** See "The differential
+> state" below: `MappingAcquireFile` has **no real-artifact differential**, so
+> this is a build and not a several-line flip. The node stays unsized only
+> because the build's shape is the framer's call; the input it was waiting on is
+> no longer missing.
 
 # Objective
 
@@ -68,14 +71,64 @@ true.
   the earlier advice that slice 4 would. Unblocking it is the spec-leader's act
   on this node's landing, not a deliverable here.
 
+# The differential state — MEASURED (Steward, 2026-09-16, at `394a5545f`)
+
+**What the promotion protocol actually requires**, read off the mechanism rather
+than the prose. A promoted op needs all three, in `crates/ken-verify`:
+
+    1. a real-artifact differential run   CanonicalDifferentialRun, native vs interp
+    2. a NativeTestedEvidence for it      NativeTestedEvidence::from_<op>_run(&run)
+    3. the transition asserted            confirm_native_tested_transition(op, evidence)
+                                          == Ok(HostOpAvailabilityV1::NativeTested)
+
+plus, in every existing instance, a **negative control** — the evidence is
+perturbed (`wrong_native`) and the confirmation must then fail.
+
+**`MappingAcquireFile` has none of the three.** No `from_mapping_acquire_file_run`
+constructor exists, and it appears in no `confirm_native_tested_transition`
+assertion.
+
+⇒ **This node is a BUILD, not a flip.** The one-line availability change is the
+last step, not the work. The work is constructing a real-artifact differential
+for file-backed mapping acquisition and its negative control.
+
+**Instrument reach, stated so the absence is a measurement and not a silence.**
+`NativeTestedEvidence` occurs in exactly two files tree-wide
+(`ken-verify/src/scenario.rs`, `ken-verify/src/catalog.rs`) and
+`CanonicalDifferentialRun` in the same two. `catalog.rs`'s only
+`confirm_native_tested_transition` calls are a **predicate** unit test on a
+hard-coded `ConsoleFlush` with synthesized booleans — not a differential for any
+op. So `scenario.rs` is the whole real-artifact harness, and a grep that covers
+it covers everything.
+
+## The finding this turned up, which is NOT this node's scope
+
+    NATIVE_TESTED_TARGETS_V1                            25 ops
+    with a real-artifact differential in scenario.rs    15
+    WITHOUT one                                         10
+
+The ten: `FsOpen`, `FsHandleMetadata`, `FsReadAt`, `FsWriteAt`,
+`ResourceRelease`, `BufferAllocate`, `BufferFreeze`, `MappingAllocate`,
+`MappingReadView`, `MappingWriteView` — the whole resource / positioned-IO /
+mapping family.
+
+**This is a question, not a defect claim.** `effect_v1.rs:272` says an operation
+stays `RepresentedUnavailable` *until its artifact differential gates promote it
+explicitly*, and ten ops are promoted without one visible. Either the protocol
+was applied through a route this instrument cannot see, or those ten were
+promoted before it existed and nobody swept backward. **Which of those it is
+changes what this node owes**: if the protocol is the real bar, this node builds
+a differential; if ten promotions already bypassed it, the bar is aspirational
+and that is a much larger conversation than a mapping flip. **Routed to the
+Architect; do not resolve it inside this node.**
+
 # Sizing / tier
 
-**Unsized, tier T1.** Deliberately unsized: `effect_v1.rs:250` conditions
-promotion on an artifact differential, and whether that differential exists,
-partially exists, or is unbuilt is the difference between a several-line flip
-and a build. Measure it before sizing. T1 regardless — a promotion out of the
-unavailable tail is a claim that the operation works, and the review is of that
-claim.
+**Unsized, tier T1 — and the reason is no longer "unmeasured".** The differential
+state is measured above and says *build*. What remains open is the build's
+shape, which is the framer's call and depends on the Architect's answer to the
+ten-op question. T1 regardless: a promotion out of the unavailable tail is a
+claim that the operation works, and the review is of that claim.
 
 # Contention
 

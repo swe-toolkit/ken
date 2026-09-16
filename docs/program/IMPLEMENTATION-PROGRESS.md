@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-16 17:11:44Z — from 643 issue file(s) in `docs/program/issues/`.
+2026-09-16 17:16:20Z — from 643 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
