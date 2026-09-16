@@ -6934,8 +6934,8 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 // DeclaredResultContract::identity)`. That value's CONTENT is
                 // plan-derived -- `checked_ih_generated_context_result_contract`
                 // builds it from `k_ret_identity` on
-                // `static_response_continuations` rows, the same field `:7031`
-                // reads for `independent_contract`, and the planner errors
+                // `static_response_continuations` rows, the same field the
+                // `independent_contract` stamp below reads, and the planner errors
                 // rather than let two rows on one context disagree. Do NOT read
                 // this as recovering an independent value. THE PLAN CANNOT
                 // CORROBORATE THE PLAN.
