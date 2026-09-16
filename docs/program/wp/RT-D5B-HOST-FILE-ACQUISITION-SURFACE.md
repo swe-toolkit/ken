@@ -211,27 +211,37 @@ Local verification is targeted only: `scripts/ken-cargo` scoped to
 `prelude.rs` and `compiler_driver.rs` are the two files outside Runtime's usual
 surface.
 
-**CONTENTION CHECK RUN BY THE STEWARD, 2026-09-16, and it found one — the
-result is textually clean and semantically NOT.** One live candidate touches
-`prelude.rs`: `wp/LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD` at
-`b7a9101ac026fcafa8cc6bac0ebfc0c88686dc31`, a single-line insertion.
+**CONTENTION CHECK RUN BY THE STEWARD, 2026-09-16. NO LIVE CONTENTION — and
+the first pass of this check got it wrong in the alarming direction, so the
+refutation is recorded rather than the finding quietly dropped.**
 
-    contender hunk      prelude.rs @@ -1450,6 +1450,7 @@  register_prelude
-    this slice's hunks  291, 442, 1884, 2110, 2144, 2160, 2185, 2592, 2621, 2878
+A branch scan surfaced `wp/LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD` at
+`b7a9101ac026fcafa8cc6bac0ebfc0c88686dc31` touching `prelude.rs`. **That ref is
+a fossil:** its node reads `status: merged` on `origin/main` and the branch is
+**273 commits behind** main. A branch ref is not a live candidate; the node's
+status is the instrument, and the branch scan is not.
 
-⇒ **Disjoint regions. Git will merge them without a conflict, and that is
-precisely the hazard.** Both edit `register_prelude`; one adds a **constructor
-namespace shadowing guard**, the other registers a **new prelude global**
-(`PrivateMappingAcquireFile`). A guard that rejects shadowing constructor names
-is exactly the mechanism that could reject a newly-added global — and because
-the hunks do not overlap, **no merge conflict will surface it.** Whichever
-lands second is the one that discovers it, in CI or not at all.
+The guard is therefore already **on** `main`, which makes the real question a
+precondition rather than a race — and it is answered:
 
-**Therefore:** if `LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD` lands first, the
-implementer must confirm `PrivateMappingAcquireFile` survives its guard, and
-say so in the PR body. If this slice lands first, the same obligation transfers
-to that candidate and the Steward carries it there. A clean `merge-tree` is not
-evidence on this question.
+    guard_constructor_spelling (data.rs:131) fires only when
+      globals.get(name) exists AND env.constructor(existing_id).is_some()
+      AND the id is not one of the declaration's own constructors
+
+⇒ It rejects a new **constructor** whose spelling collides with an existing
+**constructor**. `PrivateMappingAcquireFile` is a primitive global, not a data
+constructor, so it does not reach the guard's predicate.
+
+**And the transplant-signature worry is refuted too.** The guard added a
+`&mut elab.ctor_decl_spans` parameter to `elab_data_decl`, and this slice's
+base (`4bf1ad362`) predates it — so a transplant that touched a data
+declaration would fail to compile against current `main`. It touches **zero**
+`elab_data_decl` call sites (measured). Nothing to carry.
+
+**No obligation transfers to any other candidate.** Recorded because the first
+answer was "textually clean, semantically not" and the measurement says
+otherwise; a contention warning left standing in a released frame costs the
+ring real time chasing a hazard that is not there.
 
 ## 7. Why this slice and not the POSTCALL subject
 

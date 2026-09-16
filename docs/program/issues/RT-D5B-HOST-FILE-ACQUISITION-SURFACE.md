@@ -56,26 +56,30 @@ origin: "Steward, 2026-09-16, continuing operator directive 2026-09-16: 'factor 
 > backend-free either. The host surface is the piece that is both independent
 > and finishable, which is what the directive asks for.
 
-# CONTENTION — ONE LIVE CANDIDATE, TEXTUALLY CLEAN AND SEMANTICALLY NOT
+# CONTENTION — NONE LIVE. The first pass of this check was wrong.
 
-> Measured by the Steward 2026-09-16.
+> Measured by the Steward 2026-09-16. A branch scan surfaced
 > `wp/LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD` at
-> `b7a9101ac026fcafa8cc6bac0ebfc0c88686dc31` touches
-> `crates/ken-elaborator/src/prelude.rs` with a single-line insertion at
-> `@@ -1450`. This slice's prelude hunks are at 291, 442, 1884, 2110, 2144,
-> 2160, 2185, 2592, 2621, 2878.
+> `b7a9101ac026fcafa8cc6bac0ebfc0c88686dc31` touching `prelude.rs`, and I first
+> recorded it as live contention. **It is a fossil** — that node reads
+> `status: merged` on `origin/main` and the branch is 273 commits behind.
+> **A branch ref is not a live candidate; the node's status is the instrument.**
 >
-> **Disjoint regions, and that is the hazard.** Both edit `register_prelude`;
-> one adds a constructor-namespace shadowing guard, the other registers a new
-> global (`PrivateMappingAcquireFile`). A guard that rejects shadowing
-> constructor names is exactly what could reject a newly-added global — and
-> because the hunks do not overlap, **no merge conflict will surface it.**
-> Whichever lands second discovers it, in CI or not at all. A clean
-> `merge-tree` is not evidence on this question.
+> The guard is thus already on `main`, making this a precondition rather than a
+> race — and it is answered. `guard_constructor_spelling` (`data.rs:131`) fires
+> only when the colliding name resolves to an existing **constructor**
+> (`env.constructor(existing_id).is_some()`). `PrivateMappingAcquireFile` is a
+> primitive global, not a data constructor, so it never reaches that predicate.
 >
-> Whichever lands first, the second candidate owes the confirmation in its PR
-> body that `PrivateMappingAcquireFile` survives the guard. The Steward carries
-> that obligation to the other candidate.
+> The transplant-signature worry is refuted too: the guard added a
+> `&mut elab.ctor_decl_spans` parameter to `elab_data_decl`, and this slice's
+> base predates it — but the slice touches **zero** `elab_data_decl` call sites
+> (measured), so there is no signature to update and nothing that would fail to
+> compile on that account.
+>
+> **No obligation transfers to any candidate.** Recorded rather than quietly
+> dropped: a contention warning left standing in a released frame costs the
+> ring time chasing a hazard that is not there.
 
 # D0 IS A SEPARABILITY DETERMINATION AND IT MAY SHRINK THIS SLICE
 
