@@ -63,6 +63,60 @@ true.
   Carried forward from slice 4 unactioned, by ruling. It belongs here because it
   bears on what is safe to make available, not on what is safe to compile.
 
+# A REFUSED INSTANCE OF THIS FLIP EXISTS ON A PRESERVED REF. It is a HAZARD.
+
+**`preserve/ABI-S6-HS18-verifier-checkpoint-not-a-candidate`
+(`5d977ac7968dff3763d330690a9b4df530925d79`) already contains this flip, fully
+coordinated, and it is REFUSED.** Recorded here so the next reader finds it as a
+hazard rather than as a head start.
+
+**Do not harvest it.** The flip is refused on the merits — `MappingAcquireFile`
+has no real-artifact differential, and `catalog.rs:315` would refuse to confirm
+one if it did. It is exactly as unauthorized on that ref as it would be
+anywhere else; being already written does not advance this node by a line.
+
+**What it is good for is the opposite purpose: it is the known-bad tree.** Any
+gate written to stop this flip should be run against `5d977ac79` and required
+to **FAIL**. That control has already retired one proposed phrasing that
+reasoning alone endorsed (see below), and it costs one command.
+
+**The five coordinated sites, measured at `6f49f8521` against `5d977ac79`:**
+
+    site                                       main          5d977ac79      shape
+    1  effect_abi_v1.catalog:97                unavailable   native         change
+    2  effect_v1.rs availability() arm         Unavailable   NativeTested   ADD
+    3  effect_v1.rs ten-op refusal arm         10 ops        9 -- MAF GONE  DELETE
+    4  effect_v1.rs NATIVE_TESTED_TARGETS_V1   [_; 25]       [_; 26]        ADD
+    5  lowering/effects.rs                     0 occurrences 5+, incl. a
+                                                             lowering arm   ADD
+
+Five is a **floor, not a census** — nobody has proven no sixth exists, which is
+the argument for a predicate over an enumeration.
+
+**Four additions and one deletion, and the asymmetry is the lesson.** Sites 1,
+2, 4 and 5 each produce a new line a reviewer or a grep can query. **Site 3
+produces silence** — a roster shrinking by one leaves nothing to match. It is
+also the site that holes [[RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE]] by
+subtraction. **An omission has no complainant.**
+
+**A relation test does NOT catch this, and the measurement is the point:**
+
+    tree        availability()                      refusal arm   relation
+    main        10 RepresentedUnavailable / 25 NT   10 members    10 == 10  HOLDS
+    5d977ac79    9 RepresentedUnavailable / 26 NT    9 members     9 ==  9  HOLDS
+
+The flip edits both sides, so every internal relation stays true. **A
+consistency invariant cannot detect a coordinated unauthorized change** —
+coherence and warrant are different properties. The checkpoint's flip is
+internally coherent; what is wrong with it is that it is unauthorized and
+unproven (Architect, `evt_7jcex53r71gn6`).
+
+⇒ **When this node is eventually framed and the flip is authorized, it still
+gets written fresh.** The gate protecting other candidates from it lives in
+`docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md` §4, keyed on the operation
+at pathspec `crates/`, and it retires with that candidate rather than landing
+as a test.
+
 # Not this node
 
 - **The uniform-refusal gate and its predicate control.** That is
