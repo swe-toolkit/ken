@@ -67,11 +67,46 @@ differential compared against a constant-returning recorder is vacuous, so
 capturing values is a precondition of the promotion itself, not a cost the
 deferral imposes on it. The deferral rides work this node already had.
 
+# The differential state — MEASURED (Steward, 2026-09-16, at `394a5545f`)
+
+**Neither op has a real-artifact differential. This is a build.**
+
+A promoted op needs three things in `crates/ken-verify`: a
+`CanonicalDifferentialRun` (native vs interp), a
+`NativeTestedEvidence::from_<op>_run(&run)`, and
+`confirm_native_tested_transition(op, evidence) == Ok(NativeTested)` — plus, in
+every existing instance, a negative control that perturbs the evidence and
+requires the confirmation to fail.
+
+**`ClockMonotonicNow` and `ClockSleepUntil` have none of the three.** The only
+clock op with a differential is `ClockWallNow`
+(`from_clock_wall_now_run`, asserted in `scenario.rs`), which is a useful
+template and is **not** evidence about either of these.
+
+⇒ **Two builds converge here and they are the same build.** The deferred
+assertions above need a value-capturing test backend; the differential needs a
+real-artifact run that compares values. **Neither is satisfiable against an
+op-tag recorder**, which is why §"Why they could not simply move" and this
+section have the same remedy. Frame them together or the second one re-derives
+the first.
+
+**Instrument reach:** `NativeTestedEvidence` and `CanonicalDifferentialRun`
+occur in exactly two files tree-wide (`ken-verify/src/scenario.rs`,
+`ken-verify/src/catalog.rs`), and `catalog.rs` only unit-tests the predicate on a
+hard-coded `ConsoleFlush` with synthesized booleans. The absence above is a
+measurement, not a silence.
+
+**See also** [[RT-D5B-MAPPING-AVAILABILITY-FLIP]], which carries the open
+question this measurement raised: **ten** of the 25 `NativeTested` ops have no
+real-artifact differential either. Whether the protocol is the real bar or was
+never swept backward is the Architect's to answer, and it changes what both
+promotion nodes owe.
+
 # Sizing note, for whoever frames this
 
-Do not size before measuring the state of the artifact differential that
-`effect_v1.rs:250` conditions promotion upon, and the size of the test-backend
-extension above. Those two inputs decide whether this is a flip or a build.
+Unsized, and no longer for want of a measurement. What decides the size is the
+shape of the test-backend extension plus the Architect's answer on the ten-op
+question — not whether the differential exists, which is now known.
 
 # Related
 
