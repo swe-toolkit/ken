@@ -69,14 +69,15 @@ than a sentence in a commit message.
    bodies carrying an `independent_contract` are demanded under exactly one
    identity, and that identity **is** their own contract, so arm 2 never runs.
 3. A mutation **cannot manufacture** the shape without synthesizing an identity,
-   which `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:333-335` forbids in terms — a
+   which `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` `:366-368` forbids in terms — a
    prohibition the Architect **extended to controls as a ruling** at
    `evt_5gws0pnssfqch`, rather than treating it as already applying there.
 
-**The governing frame line is `:332`** — *"if either is unavailable in principle
+**The governing frame line is `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE:365`** —
+*"if either is unavailable in principle
 at some site, THAT IS THE FINDING."* An in-principle unavailability is a result
 to report, not an obstacle to work around. **Do not close this node by citing
-`:334`'s preference clause**; that clause governs the METHOD (why we do not
+`:367`'s preference clause**; that clause governs the METHOD (why we do not
 manufacture) and says nothing about SUFFICIENCY.
 
 ## Deliverables
