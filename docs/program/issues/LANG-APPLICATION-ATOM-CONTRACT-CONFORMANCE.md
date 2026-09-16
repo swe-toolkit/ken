@@ -1,7 +1,7 @@
 ---
 id: LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE
 title: "RE-CUT to the `if` half alone: make an ungrouped `if` after an application head reject AFFIRMATIVELY at the `if`, raised by the argument loop itself rather than by whatever parses next. The projection half is GONE -- the operator rejected the contraction (PR #3792 closed) and the 32 §3 amendment retires the pin it existed to enforce, so the parser's existing grouped reading is now the specified one and there is NO catalog migration. Scope is one continuation loop of five: removing a token from a can_start_* predicate makes the loop BREAK, never reject, so this needs re-implementing rather than re-basing."
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
@@ -11,6 +11,19 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-16 at the Architect's naming, on their D0 REVERSAL (evt_5sf71fnjxpzmb), which vacates the earlier WITHDRAW ruling (evt_64avxs9ashqqk). The divergences were measured by spec-author under the SPEC-RESERVED-INFIX-APP-BOUNDARY-CORRECTION hard stop (evt_7p78v6qb429rz) and read against the spec by the Architect. Steward verified the two quoted spec passages verbatim at origin/main e11341c7b9d11cd74879d27d555d2a5729837847: 32-grammar.md :357-363 (ungrouped operator_name is not a general application_atom, 'applies equally to generic and reserved operator names') and :368-378 (the five leading forms reject; arrow and projection nest, as `(keep Nat) -> Nat` and `(keep box).value`; 'part of §3's contract pin; an implementation must not restore a second unrestricted application production'). The catalog-source extent is UNMEASURED -- see Sizing. Not yet framed; the Steward frames and releases it when the language lane reaches it."
 ---
+
+> ## MERGED 2026-09-16 at `9a1b8247233b1273487ff22833a985a405fab138`
+>
+> **Verified by blob, not by ancestry** — the publisher squashes, so a routed
+> commit is an ancestor of nothing. All three touched paths
+> (`crates/ken-elaborator/src/parser.rs`,
+> `crates/ken-elaborator/tests/lang_application_atom_if_rejection.rs`,
+> `crates/ken-elaborator/tests/lang_surface_if.rs`) are byte-identical
+> between the approved candidate `30f3e19048b7dc5571e30b6e413c19fdb71e9cdc`
+> and `main`, landed via PR #3800 with full-mode CI green. Decision
+> `dec_1q433nvrj88xc` resolved; Architect approved exact; QA approved.
+> This is the if-half re-cut after the projection half was rejected by the
+> operator (PR #3792 closed) — see the title for the scope narrowing.
 
 > # READY. Frame:
 > `docs/program/wp/LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE.md`.
