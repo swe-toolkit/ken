@@ -796,8 +796,71 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
 
 **Both design forks are closed and the ring builds.** SITE closed toward more
 work (three steps, not one line); PRODUCE-vs-PROVE-vs-SEED closed on the
-measured bit at `evt_193ekcwm21t7w`. Owner runtime, size M, tier T1,
-`depends_on: []` — nothing is held in front of this.
+measured bit at `evt_193ekcwm21t7w`. Owner runtime, size M, tier T1.
+
+### THE BASE. CUT THE D1 CANDIDATE FROM `0f71ab5b9`, THE HEAD OF PR #3676.
+
+**Steward ruling 2026-09-16, on runtime-implementer's escalation
+`evt_6jz4a7nx5nwks`. This block previously named the tip to re-measure at and
+never named the base to build from; that omission is the Steward's and this is
+the repair.**
+
+⇒ **`depends_on: []` is true as an ISSUE relation and FALSE as a BUILD
+relation. Do not read it as "buildable on `main`."** The mechanism this node
+repairs does not exist on `main` at all. Measured by the implementer over nine
+symbols, and the sweep is the informative part: `realized_call_words` and
+`independent_contract` have hits on `main` **only under `docs/`** — this node
+and its siblings — and **zero under `crates/`**. The site exists on `main` as
+prose.
+
+**And the banner's hazard fired exactly as written.** `k_ret_identity` *does*
+resolve on `main`, in unrelated code, so a reader using name-presence as a
+wrong-tree detector gets a true negative on two names and a false reassurance on
+the third. That is why the base is named here as a value rather than left to be
+inferred.
+
+    0f71ab5b9  wp/ABI-S6-d5b-file-backed        HEAD OF PR #3676 (OPEN, -> main)
+               36 ahead of the merge-base, 46 behind main, tip 2026-09-15
+    ff7638ff6  wp/RT-D5B-live-tip-ci-check      24 ahead, 82 behind, 2026-09-14
+    0d94d58b6  wp/ABI-S6-d5b-file-backed-live   21 ahead, 82 behind, 2026-09-14
+    b0a7c2945  (local) wp/ABI-S6-d5b-file-backed = 0f71ab5b9 + ONE UNPUSHED commit
+
+**Why `0f71ab5b9`, and it is NOT A THREE-WAY CHOICE — IT IS TWO LINES.**
+`0d94d58b6` is an **ancestor of** `ff7638ff6` (zero commits in the former not in
+the latter, three the other way; Steward-measured, and the Architect reached it
+independently). So the field is `0f71ab5b9` against one older line, not three
+rival trees.
+
+`0f71ab5b9` is **the open PR's head**, and this node was cut out of that arc
+rather than alongside it, so the repair lands with the arc. It is also the
+newest, the least behind `main` by nearly half, and the tree every AC coordinate
+in this block cites — including D1-1's own control.
+
+> **USE AN ABSENCE-BASED WRONG-TREE DETECTOR, NEVER A PRESENCE-BASED ONE.**
+> This is the reusable half of the escalation that produced this ruling.
+> `k_ret_identity` is present on `main` in unrelated code, so checking for it
+> returns *"right tree"* on the wrong tree. A name with **zero** hits on `main`
+> and nonzero on the candidate cannot do that:
+>
+>     git grep -c register_generated_constructor_authority -- crates   main 0, cand 3
+>     git grep -c pending_call_result_obligations          -- crates   main 0, cand 7
+>
+> A presence check fails open; an absence check fails closed. **Pick the name
+> that is missing, not the name that is there.**
+
+**Why NOT `b0a7c2945`, even though every measurement in this arc was taken
+there.** It is `0f71ab5b9` plus one local commit that **was never pushed**, and
+all worktrees in this repository share one object database — so it reads
+perfectly from any seat while `git branch -r --contains` returns nothing, and a
+candidate cut from it would carry an ancestor chain absent from the remote.
+That one commit touches px8f trap reporting only. **If any AC's control turns
+out to depend on it, say so and escalate rather than cherry-picking it in
+silently.**
+
+**The 46-commit gap behind `main` is NOT this node's to close.** Do not rebase
+the arc as part of D1. PR #3676's ordering is an open operator decision, and
+D1-5 already requires cause 2 to stay red; a rebase here would entangle a
+localized three-edit repair with that decision.
 
 **TREAT EVERY ANCHOR IN THIS NODE AS PERISHABLE.** If a fixed input below turns
 out false against the code you are on, say so and escalate — do not quietly
