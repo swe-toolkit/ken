@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT
 title: "Port the checked-IH post-call consumer machinery that main never grew, so ABI-S6-HS18 increment A can compile: one type family (CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep) plus three accessors on existing types (StaticTransitionPlan::checked_ih_generated_context_result_contract, StaticTransitionPlan::static_response_forwarded_result_identity, Lowering::checked_post_call_consumer_frame). Increment A holds the call sites and none of the definitions, so it cannot build without this. FIRST DELIVERABLE IS THE TRANSITIVE CENSUS, NOT THE PORT -- whether the consumer machinery itself calls anything else that is absent from main is UNMEASURED, and finding a fourth population after the port is the failure this node exists to prevent."
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -12,7 +12,11 @@ tier: T1
 origin: "Steward cut 2026-09-16 on the Architect's category-B ruling (evt_6mptkrtvysd8s), relayed by runtime-leader (evt_66sfqncjzkmm): 'Cut it as its own node, sequenced ahead of A, named for the capability rather than for the errors that exposed it.' Discovered by runtime-implementer's D0-2 characterisation of increment A's 21 compile errors (evt_2gg7fd748n466), which split 11 Category A (incomplete re-derivation, no dependency) / 10 Category B (this node). The Architect re-measured the census with a live control before ruling and CORRECTED the implementer's WIP column 20/40 -> 2/4; the correction strengthened the finding, because 2 and 4 are dangling references with no definitions behind them, which is what E0425 means, whereas 20 and 40 would have said the tree already carried the machinery."
 ---
 
-> # DRAFT — NOT FRAMED, DO NOT START.
+> # READY. Frame:
+> `docs/program/wp/ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT.md`.
+>
+> **First deliverable is the TRANSITIVE CENSUS, not the port. Do not begin
+> porting before D0 is answered and posted.**
 >
 > **This node is sequenced BEFORE increment A of
 > [[ABI-S6-HS18-MAIN-BASED-CLOSURE]], and the ordering is structural rather
