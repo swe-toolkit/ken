@@ -9365,6 +9365,14 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     /// correctly. Widening that enum touches rows `recursor_fusion.rs` already
     /// asserts against; it is a follow-up, deliberately not folded in here.
     ///
+    /// **The first assertion is carried by the TYPE, not by this test.**
+    /// `required_consumer_projection_for` returns `Option<DirectOuterProjection>`,
+    /// and `direct_outer`'s `DetachedReturnContext` arm cannot return `Some`
+    /// compile-preservingly — there is no `DirectOuterProjection` to build from a
+    /// `SourceReturnContextTemplate`. So no mutation reddens it, and that green is
+    /// correct rather than a broken harness. It is stated here as intent, and the
+    /// coverage in this test is the other two facts.
+    ///
     /// The subject is selected by a predicate on the VARIANT, never positionally.
     /// A `.next()` selector would pass on whichever projection came first — the
     /// same defect this port had to repair in the
