@@ -353,8 +353,39 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  DISCRIMINATOR BIT IS READ, and its two meanings are fixed in
                  the DISCRIMINATOR row BEFORE the reading, so the size cannot be
                  argued from the bit after the fact.
+                 THE TRIGGER FIRED 2026-09-16. BOTH FORKS ARE NOW CLOSED AND
+                 THE RE-SIZE IS RULED: SIZE STAYS M. Architect
+                 evt_193ekcwm21t7w read the bit; the ruling below is the
+                 Steward's, applying meanings fixed BEFORE the reading.
+                 THE HONEST TEMPTATION IS S AND IT IS REFUSED. The
+                 DISCRIMINATOR row's own pre-registered consequence for the
+                 arm that fired says "SEED IS NARROW AND BUILDABLE", and
+                 narrow argues S. TAKING IT WOULD BE SIZING ON HOW MANY LINES
+                 THE EDIT TOUCHES, which this row already rejected as the
+                 wrong KIND of input and rejected while the number in question
+                 was smaller and more flattering.
+                 WHAT ACTUALLY SETS THE SIZE, now that neither fork can:
+                 the repair is THREE COORDINATED EDITS, not one. Stop the drop
+                 at :6874/6877, or seed what it drops; make arm 1 at :4489
+                 consult what SEED produces instead of realized_call_words
+                 membership alone; and disposition the stamp at :6962-6971,
+                 which is not automatically correct once the drop is fixed.
+                 AND THE DELIVERABLE IS A RED POPULATION, WHICH IS THE
+                 EXPENSIVE HALF. This node's thesis is that the closure makes
+                 the tree REDDER and that the red population IS the
+                 deliverable. Characterizing that population and writing ACs
+                 that accept it -- while cause 2 must NOT be repaired toward
+                 green -- is the work that does not shrink because the site
+                 got located. A located cause makes the edit cheaper; it does
+                 not make the acceptance criteria cheaper.
+                 ⇒ M, and the trigger is now SPENT rather than re-pointed.
+                 There is no third fork, so D1 does not re-size again; it is
+                 sized until someone measures the red population and finds it
+                 different from what the node predicts.
                  Steward decision; the Architect declined to rule size
-                 (evt_18mtk5rr061nk, evt_2mw3vjp30yjbn).
+                 (evt_18mtk5rr061nk, evt_2mw3vjp30yjbn) and did not rule it
+                 here either -- it ruled the fork, which is its call, and the
+                 size, which is mine.
     BOUNDARY     RULED, AND IT INVERTS. Every funcid60 pair is GATE-BLOCK'd on
                  funcid58 at the same identity, in every refusal where it
                  appears, and ARM 2 NEVER RAN IN ANY COMPILE. So the 5 arm-2
@@ -363,8 +394,41 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  D1 MUST PARTITION ROOTS AND DOWNSTREAM, and the downstream half
                  is now NAMED rather than assumed.
                  Architect evt_4s7beb7qyrhqz, RULED at evt_2mw3vjp30yjbn.
-    REPAIR       PRODUCE constructor authority.
-                 NOT re-keying: there is nothing to re-key, the tables are empty.
+    REPAIR       SEED, RULED 2026-09-16 ON MEASUREMENT. Architect
+                 evt_193ekcwm21t7w, on the bit whose meanings were fixed in
+                 the DISCRIMINATOR row before it was read.
+                 SCOPED TO THREE COORDINATED EDITS, not one: the drop at
+                 :6874/:6877, arm 1 at :4489 consulting what SEED produces
+                 rather than realized_call_words membership alone, and a
+                 disposition of the stamp at :6962-6971.
+                 PRODUCE constructor authority remains the SHAPE of what is
+                 seeded. NOT re-keying: there is nothing to re-key, the
+                 tables are empty.
+                 SEED MUST *PRODUCE*, NOT *CONSULT*, AND THAT IS NOW DIRECT
+                 RATHER THAN INFERRED FROM THE CENSUS. The fingerprints'
+                 third field is the AUTHORITY COUNT, measured in one run:
+                   funcid58   829/2611/  0/ 1/v1751    ZERO authorities
+                   funcid59   678/2090/  0/ 1/v1386    ZERO authorities
+                   funcid60 12023/40524/593/21/v26      593 authorities
+                 Arm 1 has nothing to consult because nothing PRODUCED an
+                 authority, and funcid60's 593 in the SAME RUN is the control
+                 that makes the zeroes a measurement rather than an absence.
+                 Architect evt_1c971mqdjffam.
+                 THE PROHIBITION IS UNCHANGED AND IT BINDS THE REPAIR: cause 2
+                 must NOT be repaired toward green. The closure makes the tree
+                 REDDER and that red population IS the deliverable.
+                 DEPENDENCY, RULED IN PART 2026-09-16. Defect ownership is
+                 SETTLED AND IT IS D1'S -- the arm that fired routes to the
+                 call site, so depends_on can NO LONGER be justified on "this
+                 node's premise is the parent's unmet invariant", and the
+                 schema WARN saying a team would find that premise false is
+                 CORRECT. The edge is NOT deleted on that ground: defect
+                 ownership and BUILD ORDER are different relations, and
+                 whether the constructor-authority production path SEED calls
+                 is the parent's deliverable or D1's own is the open question.
+                 If the parent builds it, the edge is real AS A BUILD
+                 DEPENDENCY and must say so in those terms; if D1 builds its
+                 own, the edge goes.
     SITE         CONFIRMED AND WIDENED 2026-09-16. It is NOT one line. It is a
                  THREE-STEP SEQUENCE on ONE emission path, spanning ~90 lines,
                  and :6971 is the SECOND step, not the site:
@@ -412,6 +476,96 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  value from invariant-plus-plausible-path is the entailment
                  mistake. NOT ASSERTED: that funcid59's obligation came
                  from :6877.
+                 ### READ 2026-09-16. TRUE / None. ARM (b). FORK CLOSED.
+                 Architect evt_193ekcwm21t7w, against meanings unchanged
+                 since they were fixed above.
+                   TRUE / None   at 10 arm-1 entries, and at NONE of the
+                                 other 84 obligations in the population.
+                   TRUE / Some   32. The DISCRIMINATION: realization and
+                                 identity travel together everywhere else,
+                                 so the bit is not a constant.
+                   FALSE / Some  EMPTY, AND IT IS A MEASURED ZERO. A fourth
+                                 cell the construction invariant predicts
+                                 must be empty and no site can produce. It
+                                 is empty. Confirmed 2026-09-16 against a
+                                 pre-registration; Architect
+                                 evt_1c971mqdjffam, evt_4m71wxrbs704c.
+                 THAT CELL IS THE ONE EMPIRICAL CHECK ON THE MUTATION-SITE
+                 CENSUS, which is what upgrades the bit from a plausible site
+                 to an ENTAILED one. The census is a GREP; greps have blind
+                 spots; a measured (false, Some) = 0 is the independent test
+                 that the grep missed no writer.
+                 AND THE ZERO IS ONLY WORTH THAT BECAUSE THE PARSE IS SHOWN
+                 COMPLETE. A zero from a parser is worth nothing until you
+                 show the parser saw everything, so the parsed totals are
+                 cross-footed against the census's OWN obligation counts:
+                   px8f_buffer_native    52+32+10 = 94
+                                         4x(21+1+1) + 1x(1+1) = 94
+                   px8f_write_partition  13+2+8   = 23
+                                         1x(21+1+1)           = 23
+                   combined              94+23    = 117
+                                         65+0+40+12           = 117
+                   per-cell  52+13=65   32+8=40   10+2=12     all exact
+                 The per-refusal 21+1+1 is the OBLIGATION COLUMN OF THE
+                 FINGERPRINTS -- funcid60 21, funcid58 1, funcid59 1 -- so the
+                 predicted total is derived from a DIFFERENT measurement than
+                 the parsed one. A genuine cross-foot, not a restatement, and
+                 it is what makes the cell a CONTROL rather than a parser
+                 report.
+                 THE PRE-REGISTRATION RESOLVED TO ITS FIRST BRANCH. Recorded
+                 because a pre-registration that is only cited when it fires
+                 the inconvenient way is not one: the alternative branch was
+                 STRIKE, not soften, with the census left standing on the grep
+                 alone.
+                 ⇒ THE CALL SITE DROPS A CONTRACT IT WAS HANDED. SEED.
+                 THE QUANTIFIER IS 12 OF 12 -- TOTAL OVER THE CENSUS
+                 POPULATION, READ 2026-09-16. Both binaries, six refusals,
+                 against a 40-way (true/Some) and a 65-way (false/None)
+                 control. It stood at "10 of 12" for one candidate, because
+                 px8f_buffer_native is one binary and the remaining 2 were
+                 unread; 10-for-10 could not plausibly have been overturned,
+                 but "cannot plausibly be overturned" is not "measured" and
+                 the reading was cheap. It was taken.
+                 2 VERSUS 4 IS SETTLED AT 2. funcid58 and funcid59 are
+                 byte-identical across ALL EIGHT compiles in both binaries:
+                 829/2611/0/1/v1751 and 678/2090/0/1/v1386.
+                 THE WEAK DIRECTION IS STILL WEAK AND IS USED WHERE IT FAILS
+                 SAFE. Identical fingerprints are counts and counts can
+                 coincide; the conclusion drawn is weight 2, not weight 12.
+                 What lifts it well past bare coincidence is that BLOCK AND
+                 INSTRUCTION COUNTS COME FROM FINALIZED CLIF and could have
+                 disagreed with the planner identity across eight independent
+                 opportunities, and did not. A measure that COULD have
+                 discriminated and did not is corroboration. It is still not
+                 identity, and the conclusion does not need it to be.
+                 THE FENCE DIRECTLY ABOVE IS NOW DISCHARGED, AND BY A CENSUS
+                 RATHER THAN BY THE BIT. The step from value to site needs
+                 the mutation-site census to be COMPLETE, not merely to
+                 contain a plausible path. On b0a7c2945, every write to
+                 either field in the whole lowering/ tree:
+                   .identity              core.rs:9637  = Some(actual)
+                                          units.rs:6877 = None
+                   .realization_required  calls.rs:2483 = contract.is_some()
+                                          core.rs:9638  = true
+                                          units.rs:6874 = true
+                                          units.rs:12052 = false (cfg(test))
+                 calls.rs:2479-2483 takes both from the SAME Option =>
+                 (Some,true) or (None,false). core.rs:9637-9638 sets both =>
+                 (Some,true). units.rs:6874/6877 sets required THEN drops
+                 identity => (None,true).
+                 ⇒ units.rs:6874/6877 is the ONLY producer of (true, None) in
+                 the tree, so observing it ENTAILS that site ran on that
+                 obligation. NOW ASSERTED, and only now: funcid59's
+                 obligation came from :6877, and so did funcid58's.
+                 THE callee FIELD IS WHAT MAKES IT ONE SENTENCE:
+                   funcid58  [(v1751, None, true, Some(funcid62))]
+                   funcid59  [(v1386, None, true, Some(funcid60))]
+                 v1751 and v1386 are those bodies' OWN published words. Each
+                 arm-1 body publishes the exact word it received from a call
+                 whose identity was dropped at :6877. One obligation each, no
+                 others. The defect stated with no inference step -- and only
+                 sayable because the implementer added a field nobody asked
+                 for.
     INSTRUMENT   THE REFUSAL'S OWN DETAILS TUPLE CANNOT REPRESENT THE DECIDING
                  EVIDENCE. At :4616-4621 it projects
                  body.call_obligations.iter().filter(|o| o.identity ==
@@ -1090,6 +1244,29 @@ narrowing.
 > THE UPGRADE BEFORE IT IS ANSWERED:** was the 17-entry census built from that
 > same interleaved output, or from a separate structured collection?
 >
+> ### ANSWERED 2026-09-16, AND THE ANSWER IS A THIRD ARM NEITHER OF US NAMED
+>
+> **SAME CHANNEL, AND THE CHANNEL'S FAILURE MODE CANNOT TOUCH THIS PROPERTY.**
+> Each refusal is **ONE ATOMIC LINE** carrying its own `missing=` and `details=`.
+> ⇒ Interleaving can misattribute **which compile a line came from**; it cannot
+> **split or merge a census**. The retracted claim was about attribution; this
+> claim is about cardinality, and the defect does not reach it.
+>
+> **THAT IS A STRUCTURAL ARGUMENT, NOT AGREEMENT BETWEEN TWO RUNS** — which is
+> what makes it a warrant. Two collections agreeing would have been two
+> instruments capable of being wrong the same way. **The 17-entry census stands,
+> and for a better reason than the question asked for.**
+>
+> **THE FORK ITSELF WAS MIS-KEYED, AND THE ARCHITECT OWNS IT:** `SAME`/`SEPARATE`
+> keys on the SOURCE when the question is about the PROPERTY, and so omits the
+> arm where the source is shared and the property is invariant to what the
+> shared source gets wrong. Same defect as `(a)`/`(b)` below — **a classification
+> keyed to the wrong entity, committed twice in one evening by the seat ruling on
+> it.** Architect `evt_193ekcwm21t7w`.
+>
+> The two arms as originally posed, kept because they are why the question was
+> worth asking:
+>
 >     SEPARATE  => the sixth compile's absence has a warrant INDEPENDENT of the
 >                  retracted stream. (ii) stays refuted, (i) and (iii) stay live,
 >                  and the absence no longer rests on a disowned instrument.
@@ -1099,9 +1276,42 @@ narrowing.
 >                  12 included, would rest on it -- a SECOND projection beneath
 >                  the one this node already established.
 >
-> **UNRESOLVED. Recorded as a question, not as the favourable arm.**
+> **RESOLVED ABOVE, and by neither arm.**
 >
-> ### AND "SIX OF SIX" MAY BE WORTH ONE OBSERVATION, NOT SIX.
+> ### AND "SIX OF SIX" MAY BE WORTH ONE OBSERVATION, NOT SIX. — REFUTED 2026-09-16
+>
+> **THE RULING BELOW IS WITHDRAWN. ITS PREMISE IS MEASURED FALSE.** The
+> fingerprints came back: `funcid60` is **THREE DISTINCT BODIES ACROSS SEVEN
+> COMPILES**, so `(a)` — *the same generated construct in every program* — does
+> not hold. **The weight is at least 2, not 1**, because the six evaluations span
+> at least two genuinely different bodies. Architect `evt_193ekcwm21t7w`,
+> withdrawing its own ruling.
+>
+> **AND THE REFUTATION IS WORTH MORE THAN THE CONFIRMATION WOULD HAVE BEEN: two
+> DIFFERENT `funcid60` bodies produced byte-identical arm-2 verdicts.** The
+> invariance is therefore **not body identity**, and what it is instead is
+> unexplained and was correctly not explained.
+>
+> **`(a)`/`(b)` WAS A FALSE DICHOTOMY, and it is the same mis-keying as
+> `SAME`/`SEPARATE` above.** *Same generated construct* or *instrument repeating
+> one body* both key on the SOURCE of the verdicts. **The truth is the arm
+> neither names: the body VARIES and the verdict DOES NOT.**
+>
+> **SEVEN COMPILES, NOT SIX, AND THE ERROR IS IN THE SENTENCE DIRECTLY BELOW.**
+> *"These are six DIFFERENT Ken programs"* takes an `ARM2-EVAL` **emission
+> count** as a **program count**. There are seven compiles. ⇒ **An observation
+> count was inherited as an object count INSIDE the ruling whose entire subject
+> was inheriting an observation count as an object count.** Fifth occurrence in
+> this arc, and the first one located in the text of the rule itself rather than
+> in something the rule was applied to.
+>
+> **ONE JOIN SETTLES THE WEIGHT EXACTLY, and it is data already in hand rather
+> than a run:** which compile did each of the six `ARM2-EVAL`s come from, and
+> what was that compile's `funcid60` fingerprint?
+>
+> The withdrawn ruling is kept below rather than deleted, because it is why the
+> fingerprints were demanded, and because the reasoning is sound on a premise
+> that simply turned out not to hold:
 >
 > Every one of the six verdicts is **byte-identical apart from the identity**:
 >
