@@ -35,6 +35,17 @@ const DECL_PARSER_SIGNATURE: &str = "expected 'const'";
 
 const UNGROUPED_IF_ARG: &str = "const k : Nat = keep if c then a else b";
 
+/// A fixture deliberately written ACROSS a `\`-continuation.
+///
+/// **The second physical line below carries no `"` at all.** A per-line
+/// quote-parity extractor yields ZERO fragments for it, which is how a census
+/// goes blind to exactly the shape it was built to find — `lang_surface_if.rs`
+/// writes its fixtures this way, including the one this node exists because of.
+/// This constant gives that blind spot a known answer inside the suite, so it
+/// is caught here rather than rediscovered from a CI failure.
+const CONTINUATION_LINE_FIXTURE: &str = "const first : Nat = Zero\n\
+     const cont_arg : Nat = keep if c then a else b";
+
 // Every behavioural fixture in this file, named once and shared with the
 // one-directional sweep below. Hoisted deliberately: a second hand-written list
 // in the sweep could drift from the fixtures the behavioural tests actually
@@ -148,14 +159,12 @@ fn ac_inline_ken_census_reaches_rust_test_sources() {
             continue;
         };
         let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-        for (number, line) in text.lines().enumerate() {
-            // Test the KEN inside the string literals, not the Rust line. The
-            // Rust syntax around it (`:`, `"`, `=`) is what let a Rust `match`
-            // guard satisfy the previous version.
-            for fragment in line.split('"').skip(1).step_by(2) {
-                if has_argument_position_if(fragment) {
-                    sites.push((name.clone(), number + 1, fragment.to_owned()));
-                }
+        // Test the KEN inside the string literals, not the Rust line. The Rust
+        // syntax around it (`:`, `"`, `=`) is what let a Rust `match` guard
+        // satisfy an earlier version.
+        for fragment in ken_fragments(&text) {
+            if has_argument_position_if(&fragment) {
+                sites.push((name.clone(), 0, fragment));
             }
         }
     }
@@ -409,6 +418,7 @@ fn no_false_negative_across_the_test_corpus() {
     let tests_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let mut checked = 0usize;
     let mut misses: Vec<String> = Vec::new();
+    let mut reached_a_continuation_line = false;
 
     for entry in std::fs::read_dir(&tests_dir).expect("tests dir").flatten() {
         let path = entry.path();
@@ -418,17 +428,18 @@ fn no_false_negative_across_the_test_corpus() {
         let Ok(text) = std::fs::read_to_string(&path) else {
             continue;
         };
-        for line in text.lines() {
-            for fragment in line.split('"').skip(1).step_by(2) {
-                let rejected_from_loop = match parse_decls(fragment) {
-                    Err(ElabError::ParseError { msg, .. }) => msg.contains(ARGUMENT_LOOP_MARKER),
-                    _ => false,
-                };
-                if rejected_from_loop {
-                    checked += 1;
-                    if !has_argument_position_if(fragment) {
-                        misses.push(format!("{}: {fragment}", path.display()));
-                    }
+        for fragment in ken_fragments(&text) {
+            if fragment == CONTINUATION_LINE_FIXTURE {
+                reached_a_continuation_line = true;
+            }
+            let rejected_from_loop = match parse_decls(&fragment) {
+                Err(ElabError::ParseError { msg, .. }) => msg.contains(ARGUMENT_LOOP_MARKER),
+                _ => false,
+            };
+            if rejected_from_loop {
+                checked += 1;
+                if !has_argument_position_if(&fragment) {
+                    misses.push(format!("{}: {fragment}", path.display()));
                 }
             }
         }
@@ -440,6 +451,15 @@ fn no_false_negative_across_the_test_corpus() {
         checked > 0,
         "the sweep found NO forbidden-shape fragment anywhere, so it cannot have \
          demonstrated the absence of misses — the instrument did not reach"
+    );
+    // REACH control on THIS sweep's own extraction, not on `ken_fragments` in
+    // isolation. Measured: reverting only the sweep's extraction to per-line
+    // quote parity left every test green, because the extractor's own control
+    // calls `ken_fragments` directly and never learns what the sweep used.
+    assert!(
+        reached_a_continuation_line,
+        "the sweep never yielded a `\\`-continuation fragment, so its zero \
+         misses is a statement about what it looked at, not about the corpus"
     );
 }
 
@@ -478,6 +498,146 @@ fn every_file_fixture_passes_the_one_directional_check() {
         forbidden > 0,
         "no fixture in FILE_FIXTURES is forbidden-shape, so the one-directional \
          check was vacuous over all of them"
+    );
+}
+
+/// Every Rust string literal in `source`, decoded, tracked ACROSS lines.
+///
+/// **Per-line quote parity is unsound here and that is the whole reason this
+/// exists.** A `\`-continued literal puts Ken on physical lines carrying no
+/// `"` at all; splitting each line on `"` yields nothing for them and — worse —
+/// yields garbage for the line that closes the literal, because its quote count
+/// is odd. Measured on `lang_surface_if.rs` before this fix: lines 118-120
+/// produced ZERO fragments and line 121 produced `","`.
+///
+/// Errs toward OVER-extraction deliberately. Under the one-directional
+/// standard a spurious fragment costs nothing — it simply fails to parse — while
+/// a missed one is the fatal direction.
+///
+/// Residual, stated: `r"..."` raw strings and quotes inside `//` comments are
+/// not modelled. Neither appears in this corpus, and both would over-extract
+/// rather than under-extract if they did.
+fn ken_fragments(source: &str) -> Vec<String> {
+    #[derive(PartialEq)]
+    enum State {
+        Code,
+        LineComment,
+        BlockComment,
+        InString,
+    }
+
+    let mut out = Vec::new();
+    let mut state = State::Code;
+    let mut buffer = String::new();
+    let mut chars = source.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match state {
+            // Comments must be skipped, not scanned. This file's own doc
+            // comments discuss `"` characters, and treating those as literal
+            // delimiters desynchronises the tracker — which under-extracts,
+            // the fatal direction. Two earlier attempts failed here: a naive
+            // scan, then a scan plus a char-literal skip that ate three
+            // characters after every apostrophe in prose.
+            State::Code => match c {
+                '/' if chars.peek() == Some(&'/') => {
+                    chars.next();
+                    state = State::LineComment;
+                }
+                '/' if chars.peek() == Some(&'*') => {
+                    chars.next();
+                    state = State::BlockComment;
+                }
+                '"' => {
+                    buffer.clear();
+                    state = State::InString;
+                }
+                _ => {}
+            },
+            State::LineComment => {
+                if c == '\n' {
+                    state = State::Code;
+                }
+            }
+            State::BlockComment => {
+                if c == '*' && chars.peek() == Some(&'/') {
+                    chars.next();
+                    state = State::Code;
+                }
+            }
+            State::InString => match c {
+                '"' => {
+                    out.push(std::mem::take(&mut buffer));
+                    state = State::Code;
+                }
+                '\\' => match chars.next() {
+                    Some('n') => buffer.push('\n'),
+                    Some('t') => buffer.push('\t'),
+                    Some('r') => buffer.push('\r'),
+                    Some('0') => buffer.push('\0'),
+                    Some('\\') => buffer.push('\\'),
+                    Some('"') => buffer.push('"'),
+                    // `\` + newline is Rust line continuation: the newline AND
+                    // the following indentation are consumed. This is the case
+                    // a per-line extractor cannot see at all.
+                    Some('\n') => {
+                        while chars.peek().is_some_and(|n| n.is_whitespace() && *n != '\n') {
+                            chars.next();
+                        }
+                    }
+                    Some(other) => buffer.push(other),
+                    None => break,
+                },
+                _ => buffer.push(c),
+            },
+        }
+    }
+    out
+}
+
+/// Known answer for the extractor's cross-line tracking.
+///
+/// `CONTINUATION_LINE_FIXTURE` puts `keep if c then a else b` on a physical
+/// line with no `"` on it. This asserts the extractor reaches it AND that the
+/// census flags it — the two halves the previous extractor failed in sequence.
+#[test]
+fn extractor_reaches_continuation_lines() {
+    let this_file = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang_application_atom_if_rejection.rs"),
+    )
+    .expect("this test file");
+
+    let fragments = ken_fragments(&this_file);
+
+    // Differential against RUSTC. `CONTINUATION_LINE_FIXTURE` is what the
+    // compiler produced from the same source text, so the extractor's decoding
+    // must reproduce it EXACTLY -- not merely contain a substring of it.
+    //
+    // A `contains("cont_arg")` check is too weak, measured: dropping the
+    // `\`+newline arm leaves the content present with stray newline and
+    // indentation, and a substring check cannot tell that apart from a correct
+    // decode. Equality can.
+    assert!(
+        fragments.iter().any(|f| f == CONTINUATION_LINE_FIXTURE),
+        "EXTRACTOR BLIND OR LOSSY: no extracted fragment equals what rustc \
+         produced for CONTINUATION_LINE_FIXTURE, whose second physical line \
+         carries no quote character. A per-line quote-parity split yields \
+         nothing for it; a missing continuation arm yields it with stray \
+         whitespace."
+    );
+
+    // and the census must then flag it, not merely see it
+    assert!(
+        has_argument_position_if(CONTINUATION_LINE_FIXTURE),
+        "the continuation fixture carries the forbidden shape and must be flagged"
+    );
+    let parser_rejects = match parse_decls(CONTINUATION_LINE_FIXTURE) {
+        Err(ElabError::ParseError { msg, .. }) => msg.contains(ARGUMENT_LOOP_MARKER),
+        _ => false,
+    };
+    assert!(
+        parser_rejects,
+        "the fixture must really BE the forbidden shape, or it is not a control"
     );
 }
 
