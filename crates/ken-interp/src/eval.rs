@@ -8944,15 +8944,32 @@ mod px5b_effect_observation_tests {
         }
     }
 
-    /// ABI-S3 AC-2. A test that only reads the monotonic clock passes whether
-    /// or not D1 was honoured, so the observation here is differential: the
-    /// wall clock is scripted to step BACKWARDS while the monotonic source
-    /// advances, and the wall-clock step is asserted first as a positive
-    /// control. Without that control a green monotonic result would be
-    /// vacuous -- it would equally mean the harness cannot perturb the wall
-    /// clock at all.
+    /// ABI-S3 AC-2, re-expressed for the uniform-refusal gate.
+    ///
+    /// `ClockMonotonicNow` is `RepresentedUnavailable`, so the interpreter must
+    /// now REFUSE it — `RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE`, and the
+    /// refusal is the property under test here.
+    ///
+    /// **`ambient_dispatch` returns `Result<EvalVal, ()>`: the error is unit,
+    /// so the refusal REASON is erased at this boundary and `is_err()` passes
+    /// for any failure, including one introduced by accident.** The wall reads
+    /// are therefore not decoration — `ClockWallNow` is `NativeTested`, so
+    /// driving both through the same closure makes this two-sided: the helper
+    /// is shown still working at the moment the unavailable op is shown
+    /// refused. Without that, this is an unguarded negative.
+    ///
+    /// **The wall clock still steps BACKWARDS while this runs**, which was the
+    /// original positive control and is retained: a green refusal must not be
+    /// obtainable from a harness that cannot perturb anything.
+    ///
+    /// **RETIRED AND DEFERRED, not deleted.** The monotonic-non-decreasing
+    /// property this test used to carry is implementation evidence for an arm
+    /// that is still live and byte-unchanged. It cannot be re-homed in
+    /// `ken-host`, whose test backend returns a CONSTANT monotonic reading, so
+    /// it is inherited by name by the promotion node for `ClockMonotonicNow`,
+    /// which must extend that backend to capture values regardless.
     #[test]
-    fn ac2_monotonic_readings_survive_a_wall_clock_step_backwards() {
+    fn ac2_monotonic_is_refused_while_the_wall_clock_still_reads_and_steps_back() {
         let ids = console_ids();
         let clock = abi_s3_clock_ids();
         let mut host = CaptureHost::new(Vec::new());
@@ -8960,7 +8977,6 @@ mod px5b_effect_observation_tests {
         let mut resources = ken_host::ResourceTableV1::default();
 
         host.set_clock_script([3_000, 1_000]);
-        host.set_monotonic_script([10, 20]);
 
         let mut read = |operation, request| {
             ambient_dispatch(
@@ -8973,22 +8989,19 @@ mod px5b_effect_observation_tests {
                 &mut store,
                 None,
             )
-            .expect("clock reifies")
         };
 
         let wall_first = read(
             ken_host::HostOpV1::ClockWallNow,
             ken_host::CanonicalRequestV1::ClockWallNow,
-        );
+        )
+        .expect("ClockWallNow is NativeTested and must still reify");
         let wall_second = read(
             ken_host::HostOpV1::ClockWallNow,
             ken_host::CanonicalRequestV1::ClockWallNow,
-        );
-        let monotonic_first = read(
-            ken_host::HostOpV1::ClockMonotonicNow,
-            ken_host::CanonicalRequestV1::ClockMonotonicNow,
-        );
-        let monotonic_second = read(
+        )
+        .expect("ClockWallNow is NativeTested and must still reify");
+        let monotonic = read(
             ken_host::HostOpV1::ClockMonotonicNow,
             ken_host::CanonicalRequestV1::ClockMonotonicNow,
         );
@@ -9015,38 +9028,57 @@ mod px5b_effect_observation_tests {
              so the monotonic result is vacuous"
         );
 
-        // The property under test: the same perturbation leaves monotonic
-        // readings non-decreasing.
-        assert!(nanoseconds(&monotonic_second) >= nanoseconds(&monotonic_first));
-
-        // D1 at the type layer: the two clocks do not merely differ in value,
-        // they reify to DIFFERENT constructors, so a wall reading cannot be
-        // substituted where a monotonic one is required.
-        assert_eq!(constructor(&wall_first), clock.mkinstant_id);
-        assert_eq!(
-            constructor(&monotonic_first),
-            clock.mk_monotonic_instant_id
+        // THE PROPERTY UNDER TEST: an unavailable op is refused on the very
+        // path that just served an available one.
+        assert!(
+            monotonic.is_err(),
+            "ClockMonotonicNow is RepresentedUnavailable and must be refused \
+             by the interpreter path"
         );
-        assert_ne!(constructor(&wall_first), constructor(&monotonic_first));
+
+        // D1 at the type layer, re-expressed WITHOUT dispatching. The claim is
+        // that a wall reading cannot be substituted where a monotonic one is
+        // required, and that is a fact about the id table -- it was only ever
+        // incidentally routed through a dispatch.
+        assert_eq!(constructor(&wall_first), clock.mkinstant_id);
+        assert_ne!(clock.mkinstant_id, clock.mk_monotonic_instant_id);
     }
 
-    /// ABI-S3 AC-3. The deadline is a value, demonstrated by use rather than
-    /// by showing a field exists: a caller passes one, and the host observes
-    /// exactly that value. The second half is the discriminator -- a different
-    /// deadline must produce a different observation, otherwise the assertion
-    /// would hold for a host that ignored the argument entirely.
+    /// ABI-S3 AC-3, re-expressed for the uniform-refusal gate.
+    ///
+    /// `ClockSleepUntil` is `RepresentedUnavailable`, so the interpreter must
+    /// now REFUSE it — `RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE`.
+    ///
+    /// **The positive control is mandatory here and is not free, which is why
+    /// it is constructed rather than inherited.** `ambient_dispatch` returns
+    /// `Result<EvalVal, ()>` — a unit error, so the refusal reason is erased
+    /// and `is_err()` passes for *any* failure. Unlike its sibling, the
+    /// original of this test dispatched no available operation at all, so an
+    /// inverted version of it would be an unguarded negative: green whether
+    /// the gate refused the op or the helper was broken outright. The
+    /// `ClockWallNow` read below exists solely to make the refusal
+    /// discriminating.
+    ///
+    /// **RETIRED AND DEFERRED, not deleted.** The deadline-is-a-value property
+    /// and its discriminator are implementation evidence for an arm that is
+    /// still live and byte-unchanged. They cannot be re-homed in `ken-host`,
+    /// whose test backend signature is `clock_sleep_until(&mut self, _deadline:
+    /// u64)` — it records the op tag and **discards the deadline**, so the
+    /// claim is not expressible there without new capture surface. The
+    /// promotion node for `ClockSleepUntil` inherits both assertions by name
+    /// and must extend that backend to capture values regardless.
     #[test]
-    fn ac3_the_deadline_a_caller_passes_is_the_deadline_honoured() {
+    fn ac3_sleep_until_is_refused_on_a_path_that_still_serves_an_available_op() {
         let ids = console_ids();
         let clock = abi_s3_clock_ids();
         let mut store = EvalStore::new();
+        let mut host = CaptureHost::new(Vec::new());
+        let mut resources = ken_host::ResourceTableV1::default();
 
-        let mut sleep_with = |deadline: u64| -> Vec<ClockTrace> {
-            let mut host = CaptureHost::new(Vec::new());
-            let mut resources = ken_host::ResourceTableV1::default();
+        let mut dispatch = |operation, request| {
             ambient_dispatch(
-                ken_host::HostOpV1::ClockSleepUntil,
-                ken_host::CanonicalRequestV1::ClockSleepUntil { deadline },
+                operation,
+                request,
                 &mut host,
                 &mut resources,
                 &ids,
@@ -9054,18 +9086,32 @@ mod px5b_effect_observation_tests {
                 &mut store,
                 None,
             )
-            .expect("sleep reifies");
-            host.clock_trace().to_vec()
         };
 
-        assert_eq!(
-            sleep_with(4_242),
-            vec![ClockTrace::SleepUntil {
-                deadline: BigInt::from(4_242),
-            }]
+        // POSITIVE CONTROL, and the whole reason it is here: the helper is
+        // shown working on an available operation at the moment the
+        // unavailable one is shown refused. Without this the assertion below
+        // cannot distinguish a gate from a broken dispatcher.
+        assert!(
+            dispatch(
+                ken_host::HostOpV1::ClockWallNow,
+                ken_host::CanonicalRequestV1::ClockWallNow,
+            )
+            .is_ok(),
+            "ClockWallNow is NativeTested and must still reify, or the refusal \
+             below proves nothing"
         );
-        // Discriminator: the observation tracks the argument.
-        assert_ne!(sleep_with(4_242), sleep_with(9_999));
+
+        // THE PROPERTY UNDER TEST.
+        assert!(
+            dispatch(
+                ken_host::HostOpV1::ClockSleepUntil,
+                ken_host::CanonicalRequestV1::ClockSleepUntil { deadline: 4_242 },
+            )
+            .is_err(),
+            "ClockSleepUntil is RepresentedUnavailable and must be refused by \
+             the interpreter path"
+        );
     }
 
     /// ABI-S3 AC-3b at the DECODE boundary — a `Deadline` carrying a second
