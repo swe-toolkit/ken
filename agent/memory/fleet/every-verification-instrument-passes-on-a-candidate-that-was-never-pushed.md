@@ -71,7 +71,7 @@ and system scope, so the exposure is live rather than hypothetical.
 
 Everyone who verifies an exact SHA, which is more seats than it first appears:
 
-- the **Steward** routing a candidate (M1-M4),
+- the **Steward** routing a candidate (M1-M3a),
 - the **Architect** gating one,
 - the **lieutenant** before running the publisher,
 - **every build QA** — a verdict of the form *"QA APPROVED exact `<sha>`"* is

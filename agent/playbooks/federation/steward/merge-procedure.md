@@ -1,4 +1,4 @@
-# Merging: the nine-step procedure and corpus git routing
+# Merging: the M1-M9 procedure and corpus git routing
 
 Steward task procedure. Read at the point of use. Governing playbook:
 `../steward.md`.
@@ -15,10 +15,37 @@ seated lieutenant takes over), M4-M5 publish, M6-M9 run after it lands.**
 > Decision (M1), the exact SHA and its shape (M2), the cited sources (M3), then
 > **post the exact-SHA authorization at M3a** (`ROUTED: <SHA>` with the gates,
 > Decision, base, and self-verified diff scope, mentioning the **lieutenant**).
-> M4's token
-> mint and **M5-M9 are the lieutenant's** — it runs the publisher, verifies the
+> **M4-M9 are the lieutenant's**, starting at M4's token
+> mint — it runs the publisher, verifies the
 > landed tree, flips the node, compacts the Adversary, and closes the loop with
 > the ring. **You do not launch the publisher when a lieutenant is seated.**
+>
+> #### THIS BOUNDARY IS A NAME OTHER DOCUMENTS HOLD. RENUMBERING IS NEVER LOCAL.
+>
+> **If you ever move this split, the edit is not to this file — it is to every
+> file that states it.** Measured 2026-09-16, when `M3a` was inserted and the
+> boundary went from `M1-M4 / M5-M9` to `M1-M3a / M4-M9`: **six instruction
+> files outside this one carried the old spelling**, including
+> `steward.md`'s pointer *added an hour earlier*, which then named the range
+> excluding the very step it was added for. A pointer that misdirects is worse
+> than no pointer, because the reader stops looking.
+>
+> **Sweep by predicate, not by list** — a list cannot report being incomplete:
+> *any statement of WHICH STEPS BELONG TO WHICH SEAT, in a file a seat reads as
+> instruction.* That reaches beyond markdown: `moot.toml`'s `startup_prompt`
+> strings and `steward-watchdog-tick-prompt.txt` both state it, and both sit
+> outside a corpus sweep.
+>
+> **Records are not readers and must not be swept.** `docs/program/issues/**`,
+> `docs/program/wp/**`, `docs/program/diary/**` and `lanes.md`'s status rows
+> carry roughly a hundred mentions describing routings that happened under the
+> old spelling. Rewriting those falsifies the record. **Leave a records file
+> uniformly in the old spelling** — a mixture is worse than either end, because
+> then both spellings look current.
+>
+> ⇒ **The failure is structural, not careless: the file that owns a name cannot
+> enumerate its holders, and the holders cannot learn the name moved.** The only
+> defence is to treat a renumber as a cross-file act from the start.
 >
 > #### `ROUTED:` IS IRREVOCABLE. DO NOT POST IT WHILE A REVIEW IS EXPECTED.
 >
@@ -53,11 +80,13 @@ seated lieutenant takes over), M4-M5 publish, M6-M9 run after it lands.**
 > and learn the outcome from a mention (landed SHA, or a CI-red relay you
 > re-route on a *new* SHA).
 >
-> **M5-M9 below are still yours to run in the FALLBACK case — no lieutenant
+> **M4-M9 below are still yours to run in the FALLBACK case — no lieutenant
 > seated, or the operator tells you to publish directly** (e.g. your own §6a
 > corpus route). The steps are identical; only the seat that runs them changes.
-> Read M5-M9 as "the executor does X" — you when there is no lieutenant, the
-> lieutenant otherwise.
+> Read M4-M9 as "the executor does X" — you when there is no lieutenant, the
+> lieutenant otherwise. **M3a is never anyone else's**: even in the fallback you
+> post the authorization before you publish, because the gate it carries is
+> about whether a review is still expected, not about who runs the publisher.
 
 Whether a thing *should* land, and where the cut goes, is `merge-policy.md`.
 This file assumes that decision is made.
@@ -676,7 +705,7 @@ before you stop.
 ### M9a — Return your worktree to your home branch, after every merge
 
 **Executor step — the "keep `steward/work` fresh" rule below, generalized to
-whichever seat ran M5-M9.** Authoring the M7 close commit leaves your worktree
+whichever seat ran M4-M9.** Authoring the M7 close commit leaves your worktree
 on a `wp/...` branch; if you never switch back, it rests **detached** on a
 superseded close commit — a stale tip that misleads every "what has landed" read
 and is the state in which the branch namespace accretes. Measured 2026-08-23:

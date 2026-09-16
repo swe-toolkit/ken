@@ -1,7 +1,7 @@
 ---
 scope: roles/steward
 audience: (see scope README) — whoever builds the list of candidates owed
-  M1-M4, or decides that a resolved Decision still needs routing
+  routing (M1-M3a), or decides that a resolved Decision still needs routing
 source: 2026-09-14 — a §0 sweep opened by reading four seats' participant
   statuses as a work queue. All four candidates were already landed; routing
   the fourth would have regressed the tracker on main. Corrected same session

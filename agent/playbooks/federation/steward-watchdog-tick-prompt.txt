@@ -24,7 +24,7 @@ ARMING SOURCE. UNDER 4096 CHARS. `wc -c` before arming; never grow a step withou
 
 2e. COMPOSER STRANDS. Tell: `[Pasted Content ...]`, no Working footer. Repair: send `zz` (appends = real strand), check tail for a numbered modal (bare Enter downgrades the model), BSpace, then a BARE `Enter` as its OWN call. Never combine text and Enter. A leader's report is not a woken seat -- verify yourself.
 
-3. HELD FINISHED WORK IS TOP OF QUEUE. Route M1-M4 (`steward/merge-procedure.md`); lieutenant runs M5-M9. Check no publisher first: `ps -eo pid,ppid,etime,args | grep '[s]cripted-pr-automerge.sh'` and READ THE LISTING -- `grep -c` counts your own wrapper. Never fetch/commit while one holds its window. M1 needs a RESOLVED Decision read fresh from the object. M8a: COMPACT ADVERSARY before code-merge notify.
+3. HELD FINISHED WORK IS TOP OF QUEUE. Route M1-M3a (`steward/merge-procedure.md`); lieutenant runs M4-M9. M3a IS the `ROUTED:` post and is irrevocable -- do not post it while a review is still expected. Check no publisher first: `ps -eo pid,ppid,etime,args | grep '[s]cripted-pr-automerge.sh'` and READ THE LISTING -- `grep -c` counts your own wrapper. Never fetch/commit while one holds its window. M1 needs a RESOLVED Decision read fresh from the object. M8a: COMPACT ADVERSARY before code-merge notify.
 
 4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: ruling, QA verdict, handoff, routing, own kick.
 

@@ -45,7 +45,7 @@ surface, classify it by the TCB test, not by whether it is "correctness-bearing"
 or "a new mechanism." If it adds a kernel rule, primitive, axiom, trusted-base
 registrant, checked source-plan encoding, or runtime carrier — operator. If it is
 private compiler surface the kernel re-checks — FENCE it: Architect (required) +
-domain QA + Adversary -> Steward M1-M4 -> lieutenant, CI native==interp. Do not
+domain QA + Adversary -> Steward M1-M3a -> lieutenant, CI native==interp. Do not
 invent a "surface growth -> operator" gate; the operator has now said planner
 surface is not theirs to approve. A genuinely new operator-owned fork (TCB
 growth, a spec commitment, a scope fork) surfacing during the build is what comes

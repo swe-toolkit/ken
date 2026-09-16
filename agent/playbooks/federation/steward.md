@@ -299,11 +299,12 @@ the object DB) on the **exact SHA**, then post `ROUTED: <SHA>` to the
 **lieutenant**, which runs the publisher and closes the node. **`ROUTED:` is
 irrevocable — do not post it while a review is still expected; say the candidate
 is NOT authorized and post the bare `ROUTED:` once it clears** (a qualified
-`ROUTED, HOLD FOR …` is not protection; see `merge-procedure.md` M1-M4). **You do not
+`ROUTED, HOLD FOR …` is not protection; see `merge-procedure.md` **M3a**, the
+step that states this rule). **You do not
 launch publishers yourself when a lieutenant is seated** — one owner per merge
 (a Steward/lieutenant double-publish raced on 2026-08-23). The full split is
-`COORDINATION §14b`; your steps are M1-M4 of `steward/merge-procedure.md`, the
-lieutenant's are M5-M9. You run M5-M9 only in the fallback (no lieutenant, or
+`COORDINATION §14b`; your steps are M1-M3a of `steward/merge-procedure.md`, the
+lieutenant's are M4-M9. You run M4-M9 only in the fallback (no lieutenant, or
 the operator says publish directly).
 
 ## 4b. Sizing: the one-hour turn
@@ -453,7 +454,7 @@ need at the point of use; do not work from memory of it.
 | Releasing a WP: the five-step sequence and the handoff gate | `steward/release-and-handoff.md` |
 | Authoring a frame: fixed-input audits, per-WP-type patterns, ACs | `steward/frame-authoring.md` |
 | What lands on `main` and when: the accepted-base and partial-WP policies | `steward/merge-policy.md` |
-| Merging: the nine-step procedure and corpus git routing | `steward/merge-procedure.md` |
+| Merging: the M1-M9 procedure and corpus git routing | `steward/merge-procedure.md` |
 | Compaction: your own and the teams' | `steward/compaction.md` |
 | The daily briefing flush, delegated to a T2 subagent | `steward/briefing-flush.md` |
 | The watchdog and the comms-drop backstop | `steward/watchdog.md` |

@@ -7,7 +7,7 @@ scope: federation
 # Merge policy: what lands on `main`, and when
 
 Steward task procedure. Read at the point of use. Governing playbook:
-`../steward.md`. The mechanics of publishing — the nine-step M1-M9 gate — are
+`../steward.md`. The mechanics of publishing — the M1-M9 gate — are
 `merge-procedure.md`; this file is the decision that precedes it.
 
 Ask both questions at every release and every review vote.

@@ -33,7 +33,7 @@ exclusion.
 ## Why the routing post specifically
 
 The same sentence in a discussion thread gets weighed. In a routing post it
-inherits the authority of the M1-M4 gates sitting above it — the verified SHAs,
+inherits the authority of the M1-M3 gates sitting above it — the verified SHAs,
 the read-not-assumed approvals, the measured diffstat. **The reader cannot see
 where the measured part stops and the guessing starts**, because the format
 does not mark the boundary and the confident register is identical.
