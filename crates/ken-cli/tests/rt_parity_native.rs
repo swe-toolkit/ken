@@ -961,25 +961,31 @@ fn uint64_checked_wrapper_admits_max_and_rejects_both_neighbors() {
 // zero-capacity request as `BufferLimit` -- the wrong public variant, but not a
 // silent success (frame AC-4).
 
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 11 of 11.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it cannot observe in CarriedWord
+// Three annotation layers struck: a byte-span block claiming the row "refuses at
+// object emission, so the program never executes"; a D1a/D2 note below it saying
+// the byte-span observation "was not the blocker"; and a live label claiming the
+// row "next refuses because a carried recursive hypothesis is an eliminated
+// value, not a callable". None reproduces -- the program emits, both engines
+// execute, and the BytesPointerLength signature is absent from the output.
 //
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// The four px4b rows carry this same owner with the OPPOSITE provenance:
-// those were branch-introduced, this one predates the branch.
-// Annotation only -- test body and expectations are unchanged.
+// READMITTED ON A MUTATION, NOT ON THE GREEN, and the mutation is native-lane
+// only by construction. Changing the BufferAllocate arm's narrow-failure detail
+// in crates/ken-runtime/src/cranelift_backend/lowering/effects.rs
+// (RESOURCE_ERROR_INVALID_BOUNDS -> RESOURCE_ERROR_INVALID_OFFSET) reds this row
+// at the native axis-1 assertion:
+//
+//   buffer-allocate-single: native must observe exactly InvalidBounds;
+//     got EffectObservation { ..., terminal_exit: ReturnedError,
+//                             exit_status: 41 }
+//     left: 41   right: 0
+//
+// The interpreter assertion immediately above it still passes, because the
+// interpreter does not go through this lowering. So the red is a DIFFERENTIAL
+// against an untouched independent producer, not a self-check: the fixture exits
+// 0 only on InvalidBounds, and only the native lane stopped observing it.
 #[test]
-// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
-// FileError SiteOperand(0) could not project its carried word. D5 byte-span
-// observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
 fn buffer_allocate_malformed_capacity_narrows_to_invalid_bounds() {
     in_large_stack_thread("rt-parity-allocate", || {
         assert_narrowed_alike(

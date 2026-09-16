@@ -382,6 +382,31 @@ fn run_query() {
     assert!(cons_pos);
 }
 
+// RT-IGNORED-PASSING-ROWS, row 8 of 11: HELD IGNORED, and the ignore is
+// STRUCTURAL rather than a defect marker. It is the routing that makes
+// d0_distinct_recursive_map_requires_normal_child_exit below an instrument: that
+// parent re-launches this binary with `--exact d0_distinct_recursive_map_child
+// --ignored`, so the child runs exactly once, on the 2 MiB
+// CONVERSION_STACK_BYTES worker, and its normal exit is the measurement.
+//
+// READMITTING IT WOULD MAKE THE PARENT VACUOUS. Measured, not argued -- with the
+// ignore attribute removed, the child process the parent spawns reports
+//
+//   test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out
+//
+// because `--ignored` runs ONLY ignored tests and the child is no longer one.
+// The child process exits 0, the parent's assert!(status.success()) passes over
+// zero executed tests, and the parent stays green while measuring nothing. The
+// child meanwhile runs in the default suite on libtest's own worker stack, which
+// is not the fixed 2 MiB instrument the traceability above names.
+//
+// So this row is not a stale label to dispose of. Do not readmit it.
+//
+// Registered in .github/ignored-test-exemptions.toml as `policy-cost`, which is
+// the disposition the frame pre-classified for it (D-REGISTER). It is registered
+// rather than merely held so the sweep stops selecting it: a row that keeps
+// appearing in the passing-ignored population is a row somebody eventually
+// readmits.
 #[test]
 #[ignore = "fixed-2MiB-stack worker; run via d0_..._requires_normal_child_exit, \
             which asserts it now exits normally (it stack-overflowed pre-repair)"]

@@ -7367,32 +7367,40 @@ fn run_worker_fixture(expr: &RuntimeExpr) -> RuntimeObservation {
 /// This is also `AC-5`'s target-redirect red: the two workers are same-shape,
 /// so a call resolving to the other one's body is exactly a redirected target.
 //
-// Ignored pending RT-WORKER-FIXTURE-DECODE.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 9 of 11.
 //
-// Observed signature, exactly:
-//   the worker fixture runs: Backend(NativeResultDecode { token: 9 })
+// The struck annotation said the row "DIES AT ITS `expect` BEFORE REACHING A
+// SINGLE ASSERTION" -- "the worker fixture runs: Backend(NativeResultDecode
+// { token: 9 })" -- so that all three assert_ne! comparisons were unreachable.
+// That is refuted: the fixture compiles and runs, no decode signature appears,
+// and the three comparisons execute. They are what makes this row evidence.
 //
-// Owner node: RT-WORKER-FIXTURE-DECODE.
-// Pre-existing base debt, NOT a bind-order regression: fails at base
-// 21fd46dc with this same signature, measured two-ended at both refs and
-// with the CI feature px8-ds-test-support both on and off.
+// AND THE DOC COMMENT ABOVE IS NARROWED RATHER THAN RESTORED. AC-5's
+// target-redirect red is discharged by
+// ac5_redirecting_the_resolved_worker_target_reds_the_same_shape_witness, which
+// drives StaticWorkerMutation::RedirectResolvedWorkerTarget at the D4 transport
+// seam on this same fixture and is not ignored. It refutes a redirect by the
+// seam's own origin check, at compile time. This row asserts something that
+// control does not: that the three linked RESULTS are pairwise distinct, which
+// is an end-to-end distinguishability property rather than a resolution check.
 //
-// IT DIES AT ITS `expect` BEFORE REACHING A SINGLE ASSERTION. The panic is
-// on the row's FIRST statement, inside `run_worker_fixture` at the
-// `.expect("the worker fixture runs")`, so all three `assert_ne!`
-// comparisons below are unreachable at both refs.
+// READMITTED ON A MUTATION, NOT ON THE GREEN. Broadcasting the first stored
+// capture across the worker call's capture run in
+// crates/ken-runtime/src/cranelift_backend/lowering/calls.rs (the
+// single `inputs.extend(worker.captures...)` that appends stored captures) reds
+// the first comparison with the collapse visible in it:
 //
-// Read the doc comment above accordingly: AC-5's target-redirect red is
-// NOT discharged by this row and is not discharged by ignoring it -- the
-// comparisons that would detect a redirected target have never run here.
-// Ignoring it switches off nothing that was working, and un-ignoring it
-// later is NOT the repair. A genuine capture-order regression would present
-// as two configurations comparing EQUAL, an `assert_ne!` firing; it cannot
-// present as a fixture that will not execute, which is why this row is not
-// evidence about the source-body binding order in either direction.
-// Annotation only -- test body, expect, and assertions are unchanged.
+//   left  Returned(Constructor { "ctor:fixture::Pair::Both",
+//                                [Int(Small(10)), Int(Small(10))] })
+//   right Returned(Constructor { "ctor:fixture::Pair::Both",
+//                                [Int(Small(10)), Int(Small(10))] })
+//
+// Two configurations that differ only in which capture the first worker's body
+// selects become identical once every capture slot carries capture 0. That is
+// exactly the shape the struck annotation said a genuine capture-order
+// regression would take -- "two configurations comparing EQUAL, an assert_ne!
+// firing" -- and this row can now present it.
 #[test]
-#[ignore = "RT-WORKER-FIXTURE-DECODE: the worker fixture cannot run, so the AC-5 comparisons are unreachable; fails at base 21fd46dc"]
 fn two_same_shape_workers_are_distinguished() {
     let baseline = run_worker_fixture(&two_same_shape_workers(1, 1, false));
     let body_swapped = run_worker_fixture(&two_same_shape_workers(2, 1, false));

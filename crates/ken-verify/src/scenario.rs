@@ -3438,6 +3438,35 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     /// The wrong-subject controls independently violate ordering, the measured
     /// window, exact Clock event shape, and a non-clock observation field. Each
     /// must be rejected by the same projection that accepts the real pair.
+    //
+    // WHY THE NAIVE FORM OF THIS GATE IS NOT A GATE. Relocated here under
+    // RT-IGNORED-PASSING-ROWS, row 10 of 11, disposition D-RELOCATE. An ignored
+    // companion test used to sit below this one asserting the raw real-clock
+    // observations do NOT compare exactly, labelled "ABI-A1 D4: demonstrates why
+    // exact instant equality is wrong". The operator pre-decided that the claim
+    // belongs in a comment and not in an ignored test, so the test is deleted and
+    // the claim is here, attached to the gate it is about.
+    //
+    // MEASURED, not asserted. Freezing both lanes' wall clocks to one constant --
+    // ken-host abi_v1.rs clock_wall_now and ken-interp eval.rs PosixHost
+    // clock_wall_now, the two independent real sources -- does NOT red an exact
+    // comparison of the raw observations. It reds this projection's own lawfulness
+    // check first:
+    //
+    //   both observations are individually lawful: OutsidePlausibleWindow {
+    //     lane: "interpreter", reading: 1700000000000000000,
+    //     start_nanoseconds: 1789535739078771665,
+    //     end_nanoseconds:   1789535739341153605 }
+    //
+    // Any perturbation that makes the two lanes' instants EQUAL must also move
+    // them outside the measured wall window. So "the raw observations differ" has
+    // no failing direction reachable by perturbing the clock: what it rests on is
+    // two real reads landing at different nanoseconds inside a window measured at
+    // about 262 ms -- a scheduling and clock-resolution fact, not a contract.
+    // A gate that can only go red for reasons outside the contract is a flake.
+    //
+    // That is the whole content of the deleted row, and it is why THIS test, which
+    // normalizes before comparing, is the one that can be a gate.
     #[test]
     fn clock_wall_now_normalized_real_artifact_differential_discriminates() {
         let run = execute_scenario(&clock_wall_scenario())
@@ -4586,23 +4615,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 ));
             }
         }
-    }
-
-    /// Promise class: durable-invariant companion control. ABI-A1 D4 is
-    /// intentionally ignored: exact instant
-    /// equality is the wrong live gate, but running it manually demonstrates
-    /// that two correct real lanes differ before normalization.
-    #[test]
-    #[ignore = "ABI-A1 D4: demonstrates why exact instant equality is wrong"]
-    fn clock_wall_now_naive_exact_equality_is_wrong_on_correct_real_clocks() {
-        let run = execute_scenario(&clock_wall_scenario())
-            .expect("ClockWallNow real-artifact differential executes");
-        run.compare_clock_wall_now()
-            .expect("both observations are individually lawful");
-        assert!(
-            run.compare_exact().is_err(),
-            "the raw real-clock observations unexpectedly compared exactly"
-        );
     }
 
     // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.

@@ -547,23 +547,34 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 "#;
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIED-RESOURCE-SCALAR.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 6 of 11.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsHandleMetadata needs ResourceScalar,
-//     which it cannot observe in CarriedWord
+// The struck label read: "RT-CARRIED-RESOURCE-SCALAR: the FsHandleMetadata seat
+// cannot observe a carried word as a resource scalar; fails at base 21fd46dc",
+// and the block above it claimed the row "refuses at object emission, so the
+// program never executes". Refuted POSITIVELY, not just by absence: the native
+// effect-operation sequence for this row is [FsOpen, ResourceRelease,
+// FsHandleMetadata]. The seat the label says cannot observe a carried word
+// appears in the trace, having observed one.
 //
-// Owner node: RT-CARRIED-RESOURCE-SCALAR.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// A ResourceScalar need, not a byte-span one, despite sharing a refusal
-// shape with most of this file. It must not be filed as a byte-span row.
-// Annotation only -- test body and expectations are unchanged.
+// READMITTED ON A MUTATION, NOT ON THE GREEN. Duplicating the live native
+// dispatch event push in ken-host abi_v1.rs (the sole producer of the native
+// effect trace, in ken_host_dispatch after dispatch_host_op_v1 returns) reds the
+// canonical effect-operation-sequence assertion with the perturbation visible in
+// it -- every native op appearing twice against the interpreter's single
+// sequence. The interpreter side is untouched by that edit and is an independent
+// producer, which is what makes the comparison an oracle rather than a
+// self-check.
+//
+// TWO EARLIER MUTATIONS DID NOT ESTABLISH IT AND ARE RECORDED BECAUSE THEY ARE
+// WHY THE THIRD IS TRUSTWORTHY. Duplicating the settlement event in
+// record_resource_settlements left both rows GREEN: that is the process-exit
+// finalize-all path, and these resources are released before termination, so it
+// never reaches. Duplicating the live push without cloning the request FAILED TO
+// COMPILE (E0382, CanonicalRequestV1 is not Copy) -- a red that is not a probe
+// result, which is exactly the four-producer aggregate a colour reading cannot
+// separate. Both were read from the output, not from the exit code.
 #[test]
-#[ignore = "RT-CARRIED-RESOURCE-SCALAR: the FsHandleMetadata seat cannot observe a carried word as a resource scalar; fails at base 21fd46dc"]
 fn escape_one_used_matches_interpreter() {
     let diff = differential("escape-one-used", ESCAPE_ONE_USED);
     assert_eq!(diff.native.exit_status, 0, "{:?}", diff.native);
@@ -571,24 +582,34 @@ fn escape_one_used_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 7 of 11.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength,
-//     which it cannot observe in CarriedWord
+// Three annotation layers struck: a byte-span block claiming the row "refuses at
+// object emission, so the program never executes"; a D1a/D2 note below it saying
+// the byte-span observation "was not the blocker"; and a live label claiming the
+// row "next refuses because a carried recursive hypothesis is an eliminated
+// value, not a callable". None reproduces. The program emits, executes, exits 0,
+// and its native effect-operation sequence is [FsOpen, ResourceRelease],
+// matching the interpreter's.
 //
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// Annotation only -- test body and expectations are unchanged.
+// READMITTED ON A MUTATION, NOT ON THE GREEN. Duplicating the live native
+// dispatch event push in ken-host abi_v1.rs (the sole producer of the native
+// effect trace, in ken_host_dispatch after dispatch_host_op_v1 returns) reds the
+// canonical effect-operation-sequence assertion with the perturbation visible in
+// it -- every native op appearing twice against the interpreter's single
+// sequence. The interpreter side is untouched by that edit and is an independent
+// producer, which is what makes the comparison an oracle rather than a
+// self-check.
+//
+// TWO EARLIER MUTATIONS DID NOT ESTABLISH IT AND ARE RECORDED BECAUSE THEY ARE
+// WHY THE THIRD IS TRUSTWORTHY. Duplicating the settlement event in
+// record_resource_settlements left both rows GREEN: that is the process-exit
+// finalize-all path, and these resources are released before termination, so it
+// never reaches. Duplicating the live push without cloning the request FAILED TO
+// COMPILE (E0382, CanonicalRequestV1 is not Copy) -- a red that is not a probe
+// result, which is exactly the four-producer aggregate a colour reading cannot
+// separate. Both were read from the output, not from the exit code.
 #[test]
-// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
-// FileError SiteOperand(0) could not project its carried word. D5 byte-span
-// observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
 fn escape_resource_plus_plain_matches_interpreter() {
     let diff = differential("escape-res-plus-plain", ESCAPE_RESOURCE_PLUS_PLAIN);
     assert_eq!(diff.native.exit_status, 0, "{:?}", diff.native);

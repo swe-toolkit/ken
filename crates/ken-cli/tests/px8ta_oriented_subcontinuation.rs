@@ -232,27 +232,30 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
+// Readmitted under RT-IGNORED-PASSING-ROWS, row 4 of 11.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength,
-//     which it cannot observe in CarriedWord
+// This row carried THREE layers of annotation, each refuting the one above it
+// and all three still present. They are struck together rather than appended to:
 //
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// Its depth-2 sibling in this file refuses with the CLOSURE-lane
-// signature instead, under a different owner. Same file, same shape
-// of test, genuinely different cause -- they are not interchangeable.
-// Annotation only -- test body and expectations are unchanged.
+//   1. "Ignored pending RT-CARRIER-BYTESPAN-OBSERVE ... it refuses at object
+//      emission, so the program never executes" -- refuted by layer 2, three
+//      lines below it, and by the row: the program emits, executes, exits 0.
+//   2. "RT-SITEOP-CARRIED-WITNESS D1a/D2 ... D5 byte-span observation was not
+//      the blocker" -- the correction to layer 1, filed below it.
+//   3. "RT-SITEOP-CARRIED-WITNESS D2: ... this row next refuses because a
+//      carried recursive hypothesis is an eliminated value, not a callable" --
+//      the live label. Does not reproduce: no refusal, and neither the
+//      byte-span nor the eliminated-value signature appears in any run.
+//
+// READMITTED ON A MUTATION, NOT ON THE GREEN. Perturbing the ResourceRelease
+// arm of ken-host effect_v1.rs dispatch (the Target binding pushed from
+// pending.identity, +1000) reds the strict-LIFO assertion in
+// assert_depth_finishes_and_releases_lifo -- releases against opens reversed --
+// with the perturbation visible in it: left [ResourceTraceIdentityV1(1001)]
+// against right [ResourceTraceIdentityV1(1)]. An earlier mutation of abi_v1.rs
+// record_resource_settlements left the row green: that is the process-exit
+// finalize-all path, and a bracket that releases explicitly never reaches it.
 #[test]
-// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
-// FileError SiteOperand(0) could not project its carried word. D5 byte-span
-// observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
 fn public_one_level_bracket_finishes_and_releases() {
     assert_depth_finishes_and_releases_lifo(1);
 }
@@ -384,6 +387,11 @@ const PX8DS_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
 // separately provisioned thread. It is invoked explicitly by targeted Runtime
 // validation rather than by the default package suite. The assertions pin a
 // successful false branch with one Console observation and one release.
+//
+// Registered in .github/ignored-test-exemptions.toml as `policy-cost` under
+// RT-IGNORED-PASSING-ROWS, the disposition the frame pre-classified for it
+// (D-REGISTER). Its ignore is a standing cost decision, not a defect, so it
+// should never have been a sweep finding in either direction.
 #[test]
 #[ignore = "focused native resource-cost row; run outside default suite"]
 fn px8ds_real_same_depth_path_runs_exact_edges() {

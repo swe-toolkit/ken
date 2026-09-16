@@ -32,3 +32,13 @@ readmission = "after integer division registration, assert V2 emits the non-zero
 test_path = "ken-interp::l1_acceptance::sec24_char_excludes_surrogates"
 class = "placeholder-no-assertions"
 readmission = "after Char literal syntax, assert a valid scalar accepts and a surrogate rejects"
+
+[[exemption]]
+test_path = "ken-kernel::recursive_head_totality_d0::d0_distinct_recursive_map_child"
+class = "policy-cost"
+readmission = "not applicable: d0_distinct_recursive_map_requires_normal_child_exit is the standing gate and drives this worker on a fixed 2 MiB stack via --ignored; un-ignoring it filters the worker out of its own parent's invocation, so the parent passes over zero executed tests"
+
+[[exemption]]
+test_path = "ken-cli::px8ta_oriented_subcontinuation::px8ds_real_same_depth_path_runs_exact_edges"
+class = "policy-cost"
+readmission = "not applicable: a focused native resource-cost row, invoked explicitly by targeted Runtime validation rather than by the default package suite; the standing gate for the same lowering is the non-ignored px8ds_retired_flat_order_does_not_gain_m4_representation in the same binary"
