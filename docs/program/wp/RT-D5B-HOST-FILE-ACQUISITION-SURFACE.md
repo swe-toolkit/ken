@@ -115,21 +115,79 @@ thing that sentence forbids. `D4` (`cf894cdb5`) and `D5a-core` (`29f64ff6f`)
 being merged is a reason to *expect* the differential to pass. It is not the
 differential.
 
-### 4a. The flip is FOUR coordinated sites, and two of them are compiler-enforced
+### 4a. The flip is FIVE coordinated sites, and two of them are compiler-enforced
 
-Verified by the Steward at `origin/main` `44bfc228d`, independently of the
-ruling:
+**CORRECTED 2026-09-16. This section said FOUR and it was wrong.** The fifth was
+found by runtime-implementer mid-slice (`evt_4v238vct498`), ruled in by the
+Architect (`evt_4kxywcq3nzsyf`), and re-measured by the Steward at `origin/main`
+`e11341c7b9d11cd74879d27d555d2a5729837847`. **`AC-AVAIL` is keyed to this list,
+so the list being short made the AC short.**
 
     1  effect_abi_v1.catalog            25 native / 10 unavailable
     2  effect_v1.rs:193                 MappingAcquireFile => RepresentedUnavailable
     3  NATIVE_TESTED_TARGETS_V1    [HostOpV1; 25], MappingAcquireFile ABSENT
     4  static_transition/effects.rs:~624   10-op `=> None` arm, op NAMED
+    5  effect_v1.rs:558-568   host_effect_wire_layout_v1's 10-op arm, op NAMED,
+                              body is `return Err(OperationUnavailable(operation))`
 
-All four agree at 10/25. Two enforce themselves: site 3's length is part of the
+All five agree at 10/25. Two enforce themselves: site 3's length is part of the
 array's type, and site 4 names its members rather than wildcarding them — its
 own comment says *"naming them is what makes promoting one to the admitted set
 a compile error here rather than an operation whose seats silently answer
 `None`."* A partial promotion does not compile.
+
+#### The real defect was the LIST, and the fix is a PREDICATE
+
+**A list of four could not tell anyone it was missing a fifth.** `AC-AVAIL` was
+keyed to an enumeration I measured once, so the AC's bar was silently whatever
+my census happened to catch. The implementer found site 5 by building, not by
+reading the frame — the frame had no way to say "and anything else meeting this
+rule."
+
+**Membership rule (this is the bar; the five above are its instances at
+`origin/main` e11341c7b9d1, not the definition):**
+
+> A site is availability-bearing for op `X` iff changing *only* `X`'s membership
+> there changes whether `X` is represented as available — i.e. the construct's
+> behaviour for `X` is *determined by* that membership.
+
+**Its falsifier, which is what makes it checkable:** find a member whose removal
+leaves `X`'s availability unchanged. Run it on the `:442` arm and it fails to
+qualify — `:442` co-lists `ConsoleRead`, which is `native`, so membership there
+is compatible with either availability and determines nothing. Run it on site 5
+and it qualifies: the entire body is
+`return Err(OperationUnavailable(operation))`, so membership *is* the unavailable
+claim, and a control at `:5960-5965` asserts exactly that for this op.
+
+⇒ **Judge an arm by what its body means for the op, never by whether the op
+appears in it.** Shape is not the criterion: sites 4 and 5 and the `:442` arm are
+all multi-op `|` arms naming `MappingAcquireFile`, and only two of the three are
+sites.
+
+**`AC-AVAIL` is satisfied by the rule, not by the count.** A sixth site found
+later is an instance of the same bar, not an amendment to it — surface it, do
+not treat the list as closed.
+
+**Site 5 splits into a PAIR of hunks and neither half is separable.** The flip
+adds a real wire layout for the op *and* removes it from the unavailable arm.
+Taking only the first yields an op with a layout that still refuses; taking only
+the second yields an op that falls through to no layout. That is why this slice
+takes neither, and why `host_effect_wire_layout_v1(MappingAcquireFile)` keeps
+returning `OperationUnavailable` after it lands. **That is intended, not an
+oversight** — the slice lands the types and dispatch plumbing while the op stays
+unreachable through the wire layout, which is what an unflipped surface means.
+
+**Unrelated stale count, found while verifying this and recorded so the flip
+slice does not inherit it.** Site 5's own comment (`:554-557`) reads *"the
+twenty-two matched above are exactly the `NativeTested` set."* Measured at
+`origin/main`: the arms above match **25** distinct variants, the unavailable
+arm names 10, and `HostOpV1` has exactly 35 — a clean 25/10 partition, and
+`NATIVE_TESTED_TARGETS_V1` is `[HostOpV1; 25]`. **The comment is stale by
+three.** The mechanism it describes is sound (the correspondence is asserted by
+name in tests, not left to two lists agreeing by coincidence); only the number
+is wrong. Not this slice's to fix — it is a comment, and touching it would put a
+non-surface edit in the file set — but whoever does the flip will be reading
+that sentence while changing that arm.
 
 **Site 4 lives in `cranelift_backend`.** That is a sequencing fact worth
 carrying: **the later flip slice cannot be backend-free**, so it cannot be cut
@@ -160,22 +218,40 @@ site advertising support.
 
 ## 5. Acceptance
 
-**AC-AVAIL (the bar). ALL FOUR availability sites are unchanged, and the AC is
-stated as four sites rather than as "the catalog is untouched."** A one-site AC
-cannot see a partial promotion, and three agreeing classifiers with one
-disagreeing is exactly this defect's shape.
+**AC-AVAIL (the bar). EVERY availability-bearing site for `MappingAcquireFile`
+is unchanged.** The bar is §4a's membership rule, not a fixed count — a list
+cannot report being incomplete, which is how this AC shipped keyed to four sites
+when there are five. A one-site AC cannot see a partial promotion, and four
+agreeing classifiers with one disagreeing is exactly this defect's shape.
+
+The instances at `origin/main` `e11341c7b9d1`, **five of them**:
 
     1  effect_abi_v1.catalog       byte-identical to its origin/main blob
        control: git rev-parse <cand>:crates/ken-host/effect_abi_v1.catalog
                 == the origin/main blob   (and row 0407 still reads `unavailable`)
-    2  effect_v1.rs                MappingAcquireFile => RepresentedUnavailable
+    2  effect_v1.rs:193            MappingAcquireFile => RepresentedUnavailable
     3  NATIVE_TESTED_TARGETS_V1    still [HostOpV1; 25], MappingAcquireFile absent
     4  static_transition/effects.rs  MappingAcquireFile still named in the
                                       10-op `=> None` arm
+    5  effect_v1.rs:558-568        MappingAcquireFile still named in
+                                   host_effect_wire_layout_v1's 10-op
+                                   OperationUnavailable arm; and
+                                   host_effect_wire_layout_v1(MappingAcquireFile)
+                                   still returns Err(OperationUnavailable),
+                                   asserted at :5960-5965
 
 Counts stay at **10 unavailable / 25 native** on every side. Note sites 3 and 4
 are compiler-enforced, so a candidate that breaks them fails to build rather
-than failing review — the AC exists to catch the two that are not.
+than failing review — the AC exists to catch the three that are not.
+
+**Site 5's held state is explicitly in scope, and its consequence is intended.**
+After this slice, `host_effect_wire_layout_v1(MappingAcquireFile)` still refuses:
+the slice lands the types and the dispatch plumbing while the op remains
+unreachable through the wire layout. A reviewer should confirm that as the
+intended meaning of an unflipped surface, not read it as an omission.
+
+**If a sixth site is found, it is in scope by the rule and does not need this
+frame amended** — report it, hold it, and say so in the PR body under `AC-D0`.
 
 **The flip is a later slice and its AC is the artifact differential the code
 already names** (`effect_v1.rs:249-251`), not a reviewer's assessment that the
