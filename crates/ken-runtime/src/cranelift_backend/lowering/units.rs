@@ -4486,7 +4486,48 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     // ledger keyed per word but populated from one arm promises
                     // coverage over a domain its population never covers, so the
                     // key would read as the closure without being one.
-                    if realized_call_words.contains(&publication.returned_word) {
+                    //
+                    // `D1` SEED, edit 2 of 2 -- ARM 1 CONSULTS WHAT SEED
+                    // PRODUCES. This arm used to discharge a
+                    // CONSTRUCTOR-IDENTITY obligation from evidence containing
+                    // no constructor identity: a PLANNED identity
+                    // (`independent_contract`, itself
+                    // `emission.row.k_ret_identity()`) compared against the
+                    // demand, plus a realization fact about the word.
+                    //
+                    // ⛔ THE MAP TO CONSULT IS `call_seeds`, NOT
+                    // `body.authorities`. `publication.returned_word` IS A CALL
+                    // RESULT WORD -- the check just above passes on it, and
+                    // `realized_call_words` is populated from nothing but
+                    // `obligation.result_word`. `body.authorities` records what
+                    // THIS BODY CONSTRUCTED, so looking a call-result word up in
+                    // it is a category error and is `None` by construction.
+                    // `call_seeds` is inserted under `obligation.result_word` --
+                    // the same key -- so it is the well-typed lookup on a key
+                    // this arm already has in hand.
+                    //
+                    // AND IT IS A TWO-VALUE CHECK, WITH TWO PRODUCERS:
+                    //   call_seeds[word]  the CALLEE's declared result contract,
+                    //                     carried by a certificate arm 2 proved
+                    //                     against the CALLEE's own authorities
+                    //   identity          this body's own
+                    //                     `emission.row.k_ret_identity()`, since
+                    //                     arm 1 is selected on
+                    //                     `independent_contract == Some(identity)`
+                    // Two bodies, two declarations. It refutes exactly when a
+                    // response owner publishes a word from a K call whose proved
+                    // identity differs from the identity the owner declares it
+                    // returns. Nothing is synthesized: every value here was put
+                    // there by a real declaration.
+                    //
+                    // Realization stays NECESSARY and stops being SUFFICIENT,
+                    // and an absent or disagreeing seed REFUSES rather than
+                    // passes. This is inert without edit 1 -- `call_seeds` is
+                    // populated only for obligations whose `identity` is `Some`
+                    // -- so the two edits are coupled and land together.
+                    let realized = realized_call_words.contains(&publication.returned_word);
+                    let seeded = call_seeds.get(&publication.returned_word).copied();
+                    if realized && seeded == Some(identity) {
                         discharge_sources.insert(publication.returned_word);
                         true
                     } else {
@@ -6871,10 +6912,31 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
                 .iter_mut()
                 .find(|obligation| obligation.result_word == returned.word)
             {
+                // `D1` SEED, edit 1 of 2 -- STOP THE DISCARD. This block used to
+                // set `obligation.identity = None`, and it is the only site in
+                // the backend that can produce `(realization_required = true,
+                // identity = None)` -- measured at 12 census entries across both
+                // binaries and at none of the other 105 obligations.
+                //
+                // WHAT IT WAS THROWING AWAY IS THE INDEPENDENT VALUE. At
+                // `calls.rs:2478` the obligation is born carrying
+                // `target.result_contract.map(DeclaredResultContract::identity)`
+                // -- THE CALLEE'S OWN DECLARED RESULT CONTRACT. It is not
+                // derived from `emission.row`, it is not in scope at this
+                // owner's emission site, and it belongs to a different unit.
+                // Keeping it is what gives arm 1 a second value to compare
+                // against this owner's own `k_ret_identity()`.
+                //
+                // ⛔ It is NOT overwritten with anything of this body's. Seeding
+                // the owner's planned identity here would put one value on both
+                // sides of the comparison, which is the vacuity this repair
+                // exists to avoid.
+                //
+                // `realization_required` is left exactly as it was. Why this
+                // site forces it true on a callee that declared nothing is a
+                // SEPARATE question and a separate node (fence 3); this change
+                // must not be read as closing it.
                 obligation.realization_required = true;
-                // The owner's exact tag/arity guards refine this realized word;
-                // a declaration on the K call is not consumed as identity proof.
-                obligation.identity = None;
             }
             let exact_ret_identity = emission.row.k_ret_identity();
             let exact_ret_abi_word = exact_ret_identity.tag_abi_word()?;
@@ -6959,6 +7021,22 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitOwnerDefinition) {
             continue;
         }
+        // `D1` -- DISPOSITION OF THE STAMP. KEPT, unchanged in value, with its
+        // meaning narrowed rather than assumed still correct.
+        //
+        // WHAT IT IS: a ROUTE TAG and an ARM SELECTOR. It is `Some(..)` at
+        // exactly this Response staging site and `None` at the Continuation and
+        // Context sites, so `is_some()` holds exactly when `unit` is `Response`.
+        // At the arm split the test is an EQUALITY, not a presence test, so it
+        // also separates a demand matching this owner's own Ret identity from
+        // one that does not -- the `Some(other)` case is live, not dead code.
+        //
+        // WHAT IT IS NO LONGER: the discharge's evidence. Before `D1` this
+        // planned value was compared against the demand and, with a realization
+        // fact about the word, DISCHARGED a constructor-identity obligation -- a
+        // plan standing in for an observation. It is now ONE SIDE of a two-value
+        // comparison whose other side is the callee's own declared result
+        // contract, reaching arm 1 through `call_seeds`.
         let independent_contract = emission.row.k_ret_identity();
         let publication = FunctionResultPublication {
             frame: finished_body.frame,
