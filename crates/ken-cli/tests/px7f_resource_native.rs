@@ -267,7 +267,6 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // is not a byte-span row and must not be filed under one.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CARRIED-RESOURCE-SCALAR: the FsHandleMetadata seat cannot observe a carried word as a resource scalar; fails at base 21fd46dc"]
 fn linked_public_escape_is_exact_closed() {
     let observation = run("escape-closed", ESCAPE_CLOSED);
     assert_eq!(observation.exit_status, 0, "{observation:?}");
