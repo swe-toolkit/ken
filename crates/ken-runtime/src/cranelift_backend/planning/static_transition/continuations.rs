@@ -2598,6 +2598,30 @@ fn record_worker_prefix_deferral(row: WorkerPrefixDeferral) {
     });
 }
 
+pub(super) fn checked_frame_for_consumer(
+    plan: &StaticTransitionPlan<'_>,
+    consumer: StaticOriginId,
+) -> Result<Option<u64>, CraneliftBackendError> {
+    let mut frames = Vec::new();
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        let RuntimeExpr::CheckedSubcontinuationFrame { frame_id, .. } = occurrence.expr else {
+            continue;
+        };
+        if plan.semantic.child_origin(occurrence.static_origin, 0)? == consumer {
+            frames.push(*frame_id);
+        }
+    }
+    frames.sort_unstable();
+    frames.dedup();
+    match frames.as_slice() {
+        [] => Ok(None),
+        [frame] => Ok(Some(*frame)),
+        _ => Err(planner_error(
+            "one post-call computational consumer is wrapped by more than one checked frame",
+        )),
+    }
+}
+
 fn continuation_result_positions(
     plan: &StaticTransitionPlan<'_>,
     root_context: &SourceReturnContextTemplate,

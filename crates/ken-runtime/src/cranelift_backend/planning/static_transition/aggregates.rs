@@ -220,6 +220,111 @@ pub(in crate::cranelift_backend) struct CheckedIhEnvironmentTransport {
     )>,
 }
 
+/// Construction authority for a required consumer paired with the exact
+/// emitted call whose Result is its before-value. The generated-entry quotient
+/// remains unchanged; this discriminator is carried beside it.
+mod required_consumer_destination {
+    use super::super::continuations::{
+        checked_frame_for_consumer, SourceReturnContextRole,
+    };
+    use super::*;
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub(in crate::cranelift_backend) struct RequiredConsumerDestination {
+        defining_transport: CheckedIhEnvironmentTransport,
+        consumer_occurrence: (StaticOriginId, Option<u64>),
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub(in crate::cranelift_backend) struct RequiredConsumerCall {
+        destination: RequiredConsumerDestination,
+    }
+
+    pub(in crate::cranelift_backend::planning::static_transition) fn
+    pair_detached_required_consumer(
+        plan: &StaticTransitionPlan<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        projection: &super::super::continuations::SourceReturnContextTemplate,
+    ) -> Result<RequiredConsumerCall, CraneliftBackendError> {
+        #[cfg(feature = "px8-ds-test-support")]
+        let transport = required_consumer_defining_transport(plan, transport)?;
+        // Template steps run root-to-result; reversing selects the first
+        // computational consumer reached by this exact result on return.
+        let consumer_origin = projection
+            .steps()
+            .iter()
+            .rev()
+            .find_map(|step| {
+                matches!(
+                    step.role(),
+                    SourceReturnContextRole::ComputationalMatchCase(_)
+                )
+                .then_some(step.parent_origin())
+            })
+            .ok_or_else(|| {
+                planner_error(
+                    "an exact detached required consumer has no computational occurrence",
+                )
+            })?;
+        let consumer_occurrence = (
+            consumer_origin,
+            checked_frame_for_consumer(plan, consumer_origin)?,
+        );
+        let destination = RequiredConsumerDestination {
+            defining_transport: transport.clone(),
+            consumer_occurrence,
+        };
+        Ok(RequiredConsumerCall { destination })
+    }
+
+    impl RequiredConsumerCall {
+        pub(in crate::cranelift_backend) fn destination(
+            &self,
+        ) -> &RequiredConsumerDestination {
+            &self.destination
+        }
+    }
+
+    impl RequiredConsumerDestination {
+        pub(in crate::cranelift_backend) fn defining_transport(
+            &self,
+        ) -> &CheckedIhEnvironmentTransport {
+            &self.defining_transport
+        }
+
+        pub(in crate::cranelift_backend) fn defining_call_identity(
+            &self,
+        ) -> &ContinuationCallIdentity {
+            self.defining_transport.source_call_identity()
+        }
+
+        pub(in crate::cranelift_backend) fn defining_owner(
+            &self,
+        ) -> ContinuationEmissionOwner {
+            self.defining_transport.destination_owner
+        }
+
+        pub(in crate::cranelift_backend) fn defining_body_origin(&self) -> StaticOriginId {
+            self.defining_transport.destination_body_origin
+        }
+
+        pub(in crate::cranelift_backend) fn defining_result_origin(&self) -> StaticOriginId {
+            self.defining_transport.source_result_origin
+        }
+
+        pub(in crate::cranelift_backend) fn consumer_occurrence(
+            &self,
+        ) -> (StaticOriginId, Option<u64>) {
+            self.consumer_occurrence
+        }
+    }
+}
+
+pub(super) use required_consumer_destination::pair_detached_required_consumer;
+pub(in crate::cranelift_backend) use required_consumer_destination::{
+    RequiredConsumerCall, RequiredConsumerDestination,
+};
+
 /// Which destination environment one transported continuation input indexes.
 /// The domain tag is part of the morphism; the same integer in these two
 /// frames is not the same coordinate.
