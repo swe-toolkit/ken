@@ -1,7 +1,7 @@
 ---
 id: SPEC-MEMBERSHIP-CLASS-CONTRACT
 title: "the L2 membership-operator typeclass contract: specify a standard Membership class and the standard binding of the (already glyph-admitted) `∈` to it -- a unary `class Membership (container) { Query : Type; member : Query -> container -> Bool }` with `member_holds := IsTrue (member ..)` as the Prop view, dispatched at use-site through the SAME class resolver A1 factors (no second operator dispatcher), over nominal witness-bound carrier VIEWS (a list view, one ordered-key view serving Map and Set, a distinct relation-edge view) so distinct roles do not collide under today's outer-head-name registry key and the comparator/validity witness lives in the view value not an implicit lookup; a shared `SameMembers` observational law plus a per-provider adapter-fidelity obligation, with container-specific laws kept container-specific; NO multi-parameter class machinery, NO `Membership Tree` instance, NO Prop-to-Bool elimination, NO new trust-root/TCB"
-status: draft
+status: ready
 owner: spec
 size: M
 gate: none
@@ -12,6 +12,33 @@ tier: T1
 origin: "Steward cut 2026-09-13 on the operator directive (Pat, this session): 'Frame the L2 binop typeclass work to support membership ... a spec-enclave elaboration task after the frame.' This is the B track of the reserved-infix-glyph objective (Pat, 2026-09-12: 'membership seems categorically different since it involves some typeclass machinery not required by the others ... dig into typeclass dispatch for member'), which Pat set to run in PARALLEL with the A-track glyph fix. Grounded in the membership class/carrier Research advisory (research evt_10xwbzfz9vz77 + evt_62nsr14rm3zd0, thr_60s5rhqdh4ht8), itself recommended by the Architect (evt_5dar8wmwpxj8x). The Architect is the design authority for the class/carrier ruling and a required reviewer; that ruling is the first design step of the enclave elaboration. Advisory anchors were measured at main 5fb21c419; re-measure at the cut (main is now 5d1347aaf). IN-LANE, spec-enclave-owned: bounded normative surface, no new language/kernel mechanism (the dispatch reuses the existing dictionary-passing resolver that A1 factors), no new trust-root, no TCB -- same posture as SPEC-RESERVED-INFIX-NAMES / SPEC-STANDARD-INFIX-BINDING; no operator sign-off beyond the directive that authorized the work."
 ---
 
+> # READY, FRAMED, NOT YET KICKED. Frame:
+> `docs/program/wp/SPEC-MEMBERSHIP-CLASS-CONTRACT.md`.
+>
+> **`ready` is a dependency statement, not a start signal.**
+> [[SPEC-RESERVED-INFIX-NAMES]] is `merged`, so nothing blocks this node's
+> premise. What holds it is **seat contention, not a dependency**:
+> @spec-leader ruled the enclave runs one WP at a time (`evt_7crxbr742ddpm`),
+> so [[SPEC-STANDARD-INFIX-BINDING]] goes first and this is kicked when that
+> candidate reaches CV. **Do not open a branch before the kick.**
+>
+> **Two of the node's code anchors below have MOVED** — `parse_class_decl` by
+> 21 lines, the `classes.rs` canonical-instance map by six. Every catalog and
+> spec anchor held. Frame §2 has the re-measured table, and §2a is why
+> `parser.rs` will move again before you reach it: **cite by symbol, verify by
+> line.**
+>
+> **Frame §3 carries two D0s.** The class shape is the Architect's to rule and
+> is the first design step — do not assume the advisory's shape.
+>
+> **Point 4 below says the binding is to "the defining class-method GlobalId".
+> That clause is STRUCK** (Architect `evt_6dyqef1q4t6av`; frame §2c). A class
+> method has no `GlobalId` — `member` is a field name in a `Vec<String>`, as
+> `leq` is. **`class Membership` does not exist on `main` at all**, so this node
+> mints `membership_member_at` as a top-level binding in the `ord_leq_at` shape
+> and keys on **its** `GlobalId`. The frame carries the rejected alternative
+> and why, because it is the one a careful author reaches for.
+>
 > # B-TRACK SPEC CONTRACT for the membership operator. Spec-enclave elaboration
 > # (operator directive, Pat, this session). Design authority: the Architect's
 > # class/carrier ruling on the Research advisory (thr_60s5rhqdh4ht8), which is
@@ -99,7 +126,8 @@ the normative text.
    mechanism that `SPEC-STANDARD-INFIX-BINDING` specifies for `≤`/`≥` and that
    [[LANG-STANDARD-INFIX-CALL-COMPLETION]] (A1) factors: membership REUSES that
    scoped/coherent resolver, it does not add a second operator dispatcher. The
-   binding is to the defining class-method GlobalId + checked telescope, not to
+   binding is to `membership_member_at`'s GlobalId + checked telescope (see the
+   banner: the earlier "class-method GlobalId" wording is struck), not to
    the `∈` glyph text; a missing / ambiguous / unadmitted-provider case is a
    normal instance error. Standard fixity candidate: `∈ infix 4` (comparison
    band, aligning with `≤ ≥ ≠`); the spec rules it.
@@ -152,9 +180,10 @@ the normative text.
   dictionary/comparator + validity witness; no `Membership Tree`, no `Set` head,
   no implicit use-site `Ord` re-choice.
 - `∈`'s standard binding completes carrier-first via the SAME resolver A1
-  factors (no second dispatcher), binds to the class-method GlobalId + telescope
-  not the glyph, and treats missing/ambiguous/unadmitted providers as normal
-  instance errors; standard fixity is stated.
+  factors (no second dispatcher), binds to `membership_member_at`'s GlobalId +
+  telescope not the glyph (the earlier "class-method GlobalId" wording is
+  struck -- see the banner), and treats missing/ambiguous/unadmitted providers
+  as normal instance errors; standard fixity is stated.
 - The shared `SameMembers` law and the per-provider adapter-fidelity obligation
   are specified; the contract states plainly that the minimal class has no
   nonvacuous internal algebraic law, and keeps container-specific laws
