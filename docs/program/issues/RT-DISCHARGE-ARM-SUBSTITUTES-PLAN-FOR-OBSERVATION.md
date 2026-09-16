@@ -904,14 +904,41 @@ tip you are on. `tag_abi_word` has the same hazard one level down — it has a
 second hit at `lowering/core/tests/control.rs`, inside a string literal in a
 test, not a second definition.
 
-> ### STOP. THIS GUESS AND THE DELIVERABLE LIST BELOW WERE BUILT AND REFUTED.
+> ### SCOPED 2026-09-16. THE SEEDING IS LIVE. THE REGISTRATION AND THE
+> ### DIVERGENCE CHECK ARE NOT. DO NOT BUILD THE WHOLE LIST.
 >
-> **2026-09-16. Marker covers the best-guess paragraph and the three-edit
-> deliverable list that follows it — everything down to *Acceptance criteria for
-> D1*. Retained verbatim; DO NOT BUILD FROM IT.** An implementer starts reading
-> here, it says *"Build it"*, and the refutation is three hundred lines below —
-> so a reader who follows it rebuilds exactly what was already built and
-> refuted.
+> **Architect `evt_18dcbz1gc0t4j`, correcting `evt_4b44mcnr1wt76`, which had
+> withdrawn too much.** This marker read a flat *"DO NOT BUILD FROM IT"*, then
+> briefly read *"BUILD IT"*, and neither was right. The list below is partly
+> live:
+>
+>     LIVE, BUILD IT      the drop and its seeding. The circularity ruling
+>                         over the seed/certificate mechanism is withdrawn and
+>                         that mechanism is sound.
+>     HELD, DO NOT BUILD  register_generated_constructor_authority(
+>                         exact_ret_identity, returned)  -- the record is a
+>                         copy of the stamp; fence 1's registration premise
+>                         stands.
+>     HELD, DO NOT BUILD  the refusing divergence check on
+>                         exact_ret_identity.tag_abi_word()? != ret_abi_word
+>                         -- it is x != x in the -p build and acquires content
+>                         only under px8-ds-test-support with VaryRet. See the
+>                         block added to D1-2.
+>
+> **AN OPEN QUESTION THE SCOPING DOES NOT SETTLE, AND IT IS THE STEWARD'S TO
+> ROUTE, NOT THE IMPLEMENTER'S TO GUESS.** Arm 1's new clause as built reads
+> `body.authorities`, which only the held-back registration writes. With the
+> registration held, `observed == None` always and **arm 1 always refuses** —
+> which is the closure-alone configuration already measured. So *"build the
+> seeding, hold the registration"* either means the increment is deliberately a
+> refusing one (consistent with `D1-5`: the red population IS the deliverable),
+> or it means arm 1 should consult **`call_seeds`** — what SEED actually
+> produces — rather than `body.authorities`. **Those are different repairs.**
+> Do not pick one from this marker.
+>
+> **AND THE ORDINALS DO NOT AGREE ACROSS DOCUMENTS.** This node numbers the
+> arm-1 change EDIT 2 and the stamp EDIT 3; runtime-implementer's report numbers
+> the arm-1 change EDIT 3. **Name the coordinate, never the ordinal.**
 >
 > **Edit 2 is the change that was built and measured VACUOUS.** Edit 1's seeding
 > is what takes the certificate arm off its `None` branch, and **under D0's
@@ -1031,6 +1058,29 @@ run, from the same source.** A repair that *derived* the recorded identity from
 `--workspace`.** The REFUSE-on-divergence form is immune, because it compares
 two independently produced values instead of trusting one.
 
+> ### AND THE CHECK ITSELF IS `x != x` IN PRODUCTION. ADDED 2026-09-16,
+> ### Architect `evt_18dcbz1gc0t4j`, read at source at `0f71ab5b9`.
+>
+> **This is sharper than the paragraph above and it cuts the other way.** The
+> refusing form is immune to a *corrupted* `ret_abi_word`, but in the build
+> `COORDINATION §12` mandates it has nothing to compare:
+>
+>     :6879   let exact_ret_identity = emission.row.k_ret_identity();
+>     :6880   let exact_ret_abi_word = exact_ret_identity.tag_abi_word()?;
+>     :6890   #[cfg(not(feature = "px8-ds-test-support"))]
+>             let ret_abi_word = exact_ret_abi_word;
+>
+> ⇒ With the feature **off**, `exact_ret_identity.tag_abi_word()? !=
+> ret_abi_word` is **literally `x != x` — provably false, and it never
+> refuses.** It acquires content only at `:6882`, under `px8-ds-test-support`
+> with `VaryRet` applied, where `ret_abi_word = exact_ret_abi_word + 1`.
+>
+> **So the check is LIVE IN CI's `--workspace` build and DEAD IN THE `-p` RUN
+> the fleet is required to use locally.** A local green on this AC measures
+> nothing. **That is the second time tonight this feature profile has been
+> load-bearing and the third undeclared measurement configuration** — the
+> pattern is the finding, not the instance.
+
 **THE SWEEP, WITH ITS SCOPE AND ITS RESULT, BECAUSE A CLEAN SWEEP AND A SKIPPED
 ONE LOOK THE SAME.** Swept `docs/` and `agent/` for the refuted phrase: **one
 hit, and it is this node's own corrected quotation of itself above.** No other
@@ -1080,6 +1130,40 @@ as a regression** — the closure makes the tree redder, and that surfacing is t
 output. This restates arc-level AC-3 at the deliverable because a constraint
 that lives only in a section two screens away is a constraint the build does not
 fail.
+
+**THE BASELINE DETERMINES WHETHER THIS CHECK HAS CONTENT, NOT WHETHER IT CAN BE
+RUN.** The instrument is the diff, so no tree has to be built and nothing here
+blocks on D0's closure existing anywhere. But on the bare base there is no
+emission refusal for this program at all, so no diff can remove one and this
+criterion is **VACUOUSLY satisfied**. Report it as *vacuous at this baseline —
+no emission refusal exists to remove*, and never as *checked and held*. It
+acquires content exactly when an emission refusal is present, whether because
+D0's closure is already in the base or because it rides in this same diff, and
+that is the case in which it must actually be read. **A green reported without
+that distinction records that the check was untestable, not that the property
+held.**
+
+The bare base is `0f71ab5b9267781ae1d91bc654011cad42b926af` (the node's
+`0f71ab5b9` ruling, resolved to full length by the Steward rather than guessed,
+and verified a commit reachable from `origin/wp/ABI-S6-d5b-file-backed`).
+
+**NAME THE COORDINATE, NOT THE ORDINAL.** D0's closure is the arm-1 clause at
+`units.rs:4489` — `realized && observed == Some(identity)` replacing the bare
+`realized_call_words.contains(...)`. **This node numbers that change EDIT 2 and
+runtime-implementer's report numbers it EDIT 3**, so *"base + edit 3"* resolves
+differently depending on which document a reader has open. Do not let an ordinal
+into an acceptance criterion on this node; cite the line and the expression.
+
+**This is an ADDITION — `D1-5` as written is true, and the falsifiability fact
+is what was missing.** Paragraph supplied verbatim by the Architect at
+`evt_6j4mw6q5xz8ah`, superseding an earlier version (`evt_2kdkn7kjja862`) that
+read as an obligation to construct a tree. `D1-5`'s instrument was always the
+diff, so there is no such obligation and nobody is blocked on where D0's closure
+lives. Caught by runtime-implementer within three minutes, by flagging that an
+AC must not reference an artifact existing only in an uncommitted diagnostic
+(`evt_2apy3aq781d9e`) — the flag was right and the obligation dissolved rather
+than escalating. **A prohibition is legitimately vacuous when the prohibited act
+is impossible; the defect was only ever in REPORTING it as a passed check.**
 
 **D1-6. THE RESIDUAL — DO NOT QUANTIFY OVER COMPILES, AND DO NOT POOL THE
 DENOMINATOR.** **"`v1386` is always handed a declaration" is NOT what was
@@ -1234,6 +1318,36 @@ of the repair are different relations. **Control:** if the repair is proposed at
 narrower than 12, the proposal states which of those two relations it is
 arguing from.
 
+**D1-8. MEASURE WHETHER `DemandIndependentBodySecondIdentity` HAS EVER FIRED
+GREEN. NEW 2026-09-16, and it is a MEASUREMENT, not a gate.**
+`DemandIndependentBodySecondIdentity` at `units.rs:511` is the positive control
+for arm 1 taking its **else** branch — a Response body demanded under an
+identity other than its own `k_ret_identity()` — with `...Unguarded` as its
+suppressed-refusal twin. **Its execution witness fails closed when it finds no
+site** (`:4380-4388`), so whether it is green is a real question with a real
+negative answer, and nobody has asked it.
+
+**Control:** report the witness's own count, not the suite's verdict. A green
+suite is compatible with the control never having fired; that union is the
+reason this AC exists.
+
+**PRE-REGISTERED, BEFORE THE MEASUREMENT, SO THE RESULT CANNOT BE READ BACKWARD
+INTO WHICHEVER ANSWER ARRIVES** (Architect `evt_2kdkn7kjja862`):
+
+    FIRES GREEN      Arm 1's else branch is exercised and the discharge
+                     ledger has a live positive control. NOTHING CHANGES.
+    NEVER GREEN,     A SEPARATE finding, and it settles nothing about the
+    or finds no      discharge loop either way: a control that fails closed
+    site             and has never fired is an untested control, and the
+                     ledger's guarantee is currently unwitnessed.
+
+**THIS AC OUTLIVED THE RULING THAT PROMPTED IT, WHICH IS WHY IT IS WORTH MORE
+THAN WHEN IT WAS WRITTEN.** It was ordered so that an unmeasured claim could not
+ride into a dispatch as settled. Within the hour, two rulings on this node were
+each corrected by the next, both from source reads rather than runs. **An
+unfired control is exactly what this arc keeps producing**, and that is a reason
+to measure it rather than a reason to defer it (Architect `evt_18dcbz1gc0t4j`).
+
 ### SYMPTOM INVENTORY — §1b. APPEND ONE LINE PER HARD-STOP; NEVER REWRITE HISTORY.
 
 **Seeded by the Steward 2026-09-16 at the Architect's request
@@ -1311,6 +1425,55 @@ change lands through arm 2's proof closing, not through arm 1 passing.**
 > there is none for this program; against D0's closure it removes the refusal
 > and adds an identity requirement that is **measurably vacuous.**
 >
+> ### THE CIRCULARITY READING OF THE SEED/CERTIFICATE MECHANISM IS WITHDRAWN.
+> ### FENCE 1'S REGISTRATION PREMISE IS NOT. 2026-09-16, Architect
+> ### evt_18dcbz1gc0t4j, correcting evt_4b44mcnr1wt76 which had over-withdrawn.
+>
+> **This marker covers from here to the end of the illegitimacy ruling below.
+> The MEASUREMENTS in it are untouched; the INTERPRETATION of two of them is
+> not.** Read the split before reading either.
+>
+>     WITHDRAWN   the seed/certificate mechanism is circular. It is not.
+>                 The find at :4435 refutes by ABSENCE, not by mismatch, and
+>                 absence is load-bearing twice -- all_calls_finished = false
+>                 defers the body, and a pair never certified lands in
+>                 `missing` and HARD ERRORS. `grounded` originates only at
+>                 :3139-3151 against emission-time `authorities` that
+>                 `required` never feeds. The seed is a RELAY and cannot
+>                 bootstrap itself; DropRootProof and BootstrapCycle at
+>                 :510-511 are its controls. EDIT 1, the drop and its
+>                 seeding, IS SOUND.
+>     STANDS      fence 1's registration premise, and the vacuity -- but
+>                 LOCAL TO ARM 1's NEW CLAUSE, which is a different object at
+>                 a different site. :6879 exact_ret_identity and :6962
+>                 independent_contract are THE SAME EXPRESSION on the same
+>                 emission.row, 83 lines apart in one loop iteration. Inside
+>                 arm 1's true branch the guard has already pinned identity
+>                 == independent_contract, so a clause placed there CANNOT
+>                 BORROW THE GUARD'S TWO-PRODUCER PROPERTY -- it must find
+>                 its own, and there is none. observed == Some(identity)
+>                 reduces to k_ret_identity() == k_ret_identity().
+>
+> **THE STRUCTURAL FORM, WHICH IS STRONGER THAN EITHER RULING IT REPLACES:**
+> without the registration nothing writes `body.authorities` at
+> `publication.returned_word`, so `observed == None` and arm 1 **always
+> refuses**; with the registration `observed` is the stamp and the clause
+> **always passes**. **There is no third configuration. A check with an
+> always-refuse arm, an always-pass arm, and nothing between them is not a
+> check — it is a switch.**
+>
+> ⇒ **The three-way below is the two ends of that switch, not two readings of a
+> working mechanism.** runtime-implementer's original vacuity measurement was
+> correct throughout, and was correct at the moment it was being told it meant
+> the opposite. **The phrase *"the lock and its key are cut from one blank"* is
+> theirs; every ruling erected on it, withdrawn and re-erected, is the
+> Architect's** (`evt_6j4mw6q5xz8ah`, on their own instruction that the node
+> record it this way round).
+>
+> **STILL TRUE AND NOT TO BE SWEPT OUT:** *"a `find` keyed on the value under
+> test cannot refute BY MISMATCH"* below. What fell was only the inference from
+> it to circularity of the certificate mechanism.
+
 > **WHAT THE THREE-WAY COMPARISON ESTABLISHES IS SHARPER THAN WHAT IT REPLACES,
 > because it carries the closure's own negative control.** The closure is **not
 > inert** — it genuinely refuses when nothing registers — and the repair's only
