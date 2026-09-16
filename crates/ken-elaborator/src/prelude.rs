@@ -291,6 +291,7 @@ pub fn empty_prelude_env() -> PreludeEnv {
         private_mapping_allocate_id: z,
         private_mapping_read_view_id: z,
         private_mapping_write_view_id: z,
+        private_mapping_acquire_file_id: z,
         private_buffer_handle_id: z,
         buffer_handle_resource_id: z,
         buffer_handle_capacity_id: z,
@@ -442,6 +443,7 @@ pub struct PreludeEnv {
     pub private_mapping_allocate_id: GlobalId,
     pub private_mapping_read_view_id: GlobalId,
     pub private_mapping_write_view_id: GlobalId,
+    pub private_mapping_acquire_file_id: GlobalId,
     pub private_buffer_handle_id: GlobalId,
     pub buffer_handle_resource_id: GlobalId,
     pub buffer_handle_capacity_id: GlobalId,
@@ -1884,10 +1886,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         .map_err(|e| ElabError::Internal(format!("prelude BufferHandle failed: {e}")))?;
     elab.elaborate_decl("data BufferSpan = PrivateBufferSpan (Resource Buffer) Int Nat")
         .map_err(|e| ElabError::Internal(format!("prelude BufferSpan failed: {e}")))?;
-    elab.elaborate_decl(
-        "data MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int Int",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude MappingSource failed: {e}")))?;
+    elab.elaborate_decl("data MappingSource = Anonymous Int | FileBacked (Resource FsHandle) Int")
+        .map_err(|e| ElabError::Internal(format!("prelude MappingSource failed: {e}")))?;
     elab.elaborate_decl("data MappingProt = ReadOnly | ReadWrite")
         .map_err(|e| ElabError::Internal(format!("prelude MappingProt failed: {e}")))?;
     elab.elaborate_decl("data MappingExtent = MkMappingExtent Int")
@@ -2110,6 +2110,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
                     bytes_t.clone(),
                     resource_mapping_t,
                 ]),
+                named(vec![resource_fs_handle_t, int_t, mapping_prot_t]),
             ]
         },
     })
@@ -2144,6 +2145,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "PrivateMappingAllocate",
         "PrivateMappingReadView",
         "PrivateMappingWriteView",
+        "PrivateMappingAcquireFile",
     ]
     .into_iter()
     .zip(fs_ctor_ids)
@@ -2160,6 +2162,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let private_mapping_allocate_id = elab.globals["PrivateMappingAllocate"];
     let private_mapping_read_view_id = elab.globals["PrivateMappingReadView"];
     let private_mapping_write_view_id = elab.globals["PrivateMappingWriteView"];
+    let private_mapping_acquire_file_id = elab.globals["PrivateMappingAcquireFile"];
 
     // `fs_resp : (a : Auth) -> FSOp a -> Type` is a genuine non-constant
     // large elimination. Every arm returns a total `Result FileError _`, with
@@ -2185,7 +2188,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
            PrivateBufferFreeze buffer start length span_origin |-> Result ResourceError Bytes; \
            PrivateMappingAllocate length protection |-> Result ResourceError (Resource Mapping); \
            PrivateMappingReadView mapping start length span_origin |-> Result ResourceError Bytes; \
-           PrivateMappingWriteView mapping start bytes span_origin |-> Result ResourceError Unit \
+           PrivateMappingWriteView mapping start bytes span_origin |-> Result ResourceError Unit; \
+           PrivateMappingAcquireFile file length protection |-> Result ResourceError (Resource Mapping) \
          }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude fs_resp failed: {}", e)))?;
@@ -2593,24 +2597,6 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         ))
     })?;
     elab.elaborate_decl(
-        "proc private_mapping_file_unavailable (a : Auth) (e : Type) (r : Type) \
-           : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [FS] = \
-         Ret (Coproduct (FSOp a) AmbientOp) \
-           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-           (Result ResourceError (ResourceBracketResult e r)) \
-           (Err ResourceError (ResourceBracketResult e r) (ResourceHostIO Unsupported))",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude mapping file refusal failed: {e}")))?;
-    elab.elaborate_decl(
-        "proc private_mapping_invalid_offset (a : Auth) (e : Type) (r : Type) \
-           : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [FS] = \
-         Ret (Coproduct (FSOp a) AmbientOp) \
-           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-           (Result ResourceError (ResourceBracketResult e r)) \
-           (Err ResourceError (ResourceBracketResult e r) InvalidOffset)",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude mapping offset refusal failed: {e}")))?;
-    elab.elaborate_decl(
         "proc withMapping (a : Auth) (e : Type) (r : Type) \
            (source : MappingSource) (protection : MappingProt) \
            (body : MappingHandle -> HostIO a (ResourceBodyResult e r)) \
@@ -2621,10 +2607,12 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
              (Result ResourceError (ResourceBracketResult e r)) \
              (InL (FSOp a) AmbientOp (PrivateMappingAllocate a length protection)) \
              (\\acquired. private_with_mapping_after_allocate a e r length body acquired); \
-           FileBacked file offset length |-> match eq_int offset (0 : Int) { \
-             False |-> private_mapping_invalid_offset a e r; \
-             True |-> private_mapping_file_unavailable a e r \
-           } \
+           FileBacked file length |-> Vis (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result ResourceError (ResourceBracketResult e r)) \
+             (InL (FSOp a) AmbientOp \
+               (PrivateMappingAcquireFile a file length protection)) \
+             (\\acquired. private_with_mapping_after_allocate a e r length body acquired) \
          }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude withMapping failed: {e}")))?;
@@ -2878,6 +2866,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "PrivateMappingAllocate",
         "PrivateMappingReadView",
         "PrivateMappingWriteView",
+        "PrivateMappingAcquireFile",
         "PrivateMappingHandle",
         "mapping_handle_resource",
         "mapping_handle_length",
@@ -2896,8 +2885,6 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "private_with_resource_after_open",
         "private_with_buffer_after_allocate",
         "private_with_mapping_after_allocate",
-        "private_mapping_file_unavailable",
-        "private_mapping_invalid_offset",
         "private_read_at_result",
         "private_read_at_admit_window",
         "private_read_at_positive",
@@ -3110,6 +3097,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         private_mapping_allocate_id,
         private_mapping_read_view_id,
         private_mapping_write_view_id,
+        private_mapping_acquire_file_id,
         private_buffer_handle_id,
         buffer_handle_resource_id,
         buffer_handle_capacity_id,

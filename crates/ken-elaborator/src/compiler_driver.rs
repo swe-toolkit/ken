@@ -3682,6 +3682,10 @@ fn checked_host_spine_v1(
             prelude.private_mapping_write_view_id,
             ken_host::HostOpV1::MappingWriteView,
         ),
+        (
+            prelude.private_mapping_acquire_file_id,
+            ken_host::HostOpV1::MappingAcquireFile,
+        ),
     ] {
         operations.insert(resolve_id(id)?, operation);
     }

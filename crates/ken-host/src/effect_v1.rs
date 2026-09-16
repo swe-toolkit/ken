@@ -1144,6 +1144,23 @@ impl MappingRegionV1 {
         })
     }
 
+    pub(crate) fn try_new_mapped_file(
+        handle: &crate::ResourceHandleV1,
+        length: u64,
+        protection: MappingProtectionV1,
+    ) -> Result<Self, IoErrorIdentityV1> {
+        let length = usize::try_from(length).map_err(|_| IoErrorIdentityV1::InvalidInput)?;
+        if length == 0 {
+            return Err(IoErrorIdentityV1::InvalidInput);
+        }
+        let mapped = crate::mapping_v1::map_file_v1(handle, length, protection)?;
+        Ok(Self {
+            storage: MappingStorageV1::Mapped(mapped),
+            backing: MappingBackingV1::FileBacked,
+            protection,
+        })
+    }
+
     pub fn length(&self) -> usize {
         match &self.storage {
             MappingStorageV1::InProcess(bytes) => bytes.len(),
@@ -2391,6 +2408,34 @@ pub trait HostEffectBackendV1 {
         _protection: MappingProtectionV1,
     ) -> Result<MappingRegionV1, SemanticErrorV1> {
         Err(SemanticErrorV1::Io(IoErrorIdentityV1::Unsupported))
+    }
+
+    /// Interpreter/default file mapping: copy the exact offset-zero prefix into
+    /// host-private bytes. Native ProcessHost overrides this with mmap-of-fd.
+    fn resource_map_file(
+        &mut self,
+        handle: &crate::ResourceHandleV1,
+        length: u64,
+        protection: MappingProtectionV1,
+    ) -> Result<MappingRegionV1, SemanticErrorV1> {
+        let length = usize::try_from(length)
+            .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::MappingLimit))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::AllocationFailed))?;
+        bytes.resize(length, 0);
+        let mut filled = 0usize;
+        while filled < length {
+            let read = self
+                .fs_resource_read_at(handle, filled as u64, &mut bytes[filled..])
+                .map_err(SemanticErrorV1::Io)?;
+            if read == 0 || read > length - filled {
+                return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds));
+            }
+            filled += read;
+        }
+        MappingRegionV1::try_new_file_backed(bytes, protection).map_err(SemanticErrorV1::Resource)
     }
 
     fn resource_close(&mut self, handle: crate::ResourceHandleV1) -> Result<(), IoErrorIdentityV1> {
