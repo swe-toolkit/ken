@@ -1,9 +1,9 @@
 ---
 id: RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE
-title: "Enforce the RepresentedUnavailable invariant uniformly across BOTH executors by gating dispatch_host_op_v1 at the convergence, with a control that is a PREDICATE over availability() rather than an assertion about any named op. The invariant is STATED at effect_v1.rs:193 and native-enforced at abi_v1.rs:1551, but the interpreter consults availability() nowhere -- so FOUR of the ten unavailable ops (ClockMonotonicNow, ClockSleepUntil, EntropyRandomBytes, MappingAcquireFile) execute interpreted and refuse natively on main TODAY, and the availability flip moves only one of them. REMEDIAL, not preventive. Architect ruling evt_21f23zmgqfxsc: the interpreter MUST refuse; RepresentedUnavailable is a language-surface claim, not a native-backend one. The gate must sit at the convergence and NOT in a caller -- the interpreter's two production callers are in different helpers (fs_dispatch, ambient_dispatch), so the natural-looking fs_dispatch placement misses clock and entropy entirely. Its SUBJECT IS REACHABILITY, a different question from AC-AVAIL's availability census -- do not fold the two together."
+title: "Enforce the RepresentedUnavailable invariant uniformly across BOTH executors by gating dispatch_host_op_v1 at the convergence, with a control that is a PREDICATE over availability() rather than an assertion about any named op. The invariant is STATED at effect_v1.rs:193 and native-enforced at abi_v1.rs:1551, but the interpreter consults availability() nowhere -- so of the ten unavailable ops, THREE reachable via the op_* intern table (ClockMonotonicNow, ClockSleepUntil, EntropyRandomBytes) PLUS ONE reachable via the separately interned PrivateMappingAcquireFile global (MappingAcquireFile) execute interpreted and refuse natively on main TODAY, and the availability flip moves only that last one. State the split, never the sum of four: the obvious re-derivation reads the intern table alone and returns three, dropping the very op the flip is about. REMEDIAL, not preventive. Architect ruling evt_21f23zmgqfxsc: the interpreter MUST refuse; RepresentedUnavailable is a language-surface claim, not a native-backend one. The gate must sit at the convergence and NOT in a caller -- the interpreter's two production callers are in different helpers (fs_dispatch, ambient_dispatch), so the natural-looking fs_dispatch placement misses clock and entropy entirely. Its SUBJECT IS REACHABILITY, a different question from AC-AVAIL's availability census -- do not fold the two together."
 status: ready
 owner: runtime
-size: S
+size: S/M
 gate: none
 depends_on: []
 blocks: [RT-D5B-MAPPING-AVAILABILITY-FLIP]
@@ -12,15 +12,23 @@ tier: T1
 origin: "Adversary Finding 1 on the landed slice 4 (statements != enforcements), routed by the Steward to the Architect as a design question rather than ruled; Architect RULED evt_21f23zmgqfxsc. Steward cut 2026-09-16 as its OWN node rather than as a rider on the flip slice -- a sequencing/packaging call (steward.md §3), not a departure from the ruling's design content, which is adopted verbatim. Fixed inputs measured at origin/main d4e977a6af1083975665e587ed7e3e31f733785e."
 ---
 
-> # READY. Framed and RELEASED 2026-09-16. Frame:
+> # READY, and RE-FRAMED 2026-09-16 after D0. Frame:
 > `docs/program/wp/RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE.md`.
 >
-> The design is RULED and is not open. **D1 is CLOSED at four-of-ten reachable**,
-> which makes this node REMEDIAL — it closes a divergence live on `main` today,
-> not a hazard that future unflipped surfaces might create. D0, the blast
-> radius, is the one thing still unmeasured and it is what sizes the node — it
-> is **D0, the WP's first act**, and a hard stop there is a successful turn.
-> Per the sequencing ruling below, this lands BEFORE the availability flip.
+> The design is RULED and is not open. **D1 is CLOSED** (three via the intern
+> table + one via `PrivateMappingAcquireFile`), which makes this node REMEDIAL —
+> it closes a divergence live on `main` today, not a hazard that future
+> unflipped surfaces might create.
+>
+> **D0 is ANSWERED and must not be re-run.** It completed, hit hard-stop
+> condition 2, and the stop was **withdrawn**: the executing turn reported
+> rather than absorbed (`evt_4w12zca5j1g03`), the Architect closed the design
+> fork it raised with a third option — **split the entry**, not relocate the
+> gate and not delete the arms (`evt_1y4rvywv1y6fr`) — and the Steward's funnel
+> measurement showed the remedy moves 21 call sites while touching **zero**
+> setup lines and **zero** assertions (`evt_5sxcg2m9qah9j`). Size S to **S/M**;
+> no recut, no blocking node. **D0's results are now fixed inputs in the frame's
+> §3.** Per the sequencing ruling below, this lands BEFORE the availability flip.
 
 # Objective
 
@@ -142,40 +150,46 @@ requires the offset-less `FileBacked`), so the deletion is not the defect. The
 defect is that the stub was the sole enforcement of a **second** thing nobody
 named, and nothing took over that duty.
 
-# D0 — the blast radius of a gate in `dispatch_host_op_v1`
+# D0 — ANSWERED 2026-09-16. Do not re-run it.
 
-**This is the sizing question and it must be answered before the frame is
-written.** The Architect measured the **production** callers exactly — the
-interpreter at `eval.rs:5593` and `:5844`, native at `abi_v1.rs:2025`. But
-`dispatch_host_op_v1` has roughly seventeen call sites across four crates:
+The blast radius is measured and closed. Full results are **fixed inputs in the
+frame's §3**; the headline, and the two things worth carrying at node level:
 
-    crates/ken-host/src/abi_v1.rs              :2025  :4549
-    crates/ken-interp/src/eval.rs              :5593  :5844  :7168  :7200
-                                               :7234  :7264  :7316  :7641  :8428
-    crates/ken-runtime/src/native_effect_v1.rs :102
-    crates/ken-runtime/src/object_linker_packaging.rs :3802 :3834
-    crates/ken-verify/src/scenario.rs          :4988
+**The call-site population is CLOSED at 96** — 15 outside `effect_v1.rs`, 81
+inside its test module, no integration-test tail, swept across all 505 `.rs`
+files under `crates/`. **None of the 15 outside dispatches a
+`RepresentedUnavailable` op today**, so no production path changes behaviour,
+and `ken-verify` has zero production dispatch sites. The earlier count of
+"roughly seventeen, fourteen unresolved" was the pre-measurement estimate.
 
-A gate inside the dispatch function changes behaviour at **every** one of them,
-not only at the three production sites. **The enclosing binding of the other
-fourteen is UNRESOLVED** — a nearby `#[cfg(test)]` attribute is evidence about
-the item it decorates, not about a line several thousand below it, and reading
-it as a module boundary is the error this node should not make in its own
-framing.
+**One production site the earlier list under-resolved:**
+`ken-runtime/src/native_effect_v1.rs:102` is production — it compiles with no
+`cfg` — and has **zero production callers**; `#![allow(dead_code)]` at `:7` is
+what stops rustc reporting it. It is a latent surface governed automatically by
+the gate's predicate the day it gains a caller. Falsifier: *any production
+reference to the module outside its own file flips this.*
 
-**D0:** resolve the enclosing binding of each of the fourteen, then determine
-which of them dispatch an op that is `RepresentedUnavailable` today. Any that
-do will change behaviour under the gate. That set is the node's real size; if
-it is large or crosses into `ken-verify` production paths, the cut is wrong and
-comes back to the Steward rather than being absorbed.
+**The method, recorded because a text match gets it wrong.** Resolve each site
+by **`cfg` satisfiability under `test=false`**, never by grepping for
+`cfg(test)`. `scenario.rs:4988` sits under `#[cfg(all(test, target_os =
+"linux"))]`, which a `cfg(test)` text match does not fire on — reading it as
+production is a false trip of the hard stop. This is the same hazard the node
+warned about one level up: an attribute decorates the item beneath it.
 
-**One constraint the Architect's D1 measurement adds, and it is not an answer to
-D0** (`evt_3ws5c4xzbfxa5` point 5): at least two of the production sites are the
-`eval.rs` pair, and a gate at the convergence must leave `ClockWallNow` and the
-other 24 `NativeTested` ops **untouched**. The predicate control gives that by
-construction — it derives the refusal set from `availability()` rather than
-listing it, so the 25 are correct without being enumerated. The blast-radius
-question stands open regardless.
+**Why D0 stopped, and why the stop was withdrawn.** D0 hit hard-stop condition
+2 — eight tests, ~900 setup lines, 66 assertions dispatching unavailable ops,
+**six of the eight asserting the executing arm**, which a naive gate deletes.
+That was the correct call and the turn was a success. It raised a design fork,
+the Architect closed it with a third option (**split the entry**: gate stays at
+the convergence, the body below becomes a `pub(crate)` inner entry, all ten arms
+stay live), and the Steward's funnel measurement then showed the remedy
+re-points **21 call sites** and moves **zero** setup lines and **zero**
+assertions. Condition 2 does not bind under the ruled design.
+
+**The constraint the Architect's D1 measurement adds** (`evt_3ws5c4xzbfxa5`
+point 5) stands unchanged: a gate at the convergence must leave `ClockWallNow`
+and the other 24 `NativeTested` ops **untouched**. The predicate control gives
+that by construction.
 
 # D1 — ANSWERED: FOUR of the ten are reachable today. This node is REMEDIAL.
 
@@ -271,19 +285,20 @@ FLIP slice, not this one and not slice 4.
 
 # Sizing / tier
 
-**Size S pending D0, tier T1.** The diff is plausibly a few lines plus one
-test. The tier is T1 because the review turns on an argument, not on
-byte-faithfulness: whether the control's predicate genuinely derives its set,
-whether the gate's placement preserves the layering the ruling describes, and
-whether the fourteen unresolved call sites were resolved rather than assumed.
-**If D0 returns a large blast radius, the size is wrong and the recut is the
-Steward's.**
+**Size S/M, tier T1 — sized on D0's measurement, not on an estimate.** The
+production diff is the gate plus the entry split; the test diff re-points 21
+call sites at the inner entry and changes nothing else. The tier is T1 because
+the review turns on an argument, not on byte-faithfulness: whether the control's
+predicate genuinely derives its set, whether the entry split keeps enforcement
+**at** the convergence rather than relocating it outward, and whether the two
+in-crate sites `pub(crate)` does not reach were dispositioned by name.
 
 # Contention
 
 `crates/ken-host/src/effect_v1.rs`, shared with
 [[RT-D5B-RESOURCE-TABLE-LIFECYCLE]] and the future flip slice. Sequence against
 whichever of those is in flight; check each node's `status:` at `origin/main`,
-not for a branch ref. Possible incidental contention in `ken-interp`,
-`ken-runtime` and `ken-verify` depending on D0's answer — which is another
-reason D0 precedes framing.
+not for a branch ref. **D0 resolved the incidental contention question: the
+expected diff is `ken-host` only** (`effect_v1.rs`, `abi_v1.rs`), because no
+call site outside that crate dispatches an unavailable op and the out-of-crate
+callers stay on the gated entry unchanged.
