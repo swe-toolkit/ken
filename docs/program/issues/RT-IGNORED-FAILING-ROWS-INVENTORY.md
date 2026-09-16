@@ -28,6 +28,50 @@ origin: "Steward, 2026-09-16, on operator directive 2026-09-15: 'The other tests
 
 Read the frame: `docs/program/wp/RT-IGNORED-FAILING-ROWS-INVENTORY.md`.
 
+## One measured instance of the banner's own warning: `px8ds`
+
+**The banner above says the sixteen are a hypothesis about the population, not
+the population. Here is a row that makes that concrete, and it is an ORDINARY
+member of the ledger — not an escalation and not a regression.**
+
+    row      px8ds_real_same_depth_path_runs_exact_edges
+    file     crates/ken-cli/tests/px8ta_oriented_subcontinuation.rs:389
+    label    "focused native resource-cost row; run outside default suite"
+
+**What is MEASURED**, all at `origin/main`
+`89d33f74cbe8227580acc486df3f5879f40e31b3` unless stated:
+
+1. The row is `#[ignore]`d on `main` (`:388`).
+2. It is **not** in `.github/ignored-test-exemptions.toml` — that registry names
+   six rows and none of them is in `px8ta_oriented_subcontinuation`.
+3. The frame's §2 listing names `ken-cli::px8ta_oriented_subcontinuation` with
+   **one** row, `public_two_three_level_brackets_finish_and_release_lifo`.
+   **`px8ds` is a different row in the same binary and is not listed.**
+4. At `0f71ab5b9267781ae1d91bc654011cad42b926af` the row **passed** — it was a
+   member of that tree's twelve.
+5. It is absent from the eleven passing on run `34753101365` (2026-09-13) and
+   absent from today's eleven.
+
+**What is INFERRED, and labelled as such:** ignored plus un-exempted means the
+sweep selects it, and absent-from-the-passing-set then places it in the failing
+set. **That is an argument from two measurements, not a third measurement.**
+`D0` confirms or kills it, and if the row turns out not to be selected at all
+**that is the more interesting answer** — say so rather than forcing it into the
+ledger.
+
+**Do NOT write this up as a regression.** `0f71ab5b9` is **not an ancestor of
+`main`**. There is no shared history in which a status changed, so "moved from
+passing to failing" has no referent. The honest statement is **one row, two
+disjoint trees, two results** — and producing the signature on the tree that
+matters is exactly this node's job.
+
+**First instruction for whoever takes this row: get its own failure output.**
+Every hypothesis about why it is not passing — unlanded work, a correctly
+failing assertion, the runner's thread/stack provisioning — is idle until the
+row has been run and read. Its label explicitly says it runs on a separately
+provisioned thread outside the default suite, so **the run conditions are part
+of the signature**, not background.
+
 ## This node READS. It repairs nothing.
 
 `AC-4`: a diff touching `crates/**/src/` fails this WP. The deliverable is one
