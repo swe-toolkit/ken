@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-16 12:52:49Z — from 637 issue file(s) in `docs/program/issues/`.
+2026-09-16 13:46:27Z — from 638 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -439,6 +439,7 @@ the committed file matches the generator's output.
 | `RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER` | Land the plan-independent immediate-bridge classifier as a standalone module on main, exercised by unit tests over RuntimeExpr that fail without it. Slice 1 of the PR #3676 re-cut: the stack admits no leaf extraction because its dependency root is 17 files and +3194/-648, so the mechanism is re-cut from main with the closed PR's branch kept as a read-only reference. | merged | runtime | M | none | — |
 | `RT-D5B-LIVE-WIRING` | Wire the immediate-bridge realization plane into the live planning path -- one import and one assignment before response phase B -- so the classifier and derivation stop being reachable only from tests. The deliverable is two lines; the work is AC-2a, a test that goes red when the call moves ABOVE the specialization installs at construction.rs:1382-1387 rather than one showing it runs -- red by EMPTINESS, since above them continuation_units() returns empty. Two earlier forms of AC-2a named construction.rs:1406 as the bound; both are refuted in frame section 6 and :1406 is not a partition point at all, so a context-bearing fixture would not pin it. The comment's upper bound (before phase B) is AC-2b and is DEFERRED: derive_'s read set and phase B's write set are disjoint and nothing live reads the field, so no test can go red for that move until the consumer exists | merged | runtime | S | none | — |
 | `RT-D5B-POSTCALL-REFUSAL-MECHANISM` | What is the mechanism of the CheckedIhDetachedCallerCut refusal at lowering/core.rs:7720 -- the only distinct Packaging reason in abi_s6_mapping_file_backed_native and the cause of 8 of its 11 base reds, where a two-step SelfDefining post-call consumer receipt meets one computational eliminator frame. THREE mechanisms have been proposed and measured away in one session, all sharing the premise that the defect is reachable from the call site's inputs; the measurement says those inputs are internally consistent and the disagreement is upstream of them. The mechanism is UNKNOWN and this node exists to find it, not to carry a candidate | ready | runtime | M | architect | — |
+| `RT-D5B-RESOURCE-TABLE-LIFECYCLE` | Slice 5 of the ABI-S6-d5b drain: transplant the ResourceTableV1 lifecycle cluster (ResourceReleaseReadinessV1, begin_release, and finish_admission's signature change with its callers) from the backup branch. Separable from the file-acquisition surface -- confirmed statically (zero hunk overlap, no call dependency, no signature coupling) AND by compilation: slice 4 built and passed with none of this cluster present. | draft | runtime | S | none | — |
 | `RT-DEAD-ARM-EFFECT-LOWERING` | A whole-program-dead but type-total request-handler arm is lowered at full strength, so its ConstructorTag effect seat (claim_host_effect_seat) fails the ENTIRE object emission on a path no execution reaches -- the cut is to lower a provably-unreachable total-handler arm's refusing effect seat to a runtime TRAP (fail-closed), gated on a conservative whole-program construction-site census, keeping the seat's Need-subset-Avail partition strict and unchanged | merged | runtime | M | none | — |
 | `RT-DEAD-ARM-JOIN-DISPOSITION` | The merged RT-DEAD-ARM-EFFECT-LOWERING trap short-circuits a provably-dead arm's lowering but leaves that arm's planned source-join origins neither emitted nor dispositioned, so finalize_join_disposition (joins.rs:1675) fires 'neither emitted nor statically unselected' once a downstream fix clears the effect-seat layer in front of it (19/19 unconsumed origins measured inside provably-dead arms, StaticOriginId(20)); complete the trap by dispositioning a PROVED-dead arm's joins as statically unselected (add to dispositioned_join_origins), reusing the RT-LEXICAL-RECURSOR-CONSUMERS D2b abandoned-region mechanism -- a latent completeness gap SURFACED (not caused) by RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL clearing the projection layer, co-landing with it as one candidate | closed | runtime | M | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
@@ -733,6 +734,7 @@ is itself not yet `merged`/`closed`:
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-D5B-RESOURCE-TABLE-LIFECYCLE` blocked by `RT-D5B-HOST-FILE-ACQUISITION-SURFACE` (status: ready)
 
 ## Gate progress
 
