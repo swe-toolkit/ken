@@ -4592,6 +4592,38 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     /// intentionally ignored: exact instant
     /// equality is the wrong live gate, but running it manually demonstrates
     /// that two correct real lanes differ before normalization.
+    //
+    // RT-IGNORED-PASSING-ROWS, row 10 of 11: HELD IGNORED. The ignore is
+    // intentional, the label says so, and the live gate it companions is
+    // clock_wall_now_normalized_real_artifact_differential_discriminates below,
+    // which is NOT ignored, drives the same clock_wall_scenario, applies the
+    // symmetric temporal normalization, and carries the wrong-subject controls.
+    // This row is the demonstration that the NAIVE comparison fails; that one is
+    // the gate.
+    //
+    // WHY READMITTING IT WOULD BE WRONG, measured rather than argued. Freezing
+    // both lanes' wall clocks to one constant -- ken-host abi_v1.rs
+    // clock_wall_now and ken-interp eval.rs PosixHost clock_wall_now, the two
+    // independent real sources -- does NOT red the exact-equality assertion. It
+    // reds the lawfulness expect one line above it:
+    //
+    //   both observations are individually lawful: OutsidePlausibleWindow {
+    //     lane: "interpreter", reading: 1700000000000000000,
+    //     start_nanoseconds: 1789535739078771665,
+    //     end_nanoseconds:   1789535739341153605 }
+    //
+    // Any perturbation that makes the two lanes' instants EQUAL must also move
+    // them out of the harness's measured wall window, so the failing direction
+    // of assert!(compare_exact().is_err()) is not reachable by perturbing the
+    // clock at all. What that assertion's green rests on is two real reads
+    // landing at different nanoseconds inside a window measured here at about
+    // 262 ms -- a scheduling and clock-resolution fact, not a contract. A gate
+    // that can only go red for reasons outside the contract is a flake, which
+    // is exactly what the doc comment above means by "the wrong live gate".
+    //
+    // The same run establishes the row is not vacuous: the frozen reading
+    // appears verbatim in the normalizer's complaint, so both lanes execute and
+    // their clock readings are observed.
     #[test]
     #[ignore = "ABI-A1 D4: demonstrates why exact instant equality is wrong"]
     fn clock_wall_now_naive_exact_equality_is_wrong_on_correct_real_clocks() {
