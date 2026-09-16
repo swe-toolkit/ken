@@ -196,6 +196,28 @@ which is why no downstream gate can see it. A *committed* leftover is the safe
 arm: it appears in the candidate's `diff(merge-base, cand)` and `AC-5`'s CI run
 almost certainly reds.
 
+**THE PRECONDITION IS WHOLE-TREE, SO THE DISPOSITIONS MUST BE COMMITTED AS THEY
+COMPLETE RATHER THAN ACCUMULATED.** Architect, `evt_kkf0ke3e4vf5`. Section 6
+lists this WP's own surface — `crates/ken-cli/tests/`, `crates/ken-kernel/
+tests/`, `crates/ken-verify/src/scenario.rs`, `.../core/tests/constructors.rs`,
+`.github/ignored-test-exemptions.toml` — **and the dispositions are edits to
+those paths.** If they pile up uncommitted, `git status --porcelain` fires on
+your own work and becomes either a constant halt or a line you learn to skip.
+Both lose the check. **A row boundary is a commit boundary**, and then the tree
+is clean at every boundary by construction.
+
+**ORDERING, which the clause above does not pin and which is the whole safety
+property: the commit falls AFTER the blob-verified revert, never between the
+mutation and the revert.** Per row: precondition clean, capture `BEFORE`,
+mutate, run, revert, verify `AFTER == BEFORE`, **then** apply the disposition
+edit and commit. That is what makes *"never commit a mutated production path"*
+mechanical instead of careful — no commit boundary can fall while a mutation is
+live.
+
+A path-scoped precondition does **not** substitute for this. The mutations and
+the dispositions land on the *same* files, so no path partition separates a leak
+from legitimate work. The separation available here is temporal.
+
 **A non-empty precondition is a finding to REPORT, not a state to clean up and
 continue from.** Every row measured after the leak began is suspect, and which
 rows those were is knowable only if the stop is loud.
