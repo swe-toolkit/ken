@@ -287,15 +287,31 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  A COUNT IS THE WRONG KIND OF INPUT ALTOGETHER, whichever object
                  it ranges over. D1's size is set by TWO OPEN DESIGN FORKS, not
                  by how many sites the edit touches: the FIRST row's PRODUCE vs
-                 PROVE vs SEED evaluation, and a SITE still pending a
-                 declaration-path source read. Neither moves when the population
-                 count moves.
+                 PROVE vs SEED evaluation, and a SITE pending a declaration-path
+                 source read. Neither moves when the population count moves.
                  Re-pointing the trigger at distinct bodies would have fired it
                  IMMEDIATELY -- 2 and 4 are both below 5 -- and re-cut to S on a
                  number the Architect explicitly declined to size on. That is
                  the guess this node exists to avoid, arriving through a repaired
                  trigger instead of a broken one.
                  D1 RE-SIZES WHEN A FORK CLOSES, NOT WHEN A NUMBER LANDS.
+                 2026-09-16: THAT RULE HAS NOW FIRED, AND IT IS THE STEWARD'S
+                 OWN, SO IT IS DISCHARGED IN THE OPEN RATHER THAN LEFT TO A
+                 READER TO CHECK. The SITE fork CLOSED -- the declaration-path
+                 read is done (Architect evt_2tzn77b3tcxj4, at source).
+                 IT RESOLVED TOWARD MORE WORK, NOT LESS. The site is not the
+                 one line it was held at; it is a THREE-STEP SEQUENCE spanning
+                 ~90 lines on one emission path, and the step where the OBSERVED
+                 identity is discarded was OUTSIDE the site as previously
+                 stated. A repair must address the drop, the stamp, and the arm
+                 that accepts them.
+                 ⇒ SIZE STAYS M, now for a MEASURED reason rather than a held
+                 one. One of the two forks closed and moved the size AWAY from
+                 S; the other (PRODUCE vs PROVE vs SEED) is still open and is
+                 now one printed bit from closing. THE NEXT RE-SIZE IS WHEN THE
+                 DISCRIMINATOR BIT IS READ, and its two meanings are fixed in
+                 the DISCRIMINATOR row BEFORE the reading, so the size cannot be
+                 argued from the bit after the fact.
                  Steward decision; the Architect declined to rule size
                  (evt_18mtk5rr061nk, evt_2mw3vjp30yjbn).
     BOUNDARY     RULED, AND IT INVERTS. Every funcid60 pair is GATE-BLOCK'd on
@@ -308,10 +324,72 @@ repair is PRODUCTION, not re-keying.** Steward-cut on that ruling.
                  Architect evt_4s7beb7qyrhqz, RULED at evt_2mw3vjp30yjbn.
     REPAIR       PRODUCE constructor authority.
                  NOT re-keying: there is nothing to re-key, the tables are empty.
-    SITE         the RESPONSE STAGING PATH at :6971 -- NOT the two published
-                 words. v1751/v1386 are where the symptom surfaces. Settled by
-                 the route read below; see also the open Continuation question,
-                 which decides the repair's SHAPE but not its site.
+    SITE         CONFIRMED AND WIDENED 2026-09-16. It is NOT one line. It is a
+                 THREE-STEP SEQUENCE on ONE emission path, spanning ~90 lines,
+                 and :6971 is the SECOND step, not the site:
+                   :6868-6878  DROPS the observed identity (obligation.identity
+                               = None) and sets realization_required = true
+                   :6879       let exact_ret_identity = k_ret_identity()  PLANNED
+                   :6962-6971  STAMPS that PLANNED identity as
+                               independent_contract
+                   :4489       arm 1 discharges on realized_call_words
+                               membership ALONE
+                 THAT SEQUENCE IS THE SUBSTITUTION THIS NODE'S TITLE NAMES: the
+                 plan is compared against the demand, the word is checked to be
+                 initialized, and NOTHING CHECKS WHAT THE WORD HOLDS. The drop,
+                 the stamp, and the arm that accepts them.
+                 The first step -- where the OBSERVED identity is discarded --
+                 was outside the site as previously stated. v1751/v1386 remain
+                 where the symptom surfaces, not the site.
+                 Architect evt_2tzn77b3tcxj4, read at source on b0a7c2945.
+    DISCRIMINATOR ONE BIT PER OBLIGATION DECIDES THE PRODUCE/PROVE/SEED FORK,
+                 AND BOTH MEANINGS ARE FIXED HERE BEFORE THE BIT IS READ.
+                   (realization_required = FALSE, identity = None)
+                       constructed that way => THE CALLEE DECLARED NOTHING
+                       => UPSTREAM. RT-CONSTRUCTOR-AUTHORITY-DISCHARGE owns it.
+                       SEED IS WRONG.
+                   (realization_required = TRUE, identity = None)
+                       NOT CONSTRUCTIBLE => produced by the drop at :6877
+                       => a CALL-SITE defect. SEED IS NARROW AND BUILDABLE.
+                 THE INVARIANT THAT MAKES THE SECOND PAIR IMPOSSIBLE AT
+                 CONSTRUCTION: calls.rs:2479-2483 sets identity from
+                 target.result_contract.map(...) and realization_required from
+                 target.result_contract.is_some() -- BOTH functions of the SAME
+                 Option, so identity.is_some() == realization_required always.
+                 (units.rs:12050 also constructs one; it is under #[cfg(test)]
+                 at :11886.)
+                 EXACTLY TWO MUTATIONS OF .identity EXIST IN THE WHOLE BACKEND,
+                 grepped over the entire cranelift_backend tree, not sampled:
+                   core.rs:9637   -> Some(actual_result_identity()). UPGRADES
+                                     declared to ACTUAL OBSERVED after checking
+                                     agreement at :9628-9634 and REFUSING on
+                                     disagreement. The mechanism working.
+                   units.rs:6877  -> None. DROPS it. The response-owner K call.
+                 So ONLY :6877 can produce (true, None).
+                 THE INVARIANT FIXES WHAT THE BIT MEANS. IT DOES NOT FIX WHICH
+                 VALUE IT HAS -- that is the measurement, and asserting the
+                 value from invariant-plus-plausible-path is the entailment
+                 mistake. NOT ASSERTED: that funcid59's obligation came
+                 from :6877.
+    INSTRUMENT   THE REFUSAL'S OWN DETAILS TUPLE CANNOT REPRESENT THE DECIDING
+                 EVIDENCE. At :4616-4621 it projects
+                 body.call_obligations.iter().filter(|o| o.identity ==
+                 Some(*identity)), so EVERY obligation with identity = None is
+                 INVISIBLE to the instrument that reports the refusal -- and
+                 those are exactly the ones the fork turns on.
+                 This is NOT a gap in what was measured. It is a gap in what the
+                 instrument CAN REPRESENT. Every number this node has argued
+                 over was computed by a projection that structurally excluded
+                 the evidence that decides it.
+                 THE FIX IS ONE FIELD ON AN EXISTING PRINT, no new harness: in
+                 the :4587 details tuple, add a projection over
+                 body.call_obligations that does NOT filter on identity,
+                 emitting (result_word, identity, realization_required) per
+                 obligation -- the shape missing_realizations already uses at
+                 the realization-graph error. Report the realization_required
+                 bit per (refusal, identity) pair for every identity = None
+                 obligation, specifically funcid59's obligation on funcid60,
+                 which is the row the partition turned on.
     FIRST        D1 EVALUATES **PRODUCE AGAINST PROVE** BEFORE DESIGNING THE
                  REPAIR. "Production, not re-keying" was a TWO-way fork and
                  there is a third arm the code already implements; see below.
@@ -391,8 +469,11 @@ no authorities."** That is strictly stronger than what was measured, and the
 
 ⇒ **Authority production does not run on the RESPONSE-OWNER route.** Context
 bodies in the same compile get 593 entries; Response bodies get none. **The site
-is settled: `:6971`, not `v1751`/`v1386`.** An earlier provisional 3-of-17 read
-is retired by this one, not merged with it.
+is settled: the RESPONSE STAGING PATH, not `v1751`/`v1386`.** An earlier
+provisional 3-of-17 read is retired by this one, not merged with it.
+**WIDENED 2026-09-16:** that path is a three-step sequence and `:6971` is its
+second step — see the SITE row.  The claim corrected here is *which route*, and
+that half is unchanged.
 
 > **THE EMPTY `Some(other)` CELL ESTABLISHES NOTHING ABOUT REACHABILITY, AND D1
 > MUST NOT TREAT THAT ARM AS DEAD CODE.** In the implementer's terms:
@@ -734,6 +815,36 @@ declaration and `RT-CONSTRUCTOR-AUTHORITY-DISCHARGE` owns it; if it does
 declare, SEED is the repair and it is narrow. **The SITE line is NOT amended
 until this is read** — it still says `:6971`.
 
+> ### READ 2026-09-16. THE CALL SITE DROPS A CONTRACT IT WAS HANDED — arm (b).
+>
+> **`units.rs:6868-6878`, on the response-owner K-call path, verbatim:**
+>
+>     if let Some(obligation) = compiler
+>         .function_local
+>         .pending_call_result_obligations
+>         .iter_mut()
+>         .find(|obligation| obligation.result_word == returned.word)
+>     {
+>         obligation.realization_required = true;
+>         // The owner's exact tag/arity guards refine this realized word;
+>         // a declaration on the K call is not consumed as identity proof.
+>         obligation.identity = None;
+>     }
+>
+> **The comment concedes it** — *"a declaration on the K call is not consumed as
+> identity proof"*, and you cannot decline to consume a declaration that was
+> never made. **But a comment is not a proof**, and this is settled from an
+> INVARIANT instead: see the DISCRIMINATOR row for the construction-site
+> invariant (`calls.rs:2479-2483`) and the exhaustive two-mutation grep that
+> together make `(realization_required = true, identity = None)` reachable only
+> from `:6877`.
+>
+> ⇒ **THE SITE LINE IS NOW AMENDED, and it widened rather than moved.** It is
+> the three-step sequence in the SITE row, of which `:6971` is the second step.
+> **The question above is answered; the fork it fed is not closed** — the
+> invariant fixes what the bit MEANS, not which value it has, and that bit is
+> not yet printed. Architect `evt_2tzn77b3tcxj4`.
+
 ### THE CUT CONTRADICTS ITSELF AT THE BOUNDARY, AND ONLY THE GRAPH SHOWS IT
 
 **Architect `evt_4s7beb7qyrhqz`. This is scope, not prose.**
@@ -980,7 +1091,9 @@ matched at `:4356`/`:4406` by `.filter(|(target, _)| *target == body.target)`.
 other: **its absence here is a gap in the measurement, not a consequence of the
 code.**
 
-⇒ **This changes the repair's SHAPE, not its site.** `:6971` either way.
+⇒ **This changes the repair's SHAPE, not its site.** The same
+response-staging sequence either way — see the SITE row, which widened on
+2026-09-16 to three steps of which `:6971` is the second.
 
     if Continuation ALSO produces authority   the split is Response-vs-rest, and
                                               Response is missing something two
