@@ -9352,6 +9352,67 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     /// CLAIMED: D1-D5 are a closed planner population before any consumer is
     /// exposed. GAP: Slice 2 still has to declare the ABI unit arm, and Slice 3
     /// still has to lower a call; this test claims neither.
+    /// `R1a` — a detached proof is present in the plan AND refused by the
+    /// direct-outer accessor.
+    ///
+    /// Two facts about one population, asserted on the MAP. The observation
+    /// channel cannot carry this: `RequiredConsumerProjectionDisposition` has
+    /// three arms that partition the world as it stood before
+    /// `DetachedReturnContext` existed, and the drain that installs a detached
+    /// proof pushes no observation at all, so a pin keyed on
+    /// `take_continuation_required_consumer_observations` would read identically
+    /// whether the detached arm never ran, ran and was miscategorised, or ran
+    /// correctly. Widening that enum touches rows `recursor_fusion.rs` already
+    /// asserts against; it is a follow-up, deliberately not folded in here.
+    ///
+    /// The subject is selected by a predicate on the VARIANT, never positionally.
+    /// A `.next()` selector would pass on whichever projection came first — the
+    /// same defect this port had to repair in the
+    /// `REQUIRED_CONSUMER_PROJECTION_MUTATION` harness one channel over, where
+    /// widening the type turned a control into one that stops firing rather than
+    /// failing.
+    #[test]
+    fn a_detached_projection_is_in_the_map_and_refused_by_the_direct_outer_accessor() {
+        let plan = contspec_plan();
+
+        let detached = plan
+            .required_consumer_projections
+            .iter()
+            .filter(|(_, projection)| {
+                matches!(
+                    projection,
+                    RequiredConsumerProjection::DetachedReturnContext(_)
+                )
+            })
+            .map(|(identity, _)| identity.clone())
+            .collect::<Vec<_>>();
+
+        // Vacuity control. Without it the assertions below hold trivially on any
+        // tree whose producer stopped minting, which is exactly the regression
+        // that would make the direct-outer accessors total for the wrong reason.
+        assert!(
+            !detached.is_empty(),
+            "this fixture must mint at least one detached return-context proof; \
+             if it does not, the producer regressed and every assertion below is \
+             vacuous",
+        );
+
+        for identity in &detached {
+            assert!(
+                plan.required_consumer_projection_for(identity).is_none(),
+                "R1a: the direct-outer accessor must refuse a detached proof, so \
+                 the three accessors on DirectOuterProjection stay total at every \
+                 reachable call; identity {identity:?}",
+            );
+            assert!(
+                plan.detached_return_context_for(identity).is_some(),
+                "a detached proof must stay reachable through its own accessor; \
+                 refusing it on both routes would lose the capability rather than \
+                 route it; identity {identity:?}",
+            );
+        }
+    }
+
     #[test]
     fn contspec_planner_closes_ordered_keys_units_and_causal_edges_dormantly() {
         let plan = contspec_plan();
