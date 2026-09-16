@@ -47,3 +47,33 @@ executes that fresh authorization.
 
 Neither seat can merge alone: the Steward holds no GitHub credential, the
 lieutenant holds no gate authority. The split is what makes that safe.
+
+## A HOLD ASKED FOR IN A REVIEW POST IS NOT A HOLD (2026-09-16, twice in one hour)
+
+**Only the ROUTER can withdraw an authorization, because only `ROUTED: <SHA>`
+created it.** A reviewer who spots a defect after routing and writes *"@lieutenant
+hold this one for a one-line fix"* has posted into a channel the publisher is not
+reading for instructions — it is polling for `ROUTED:`, and a review is not that.
+
+Measured twice in one hour, both times the Architect, both times correct:
+
+    review asked to hold 9312aeab3   -> landed uncorrected at 235b49683
+    review asked to hold 577444432   -> landed as the +33/-0 shape at 2a0b1cf83
+
+**Both defects were real, both were named before the landing, and both became
+follow-up corrections to `main` instead** — including one the reviewer had
+explicitly predicted would become *"a `-N` correction to a memory file."*
+
+⇒ **The tell for a REVIEWER:** if your finding needs to stop a landing, address
+the **router**, not the executor, and say *"withdraw the routing"* rather than
+*"hold." The router is the only seat that can un-authorize.
+
+⇒ **The tell for the ROUTER:** the window between your `ROUTED:` and the merge is
+when reviews arrive, and you have no way to recall the authorization once the
+publisher picks it up. **On a doc-only candidate you expect commentary on, route
+it as `ROUTED, HOLD FOR <reviewer>` and post a bare `ROUTED: <SHA>` only after
+the review clears** — so the hold lives in the one channel the publisher acts on.
+
+**Do not read this as "the executor erred."** It executed exactly the
+authorization it was given, which is the protocol working. The defect is that a
+live authorization had no withdrawal mechanism, and that belongs to the router.
