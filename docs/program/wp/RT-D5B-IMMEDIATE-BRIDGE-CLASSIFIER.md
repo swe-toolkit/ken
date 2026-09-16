@@ -142,28 +142,192 @@ warning to a source file. **Warnings arising in files other than the new module
 fail this AC.** At the base measurement the delta was 12, all in the new module
 and none elsewhere.
 
-## 7. The open decision, and the WP's real risk
+**AC-6. Every test case carries its provenance.** A case whose expected verdict
+is **lifted** cites its ancestor as `file:line` at `0f71ab5b9`. A case with no
+cited ancestor is labelled **new intent** in the test itself. Control: every
+case has exactly one of the two.
 
-**The tests are new authorship, not a lift.** The 36 commits proved this
-classifier out *through the plan*, so no direct unit tests over `RuntimeExpr`
-exist to carry across. The classifier is pure, so it is directly testable — but
-writing those tests is design work, which is why this is T1 and M rather than a
-file move.
+> **`AC-6` IS NOT REDUNDANT WITH `AC-2`, AND THE REASON IS THE POINT OF BOTH.**
+> `AC-2` cannot catch a **by-construction** suite: stub the classifier's return
+> and a test whose expectation was simply read off the classifier still goes
+> red. **`AC-2` measures COUPLING, not FAITHFULNESS.** It is necessary, it is
+> well-designed for what it does, and it is not sufficient — and the gap is
+> exactly the size of `AC-6`. Same family as the entailment ruling on
+> `call_seeds`: a value and the thing it is offered to confirm, sharing one
+> producer. (Architect, `evt_5rbgwyamv4y2n`.)
 
-**OPEN, for the Architect: the dead-code window.** In a production build the
-classifier has no consumer until Stratum B lands, so it reports `never used`
-twelve times. Measured: CI has no `-D warnings`, no clippy gate, no
-`[workspace.lints]`, and no `deny(dead_code)`, **so this does not block a green
-build** — it is a quality call, not a gate. Two options:
+**AC-7. Each refusal point has a case.** The classifier's refusals are the
+extraction-fragile part, and a suite authored by walking the `Some` arms will
+miss them. **Every coordinate below was re-verified at source; the arm heads are
+NOT the refusal sites:**
 
-    (a) accept the 12 warnings for one slice's duration
-    (b) #[allow(dead_code)] on the module, with a comment naming the
-        successor node, and an AC on Stratum B REMOVING it
+    :190        body is none of the four spellings
+    :163/:182   Checked wrapper with the wrong inner form
+                (:156 / :175 are the ARM HEADS -- the `return None` lives
+                 in the `let ... else` at :163 and :182)
+    :193        scrutinee is not Var
+                (:192 is the `let ... else` head)
+    :196        offset underflow -- index.checked_sub(argument_binder_offset)?
+    :197        selected_field past the end of producer_args
+    :205        neither cause
 
-**Recommendation: (b), on the condition that the removal obligation is written
-into the Stratum B frame at the same time.** An `allow` with no named remover is
-how a temporary suppression becomes permanent. If the Architect prefers (a),
-`AC-5` still holds and the warnings are simply recorded.
+**`:195` IS DELIBERATELY EXCLUDED AND MUST NOT BE ADDED.** It is
+`usize::try_from(*index).ok()?`, and `RuntimeExpr::Var` carries a `u32`
+(`0f71ab5b9:crates/ken-runtime/src/ir.rs:691`). **`usize::try_from(u32)` cannot
+fail on any target this project supports**, so an AC requiring a case for it
+would be unsatisfiable and a test written to satisfy it could not go red. That
+is the same defect as an uncovered refusal, approached from the other side.
+
+**`:205` does NOT require a lifted negative verdict.** There are two routes to
+`heterogeneous == false` at `:198`, and one needs no producer evidence at all:
+
+    :198  let heterogeneous = !checked_ih_slots_wrapper
+                              && requires_heterogeneous_deforestation(producer);
+
+**Place an attested POSITIVE producer — any of the three at `mod.rs:1518` /
+`:1392` / `:2691` — inside the `CheckedComputationalIHSlots` spelling and
+`heterogeneous` is false by the wrapper, whatever the producer's verdict.** So
+`:205` is reachable from evidence already in hand, and the case composes with
+`AC-8` into one shape rather than two.
+
+**The honest remainder, stated rather than smoothed:** `:205` also needs
+`static_host_operation == false`, and `statically_selects_host_operation` has
+zero ancestors, so **that leg is new intent whichever route is taken** and is
+labelled so per `AC-6`. This repair does not make it attestable; it stops it
+being compounded by a second unattested leg.
+
+**AC-8. The `checked_ih_slots_wrapper` interaction has a case.** At **`:198`**
+that flag **suppresses** the heterogeneous test, and it is the only place the
+flag does anything. **The same producer yields `Heterogeneous` under `Match` and
+does not under `CheckedComputationalIHSlots`.** Two lines, and it pins the one
+flag the four-way dispatch sets. Compose it with the `:205` case above.
+
+**AC-9. The candidate adds no `#[ignore]` rows, or names and excludes any it
+adds.** Control: one grep at candidate time; the expected answer is zero, since
+§5.3 gives no reason for ignored rows. **This is a `D0` precondition, not a
+style rule:** the ignored-row sweep measures the merged tree, so any row added
+here enters `D0`'s population and its dispositions would be working a roster
+nobody framed. Check it rather than assume it.
+
+## 7. The WP's real risk: how the tests get their expectations
+
+**RULED by the Architect, `evt_5rbgwyamv4y2n`. The framing below replaces this
+section's earlier "the tests are new authorship" claim, which was too coarse.**
+
+The tests are **not** uniformly new authorship. The classifier's expectations
+split into two kinds with completely different risk, and only one of them is
+hazardous:
+
+    SEMANTIC   "does this producer require heterogeneous
+                deforestation?"                              MUST BE LIFTED
+    STRUCTURAL "a Match whose scrutinee is Var(3) with
+                offset 1 selects producer_args[2]"           AUTHOR IT FREELY
+
+Read at `0f71ab5b9:...immediate_bridge.rs:132-213`, everything above `:198` is
+total structural dispatch and arithmetic over values the test author chooses.
+**The only judgment in the function is the two calls at `:198-199`** —
+`requires_heterogeneous_deforestation` and `statically_selects_host_operation`.
+So the `RuntimeExpr` handed to the classifier is a **composition**: an attested
+producer, lifted and citable, placed at an index of the author's choosing inside
+a wrapper of the author's choosing.
+
+**Attested positives for `requires_heterogeneous_deforestation`, verbatim at
+`0f71ab5b9`:**
+
+    core/tests/mod.rs:1518-1522  Call { callee: Closure -> Construct }   TRUE
+                                 fixture constructs it at :1509-1514
+    core/tests/mod.rs:1392-1395  a declaration call producing an
+                                 aggregate -- a distinct second shape    TRUE
+    core/tests/mod.rs:2691-2693  Match { scrutinee:
+                                 Construct("ctor:prelude::Bool::True") } TRUE
+                                 inside seed_call_port_producer_match_example()
+
+**THE NEGATIVES ARE SCARCE AND WE HAVE NO ATTESTED SOURCE FOR THEM. An earlier
+version of this frame claimed `core/tests/specialization_binding.rs:4295` and
+`:4301-4302` were one. THAT CLAIM IS STRUCK — it is false.** Read to the end of
+that comment at `:4304-4323`, the three rejected shapes reject on the *other*
+facts in its four-fact conjunction:
+
+    :4304-4309  planner refusal, "computational continuation is outside its
+                source owner subtree"
+    :4310-4314  the ordinary producer route declined -- "that route defined no
+                units, so FACT 3 failed silently"
+    :4315-4323  a runtime merge materializes a source join the deferred-
+                constructor case "refuses outright"
+
+**None is a negative verdict from `requires_heterogeneous_deforestation`.** The
+citation is still useful as context for the fixture; it is **not** evidence for
+`AC-7`. The failure was reading a comment's headline sentence and substituting
+it for the bullets underneath — *three shapes were rejected* became *three
+shapes with an attested negative verdict on the predicate I needed*.
+
+A suite authored by reading the function is almost always all-positive — the
+author walks the `Some` arms. **The refusals are where an extraction bug
+lives**, which is why `AC-7` enumerates them structurally instead of relying on
+lifted negatives that do not exist.
+
+**`produces_deforestable_aggregate_with_ih` gets a DIFFERENTIAL case, and it is
+required.** Production code at `0f71ab5b9:lowering/mod.rs:11739-11740`:
+
+    produces_deforestable_aggregate_with_ih(expr, &recursive_hypotheses)
+        && !produces_deforestable_aggregate_with_ih(expr, &BTreeSet::new())
+
+Same `expr`, two IH sets, opposite verdicts — attested by every green run of
+that branch's suite. The reason it is required is specific: `shifted_aggregate_ihs`
+at `:337` shifts the IH set by binder depth, `:276` recurses **without** the
+shift and `:280` **with** it. **A single-point test that never crosses a binder
+cannot tell those two arms apart, so an off-by-one in the shift is invisible to
+it.** The differential over a binder-crossing shape is what catches it.
+
+**THE HONEST GAP, declared rather than papered over.**
+`statically_selects_host_operation` has **zero** plan-level ancestors — measured
+across `crates/` at `0f71ab5b9`, two hits, both inside the module itself (the
+call at `:199`, the definition at `:215`). **Every case whose expectation turns
+on `ImmediateBridgeCause::StaticHostOperation` is NEW INTENT and is labelled so
+by name in the test.** That cause gets attested by Stratum B, which is what
+gives it a consumer.
+
+**Rejected approach, recorded so it is not re-proposed:** instrumenting
+`core.rs:7144` on the reference branch to capture the `case_body.expr` values
+the existing tests drive through it. It is a genuine lift and it is not ruled
+out on cost — it yields *whatever the existing tests happen to drive*, which is
+a sample of the input distribution rather than a characterization of the
+classifier, in opaque values that tell the next reader nothing. Held in reserve
+for the `StaticHostOperation` gap alone, and not ordered for this slice.
+
+## 7a. The dead-code window: RULED (a), ACCEPT THE TWELVE WARNINGS
+
+**Architect ruling, `evt_5rbgwyamv4y2n`, against this frame's earlier
+recommendation of `#[allow(dead_code)]`. The ruling is adopted and the reasoning
+is better than the recommendation it replaces.**
+
+**In this slice the warnings are not debris — they are the instrument.** The
+twelve `never used` warnings are the only live indicator that the module is on
+no live path, which is the property `AC-3` defines the slice by. Suppressing
+them makes that property unobservable for the whole window:
+
+    AC-5 clause "no warnings outside the new module"    SURVIVES
+    AC-5 clause "attribute the delta to a source file"  LOSES ITS CONTENT
+
+Option (b) does not make `AC-5` vacuous; it kills one of its two clauses, and it
+is the clause carrying `AC-3`'s evidence.
+
+Three further reasons, in order of weight:
+
+1. **(a) is self-clearing; (b) needs someone to remember.** The warnings vanish
+   the moment Stratum B wires the classifier in. (b)'s removal obligation would
+   live in a frame that does not yet exist — and *"an `allow` with no named
+   remover is how a temporary suppression becomes permanent"* was this frame's
+   own hazard note. The condition attached to (b) was right; it just costs more
+   than the thing it protects.
+2. **A recorded baseline turns noise into a discriminator.** With twelve written
+   down, a thirteenth warning or one outside the module is a finding. Silence
+   has no such property.
+3. **This lane's history argues against (b).** "One slice's duration" has been
+   meaning longer than intended, and the longer the module sits without a
+   consumer, the more useful a standing signal saying exactly that.
+
+**No `#[allow(dead_code)]` is added. The twelve warnings ship.**
 
 ## 8. Contention
 

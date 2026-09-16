@@ -36,9 +36,22 @@ origin: "Steward, 2026-09-16, on operator directive 2026-09-16: 'factor small me
 > through the plan, so there are no direct unit tests to carry across. That is
 > why this is T1 and M rather than a file move, and it is where the hour goes.
 >
-> **One open decision is recorded in the frame's §7 (the dead-code window) and
-> it is the Architect's, not the implementer's.** Proceed on option (b) —
-> `#[allow(dead_code)]` naming the successor — unless the Architect rules
-> otherwise; either way `AC-5` holds.
+> **The dead-code window is RULED and there is no open decision left.**
+> Architect `evt_5rbgwyamv4y2n` ruled **(a): accept the twelve warnings, add no
+> `#[allow(dead_code)]`** — against this frame's earlier recommendation. **In
+> this slice the warnings are not debris, they are the instrument:** they are
+> the only live indicator that the module is on no live path, which is the
+> property `AC-3` defines the slice by. Frame §7a carries the full reasoning.
+>
+> **`AC-6` through `AC-9` were added after the ruling and they are where the
+> turn goes.** `AC-6` (provenance per case) exists because **`AC-2` measures
+> COUPLING, not FAITHFULNESS** — stub the classifier and a test whose
+> expectation was read off the classifier still goes red. `AC-7` covers the six
+> refusal points, `AC-8` the one flag interaction, `AC-9` is a `D0` precondition.
+>
+> **The tests are NOT uniformly new authorship** — frame §7 splits semantic
+> expectations (must be lifted, with three attested positives cited verbatim)
+> from structural ones (author freely). The `StaticHostOperation` cause has zero
+> plan-level ancestors and is declared new intent by name.
 
 Read the frame: `docs/program/wp/RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER.md`.
