@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-16 05:12:17Z — from 632 issue file(s) in `docs/program/issues/`.
+2026-09-16 05:14:06Z — from 633 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -432,6 +432,7 @@ the committed file matches the generator's output.
 | `RT-CROSSING-CALLEE-IDENTITY` | GeneratedUnitCallInput is measured at a shared helper with six callers, so branch 1 is provisional -- record WHOSE call is being carried, and exercise the tag's unused negative arm | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2314 |
 | `RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY` | Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it | closed | runtime | S | none | — |
 | `RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING` | Three instruments that discharged RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT cannot detect the failures they were chosen for -- AC-3's recorder is satisfied by a no-op D2, AC-4's control reaches its mechanism only from its own unit test, and the cfg(test) pin that cost a review round annotates a census compiled out 19 days earlier | merged | runtime | S | none | — |
+| `RT-D5B-BRIDGE-REALIZATION-PLANE` | Land the immediate-bridge realization plane -- the derivation, the plan field, and the feature-gated mutation harness -- on top of the classifier slice 1 landed, exercised by unit tests that fail without it and still NOT wired into the live planning path. Slice 2 of the PR #3676 re-cut. | ready | runtime | M | none | — |
 | `RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER` | Land the plan-independent immediate-bridge classifier as a standalone module on main, exercised by unit tests over RuntimeExpr that fail without it. Slice 1 of the PR #3676 re-cut: the stack admits no leaf extraction because its dependency root is 17 files and +3194/-648, so the mechanism is re-cut from main with the closed PR's branch kept as a read-only reference. | ready | runtime | M | none | — |
 | `RT-D5B-POSTCALL-REFUSAL-MECHANISM` | What is the mechanism of the CheckedIhDetachedCallerCut refusal at lowering/core.rs:7720 -- the only distinct Packaging reason in abi_s6_mapping_file_backed_native and the cause of 8 of its 11 base reds, where a two-step SelfDefining post-call consumer receipt meets one computational eliminator frame. THREE mechanisms have been proposed and measured away in one session, all sharing the premise that the defect is reachable from the call site's inputs; the measurement says those inputs are internally consistent and the disagreement is upstream of them. The mechanism is UNKNOWN and this node exists to find it, not to carry a candidate | ready | runtime | M | architect | — |
 | `RT-DEAD-ARM-EFFECT-LOWERING` | A whole-program-dead but type-total request-handler arm is lowered at full strength, so its ConstructorTag effect seat (claim_host_effect_seat) fails the ENTIRE object emission on a path no execution reaches -- the cut is to lower a provably-unreachable total-handler arm's refusing effect seat to a runtime TRAP (fail-closed), gated on a conservative whole-program construction-site census, keeping the seat's Need-subset-Avail partition strict and unchanged | merged | runtime | M | none | — |
@@ -728,6 +729,7 @@ is itself not yet `merged`/`closed`:
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-D5B-BRIDGE-REALIZATION-PLANE` blocked by `RT-D5B-IMMEDIATE-BRIDGE-CLASSIFIER` (status: ready)
 
 ## Gate progress
 
