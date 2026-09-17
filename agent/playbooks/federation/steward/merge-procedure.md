@@ -102,6 +102,76 @@ This file assumes that decision is made.
 watched resolve earlier can be voided by an intervening publish — **re-read it
 at merge time, never from memory.**
 
+> ### M1 IS A PRESENCE PROOF. IT IS THREE-VALUED, AND THE THIRD VALUE IS NOT "ABSENT".
+>
+> **`list_decisions` is hard-capped at 100 rows and returns a sliding recency
+> window.** Measured 2026-09-17 from 313 saved payloads: the last response
+> exceeding 100 rows was `2026-09-05T14:35` (1036 objects); every call from
+> `16:03` that day onward returns **exactly 100**. There is no error, no flag,
+> no `has_more`. **A capped response is shaped exactly like a complete one.**
+>
+> **The cap applies AFTER the filter**, so a bucket's calendar reach is
+> inversely proportional to how fast it fills:
+>
+>     status=proposed    n=0     under cap                     absence SOUND
+>     status=approved    n=6     reaches 2026-07-03            absence SOUND
+>     status=resolved    n=100   reaches ~9 days               absence UNSOUND
+>     status=rejected    n=100   reaches ~40 days              absence UNSOUND
+>     unfiltered         n=100   SHALLOWEST of all             absence UNSOUND
+>
+> ⇒ **Never "read it unfiltered to be safe."** Unfiltered spends its whole
+> 100-row budget across every status at once and has the least reach of any
+> query you can make. **The busiest bucket is the blindest, and `resolved` — the
+> one this step reads — is the busiest.**
+>
+> **What saves this step is that M1 needs PRESENCE, not absence.** A recency cap
+> removes rows; it can never invent one. So everything returned is real and a
+> hit is always sound. Only the inference *"not in the list ⇒ does not exist"*
+> is broken — and the window **emits its own floor**, so you can test it
+> without knowing the cap exists:
+>
+>     FOUND                                          -> PASS
+>     NOT FOUND, Decision resolved AFTER the floor   -> genuinely absent, FAIL soundly
+>     NOT FOUND, resolved BEFORE the floor           -> INCONCLUSIVE: escalate,
+>                                                       and never report it as absent
+>
+> **Read the floor — the oldest `created_at`/`resolved_at` in what came back —
+> at gate time, and never carry it.** It slides. A memorised floor is the same
+> defect as a memorised `origin/main`.
+>
+> **There is no by-id endpoint**, so the assembled read is all there is. In
+> normal operation this step is conclusive: a candidate is routed minutes after
+> its Decision resolves, which is deep inside the window. **The failure mode is
+> old finished work routed late** — a re-route, a long-held branch, a survey
+> that has been asked for five times. It fails CLOSED, refusing valid work
+> rather than admitting invalid work, which is why it ran unnoticed from
+> 2026-09-05.
+>
+> **Do NOT repair this by relaxing the acceptance criterion.** Re-keying M1 off
+> `resolved_by`/`resolved_at` instead of the status string was proposed and
+> **withdrawn as fail-open** on 2026-09-16: the same mis-key made by three seats
+> is one defect with three instances, not a convention. M1's criterion is
+> correct as written. **The defect was never the gate or its key — it was
+> reporting an INCONCLUSIVE as an ABSENCE.**
+
+> ### WHAT M1-M3 CANNOT SEE, SO YOU DO NOT MISREAD A LATER RED AS A GATE FAILURE
+>
+> This gate verifies **provenance and scope**: a resolved Decision, an exact
+> SHA, a diff shape. **None of those is a compile, a test, or a review.**
+>
+> Measured 2026-09-17 on `fe7dc542b0fe29ce899ec575aabd5f8930e8901d`: M2 and M3
+> were clean and every statement in them was true — 9 files, crates-only,
+> correct merge-base, empty intersection, on origin — **and the tree called four
+> functions that are defined nowhere in it.** `-p ken-runtime` compiled green
+> because the call sites sit under `#[cfg(feature = "px8-ds-test-support")]` and
+> that package's `default = []`, while CI activates the union every workspace
+> member demands.
+>
+> ⇒ **When a routed candidate reds in CI, the routing gate did not fail.** Do
+> not add build steps to M1-M3 and do not weaken `COORDINATION §12`, which is
+> operator law. Withdraw the routing, say so by full SHA, and let the ring
+> respin — the next candidate is a new SHA and carries nothing forward.
+
 ## M2 — Verify the exact SHA, and verify its SHAPE against the declared range
 
 ```sh
@@ -345,6 +415,34 @@ scripts/scripted-pr-automerge.sh \
   --target <SHA> --title <pr-title> \
   (--description <text> | --description-file <path>) [--doc-only]
 ```
+
+> ### BEFORE YOU PUBLISH, CHECK WHETHER A RUN IS IN PROGRESS ON `main`
+>
+> ```sh
+> gh api "repos/swe-toolkit/ken/actions/runs?branch=main&per_page=1" \
+>   --jq '.workflow_runs[0] | "\(.status) \(.head_sha)"'
+> ```
+>
+> **If it says `in_progress`, wait.** `.github/workflows/ci.yml` keys its
+> concurrency group on `github.event.pull_request.number || github.ref`. On a
+> push there is no PR number, so the group collapses to the constant
+> `refs/heads/main`, and `cancel-in-progress: true` means **your merge cancels
+> the run verifying the commit before yours.**
+>
+> On a PR branch that supersede is correct — successive pushes are revisions of
+> one candidate. **On `main` it is never correct**: successive pushes are
+> distinct landed commits, each its own subject, each needing its own
+> measurement.
+>
+> **A DOC-ONLY publish is the most destructive kind**, which is the opposite of
+> how it reads. It cancels a full crates matrix and replaces it with a run whose
+> heavy jobs are *skipped* — so the branch keeps reporting green while nothing
+> executes. Measured 2026-09-16: `f4229a16` (crates) was cancelled 3m48s in by a
+> docs push, and ten docs commits followed, each green, none running a shard.
+>
+> **This is a live workaround, not the fix.** The fix is a one-line change of
+> `github.ref` to `github.sha`, which leaves the `pull_request` path provably
+> untouched because that branch of the expression is unreachable there.
 
 - **doc-only** — about two minutes; foreground is fine.
 - **code** — `run_in_background: true`, always. It waits 581 to 718 seconds
