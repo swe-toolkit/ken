@@ -386,26 +386,49 @@ Run that way the instrument conflates two different facts: *"`main` moved this
 method"* and *"the implementer already ported this method onto the branch"*.
 Both read as `M != B`.
 
-**Steward-measured, one variable changed, same extractor on both runs:**
+**Measured independently by the Steward and by the Architect, each in their own
+extractor, one variable changed between the two runs of each:**
 
-    third tree = port branch 879f00c99    ADJUDICATE  154
-    third tree = origin/main              ADJUDICATE   32
+| | | OWED | MAIN'S | ADJUDICATE | ABSENT |
+|---|---|---|---|---|---|
+| Steward | third tree = branch `879f00c99` | 252 | 11 | 154 | 90 |
+| Steward | third tree = `origin/main` | **372** | 11 | **32** | **151** |
+| Architect | third tree = branch `879f00c99` | 200 | 12 | 20 | 88 |
+| Architect | third tree = `origin/main` | **322** | 12 | **6** | **131** |
 
-⇒ **A five-fold inflation of the single number the sizing turns on**, in the
-direction that makes the node look far bigger than it is. The control that
-proves it is `units.rs`: `main` is **byte-identical to the base** there
-(Steward-verified), so by definition *no* method in it can be "both moved" —
-yet the branch-based run puts 25 of its methods in ADJUDICATE. Against
-`origin/main` it has **zero**, and the remaining ADJUDICATE rows concentrate
-in `planning/static_transition/**`, which is exactly the diverged Region 3.
+The control that proves the defect is `units.rs`: `main` is **byte-identical to
+the base** there, so by definition *no* method in it can be "both moved" — yet
+the branch-based run puts 25 of its methods in ADJUDICATE (2 in the Architect's
+extractor). Against `origin/main` **both go to zero**, and the surviving rows
+concentrate in `planning/static_transition/**`, which is exactly the diverged
+Region 3.
 
-**Do not read this as overturning the Architect's census.** His counts were
-taken with his own extractor and are re-derivable; mine uses a different one
-and reports different totals throughout (my AGREE is 2601 against his 2172), so
-**the absolute numbers are not comparable and I am not replacing them.** The
-claim here is the controlled one: *within one extractor, changing only the
-third tree moves ADJUDICATE by 5x.* His **20** and my **32** are the same
-finding; the branch-based **154** is an artifact.
+### THE CORRECTION MOVES THREE BUCKETS, IN TWO DIRECTIONS. Read all of them.
+
+> **AMENDED 2026-09-17. The first version of this section published only the
+> ADJUDICATE row, and it was the Architect who re-ran his own extractor and
+> supplied the rest** (`evt_55pw9gwz3vqm4`). **The two OWED/ABSENT figures were
+> printed beside the ADJUDICATE figure in the same run** — this was not an
+> unmeasured quantity, it was the half of one measurement that made the recut
+> look clean. **A correction that moves buckets in opposite directions is one
+> finding; reporting half of it is a different claim, not a partial one.**
+
+    ADJUDICATE   FALLS several-fold      the judgment node gets SMALLER
+    OWED         RISES ~50-60%           the mechanical node gets BIGGER
+    ABSENT       RISES ~50-70%           the mechanical node gets BIGGER
+
+**The two rising buckets are this node's entire content.** Whatever sizing was
+taken from the branch-based OWED and ABSENT understates this node by roughly
+half. **`§2c`'s "~117 items" predates all of this and is not the extent
+either.**
+
+**What both extractors agree on: every direction. What they agree on in
+absolute terms: nothing.** With `origin/main` as the third tree the Architect's
+AGREE is 2064 against the Steward's 2601, and ADJUDICATE differs 6 against 32.
+⇒ **The controlled claim is the only one either of us is entitled to: within
+one extractor, changing only the third tree moves ADJUDICATE down several-fold
+and OWED/ABSENT up by roughly half.** No number in this frame is a target, and
+`AC-1` says so explicitly.
 
 ### POPULATION FROM THE UNION, AND THE INSTRUMENT MUST SAY SO IN ITS OUTPUT
 
