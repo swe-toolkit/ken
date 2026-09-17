@@ -1,6 +1,6 @@
 ---
-name: publisher-app-cannot-push-workflow-file-changes
-description: "The scripted-publisher GitHub App CANNOT push changes to .github/workflows/ (it lacks the `workflows` permission) — a branch touching any workflow file is rejected at push with 'refusing to allow a GitHub App to create or update workflow ... without workflows permission', so it never merges. Enforce CI gates as WORKSPACE TESTS (run by the existing cargo test CI), not by editing a workflow file. Any WP that wires a gate via .github/workflows/ is unpublishable via the scripted publisher."
+name: publisher-app-workflow-push-was-permitted-2026-07-21
+description: "SUPERSEDED, and the old title was the hazard: the scripted-publisher GitHub App CAN push .github/workflows/ changes. The operator granted the ken-ci App the Workflows permission on 2026-07-21; measured 2026-09-17, the App has landed 23 commits touching .github/workflows/, 18 of them after 2026-07-22, most recently 2026-09-04. A workflow-touching WP is DELIVERABLE by the scripted publisher. Kept as a reference because two seats once ruled a finished WP undeliverable from the stale note and the Steward escalated for a permission already granted -- for mutable external state, test at point of use; a recorded constraint is evidence about the past, not a fact about now."
 metadata:
   node_type: memory
   type: reference
