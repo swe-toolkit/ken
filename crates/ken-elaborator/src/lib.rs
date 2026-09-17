@@ -7,6 +7,15 @@
 //! L1 extensions: numeric tower, literal defaulting, overflow obligations.
 //! Clean-room: built from `/spec` and `/conformance` only.
 
+// `standard_operators::StandardOperatorRole` is crate-internal BY CONTRACT,
+// not by convention: the membership track widens it, and that widening is an
+// ordinary internal edit only for as long as the type never reaches this
+// crate's public surface. `private_interfaces` is the compiler check that
+// says so -- a `pub fn` taking or returning the role type, or a `pub` field
+// holding one, becomes a BUILD ERROR here rather than a silent escape that
+// the widening seat discovers later.
+#![deny(private_interfaces)]
+
 mod ast;
 pub mod bytes;
 pub mod capabilities;
@@ -39,6 +48,7 @@ pub mod program_admission;
 pub mod protocol;
 pub mod prover;
 pub mod resolve;
+mod standard_operators;
 pub mod strings;
 pub mod temporal;
 pub mod trace;
