@@ -986,6 +986,73 @@ eleven are gone".**
 > measured result is that careful manual porting has a nonzero error rate at
 > scale — five instances on one WP is the expected number, not an anomaly.
 >
+> ### THE CRATE SET IS DERIVED FROM THE MANIFESTS, NOT NAMED BY THE AUTHOR.
+> Amended 2026-09-17, correcting the amendment above within the hour.
+>
+> **`-p ken-runtime --lib` is under-scoped, and so was the four-crate
+> requirement that preceded it.** Flagged by the Architect: `ken-runtime`
+> caught all 31 regressions **by accident of this tree's shape** — 21 of 25
+> changed files happen to sit in that crate — not because it covers the change.
+> `ken-host` has consumers outside it.
+>
+> **The closure, derived from `crates/*/Cargo.toml` and recorded as the output
+> of a derivation rather than as a preference:**
+>
+>     TOUCHED      ken-runtime   ken-host   ken-interp   ken-cli
+>     DEPENDENTS   ken-elaborator  -> runtime, host, interp
+>                  ken-verify      -> runtime, host, interp, cli
+>     CLOSURE      ken-host  ken-runtime  ken-interp  ken-cli
+>                  ken-elaborator  ken-verify                        = SIX
+>
+>     the port's reported coverage    1 of 6
+>     the four-crate requirement      4 of 6      <- also author-named
+>
+> ⇒ **The defect is not list length. It is that a human enumerated the list.**
+> Research advisory `evt_7hscbvr36bhgj`, layer 1: **compute the re-verification
+> set as the reverse-dependency closure over the declared build graph.** It is
+> decidable precisely because dependencies are declared. **This frame wrote
+> *"state the population as something you SELECTED"* one paragraph above and
+> then selected it by hand** — the same predicate, committed inside the sentence
+> correcting it.
+>
+> **`COORDINATION §12` is NOT in tension with this.** The AC names the six
+> crates **explicitly**, as a recorded derivation output to be re-run when the
+> touched set changes. **Never `--workspace`** — that is the operator's hard
+> rule and it OOMs this box. **A derived list, written down, is still a targeted
+> build.**
+>
+> **THE CLOSURE IS A FIXPOINT, AND THAT IS MEASURED RATHER THAN ASSUMED.** The
+> table above is one hop, and **a hand-chosen depth is the same defect a third
+> time** — flagged by the Architect, whose number four this corrects and who
+> owns it rather than letting it be absorbed. So the second hop was run:
+>
+>     dependents of ken-elaborator   ken-cli, ken-interp, ken-verify   ALL ALREADY IN
+>     dependents of ken-verify       none
+>     => the set is CLOSED at six.  One hop reached the fixpoint HERE, by luck
+>        of this graph, not because one hop is the method.
+>
+> **The method is the fixpoint; the six is its output.** It is a genuine 6 of
+> the workspace's 8 — `ken-foundation` and `ken-kernel` depend on nothing in the
+> touched set — so this is a real closure and not `--workspace` wearing a list.
+>
+> **Re-run the derivation to a FIXPOINT, do not copy the six.** The touched set
+> is a property of the candidate; a later cut that touches a different crate has
+> a different closure, and there is no guarantee its first hop is closed.
+>
+> **Re-run it MECHANICALLY.** A derivation whose re-run means reading manifests
+> by hand is prose, and it will decay exactly the way the four-crate number did.
+> `evt_6tm4wpntt1dpa` supplies it in command form.
+>
+> **THE ONE-HOP WARNING IS ABOUT HAND-DERIVATION AND IS NOT A CAVEAT ON THAT
+> COMMAND.** The command already computes the fixpoint; **do not wrap it in an
+> outer loop and do not read the warning as distrust of it.** The defect it
+> guards against is the manual read that produced the first version of this
+> table — a human walking one level of `Cargo.toml` and calling the result a
+> closure. **A tool that iterates to a fixpoint has already discharged it.**
+> Corrected by @research before landing (`evt_68a1rzrfc198n`), who flagged that
+> the instruction sitting beside their command would be read as a correction
+> OF it.
+>
 > **No mutation AC is added here.** Mutation at the change surface
 > (`agent/playbooks/tools/mutation-prove-a-pin.md`) is the instrument that would
 > have exhibited this in one run, and it is the right instrument for a later
@@ -1023,6 +1090,73 @@ eleven are gone".**
 > it.** The implementer names the six locations in the handover; *"byte-faithful
 > port"* is false there and the frame says so rather than leaving a reviewer to
 > discover it as a discrepancy.
+
+> ### WHAT THE CORRECTED METHOD MEASURED: 31 REGRESSIONS, AND THEY ARE NOT A
+> CLOSURE-DEPTH QUESTION. **THE RECUT STARTS HERE.**
+>
+>     origin/main   ken-runtime --lib   1035 passed    0 FAILED   2 ignored
+>     candidate     ken-runtime --lib   1014 passed   31 FAILED   2 ignored
+>
+>     exist on main, pass on main    31       all port-introduced
+>     candidate-only                  0       bucket 3 measured EMPTY
+>
+> **`main`'s baseline is completely green, so there is nothing to net out.**
+>
+> **This candidate (`0b653a894` / `f877914b4`) is DEAD, not respinnable.** A
+> port whose central claim is *it replays cleanly* is refuted by its own first
+> honest measurement. No merge Decision opens on it.
+>
+> #### TWO DIAGNOSES WERE PUBLISHED AND BOTH WERE REFUTED BY ONE MEMBERSHIP TEST
+>
+>     Architect   a coupling relation among rows -- the closure UNDER-CLOSED
+>     Steward     the closure DEPTH I ruled one step over a second relation
+>
+>     measured    IN fixpoint-minus-one-step ....  4 of 31
+>                 a row, in NEITHER set .........  8
+>                 NOT A ROW AT ALL .............. 19
+>
+> **Extending the ruling to the fixpoint would have caught 4, not 31.**
+>
+> #### THE DOMINANT CASE, RE-DERIVED AGAINST THE OBJECTS BY THE STEWARD
+>
+>     crates/ken-runtime/src/cranelift_backend/lowering/core/tests/
+>
+>     source_frame_bridge.rs               8 failures
+>     positional_candidate_settlement.rs   6 failures
+>     specialization_binding.rs            3 failures
+>                                         17 of 31
+>
+>     all three:  blob at BASE == blob at SOURCE == blob at MAIN
+>
+> **Byte-identical in ALL THREE trees** — not merely base-vs-source. The port
+> had nothing to port there, and neither line ever touched them.
+>
+> ⇒ **No instrument keyed on *what differs* can contain these rows — at any
+> closure depth, over any relation.** The one-step/fixpoint axis is not too
+> narrow here, **it is DISJOINT**: the worklist's population is *things that
+> changed* and the victims are *things that did not*. Widening the closure moves
+> a boundary inside a set that never contained them.
+>
+> **Both published diagnoses looked for the answer INSIDE the worklist** — one a
+> relation among rows, one a depth over that relation. **The failure is in the
+> unchanged consumer.** That is collateral evolution's defining shape
+> (`evt_7hscbvr36bhgj`, an hour before either diagnosis): the dependent nobody
+> edited is the one that breaks, because its expectations are pinned to
+> behaviour that moved underneath it.
+>
+> #### WHAT THE RECUT MUST SETTLE, AND WHAT IT MUST NOT ASSUME
+>
+> **The unit of the port is the METHOD; the unit of correctness here is not a
+> unit in the worklist at all.** Do not recut by resizing the row set — a recut
+> that changes only how many rows are in scope reproduces this at a different
+> size. **The open question is what makes an unchanged consumer's expectations
+> survive a production-behaviour change**, and nothing measured so far answers
+> it.
+>
+> **Do not run triage on the 31 to answer it.** Sizing a repair program off 31
+> individually-attributed reds is the failure that produced this node's history.
+
+
 
 **AC-1b — NO PORTED TEST GETS QUIETER. Written down 2026-09-17, having been
 operated for a day without existing.**
