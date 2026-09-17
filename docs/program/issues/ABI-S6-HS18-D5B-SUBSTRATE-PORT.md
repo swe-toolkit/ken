@@ -142,7 +142,20 @@ can name is reviewable, and a silent one is indistinguishable from an oversight.
 
 - **The refused `MappingAcquireFile` grant — SIX sites, not five (amended
   2026-09-17).** `lowering/effects.rs` +46/-5 is census site 5, 8 of 42 lines.
-  **Do NOT hand-separate it.** It is already carved out as
+  **Do NOT hand-separate it — and the REASON is the rule, not the shape.**
+  Hand-picking 8 of 42 lines draws a boundary a reviewer must **trust** rather
+  than **check**.
+
+  ⇒ **The rule is "never draw a boundary only your judgement can locate." It is
+  NOT "never split a file."** Where the boundary is already drawn by something
+  mechanical — a `cfg` attribute, a module wall — a reviewer verifies it by
+  reading one line, the concern that produced this rule does not arise, and
+  **splitting is licensed.** Worked case: `ken-host/src/effect_v1.rs`, frame
+  `§2e`, where whole-file exclusion would have broken the build outright
+  (Architect `evt_2jzjsj3nhn2qm`). **A future reader applying the shape instead
+  of the reason would have taken the wrong branch there.**
+
+  It is already carved out as
   [[RT-D5B-MAPPING-AVAILABILITY-FLIP]] (`draft`), held out of slice 4 on
   Architect ruling `evt_3wtg8w8krmmt` — *"Membership is a plan, not evidence"* —
   and unblocked for **cutting, not release** (`evt_21f23zmgqfxsc`). **Excluded

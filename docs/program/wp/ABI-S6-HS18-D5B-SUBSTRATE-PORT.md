@@ -107,13 +107,58 @@ panic.** Land the roster without site 5's dispatch arm and the op passes the gat
 at `:2812`, falls through `match operation` at `:3076`, and hits
 `unreachable!()` at `:3713`.
 
-⇒ **Exclude whole files, do not hand-separate hunks**, exactly as the node
-already mandates for site 5. **Treat six as a floor and close it with the
+⇒ **Exclude whole files rather than hand-separating hunks WHEREVER THE ONLY
+BOUNDARY AVAILABLE IS YOUR JUDGEMENT**, as the node mandates for site 5. **That
+is the rule's reason and its limit — see `§1b`, where a compiler-drawn boundary
+licenses a split and whole-file exclusion would have broken the build.**
+**Treat six as a floor and close it with the
 parent's `AC-PREDICATE` — zero diff lines naming the operation at pathspec
 `crates/` — which catches all seven touches without anyone holding a complete
 site list.** Measured: Region 2's 13 files carry 17 such lines; the 10 files
 that remain after excluding the catalog, `lowering/effects.rs` and
 `st/effects.rs` carry **zero**.
+
+**1b. `ken-host/src/effect_v1.rs` IS SPLIT, and whole-file exclusion is
+REFUSED.** Ruled by the Architect (`evt_2jzjsj3nhn2qm`), Steward-verified at
+`origin/main` and `30d35f625`:
+
+    ken-runtime/src/lib.rs   pub use ken_host::{with_d5b_file_source_admission_mutation,
+                                                D5bFileSourceAdmissionMutation}
+      origin/main   0 occurrences        30d35f625   1
+
+`lib.rs` is a **Region 2 file this port replays** (`+9/-8`), and its replay adds
+that re-export. **Exclude `effect_v1.rs` whole and Region 2 re-exports two
+symbols that do not exist — `ken-runtime` does not compile.** A tree that does
+not build produces one error and **no test results at all**, so whole-file
+exclusion does not yield a node carrying honest reds; it yields a node that
+**cannot report anything**, defeating the instrument this port exists to run.
+
+**Site 5's whole-file rule does not transfer, and the reason is why.** That rule
+exists because hand-picking 8 of 42 lines draws a boundary a reviewer must
+**trust**. Here the boundary is drawn by the compiler:
+
+    effect_v1.rs:1072 .. :1116   #[cfg(any(test, feature = "px8-ds-test-support"))]
+      brackets exactly: the enum, two thread_locals, the Drop guard,
+      and with_d5b_file_source_admission_mutation
+
+**A `cfg` attribute is not judgement** — one line checks it. **LAND that block.**
+
+**THE GRANT'S FOOTPRINT IN THIS FILE IS BIGGER THAN SITES 2/3/4.**
+Steward-verified:
+
+    effect_v1.rs:1118  fn mapping_acquire_file_source_rights   NOT cfg-gated
+    effect_v1.rs:3263  called INSIDE the op's own match arm,
+                       (HostOpV1::MappingAcquireFile, CanonicalRequestV1::MappingAcquireFile {..})
+      origin/main  0 occurrences (whole file)      30d35f625  2
+
+It computes how the promoted op resolves its source handle ⇒ by the boundary
+criterion (*a site belongs to the grant if its presence is required for the
+promoted op to function as promoted*) it is the **paradigm case, not a near
+miss**. **EXCLUDE it and its `:3263` call site.** This is the third time the
+grant census has grown — **six is a floor, and so is this.**
+
+⇒ Within `effect_v1.rs`: **LAND** the cfg-gated instrument block; **EXCLUDE**
+sites 2/3/4, `mapping_acquire_file_source_rights`, and `:3263`.
 
 **2. This node does NOT unblock `RT-D5B-POSTCALL-REFUSAL-MECHANISM`.** The
 Steward's sequencing ruling claimed it would give that node *"a reproduction on
@@ -261,6 +306,32 @@ that does not match them is this AC working, not failing.** Report the
 population you actually observe, do not reconcile it against that one, and do
 not read a missing red as a red you repaired.
 
+**ONE RED IS PREDICTED IN ADVANCE. It carries NO information about the port.**
+Named before the run so it is never read as a finding (Architect
+`evt_2jzjsj3nhn2qm`):
+
+    D5B_FILE_SOURCE_ADMISSION_APPLICATIONS -- only writer is
+      mapping_acquire_file_source_rights  (effect_v1.rs:1121-1124)   EXCLUDED
+
+    consumer  ken-cli/tests/abi_s6_mapping_file_backed_native.rs:607
+      fn file_source_admission_uses_read_not_destination_protection_rights
+      :614  assert_eq!(applications, 1, "...must reach one file acquisition")
+
+On the ported tree `applications` is **0 by construction** and that assertion
+fails. **Report it per AC-4 with the exclusion named as its cause.**
+
+**WRITE THE CAUSE BESIDE IT OR IT WILL BE RE-DERIVED WRONGLY.** A
+mutation-witness reading zero is the exact signature of a **vacuous
+instrument**, and a later reader cannot distinguish *"the exclusion removed the
+producer"* from *"this instrument never worked."* Those are two causes behind
+one number.
+
+**THE DISCRIMINATOR, which is the informative half:** if that test fails at
+**any other** assertion — `exit_status`, `terminal_error`, `mutated_backing`,
+the effect trace — **that is NOT predicted by the exclusion and IS a finding.**
+**Quote which assertion failed, never only the test name.** Same discipline as
+the `CheckedIhDetachedCallerCut` reds: name the emitting site, not the symptom.
+
 **AC-5 — the excluded instruments are NAMED.** `§3`'s predicate produces
 exclusions; list them with the reason each failed the reaching-consumer test.
 **An exclusion you can name is reviewable; a silent one is indistinguishable
@@ -298,3 +369,29 @@ gets answered.
 - [[ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT]] — the landed sibling port
   (`10e75cb93656d5ea787bceaf754b2500b78de166`); the worked precedent for extent
   and review on this exact surface.
+
+## 11. Symptom inventory
+
+**Armed by the Steward 2026-09-17, after the Architect correctly reported that
+this WP had none** (`evt_yg6f1x2cpwez`). The omission was the Steward's: per
+`steward/escalation.md`, arming this line is the Steward's act and *"an unarmed
+trigger is not a trigger."* The Architect appends entries and owns the predicate
+check.
+
+```text
+SYMPTOM INVENTORY (Architect appends one line per hard-stop; never rewritten)
+NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
+
+1. a file holding BOTH grant content and an instrument the replayed region
+   imports -- keyed on COMPILE DEPENDENCY crossing the exclusion boundary,
+   not on what the lines mean          (ken-host/src/effect_v1.rs, evt_2jzjsj3nhn2qm)
+```
+
+**THE NUMBERING RESTARTS HERE, AT 1.** The Architect first wrote this entry as
+*"5."* and then withdrew the number themselves, because there is no durable
+record of entries 1-4 **on this WP** — the count was carried from context.
+**A number a reader cannot resolve against this file is not a record.** If this
+inventory is meant to continue a predecessor WP's, name that WP and its entries
+here; otherwise 1 is correct and the predicate check falls at the 3rd entry
+appended below.
+
