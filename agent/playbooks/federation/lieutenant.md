@@ -205,7 +205,69 @@ implementer -> leader -> {QA, Architect}      (review routing, UNCHANGED)
   wait on and the seat that owes it, you are stalled — find out.
 - **Held finished work is the top of the queue** (COORDINATION §10⁻). A routed
   candidate waiting to merge outranks starting anything else.
-- **Whether you run a self-watchdog is an open item** — it depends on whether the
-  pi harness exposes the convo-channel interval the Steward uses. Until resolved,
-  the **Steward's watchdog covers your lanes** via `local/lanes.md`. Flag a
-  starved lane to the Steward if you notice it before the Steward does.
+## §8. ARM YOUR OWN MONITORING INTERVAL AT SESSION START
+
+**Operator ruling, 2026-09-17. This closes the former open item — "whether you
+run a self-watchdog" — in favour of YES.** Pat, on clearing a stalled
+lieutenant seat by hand: *"I cleared the block by compacting the lieutenant and
+instructing it to start an interval timer for monitoring. That should be part
+of its skill."*
+
+**Arm it at session start, and again after every compaction,** while any
+candidate is routed and unpublished:
+
+    schedule_create(interval_seconds=900, label="lieutenant-monitor",
+      prompt="[monitor tick] list routed-but-unpublished candidates; read
+      origin/main's SHA; for each, is a PR open and what is its check state?
+      Publish the next one in the Steward's order. Reap dead monitors. If the
+      queue is empty and nothing is owed, do nothing.")
+
+It is the **same sanctioned, provider-agnostic mechanism the Steward uses**
+(`COORDINATION §13`) — it works identically on Claude-Code and terra/Codex
+seats. It **posts nothing to the space**: the prompt is delivered privately
+into your own session. `schedule_delete(schedule_id)` disarms it;
+`schedule_list` shows what you own. **Do NOT use convo `schedule_call`** — that
+executes on the backend and broadcasts a System event to every participant.
+
+### WHY THIS IS NOT "POLLING", WHICH §7 FORBIDS
+
+**§7's "event-driven, never poll" governs how you READ THE SPACE.** It is still
+in force: do not sit in a loop calling `get_recent_context`.
+
+**This interval reads your OWN QUEUE, not the space.** The distinction is the
+whole point — **a routed candidate's arrival is an event, but its continued
+non-publication is a STATE, and no event ever fires for it.** The Steward posts
+`ROUTED:` exactly once. If that wake is missed, dropped, consumed by a
+compaction, or swallowed by a modal, **nothing will ever tell you again**, and
+the queue is silently stalled while your seat looks merely quiet.
+
+### THE STALL THIS WAS RULED ON
+
+Measured 2026-09-17. Three candidates sat routed with **no PR opened**;
+`origin/main` did not move for roughly half an hour; a fourth PR's CI was
+running normally and masked the gap. The seat was **alive** — 44% ctx, a
+7-second crunch on receiving a mention — but it had **60 accumulated monitors**
+and a modal awaiting a keypress, and it neither published nor reported.
+
+**Every single-shot recovery had already been tried and had failed**: the
+Steward posted the queue twice, by mention, which is the only wake there is.
+The seat woke, did nothing substantive, and slept. **A missed wake cannot be
+repaired by another wake through the same channel** — recovery has to come from
+a timer the seat owns, or from a human.
+
+### TWO THINGS THE TICK MUST ACTUALLY DO
+
+1. **Reap your monitors.** Sixty accumulated watches is a seat spending its
+   context on landings that already happened. Retire a monitor when its
+   candidate lands; a dead watch costs you the context M4-M9 needs.
+2. **Report a queue you cannot drain.** If a tick finds routed candidates you
+   are not publishing — blocked, red, or you do not know why — **say so to the
+   Steward.** §1a: a hold must have an address. "Quiet" and "stalled" are
+   indistinguishable from outside, and the Steward's `ROUTED:` is irrevocable,
+   so it cannot take the work back without you.
+
+**The Steward's watchdog still covers your lanes** via `steward/lanes.md`, and
+you still flag a starved lane if you see it first. **That is a backstop, not
+your primary instrument** — it fires on the Steward's schedule and measures the
+Steward's concerns, and on 2026-09-17 it noticed the drought only because the
+Steward ran a production check on itself.
