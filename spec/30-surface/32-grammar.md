@@ -276,10 +276,12 @@ delimiter, `31 §1b`) is the surface spelling of the kernel propositional-
 truncation former (`../10-kernel/16 §6`, `‖A‖ : Ω`). It is a first-class atomic
 type, spellable **wherever a type is expected** — including annotation position
 (`x : ‖A‖`, `fn f : ‖A‖`, `let y : ‖A‖`) — and, since types are terms (§3), in
-expression position. (Staging: expression position is landed now; annotation
-position parses once `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES` D1's grammar
-production lands — the annotation-position spelling is the settled end state,
-not yet the current parser, which rejects `‖A‖` in a type position until D1.)
+expression position. (Staging: expression position is landed now; **annotation
+position parses today** — `LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES` D1 landed its
+`parse_atom_type` production at `15c4ba089`, so the annotation-position
+spelling is the current parser and not a future one. In **both** categories a
+truncation as the **argument** of an application (`f ‖A‖`, `G ‖A‖`) does not
+yet parse; write `f (‖A‖)` and `G (‖A‖)`.)
 Its **introduction** is written `trunc_intro a` (arity-1 checked-mode sugar),
 injecting `a : A` into `‖A‖`; the kernel notation for this is `|a|` (`16 §6`),
 which is **not** surface-spellable — a single `|` is an ordinary token, so the
