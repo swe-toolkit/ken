@@ -83,6 +83,14 @@ comm -23 <(items 30d35f625 "$f") <(items origin/main "$f")
 `crates/ken-runtime/src/cranelift_backend/**` moves under active work. **Every
 coordinate in this frame is a symbol name, and yours should be too.**
 
+**THE PREDICATE IS ONLY DEFINED OVER FILES THAT CONTAIN COUNTABLE ITEMS, and it
+does not say so itself — it AGREES instead.** On a manifest, a `.toml`, a doc
+file or anything else with no `fn`/`struct`/`enum`/`const`/`type`, both sides of
+the `comm` are empty and the empty result reads as **nothing missing**. That
+fired on `crates/ken-runtime/Cargo.toml`, which was reported SUBSUMED while
+holding a different feature line (`§3a`). **Restrict the file set before running
+it, or the favourable answer is structural.**
+
 ### 2e. THE GRANT IS SIX SITES, NOT FIVE — and this node is NOT an enabler
 
 Amended 2026-09-17, after three seats measured this independently. **Two things
@@ -261,6 +269,27 @@ tree property that yields the enumeration as a by-product.
 without knowing what to move. **The list is needed to ACT; the defect is using
 it as EVIDENCE.** Two jobs, one artifact, and the chain has been running both.
 
+### The closure's first confirmation, found the day it was written
+
+`runtime-implementer`, `evt_662hds2t1j7g1`. The item predicate reported
+`crates/ken-runtime/Cargo.toml` **SUBSUMED** — while that file held a genuinely
+different feature line.
+
+**It was not a bug in the predicate. The file contains zero items of the kinds
+the predicate counts, so it compared two empty sets and returned the favourable
+answer.** A manifest has no `fn`, `struct`, `enum`, `const` or `type`, and
+`comm -23` over two empty lists is empty, which the instrument reads as nothing
+missing.
+
+⇒ **A vacuous comparison does not fail; it AGREES.** The rung below reachability
+failing silently in the direction that says "proceed" — and the build is what
+caught it. **This is the closure's own prediction firing on the day it was
+written, by an instrument aimed at the tree rather than the list.**
+
+**Pin for anyone re-running `§2d`'s predicate:** it is scoped to files that
+**contain countable items**. Run it over a manifest, a `.toml`, a doc file or a
+generated file and its silence is structural, not evidential.
+
 ### What the recut RETAINS, REPLACES, and does NOT freeze
 
 **RETAINS — everything already proved.** A named predicate is not a licence to
@@ -279,8 +308,28 @@ changed representation of the **work** makes the old stops count against
 something superseded. **Here the predicate names the representation of the
 EVIDENCE; the mechanism chain is unchanged and continues.** The count is also
 not the Steward's to move: `escalation.md` duty 1 is explicit that the Architect
-holds it alone and *"their own record stands."* Theirs reads `§1a` 16, delta 0,
-predicate check discharged at row 12, next check at row 15.
+holds it alone and *"their own record stands."*
+
+**THE CATEGORY ARGUMENT ABOVE IS NOT THE STRONGEST ONE, and the stronger one is
+what should be copied** (Architect `evt_7v1j0d8zw4qe8`, interrogating the call
+rather than ratifying it). The case *for* freezing is real: if the closure works,
+the stops it explains were caused by a defect now fixed, so continuing to count
+means a later advisory fires on a question already answered.
+
+⇒ **What defeats it is COST ASYMMETRY, not category.** The hard-stop trigger is
+a safety net: firing it early costs one research pull; not firing it when needed
+is what let an earlier chain reach ten. **And the decisive half — the closure is
+UNTESTED.** Zeroing a counter on the assumption that a just-authored closure will
+hold is *"one more round will crack it"* wearing bookkeeping clothes, and it
+would zero the counter **immediately before the stops that would most need the
+trigger.** If the closure holds, the count simply never reaches its next
+threshold — **that is the outcome working, not the counter being wrong.**
+
+**Two counters, and they are not the same number.** The advancing hard-stop count
+that drives the research cadence stands at **16, delta 0, next trigger at 18**.
+The inventory's predicate check is keyed on `§11` rows, was discharged at row 12,
+and falls next **three appended entries after that discharge** — see `§11`, where
+striking the unrecoverable rows makes an ordinal schedule unsafe.
 
 ## 4. D0 — answer before writing production. A hard stop here is a GOOD outcome.
 
@@ -499,9 +548,14 @@ The predecessor's predicate, **already WIDENED once** (Architect
 
 ```text
 SYMPTOM INVENTORY (Architect appends one line per hard-stop; never rewritten)
-PREDICATE CHECK: 12th DISCHARGED 2026-09-17 -> NEXT = 15th, then 18th, ...
+PREDICATE CHECK IS ANCHORED TO AN ENTRY, NOT TO AN ORDINAL.
+  discharged at the effect_v1.rs entry (row 12) on 2026-09-17
+  next check = the 3rd entry appended AFTER that one
 
-  1-3  NO DURABLE RECORD ANYWHERE -- see the gap note below
+  1-3  TOMBSTONE -- STRUCK 2026-09-17, content unrecoverable.
+       Numbers RETAINED so every ordinal below keeps the value it has
+       always had. Both WPs recorded these as a pointer at
+       thr_6azxdz555c2qy; neither ever held the content.
 
   4    seed of 5 closes to 29 items                 D0 census
   5    RequiredConsumerProjection resident on main and RESHAPING   read, not census
@@ -541,9 +595,14 @@ enum, accessors going total to partial), which is the majority of the list the
 candidate claimed to explain. It was generalised from the three rows its author
 had personally produced. **The surviving predicate covers all nine rows read.**
 
-**SCOPE OF THE ANSWER: nine of twelve rows.** The Architect read rows 4-12 and
-the widened three-shape table; **rows 1-3 they have not read, and neither has
-anyone else — there is no copy to read.** They asked to be checked against them.
+**SCOPE OF THE ANSWER, as given: nine of twelve rows.** The Architect read rows
+4-12 and the widened three-shape table; **rows 1-3 they had not read, and
+neither had anyone else — there is no copy to read.** They asked to be checked
+against them, which is what produced the strike below.
+
+⇒ **After the strike the answer stands over EVERY row that has content**, and
+the caveat is discharged rather than outstanding. **The nine were never the
+incomplete part; the twelve was.**
 
 > **THE GAP IS THE SEED, AND IT IS THE STEWARD'S.** Rows 1-3 have never had a
 > durable home. The predecessor's `§1b` stubs them exactly as this section did —
@@ -554,8 +613,39 @@ anyone else — there is no copy to read.** They asked to be checked against the
 > exactly what a compaction discards."* **The section's first row broke the
 > section's own rule, at the moment it was armed.**
 >
-> ⇒ **A row whose content is a pointer is not a row.** Reproduce the entry, or
-> record that it is lost. Asked of `runtime-implementer`, who appended them; if
-> they cannot be reproduced, they are struck and the count is re-based with that
-> said out loud rather than left as three silent placeholders.
+> ⇒ **A row whose content is a pointer is not a row.**
+
+**ANSWERED AND STRUCK, 2026-09-17.** `runtime-implementer`, who appended them,
+could not reproduce them and said so plainly rather than reconstructing
+something plausible (`evt_662hds2t1j7g1`). They measured before answering:
+
+    git grep 'thr_6azxdz555c2qy' origin/main -- docs/ agent/
+      -> escalation.md, and the predecessor's stub line. Nothing else.
+
+**The only surviving trace of rows 1-3 is the stub itself.** Rows 4-11 carry
+content inline — populations, coordinates, which instrument found each — and
+rows 1-3 carry a thread id. Their own context cannot supply it either, across
+several compactions since: **the three rows that were never written down are
+exactly the three that could not survive a compaction**, which is the section's
+own stated rationale arriving from the other side. **An honest eight-of-eight
+beats three placeholders that make the list read nine-twelfths-checked forever.**
+
+> **THEY ARE TOMBSTONES, NOT DELETIONS, AND THE ORDINALS DO NOT MOVE** (Architect
+> `evt_7v1j0d8zw4qe8`). Renumbering would have been a **silent three-entry delay
+> in a safety trigger, arriving as a side effect of a bookkeeping fix** — the
+> `effect_v1.rs` entry would become row 9, and *"next check at 15"* would then
+> mean three more real events than it meant this morning. Nobody would choose
+> that; it just happens if the numbers re-base and the schedule does not.
+>
+> ⇒ **General form, because it will recur: an append-only record whose ordinals
+> carry SCHEDULING meaning cannot have rows removed.** Either the ordinals are
+> stable — struck rows become tombstones keeping their number — or the schedule
+> is anchored to entries rather than counts. **Tombstones are the smaller
+> change**, and they preserve the evidence that three rows were once cited and
+> never written. This section now does both: tombstoned numbers **and** a check
+> anchored to the `effect_v1.rs` entry.
+
+**Recorded as a visible re-base rather than a quiet edit**, the same way the
+row-number correction was: the list was cited as **12** entries, holds **9** with
+content, and the ordinals of all nine are unchanged.
 
