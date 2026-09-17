@@ -8,7 +8,7 @@ mod catalog_publication;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
+use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DIAGNOSTIC_KEN_MD: &str =

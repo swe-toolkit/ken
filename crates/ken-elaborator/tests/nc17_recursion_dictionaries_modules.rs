@@ -546,8 +546,7 @@ fn checked_core_imported_value_crosses_an_accepted_var_capture() {
     let example = RuntimeExample {
         name: "checked-core-imported-var-capture".to_string(),
         checked_core_shape:
-            "let captured = dep-pkg.Dep.answer in (lambda ignored. captured) captured"
-                .to_string(),
+            "let captured = dep-pkg.Dep.answer in (lambda ignored. captured) captured".to_string(),
         ir: body,
         observation: RuntimeObservation::Returned(RuntimeGroundValue::Int((9).into())),
     };
@@ -564,9 +563,8 @@ fn checked_core_imported_value_crosses_an_accepted_var_capture() {
     assert_eq!(interpreted.observation.observation, example.observation);
 
     let native = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty());
-    let error = native.expect_err(
-        "the representable capture reaches the separate dependency-linking gap",
-    );
+    let error =
+        native.expect_err("the representable capture reaches the separate dependency-linking gap");
     let ken_runtime::CraneliftBackendError::Unsupported(unsupported) = error else {
         panic!("the checked-Ken capture reached the wrong native failure: {error:?}");
     };

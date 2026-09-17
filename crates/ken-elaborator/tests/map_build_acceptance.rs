@@ -93,11 +93,8 @@ fn mk_map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::load_derived_importing_fixture(&mut env, "list_append");
-    env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Data.Numeric.Nat.Arithmetic",
-    )
-    .expect("Map's canonical Nat addition provider must roots-load");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+        .expect("Map's canonical Nat addition provider must roots-load");
     for imported in ["add", "cong", "sym", "trans", "list_append"] {
         assert!(
             !env.globals.contains_key(imported),
@@ -313,7 +310,9 @@ fn make_store(env: &ElabEnv) -> EvalStore {
     let mut store = EvalStore::new();
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
     for (id, v) in &env.num_values {
-        store.num_values.insert(*id, lit_to_eval(v, mkdecimalpair_id));
+        store
+            .num_values
+            .insert(*id, lit_to_eval(v, mkdecimalpair_id));
     }
     store.list_char_ids = Some(ListCharIds {
         nil_id: env.prelude_env.nil_id,
@@ -342,14 +341,23 @@ fn eval_def(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
     }
 }
 
-fn eval_view(env: &mut ElabEnv, store: &mut EvalStore, name: &str, ty: &str, expr: &str) -> EvalVal {
+fn eval_view(
+    env: &mut ElabEnv,
+    store: &mut EvalStore,
+    name: &str,
+    ty: &str,
+    expr: &str,
+) -> EvalVal {
     let src = format!("const {name} : {ty} = {expr}");
     let id = env
         .elaborate_decl(&src)
         .unwrap_or_else(|e| panic!("{name} failed to elaborate: {e}"));
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
     for (nid, v) in &env.num_values {
-        store.num_values.entry(*nid).or_insert_with(|| lit_to_eval(v, mkdecimalpair_id));
+        store
+            .num_values
+            .entry(*nid)
+            .or_insert_with(|| lit_to_eval(v, mkdecimalpair_id));
     }
     eval_def(env, store, id)
 }
@@ -391,7 +399,9 @@ fn list_pair_nat_nat(env: &ElabEnv, v: &EvalVal) -> Vec<(u64, u64)> {
                     EvalVal::Pair { fst, snd, .. } => {
                         out.push((nat_count(env, fst), nat_count(env, snd)));
                     }
-                    other => panic!("Cons head of List (Pair k v) must be an EvalVal::Pair, got {other:?}"),
+                    other => panic!(
+                        "Cons head of List (Pair k v) must be an EvalVal::Pair, got {other:?}"
+                    ),
                 }
                 cur = args[2].clone();
             }
@@ -466,7 +476,9 @@ fn tree_carrier_and_ops_are_not_primitive() {
         matches!(env.env.lookup(tree_id), Some(Decl::Inductive { .. })),
         "Tree k v must be Decl::Inductive"
     );
-    for name in ["empty", "to_list", "fold", "Pair", "mk_pair", "pair_fst", "pair_snd"] {
+    for name in [
+        "empty", "to_list", "fold", "Pair", "mk_pair", "pair_fst", "pair_snd",
+    ] {
         let id = env.globals[name];
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
@@ -475,11 +487,20 @@ fn tree_carrier_and_ops_are_not_primitive() {
     }
     // Zero-NEW-delta: none of these mint a fresh trusted_base entry.
     let delta_empty = trusted_base_delta(&env.env, env.globals["empty"]);
-    assert!(delta_empty.is_empty(), "empty must add zero trusted_base delta, got {delta_empty:?}");
+    assert!(
+        delta_empty.is_empty(),
+        "empty must add zero trusted_base delta, got {delta_empty:?}"
+    );
     let delta_tolist = trusted_base_delta(&env.env, env.globals["to_list"]);
-    assert!(delta_tolist.is_empty(), "to_list must add zero trusted_base delta, got {delta_tolist:?}");
+    assert!(
+        delta_tolist.is_empty(),
+        "to_list must add zero trusted_base delta, got {delta_tolist:?}"
+    );
     let delta_fold = trusted_base_delta(&env.env, env.globals["fold"]);
-    assert!(delta_fold.is_empty(), "fold must add zero trusted_base delta, got {delta_fold:?}");
+    assert!(
+        delta_fold.is_empty(),
+        "fold must add zero trusted_base delta, got {delta_fold:?}"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -491,8 +512,17 @@ fn tolist_of_empty_is_nil() {
     let mut env = mk_env();
     let mut store = make_store(&env);
     let nil_id = env.globals["Nil"];
-    let v = eval_view(&mut env, &mut store, "t_empty_tolist", "List (Pair Nat Nat)", "to_list Nat Nat (empty Nat Nat)");
-    assert!(matches!(v, EvalVal::Ctor { id, .. } if id == nil_id), "to_list of empty must be Nil, got {v:?}");
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_empty_tolist",
+        "List (Pair Nat Nat)",
+        "to_list Nat Nat (empty Nat Nat)",
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor { id, .. } if id == nil_id),
+        "to_list of empty must be Nil, got {v:?}"
+    );
 }
 
 #[test]
@@ -511,7 +541,11 @@ fn tolist_ascending_by_key_on_hand_built_tree() {
         // The flip: a bug emitting construction/insertion order instead of
         // in-order-by-key traversal would yield [(2,2),(1,1),(3,3)] — this
         // asserts the ASCENDING list, not just the element set.
-        assert_eq!(out, vec![(1, 1), (2, 2), (3, 3)], "to_list must be ascending by key, got {out:?}");
+        assert_eq!(
+            out,
+            vec![(1, 1), (2, 2), (3, 3)],
+            "to_list must be ascending by key, got {out:?}"
+        );
     });
 }
 
@@ -542,7 +576,11 @@ fn fold_agrees_with_left_fold_over_tolist() {
                 other => panic!("not a well-formed List chain: {other:?}"),
             }
         }
-        assert_eq!(out, vec![1, 2, 3], "fold must visit ascending key order, matching to_list; got {out:?}");
+        assert_eq!(
+            out,
+            vec![1, 2, 3],
+            "fold must visit ascending key order, matching to_list; got {out:?}"
+        );
     });
 }
 
@@ -553,14 +591,29 @@ fn fold_agrees_with_left_fold_over_tolist() {
 #[test]
 fn map_ops_full_api_not_primitive() {
     let env = mk_env();
-    for name in ["insert", "lookup", "member", "from_list", "from_list_acc", "set_insert", "set_member", "set_to_list", "Ordered", "all_keys", "lookup_empty_is_none"] {
+    for name in [
+        "insert",
+        "lookup",
+        "member",
+        "from_list",
+        "from_list_acc",
+        "set_insert",
+        "set_member",
+        "set_to_list",
+        "Ordered",
+        "all_keys",
+        "lookup_empty_is_none",
+    ] {
         let id = env.globals[name];
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "{name} must be Decl::Transparent (declare_def), not a primitive/postulate"
         );
         let delta = trusted_base_delta(&env.env, id);
-        assert!(delta.is_empty(), "{name} must add zero trusted_base delta, got {delta:?}");
+        assert!(
+            delta.is_empty(),
+            "{name} must add zero trusted_base delta, got {delta:?}"
+        );
     }
 }
 
@@ -587,7 +640,11 @@ fn insert_lookup_roundtrip_some() {
     let v = eval_view(&mut env, &mut store, "t_roundtrip", "Option Char", &expr);
     match v {
         EvalVal::Ctor { id, ref args, .. } if id == some_id => {
-            assert_eq!(args[1], EvalVal::Int('v' as i64), "lookup after insert must return Some 'v', got {args:?}");
+            assert_eq!(
+                args[1],
+                EvalVal::Int('v' as i64),
+                "lookup after insert must return Some 'v', got {args:?}"
+            );
         }
         other => panic!("insert-then-lookup must be Some 'v'; got {other:?}"),
     }
@@ -607,11 +664,26 @@ fn lookup_order_distinct_key_is_none() {
         v = char_lit('v')
     );
     let v = eval_view(&mut env, &mut store, "t_distinct", "Option Char", &expr);
-    assert!(matches!(v, EvalVal::Ctor { id, .. } if id == none_id), "distinct-key lookup must be None, got {v:?}");
+    assert!(
+        matches!(v, EvalVal::Ctor { id, .. } if id == none_id),
+        "distinct-key lookup must be None, got {v:?}"
+    );
 
-    let expr_empty = format!("lookup Char Char leqChar ({z}) (empty Char Char)", z = char_lit('z'));
-    let v = eval_view(&mut env, &mut store, "t_lookup_empty", "Option Char", &expr_empty);
-    assert!(matches!(v, EvalVal::Ctor { id, .. } if id == none_id), "lookup on empty must be None, got {v:?}");
+    let expr_empty = format!(
+        "lookup Char Char leqChar ({z}) (empty Char Char)",
+        z = char_lit('z')
+    );
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_lookup_empty",
+        "Option Char",
+        &expr_empty,
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor { id, .. } if id == none_id),
+        "lookup on empty must be None, got {v:?}"
+    );
 }
 
 #[test]
@@ -625,10 +697,20 @@ fn overwrite_last_writer_wins() {
         v1 = char_lit('1'),
         v2 = char_lit('2')
     );
-    let v = eval_view(&mut env, &mut store, "t_overwrite_lookup", "Option Char", &expr);
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_overwrite_lookup",
+        "Option Char",
+        &expr,
+    );
     match v {
         EvalVal::Ctor { id, ref args, .. } if id == some_id => {
-            assert_eq!(args[1], EvalVal::Int('2' as i64), "re-insert must overwrite to the LAST writer's value, got {args:?}");
+            assert_eq!(
+                args[1],
+                EvalVal::Int('2' as i64),
+                "re-insert must overwrite to the LAST writer's value, got {args:?}"
+            );
         }
         other => panic!("overwrite lookup must be Some '2'; got {other:?}"),
     }
@@ -638,9 +720,19 @@ fn overwrite_last_writer_wins() {
         v1 = char_lit('1'),
         v2 = char_lit('2')
     );
-    let v = eval_view(&mut env, &mut store, "t_overwrite_tolist", "List (Pair Char Char)", &tolist_expr);
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_overwrite_tolist",
+        "List (Pair Char Char)",
+        &tolist_expr,
+    );
     let out = list_pair_char_char(&env, &v);
-    assert_eq!(out, vec![('k' as i64, '2' as i64)], "re-insert must NOT duplicate the node, got {out:?}");
+    assert_eq!(
+        out,
+        vec![('k' as i64, '2' as i64)],
+        "re-insert must NOT duplicate the node, got {out:?}"
+    );
 }
 
 #[test]
@@ -655,11 +747,21 @@ fn tolist_ascending_via_real_insert() {
         b = char_lit('b'),
         c = char_lit('c')
     );
-    let v = eval_view(&mut env, &mut store, "t_tolist_real_insert", "List (Pair Char Char)", &expr);
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_tolist_real_insert",
+        "List (Pair Char Char)",
+        &expr,
+    );
     let out = list_pair_char_char(&env, &v);
     assert_eq!(
         out,
-        vec![('a' as i64, 'a' as i64), ('b' as i64, 'b' as i64), ('c' as i64, 'c' as i64)],
+        vec![
+            ('a' as i64, 'a' as i64),
+            ('b' as i64, 'b' as i64),
+            ('c' as i64, 'c' as i64)
+        ],
         "to_list over a real b,c,a-order insert sequence must be ascending by key, got {out:?}"
     );
 }
@@ -681,7 +783,13 @@ fn fromlist_last_writer_and_ordered() {
         c = char_lit('c')
     );
     let expr = format!("to_list Char Char (from_list Char Char leqChar ({list_expr}))");
-    let v = eval_view(&mut env, &mut store, "t_fromlist", "List (Pair Char Char)", &expr);
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_fromlist",
+        "List (Pair Char Char)",
+        &expr,
+    );
     let out = list_pair_char_char(&env, &v);
     assert_eq!(
         out,
@@ -702,15 +810,27 @@ fn set_is_map_unit() {
         b = char_lit('b')
     );
     let v = eval_view(&mut env, &mut store, "t_set_member_hit", "Bool", &expr);
-    assert!(matches!(v, EvalVal::Ctor { id, .. } if id == true_id), "member of an inserted element must be True, got {v:?}");
+    assert!(
+        matches!(v, EvalVal::Ctor { id, .. } if id == true_id),
+        "member of an inserted element must be True, got {v:?}"
+    );
 
     let expr_absent = format!(
         "set_member Char leqChar ({z}) (set_insert Char leqChar ({a}) (Leaf Char Unit))",
         z = char_lit('z'),
         a = char_lit('a')
     );
-    let v = eval_view(&mut env, &mut store, "t_set_member_miss", "Bool", &expr_absent);
-    assert!(matches!(v, EvalVal::Ctor { id, .. } if id == false_id), "member of an absent element must be False, got {v:?}");
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_set_member_miss",
+        "Bool",
+        &expr_absent,
+    );
+    assert!(
+        matches!(v, EvalVal::Ctor { id, .. } if id == false_id),
+        "member of an absent element must be False, got {v:?}"
+    );
 
     let tolist_expr = format!(
         "set_to_list Char (set_insert Char leqChar ({a}) (set_insert Char leqChar ({c}) (set_insert Char leqChar ({b}) (Leaf Char Unit))))",
@@ -718,7 +838,13 @@ fn set_is_map_unit() {
         b = char_lit('b'),
         c = char_lit('c')
     );
-    let v = eval_view(&mut env, &mut store, "t_set_tolist", "List Char", &tolist_expr);
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_set_tolist",
+        "List Char",
+        &tolist_expr,
+    );
     let nil_id = env.globals["Nil"];
     let cons_id = env.globals["Cons"];
     let mut out = Vec::new();
@@ -736,7 +862,11 @@ fn set_is_map_unit() {
             other => panic!("not a well-formed List chain: {other:?}"),
         }
     }
-    assert_eq!(out, vec!['a' as i64, 'b' as i64, 'c' as i64], "set_to_list must be ascending, got {out:?}");
+    assert_eq!(
+        out,
+        vec!['a' as i64, 'b' as i64, 'c' as i64],
+        "set_to_list must be ascending, got {out:?}"
+    );
 }
 
 #[test]
@@ -767,7 +897,13 @@ fn letter_frequency_shape() {
         n = char_lit('n')
     );
     let expr = format!("to_list Char Nat (countChars leqChar ({banana}) (empty Char Nat))");
-    let v = eval_view(&mut env, &mut store, "t_letter_freq", "List (Pair Char Nat)", &expr);
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_letter_freq",
+        "List (Pair Char Nat)",
+        &expr,
+    );
     let nil_id = env.globals["Nil"];
     let cons_id = env.globals["Cons"];
     let mut out = Vec::new();
@@ -1312,7 +1448,10 @@ fn cat4_new_api_is_derived_and_axiom_free() {
             "{name} must be transparent derived Ken, not a primitive/postulate"
         );
         let delta = trusted_base_delta(&env.env, id);
-        assert!(delta.is_empty(), "{name} must add zero trusted_base delta, got {delta:?}");
+        assert!(
+            delta.is_empty(),
+            "{name} must add zero trusted_base delta, got {delta:?}"
+        );
     }
 }
 
@@ -1356,9 +1495,17 @@ fn cat4_delete_dropkey_filters_all_equivalent_keys() {
         &mut store,
         "t_cat4_delete_lookup",
         "Option Nat",
-        &format!("lookup Nat Nat leq_nat ({}) (delete Nat Nat leq_nat ({}) ({m}))", nat(1), nat(1)),
+        &format!(
+            "lookup Nat Nat leq_nat ({}) (delete Nat Nat leq_nat ({}) ({m}))",
+            nat(1),
+            nat(1)
+        ),
     );
-    assert_eq!(option_nat(&env, &v), None, "deleted key must look up as None");
+    assert_eq!(
+        option_nat(&env, &v),
+        None,
+        "deleted key must look up as None"
+    );
 }
 
 #[test]
@@ -1387,7 +1534,10 @@ fn cat4_union_intersection_difference_execute_over_nat() {
         &mut store,
         "t_cat4_union_orientation",
         "Option Nat",
-        &format!("lookup Nat Nat leq_nat ({}) (union Nat Nat leq_nat (λx.λy. x) ({a}) ({b}))", nat(1)),
+        &format!(
+            "lookup Nat Nat leq_nat ({}) (union Nat Nat leq_nat (λx.λy. x) ({a}) ({b}))",
+            nat(1)
+        ),
     );
     assert_eq!(
         option_nat(&env, &v),
@@ -1402,7 +1552,11 @@ fn cat4_union_intersection_difference_execute_over_nat() {
         "List (Pair Nat Nat)",
         &format!("to_list Nat Nat (intersection Nat Nat leq_nat ({a}) ({b}))"),
     );
-    assert_eq!(list_pair_nat_nat(&env, &v), vec![(1, 10)], "intersection keeps only shared keys with values from the left map");
+    assert_eq!(
+        list_pair_nat_nat(&env, &v),
+        vec![(1, 10)],
+        "intersection keeps only shared keys with values from the left map"
+    );
 
     let v = eval_view(
         &mut env,
@@ -1411,7 +1565,11 @@ fn cat4_union_intersection_difference_execute_over_nat() {
         "List (Pair Nat Nat)",
         &format!("to_list Nat Nat (difference Nat Nat leq_nat ({a}) ({b}))"),
     );
-    assert_eq!(list_pair_nat_nat(&env, &v), vec![(2, 20)], "difference keeps left-only keys");
+    assert_eq!(
+        list_pair_nat_nat(&env, &v),
+        vec![(2, 20)],
+        "difference keeps left-only keys"
+    );
 }
 
 /// Regression for LANG-MOD-CATALOG-REALIZATION: persistent local declaration
@@ -1490,10 +1648,30 @@ fn cat4_keys_values_are_aligned_tolist_projections() {
         twenty = nat(20),
         thirty = nat(30)
     );
-    let ks = eval_view(&mut env, &mut store, "t_cat4_keys", "List Nat", &format!("keys Nat Nat ({m})"));
-    let vs = eval_view(&mut env, &mut store, "t_cat4_values", "List Nat", &format!("values Nat Nat ({m})"));
-    assert_eq!(list_nat(&env, &ks), vec![1, 2, 3], "keys must follow to_list ascending key order");
-    assert_eq!(list_nat(&env, &vs), vec![10, 20, 30], "values must stay positionally aligned with keys");
+    let ks = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat4_keys",
+        "List Nat",
+        &format!("keys Nat Nat ({m})"),
+    );
+    let vs = eval_view(
+        &mut env,
+        &mut store,
+        "t_cat4_values",
+        "List Nat",
+        &format!("values Nat Nat ({m})"),
+    );
+    assert_eq!(
+        list_nat(&env, &ks),
+        vec![1, 2, 3],
+        "keys must follow to_list ascending key order"
+    );
+    assert_eq!(
+        list_nat(&env, &vs),
+        vec![10, 20, 30],
+        "values must stay positionally aligned with keys"
+    );
 }
 
 #[test]
@@ -1521,7 +1699,10 @@ fn cat4_relations_compose_and_converse_over_adjacency_maps() {
             three = nat(3)
         ),
     );
-    assert!(bool_value(&env, &v), "compose must include 1 -> 3 when R has 1 -> 2 and S has 2 -> 3");
+    assert!(
+        bool_value(&env, &v),
+        "compose must include 1 -> 3 when R has 1 -> 2 and S has 2 -> 3"
+    );
 
     let v = eval_view(
         &mut env,
@@ -1534,7 +1715,10 @@ fn cat4_relations_compose_and_converse_over_adjacency_maps() {
             two = nat(2)
         ),
     );
-    assert!(bool_value(&env, &v), "converse must reverse the adjacency edge 1 -> 2 into 2 -> 1");
+    assert!(
+        bool_value(&env, &v),
+        "converse must reverse the adjacency edge 1 -> 2 into 2 -> 1"
+    );
 }
 
 /// Source: `spec/50-stdlib/58-maps-sets-relations.md §7` and the CAT-4
@@ -1682,12 +1866,8 @@ fn cat_rel_size_and_dom_count_only_outer_relation_keys() {
            ({one}) MkUnit \
            (Node Nat Unit (Leaf Nat Unit) ({two}) MkUnit (Leaf Nat Unit))"
     );
-    let single_edge = format!(
-        "add_edge Nat leq_nat ({one}) ({two}) (empty Nat (Tree Nat Unit))"
-    );
-    let two_sources = format!(
-        "add_edge Nat leq_nat ({two}) ({three}) ({single_edge})"
-    );
+    let single_edge = format!("add_edge Nat leq_nat ({one}) ({two}) (empty Nat (Tree Nat Unit))");
+    let two_sources = format!("add_edge Nat leq_nat ({two}) ({three}) ({single_edge})");
     let seeded_dom = format!(
         "add_edge Nat leq_nat ({two}) ({three}) \
            (add_edge Nat leq_nat ({zero}) ({one}) (empty Nat (Tree Nat Unit)))"
@@ -1737,9 +1917,7 @@ fn cat_rel_size_and_dom_count_only_outer_relation_keys() {
         &mut store,
         "t_cat_rel_two_source_dom_size",
         "Nat",
-        &format!(
-            "size Nat Unit (dom Nat (Tree Nat Unit) ({two_sources}))"
-        ),
+        &format!("size Nat Unit (dom Nat (Tree Nat Unit) ({two_sources}))"),
     );
     assert_eq!(
         nat_count(&env, &value),
@@ -1752,18 +1930,14 @@ fn cat_rel_size_and_dom_count_only_outer_relation_keys() {
         &mut store,
         "t_cat_rel_dom_source_member",
         "Bool",
-        &format!(
-            "set_member Nat leq_nat ({one}) (dom Nat (Tree Nat Unit) ({single_edge}))"
-        ),
+        &format!("set_member Nat leq_nat ({one}) (dom Nat (Tree Nat Unit) ({single_edge}))"),
     );
     let target_member = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_dom_target_member",
         "Bool",
-        &format!(
-            "set_member Nat leq_nat ({two}) (dom Nat (Tree Nat Unit) ({single_edge}))"
-        ),
+        &format!("set_member Nat leq_nat ({two}) (dom Nat (Tree Nat Unit) ({single_edge}))"),
     );
     assert!(
         bool_value(&env, &source_member),
@@ -1908,36 +2082,32 @@ fn cat_rel_reachability_obeys_positive_fuel_and_domain_bound() {
     let one = nat(1);
     let two = nat(2);
     let three = nat(3);
-    let seed_edge = format!(
-        "add_edge Nat leq_nat ({zero}) ({one}) (empty Nat (Tree Nat Unit))"
-    );
-    let seed_loop = format!(
-        "add_edge Nat leq_nat ({zero}) ({zero}) (empty Nat (Tree Nat Unit))"
-    );
-    let single_edge = format!(
-        "add_edge Nat leq_nat ({one}) ({two}) (empty Nat (Tree Nat Unit))"
-    );
+    let seed_edge = format!("add_edge Nat leq_nat ({zero}) ({one}) (empty Nat (Tree Nat Unit))");
+    let seed_loop = format!("add_edge Nat leq_nat ({zero}) ({zero}) (empty Nat (Tree Nat Unit))");
+    let single_edge = format!("add_edge Nat leq_nat ({one}) ({two}) (empty Nat (Tree Nat Unit))");
     let chain = format!("add_edge Nat leq_nat ({two}) ({three}) ({single_edge})");
     let direct_zero = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_direct_zero",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({zero}) ({zero}) ({one}) ({seed_edge})"
-        ),
+        &format!("reachable_within Nat leq_nat ({zero}) ({zero}) ({one}) ({seed_edge})"),
     );
     let direct_one = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_direct_one",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({one}) ({zero}) ({one}) ({seed_edge})"
-        ),
+        &format!("reachable_within Nat leq_nat ({one}) ({zero}) ({one}) ({seed_edge})"),
     );
-    assert!(!bool_value(&env, &direct_zero), "fuel zero must reject a direct edge");
-    assert!(bool_value(&env, &direct_one), "fuel one must accept a direct edge");
+    assert!(
+        !bool_value(&env, &direct_zero),
+        "fuel zero must reject a direct edge"
+    );
+    assert!(
+        bool_value(&env, &direct_one),
+        "fuel one must accept a direct edge"
+    );
 
     let sink_domain_size = eval_view(
         &mut env,
@@ -1971,27 +2141,21 @@ fn cat_rel_reachability_obeys_positive_fuel_and_domain_bound() {
         &mut store,
         "t_cat_rel_absent_shortcut",
         "Bool",
-        &format!(
-            "set_member Nat leq_nat ({three}) (succ Nat leq_nat ({one}) ({chain}))"
-        ),
+        &format!("set_member Nat leq_nat ({three}) (succ Nat leq_nat ({one}) ({chain}))"),
     );
     let two_step_one = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_two_step_one",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({one}) ({one}) ({three}) ({chain})"
-        ),
+        &format!("reachable_within Nat leq_nat ({one}) ({one}) ({three}) ({chain})"),
     );
     let two_step_two = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_two_step_two",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({two}) ({one}) ({three}) ({chain})"
-        ),
+        &format!("reachable_within Nat leq_nat ({two}) ({one}) ({three}) ({chain})"),
     );
     assert!(
         !bool_value(&env, &absent_shortcut),
@@ -2020,9 +2184,7 @@ fn cat_rel_reachability_obeys_positive_fuel_and_domain_bound() {
         &mut store,
         "t_cat_rel_unreachable",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({two}) ({three}) ({one}) ({chain})"
-        ),
+        &format!("reachable_within Nat leq_nat ({two}) ({three}) ({one}) ({chain})"),
     );
     let acyclic_self = eval_view(
         &mut env,
@@ -2118,18 +2280,14 @@ fn cat_rel_seed_positive_two_edge_cycle_executes() {
         &mut store,
         "t_cat_rel_seed_cycle_one",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({one}) ({zero}) ({zero}) ({cycle})"
-        ),
+        &format!("reachable_within Nat leq_nat ({one}) ({zero}) ({zero}) ({cycle})"),
     );
     let fuel_two = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_seed_cycle_two",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({two}) ({zero}) ({zero}) ({cycle})"
-        ),
+        &format!("reachable_within Nat leq_nat ({two}) ({zero}) ({zero}) ({cycle})"),
     );
     assert!(
         !bool_value(&env, &fuel_one),
@@ -2189,36 +2347,28 @@ fn cat_rel_seed_non_root_successor_path_executes() {
         &mut store,
         "t_cat_rel_seed_non_root_direct",
         "Bool",
-        &format!(
-            "set_member Nat leq_nat ({two}) (succ Nat leq_nat ({zero}) ({path}))"
-        ),
+        &format!("set_member Nat leq_nat ({two}) (succ Nat leq_nat ({zero}) ({path}))"),
     );
     let fuel_one = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_seed_non_root_one",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({one}) ({zero}) ({two}) ({path})"
-        ),
+        &format!("reachable_within Nat leq_nat ({one}) ({zero}) ({two}) ({path})"),
     );
     let fuel_two = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_seed_non_root_two",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({two}) ({zero}) ({two}) ({path})"
-        ),
+        &format!("reachable_within Nat leq_nat ({two}) ({zero}) ({two}) ({path})"),
     );
     let reverse = eval_view(
         &mut env,
         &mut store,
         "t_cat_rel_seed_non_root_reverse",
         "Bool",
-        &format!(
-            "reachable_within Nat leq_nat ({two}) ({two}) ({zero}) ({path})"
-        ),
+        &format!("reachable_within Nat leq_nat ({two}) ({two}) ({zero}) ({path})"),
     );
 
     assert_eq!(
@@ -2226,13 +2376,22 @@ fn cat_rel_seed_non_root_successor_path_executes() {
         3,
         "required intermediate 1 must not be successor-tree root 3"
     );
-    assert!(!bool_value(&env, &direct), "the direct 0 -> 2 edge must be absent");
-    assert!(!bool_value(&env, &fuel_one), "fuel one must reject the two-edge path");
+    assert!(
+        !bool_value(&env, &direct),
+        "the direct 0 -> 2 edge must be absent"
+    );
+    assert!(
+        !bool_value(&env, &fuel_one),
+        "fuel one must reject the two-edge path"
+    );
     assert!(
         bool_value(&env, &fuel_two),
         "the fold must find intermediate 1 below successor-tree root 3"
     );
-    assert!(!bool_value(&env, &reverse), "the directed path must reject 2 -> 0");
+    assert!(
+        !bool_value(&env, &reverse),
+        "the directed path must reject 2 -> 0"
+    );
 
     env.elaborate_decl(&format!(
         "theorem t_cat_rel_plus_non_root_path : \
@@ -2279,10 +2438,38 @@ fn cat_rel_seed_non_root_successor_path_executes() {
 fn pair_roundtrip() {
     let mut env = mk_env();
     let mut store = make_store(&env);
-    let v = eval_view(&mut env, &mut store, "t_fst", "Nat", &format!("pair_fst Nat Nat (mk_pair Nat Nat ({}) ({}))", nat(3), nat(4)));
-    assert_eq!(nat_count(&env, &v), 3, "pair_fst (mk_pair 3 4) must be 3, got {v:?}");
-    let v = eval_view(&mut env, &mut store, "t_snd", "Nat", &format!("pair_snd Nat Nat (mk_pair Nat Nat ({}) ({}))", nat(3), nat(4)));
-    assert_eq!(nat_count(&env, &v), 4, "pair_snd (mk_pair 3 4) must be 4, got {v:?}");
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_fst",
+        "Nat",
+        &format!(
+            "pair_fst Nat Nat (mk_pair Nat Nat ({}) ({}))",
+            nat(3),
+            nat(4)
+        ),
+    );
+    assert_eq!(
+        nat_count(&env, &v),
+        3,
+        "pair_fst (mk_pair 3 4) must be 3, got {v:?}"
+    );
+    let v = eval_view(
+        &mut env,
+        &mut store,
+        "t_snd",
+        "Nat",
+        &format!(
+            "pair_snd Nat Nat (mk_pair Nat Nat ({}) ({}))",
+            nat(3),
+            nat(4)
+        ),
+    );
+    assert_eq!(
+        nat_count(&env, &v),
+        4,
+        "pair_snd (mk_pair 3 4) must be 4, got {v:?}"
+    );
 }
 
 fn run_with_big_stack<F: FnOnce() + Send + 'static>(f: F) {

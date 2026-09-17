@@ -115,7 +115,9 @@ fn ac8_off_by_one_range_length_rejected() {
         "theorem bad_range_length_off_by_one (n : Nat) : Equal Nat (length Nat (range n)) (Suc n) = range_length n",
     );
     match r {
-        Ok(_) => panic!("range_length proves length(range n) = n, not Suc n — reusing it here must be rejected"),
+        Ok(_) => panic!(
+            "range_length proves length(range n) = n, not Suc n — reusing it here must be rejected"
+        ),
         Err(e) => {
             let msg = format!("{:?}", e);
             assert!(
@@ -138,7 +140,9 @@ fn ac8_zip_length_is_min_not_left_length() {
            Equal Nat (length (Pair a b) (zip a b xs ys)) (length a xs) = zip_length a b xs ys",
     );
     match r {
-        Ok(_) => panic!("zip_length proves length = min(..), not the left length alone — must be rejected"),
+        Ok(_) => panic!(
+            "zip_length proves length = min(..), not the left length alone — must be rejected"
+        ),
         Err(e) => {
             let msg = format!("{:?}", e);
             assert!(

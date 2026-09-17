@@ -861,15 +861,12 @@ fn collect_checked_perform_nodes(
                         .cloned()
                         .ok_or(CompilerDriverError::MissingStableSymbol { id: constructor })?;
                     if let Some(operation) = self.operations.get(&constructor).copied() {
-                        let family_symbol = match crate::export::host_operation_family_v1(
-                            operation,
-                        ) {
+                        let family_symbol = match crate::export::host_operation_family_v1(operation)
+                        {
                             crate::export::HostOpFamilyV1::Clock => self.clock_family.clone(),
                             crate::export::HostOpFamilyV1::Console => self.console_family.clone(),
                             crate::export::HostOpFamilyV1::Fs => self.fs_family.clone(),
-                            crate::export::HostOpFamilyV1::Entropy => {
-                                self.entropy_family.clone()
-                            }
+                            crate::export::HostOpFamilyV1::Entropy => self.entropy_family.clone(),
                         };
                         self.nodes.insert(CheckedPerformNodeV1::Host {
                             family_symbol,
@@ -1870,10 +1867,7 @@ impl ComputationalIHTemplateCollector<'_> {
                         level_args,
                     )
                     .map_err(|_| {
-                        Self::runtime_shape_mismatch(
-                            owner,
-                            "kernel method type generation failed",
-                        )
+                        Self::runtime_shape_mismatch(owner, "kernel method type generation failed")
                     })?;
                     prepared_methods.push(self.prepare_method(
                         owner,
@@ -2287,8 +2281,8 @@ pub fn prepare_native_program_sources(
     // plan bytes against a full native build's, rather than recomputing them.
     let plan_bytes_retained = plan_bytes.clone();
     let plan_transport_hash = fingerprint(&plan_bytes);
-    let host_spine =
-        checked_host_spine_v1(&env.prelude_env, &symbols).map_err(NativeProgramBuildError::Driver)?;
+    let host_spine = checked_host_spine_v1(&env.prelude_env, &symbols)
+        .map_err(NativeProgramBuildError::Driver)?;
     let host_spine_bytes = canonical_checked_host_spine_v1_bytes(&host_spine);
     // The production package owns the exact live-environment closure, including
     // prelude definitions referenced by `main`; source-only generic packages
@@ -2716,7 +2710,8 @@ fn complete_native_program_preparation(
     let plan = preparation.plan.as_ref();
     let host_spine = preparation.host_spine.as_ref();
     let NativeProgramPreparationV1 {
-        plan_transport_hash, ..
+        plan_transport_hash,
+        ..
     } = &preparation;
     let artifact = ken_runtime::build_bound_process_starter_executable_artifact(
         &preparation.runtime_program,
@@ -2756,24 +2751,18 @@ fn complete_native_program_preparation(
                 file_operation_write: host_spine.file_operation_write.to_string(),
                 file_operation_change_mode: host_spine.file_operation_change_mode.to_string(),
                 file_operation_append: host_spine.file_operation_append.to_string(),
-                file_operation_metadata: host_spine
-                    .file_operation_metadata
-                    .to_string(),
+                file_operation_metadata: host_spine.file_operation_metadata.to_string(),
                 file_metadata: host_spine.file_metadata.to_string(),
                 file_kind_file: host_spine.file_kind_file.to_string(),
                 file_kind_directory: host_spine.file_kind_directory.to_string(),
                 file_kind_symlink: host_spine.file_kind_symlink.to_string(),
                 file_kind_other: host_spine.file_kind_other.to_string(),
                 file_operation_rename: host_spine.file_operation_rename.to_string(),
-                file_operation_read_directory: host_spine
-                    .file_operation_read_directory
-                    .to_string(),
+                file_operation_read_directory: host_spine.file_operation_read_directory.to_string(),
                 file_operation_create_directory: host_spine
                     .file_operation_create_directory
                     .to_string(),
-                file_operation_remove_file: host_spine
-                    .file_operation_remove_file
-                    .to_string(),
+                file_operation_remove_file: host_spine.file_operation_remove_file.to_string(),
                 file_operation_remove_directory: host_spine
                     .file_operation_remove_directory
                     .to_string(),
@@ -2825,7 +2814,7 @@ fn complete_native_program_preparation(
             },
         },
         output_dir,
-            // `RT-FNSPLIT-C3-ACTIVATION` `D4` — the deployment caller names its
+        // `RT-FNSPLIT-C3-ACTIVATION` `D4` — the deployment caller names its
         // resource policy; the emitter may not invent one. ⚠ The driver has no
         // CLI surface for it yet, so it names the runtime's own starter policy
         // explicitly rather than letting a default exist.
@@ -3642,10 +3631,7 @@ fn checked_host_spine_v1(
         operations.insert(resolve_id(id)?, operation);
     }
     for (id, operation) in [
-        (
-            prelude.private_fs_open_id,
-            ken_host::HostOpV1::FsOpen,
-        ),
+        (prelude.private_fs_open_id, ken_host::HostOpV1::FsOpen),
         (
             prelude.private_fs_handle_metadata_id,
             ken_host::HostOpV1::FsHandleMetadata,
@@ -3654,10 +3640,7 @@ fn checked_host_spine_v1(
             prelude.private_buffer_allocate_id,
             ken_host::HostOpV1::BufferAllocate,
         ),
-        (
-            prelude.private_fs_read_at_id,
-            ken_host::HostOpV1::FsReadAt,
-        ),
+        (prelude.private_fs_read_at_id, ken_host::HostOpV1::FsReadAt),
         (
             prelude.private_fs_write_at_id,
             ken_host::HostOpV1::FsWriteAt,
@@ -4248,9 +4231,7 @@ fn add_data_metadata(
         );
         if let Some((origin, _, _)) = env.env.all_support_origin(ind.id) {
             if let Some(origin) = symbols.get(&origin) {
-                semantic
-                    .all_support_origins
-                    .insert(family, origin.clone());
+                semantic.all_support_origins.insert(family, origin.clone());
             }
         }
     }
@@ -5406,10 +5387,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let package_name = "r3_gate_4a_equality";
         let preparation = prepare_native_program_sources(
             package_name,
-            vec![CompilerSource::new(
-                "src/main.ken",
-                GATE_4A_EQUALITY_SOURCE,
-            )],
+            vec![CompilerSource::new("src/main.ken", GATE_4A_EQUALITY_SOURCE)],
         )
         .expect("the already-green recursive native source reaches preparation");
 
@@ -7011,16 +6989,46 @@ mod d1b_role_c1_roster_identity {
             ("result_ok", record.spine.result_ok.clone()),
             ("option_some", record.spine.option_some.clone()),
             ("file_error", record.spine.file_error.clone()),
-            ("file_operation_read", record.spine.file_operation_read.clone()),
-            ("file_operation_write", record.spine.file_operation_write.clone()),
-            ("file_operation_change_mode", record.spine.file_operation_change_mode.clone()),
-            ("resource_kind_mismatch", record.spine.resource_kind_mismatch.clone()),
-            ("resource_buffer_limit", record.spine.resource_buffer_limit.clone()),
-            ("resource_allocation_failed", record.spine.resource_allocation_failed.clone()),
-            ("resource_invalid_offset", record.spine.resource_invalid_offset.clone()),
-            ("resource_invalid_bounds", record.spine.resource_invalid_bounds.clone()),
-            ("resource_no_progress", record.spine.resource_no_progress.clone()),
-            ("resource_kind_buffer", record.spine.resource_kind_buffer.clone()),
+            (
+                "file_operation_read",
+                record.spine.file_operation_read.clone(),
+            ),
+            (
+                "file_operation_write",
+                record.spine.file_operation_write.clone(),
+            ),
+            (
+                "file_operation_change_mode",
+                record.spine.file_operation_change_mode.clone(),
+            ),
+            (
+                "resource_kind_mismatch",
+                record.spine.resource_kind_mismatch.clone(),
+            ),
+            (
+                "resource_buffer_limit",
+                record.spine.resource_buffer_limit.clone(),
+            ),
+            (
+                "resource_allocation_failed",
+                record.spine.resource_allocation_failed.clone(),
+            ),
+            (
+                "resource_invalid_offset",
+                record.spine.resource_invalid_offset.clone(),
+            ),
+            (
+                "resource_invalid_bounds",
+                record.spine.resource_invalid_bounds.clone(),
+            ),
+            (
+                "resource_no_progress",
+                record.spine.resource_no_progress.clone(),
+            ),
+            (
+                "resource_kind_buffer",
+                record.spine.resource_kind_buffer.clone(),
+            ),
             ("read_some", record.spine.read_some.clone()),
             ("read_eof", record.spine.read_eof.clone()),
             ("wrote", record.spine.wrote.clone()),
@@ -7100,8 +7108,14 @@ mod d1b_role_c1_roster_identity {
                 record.spine.resource_kind_mapping.clone(),
             ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
-            ("io_error_permission_denied", record.spine.io_errors[1].clone()),
-            ("io_error_capability_denied", record.spine.io_errors[2].clone()),
+            (
+                "io_error_permission_denied",
+                record.spine.io_errors[1].clone(),
+            ),
+            (
+                "io_error_capability_denied",
+                record.spine.io_errors[2].clone(),
+            ),
             ("io_error_broken_pipe", record.spine.io_errors[3].clone()),
             ("io_error_interrupted", record.spine.io_errors[4].clone()),
             ("io_error_already_exists", record.spine.io_errors[5].clone()),
@@ -7135,7 +7149,26 @@ mod d1b_role_c1_roster_identity {
 
         // Operations are keyed by symbol rather than positional, so each
         // canonical operation symbol must be a KEY of the emitted map.
-        for field in ["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"] {
+        for field in [
+            "op_console_read",
+            "op_console_write",
+            "op_console_flush",
+            "op_console_is_terminal",
+            "op_clock_wall_now",
+            "op_clock_monotonic_now",
+            "op_clock_sleep_until",
+            "op_entropy_random_bytes",
+            "op_fs_read_file",
+            "op_fs_write_file",
+            "op_fs_append_file",
+            "op_fs_metadata",
+            "op_fs_read_directory",
+            "op_fs_create_directory",
+            "op_fs_remove_file",
+            "op_fs_remove_directory",
+            "op_fs_rename",
+            "op_fs_change_mode",
+        ] {
             let expected = canonical
                 .get(field)
                 .unwrap_or_else(|| panic!("no canonical roster entry named {field}"));
@@ -7147,9 +7180,27 @@ mod d1b_role_c1_roster_identity {
 
         // COMPLETENESS, so the loops above cannot go quietly partial: every
         // canonical role is covered by one of the three checks.
-        let mut covered: BTreeSet<&'static str> =
-            emitted.iter().map(|(field, _)| *field).collect();
-        covered.extend(["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"]);
+        let mut covered: BTreeSet<&'static str> = emitted.iter().map(|(field, _)| *field).collect();
+        covered.extend([
+            "op_console_read",
+            "op_console_write",
+            "op_console_flush",
+            "op_console_is_terminal",
+            "op_clock_wall_now",
+            "op_clock_monotonic_now",
+            "op_clock_sleep_until",
+            "op_entropy_random_bytes",
+            "op_fs_read_file",
+            "op_fs_write_file",
+            "op_fs_append_file",
+            "op_fs_metadata",
+            "op_fs_read_directory",
+            "op_fs_create_directory",
+            "op_fs_remove_file",
+            "op_fs_remove_directory",
+            "op_fs_rename",
+            "op_fs_change_mode",
+        ]);
         let uncovered: Vec<&&'static str> = canonical
             .keys()
             .filter(|field| !covered.contains(*field))

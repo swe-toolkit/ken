@@ -63,8 +63,7 @@ fn module_elaborates_to_identical_flat_sigma() {
     let fixture_parent = fixture.parent().expect("fixture has parent");
     let _ = fs::remove_dir_all(fixture_parent);
     fs::create_dir_all(&fixture).expect("create catalog fixture");
-    fs::write(fixture.join("M.ken"), "pub const foo : Int = 0")
-        .expect("write provider");
+    fs::write(fixture.join("M.ken"), "pub const foo : Int = 0").expect("write provider");
     let core_logic = fixture.join("Core/Logic");
     fs::create_dir_all(&core_logic).expect("create Core.Logic fixture path");
     fs::write(
@@ -75,10 +74,8 @@ fn module_elaborates_to_identical_flat_sigma() {
     )
     .expect("write proof-relevant Or provider");
     let entry_path = fixture.join("Entry.ken");
-    fs::write(&entry_path, "import M\nconst bar : Int = M.foo")
-        .expect("write entry");
-    let address = catalog_module_from_path(&entry_path)
-        .expect("derive catalog module address");
+    fs::write(&entry_path, "import M\nconst bar : Int = M.foo").expect("write entry");
+    let address = catalog_module_from_path(&entry_path).expect("derive catalog module address");
     let mut c = mk_env();
     c.elaborate_module_from_roots(&[address.root.clone()], &address.entry)
         .expect("roots-loaded module program elaborates");
@@ -94,7 +91,8 @@ fn module_elaborates_to_identical_flat_sigma() {
         "AC1: roots loading must preserve the flattened zero-trust boundary"
     );
     let provider = c.globals["M.foo"];
-    let (_, imported_body) = c.env
+    let (_, imported_body) = c
+        .env
         .transparent_body(c.globals["Entry.bar"])
         .expect("entry binding is transparent");
     assert!(
@@ -215,19 +213,24 @@ fn nullary_abstract_export_is_transparent_to_owner_and_opaque_to_client() {
 #[test]
 fn top_level_pub_data_is_not_abstract_exported() {
     let mut env = mk_env();
-    env.elaborate_file("pub data T = MkT").expect("top-level pub data elaborates");
+    env.elaborate_file("pub data T = MkT")
+        .expect("top-level pub data elaborates");
 
     let t_id = env.globals["T"];
     assert!(
         env.env.inductive(t_id).is_some(),
         "a top-level `pub data T` must stay a real inductive, not become an opaque constant"
     );
-    assert!(env.globals.contains_key("MkT"), "the constructor must remain registered");
+    assert!(
+        env.globals.contains_key("MkT"),
+        "the constructor must remain registered"
+    );
 
     // The constructor must still be constructible AND matchable in the
     // same compilation unit — the exact capability the defect silently
     // destroyed.
-    env.elaborate_decl("const mk : T = MkT").expect("MkT must be constructible");
+    env.elaborate_decl("const mk : T = MkT")
+        .expect("MkT must be constructible");
     env.elaborate_decl("fn unwrap (t : T) : Int = match t { MkT |-> 0 }")
         .expect("MkT must be matchable");
 }
@@ -239,7 +242,8 @@ fn top_level_pub_data_is_not_abstract_exported() {
 #[test]
 fn client_match_hidden_ctor_rejected_at_surface() {
     let mut env = mk_env();
-    env.elaborate_file("module M { pub data T = MkT }").expect("module M elaborates");
+    env.elaborate_file("module M { pub data T = MkT }")
+        .expect("module M elaborates");
 
     match env.elaborate_decl("fn bad (t : M.T) : Int = match t { MkT |-> 0 }") {
         Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "MkT"),
@@ -488,7 +492,10 @@ fn selective_import_ambiguity_rejected_naming_both() {
             assert!(sources.contains(&"M.foo".to_string()));
             assert!(sources.contains(&"N.foo".to_string()));
         }
-        other => panic!("AC3: expected AmbiguousReference naming both M.foo and N.foo, got {:?}", other),
+        other => panic!(
+            "AC3: expected AmbiguousReference naming both M.foo and N.foo, got {:?}",
+            other
+        ),
     }
 }
 
@@ -519,7 +526,8 @@ fn top_level_local_import_clash_is_rejected_latently() {
 #[test]
 fn three_import_forms_resolve_to_one_binding() {
     let mut env = mk_env();
-    env.elaborate_file("module M { pub const foo : Int = 0 }").expect("module M elaborates");
+    env.elaborate_file("module M { pub const foo : Int = 0 }")
+        .expect("module M elaborates");
     let m_foo = env.globals["M.foo"];
 
     env.elaborate_file("import M").unwrap();
@@ -529,11 +537,15 @@ fn three_import_forms_resolve_to_one_binding() {
     let (_, b1) = env.env.transparent_body(via_qualified).unwrap();
 
     env.elaborate_file("import M as N").unwrap();
-    let via_aliased = env.elaborate_decl("const c2 : Int = N.foo").expect("import M as N");
+    let via_aliased = env
+        .elaborate_decl("const c2 : Int = N.foo")
+        .expect("import M as N");
     let (_, b2) = env.env.transparent_body(via_aliased).unwrap();
 
     env.elaborate_file("import M (foo)").unwrap();
-    let via_selective = env.elaborate_decl("const c3 : Int = foo").expect("import M (foo)");
+    let via_selective = env
+        .elaborate_decl("const c3 : Int = foo")
+        .expect("import M (foo)");
     let (_, b3) = env.env.transparent_body(via_selective).unwrap();
 
     for (label, body) in [("qualified", &b1), ("aliased", &b2), ("selective", &b3)] {
@@ -541,7 +553,8 @@ fn three_import_forms_resolve_to_one_binding() {
             matches!(body, Term::Const { id, .. } if *id == m_foo),
             "AC3/AC1: the {} import form must resolve to the SAME GlobalId as \
              `M.foo` (re-naming, not re-declaration); got {:?}",
-            label, body
+            label,
+            body
         );
     }
 }

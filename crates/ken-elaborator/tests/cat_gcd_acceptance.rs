@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::ElabEnv;
-use ken_interp::eval::{EvalStore, EvalVal, eval};
+use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const GCD: &str = "Algorithm.Numeric.Gcd";

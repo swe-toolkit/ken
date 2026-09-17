@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ken_elaborator::modules::{
-    PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES, catalog_module_from_path,
-    is_prelude_floor_name,
+    catalog_module_from_path, is_prelude_floor_name, PRELUDE_COMPANION_BINDING_NAMES,
+    PRELUDE_FLOOR_NAMES,
 };
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Level, Term};
@@ -1280,9 +1280,9 @@ fn catalog_ambient_passthrough_migration_census() {
     .map(str::to_string)
     .collect::<BTreeSet<_>>();
     let expected_residuals = ["Algorithm.Searching.OrderedSearch"]
-    .into_iter()
-    .map(str::to_string)
-    .collect::<BTreeSet<_>>();
+        .into_iter()
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
     assert_eq!(clean, expected_clean, "WP-4 strict-floor-clean sentinel");
     assert_eq!(
         residual_names, expected_residuals,

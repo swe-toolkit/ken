@@ -26,7 +26,9 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use ken_elaborator::fo_kripke::{declare_fo_slice_signature, embed, find_certificate, Form, IForm, IVar};
+use ken_elaborator::fo_kripke::{
+    declare_fo_slice_signature, embed, find_certificate, Form, IForm, IVar,
+};
 use ken_elaborator::ElabEnv;
 use ken_kernel::GlobalEnv;
 
@@ -148,7 +150,13 @@ fn bound_object_eigen_step_has_no_constructor_encoding_on_the_ken_surface() {
 
 /// True iff `Equal Bool (fok_check_tree sequent cert) expected` is provable by
 /// `Proved` -- i.e. the Ken checker returns `expected` on this certificate.
-fn ken_verdict_is(env: &mut ElabEnv, name: &str, sequent: &str, cert: &str, expected: &str) -> bool {
+fn ken_verdict_is(
+    env: &mut ElabEnv,
+    name: &str,
+    sequent: &str,
+    cert: &str,
+    expected: &str,
+) -> bool {
     env.elaborate_decl(&format!(
         "theorem {name} : Equal Bool (fok_check_tree ({sequent}) ({cert})) {expected} = Proved"
     ))
@@ -165,7 +173,8 @@ fn ken_verdict_is(env: &mut ElabEnv, name: &str, sequent: &str, cert: &str, expe
 fn ken_forall_obj_cert(eigen_ix: &str) -> (String, String) {
     let gamma = "Cons FokForm FokBottom (Nil FokForm)";
     let body = "FokForcingP (FokQParameter (Suc Zero)) (FokQParameter Zero)";
-    let delta = format!("Cons FokForm (FokForallObj ({body})) (Cons FokForm FokBottom (Nil FokForm))");
+    let delta =
+        format!("Cons FokForm (FokForallObj ({body})) (Cons FokForm FokBottom (Nil FokForm))");
     let sequent = format!("FokMkSequent ({gamma}) ({delta})");
     let child_delta =
         format!("fok_list_form_set_nth ({delta}) Zero (fok_subst0_form ({body}) (FokQParameter ({eigen_ix})))");
@@ -192,7 +201,13 @@ fn ken_checker_accepts_a_planted_comparable_cert_and_refuses_a_near_miss() {
     // is a HARD STOP to Steward+Architect (the corrected relation would reject
     // something it should admit) -- NOT a reason to weaken this assertion.
     assert!(
-        ken_verdict_is(&mut env, "ken_ac1_power_accept", &accept_seq, &accept_cert, "True"),
+        ken_verdict_is(
+            &mut env,
+            "ken_ac1_power_accept",
+            &accept_seq,
+            &accept_cert,
+            "True"
+        ),
         "HARD-STOP signal: the planted representable comparable certificate must be \
          ACCEPTED by fok_check_tree; if this reds, escalate to Steward + Architect"
     );
@@ -203,12 +218,24 @@ fn ken_checker_accepts_a_planted_comparable_cert_and_refuses_a_near_miss() {
     let (reject_seq, reject_cert) = ken_forall_obj_cert("Zero");
     let mut env2 = fok_env();
     assert!(
-        ken_verdict_is(&mut env2, "ken_ac1_near_miss_reject", &reject_seq, &reject_cert, "False"),
+        ken_verdict_is(
+            &mut env2,
+            "ken_ac1_near_miss_reject",
+            &reject_seq,
+            &reject_cert,
+            "False"
+        ),
         "the representable non-fresh near-miss must be REFUSED downstream"
     );
     let mut env3 = fok_env();
     assert!(
-        !ken_verdict_is(&mut env3, "ken_ac1_near_miss_not_accept", &reject_seq, &reject_cert, "True"),
+        !ken_verdict_is(
+            &mut env3,
+            "ken_ac1_near_miss_not_accept",
+            &reject_seq,
+            &reject_cert,
+            "True"
+        ),
         "the near-miss must not also be accepted"
     );
 }

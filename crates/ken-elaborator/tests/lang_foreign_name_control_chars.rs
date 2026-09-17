@@ -26,7 +26,9 @@ fn err_of(src: &str) -> ElabError {
 fn symbol_name_containing_escaped_nul_rejects() {
     let err = err_of(r#"foreign f : Int -> Int = "sym\0bol" "lib""#);
     match err {
-        ElabError::ForeignNameControlCharacter { which, character, .. } => {
+        ElabError::ForeignNameControlCharacter {
+            which, character, ..
+        } => {
             assert_eq!(which, "symbol");
             assert_eq!(character, '\0');
         }
@@ -41,7 +43,9 @@ fn symbol_name_containing_escaped_nul_rejects() {
 fn library_name_containing_escaped_nul_rejects() {
     let err = err_of(r#"foreign f : Int -> Int = "sym" "li\0b""#);
     match err {
-        ElabError::ForeignNameControlCharacter { which, character, .. } => {
+        ElabError::ForeignNameControlCharacter {
+            which, character, ..
+        } => {
             assert_eq!(which, "library");
             assert_eq!(character, '\0');
         }
@@ -69,7 +73,13 @@ fn ordinary_string_literal_with_nul_still_elaborates() {
 fn non_nul_control_character_also_rejects() {
     // \u{7} is BEL, a C0 control character distinct from NUL.
     let err = err_of(r#"foreign f : Int -> Int = "sym\u{7}bol" "lib""#);
-    assert!(matches!(err, ElabError::ForeignNameControlCharacter { character: '\u{7}', .. }));
+    assert!(matches!(
+        err,
+        ElabError::ForeignNameControlCharacter {
+            character: '\u{7}',
+            ..
+        }
+    ));
 }
 
 /// AC-5: the span points at the offending string literal, not at the
@@ -86,7 +96,10 @@ fn span_points_at_the_offending_literal_not_the_foreign_keyword() {
                 (literal_start, literal_end),
                 "span must cover exactly the symbol string literal"
             );
-            assert!(span.start > 0, "span must not start at the `foreign` keyword");
+            assert!(
+                span.start > 0,
+                "span must not start at the `foreign` keyword"
+            );
         }
         other => panic!("expected ForeignNameControlCharacter, got {other:?}"),
     }

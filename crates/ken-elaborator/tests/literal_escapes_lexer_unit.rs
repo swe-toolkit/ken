@@ -4,12 +4,16 @@
 //! token payloads and exact `InvalidEscape` spans, one property per test,
 //! independent of elaboration.
 
-use ken_elaborator::{ElabError, ElabEnv};
 use ken_elaborator::lexer::{Lexer, Token};
+use ken_elaborator::{ElabEnv, ElabError};
 
 fn lex_one(src: &str) -> Token {
     let toks = Lexer::lex(src).expect("must lex");
-    assert_eq!(toks.len(), 2, "expected exactly one token + Eof, got {toks:?}");
+    assert_eq!(
+        toks.len(),
+        2,
+        "expected exactly one token + Eof, got {toks:?}"
+    );
     toks[0].0.clone()
 }
 
@@ -24,12 +28,18 @@ fn invalid_escape_span(src: &str) -> (usize, usize) {
 fn common_escapes_decode_in_every_kind() {
     assert_eq!(lex_one(r#""a\nb""#), Token::Str("a\nb".to_string()));
     assert_eq!(lex_one(r#"'\n'"#), Token::CharLit('\n'));
-    assert_eq!(lex_one(r#"b"a\tb""#), Token::ByteStr(vec![b'a', 0x09, b'b']));
+    assert_eq!(
+        lex_one(r#"b"a\tb""#),
+        Token::ByteStr(vec![b'a', 0x09, b'b'])
+    );
 }
 
 #[test]
 fn unicode_escape_decodes_in_string_and_char() {
-    assert_eq!(lex_one(r#""\u{1F600}""#), Token::Str("\u{1F600}".to_string()));
+    assert_eq!(
+        lex_one(r#""\u{1F600}""#),
+        Token::Str("\u{1F600}".to_string())
+    );
     assert_eq!(lex_one(r#"'\u{41}'"#), Token::CharLit('A'));
 }
 
@@ -70,7 +80,10 @@ fn ordinary_unterminated_literal_is_unaffected() {
 #[test]
 fn raw_triple_string_performs_no_escape_processing() {
     let toks = Lexer::lex("\"\"\"\\n\\q\\u{D800}\\xGG\\\\\"\"\"").expect("must lex");
-    assert_eq!(toks[0].0, Token::Str("\\n\\q\\u{D800}\\xGG\\\\".to_string()));
+    assert_eq!(
+        toks[0].0,
+        Token::Str("\\n\\q\\u{D800}\\xGG\\\\".to_string())
+    );
 }
 
 #[test]
@@ -85,7 +98,11 @@ fn malformed_unicode_escape_spans_end_at_the_offending_character() {
     // so it is included).
     assert_eq!(invalid_escape_span("\"\\u{}\""), (1, 5), "\\u{{}}");
     // `\u{0000041}` -- 7 digits; span excludes the closing brace.
-    assert_eq!(invalid_escape_span("\"\\u{0000041}\""), (1, 11), "\\u{{0000041}}");
+    assert_eq!(
+        invalid_escape_span("\"\\u{0000041}\""),
+        (1, 11),
+        "\\u{{0000041}}"
+    );
     // `\u{4_}` -- the underscore is consumed and included; brace excluded.
     assert_eq!(invalid_escape_span("\"\\u{4_}\""), (1, 6), "\\u{{4_}}");
     // `\u{G}` -- the first non-hex character is consumed and included.
@@ -96,13 +113,21 @@ fn malformed_unicode_escape_spans_end_at_the_offending_character() {
 fn well_shaped_invalid_scalar_spans_the_complete_escape() {
     assert_eq!(invalid_escape_span("\"\\u{D800}\""), (1, 9), "\\u{{D800}}");
     assert_eq!(invalid_escape_span("\"\\u{DFFF}\""), (1, 9), "\\u{{DFFF}}");
-    assert_eq!(invalid_escape_span("\"\\u{110000}\""), (1, 11), "\\u{{110000}}");
+    assert_eq!(
+        invalid_escape_span("\"\\u{110000}\""),
+        (1, 11),
+        "\\u{{110000}}"
+    );
 }
 
 #[test]
 fn byte_escape_malformed_spans_end_at_the_offending_character() {
     // `b"\x4"` -- string closes right after the first digit; boundary excluded.
-    assert_eq!(invalid_escape_span("b\"\\x4\""), (2, 5), "\\x4 (incomplete)");
+    assert_eq!(
+        invalid_escape_span("b\"\\x4\""),
+        (2, 5),
+        "\\x4 (incomplete)"
+    );
     // `b"\xG0"` -- span excludes the trailing 0.
     assert_eq!(invalid_escape_span("b\"\\xG0\""), (2, 5), "\\xG");
 }
@@ -115,7 +140,11 @@ fn incomplete_escape_three_leg_matrix() {
     let err = Lexer::lex("'\\\n").unwrap_err();
     match err {
         ElabError::InvalidEscape { span, .. } => {
-            assert_eq!((span.start, span.end), (1, 2), "span must be exactly the backslash");
+            assert_eq!(
+                (span.start, span.end),
+                (1, 2),
+                "span must be exactly the backslash"
+            );
         }
         other => panic!("expected InvalidEscape, got {other:?}"),
     }

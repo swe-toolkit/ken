@@ -421,11 +421,7 @@ impl<'a> LayoutPrinter<'a> {
         if indices.len() > 1 {
             if let Some(list) = self.comma_separated_token_slice(&indices[1..]) {
                 let separator = self.token_boundary(indices[0], indices[1], Doc::text(" "));
-                return Doc::concat([
-                    Doc::text(self.token_text(indices[0])),
-                    separator,
-                    list,
-                ]);
+                return Doc::concat([Doc::text(self.token_text(indices[0])), separator, list]);
             }
         }
         self.grouped_token_slice(&indices)

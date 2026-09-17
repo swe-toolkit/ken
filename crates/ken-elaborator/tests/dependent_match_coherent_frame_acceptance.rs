@@ -289,7 +289,7 @@ fn forced_index_telescope_relation_extension_elaborates() {
                    (Some a (dual_lookup a m xs j)) \
                    Refl \
                    (dual_env_relation_after_anchor \
-                     a m xs anchor relation j) }"
+                     a m xs anchor relation j) }",
         )
         .expect("forced-index return telescope must use predecessor views");
         env.elaborate_decl(

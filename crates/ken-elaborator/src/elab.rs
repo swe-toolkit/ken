@@ -893,11 +893,7 @@ fn prepare_let_rhs(
 /// RHS core and its recorded type in lockstep: the fresh binder itself is not
 /// in scope in either, and it is not added to `var_refinements`.
 #[inline(never)]
-fn refine_let_rhs(
-    cx: &ElabCtx,
-    rhs_core: &mut Term,
-    rhs_ty: &mut Term,
-) -> Result<(), ElabError> {
+fn refine_let_rhs(cx: &ElabCtx, rhs_core: &mut Term, rhs_ty: &mut Term) -> Result<(), ElabError> {
     for frame in &cx.active_index_refinements {
         let growth = cx
             .ctx
@@ -1106,11 +1102,11 @@ fn check_record(
     })?;
     let projection =
         class_env
-        .projection_by_type_id(owner_id)
-        .ok_or_else(|| ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: "record literal expected type is not a known named-field owner".into(),
-        })?;
+            .projection_by_type_id(owner_id)
+            .ok_or_else(|| ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "record literal expected type is not a known named-field owner".into(),
+            })?;
     let owner_name = projection.owner_name.to_string();
     let field_names = projection.field_names.to_vec();
     let field_types = projection.field_types.to_vec();
@@ -2169,12 +2165,12 @@ fn repair_embedded_method_from_ih(
                 }
                 for index in 0..ctx.len() {
                     let mut candidate = Term::var(index);
-                    let mut candidate_ty = match kernel_infer_in_context_current(cx, ctx, &candidate)
-                    {
-                        Ok(ty) => ty,
-                        Err(CurrentKernelQueryError::View(error)) => return Err(error),
-                        Err(CurrentKernelQueryError::Kernel(_)) => return Ok(None),
-                    };
+                    let mut candidate_ty =
+                        match kernel_infer_in_context_current(cx, ctx, &candidate) {
+                            Ok(ty) => ty,
+                            Err(CurrentKernelQueryError::View(error)) => return Err(error),
+                            Err(CurrentKernelQueryError::Kernel(_)) => return Ok(None),
+                        };
                     let mut consumed = false;
                     loop {
                         if convert_type(cx.env, ctx, &candidate_ty, expected) && consumed {
@@ -2186,15 +2182,12 @@ fn repair_embedded_method_from_ih(
                         let mut selected_argument = None;
                         for argument_index in 0..ctx.len() {
                             let argument = Term::var(argument_index);
-                            let argument_ty = match kernel_infer_in_context_current(
-                                cx,
-                                ctx,
-                                &argument,
-                            ) {
-                                Ok(ty) => ty,
-                                Err(CurrentKernelQueryError::View(error)) => return Err(error),
-                                Err(CurrentKernelQueryError::Kernel(_)) => return Ok(None),
-                            };
+                            let argument_ty =
+                                match kernel_infer_in_context_current(cx, ctx, &argument) {
+                                    Ok(ty) => ty,
+                                    Err(CurrentKernelQueryError::View(error)) => return Err(error),
+                                    Err(CurrentKernelQueryError::Kernel(_)) => return Ok(None),
+                                };
                             if convert_type(cx.env, ctx, &argument_ty, &domain) {
                                 selected_argument = Some(argument);
                                 break;
@@ -2735,14 +2728,14 @@ fn build_index_equation_convoy_body(
             let Term::Type(goal_level) = whnf(
                 env,
                 outer_ctx,
-                &kernel_infer_in_context_current(cx, outer_ctx, &goal_ty).map_err(
-                    |error| match error {
+                &kernel_infer_in_context_current(cx, outer_ctx, &goal_ty).map_err(|error| {
+                    match error {
                         CurrentKernelQueryError::View(error) => error,
                         CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
                             "large index convoy could not classify its equality carrier: {error:?}"
                         )),
-                    },
-                )?,
+                    }
+                })?,
             ) else {
                 return Ok(None);
             };
@@ -2802,17 +2795,13 @@ fn build_index_equation_convoy_body(
     let mut index_binder_ctx = outer_ctx.clone();
     index_binder_ctx.push(index_ty.clone());
     let predicate_body = Term::pi(matched_at(1, Term::var(0)), weaken(&goal_sort, 1));
-    let predicate_sort = kernel_infer_in_context_current(
-        cx,
-        &index_binder_ctx,
-        &predicate_body,
-    )
-    .map_err(|error| match error {
-        CurrentKernelQueryError::View(error) => error,
-        CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
-            "large index convoy predicate is ill-typed: {error:?}"
-        )),
-    })?;
+    let predicate_sort = kernel_infer_in_context_current(cx, &index_binder_ctx, &predicate_body)
+        .map_err(|error| match error {
+            CurrentKernelQueryError::View(error) => error,
+            CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                "large index convoy predicate is ill-typed: {error:?}"
+            )),
+        })?;
     let selector_motive = Term::Ascript(
         Box::new(Term::lam(index_ty.clone(), predicate_body)),
         Box::new(Term::pi(index_ty.clone(), predicate_sort)),
@@ -3149,7 +3138,7 @@ fn recursive_field_index_path(
         || !matches!(scrut_core, Term::Var(_))
         || !matches!(scrut_indices[0], Term::Var(_))
         || !compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions)
-        .is_empty()
+            .is_empty()
     {
         return Ok(RecursiveFieldIndexPath::CoupledRefinement);
     }
@@ -3178,9 +3167,9 @@ fn recursive_field_index_path(
             )));
         }
         let target_indices = ctor_target_indices(ctor, ind, params, level_args, field_count)
-        .into_iter()
-        .map(|term| cx.metas.zonk_term(&term))
-        .collect::<Vec<_>>();
+            .into_iter()
+            .map(|term| cx.metas.zonk_term(&term))
+            .collect::<Vec<_>>();
         let shapes = recursive_shapes(cx.env, ctor, ind.id, ind.params.len()).map_err(|error| {
             ElabError::Internal(format!(
                 "declared-index recursive-field classification failed: {error:?}"
@@ -3828,12 +3817,13 @@ fn transport_recursive_group_call_result(
                 .iter()
                 .zip(&expected_arguments[..parameter_count])
             {
-                let parameter_ty = kernel_infer_current(cx, actual).map_err(|error| match error {
-                    CurrentKernelQueryError::View(error) => error,
-                    CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                let parameter_ty =
+                    kernel_infer_current(cx, actual).map_err(|error| match error {
+                        CurrentKernelQueryError::View(error) => error,
+                        CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
                         "result refinement: could not classify a result-family parameter: {error:?}"
                     )),
-                })?;
+                    })?;
                 if !convert(cx.env, &cx.ctx, &parameter_ty, actual, wanted) {
                     parameters_match = false;
                     break;
@@ -4336,15 +4326,13 @@ fn check_match_with_lift(
             // occurrence builds no evidence and remains rejected.
             let recursive_result_position = match result_ordinal {
                 Some(ordinal) => Some(base + support_ctor.args.len() + ordinal),
-                None => cx.binding_term(base + evidence_argument).and_then(
-                    |(_, evidence_field_ty)| {
-                        (!matches!(
-                            whnf(cx.env, &cx.ctx, &evidence_field_ty),
-                            Term::Pi(_, _)
-                        ))
-                        .then_some(base + evidence_argument)
-                    },
-                ),
+                None => {
+                    cx.binding_term(base + evidence_argument)
+                        .and_then(|(_, evidence_field_ty)| {
+                            (!matches!(whnf(cx.env, &cx.ctx, &evidence_field_ty), Term::Pi(_, _)))
+                                .then_some(base + evidence_argument)
+                        })
+                }
             };
             let installed = install_lift_binding(
                 cx,
@@ -4396,12 +4384,14 @@ fn check_match_with_lift(
         }
         let zonked_method = cx.metas.zonk_term(&method);
         let zonked_method_ty = cx.metas.zonk_term(&method_ty);
-        kernel_check_current(cx, &zonked_method, &zonked_method_ty).map_err(|error| match error {
-            CurrentKernelQueryError::View(error) => error,
-            CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
-                "generated All method failed kernel re-check: {error}"
-            )),
-        })?;
+        kernel_check_current(cx, &zonked_method, &zonked_method_ty).map_err(
+            |error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                    "generated All method failed kernel re-check: {error}"
+                )),
+            },
+        )?;
         methods.push(method);
     }
     for (i, used) in arm_used.iter().enumerate() {
@@ -4633,8 +4623,8 @@ fn check_match_dependent_refined_fallback(
     let expected_here_refined = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
         goal_refined
     } else {
-            simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
-        };
+        simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
+    };
     let body_core_checked = check(cx, &arm.body, &expected_here_refined, &arm.span)?;
     let mut body_core = body_core_checked;
     for restoration in goal_restorations.into_iter().rev() {
@@ -4928,15 +4918,15 @@ fn finish_dependent_elim(
                 types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
             };
             let zonked_elim = cx.metas.zonk_term(&elim);
-            kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_elim).map_err(
-                |error| match error {
+            kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_elim).map_err(|error| {
+                match error {
                     CurrentKernelQueryError::View(error) => error,
                     CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
                         error,
                         span: span.clone(),
                     },
-                },
-            )?;
+                }
+            })?;
         } else {
             kernel_check_current(cx, &elim, expected).map_err(|error| match error {
                 CurrentKernelQueryError::View(error) => error,
@@ -5669,10 +5659,10 @@ fn install_plain_declared_index_aliases(
         };
         let actual_index = actual_index + field_count;
         let position = cx.ctx.len().checked_sub(1 + actual_index).ok_or_else(|| {
-                ElabError::Internal(
-                    "plain declared-index variable escaped its constructor context".into(),
-                )
-            })?;
+            ElabError::Internal(
+                "plain declared-index variable escaped its constructor context".into(),
+            )
+        })?;
         let index_ty = cx.metas.zonk_term(&weaken(
             &subst_levels(
                 &subst_outer(&ind.indices[ordinal], ind.params.len(), params, ordinal),
@@ -5707,7 +5697,7 @@ fn install_plain_declared_index_aliases(
     let scrut_index = scrut_index + field_count;
     let scrut_position = cx.ctx.len().checked_sub(1 + scrut_index).ok_or_else(|| {
         ElabError::Internal("plain declared-index scrutinee escaped its constructor context".into())
-        })?;
+    })?;
     let concrete = cx.metas.zonk_term(concrete);
     let concrete_ty = kernel_infer_in_zonked_current(cx, &zonked_ctx, &concrete).map_err(
         |error| match error {
@@ -5800,10 +5790,10 @@ fn check_dependent_branch_body(
             !ind.indices.is_empty() && matches!(arm.body, RExpr::RMatch { .. });
         let expected_unrefined = if preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _))
         {
-                expected_here.clone()
-            } else {
-                simplify_branch_goal(cx.env, &cx.ctx, expected_here)
-            };
+            expected_here.clone()
+        } else {
+            simplify_branch_goal(cx.env, &cx.ctx, expected_here)
+        };
         if let Some(premise_slot) = hidden_result_premise_slot {
             if premise_slot >= premise_domains.len() {
                 return Err(ElabError::Internal(format!(
@@ -6989,14 +6979,15 @@ fn install_hidden_result_variable_refinements(
     // whole observational Sigma.
     let mut symmetric_leaves = Vec::with_capacity(leaves.len());
     for leaf in leaves {
-        let level_ty = kernel_infer_in_zonked_current(cx, &zonked_ctx, &leaf.index_ty).map_err(
-            |error| match error {
-                CurrentKernelQueryError::View(error) => error,
-                CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
-                    "result refinement: could not classify a projected index type: {error:?}"
-                )),
-            },
-        )?;
+        let level_ty =
+            kernel_infer_in_zonked_current(cx, &zonked_ctx, &leaf.index_ty).map_err(|error| {
+                match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                        "result refinement: could not classify a projected index type: {error:?}"
+                    )),
+                }
+            })?;
         let level = match whnf(cx.env, &zonked_ctx, &level_ty) {
             Term::Type(level) => level,
             other => {
@@ -7353,29 +7344,19 @@ fn relocate_active_premise_term<F>(
 where
     F: FnMut(usize, usize) -> Result<Term, ElabError>,
 {
-    let mut go = |term: &Term, depth: usize| {
-        relocate_active_premise_term(term, depth, map_free)
-    };
+    let mut go = |term: &Term, depth: usize| relocate_active_premise_term(term, depth, map_free);
     Ok(match term {
         Term::Var(index) if *index < depth => Term::var(*index),
         Term::Var(index) => map_free(*index - depth, depth)?,
-        Term::Pi(domain, codomain) => {
-            Term::pi(go(domain, depth)?, go(codomain, depth + 1)?)
-        }
-        Term::Lam(domain, body) => {
-            Term::lam(go(domain, depth)?, go(body, depth + 1)?)
-        }
-        Term::Sigma(domain, codomain) => {
-            Term::sigma(go(domain, depth)?, go(codomain, depth + 1)?)
-        }
+        Term::Pi(domain, codomain) => Term::pi(go(domain, depth)?, go(codomain, depth + 1)?),
+        Term::Lam(domain, body) => Term::lam(go(domain, depth)?, go(body, depth + 1)?),
+        Term::Sigma(domain, codomain) => Term::sigma(go(domain, depth)?, go(codomain, depth + 1)?),
         Term::Let { ty, val, body } => Term::Let {
             ty: Box::new(go(ty, depth)?),
             val: Box::new(go(val, depth)?),
             body: Box::new(go(body, depth + 1)?),
         },
-        Term::App(function, argument) => {
-            Term::app(go(function, depth)?, go(argument, depth)?)
-        }
+        Term::App(function, argument) => Term::app(go(function, depth)?, go(argument, depth)?),
         Term::Pair(first, second) => Term::pair(go(first, depth)?, go(second, depth)?),
         Term::Proj1(pair) => Term::proj1(go(pair, depth)?),
         Term::Proj2(pair) => Term::proj2(go(pair, depth)?),
@@ -7399,9 +7380,10 @@ where
             Box::new(go(base, depth)?),
             Box::new(go(evidence, depth)?),
         ),
-        Term::Quot(carrier, relation) => {
-            Term::Quot(Box::new(go(carrier, depth)?), Box::new(go(relation, depth)?))
-        }
+        Term::Quot(carrier, relation) => Term::Quot(
+            Box::new(go(carrier, depth)?),
+            Box::new(go(relation, depth)?),
+        ),
         Term::QuotClass(value) => Term::QuotClass(Box::new(go(value, depth)?)),
         Term::Trunc(ty) => Term::Trunc(Box::new(go(ty, depth)?)),
         Term::TruncProj(value) => Term::TruncProj(Box::new(go(value, depth)?)),
@@ -7443,10 +7425,9 @@ where
                 .collect::<Result<Vec<_>, _>>()?,
             scrut: Box::new(go(scrut, depth)?),
         },
-        Term::Absurd(motive, proof) => Term::Absurd(
-            Box::new(go(motive, depth)?),
-            Box::new(go(proof, depth)?),
-        ),
+        Term::Absurd(motive, proof) => {
+            Term::Absurd(Box::new(go(motive, depth)?), Box::new(go(proof, depth)?))
+        }
         Term::Type(_)
         | Term::Omega(_)
         | Term::Const { .. }
@@ -7497,8 +7478,7 @@ impl ActivePremiseEmbedding {
             ));
         }
         relocate_active_premise_term(term, 0, &mut |free_index, depth| {
-            for (&(sentinel_region, premise_slot), &expanded_position) in
-                &self.premise_to_expanded
+            for (&(sentinel_region, premise_slot), &expanded_position) in &self.premise_to_expanded
             {
                 let Some(&install_depth) = self
                     .premise_install_depth
@@ -7509,11 +7489,7 @@ impl ActivePremiseEmbedding {
                     ));
                 };
                 let expected = if install_depth <= original_prefix_len {
-                    self.sentinel_at_prefix(
-                        sentinel_region,
-                        premise_slot,
-                        original_prefix_len,
-                    )?
+                    self.sentinel_at_prefix(sentinel_region, premise_slot, original_prefix_len)?
                 } else {
                     checked_index_refinement_sentinel(sentinel_region, premise_slot)?
                 };
@@ -7629,10 +7605,7 @@ fn active_premise_kernel_view_for_context(
     let mut premise_domains = HashMap::new();
     let mut expanded_len = original_len;
     for (frame_index, frame) in cx.active_index_premise_frames.iter().enumerate() {
-        if regions
-            .insert(frame.sentinel_region, frame_index)
-            .is_some()
-        {
+        if regions.insert(frame.sentinel_region, frame_index).is_some() {
             return Err(ElabError::Internal(format!(
                 "duplicate active index-premise sentinel region {}",
                 frame.sentinel_region
@@ -7665,14 +7638,9 @@ fn active_premise_kernel_view_for_context(
                 ))
             })?;
             checked_index_refinement_sentinel(frame.sentinel_region, effective_slot)?;
-            premise_install_depth.insert(
-                (frame.sentinel_region, premise_slot),
-                frame.install_depth,
-            );
-            premise_domains.insert(
-                (frame.sentinel_region, premise_slot),
-                domain.clone(),
-            );
+            premise_install_depth
+                .insert((frame.sentinel_region, premise_slot), frame.install_depth);
+            premise_domains.insert((frame.sentinel_region, premise_slot), domain.clone());
         }
     }
 
@@ -7695,9 +7663,7 @@ fn active_premise_kernel_view_for_context(
         if refinement.install_depth != frame.install_depth {
             return Err(ElabError::Internal(format!(
                 "result refinement region {} install depth {} differs from its frame depth {}",
-                refinement.sentinel_region,
-                refinement.install_depth,
-                frame.install_depth
+                refinement.sentinel_region, refinement.install_depth, frame.install_depth
             )));
         }
     }
@@ -7713,10 +7679,8 @@ fn active_premise_kernel_view_for_context(
         {
             for premise_slot in 0..frame.premise_domains.len() {
                 let expanded_position = expanded_sources.len();
-                premise_to_expanded.insert(
-                    (frame.sentinel_region, premise_slot),
-                    expanded_position,
-                );
+                premise_to_expanded
+                    .insert((frame.sentinel_region, premise_slot), expanded_position);
                 expanded_sources.push(ExpandedBindingSource::Premise {
                     sentinel_region: frame.sentinel_region,
                     premise_slot,
@@ -7780,11 +7744,12 @@ fn active_premise_kernel_view_for_context(
             original_prefix_len,
             context.len(),
         )?;
-        let classifier = kernel_infer_raw(cx.env, &context, &relocated_domain).map_err(|error| {
-            ElabError::Internal(format!(
-                "active premise expanded context contains an ill-typed domain: {error:?}"
-            ))
-        })?;
+        let classifier =
+            kernel_infer_raw(cx.env, &context, &relocated_domain).map_err(|error| {
+                ElabError::Internal(format!(
+                    "active premise expanded context contains an ill-typed domain: {error:?}"
+                ))
+            })?;
         match whnf(cx.env, &context, &classifier) {
             Term::Type(_) | Term::Omega(_) => {}
             other => {
@@ -7824,11 +7789,19 @@ fn kernel_check_in_context_current(
     let expected = cx.metas.zonk_term(expected);
     let checked = view
         .embedding
-        .translate_from_original(&checked, view.embedding.original_len, view.embedding.expanded_len)
+        .translate_from_original(
+            &checked,
+            view.embedding.original_len,
+            view.embedding.expanded_len,
+        )
         .map_err(CurrentKernelQueryError::View)?;
     let expected = view
         .embedding
-        .translate_from_original(&expected, view.embedding.original_len, view.embedding.expanded_len)
+        .translate_from_original(
+            &expected,
+            view.embedding.original_len,
+            view.embedding.expanded_len,
+        )
         .map_err(CurrentKernelQueryError::View)?;
     kernel_check_raw(cx.env, &view.context, &checked, &expected)
         .map_err(CurrentKernelQueryError::Kernel)
@@ -7872,8 +7845,8 @@ fn kernel_infer_in_context_current(
             view.embedding.expanded_len,
         )
         .map_err(CurrentKernelQueryError::View)?;
-    let inferred_ty =
-        kernel_infer_raw(cx.env, &view.context, &inferred).map_err(CurrentKernelQueryError::Kernel)?;
+    let inferred_ty = kernel_infer_raw(cx.env, &view.context, &inferred)
+        .map_err(CurrentKernelQueryError::Kernel)?;
     view.embedding
         .translate_to_original(
             &inferred_ty,
@@ -8269,13 +8242,14 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
                     binding_span: binding_span.clone(),
                 }
             })?;
-            let classifier = kernel_infer_current(cx, &result_type).map_err(|error| match error {
-                CurrentKernelQueryError::View(error) => error,
-                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                    error,
-                    span: span.clone(),
-                },
-            })?;
+            let classifier =
+                kernel_infer_current(cx, &result_type).map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                        error,
+                        span: span.clone(),
+                    },
+                })?;
             let classifier = whnf(cx.env, &cx.ctx, &classifier);
             let (actual, required) = match classifier {
                 Term::Type(level) => (
@@ -8622,15 +8596,16 @@ fn infer_eq(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let zonked_eq = cx.metas.zonk_term(&eq_term);
-    let ty = kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_eq).map_err(|error| {
-        match error {
-            CurrentKernelQueryError::View(error) => error,
-            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                error,
-                span: span.clone(),
+    let ty =
+        kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_eq).map_err(
+            |error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                },
             },
-        }
-    })?;
+        )?;
     Ok((eq_term, ty))
 }
 
@@ -8661,15 +8636,16 @@ fn infer_pi(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let zonked_pi = cx.metas.zonk_term(&pi);
-    let sort = kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_pi).map_err(
-        |error| match error {
-            CurrentKernelQueryError::View(error) => error,
-            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                error,
-                span: span.clone(),
+    let sort =
+        kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_pi).map_err(
+            |error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                },
             },
-        },
-    )?;
+        )?;
     Ok((pi, sort))
 }
 
@@ -8699,15 +8675,16 @@ fn infer_arrow(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let zonked_pi = cx.metas.zonk_term(&pi);
-    let sort = kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_pi).map_err(
-        |error| match error {
-            CurrentKernelQueryError::View(error) => error,
-            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                error,
-                span: span.clone(),
+    let sort =
+        kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_pi).map_err(
+            |error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                },
             },
-        },
-    )?;
+        )?;
     Ok((pi, sort))
 }
 
@@ -8752,15 +8729,16 @@ fn infer_trunc(cx: &mut ElabCtx, inner: &RExpr, span: &Span) -> Result<(Term, Te
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let zonked_trunc = cx.metas.zonk_term(&trunc);
-    let sort = kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_trunc).map_err(
-        |error| match error {
-            CurrentKernelQueryError::View(error) => error,
-            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                error,
-                span: span.clone(),
+    let sort =
+        kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_trunc).map_err(
+            |error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                },
             },
-        },
-    )?;
+        )?;
     Ok((trunc, sort))
 }
 
@@ -10687,9 +10665,10 @@ fn reassociate_rtype(
         // operators of conflicting associativity / a non-associative operator in
         // a chain) that a correct descent REJECTS. Mutation-proven by
         // `d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation`.
-        RType::RTrunc(inner, span) => {
-            RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities)?), span)
-        }
+        RType::RTrunc(inner, span) => RType::RTrunc(
+            Box::new(reassociate_rtype(*inner, globals, fixities)?),
+            span,
+        ),
         leaf => leaf,
     })
 }
@@ -11129,8 +11108,15 @@ fn elaborate_associated_rdecl(
             fields.clone(),
         ),
         RDeclKind::DataDecl { type_params, ctors } => {
-            let d_id =
-                data::elab_data_decl(env, globals, ctor_decl_spans, &rdecl.name, type_params, ctors, &rdecl.span)?;
+            let d_id = data::elab_data_decl(
+                env,
+                globals,
+                ctor_decl_spans,
+                &rdecl.name,
+                type_params,
+                ctors,
+                &rdecl.span,
+            )?;
             // Register data type in the module map for orphan check (`33 §5.3`).
             class_env
                 .global_modules
@@ -11773,7 +11759,7 @@ fn elab_instance_decl(
                         name: constraint.class_name.clone(),
                         span: span.clone(),
                     }
-                    })?;
+                })?;
                 let head = elab_type(&mut cx, &constraint.head_type)?;
                 Ok(if class.projection.head_param.is_some() {
                     Term::app(Term::const_(class.projection.type_id, vec![]), head)
@@ -12284,12 +12270,13 @@ pub(crate) fn elaborate_space_decl(
     }
 
     let state_body = build_space_state_type(&cell_types);
-    let state_sort = kernel_infer_raw(&elab.env, &Context::new(), &state_body).map_err(|error| {
-        ElabError::KernelRejected {
-            error,
-            span: space.span.clone(),
-        }
-    })?;
+    let state_sort =
+        kernel_infer_raw(&elab.env, &Context::new(), &state_body).map_err(|error| {
+            ElabError::KernelRejected {
+                error,
+                span: space.span.clone(),
+            }
+        })?;
     let state_id = declare_def(&mut elab.env, vec![], state_sort, state_body).map_err(|error| {
         ElabError::KernelRejected {
             error,
@@ -13969,9 +13956,11 @@ fn elab_in_ctx_at_omega(
         _ => {
             // Check if the kernel will accept it as Ω — check core at omega
             // If not, surface error
-            kernel_check_raw(env, ctx, &core_zonked, omega).map_err(|_| ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: format!("spec proposition must have type Ω, found non-proposition"),
+            kernel_check_raw(env, ctx, &core_zonked, omega).map_err(|_| {
+                ElabError::TypeMismatch {
+                    span: span.clone(),
+                    reason: format!("spec proposition must have type Ω, found non-proposition"),
+                }
             })?;
         }
     }
@@ -14056,11 +14045,11 @@ fn infer_active_pattern_alias(
         .len()
         .checked_sub(alias.install_depth)
         .ok_or_else(|| {
-        ElabError::Internal(format!(
-            "as-pattern alias '{}' escaped its installation context",
-            name
-        ))
-    })?;
+            ElabError::Internal(format!(
+                "as-pattern alias '{}' escaped its installation context",
+                name
+            ))
+        })?;
     let term = if alias.use_occurrence {
         let occurrence_growth = cx.ctx.len().saturating_sub(alias.occurrence_depth);
         weaken(&alias.occurrence, occurrence_growth as i64)
@@ -16775,8 +16764,7 @@ fn top_pattern_is_literal_form(pattern: &RPattern) -> bool {
             top_pattern_contains_literal(inner) && top_pattern_is_literal_form(inner)
         }
         RPatKind::Or(alternatives) => alternatives.iter().all(|alternative| {
-            top_pattern_contains_literal(alternative)
-                && top_pattern_is_literal_form(alternative)
+            top_pattern_contains_literal(alternative) && top_pattern_is_literal_form(alternative)
         }),
         RPatKind::Var(_, _) | RPatKind::Ctor(_, _) | RPatKind::Tuple(_) | RPatKind::Record(_) => {
             false
@@ -16857,7 +16845,10 @@ fn infer_match(
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
     }
-    if arms.iter().any(|arm| top_pattern_contains_literal(&arm.pat)) {
+    if arms
+        .iter()
+        .any(|arm| top_pattern_contains_literal(&arm.pat))
+    {
         return infer_literal_match(cx, scrut, arms, span);
     }
     if arms_have_top_or(arms) {
@@ -17303,7 +17294,8 @@ pub fn elaborate_rexpr(
 mod omega_index_refinement_tests {
     use crate::{ElabEnv, ElabError};
     use ken_kernel::{
-        infer as kernel_infer_raw, whnf, ConstructorDecl, Context, GlobalId, InductiveDecl, Level, Term,
+        infer as kernel_infer_raw, whnf, ConstructorDecl, Context, GlobalId, InductiveDecl, Level,
+        Term,
     };
 
     use super::{
@@ -17891,10 +17883,7 @@ mod result_transport_control_flow_tests {
         cx.active_index_premise_frames
             .push(ActiveIndexPremiseFrame {
                 sentinel_region: 32,
-                premise_domains: vec![
-                    index_refinement_sentinel(32, 1),
-                    Term::Type(Level::Zero),
-                ],
+                premise_domains: vec![index_refinement_sentinel(32, 1), Term::Type(Level::Zero)],
                 install_depth: 0,
             });
         let Err(later_slot) = active_premise_kernel_view(&cx) else {
@@ -17971,7 +17960,10 @@ mod result_transport_control_flow_tests {
         }
 
         let level = Level::Suc(Box::new(Level::Zero));
-        assert_eq!(classify(Term::Type(level.clone())), Term::Type(level.clone()));
+        assert_eq!(
+            classify(Term::Type(level.clone())),
+            Term::Type(level.clone())
+        );
         assert_eq!(classify(Term::Omega(level.clone())), Term::Omega(level));
     }
 
@@ -18101,16 +18093,10 @@ mod result_transport_control_flow_tests {
             install_depth: 0,
         });
 
-        let returned = validate_large_convoy_base(
-            &cx,
-            &base,
-            &domain,
-            &Span::new(0, 0),
-        )
-        .expect("the active-premise kernel view must validate");
+        let returned = validate_large_convoy_base(&cx, &base, &domain, &Span::new(0, 0))
+            .expect("the active-premise kernel view must validate");
         assert_eq!(returned, base, "the contextual view must never escape");
     }
-
 
     #[test]
     fn non_family_result_shape_still_uses_whole_index_fallback() {
@@ -18265,7 +18251,6 @@ mod result_transport_control_flow_tests {
                 .expect("both active result refinements must compose");
         assert!(convert_type(cx.env, &cx.ctx, &transported_ty, &expected));
     }
-
 }
 
 #[cfg(test)]
@@ -18277,15 +18262,15 @@ mod nested_lift_association_tests {
         ElabEnv,
     };
     use ken_kernel::{
-        check as kernel_check_raw, declare_postulate, infer as kernel_infer_raw, Context, KernelError,
-        Level, Term,
+        check as kernel_check_raw, declare_postulate, infer as kernel_infer_raw, Context,
+        KernelError, Level, Term,
     };
 
     use super::{
         check_match_with_lift, discharge_reflexive_recursive_ih_evidence, infer,
         install_lift_binding, lift_association_error, method_type, peel_pi,
-        validate_lift_associations, whnf, ActiveIndexPremiseFrame, ElabCtx, ElabError,
-        GlobalId, HashMap, LiftAssociationFailure, LiftBinding, ResultRefinement, Span,
+        validate_lift_associations, whnf, ActiveIndexPremiseFrame, ElabCtx, ElabError, GlobalId,
+        HashMap, LiftAssociationFailure, LiftBinding, ResultRefinement, Span,
     };
 
     fn binding(
@@ -18448,15 +18433,8 @@ mod nested_lift_association_tests {
             )),
             Box::new(Term::pi(rose.clone(), Term::Type(Level::Zero))),
         );
-        let node_method_ty = method_type(
-            &env.env,
-            &rose_decl,
-            1,
-            &closed_motive,
-            &[],
-            &[],
-        )
-        .expect("ShadowNode method type");
+        let node_method_ty = method_type(&env.env, &rose_decl, 1, &closed_motive, &[], &[])
+            .expect("ShadowNode method type");
         let (node_domains, _) = peel_pi(&node_method_ty);
         assert_eq!(node_domains.len(), 2, "field plus generated evidence");
 
@@ -18493,12 +18471,9 @@ mod nested_lift_association_tests {
             sentinel_region: region,
             install_depth: cx.ctx.len(),
         });
-        let installed = install_lift_binding(&mut cx, base, base + 1, None)
-            .expect("generated lift binding");
-        let members = cx
-            .binding_term(base)
-            .expect("members source binding")
-            .0;
+        let installed =
+            install_lift_binding(&mut cx, base, base + 1, None).expect("generated lift binding");
+        let members = cx.binding_term(base).expect("members source binding").0;
         let list = cx
             .env
             .inductive(cx.globals["List"])

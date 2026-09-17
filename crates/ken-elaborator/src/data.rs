@@ -110,7 +110,14 @@ pub fn elab_data_decl(
 
     let own_ctor_ids: HashSet<GlobalId> = ctor_ids.iter().copied().collect();
     for (i, c) in ctors.iter().enumerate() {
-        guard_constructor_spelling(env, globals, ctor_decl_spans, &own_ctor_ids, &c.name, &c.span)?;
+        guard_constructor_spelling(
+            env,
+            globals,
+            ctor_decl_spans,
+            &own_ctor_ids,
+            &c.name,
+            &c.span,
+        )?;
         globals.insert(c.name.clone(), ctor_ids[i]);
         ctor_decl_spans.insert(c.name.clone(), c.span.clone());
     }
@@ -137,7 +144,10 @@ fn guard_constructor_spelling(
         if env.constructor(existing_id).is_some() && !own_ctor_ids.contains(&existing_id) {
             return Err(ElabError::DuplicateConstructorSpelling {
                 name: name.to_string(),
-                first_span: ctor_decl_spans.get(name).cloned().unwrap_or_else(Span::zero),
+                first_span: ctor_decl_spans
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(Span::zero),
                 second_span: span.clone(),
             });
         }
@@ -307,7 +317,14 @@ pub fn elab_explicit_data_decl(
 
     let own_ctor_ids: HashSet<GlobalId> = ctor_ids.iter().copied().collect();
     for (i, c) in ctors.iter().enumerate() {
-        guard_constructor_spelling(env, globals, ctor_decl_spans, &own_ctor_ids, &c.name, &c.span)?;
+        guard_constructor_spelling(
+            env,
+            globals,
+            ctor_decl_spans,
+            &own_ctor_ids,
+            &c.name,
+            &c.span,
+        )?;
         globals.insert(c.name.clone(), ctor_ids[i]);
         ctor_decl_spans.insert(c.name.clone(), c.span.clone());
     }
@@ -745,7 +762,12 @@ fn rtype_to_kernel_checked(
             rtype_to_kernel_checked(carrier, d_name, d_id, globals, ind_id_set, ctor_id_set)
         }
         RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(rtype_to_kernel_checked(
-            inner, d_name, d_id, globals, ind_id_set, ctor_id_set,
+            inner,
+            d_name,
+            d_id,
+            globals,
+            ind_id_set,
+            ctor_id_set,
         )?))),
     }
 }

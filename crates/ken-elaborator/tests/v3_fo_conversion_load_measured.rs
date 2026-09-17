@@ -235,13 +235,18 @@ fn measure_one(env: &mut ElabEnv, label: &str, source: &str, formula_depth: usiz
         .elaborate_decl_v1(source)
         .unwrap_or_else(|e| panic!("{label}: source must elaborate, got {e:?}"));
     let ex = v2_extract(&elab_res);
-    assert_eq!(ex.obligations.len(), 1, "{label}: exactly one ensures obligation");
+    assert_eq!(
+        ex.obligations.len(),
+        1,
+        "{label}: exactly one ensures obligation"
+    );
     let phi_closed = &ex.obligations[0].goal_closed;
 
     let (_sig, problem) = discover_and_quote_fo(&env.env, phi_closed)
         .unwrap_or_else(|| panic!("{label}: discovery+quotation must succeed on this obligation"));
-    let cert = find_certificate(&problem.f)
-        .unwrap_or_else(|| panic!("{label}: this obligation is a tautology, a certificate must exist"));
+    let cert = find_certificate(&problem.f).unwrap_or_else(|| {
+        panic!("{label}: this obligation is a tautology, a certificate must exist")
+    });
     let target = embed(&problem.f);
     let cert_node_count = count_cert_nodes(&cert);
 
@@ -252,7 +257,10 @@ fn measure_one(env: &mut ElabEnv, label: &str, source: &str, formula_depth: usiz
     let accepted = check_cert(&target, &cert);
     let wall_clock = start.elapsed();
 
-    assert!(accepted, "{label}: check_cert must accept this genuine certificate");
+    assert!(
+        accepted,
+        "{label}: check_cert must accept this genuine certificate"
+    );
 
     Measurement {
         label: label.to_string(),
@@ -282,14 +290,24 @@ fn measure_rust_reference_checker_load_on_real_source_programs() {
         for depth in [1usize, 2, 4, 8, 16, 32, 48, 64] {
             let name = format!("imp_chain_{depth}");
             let source = imp_chain_source(&name, depth);
-            measurements.push(measure_one(&mut env, &format!("imp_chain[{depth}]"), &source, depth));
+            measurements.push(measure_one(
+                &mut env,
+                &format!("imp_chain[{depth}]"),
+                &source,
+                depth,
+            ));
         }
 
         // Axis 2: forall-nesting depth (independent dimension).
         for depth in [1usize, 2, 4, 8, 16] {
             let name = format!("forall_chain_{depth}");
             let source = forall_chain_source(&name, depth);
-            measurements.push(measure_one(&mut env, &format!("forall_chain[{depth}]"), &source, depth));
+            measurements.push(measure_one(
+                &mut env,
+                &format!("forall_chain[{depth}]"),
+                &source,
+                depth,
+            ));
         }
 
         eprintln!("\n=== V3-FO-CONVERSION-LOAD-MEASURED: D1-D4 report ===");

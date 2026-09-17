@@ -1766,9 +1766,7 @@ fn resolve_infix_spine(
                 InfixOperator::Builtin(operator, span) => {
                     RInfixOperator::Builtin(*operator, span.clone())
                 }
-                InfixOperator::User(name, span) => {
-                    RInfixOperator::User(name.clone(), span.clone())
-                }
+                InfixOperator::User(name, span) => RInfixOperator::User(name.clone(), span.clone()),
             })
             .collect(),
         span: span.clone(),

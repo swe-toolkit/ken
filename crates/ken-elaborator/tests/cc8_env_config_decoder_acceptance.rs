@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, apply, eval};
+use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
 const BYTES_KEYS: &str = include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");

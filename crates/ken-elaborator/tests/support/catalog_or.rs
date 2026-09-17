@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{ElabEnv, modules::ModuleState};
+use ken_elaborator::{modules::ModuleState, ElabEnv};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 
 pub fn catalog_root() -> PathBuf {

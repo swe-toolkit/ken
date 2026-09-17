@@ -17,8 +17,7 @@ fn huge() -> BigInt {
 #[test]
 fn huge_surface_int_reaches_kernel_and_evaluation_exactly() {
     let mut env = ElabEnv::new().expect("base env");
-    let before: std::collections::BTreeSet<_> =
-        env.env.trusted_base().into_iter().collect();
+    let before: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let id = env
         .elaborate_decl(&format!("const huge : Int = {HUGE}"))
         .expect("arbitrary-precision surface Int must elaborate");
@@ -35,8 +34,7 @@ fn huge_surface_int_reaches_kernel_and_evaluation_exactly() {
         ken_interp::EvalVal::BigInt(huge())
     );
 
-    let after: std::collections::BTreeSet<_> =
-        env.env.trusted_base().into_iter().collect();
+    let after: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "surface Int must not change trusted_base()");
 }
 
@@ -108,7 +106,9 @@ fn zero_and_succ_constructor_result_indices_still_elaborate() {
 fn assert_fixed_accepts(target: &str, literal: &str) {
     let mut env = ElabEnv::new().expect("base env");
     let source = format!("const accepted : {target} = {literal}");
-    let id = env.elaborate_decl(&source).expect("in-range literal accepts");
+    let id = env
+        .elaborate_decl(&source)
+        .expect("in-range literal accepts");
     let (_, body) = env.env.transparent_body(id).expect("accepted body");
     let Term::Const { id: literal_id, .. } = body else {
         panic!("fixed-width literal must use its checked literal primitive")

@@ -1293,11 +1293,7 @@ pub fn canonical_semantic_bytes(inputs: &CheckedCoreSemanticInputs) -> Vec<u8> {
     encode_string_map("primitive_refs", &inputs.primitive_refs, &mut out);
     encode_primitive_metadata_map("primitive_metadata", &inputs.primitive_metadata, &mut out);
     encode_data_metadata_map("data_metadata", &inputs.data_metadata, &mut out);
-    encode_symbol_map(
-        "all_support_origins",
-        &inputs.all_support_origins,
-        &mut out,
-    );
+    encode_symbol_map("all_support_origins", &inputs.all_support_origins, &mut out);
     encode_record_sigma_metadata_map(
         "record_sigma_metadata",
         &inputs.record_sigma_metadata,

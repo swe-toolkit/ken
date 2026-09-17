@@ -26,9 +26,7 @@
 //!
 //! `[placeholder — reifies in V4]` marks deferred decisions/backends.
 
-use ken_kernel::{
-    check, declare_postulate, subst::subst0, Context, GlobalEnv, GlobalId, Term,
-};
+use ken_kernel::{check, declare_postulate, subst::subst0, Context, GlobalEnv, GlobalId, Term};
 use num_bigint::BigInt;
 
 use crate::extract::{ObligationId, ObligationTriple};
@@ -248,9 +246,7 @@ fn is_literal_equality(phi: &Term) -> bool {
 /// or inductive eliminators.
 fn is_first_order_intuit(phi: &Term) -> bool {
     match phi {
-        Term::Pi(a, b) | Term::Sigma(a, b) => {
-            is_first_order_intuit(a) && is_first_order_intuit(b)
-        }
+        Term::Pi(a, b) | Term::Sigma(a, b) => is_first_order_intuit(a) && is_first_order_intuit(b),
         Term::App(f, a) => is_first_order_intuit(f) && is_first_order_intuit(a),
         Term::Omega(_) => true,
         Term::Var(_) => true,
@@ -402,9 +398,8 @@ fn attempt_d(
         if let (Term::IntLit(left), Term::IntLit(right)) = (lhs.as_ref(), rhs.as_ref()) {
             if left != right {
                 let refutation = Term::lam(phi.clone(), Term::var(0));
-                let countermodel = Countermodel::root(format!(
-                    "Int literal equality fails: {left} != {right}"
-                ));
+                let countermodel =
+                    Countermodel::root(format!("Int literal equality fails: {left} != {right}"));
                 return attempt_with_refutation(
                     env,
                     ctx,
@@ -451,7 +446,9 @@ pub fn attempt_d_with_int_assignment(
     else {
         return emit_unknown_hole(env, &triple.goal_closed);
     };
-    let int_id = env.int_lit_type().expect("classification required registered Int");
+    let int_id = env
+        .int_lit_type()
+        .expect("classification required registered Int");
     let is_ground_int_equality = matches!(
         &ground,
         Term::Eq(ty, lhs, rhs)
@@ -507,11 +504,9 @@ pub fn attempt_d_with_z3_process(
     triple: &ObligationTriple,
     config: &Z3ProcessConfig,
 ) -> Verdict {
-    let Some(assignment) = crate::z3_process::candidate_assignment(
-        &triple.goal_closed,
-        env.int_lit_type(),
-        config,
-    ) else {
+    let Some(assignment) =
+        crate::z3_process::candidate_assignment(&triple.goal_closed, env.int_lit_type(), config)
+    else {
         return emit_unknown_hole(env, &triple.goal_closed);
     };
     attempt_d_with_int_assignment(env, triple, &assignment)
@@ -640,12 +635,7 @@ pub fn attempt_fo_with_signature(
 /// context assumption lookup (hyp), Sigma-elim (∧ elim → Proj1/Proj2).
 /// Induction tactics and full higher-order proving are
 /// `[placeholder — reifies in V4]` (`23 §5`).
-fn attempt_ho(
-    env: &mut GlobalEnv,
-    ctx: &Context,
-    phi: &Term,
-    phi_closed: &Term,
-) -> Verdict {
+fn attempt_ho(env: &mut GlobalEnv, ctx: &Context, phi: &Term, phi_closed: &Term) -> Verdict {
     attempt_ipc(env, ctx, phi, phi_closed)
 }
 
@@ -656,12 +646,7 @@ fn attempt_ho(
 ///
 /// The returned cert is **always kernel-checked** before `proved` is declared
 /// — the cardinal rule (`23 §1.5`).
-fn attempt_ipc(
-    env: &mut GlobalEnv,
-    ctx: &Context,
-    phi: &Term,
-    phi_closed: &Term,
-) -> Verdict {
+fn attempt_ipc(env: &mut GlobalEnv, ctx: &Context, phi: &Term, phi_closed: &Term) -> Verdict {
     match try_ipc_cert(env, ctx, phi, phi_closed) {
         Some(cert) => Verdict::Proved { cert },
         None => emit_unknown_hole(env, phi_closed),
@@ -673,12 +658,7 @@ fn attempt_ipc(
 /// Fragment D uses this side-effect-free phase before attempting a backend, so
 /// a later successful refutation cannot inherit a ghost `Unknown` postulate
 /// from a failed IPC pre-pass.
-fn try_ipc_cert(
-    env: &GlobalEnv,
-    ctx: &Context,
-    phi: &Term,
-    phi_closed: &Term,
-) -> Option<Term> {
+fn try_ipc_cert(env: &GlobalEnv, ctx: &Context, phi: &Term, phi_closed: &Term) -> Option<Term> {
     match ipc_search(ctx, phi, 0) {
         Some(open_cert) => {
             // Close the open cert: wrap with Lam for each context entry so the
@@ -788,7 +768,7 @@ fn emit_unknown_hole(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
         vec![],
         phi_closed.clone(),
     )
-        .expect("declare_postulate for unknown hole must succeed");
+    .expect("declare_postulate for unknown hole must succeed");
     Verdict::Unknown { hole_id }
 }
 
@@ -834,7 +814,7 @@ fn emit_unknown_hole_fo_withheld(env: &mut GlobalEnv, phi_closed: &Term) -> Verd
         vec![],
         phi_closed.clone(),
     )
-        .expect("declare_postulate for FO-withheld unknown hole must succeed");
+    .expect("declare_postulate for FO-withheld unknown hole must succeed");
     Verdict::Unknown { hole_id }
 }
 

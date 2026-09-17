@@ -2670,9 +2670,7 @@ impl Parser {
             Token::Nat(value) => LiteralPat::Numeric(NumLit::Int(value.into())),
             Token::IntLit(value) => LiteralPat::Numeric(NumLit::Int(value)),
             Token::FloatLit(value) => LiteralPat::Numeric(NumLit::Float(value)),
-            Token::DecimalLit(coeff, exp) => {
-                LiteralPat::Numeric(NumLit::Decimal(coeff, exp))
-            }
+            Token::DecimalLit(coeff, exp) => LiteralPat::Numeric(NumLit::Decimal(coeff, exp)),
             Token::Float32Lit(value) => LiteralPat::Numeric(NumLit::Float32(value)),
             Token::Str(value) => LiteralPat::String(value),
             Token::CharLit(value) => LiteralPat::Char(value),
@@ -2963,11 +2961,37 @@ impl Parser {
                 }
             }
             operator if canonical_operator_name(&operator).is_some() => {
+                // `32 Section 3`: an ungrouped `operator_name` is admitted only
+                // as an `operator_prefix` head with at least one following
+                // atom. With zero following atoms it rejects AT ITS LEADING
+                // TOKEN -- hence `span`, captured before the advance.
+                //
+                // This rejection is raised by THIS production. Letting the
+                // operator through and leaving the caller to trip over the
+                // leftover tokens also produces an error at this coordinate,
+                // and it is the wrong error: a span is a coordinate, and the
+                // requirement is about authorship.
+                //
+                // The infix path (`parse_mixed_infix_expr`) is untouched: it
+                // consumes its operator directly and never routes one through
+                // this arm, because `can_start_atom_expr` does not admit an
+                // operator token, so an operator is only ever seen here when an
+                // expression STARTS with it.
                 let span = self.peek_span().clone();
                 let name = canonical_operator_name(&operator)
                     .expect("guarded by operator-name recognition")
                     .to_owned();
                 self.advance();
+                if !self.can_start_atom_expr() {
+                    return Err(ElabError::ParseError {
+                        msg: format!(
+                            "`{name}` is an operator name, not an atom: group it as \
+                             `({name})` to use it as a value, or apply it to at least \
+                             one argument"
+                        ),
+                        span,
+                    });
+                }
                 Ok(Expr::EVar(name, span))
             }
             Token::ConId(s) => {
@@ -3018,6 +3042,29 @@ impl Parser {
             }
             Token::LParen => {
                 self.advance();
+                // `( operator_name )` is the sanctioned way to use an operator
+                // as a value, and `32 Section 3` preserves it. It is recognised
+                // HERE, as its own production, rather than by peeking `RParen`
+                // from inside the operator arm below: the parens must ENCLOSE
+                // the operator, and a peek cannot tell `(<+>)` from the `<+>`
+                // in `(a, <+>)`, which is ungrouped and must still reject.
+                //
+                // The span deliberately covers both parens, which is what the
+                // re-span at the end of this arm would have produced. Grouped
+                // and bare therefore yield the SAME node and the discriminator
+                // is the source byte AT `span.start` -- not the node type, and
+                // not the start offset.
+                if canonical_operator_name(self.peek()).is_some()
+                    && matches!(self.lookahead(1), Token::RParen)
+                {
+                    let name = canonical_operator_name(self.peek())
+                        .expect("guarded by the condition above")
+                        .to_owned();
+                    self.advance();
+                    let end = self.peek_span().end;
+                    self.advance();
+                    return Ok(Expr::EVar(name, Span::new(start, end)));
+                }
                 if matches!(self.peek(), Token::KwProof) {
                     self.advance();
                     let (proof_name, _) = self.expect_ident()?;
@@ -3184,10 +3231,7 @@ fn reduce_default_surface(values: &mut Vec<Expr>, operator: InfixOperator) {
     values.push(combined);
 }
 
-fn associate_surface_spine(
-    operands: Vec<Expr>,
-    operators: Vec<InfixOperator>,
-) -> Expr {
+fn associate_surface_spine(operands: Vec<Expr>, operators: Vec<InfixOperator>) -> Expr {
     let mut operands = operands.into_iter();
     let mut values = vec![operands.next().expect("a spine has one more operand")];
     let mut pending: Vec<InfixOperator> = Vec::new();
@@ -3196,10 +3240,7 @@ fn associate_surface_spine(
             .last()
             .is_some_and(|top| default_precedence(top) >= default_precedence(&operator))
         {
-            reduce_default_surface(
-                &mut values,
-                pending.pop().expect("pending operator exists"),
-            );
+            reduce_default_surface(&mut values, pending.pop().expect("pending operator exists"));
         }
         pending.push(operator);
         values.push(rhs);
@@ -3257,10 +3298,7 @@ fn reassociate_default_expr(expr: Expr) -> Expr {
             operators,
             ..
         } => associate_surface_spine(
-            operands
-                .into_iter()
-                .map(reassociate_default_expr)
-                .collect(),
+            operands.into_iter().map(reassociate_default_expr).collect(),
             operators,
         ),
         Expr::EMatch {
@@ -3383,9 +3421,7 @@ fn reassociate_default_type(ty: Type) -> Type {
         // `RTrunc` arm, which IS reaching (it runs at DECLARED fixity and rejects
         // an ambiguous-fixity truncated predicate; see that arm and its test).
         // The traversal must still not silently leaf a `‖…‖`.
-        Type::TTrunc(inner, span) => {
-            Type::TTrunc(Box::new(reassociate_default_type(*inner)), span)
-        }
+        Type::TTrunc(inner, span) => Type::TTrunc(Box::new(reassociate_default_type(*inner)), span),
         leaf => leaf,
     }
 }

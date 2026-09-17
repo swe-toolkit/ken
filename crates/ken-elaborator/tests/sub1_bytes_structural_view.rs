@@ -10,7 +10,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, PrimReduction, Term};
 
-
 fn make_store(env: &ElabEnv) -> EvalStore {
     let mut store = EvalStore::new();
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;

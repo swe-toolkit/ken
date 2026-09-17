@@ -1188,9 +1188,7 @@ fn rewrite_rtype_inner(
             Box::new(rewrite_rtype(scope, exports, *a)?),
             s,
         ),
-        RType::RTrunc(a, s) => {
-            RType::RTrunc(Box::new(rewrite_rtype(scope, exports, *a)?), s)
-        }
+        RType::RTrunc(a, s) => RType::RTrunc(Box::new(rewrite_rtype(scope, exports, *a)?), s),
     })
 }
 
@@ -2399,8 +2397,7 @@ fn elaborate_resolved_space(
     elab: &mut ElabEnv,
     resolved: &crate::resolve::RSpaceDecl,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    let associated =
-        crate::elab::reassociate_space_decl(resolved, &elab.globals, &elab.fixities)?;
+    let associated = crate::elab::reassociate_space_decl(resolved, &elab.globals, &elab.fixities)?;
     crate::elab::elaborate_space_decl(elab, associated.as_deref().unwrap_or(resolved))
 }
 
@@ -2767,9 +2764,7 @@ fn expand_scope(
                         let subject_is_public = exports_here.contains_key(subject)
                             || run
                                 .iter()
-                                .filter(|candidate| {
-                                    is_recursive_candidate(candidate.unwrap_pub())
-                                })
+                                .filter(|candidate| is_recursive_candidate(candidate.unwrap_pub()))
                                 .any(|candidate| {
                                     candidate.is_pub() && candidate.unwrap_pub().name() == subject
                                 });

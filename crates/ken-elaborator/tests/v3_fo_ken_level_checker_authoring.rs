@@ -837,10 +837,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
             gamma: vec![],
             delta: vec![forall_target.clone()],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen: 0,
-        },
+        rule: Rule::ForallRight { right: 0, eigen: 0 },
         children: vec![imp_accept.clone()],
     };
 
@@ -995,10 +992,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
             gamma: vec![],
             delta: vec![forall_target.clone()],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen: 0,
-        },
+        rule: Rule::ForallRight { right: 0, eigen: 0 },
         children: vec![],
     };
     let cert_forall_two = Cert {
@@ -1006,10 +1000,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
             gamma: vec![],
             delta: vec![forall_target.clone()],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen: 0,
-        },
+        rule: Rule::ForallRight { right: 0, eigen: 0 },
         children: vec![imp_accept.clone(), imp_accept.clone()],
     };
     checks.push((
@@ -1038,10 +1029,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
             gamma: vec![],
             delta: vec![Form::Bottom],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen: 0,
-        },
+        rule: Rule::ForallRight { right: 0, eigen: 0 },
         children: vec![imp_accept.clone()],
     };
     checks.push((
@@ -1069,10 +1057,7 @@ fn fok_check_cert_agrees_with_rust_on_near_miss_pairs() {
             gamma: vec![],
             delta: vec![q_forall_fresh_violation.clone()],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen: 0,
-        },
+        rule: Rule::ForallRight { right: 0, eigen: 0 },
         children: vec![imp_accept.clone()],
     };
     checks.push((
@@ -1416,10 +1401,7 @@ fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
             gamma: vec![],
             delta: vec![q.clone()],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen: 0,
-        },
+        rule: Rule::ForallRight { right: 0, eigen: 0 },
         children: vec![imp_right_node],
     };
 
@@ -1485,10 +1467,7 @@ fn forall_probe_certificate(
             gamma: vec![],
             delta: vec![target.clone()],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen,
-        },
+        rule: Rule::ForallRight { right: 0, eigen },
         children: vec![child],
     };
     (target, root)
@@ -1520,10 +1499,7 @@ fn nested_reused_eigen_certificate(inner_eigen: usize) -> (Form, Cert) {
             gamma: vec![],
             delta: vec![target.clone()],
         },
-        rule: Rule::ForallRight {
-            right: 0,
-            eigen: 0,
-        },
+        rule: Rule::ForallRight { right: 0, eigen: 0 },
         children: vec![inner_root],
     };
     (target, root)

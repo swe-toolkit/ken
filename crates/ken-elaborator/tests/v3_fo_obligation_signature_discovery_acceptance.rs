@@ -21,14 +21,16 @@
 //! built to be, now exercised by a route that can actually reach it.
 
 use ken_elaborator::{
+    attempt_obligation, classify,
+    error::Span,
     extract::{ObligationId, ObligationTriple, ProvKind, Provenance},
     fo_kripke::{check_cert, denote, discover_and_quote_fo, embed, find_certificate, IForm},
     prover::Route,
-    attempt_obligation, classify,
-    error::Span,
     prover::Verdict,
 };
-use ken_kernel::{declare_postulate, subst::shift, Context, Decl, GlobalEnv, GlobalId, Level, Term};
+use ken_kernel::{
+    declare_postulate, subst::shift, Context, Decl, GlobalEnv, GlobalId, Level, Term,
+};
 
 const FO_WITHHELD_MARKER: &str = "theorem-home unapproved";
 const ORDINARY_LABEL: &str = "prover unknown goal";
@@ -37,8 +39,13 @@ const ORDINARY_LABEL: &str = "prover unknown goal";
 /// independent postulates -- simulating a real program's own declarations,
 /// never `fo_kripke::declare_fo_slice_signature`'s prover-owned ones.
 fn declare_real_program_signature(env: &mut GlobalEnv) -> (Term, GlobalId) {
-    let a_id = declare_postulate(env, "user sort A".to_string(), vec![], Term::Type(Level::zero()))
-        .expect("declare sort A");
+    let a_id = declare_postulate(
+        env,
+        "user sort A".to_string(),
+        vec![],
+        Term::Type(Level::zero()),
+    )
+    .expect("declare sort A");
     let sort_a = Term::const_(a_id, vec![]);
     let pred_id = declare_postulate(
         env,
@@ -83,7 +90,10 @@ fn closed_triple(env: &mut GlobalEnv, id: &str, phi: Term) -> ObligationTriple {
         context: vec![],
         phi: phi.clone(),
         goal_closed: phi,
-        provenance: Provenance { kind: ProvKind::Prove, span: Span::zero() },
+        provenance: Provenance {
+            kind: ProvKind::Prove,
+            span: Span::zero(),
+        },
     }
 }
 
@@ -106,14 +116,20 @@ fn real_positive_obligation_reaches_fo_boundary_through_public_route() {
 
     // classify must route this through FO for the public route to exercise
     // `attempt_fo` at all.
-    assert_eq!(classify(&env, &phi), Route::FO, "classify must route this obligation to FO");
+    assert_eq!(
+        classify(&env, &phi),
+        Route::FO,
+        "classify must route this obligation to FO"
+    );
 
     let triple = closed_triple(&mut env, "d2.positive", phi);
     let result = attempt_obligation(&mut env, &triple);
 
     let hole_id = match result.verdict {
         Verdict::Unknown { hole_id } => hole_id,
-        other => panic!("D2 obligation must yield Unknown (23 §4.4 still forbids Proved), got {other:?}"),
+        other => {
+            panic!("D2 obligation must yield Unknown (23 §4.4 still forbids Proved), got {other:?}")
+        }
     };
     let label = hole_label(&env, hole_id);
     assert!(
@@ -137,7 +153,11 @@ fn bottom_in_antecedent_does_not_overcollect_as_a_spurious_sort() {
     let (sort_a, pred_id) = declare_real_program_signature(&mut env);
     let phi = real_bottom_in_antecedent_obligation(&env, &sort_a, pred_id);
 
-    assert_eq!(classify(&env, &phi), Route::FO, "classify must route this obligation to FO");
+    assert_eq!(
+        classify(&env, &phi),
+        Route::FO,
+        "classify must route this obligation to FO"
+    );
 
     // Precondition, not decoration: discovery succeeds and a genuine
     // certificate (imp-right, imp-right, init) is found and accepted for
@@ -147,7 +167,10 @@ fn bottom_in_antecedent_does_not_overcollect_as_a_spurious_sort() {
     let cert =
         find_certificate(&problem.f).expect("a certificate must be found for this tautology");
     let target = embed(&problem.f);
-    assert!(check_cert(&target, &cert), "the certificate must compute True");
+    assert!(
+        check_cert(&target, &cert),
+        "the certificate must compute True"
+    );
 
     let triple = closed_triple(&mut env, "d1.bottom_antecedent", phi);
     let result = attempt_obligation(&mut env, &triple);
@@ -267,8 +290,13 @@ fn conjunct_3_convert_distinguishes_structurally_different_iforms() {
 fn ambiguous_two_sort_obligation_is_refused_by_discovery_not_guessed() {
     let mut env = GlobalEnv::new();
     let (sort_a, pred_id) = declare_real_program_signature(&mut env);
-    let b_id = declare_postulate(&mut env, "user sort B".to_string(), vec![], Term::Type(Level::zero()))
-        .expect("declare sort B");
+    let b_id = declare_postulate(
+        &mut env,
+        "user sort B".to_string(),
+        vec![],
+        Term::Type(Level::zero()),
+    )
+    .expect("declare sort B");
     let sort_b = Term::const_(b_id, vec![]);
 
     // `forall x:A. forall y:B. P x => P x` -- two distinct sort candidates.
