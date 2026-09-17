@@ -36,6 +36,43 @@ origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks 
 > **A row excluded by file that does NOT reference the refused operation is not
 > this node's** — it is owed work with no owner and goes back to the Steward.
 >
+> ### THE PREDICATE FIRED. FOUR MORE ROWS AND A WHOLE FILE ALSO ARRIVE HERE.
+>
+> Written 2026-09-17 after the port closed at `REMAINING 0` (`e575e8058`). The
+> three above were never the whole population, and the frame said so.
+>
+> **Four pure-grant method rows** — every changed line in each names the
+> operation, so there is nothing else in them to port:
+>
+>     effect_v1.rs::availability                                    2 of 2 lines
+>     effect_v1.rs::every_catalog_or_layout_value_mutation_...       2 of 2 lines
+>     effect_v1.rs::abi_s6_d5b_file_acquire_identity_...      new fn, 8 refs/22 ln
+>     effect_v1.rs::mapping_acquire_file_source_rights       new fn, already
+>                                                            EXCLUDED by §2e
+>
+> **And one WHOLE FILE, which is the part a row list would lose:**
+>
+>     crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs
+>       three tests, 196 / 71 / 89 line bodies, 4 / 4 / 2 operation refs
+>       ABSENT FROM main ENTIRELY -- so the FILE is the smallest takeable unit
+>
+> **This file is the refused capability's ACCEPTANCE SURFACE**, so it is this
+> node's deliverable and not a stray. With it comes the port's `AC-4` procedure
+> verbatim — report each red, repair none, and an accepted red needs an
+> `.github/ignored-test-exemptions.toml` row naming what would readmit it — and
+> the **one predicted red** the Architect named in advance
+> (`evt_2jzjsj3nhn2qm`): `file_source_admission_uses_read_not_destination_
+> protection_rights` asserts `applications == 1`, which is **0 by construction**
+> until this node lands the grant. On THIS node it should go green; if it does
+> not, that is a finding about the flip, not about the port.
+>
+> **`RT-D5B-MAPPING-AVAILABILITY-FLIP` is where port deliverable `§5` item 3
+> comes to rest. Without this paragraph that item is silently unmet rather than
+> deferred** — QA declined to read it as discharged on a ruling that existed only
+> in a convo thread (`evt_jcfntthp14d9`), and was right to. The site table below
+> is unaffected: the catalog line is still site 1 of 5 and this file is a
+> separate object.
+>
 > ## 2026-09-17: A "THIS NODE BLOCKS A `ready` NODE" CLAIM WAS MADE AND WITHDRAWN
 >
 > **RETRACTED THE SAME HOUR. This node's priority is UNCHANGED, and nothing below
