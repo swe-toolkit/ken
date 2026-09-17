@@ -1036,6 +1036,80 @@ pub fn mixed_owner_execute_then_resume_overpromotion_is_exact() -> bool {
     OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
 }
 
+/// Compile-preserving HS15/HS17 refutations. Each moves one operand of the
+/// post-call consumer contract while leaving the ordinary call ABI untouched.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum D5bHs17PostCallConsumerMutation {
+    Exact,
+    DeleteRelation,
+    TransplantConsumer,
+    RelabelWithoutConsumer,
+    SkipDetachedRequiredConsumerSuffix,
+    DeleteStaticResponseBoundary,
+    TransplantStaticResponseBoundary,
+    SubstituteForwardedResultWord,
+    ReplayCompletedSelectedExit,
+    DropResidualSuffix,
+    MintReceiptAtNonEmittingTail,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static D5B_HS17_POST_CALL_CONSUMER_MUTATION:
+        std::cell::Cell<D5bHs17PostCallConsumerMutation> =
+        const { std::cell::Cell::new(D5bHs17PostCallConsumerMutation::Exact) };
+    static D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+struct D5bHs17PostCallConsumerMutationGuard;
+
+#[cfg(feature = "px8-ds-test-support")]
+impl Drop for D5bHs17PostCallConsumerMutationGuard {
+    fn drop(&mut self) {
+        D5B_HS17_POST_CALL_CONSUMER_MUTATION
+            .with(|slot| slot.set(D5bHs17PostCallConsumerMutation::Exact));
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_d5b_hs17_post_call_consumer_mutation<T>(
+    mutation: D5bHs17PostCallConsumerMutation,
+    operation: impl FnOnce() -> T,
+) -> (T, usize) {
+    let previous = D5B_HS17_POST_CALL_CONSUMER_MUTATION.with(|slot| slot.replace(mutation));
+    assert_eq!(
+        previous,
+        D5bHs17PostCallConsumerMutation::Exact,
+        "HS15/HS17 post-call consumer mutations cannot nest"
+    );
+    D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS.with(|count| count.set(0));
+    let guard = D5bHs17PostCallConsumerMutationGuard;
+    let result = operation();
+    let applications = D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS.with(std::cell::Cell::get);
+    drop(guard);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn d5b_hs17_post_call_consumer_mutation_is_exact() -> bool {
+    D5B_HS17_POST_CALL_CONSUMER_MUTATION
+        .with(|slot| slot.get() == D5bHs17PostCallConsumerMutation::Exact)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn d5b_hs17_post_call_consumer_mutation(
+) -> D5bHs17PostCallConsumerMutation {
+    D5B_HS17_POST_CALL_CONSUMER_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn record_d5b_hs17_post_call_consumer_application() {
+    D5B_HS17_POST_CALL_CONSUMER_APPLICATIONS.with(|count| count.set(count.get().saturating_add(1)));
+}
+
 impl SsaInfeasible {
     fn at_vis(
         base_owner: ContinuationEmissionOwner,

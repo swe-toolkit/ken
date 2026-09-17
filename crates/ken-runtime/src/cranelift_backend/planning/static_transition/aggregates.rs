@@ -12842,3 +12842,148 @@ pub(in crate::cranelift_backend::planning::static_transition) fn checked_ih_post
         )),
     }
 }
+
+/// Exact-call selection report for the discriminator carried alongside the
+/// unchanged generated-entry quotient.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RequiredConsumerCallObservation {
+    pub context: u32,
+    pub worker_body_origin: u32,
+    pub transport_call_count: usize,
+    pub candidate_targets: Vec<u32>,
+    pub candidate_result_origins: Vec<u32>,
+    pub selected_target: u32,
+    pub selected_result_origin: u32,
+}
+
+/// Production-side mutation proving that the exact defining transport selects
+/// the required-consumer relation rather than decorating an already-made choice.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RequiredConsumerCallMutation {
+    Exact,
+    SubstituteDefiningTransport {
+        defining_body_origin: u32,
+        selected_target: u32,
+        substitute_target: u32,
+    },
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static REQUIRED_CONSUMER_CALL_MUTATION: Cell<RequiredConsumerCallMutation> =
+        const { Cell::new(RequiredConsumerCallMutation::Exact) };
+    static REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS: Cell<usize> = const { Cell::new(0) };
+    static REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static REQUIRED_CONSUMER_CALL_OBSERVATIONS:
+        RefCell<Vec<RequiredConsumerCallObservation>> = const { RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_required_consumer_call_observations<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<RequiredConsumerCallObservation>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(false));
+        }
+    }
+    REQUIRED_CONSUMER_CALL_OBSERVATIONS.with(|rows| rows.borrow_mut().clear());
+    REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(true));
+    let restore = Restore;
+    let result = f();
+    let rows = REQUIRED_CONSUMER_CALL_OBSERVATIONS
+        .with(|rows| std::mem::take(&mut *rows.borrow_mut()));
+    drop(restore);
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_required_consumer_call_mutation<T>(
+    mutation: RequiredConsumerCallMutation,
+    f: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_CALL_MUTATION
+                .with(|active| active.set(RequiredConsumerCallMutation::Exact));
+        }
+    }
+    REQUIRED_CONSUMER_CALL_MUTATION.with(|active| active.set(mutation));
+    REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let restore = Restore;
+    let result = f();
+    let applications = REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(Cell::get);
+    drop(restore);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn required_consumer_defining_transport<'plan>(
+    plan: &'plan StaticTransitionPlan<'_>,
+    selected: &'plan CheckedIhEnvironmentTransport,
+) -> Result<&'plan CheckedIhEnvironmentTransport, CraneliftBackendError> {
+    let RequiredConsumerCallMutation::SubstituteDefiningTransport {
+        defining_body_origin,
+        selected_target,
+        substitute_target,
+    } = REQUIRED_CONSUMER_CALL_MUTATION.with(Cell::get)
+    else {
+        return Ok(selected);
+    };
+    if selected.destination_body_origin.observation_ordinal() != defining_body_origin
+        || selected.source_call_identity.target().observation_ordinal() != selected_target
+    {
+        return Ok(selected);
+    }
+    let mut substitutes = plan.checked_ih_environment_transports.iter().filter(|candidate| {
+        candidate.destination_owner == selected.destination_owner
+            && candidate.destination_body_origin == selected.destination_body_origin
+            && candidate.source_call_identity.target().observation_ordinal() == substitute_target
+    });
+    let Some(substitute) = substitutes.next() else {
+        return Err(planner_error(
+            "the required-consumer defining-call mutation has no exact substitute transport",
+        ));
+    };
+    if substitutes.next().is_some() {
+        return Err(planner_error(
+            "the required-consumer defining-call mutation has an ambiguous substitute transport",
+        ));
+    }
+    REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS
+        .with(|count| count.set(count.get().saturating_add(1)));
+    Ok(substitute)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_required_consumer_call_selection(
+    context: super::ContinuationContextId,
+    worker_body_origin: StaticOriginId,
+    transports: &[&CheckedIhEnvironmentTransport],
+    selected: &CheckedIhEnvironmentTransport,
+) {
+    if !REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    REQUIRED_CONSUMER_CALL_OBSERVATIONS.with(|rows| {
+        rows.borrow_mut().push(RequiredConsumerCallObservation {
+            context: context.0,
+            worker_body_origin: worker_body_origin.0,
+            transport_call_count: transports.len(),
+            candidate_targets: transports
+                .iter()
+                .map(|transport| transport.source_call_identity.target().0)
+                .collect(),
+            candidate_result_origins: transports
+                .iter()
+                .map(|transport| transport.source_result_origin.0)
+                .collect(),
+            selected_target: selected.source_call_identity.target().0,
+            selected_result_origin: selected.source_result_origin.0,
+        });
+    });
+}

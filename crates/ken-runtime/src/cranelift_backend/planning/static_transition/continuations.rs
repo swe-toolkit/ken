@@ -59,6 +59,13 @@ pub(in crate::cranelift_backend) use fusion::{
 #[repr(transparent)]
 pub(in crate::cranelift_backend) struct ContinuationSpecializationId(pub(super) u32);
 
+impl ContinuationSpecializationId {
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
+        self.0
+    }
+}
+
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the generalized emission-owner domain.**
 ///
 /// Architect ruling `evt_609am4v7cdt5b`. The planner had been conflating three
