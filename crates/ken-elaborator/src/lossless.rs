@@ -804,6 +804,9 @@ fn collect_type_spans(ty: &Type, out: &mut Vec<Span>) {
             collect_expr_spans(predicate, out);
         }
         Type::TTrunc(inner, _) => collect_type_spans(inner, out),
+        // The base is an expression, so its spans come from the expression
+        // walk -- the same split `TRefine` above makes for its predicate.
+        Type::TProj(base, _, _) => collect_expr_spans(base, out),
         Type::TUniv(_, _) | Type::TCon(_, _) | Type::TVar(_, _) => {}
     }
 }

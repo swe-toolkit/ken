@@ -1191,6 +1191,13 @@ fn rewrite_rtype_inner(
         RType::RTrunc(a, s) => {
             RType::RTrunc(Box::new(rewrite_rtype(scope, exports, *a)?), s)
         }
+        // Rewrite the base through the EXPRESSION rewriter, as `RRefine` does
+        // with its predicate: the projected object can name an imported
+        // binding, so skipping it would leave an unrewritten reference that
+        // fails to resolve only in a module context.
+        RType::RProj(base, field, s) => {
+            RType::RProj(Box::new(rewrite_rexpr(scope, exports, *base)?), field, s)
+        }
     })
 }
 
@@ -1893,7 +1900,9 @@ fn named_type_head(ty: &Type) -> Option<&str> {
         | Type::TEffectArr(_, _, _, _)
         | Type::TPi(_, _, _, _)
         | Type::TSigma(_, _, _, _)
-        | Type::TTrunc(_, _) => None,
+        | Type::TTrunc(_, _)
+        // A projection names no type head -- see `head_type_name`.
+        | Type::TProj(_, _, _) => None,
     }
 }
 

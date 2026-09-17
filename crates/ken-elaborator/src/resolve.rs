@@ -407,6 +407,18 @@ pub enum RType {
     /// (`16 §6`). Resolved from `Type::TTrunc`; elaborates to `Term::Trunc`. The
     /// expression-position sibling is `RExpr::RTrunc`.
     RTrunc(Box<RType>, Span),
+    /// `d.Query` — named-field projection in type position (`33 §6.3`).
+    /// Resolved from `Type::TProj`; elaborates to `Term::Proj1` over a
+    /// `Term::Proj2` chain.
+    ///
+    /// **It carries the FIELD NAME, not an index, and that is deliberate.**
+    /// The name-to-index map is the class's field list, which is a
+    /// `classes::ClassEnv` fact and is NOT available at resolution — so this
+    /// mirrors the expression-position sibling `RExpr::RProj` exactly, and
+    /// `elab.rs`'s `infer_proj` performs the single shared lookup. Resolving
+    /// the index here would duplicate that map in a second place that could
+    /// then disagree with it.
+    RProj(Box<RExpr>, String, Span),
 }
 
 impl RType {
@@ -422,7 +434,8 @@ impl RType {
             | RType::RPatternAliasTy(_, _, s)
             | RType::RRefine(_, _, _, s)
             | RType::RApp(_, _, s)
-            | RType::RTrunc(_, s) => s,
+            | RType::RTrunc(_, s)
+            | RType::RProj(_, _, s) => s,
         }
     }
 }
@@ -638,6 +651,9 @@ fn collect_instance_head_params(ty: &Type, out: &mut Vec<String>) {
         }
         Type::TRefine(_, carrier, _, _) => collect_instance_head_params(carrier, out),
         Type::TTrunc(inner, _) => collect_instance_head_params(inner, out),
+        // A projection contributes no instance-head parameter: its base is a
+        // value binder, not a type variable the head abstracts over.
+        Type::TProj(_, _, _) => {}
         Type::TUniv(_, _) | Type::TCon(_, _) | Type::TVar(_, _) => {}
     }
 }
@@ -2507,6 +2523,17 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
         Type::TTrunc(a, span) => {
             let ra = resolve_type(scope, a)?;
             Ok(RType::RTrunc(Box::new(ra), span.clone()))
+        }
+
+        // `d.Query`. The base is an expression -- the projected object is a
+        // value binder -- so it resolves through the expression resolver, which
+        // is what binds `d` to its de Bruijn index in the SAME scope the
+        // telescope's earlier binders live in. `PropCtx::None` matches the
+        // treatment of `TRefine`'s predicate: a type annotation is not a
+        // proposition context.
+        Type::TProj(base, field, span) => {
+            let rbase = resolve_expr_ctx(scope, base, PropCtx::None)?;
+            Ok(RType::RProj(Box::new(rbase), field.clone(), span.clone()))
         }
     }
 }

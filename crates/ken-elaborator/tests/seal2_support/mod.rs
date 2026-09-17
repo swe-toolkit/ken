@@ -621,6 +621,13 @@ pub fn type_names_in_type(ty: &SurfaceType, out: &mut BTreeSet<String>) {
         SurfaceType::TTrunc(inner, _) => {
             type_names_in_type(inner, out);
         }
+        // `d.Query` — the base is an expression, so its names come from the
+        // expression walk, the same split `TRefine` makes for its predicate.
+        // The FIELD name is not a type name: it is a class field, resolved
+        // against the owner's field list rather than against the global scope.
+        SurfaceType::TProj(base, _field, _) => {
+            type_names_in_expr(base, out);
+        }
     }
 }
 
