@@ -7703,7 +7703,7 @@ impl<'src> StaticTransitionPlan<'src> {
     /// never share one funnel. That filter is what makes the direct-outer
     /// accessors on [`RequiredConsumerProjection`] total at every reachable
     /// call; it is load-bearing and pinned by
-    /// `a_detached_projection_is_never_handed_to_the_direct_outer_route`.
+    /// `a_detached_projection_is_in_the_map_and_refused_by_the_direct_outer_accessor`.
     pub(in crate::cranelift_backend) fn detached_return_context_for(
         &self,
         identity: &ContinuationCallIdentity,
