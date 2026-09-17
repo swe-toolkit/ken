@@ -96,6 +96,35 @@ load and follow it after this generic archetype.
 > instrument never shown to fire is not a measurement. Run it on the pre-fix SHA
 > first and record which names it prints. A name it does not print today has no
 > post-fix silence worth reading — census that one by call site instead.
+>
+> ### "GONE FROM `never used`" HAS TWO CAUSES. REPORT THREE CATEGORIES, NOT TWO.
+>
+> **The exemption that makes the lint sound is also the hole in every criterion
+> built on it.** A name leaves `never used` for either of two reasons:
+>
+>     it acquired a CALLER                 -> CLOSED
+>     it became EXTERNALLY REACHABLE       -> EXEMPT: the lint stopped looking
+>
+> **Making an item `pub` discharges "must be gone" permanently, without wiring
+> anything** — and it removes that item from the census **forever**, so the one
+> instrument that runs the complement direction can never again answer for it.
+>
+> ⇒ **A disappearance counts as closure ONLY if the item's visibility did not
+> change in the same diff.** If it did, the silence is uninformative and the item
+> must be censused **by call site**. Report **CLOSED / EXEMPT / STILL DEAD**, and
+> treat a `pub`-lift on an item with no in-tree caller as EXEMPT every time.
+>
+> An EXEMPT item is not a defect — lifting a symbol for a consumer that is
+> genuinely coming is often the right edit. It is an item whose **code must say
+> what the lift is for**, naming the consumer it awaits, because the next reader
+> finds public API that nothing calls and has no way to tell whether that was
+> intended.
+>
+> (Measured 2026-09-17 on `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT`: two functions
+> were re-exported to crate-public in the same diff, left `never used`, and were
+> reported as closed. Zero callers on the tree, then or after. The acceptance
+> condition was the Architect's own and a visibility change discharged it —
+> which is why this rule is stated as a category count, not as advice.)
 
 ## What you verify
 
