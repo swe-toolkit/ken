@@ -166,23 +166,25 @@ load and follow it after this generic archetype.
 >
 > | rendering | what a keyed filter sees |
 > |---|---|
-> | `` `name` is never used ``, or `` methods `f1` … `f6` are never used `` | every member backticked in the headline — this is what filters key on |
-> | `multiple methods are never used`, or `multiple associated items are never used` | the headline names **nobody**; each member is a **source span** below it, carrying its bare name |
+> | ENUMERATED — `` `name` is never used ``, `` methods `f1` … `f6` are never used ``, `` associated items `C1`, `f1` … are never used `` | every member backticked in the headline — this is what filters key on |
+> | COLLAPSED — `multiple methods are never used`, `multiple associated items are never used` | the headline names **nobody**; each member is a **source span** below it, carrying its bare name |
 >
 > **The threshold is exactly 7.** At 6 or fewer dead associated items rustc
 > backticks every one in the headline; at 7 or more the headline collapses and
-> names none. **The collapsed headline has TWO spellings and rustc picks by the
-> composition of the dead set** — `methods` when they are all methods,
-> `associated items` when the set mixes methods with consts or types. Key on
-> neither: key on the span lines. Reproduce it all in seconds — no workspace, no
-> features, no build lock:
+> names none. **The NOUN is not stable in either form.** rustc picks it from the
+> dead set's kind and homogeneity — `method`/`methods` when every dead item is a
+> method, `associated constant` for a lone const, `associated items` the moment
+> the set is mixed. ⇒ **Never key on the noun, in either row.** The one invariant
+> across every form is that **the span lines carry the bare name**, so key there.
+> Reproduce it all in seconds — no workspace, no features, no build lock:
 >
->     impl Live { pub(crate) fn f1(&self) {} ... }   // N methods, none called
->     rustc --crate-type=lib --edition 2021 t.rs
+>     rustc --crate-type=lib --edition 2021 t.rs      // N dead assoc items on a LIVE type
 >
->       N=6                warning: methods `f1`, `f2`, `f3`, `f4`, `f5`, and `f6` are never used
->       N=7                warning: multiple methods are never used
+>       6 fns              warning: methods `f1`, `f2`, `f3`, `f4`, `f5`, and `f6` are never used
+>       7 fns              warning: multiple methods are never used
+>       3 fns + 2 consts   warning: associated items `C1`, `C2`, `f1`, `f2`, and `f3` are never used
 >       5 fns + 2 consts   warning: multiple associated items are never used
+>       1 const            warning: associated constant `C` is never used
 >
 > ⇒ **The span lines always carry the bare name, in both renderings.** So a
 > **bare-name** search over the full rendered output reaches every member; a
