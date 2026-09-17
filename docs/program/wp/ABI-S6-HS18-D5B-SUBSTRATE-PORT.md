@@ -575,6 +575,11 @@ PREDICATE CHECK IS ANCHORED TO AN ENTRY, NOT TO AN ORDINAL.
        replayed region imports -- keyed on COMPILE DEPENDENCY
        crossing the exclusion boundary, not on what the lines mean
        (ken-host/src/effect_v1.rs)                                 evt_2jzjsj3nhn2qm
+ 13    four mutation instruments ported as DEFINITIONS with zero call
+       sites (HS7, HS8, HS10-bridge-lowering; HS10-inline-response dead
+       at both ends) -- keyed on the COMPILER WORKLIST being read for
+       ERRORS while the defect is visible only in WARNINGS
+                                                                  evt_2mq3v11w25k93
 ```
 
 ### The check at row 12: ANSWERED AND DISCHARGED
