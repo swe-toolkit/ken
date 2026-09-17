@@ -368,6 +368,7 @@ instead of a reading exercise:
     B = body at b4c8df33a   (last point the source and the main line agreed)
     S = body at b601e2ec7898 (port source)
     M = body at origin/main  (the tree this port must land on)
+    C = body at the CANDIDATE (the tree being built -- COMPLETION ONLY)
 
     S != B  and  M == B   ->  OWED        the source moved it; main never did
     S == B  and  M != B   ->  MAIN'S      main moved it; not owed
@@ -375,9 +376,39 @@ instead of a reading exercise:
     S == B  and  M == B   ->  AGREE
     present in S, absent from M   ->  ABSENT
 
-**It produces a worklist, not a build result**, and it can be re-run at any
-commit to report how much is left. That is what makes it a completion
-criterion rather than a progress anecdote.
+    a row in OWED or ABSENT is CLOSED when  C == S     <- the fourth tree
+    REMAINING = |OWED U ABSENT| - closed
+
+**It produces a worklist, not a build result.**
+
+> ### CLASSIFICATION AND COMPLETION ARE DIFFERENT QUESTIONS AND NEED DIFFERENT TREES
+>
+> **Amended 2026-09-17, on the implementer's finding (`evt_57xf8p0zw3192`),
+> which is correct and which this frame previously got wrong in the
+> affirmative.** The struck sentence read: *"it can be re-run at any commit to
+> report how much is left."* **It cannot.** `OWED`, `ABSENT`, `ADJUDICATE`,
+> `MAIN'S` and `AGREE` are functions of **`(B, S, M)` alone** — the candidate is
+> not an argument to the classifier — so **every bucket is invariant under the
+> candidate's own work.** Measured: 11 R2 files replayed, and `OWED 466 -> 466`,
+> `ABSENT 165 -> 165`. Nothing moved, because nothing could.
+>
+>     classification   B, S, M          WHICH ROWS ARE OWED AT ALL
+>     completion       B, S, M, and C   WHICH OWED ROWS ARE NOW SATISFIED
+>
+> **Pinning the third tree to `origin/main` is still right and is not what is
+> being revisited** — it is what makes `M != B` mean *"main moved it"* rather
+> than *"the implementer already ported it"* (see the next subsection). The
+> fourth tree is added **beside** it, not in place of it.
+>
+> ⇒ **A COMPLETION CRITERION MUST BE A FUNCTION OF THE ARTIFACT BEING
+> COMPLETED.** If the work is not an input to the measurement, the measurement
+> cannot report completion, however well it reports the worklist.
+>
+> **This is the THIRD completion criterion on this node and the third to fail
+> the same way, one level up each time.** The original could not distinguish
+> *done* from *compiles*. Its replacement — the bucket totals — cannot
+> distinguish *done* from *not started*. **Whatever this node's criterion is,
+> check that it CHANGES as the work proceeds before adopting it.**
 
 ### THE THIRD TREE IS `origin/main`, NEVER THE PORT BRANCH. This is not a detail.
 
@@ -618,32 +649,49 @@ the Steward's.
 
 ## 6. Acceptance
 
-**AC-1 — THE THREE-WAY WORKLIST IS DRIVEN TO ZERO ON THE MECHANICAL BUCKETS.**
-The satisfying act is **re-running the `§3b` instrument at the candidate**,
-with `origin/main` as the third tree, and its output showing:
+**AC-1 — `REMAINING` IS DRIVEN TO ZERO AGAINST THE CANDIDATE.** The satisfying
+act is **re-running the `§3b` instrument with all FOUR trees**, `origin/main` as
+the third and the candidate as the fourth, and its output showing:
 
-    OWED         0
-    ABSENT       0
+    REMAINING    0     rows in OWED u ABSENT whose candidate body does not
+                       yet match the source's. THIS is the completion figure.
+    closed       |OWED u ABSENT|, i.e. every owed row satisfied
     ADJUDICATE   enumerated by name and file, non-zero, handed to the
                  adjudication node
+    OWED/ABSENT  reported as the CLASSIFICATION totals, which are constants
+                 of (B, S, M). They are the denominator, NOT the criterion.
     population   stated in the output: union of method names, over the
                  file set, with the production/test split
     unit         stated in the output: what counts as ONE ROW. Specifically
                  whether a NESTED `fn` is its own row or is absorbed into
                  the body of the `fn` that encloses it.
 
+> **`OWED = 0` AND `ABSENT = 0` WERE THE PREVIOUS WORDING AND ARE STRUCK — they
+> are UNSATISFIABLE, not merely hard.** With the third tree pinned to
+> `origin/main` those buckets do not depend on the candidate at all, so no
+> amount of correct porting moves them. **Do not read a non-zero `OWED` as
+> incomplete work**; read `REMAINING`.
+
 **This replaces *"increment A compiles against this"* as the completion
 criterion.** A build answers *"does every name resolve"*; this answers *"is
 anything still owed"*, which is the node's actual contract.
 
 **POSITIVE CONTROL, REQUIRED, AND IT IS THE HALF THAT USUALLY GETS SKIPPED.**
-Run the identical instrument at the candidate's **base** in the same report. It
-must show OWED and ABSENT **non-zero**. A zero from a real port and a zero from
-an instrument whose file set matched nothing **print the same word**, and this
-node has already been bitten three times by exactly that — `ci-doc-only.py`'s
-bare `except`, `unique demands=0` on an empty set, and the item predicate
-agreeing about a manifest with nothing to count. **A green AC-1 with no base
-reading beside it is not evidence.**
+Run the identical instrument in the same report with the **fourth tree set to
+the candidate's base** (`C := B`). It must show **`closed` = 0 and `REMAINING` =
+the full `|OWED u ABSENT|`** — nothing satisfied before any work was done. A zero
+from a real port and a zero from an instrument whose file set matched nothing
+**print the same word**, and this node has already been bitten three times by
+exactly that — `ci-doc-only.py`'s bare `except`, `unique demands=0` on an empty
+set, and the item predicate agreeing about a manifest with nothing to count. **A
+green AC-1 with no base reading beside it is not evidence.**
+
+> **THE CONTROL NOW HAS A DIRECTION AND PREVIOUSLY COULD NOT HAVE HAD ONE.**
+> Against the old wording it re-ran a computation that **ignored the candidate**,
+> so the base run and the candidate run were the *same numbers by construction*
+> — the control could not have disagreed with the criterion it was checking. It
+> is a control only because the fourth tree makes `closed` vary: **0 at the base,
+> `|OWED u ABSENT|` at a complete candidate.** State both readings side by side.
 
 **AC-1c — THE CLASSIFIER MUST DECIDE THE NO-BASE CASE BY COMPARING SOURCE
 AGAINST MAIN, AND BOTH CONTROLS MUST BE SHOWN TO REACH IT.** A method **new in
