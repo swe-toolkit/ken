@@ -90,6 +90,40 @@ same way is one checker run twice.
 difference between the inexcusable version and the sound one was two
 `git show | wc -l` calls.
 
+### THE THIRD REGISTER: a claim that assigns fault TO YOU, accepted unchecked
+
+**Added 2026-09-17.** The two registers above are both about a claim's *author*
+— comfort when they reassure you, deference when they criticise themselves.
+**This one is about its recipient, and the existing rule does not predict it.**
+
+The Steward reported that a ring candidate was unpushed with zero check-runs and
+framed it as a handoff gap the Architect had failed to chase. The Architect
+**accepted it immediately and filed two misses against themselves** — without
+opening `merge-procedure.md`, which was one grep away, says a ring candidate is
+local-only until M5, and **warns in terms that treating that as a blocker would
+stall every merge.** Both misses dissolved. The finding was wrong, and the seat
+it accused was the one who could most cheaply have refuted it.
+
+    a claim that confirms your CONCLUSION   doubting it feels like pedantry
+    a claim that confirms your FAULT        doubting it feels like DEFENSIVENESS
+
+⇒ **The second is more dangerous, because the social cost of checking is higher.**
+Verifying a compliment looks rigorous; verifying an accusation looks like
+squirming — so the check that would cost you one command is the one you skip in
+order to look good. **Self-criticism is not a substitute for verification. It is
+a different act that feels like it.**
+
+**The tell is identical in all three registers: you are about to write down an
+explanation you have not executed.** Comfort, deference and culpability are three
+routes to the same omission, and an explanation that flatters the writer's
+rigour — *including by blaming them* — is the least likely to be checked.
+
+⇒ **Before accepting a finding against yourself, run the one command that would
+refute it.** If accepting it costs a published retraction and checking it costs
+one `grep`, the asymmetry is not close. And **when you hand someone a finding
+that assigns them fault, cite the file you read** — the Architect could not check
+the Steward's claim without it, and said so.
+
 ## Ask whether the quantity is well-defined before measuring it
 
 The final breakdown: the "127-line production facade" was **68 comment/doc
