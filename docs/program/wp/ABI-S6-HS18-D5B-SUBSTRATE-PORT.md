@@ -959,8 +959,8 @@ operated for a day without existing.**
 
 > ### THIS AC WAS BEING REPORTED, FLAGGED AND RULED ON WHILE PRESENT IN NO FRAME
 >
-> **`AC-1b` appears in ZERO revisions of this frame's history**, and no document
-> on `main` mentions an assertion delta. Yet the implementer reported against it
+> **`AC-1b` appears in ZERO revisions of this frame's history.** Yet the
+> implementer reported against it
 > (*"131 closed test rows, 669 → 746 assertions, QUIETER 0"*), QA flagged it
 > **unverified-by-QA**, the merge Decision `dec_74b8gs68nmgzr` recorded that
 > flag, the Architect ruled on what it does and does not discharge, and an
@@ -970,11 +970,52 @@ operated for a day without existing.**
 >
 > **Nobody did anything wrong with it and that is the point.** The measurement
 > is real and useful, the reports were honest, and QA's *"unverified"* was the
-> correct response to a criterion it could not read. **An AC that lives only in
-> conversation cannot be checked, cannot be disputed, and cannot be discharged
-> — but it can still be cited in a merge Decision.** Third instance in one day
-> of a ruling that existed only in a thread; this is the one that grew an
-> instrument.
+> **correct** response — it could not verify `AC-1b` against the PORT frame
+> because `AC-1b` is not in the PORT frame.
+>
+> #### CORRECTED SAME HOUR: THE CRITERION WAS NEVER A PHANTOM
+>
+> **I first wrote beside the sentence above that "no document on `main` mentions
+> an assertion delta." THAT WAS FALSE and it is struck.** `AC-1b` exists in full
+> normative form, on `main`, under its own number, in **the sibling half of this
+> node's own split** — `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION.md:249`, with its
+> §3a statement at `:185`. I authored it, in the recut amendment `4bc5f0eee`,
+> writing *"`AC-1b` added, and it is deliberately one of the criteria whose
+> evidence must be manufactured."* `hs18-d5b-assertion-delta.py` implements that
+> text almost line for line. Caught by the Architect, `evt_58x5gd2j8c2x7`.
+>
+> ⇒ **The right diagnosis is better than the one it replaces. Four seats were
+> citing REAL NORMATIVE TEXT filed against the SIBLING node**, which is a
+> different thing from four seats operating on nothing:
+>
+> > **A split produces two frames, each of which reads as complete, and neither
+> > can report that it is missing a criterion the other kept. Completeness is
+> > not a property a single frame can report about ITSELF.**
+>
+> Same reason a served playbook cannot tell you `main` added a section. Writing
+> `AC-1b` into this frame stays correct — the PORT node genuinely was not bound
+> by it — but the defect is a **split that divided the criteria**, not a ruling
+> that lived in a thread.
+>
+> **TWO INSTRUMENT FAILURES OF MINE PRODUCED THE FALSE SENTENCE, and the second
+> is the one worth carrying:**
+>
+> 1. **A case-blind search returned a false zero.** I grepped `assertion delta`
+>    lowercase; the sibling frame writes **`ASSERTION DELTA`** — 2 uppercase
+>    occurrences, **0 lowercase**. A search that could not have produced a hit
+>    reported none, and I read that as absence.
+> 2. **The refuting hit was IN MY OWN OUTPUT and I explained it away.** A
+>    `git grep -lI 'AC-1b' origin/main -- docs/` run minutes earlier **listed
+>    `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION.md`**, and I dismissed the whole
+>    list as *"other nodes that happen to have an AC-1b."* **It was the other
+>    half of the node I was standing in.** The conclusion was already formed and
+>    the contradicting evidence was filed as noise.
+>
+> **A single-file census generalized to the corpus.** *"Every commit that ever
+> touched this frame"* is complete and correct about **one file**; it answers
+> *"was this ever in the PORT frame?"* and I read it as answering *"does this
+> exist?"* **Before calling a criterion unwritten: `git grep -i` the term across
+> `origin/main`, and read the hits you get rather than the conclusion you have.**
 >
 > **This block RECORDS existing practice. It adds no work to the respin.**
 
