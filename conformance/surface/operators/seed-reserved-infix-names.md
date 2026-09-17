@@ -129,11 +129,12 @@ add a tree node.
 - expect-negative: bare `<+>` and bare `≤` each reject syntactically before
   resolution: neither is an `application_atom` or a complete `operator_prefix`,
   because each has zero following atoms. Neither may produce a global-value
-  tree for its `G(OP)`. This is `32 §3`'s restriction, which `:362-363` states applies
-  equally to generic and reserved operator names — so the row's target is the
-  spec's, not A0's. The generic refusal is a required behavior change, not a
-  pre-existing token dead end; the reserved refusal must occur after `Le`
-  reaches `operator_name`, so the reserved arm additionally presupposes A0.
+  tree for its `G(OP)`. This is `32 §3`'s restriction, which `:362-363`
+  states applies equally to generic and reserved operator names — so the
+  row's target is the spec's, not A0's. The generic refusal is a required
+  behavior change, not a pre-existing token dead end; the reserved refusal
+  must occur after `Le` reaches `operator_name`, so the reserved arm
+  additionally presupposes A0.
   **MEASURED, `LANG-BARE-OPERATOR-ATOM-REJECTION`:** both arms now reject, and
   each rejection is raised by the atom parser's `operator_name` arm at the
   operator's own leading token -- not by a later production tripping over the
@@ -174,9 +175,10 @@ add a tree node.
   this base; these three conform to `32 §3` today and carry no gate.
 - expect-leading-if: `32 §3` names `if` among the five leading forms that must
   reject at their leading token when ungrouped after an application head.
-  **MEASURED on this base:** `keep if true then Zero else Zero` now rejects at the leading `if`,
-  and the grouped form still yields exactly the stated tree. Closed by
-  `LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE`; the row carries no gate.
+  **MEASURED on this base:** `keep if true then Zero else Zero` now rejects
+  at the leading `if`, and the grouped form still yields exactly the stated
+  tree. Closed by `LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE`; the row
+  carries no gate.
 - expect-arrow: the ungrouped arrow row accepts with exactly its stated outer
   tree and does not silently acquire the grouped interpretation. Live on this
   base; conforms to `32 §3`'s `(keep Nat) -> Nat` and carries no gate.
