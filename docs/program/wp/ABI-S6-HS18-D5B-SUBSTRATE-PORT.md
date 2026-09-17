@@ -109,7 +109,8 @@ at `:2812`, falls through `match operation` at `:3076`, and hits
 
 ⇒ **Exclude whole files rather than hand-separating hunks WHEREVER THE ONLY
 BOUNDARY AVAILABLE IS YOUR JUDGEMENT**, as the node mandates for site 5. **That
-is the rule's reason and its limit — see `§1b`, where a compiler-drawn boundary
+is the rule's reason and its limit — see the `effect_v1.rs` split below, where
+a compiler-drawn boundary
 licenses a split and whole-file exclusion would have broken the build.**
 **Treat six as a floor and close it with the
 parent's `AC-PREDICATE` — zero diff lines naming the operation at pathspec
@@ -118,7 +119,7 @@ site list.** Measured: Region 2's 13 files carry 17 such lines; the 10 files
 that remain after excluding the catalog, `lowering/effects.rs` and
 `st/effects.rs` carry **zero**.
 
-**1b. `ken-host/src/effect_v1.rs` IS SPLIT, and whole-file exclusion is
+**THE `ken-host/src/effect_v1.rs` SPLIT, and why whole-file exclusion is
 REFUSED.** Ruled by the Architect (`evt_2jzjsj3nhn2qm`), Steward-verified at
 `origin/main` and `30d35f625`:
 
@@ -370,28 +371,92 @@ gets answered.
   (`10e75cb93656d5ea787bceaf754b2500b78de166`); the worked precedent for extent
   and review on this exact surface.
 
-## 11. Symptom inventory
+## 11. Symptom inventory — CONTINUES `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` `§1b`
 
-**Armed by the Steward 2026-09-17, after the Architect correctly reported that
-this WP had none** (`evt_yg6f1x2cpwez`). The omission was the Steward's: per
-`steward/escalation.md`, arming this line is the Steward's act and *"an unarmed
+**Armed by the Steward 2026-09-17** after the Architect reported this WP had
+none (`evt_yg6f1x2cpwez`). The omission was the Steward's: per
+`steward/escalation.md` arming this line is the Steward's act and *"an unarmed
 trigger is not a trigger."* The Architect appends entries and owns the predicate
 check.
 
+**THIS WP CONTINUES THE PREDECESSOR'S CHAIN, so entries do NOT restart at 1.**
+Same HS18 chain, same immediate predecessor, and the same node model — a port
+from an unlanded prefix onto `main`, scoped by what is missing (Architect
+`evt_73ynk31tang40`). The campaign-level inventory in
+`docs/program/issues/ABI-S6.md` sits **above** both and stays where it is;
+folding a WP-level chain into it would lose the level the predicate is about.
+
+> **AUTHORITATIVE COPY OF ROWS 1-11: the predecessor's `§1b`.** Reproduced below
+> in one-line form so the predicate check can run against an assembled list.
+> **Amend a row THERE, never here** — two mutable copies of an append-only
+> record is how the record stops being one.
+
+**THREE PEOPLE GUESSED THIS NUMBER AND ONLY THE FILE SETTLED IT.** The Architect
+wrote *"5"* (carried from context, withdrawn by them); the Steward wrote *"1"*
+(no record found, and I had not read the predecessor); **the file says 12.**
+Wrong in opposite directions, which is what a number nobody resolved against a
+file looks like. **Take the number from the file.**
+
+### The predicate this WP's entries are tested against
+
+The predecessor's predicate, **already WIDENED once** (Architect
+`evt_2qqye3tdnh4b1`, at row 11) from two shapes to three:
+
+| shape | what the census sees | what it misses |
+|---|---|---|
+| ABSENT from `main` | its subject | — |
+| PRESENT on `main` and CHANGING | the name is there, so unreported | the shape change (rows 5-8, 10) |
+| PRESENT at the port and UNREACHABLE | every census PASSES them | the module edge (row 11) |
+
+### Assembled rows
+
 ```text
 SYMPTOM INVENTORY (Architect appends one line per hard-stop; never rewritten)
-NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
+NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, 12th, ...
 
-1. a file holding BOTH grant content and an instrument the replayed region
-   imports -- keyed on COMPILE DEPENDENCY crossing the exclusion boundary,
-   not on what the lines mean          (ken-host/src/effect_v1.rs, evt_2jzjsj3nhn2qm)
+  1-3  the first three, from thr_6azxdz555c2qy      [predecessor §1b]
+  4    seed of 5 closes to 29 items                 D0 census
+  5    RequiredConsumerProjection resident on main and RESHAPING   read, not census
+  6    Copy DROPPED from the same derive; Ord/PartialOrd added     read, not census
+  7    three accessors go TOTAL -> PARTIAL, signatures unchanged   read, not census
+  8    ten variants behind a dev-dependency feature invisible to
+       every permitted local build                                 manifest read
+  9    a 26th host-effect consumer (HostOpV1::MappingAcquireFile),
+       ROUTED OUT; recorded because the inventory records what the
+       model failed to predict                                     D0b
+ 10    a second Copy drop, EliminatorRole                          D0b -- first row
+                                                                   found by an instrument
+ 11    four types PRESENT at the port but UNREACHABLE from
+       lowering; refused at the MODULE EDGE                        increment A's BUILD
+ -- entries below are THIS WP's --
+ 12    a file holding BOTH grant content and an instrument the
+       replayed region imports -- keyed on COMPILE DEPENDENCY
+       crossing the exclusion boundary, not on what the lines mean
+       (ken-host/src/effect_v1.rs)                                 evt_2jzjsj3nhn2qm
 ```
 
-**THE NUMBERING RESTARTS HERE, AT 1.** The Architect first wrote this entry as
-*"5."* and then withdrew the number themselves, because there is no durable
-record of entries 1-4 **on this WP** — the count was carried from context.
-**A number a reader cannot resolve against this file is not a record.** If this
-inventory is meant to continue a predecessor WP's, name that WP and its entries
-here; otherwise 1 is correct and the predicate check falls at the 3rd entry
-appended below.
+**Row 12 lands ON a predicate-check position (12th).** `§1b-ii` is therefore
+**owed, not optional.** The Architect declined to answer it off remembered rows
+and asked for the assembled list first (`evt_73ynk31tang40`) — that ordering is
+right, and this section is what it was waiting on.
+
+**Their candidate predicate, recorded as OFFERED and NOT asserted:**
+
+> **The node's model is a SET (what is missing: regions, item counts, census
+> sites). Every surprise has been an EDGE — a dependency the set difference
+> cannot express.**
+
+Its supporting instances are site 6 (roster and dispatch are a matched pair),
+`effect_v1.rs` (a re-export binding to a definition the exclusion removes), and
+the predicted red (the counter's only writer inside the grant). **In all three
+the census was complete and the failure was BETWEEN two of its rows** — and each
+was individually correct as a site ruling, which is what made the pattern
+invisible. **Note that row 11's widening was already moving toward edges before
+tonight**, which is evidence for the candidate and should be weighed as such
+rather than treated as three fresh instances.
+
+**If the predicate holds, `§1b-ii` makes the fix a structural closure over it,
+not a fourth site ruling.** `AC-PREDICATE` — zero diff lines naming the
+operation at pathspec `crates/` — is the closest existing instrument, and it has
+now been right **twice** about sites a human census missed.
 
