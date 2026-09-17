@@ -405,10 +405,24 @@ instead of a reading exercise:
 > cannot report completion, however well it reports the worklist.
 >
 > **This is the THIRD completion criterion on this node and the third to fail
-> the same way, one level up each time.** The original could not distinguish
-> *done* from *compiles*. Its replacement — the bucket totals — cannot
-> distinguish *done* from *not started*. **Whatever this node's criterion is,
-> check that it CHANGES as the work proceeds before adopting it.**
+> the same way, one level up each time.** Implementer's statement of the
+> progression (`evt_4e19e5pjgcrm9`), which is the clearest form of it:
+>
+>     first    could not tell DONE from COMPILES
+>     second   could not tell DONE from NOT STARTED
+>     third    cannot be SATISFIED AT ALL, by three rows (see AC-1e)
+>
+> **Each one passed inspection as a sentence.** What catches them is one
+> question in **two forms**, and a criterion has to answer both:
+>
+> > **Can this criterion CHANGE as the work proceeds — and can it REACH the
+> > value it demands?**
+>
+> The first form catches a criterion the work cannot move. The second catches
+> one the work can move but never far enough, because some rows are excluded by
+> a ruling elsewhere in the frame. **A criterion satisfying the first and
+> failing the second reads as a near-miss forever**, and the tell arrives as an
+> asymptote at a small number rather than as an error.
 
 ### THE THIRD TREE IS `origin/main`, NEVER THE PORT BRANCH. This is not a detail.
 
@@ -654,10 +668,15 @@ act is **re-running the `§3b` instrument with all FOUR trees**, `origin/main` a
 the third and the candidate as the fourth, and its output showing:
 
     REMAINING    0     rows in OWED u ABSENT whose candidate body does not
-                       yet match the source's. THIS is the completion figure.
-    closed       |OWED u ABSENT|, i.e. every owed row satisfied
+                       yet match the source's, EXCLUDING the grant rows
+                       below. THIS is the completion figure.
+    closed       every owed row satisfied, i.e. |OWED u ABSENT| - EXCLUDED
     ADJUDICATE   enumerated by name and file, non-zero, handed to the
                  adjudication node
+    EXCLUDED     rows in a file the six-site ruling excludes. Enumerated by
+                 name and file and HANDED TO RT-D5B-MAPPING-AVAILABILITY-FLIP,
+                 the same way ADJUDICATE rows are handed over. Reported as
+                 its own bucket, never subtracted silently.
     OWED/ABSENT  reported as the CLASSIFICATION totals, which are constants
                  of (B, S, M). They are the denominator, NOT the criterion.
     population   stated in the output: union of method names, over the
@@ -671,6 +690,44 @@ the third and the candidate as the fourth, and its output showing:
 > `origin/main` those buckets do not depend on the candidate at all, so no
 > amount of correct porting moves them. **Do not read a non-zero `OWED` as
 > incomplete work**; read `REMAINING`.
+
+**AC-1e — THE GRANT ROWS ARE HANDED OVER, NOT SUBTRACTED, AND `EXCLUDED` IS
+DERIVED FROM A PREDICATE.** Amended 2026-09-17 on the implementer's finding
+(`evt_4e19e5pjgcrm9`): three OWED rows sit in files the six-site ruling excludes
+from hand-separation, so **they can never close here and `REMAINING = 0` was
+unreachable by three.** They are the refused grant's own carriers, not
+bystanders trapped in an excluded file — measured references to the operation in
+each source body:
+
+    lowering/effects.rs::lower_process_host_effect        8    census site 5
+    st/effects.rs::host_effect_seat_contract             5    the sixth site
+    st/effects.rs::host_effect_constructor_dispatch      1    the sixth site
+
+**They go to [[RT-D5B-MAPPING-AVAILABILITY-FLIP]] by name**, on the same
+mechanism that sends ADJUDICATE rows to the adjudication node: this frame has
+one way of deferring work, and it is handover to a named successor. **An
+exclusion set living only inside the instrument is the same deferral with no
+recipient.**
+
+> **DERIVE `EXCLUDED` FROM THE FILE-EXCLUSION PREDICATE, NEVER FROM A LIST OF
+> THREE NAMES.** The implementer's reason for reporting the bucket rather than
+> subtracting it is adopted verbatim — *"subtracting three would make the
+> exclusion silent and a fourth appearing later would hide inside an
+> off-by-three"* — and **a hardcoded list reintroduces exactly that failure one
+> level down**, where a fourth carrier is invisible instead of merely
+> miscounted.
+>
+> **PRINT TWO COUNTS. A DIVERGENCE IS A HARD STOP, NOT A NUMBER TO ABSORB.**
+>
+>     rows excluded because their FILE is excluded                 N
+>     of those, rows whose SOURCE BODY references the refused op    M
+>
+> Today `N == M == 3`. **Nothing guarantees that holds.** A method the source
+> moved for reasons unrelated to `MappingAcquireFile`, sitting in a file
+> excluded wholesale to avoid hand-separating hunks, is **owed work with no
+> owner** — not the flip node's, because it is not the grant — and it would
+> vanish silently between two correctly-reasoned exclusions. **`N > M` comes
+> back to the Steward for placement.**
 
 **This replaces *"increment A compiles against this"* as the completion
 criterion.** A build answers *"does every name resolve"*; this answers *"is
