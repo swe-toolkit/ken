@@ -1,0 +1,209 @@
+# WP frame — `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION`
+
+    owner   runtime        tier   T1        size   M
+    depends ABI-S6-HS18-D5B-SUBSTRATE-PORT  (its only dependency)
+    blocks  ABI-S6-HS18-MAIN-BASED-CLOSURE
+    node    docs/program/issues/ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION.md
+
+## 1. Objective
+
+Decide, for every method where **both** the D5b port source and `main` moved
+since their common base, which body `main` should end up with — and **show the
+check for each one.**
+
+This is the judgment surface of the D5b substrate port, split out of
+[[ABI-S6-HS18-D5B-SUBSTRATE-PORT]] by that frame's `§3b` so that the mechanical
+bulk could run on a T2 seat without anyone being asked to exercise judgment
+they were not provisioned for.
+
+## 2. Fixed inputs
+
+### 2a. The population comes from the predecessor's worklist, not from this frame
+
+**The ADJUDICATE list is a DELIVERABLE of [[ABI-S6-HS18-D5B-SUBSTRATE-PORT]]**
+(its `§5` item 6), produced by re-running the three-way instrument at that
+node's candidate. **Take it from there; do not re-derive it here and do not
+take a count from this frame as the contract.**
+
+Steward's own re-derivation at `origin/main` `9bd5f8513`, given so the node can
+be sized and **not** so it can be checked against:
+
+    ADJUDICATE, production      ~30 methods
+    ADJUDICATE, test             ~2 methods
+    concentrated in   planning/static_transition/{continuations,aggregates,
+                      responses,construction,immediate_bridge}.rs
+                      ken-interp/src/eval.rs
+                      ken-elaborator/src/{prelude,compiler_driver}.rs
+                      ken-host/src/{abi_v1,effect_v1}.rs
+
+**Different extractors produce different totals.** The Architect's census
+reported 20 with his own extractor (`evt_7tx7a1n71qa9g`); the Steward's reports
+32 with a different one. **Neither number is the contract** — the contract is
+that every row on the predecessor's actual worklist has a disposition.
+
+### 2b. THE THIRD TREE IS `origin/main`. The branch-based reading is an artifact.
+
+Carried from the predecessor's `§3b`, because getting this wrong inflates
+precisely this node's population:
+
+    third tree = port branch 879f00c99    ADJUDICATE  154
+    third tree = origin/main              ADJUDICATE   32
+
+Running the classifier against the port **branch** makes *"the implementer
+already ported this"* indistinguishable from *"`main` moved this"*. The control
+is `units.rs`, where `main` is byte-identical to the base and therefore **no**
+method can be "both moved" — the branch-based run nonetheless puts 25 of its
+methods in this bucket.
+
+### 2c. The worked example, and it is the reason this node exists
+
+**`dispatch_host_op_v1` in `ken-host/src/effect_v1.rs`** — the Architect's own
+falsifier, caught before the line total was published:
+
+    b4c8df33 (base)    814 lines
+    b601e2ec (source)  794 lines
+    879f00c9 (port)     24 lines
+    origin/main         24 lines     <- the port already EQUALS main
+
+`main` refactored it into `dispatch_host_op_v1_for_promotion_evidence` after
+the base. The source's 794-line body is the **pre-refactor** shape, and
+transplanting it would undo `main`'s work — the
+`AC-REDERIVED-NOT-TRANSPLANTED` failure.
+
+⇒ **It scored +770 lines in this bucket and is not owed at all.** That is the
+single largest item by line count and the correct disposition is KEEP MAIN'S.
+
+**SIZE AND PRIORITISE ON METHOD COUNTS, NEVER ON LINE DELTAS.** The Architect's
+sentence, carried verbatim as a fixed input: *a line delta measures how much
+text moved, never how much is owed, and the two look identical until you check
+one against `main`.*
+
+## 3. The method: three dispositions, and each one is SHOWN
+
+For every method on the worklist, record one of:
+
+    KEEP MAIN'S    main's change supersedes the source's, or main refactored
+                   past it. The port owes nothing. Default for anything
+                   resembling dispatch_host_op_v1.
+    TRANSPLANT     the source's change is genuinely owed and main's change is
+                   orthogonal or absent in substance. State why main's move
+                   does not conflict.
+    RECONCILE      both changes are substantive and neither supersedes the
+                   other. Write the merged body and say what each side
+                   contributed.
+
+**The showing is the deliverable, not the disposition.** A bare verdict per
+method is an authored list, and this chain has already ruled once that an
+item list carries no evidential weight (`ABI-S6-HS18-D5B-SUBSTRATE-PORT`
+`§3a`): *derive the list FROM the tree property; never validate the tree
+property against the list.*
+
+⇒ **Each row cites what was compared.** The `dispatch_host_op_v1` row is the
+template: four bodies named at four refs, and the conclusion falling out of
+them.
+
+**RECONCILE IS THE ANSWER THAT NEEDS THE MOST SCRUTINY AND WILL BE THE RAREST.**
+A reconciliation is new code that existed in neither tree, so it inherits
+neither tree's testing. **If a RECONCILE row cannot name what exercises the
+merged body, say so in the row** — that is a coverage gap worth surfacing, not
+a detail to leave implicit.
+
+## 4. D0 — answer before writing production
+
+**D0-1. Does any row need a decision that is not the runtime ring's to make?**
+A method whose two bodies encode **different intended semantics** is a design
+question, not a merge. **Name it and stop** — that routes to the Architect, and
+a hard stop here is a good outcome, not a failure of the node.
+
+**D0-2. Is the predecessor's worklist stable at this node's base?** `main`
+moves. A method that was ADJUDICATE when the predecessor handed it over can
+have become AGREE or MAIN'S by the time this node starts. **Re-run the
+instrument at this node's base and diff the two worklists**; report rows that
+changed class and treat the fresh run as authoritative. **A row that left the
+bucket needs no disposition, and recording one for it would be fiction.**
+
+## 5. Deliverables
+
+1. A disposition for every row on the predecessor's ADJUDICATE worklist, each
+   with its check-against-`main` shown per `§3`.
+2. The TRANSPLANT and RECONCILE bodies landed on `main`.
+3. The re-run worklist diff from `D0-2`, with any class changes named.
+4. Any row escalated under `D0-1`, named with the question it raises.
+
+## 6. Acceptance
+
+**AC-1 — EVERY ROW HAS A DISPOSITION AND A SHOWN CHECK.** Re-running the
+three-way instrument at the candidate, third tree `origin/main`, reports
+**ADJUDICATE = 0** over the pinned file set — every row having become AGREE
+(transplanted or reconciled) or been recorded KEEP MAIN'S.
+
+**The instrument states its population from the UNION**, per the predecessor's
+`§3b`, and prints the file set it ran over. **Positive control required:** the
+same instrument at this node's base must report ADJUDICATE **non-zero**. A zero
+from real adjudication and a zero from a file set that matched nothing print
+the same word.
+
+**AC-2 — no ADJUDICATE row was closed by transplanting over `main`'s work.**
+For every TRANSPLANT row, the recorded check shows what `main`'s move was and
+why it does not conflict. **The failure this catches is the one that already
+happened**: `dispatch_host_op_v1` would have been transplanted at +770 lines on
+the strength of its line delta alone.
+
+**Negative control, and it is the informative half:** at least one row is
+expected to be KEEP MAIN'S. **If every row resolves to TRANSPLANT, the check is
+not running** — that is the signature of a disposition being read off the
+source rather than derived from a comparison.
+
+**AC-3 — `trusted_base()` delta is ZERO.** No kernel change is in scope.
+
+**AC-4 — the mechanical buckets stay closed.** The instrument reports OWED = 0
+and ABSENT = 0 at this candidate, as the predecessor left them. **This catches
+a regression in the other direction**: a reconciliation that drops a
+source-owed change re-opens a bucket this node did not own.
+
+## 7. Base
+
+Cut from a `main` containing the predecessor's landed candidate. Pin a literal
+SHA, never the ref, and verify it at the moment you adopt it.
+
+## 8. Contention
+
+`crates/ken-runtime/src/cranelift_backend/**` is this ring's own territory. The
+live overlap is [[RT-D5B-POSTCALL-REFUSAL-MECHANISM]] (`ready`, unstarted) —
+see the predecessor's `§4` D0-3, which is the same semantic hazard and is not
+re-opened here.
+
+## 9. Not this node
+
+- The mechanical buckets — OWED, ABSENT, MAIN'S are
+  [[ABI-S6-HS18-D5B-SUBSTRATE-PORT]]'s and land before this node starts.
+- The refused `MappingAcquireFile` grant —
+  [[RT-D5B-MAPPING-AVAILABILITY-FLIP]], deliberately `draft`.
+- Repairing the HS10-inline cross-family guard. The predecessor records the
+  limitation; widening the assertion is a change to a guarantee and needs its
+  own decision.
+- Increment A's own substance, and increments B and C.
+- Any kernel change.
+
+## 10. Related
+
+- [[ABI-S6-HS18-D5B-SUBSTRATE-PORT]] — the mechanical half and this node's only
+  dependency. Its `§3b` is the authoritative statement of the split, the
+  instrument, and the third-tree rule.
+- [[ABI-S6-HS18-MAIN-BASED-CLOSURE]] — what the pair unblocks.
+- [[ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT]] — the landed sibling port
+  (`10e75cb93656d5ea787bceaf754b2500b78de166`); the worked precedent for review
+  on this surface.
+
+## 11. Symptom inventory
+
+**This WP continues the HS18 chain and does NOT open a new one.** The
+authoritative record is [[ABI-S6-HS18-D5B-SUBSTRATE-PORT]] `§11`, which itself
+continues [[ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT]] `§1b`. **Append entries
+there, never here** — two mutable copies of an append-only record is how the
+record stops being one, and that section already carries a strike and three
+tombstones from exactly this failure.
+
+The Architect appends entries and owns the predicate check. The advancing
+hard-stop count stood at **17, next trigger at 18**, when this node was cut
+(`evt_7tx7a1n71qa9g`).

@@ -1,15 +1,33 @@
 # WP frame — `ABI-S6-HS18-D5B-SUBSTRATE-PORT`
 
-    owner   runtime        tier   T1        size   L
-    blocks  ABI-S6-HS18-MAIN-BASED-CLOSURE  (its only dependency)
+    owner   runtime        tier   T2        size   L
+    blocks  ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION
+            ABI-S6-HS18-MAIN-BASED-CLOSURE
     node    docs/program/issues/ABI-S6-HS18-D5B-SUBSTRATE-PORT.md
+
+> ## RECUT 2026-09-17 (SECOND). THIS NODE IS NOW THE MECHANICAL HALF ONLY.
+>
+> The Architect re-ruled this WP **(c) mis-sized** (`evt_7tx7a1n71qa9g`) and
+> asked the Steward to recut around **replacing the completion criterion**. The
+> recut is `§3b`, and it does two things: it splits the judgment surface out
+> into [[ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION]], and it replaces `AC-1`.
+>
+> **`§3b` is the operative text for scope, sizing and acceptance.** Everything
+> above it that states a measurement — the regions, the extent, the six-site
+> grant exclusion, `§3`'s reaching-consumer predicate — is **retained
+> unchanged** and is still binding. A recut is not a licence to restart.
 
 ## 1. Objective
 
-Land the D5b prefix's **production** residue on `main`, so
-`ABI-S6-HS18-MAIN-BASED-CLOSURE` increment A has a substrate to compile
-against. **Exclude the refused `MappingAcquireFile` grant by construction, and
-do not absorb increment A's own substance.**
+Land the **mechanically determined** part of the D5b prefix's production
+residue on `main`: the methods `main` has not touched since the common base,
+and the names `main` does not have at all. **Every method where both the port
+source and `main` moved is OUT of this node** — it goes to
+[[ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION]], and leaving it at `main`'s body is
+compile-safe by construction (`§3b`).
+
+**Exclude the refused `MappingAcquireFile` grant by construction, and do not
+absorb increment A's own substance.**
 
 ## 2. Fixed inputs — measured, with the ref each was taken at
 
@@ -331,13 +349,203 @@ The inventory's predicate check is keyed on `§11` rows, was discharged at row 1
 and falls next **three appended entries after that discharge** — see `§11`, where
 striking the unrecoverable rows makes an ordinal schedule unsafe.
 
+## 3b. THE SECOND RECUT, 2026-09-17: A COMPLETION CRITERION, AND A SPLIT
+
+**Authored by the Steward on the Architect's re-rule to (c) mis-sized**
+(`evt_7tx7a1n71qa9g`). The Architect's own statement of the defect is the one
+to keep: **the WP has no criterion that can report its own completion.**
+`AC-1` was *"increment A compiles against this"*, and compiler-clean answers
+*"does every name resolve"*, which is a different question from *"is the port
+done"*.
+
+### The instrument: a three-way per method, against a common ancestor
+
+A common ancestor exists for the port source and the main line —
+`b4c8df33add9a2d260a3733341485b474ff04f5a`, Steward-verified an ancestor of
+`origin/main`. That makes owed-versus-divergent **mechanically separable**
+instead of a reading exercise:
+
+    B = body at b4c8df33a   (last point the source and the main line agreed)
+    S = body at b601e2ec7898 (port source)
+    M = body at origin/main  (the tree this port must land on)
+
+    S != B  and  M == B   ->  OWED        the source moved it; main never did
+    S == B  and  M != B   ->  MAIN'S      main moved it; not owed
+    S != B  and  M != B   ->  ADJUDICATE  both moved
+    S == B  and  M == B   ->  AGREE
+    present in S, absent from M   ->  ABSENT
+
+**It produces a worklist, not a build result**, and it can be re-run at any
+commit to report how much is left. That is what makes it a completion
+criterion rather than a progress anecdote.
+
+### THE THIRD TREE IS `origin/main`, NEVER THE PORT BRANCH. This is not a detail.
+
+The re-rule specified the third tree as `879f00c994c6`, **the port branch**.
+Run that way the instrument conflates two different facts: *"`main` moved this
+method"* and *"the implementer already ported this method onto the branch"*.
+Both read as `M != B`.
+
+**Steward-measured, one variable changed, same extractor on both runs:**
+
+    third tree = port branch 879f00c99    ADJUDICATE  154
+    third tree = origin/main              ADJUDICATE   32
+
+⇒ **A five-fold inflation of the single number the sizing turns on**, in the
+direction that makes the node look far bigger than it is. The control that
+proves it is `units.rs`: `main` is **byte-identical to the base** there
+(Steward-verified), so by definition *no* method in it can be "both moved" —
+yet the branch-based run puts 25 of its methods in ADJUDICATE. Against
+`origin/main` it has **zero**, and the remaining ADJUDICATE rows concentrate
+in `planning/static_transition/**`, which is exactly the diverged Region 3.
+
+**Do not read this as overturning the Architect's census.** His counts were
+taken with his own extractor and are re-derivable; mine uses a different one
+and reports different totals throughout (my AGREE is 2601 against his 2172), so
+**the absolute numbers are not comparable and I am not replacing them.** The
+claim here is the controlled one: *within one extractor, changing only the
+third tree moves ADJUDICATE by 5x.* His **20** and my **32** are the same
+finding; the branch-based **154** is an artifact.
+
+### POPULATION FROM THE UNION, AND THE INSTRUMENT MUST SAY SO IN ITS OUTPUT
+
+**This is a requirement on the instrument, not a caution.** Every instrument
+this port has used so far defined its population by what both trees already
+have, and **a comparison restricted to the intersection is structurally blind
+to the names present in only one of them.** That is three occurrences of one
+predicate on this node: the Architect's intersection-only body diff, the
+implementer's *"of 94 methods present in both trees"*, and `§2d`'s item
+predicate agreeing about a manifest that holds no countable items.
+
+⇒ The instrument's population is the **union of method names across all three
+trees**, and its output must **print the population and the file count it was
+taken over**. An instrument that does not state its own population cannot be
+audited for this failure, and this one has now exhibited it three times.
+
+### The split, and why deferring ADJUDICATE is COMPILE-SAFE
+
+**ADJUDICATE methods exist in `main` already** — that is what `M != B` means.
+Leaving one at `main`'s body therefore resolves, links and builds; the question
+it raises is *which body is correct*, never *does the tree stand up*. So the
+judgment surface can be deferred to a second node without leaving a broken tree
+behind, and that is the whole basis for splitting here rather than anywhere
+else.
+
+    THIS NODE              OWED, ABSENT, MAIN'S      mechanical      T2
+    ADJUDICATION NODE      ADJUDICATE                judgment        T1
+
+**The default for every ADJUDICATE method in this node is `main`'s body,
+untouched.** Not the source's. The Architect's own falsifier is why:
+`dispatch_host_op_v1` scored +770 lines in that bucket and is **not owed at
+all** — `main` refactored it into `dispatch_host_op_v1_for_promotion_evidence`
+after the base, and the source carries the pre-refactor shape. Transplanting it
+would undo `main`'s work. **Take `main`'s body and record the name; do not
+transplant into this bucket.**
+
+### THE BOUNDARY BETWEEN THE TWO NODES IS A PREDICATE, NOT A LIST
+
+**Any method this node cannot place mechanically moves to the adjudication
+node.** The implementer does not have to decide anything to hand it over —
+naming it is the whole act.
+
+⇒ **A growing adjudication list is this split WORKING, not a re-scope.** The
+T2 seat is never required to exercise judgment it was not provisioned for, and
+the only way this node fails is if someone forces a call rather than moving the
+row. This is the same shape as `§3`'s reaching-consumer predicate and for the
+same stated reason: **a list cannot report being incomplete.**
+
+### PARTITION BY REGION BEFORE SIZING ANYTHING
+
+Sizing a transplant list without first asking which region each item sits in is
+**how this node got mis-sized the first time.** Re-derived by the Steward at
+today's `origin/main`, over every file the source moved from base:
+
+    R1  already landed (main == source)      5 files   EXCLUDE
+    R2  replays        (main == base)       14 files   file-level checkout
+    R3  diverged       (both moved)         16 files   per-method transplant
+
+**The frame's `§2b` says 13 for Region 2; it is 14.** One more file qualifies
+now than when that was written.
+
+**An OWED method inside an R2 file rides the file-level replay and is not an
+individual transplant.** That is what collapses the largest single bucket:
+`units.rs` is R2, and the ~57 names absent from `main` there close as one
+checkout rather than as 57 placements.
+
+⇒ **The unit of work in R2 is the FILE. The unit of work in R3 is the METHOD.**
+
+**What the replay does NOT settle, so nobody inherits more than was measured:**
+file-level replay is **conflict-freedom, not compilation**. An R2 file calling
+into an unreconciled R3 neighbour still fails to build. `§2d`'s
+compile-dependency keying already says this.
+
+### PRODUCTION AND TEST FUNCTIONS ARE DIFFERENT OBLIGATIONS
+
+The Architect flagged this as unmeasured: *"I have not distinguished production
+functions from `#[test]` functions... The counts above are of `fn` definitions,
+not of obligations."* Steward-measured, and it is material to sizing — roughly
+**two fifths** of the raw `fn` population across the mechanical buckets is test
+functions.
+
+**Report the split in the instrument's output.** A test function that fails to
+port is an acceptance-evidence question and routes to `AC-4`'s
+report-don't-repair discipline; a production function that fails to port is
+port debt. **Counting them together produces a number that answers neither.**
+
+### The HS10-inline guard, folded in as a FIXED INPUT and explicitly NOT a fix
+
+`runtime-implementer`, `evt_50ra77wgfzeh9`: the assertion in
+`with_d5b_hs10_inline_response_mutation` that *"HS10 inline-response mutations
+cannot nest"* is **intra-family**. The duplicating mutations
+(`DuplicateResponseOnlyDemand`, `DuplicateProducerKRow`) live in a different
+family behind a different `thread_local` and a different guard, and **nothing
+prevents cross-family co-activation.**
+
+⇒ **A guard that cannot fail in the only configuration it runs in is not a
+guard.** It holds under HS10-inline alone, which is the only configuration its
+own assert ever runs in — which is precisely why nobody would catch it.
+
+**This node LANDS that instrument with its limitation RECORDED beside it, and
+does NOT repair it.** Widening the assertion across families is a change to a
+guarantee, needs its own decision, and is not a port. **Record it; do not fix
+it; do not silently land it as though the wording were accurate.**
+
+### What rides in unchanged, and is NOT to be re-derived
+
+Named by the Architect as retained, and confirmed:
+
+- the `D0-2` re-aim (`§4`)
+- the instrument work already landed
+- entry 13's four dead instruments (`§11`)
+- the HS10-inline transplant and counter-split rulings
+
+**And from the Steward's own measurement:** `units.rs` is inside the pinned
+scope and is Region 2 — that question was named by the Architect as the first
+one to settle and it is settled, in the direction that makes this node smaller.
+
+### The counter, recorded not moved
+
+`§3a` states the advancing hard-stop count as **16, delta 0, next trigger at
+18**. The re-rule moved it to **17, delta +1** (`evt_7tx7a1n71qa9g`), an
+advancing stop: the implementer built the previous ruling, hit a genuinely new
+structural wall, and needed a new one. **Next trigger at 18, so no research
+hold fires on this recut.** Recorded here because it is stale above; the count
+is the Architect's and is not the Steward's to move.
+
 ## 4. D0 — answer before writing production. A hard stop here is a GOOD outcome.
 
-**D0-1. Does Region 2 actually replay onto `main`?** `§2b` says `main` sits at
-the prefix base for 13 files — that is a **content** claim, and applying a diff
-is a different act from matching a blob. Apply and report, per file. **If some
-subset does not replay cleanly, say which and stop**; that converts Region 2
-into Region 3 and is a re-scope for the Steward, not something to force.
+**D0-1. ANSWERED AT FILE LEVEL BY THE STEWARD — do not re-derive the blob
+comparison.** `main` sits byte-identical to the base for all **14** Region 2
+files at today's `origin/main`, so `diff(base, source)` applied to `main` is a
+file-level checkout and **cannot conflict**. Region 2 replays.
+
+⇒ **What remains open is the half the blob check cannot reach: does the
+replayed tree BUILD?** Replay is conflict-freedom, not compilation, and an R2
+file calling an unreconciled R3 neighbour still fails. **That is a build
+question and `AC-1a` is where it is answered** — not a reading exercise, and
+not a reason to re-run the blob comparison. If a Region 2 file turns out not to
+replay after all, say which and stop: that converts it to Region 3 and is a
+re-scope for the Steward.
 
 **D0-2. For Region 3, is reconciliation bounded per file? RE-AIMED BY `§3a` —
 do NOT pre-clear files by reading.** The original phrasing asked for a per-file
@@ -364,27 +572,67 @@ the Steward's.
 
 ## 5. Deliverables
 
-1. The production cluster from the node's `§What is IN`, landed on `main`:
+1. **The three-way instrument itself, committed with the candidate** (`§3b`).
+   It is the completion criterion, so it must live in the tree rather than in a
+   thread or in this frame — a criterion nobody can re-run is not one. Region
+   2's replay, Region 3's per-method transplants, and the placement of absent
+   names are all driven from its worklist.
+2. The production cluster from the node's `§What is IN`, landed on `main`:
    generated-context-result authority; checked-IH post-call/detached;
-   recursive-position calls; source dynamic match.
-2. `crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs`, currently absent
+   recursive-position calls; source dynamic match — **minus every ADJUDICATE
+   method, which is [[ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION]]'s.**
+3. `crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs`, currently absent
    in full. **Note the path: `ken-cli/tests/`, not `ken-runtime/tests/`** — this
    frame and the node both said `ken-runtime` until 2026-09-17. **Its expected
    state is not assumed green — see AC-4.**
-3. The evidence instruments that pass `§3`'s reaching-consumer predicate, with
-   the **excluded** ones named and the reason given.
-4. Whatever `lowering/mod.rs` re-exports the above require (39 items missing
-   there, the largest single residue).
+4. The evidence instruments that pass `§3`'s reaching-consumer predicate, with
+   the **excluded** ones named and the reason given, and with the HS10-inline
+   cross-family limitation recorded per `§3b`.
+5. Whatever `lowering/mod.rs` re-exports the above require (the largest single
+   residue after `units.rs`).
+6. **The ADJUDICATE worklist, handed over by name and file** — the input the
+   adjudication node is framed against.
 
 ## 6. Acceptance
 
-**AC-1 — increment A compiles against this.** The satisfying act is
-`scripts/ken-cargo check -p ken-runtime --lib` exiting 0 **with increment A's
-tree applied on top of this node's landed `main`**, and *"Checking ken-runtime"*
-present in the log. That is the whole point of the node, so it is the first
-criterion. **Zero errors, never "the eleven are gone"** — the parent's inventory
-was already short by one (`constructor_identity`), so the count may GROW when
-re-attempted. **A count that goes up is the predicate working.**
+**AC-1 — THE THREE-WAY WORKLIST IS DRIVEN TO ZERO ON THE MECHANICAL BUCKETS.**
+The satisfying act is **re-running the `§3b` instrument at the candidate**,
+with `origin/main` as the third tree, and its output showing:
+
+    OWED         0
+    ABSENT       0
+    ADJUDICATE   enumerated by name and file, non-zero, handed to the
+                 adjudication node
+    population   stated in the output: union of method names, over the
+                 file set, with the production/test split
+
+**This replaces *"increment A compiles against this"* as the completion
+criterion.** A build answers *"does every name resolve"*; this answers *"is
+anything still owed"*, which is the node's actual contract.
+
+**POSITIVE CONTROL, REQUIRED, AND IT IS THE HALF THAT USUALLY GETS SKIPPED.**
+Run the identical instrument at the candidate's **base** in the same report. It
+must show OWED and ABSENT **non-zero**. A zero from a real port and a zero from
+an instrument whose file set matched nothing **print the same word**, and this
+node has already been bitten three times by exactly that — `ci-doc-only.py`'s
+bare `except`, `unique demands=0` on an empty set, and the item predicate
+agreeing about a manifest with nothing to count. **A green AC-1 with no base
+reading beside it is not evidence.**
+
+**A COUNT THAT GROWS MID-RUN IS THE METHOD WORKING.** The parent's inventory
+was already short by one (`constructor_identity`). Report the number you
+observe; do not reconcile it against any number in this frame, including the
+Architect's census and the Steward's re-derivation — **different extractors
+produce different totals and neither is the contract.** The contract is *zero
+owed under YOUR extractor, with the base control beside it.*
+
+**AC-1a — the resulting tree builds, and increment A compiles against it.**
+`scripts/ken-cargo check -p ken-runtime --lib` exits 0, *"Checking ken-runtime"*
+present in the log, and the same with increment A's tree applied on top.
+**Necessary, not sufficient, and no longer the completion criterion** — this is
+what answers `D0-1`'s open half, since file-level replay is conflict-freedom
+and says nothing about whether the result compiles. **Zero errors, never "the
+eleven are gone".**
 
 **AC-2 — the refused grant is ABSENT, measured in the direction that fails
 open.** `MappingAcquireFile` must not be promoted out of the
@@ -494,6 +742,12 @@ gets answered.
 
 ## 9. Not this node
 
+- **Every ADJUDICATE method** — [[ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION]].
+  Leave `main`'s body in place and hand the name over. **Moving a row there is
+  not a re-scope and needs no ruling; forcing a call here is the only way to
+  get this wrong.**
+- **Repairing the HS10-inline cross-family guard.** Record the limitation, land
+  the instrument, change nothing (`§3b`).
 - The refused `MappingAcquireFile` grant — [[RT-D5B-MAPPING-AVAILABILITY-FLIP]],
   deliberately `draft`. **Do not hand-separate 8 of 42 lines.**
 - Increment A's own substance, and increments B and C.
@@ -502,6 +756,8 @@ gets answered.
 
 ## 10. Related
 
+- [[ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION]] — the judgment half, split out by
+  `§3b`. Depends on this node and is framed against its ADJUDICATE worklist.
 - [[ABI-S6-HS18-MAIN-BASED-CLOSURE]] — what this unblocks.
 - [[ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT]] — the landed sibling port
   (`10e75cb93656d5ea787bceaf754b2500b78de166`); the worked precedent for extent

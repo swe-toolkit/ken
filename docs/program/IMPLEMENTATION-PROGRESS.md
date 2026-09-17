@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-17 09:10:01Z — from 656 issue file(s) in `docs/program/issues/`.
+2026-09-17 10:19:36Z — from 657 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -57,6 +57,7 @@ the committed file matches the generator's output.
 | `ABI-S4` | statx-shaped metadata with field-availability bits | draft | runtime | M | none | — |
 | `ABI-S5` | terminal basics and process signal disposition at the executable edge | draft | runtime | M | none | — |
 | `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` | Port the checked-IH post-call consumer machinery that main never grew, so ABI-S6-HS18 increment A can compile: one type family (CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep) plus three accessors on existing types (StaticTransitionPlan::checked_ih_generated_context_result_contract, StaticTransitionPlan::static_response_forwarded_result_identity, Lowering::checked_post_call_consumer_frame). Increment A holds the call sites and none of the definitions, so it cannot build without this. FIRST DELIVERABLE IS THE TRANSITIVE CENSUS, NOT THE PORT -- whether the consumer machinery itself calls anything else that is absent from main is UNMEASURED, and finding a fourth population after the port is the failure this node exists to prevent. | merged | runtime | M | none | — |
+| `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION` | Adjudicate the D5b substrate port's judgment surface: every method where BOTH the port source and main moved since their common base b4c8df33a. Each row gets one of KEEP MAIN'S / TRANSPLANT / RECONCILE with the check-against-main SHOWN, on the template of dispatch_host_op_v1 -- which scored +770 lines in this bucket and is not owed at all, because main refactored it after the base and the source carries the pre-refactor shape. Split out of ABI-S6-HS18-D5B-SUBSTRATE-PORT so the mechanical bulk could run on a T2 seat; deferring these rows is compile-safe because an ADJUDICATE method already exists in main, so leaving main's body resolves and builds. Completion is ADJUDICATE = 0 under the three-way instrument with origin/main as the third tree. | draft | runtime | M | none | — |
 | `ABI-S6-HS18-D5B-SUBSTRATE-PORT` | Port the D5b prefix's PRODUCTION residue onto main so ABI-S6-HS18-MAIN-BASED-CLOSURE increment A has a substrate to stand on. Increment A was decomposed as a diff between two points on the preserved line, which measures what it ADDED to the checkpoint rather than what it NEEDS on main; the four prefix commits below it never landed. Scope is the ~117-item prefix-minus-main gap NARROWED to its production cluster (generated-context-result authority, checked-IH post-call/detached, recursive-position calls, source dynamic match, the absent acceptance test), not the raw +10472/-5307. Excludes the refused MappingAcquireFile arm BY CONSTRUCTION -- it is RT-D5B-MAPPING-AVAILABILITY-FLIP's, deliberately held. | ready | runtime | L | none | — |
 | `ABI-S6-HS18-MAIN-BASED-CLOSURE` | Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation. | draft | runtime | L | none | — |
 | `ABI-S6` | ordinary anonymous and file-backed mappings as opaque runtime-owned regions and bounded byte views | active | runtime | L | none | — |
@@ -739,6 +740,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
+- `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: active)
