@@ -6,12 +6,41 @@ owner: runtime
 size: L
 gate: none
 depends_on: []
-blocks: [ABI-S6-HS18-MAIN-BASED-CLOSURE]
+blocks: [ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION, ABI-S6-HS18-MAIN-BASED-CLOSURE]
 github: null
-tier: T1
+tier: T2
 origin: "Steward cut 2026-09-17, ruling runtime-leader's measured scope fork (evt_1yma657vq6bkg) after the Architect answered both extent questions from measurement (evt_6fr79bx4cjhsw). The fork offered two dispositions -- re-scope increment A, or re-sequence behind B -- and the ruling is NEITHER (evt_2dgjc1h7as88w): widening A makes A the whole substance again, which the increment split exists to prevent, and B supplies source.rs, one row of an eight-row table. This node is the third disposition, a prerequisite increment in front of A."
 ---
 
+> # RECUT 2026-09-17 (SECOND). NOW THE MECHANICAL HALF, AND T2.
+>
+> The Architect re-ruled this WP **(c) mis-sized** (`evt_7tx7a1n71qa9g`): *"the
+> WP has no criterion that can report its own completion."* The recut is the
+> frame's **`§3b`** and it does two things.
+>
+> **1. It replaces `AC-1`.** *"Increment A compiles against this"* answers
+> *"does every name resolve"*, which is not the question. Completion is now the
+> **three-way instrument** — per method, against the common ancestor
+> `b4c8df33add9a2d260a3733341485b474ff04f5a`, with **`origin/main` as the third
+> tree** — driven to `OWED = 0` and `ABSENT = 0`, with a base-run positive
+> control beside it. It yields a **worklist**, not a build result.
+>
+> **2. It splits the judgment surface out** into
+> [[ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION]]. An ADJUDICATE method already
+> exists on `main`, so leaving `main`'s body **resolves and builds** — deferring
+> it is compile-safe, which is what makes the cut fall here. **The boundary is a
+> predicate, not a list: anything this node cannot place mechanically moves
+> there, and a growing list is the split working.**
+>
+> **The third tree is `origin/main`, never the port branch `879f00c99`.**
+> Steward-measured, one variable changed: the branch-based run reports
+> ADJUDICATE **154**, the main-based run **32**. Classifying against the branch
+> makes *"already ported"* indistinguishable from *"`main` moved it"*.
+>
+> **Retained unchanged, not re-opened:** the three regions, the ~117-item
+> extent, the six-site grant exclusion, `§3`'s reaching-consumer predicate, the
+> `D0-2` re-aim, and entry 13's four dead instruments.
+>
 > # READY. Frame: `docs/program/wp/ABI-S6-HS18-D5B-SUBSTRATE-PORT.md`.
 >
 > **This node exists because a DECOMPOSITION was refuted, not because the
