@@ -62,9 +62,15 @@ const PRESERVED: [(&str, &str); 11] = [
     ("prefix head, glyph", "const k : Nat = \u{2264} Zero One"),
     ("infix spine", "const k : Nat = x <+> y"),
     ("infix spine, glyph", "const k : Nat = x \u{2264} y"),
-    ("infix spine, two operators", "const k : Nat = x \u{2264} y \u{2227} z"),
+    (
+        "infix spine, two operators",
+        "const k : Nat = x \u{2264} y \u{2227} z",
+    ),
     ("grouped then applied", "const k : Nat = (<+>) a b"),
-    ("grouped as an argument", "const k : Nat = map (\u{2264}) xs"),
+    (
+        "grouped as an argument",
+        "const k : Nat = map (\u{2264}) xs",
+    ),
 ];
 
 #[test]
