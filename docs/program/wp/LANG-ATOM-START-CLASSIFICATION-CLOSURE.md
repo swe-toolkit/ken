@@ -1,8 +1,15 @@
 # LANG-ATOM-START-CLASSIFICATION-CLOSURE — work package
 
 **Owner: Team Language. Size M. Tier T1. Gate: none.**
-**Implementation base: `origin/main` at `<SET AT RELEASE>`.**
+**Implementation base: `origin/main` as of whenever you cut your branch. NAME
+IT in your first post — AC-0 requires you to re-measure the defect there.**
 **Inputs below measured at `6acd40705709cadc5e9a86cd0a83e835fd9dc9f4`.**
+
+> **The base is deliberately not a SHA here.** A release-time SHA in this line
+> decays between release and the cut — the publish queue moves `main`, and
+> `LANG-STANDARD-INFIX-CALL-COMPLETION` is live in the same file. A base you
+> measured at beats a base someone wrote down for you. **AC-0 is where that
+> gets checked.**
 
 Raised by the Architect from their own carry list, `evt_a1t4jpv9tvc0`. Two
 spec-authority rulings from the Spec enclave settle the objective; both are
@@ -293,6 +300,40 @@ move explicitly.
 6. **AC-6's finding on further contextual forms, reported either way.**
 
 ## 7. Acceptance criteria
+
+**AC-0 — THE DEFECT STILL OCCURS AT YOUR BASE. RUN THIS BEFORE AC-1.**
+Re-run this frame's own two-sided probes **at your implementation base** — not
+at `6acd40705` — and paste the output:
+
+    REJECTED  f proof p for s          PARSED  f (proof p for s)
+    REJECTED  f ‖x‖                    PARSED  f (‖x‖)
+    REJECTED  fn f (x : G ‖Bool‖)...   PARSED  fn f (x : G (‖Bool‖))...
+    FIRES     f if a then b else c     -- the negative control
+
+**If any bare case PARSES at your base, STOP and return to the Steward.** The
+node's premise has changed, and that makes its scope WRONG, not merely smaller.
+
+> ### WHY THIS AC EXISTS, AND WHY IT IS AC-0 RATHER THAN AC-11
+>
+> **Every other criterion in this section is about the repair or about
+> preservation.** Ask the reader-side question — *which AC fails if the defect
+> does not exist?* — and the answer for AC-1 through AC-10 is **none**. If
+> `f proof p for s` already parsed at your base, you could build the
+> classification, pass every control, and close the node without anything
+> reporting that there was nothing to fix.
+>
+> **This frame has a specific reason to care.** Every defect measurement in §3,
+> §4, §4b and §5 is anchored at `6acd40705`; the base you work from is a later
+> `main`, set at release, with other candidates in the publish queue ahead of
+> you — and `LANG-STANDARD-INFIX-CALL-COMPLETION` is live **in the same file**.
+> Its implementer reports that layer 3 does not touch the atom roster. That is
+> a claim about a design, not about a landed diff, and nobody has measured it.
+>
+> **The probes are already written, so this costs one build.** Raised by the
+> Architect (`evt_11nyyh216pqz2`), who supplied most of §3, §4b and §5 and
+> named the reason they were the wrong seat to catch it: *"having spent the
+> evening establishing that the defect is real, 'what if it isn't' is the
+> question I was least able to ask."*
 
 **AC-1 — the closure property, over BOTH kinds of atom form.** *Adding an atom
 form must be impossible without its start test and its parse moving together.*
