@@ -83,6 +83,72 @@ comm -23 <(items 30d35f625 "$f") <(items origin/main "$f")
 `crates/ken-runtime/src/cranelift_backend/**` moves under active work. **Every
 coordinate in this frame is a symbol name, and yours should be too.**
 
+### 2e. THE GRANT IS SIX SITES, NOT FIVE — and this node is NOT an enabler
+
+Amended 2026-09-17, after three seats measured this independently. **Two things
+this frame previously said are wrong.**
+
+**1. The census of five was short.** The sixth site is
+`CRANELIFT_HOST_EFFECT_CONSUMERS_V1` membership plus the matching removal from
+the named-unavailable-lanes arm, both in
+`planning/static_transition/effects.rs`, inside a **Region 2** file:
+
+    roster contains MappingAcquireFile   origin/main  0     30d35f625  1
+    represented-unavailable lane count   origin/main 10     30d35f625  9
+
+**That is the site that actually operates the gate**, and the removal is a pure
+deletion with **no added line to grep for** — site 3's signature in the planner
+plane instead of the host plane. There is a seventh touch in `st/aggregates.rs`.
+Found by the runtime-implementer before applying anything (`evt_316yppb8r4zxa`);
+the Architect confirmed and amended their own ruling (`evt_1jfpng6yvy89v`).
+
+⇒ **The roster ADMITS and the dispatch HANDLES; excluding either alone creates a
+panic.** Land the roster without site 5's dispatch arm and the op passes the gate
+at `:2812`, falls through `match operation` at `:3076`, and hits
+`unreachable!()` at `:3713`.
+
+⇒ **Exclude whole files, do not hand-separate hunks**, exactly as the node
+already mandates for site 5. **Treat six as a floor and close it with the
+parent's `AC-PREDICATE` — zero diff lines naming the operation at pathspec
+`crates/` — which catches all seven touches without anyone holding a complete
+site list.** Measured: Region 2's 13 files carry 17 such lines; the 10 files
+that remain after excluding the catalog, `lowering/effects.rs` and
+`st/effects.rs` carry **zero**.
+
+**2. This node does NOT unblock `RT-D5B-POSTCALL-REFUSAL-MECHANISM`.** The
+Steward's sequencing ruling claimed it would give that node *"a reproduction on
+main for the first time."* **Refuted by reading** (`evt_30p9m0j8bj1f2`),
+measured at `origin/main` `b0eb29e71` and `30d35f625`:
+
+    lowering/effects.rs :2812   if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation)
+                                   { return Err(unsupported(...)) }   -- roster membership,
+                                   NOT a RepresentedUnavailable test; the message says
+                                   "represented unavailable lane" and the predicate does not
+
+    abi_s6_mapping_file_backed_native.rs   13 #[test] fns
+      raw strings in the whole file         exactly ONE   const SOURCE  :11 .. :106
+      build/run call sites                          15
+        passing SOURCE                              15
+        passing anything else                        0
+      SOURCE :67   (withMapping ... (FileBacked file (8 : Int)) ReadWrite ...)
+
+**Thirteen tests, one program, and that program acquires a file-backed
+mapping.** With the grant excluded the op is out of the roster, so **every test
+is refused at `:2812` before lowering** and the refusal is unreachable.
+
+**The node still proceeds** — the sequencing ruling's other leg (that node is
+not workable on `main` today regardless, its site and evidence both absent)
+is measured and stands on its own. What is withdrawn is the *benefit* claimed,
+not the *disposition*. `RT-D5B-POSTCALL-REFUSAL-MECHANISM` now depends on
+[[RT-D5B-MAPPING-AVAILABILITY-FLIP]].
+
+**Do not run a dedicated experiment to confirm this.** Both arms are predicted
+from the producer above, and this node's own AC-1/AC-4 build reports the answer
+for free (§12). **The refuting observations are named and cheap to spot: any red
+carrying the `CheckedIhDetachedCallerCut` Packaging reason, or a `:3713` panic.**
+Either means the gate was read wrong — **say so loudly**; it returns to the
+Steward.
+
 ## 3. THE DESIGN QUESTION, already ruled: which evidence instruments travel
 
 Most of the ~117 items are evidence instruments, not production — `D5bHs*
@@ -128,8 +194,10 @@ the Steward's.
 1. The production cluster from the node's `§What is IN`, landed on `main`:
    generated-context-result authority; checked-IH post-call/detached;
    recursive-position calls; source dynamic match.
-2. `crates/ken-runtime/tests/abi_s6_mapping_file_backed_native.rs`, currently
-   absent in full. **Its expected state is not assumed green — see AC-4.**
+2. `crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs`, currently absent
+   in full. **Note the path: `ken-cli/tests/`, not `ken-runtime/tests/`** — this
+   frame and the node both said `ken-runtime` until 2026-09-17. **Its expected
+   state is not assumed green — see AC-4.**
 3. The evidence instruments that pass `§3`'s reaching-consumer predicate, with
    the **excluded** ones named and the reason given.
 4. Whatever `lowering/mod.rs` re-exports the above require (39 items missing
@@ -160,15 +228,38 @@ file the candidate DOES change in the same command, so a green AC-3 is
 distinguishable from a command that matched nothing.
 
 **AC-4 — the acceptance test's state is REPORTED, not assumed.**
-`abi_s6_mapping_file_backed_native.rs` arrives with known reds (the parent
-records 11 base reds, 8 of them one `CheckedIhDetachedCallerCut` Packaging
-reason). **Do not repair toward green.** Land it with its actual state named
+`abi_s6_mapping_file_backed_native.rs` arrives with reds. **Do not repair toward
+green.** Land it with its actual state named
 per-red, and if any red is to be accepted it needs a row in
 `.github/ignored-test-exemptions.toml` — whose schema is `class` +
 `readmission` + `test_path`, i.e. **an accepted red names what would readmit
-it.** Steward-verified at `6036f9f5d`: that register is 44 lines and carries
-**zero** entries matching `abi_s6`, `mapping`, `d5b`, `file_backed` or `px8f`.
-**A red with no row is not an accepted state; it is just red.**
+it.** Steward-verified at `origin/main` `6036f9f5d`: 44 lines, 8 `[[exemption]]`
+entries, and **zero** matching `abi_s6`, `mapping`, `d5b`, `file_backed` or
+`px8f`. **A red with no row is not an accepted state; it is just red.**
+
+**READ THIS REGISTER FROM `origin/main`, NEVER FROM YOUR WORKTREE:**
+
+```sh
+git show origin/main:.github/ignored-test-exemptions.toml
+```
+
+**The failure mode is a FALSE NEGATIVE on the exact question this AC turns on,
+and it is silent.** A branch that lags `main` has *fewer* rows, so a row added
+to `main` after your branch point is invisible — and the answer you get,
+*"no row exists, therefore this red is not accepted"*, is wrong in the direction
+that convicts a red the fleet already accepted. **Demonstrated live** while this
+frame was being written: the Architect first reported 34 lines, read from a
+worktree on a lagging branch, and corrected it themselves to 44 at `origin/main`
+(`evt_f3y5ffna32kv`). **The conclusion survived; the method did not.** A
+measurement correct on one tree is not a claim about another without naming
+which tree it was taken on.
+
+**THE "11 BASE REDS, 8 OF THEM `CheckedIhDetachedCallerCut`" POPULATION IS
+WITHDRAWN FROM THIS AC.** Those 11 were measured on the checkpoint tree, **with
+the grant**. With the grant excluded they cannot recur — see `§2e`. **A report
+that does not match them is this AC working, not failing.** Report the
+population you actually observe, do not reconcile it against that one, and do
+not read a missing red as a red you repaired.
 
 **AC-5 — the excluded instruments are NAMED.** `§3`'s predicate produces
 exclusions; list them with the reason each failed the reaching-consumer test.
