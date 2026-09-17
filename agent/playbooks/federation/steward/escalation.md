@@ -38,12 +38,34 @@ Keep them distinct, because the confusion is live: an `HS<N>` label reads like
   whether the count advances.
 
 **The count is per-chain and re-anchors on every recut**, so an `HS` number is
-not a campaign-wide ordinal — a fresh chain restarts the advancing count. ⇒
-**research-due is read off the armed `next research pull = #N` line for the live
-chain, never inferred from whether an `HS` number is divisible by 3.** On a chain
-where the two happen to coincide (pulls at HS9/HS12/HS15, say), that coincidence
-is the trap, not the rule — see the steward lesson
-`anchor-an-armed-trigger-on-an-event-not-on-an-index`.
+not a campaign-wide ordinal — a fresh chain restarts the advancing count.
+
+### THREE DIFFERENT NUMBERS. Only the first is the trigger.
+
+This clause used to collapse them, and the collapse read as *"research is due
+only when an armed line says so"* — which, since no line is armed absent an
+operator anchor, made research **never** due and the whole §1a cadence dead
+letter. Corrected 2026-09-17 (`thr_6azxdz555c2qy`).
+
+| number | who holds it | does it fire the pull? |
+|---|---|---|
+| **consecutive ADVANCING hard stops in the live chain** | the Architect, alone | **YES — every 3rd. This is the trigger.** |
+| the **`HS<N>` label** | free text in frames and threads | **NO.** A campaign ordinal that re-anchors on recut. Its divisibility by 3 means nothing. |
+| an armed **`next research pull = #N`** | the Steward, and **only** from an operator count-anchor | **Overrides the cadence when present.** Usually absent; absence is not "not due". |
+
+⇒ **The Architect's own count of advancing stops is always operative.** It does
+not need a line from you to be armed, and it is an obligation, not a prompt. The
+thing the old wording rightly warned against is reading the trigger off an
+**`HS` label** — labels drift, get reused, and survive recuts that reset the
+real count. **A label is not a count.**
+
+⇒ **Absent an operator anchor, the correct answer to "is a pull armed?" is "no
+line is armed, and your every-3rd obligation stands unchanged."** Never let
+"no armed line" be heard as "not due" — that is the failure this table exists
+to stop. See the steward lesson
+`anchor-an-armed-trigger-on-an-event-not-on-an-index`, which is about anchoring
+on an **event** rather than an index, and is not a licence to disarm the
+cadence.
 
 ## The hard-stop chain: the Architect self-triggers, you backstop
 
