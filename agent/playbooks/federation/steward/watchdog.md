@@ -321,12 +321,55 @@ re-mention blind.
 2. **git-verify the handed-off work actually exists** — the commit or branch
    the post claimed.
 3. **Relay** — a real mention if the channel is flowing, or for an idle-wedged
-   session `tmux send-keys -t moot-<role> "<text>"` then a **separate**
-   `tmux send-keys -t moot-<role> Enter`. Text and Enter in one call does not
-   submit.
+   session `tmux send-keys -t moot-<role> -l "<text>"` then a **separate**
+   `tmux send-keys -t moot-<role> Enter`. **Both halves are load-bearing:** text
+   and Enter in one call does not submit, and **without `-l` the text is read as
+   key names** rather than sent literally (`compaction.md`).
 
 **Log every relay. Never interrupt a working agent; capture-pane first,
 always.**
+
+### THE `other` RESIDUAL IS A REAL PANE STATE. This is what you do with it.
+
+Tick step 1's sweep **reports but does not repair** a short delivery that lands
+as raw composer text with no envelope — it classifies `other`, and that is
+deliberate, since it is indistinguishable from half-typed operator input. **The
+sweep having said `other` is the whole of its job; the next act is yours.**
+
+**Measured 2026-09-17: this state cost a seat 67 minutes.** Its composer held a
+typed line, it showed no working indicator, and **`orientation()` reported a
+perfectly reasonable status the entire time** — because a status is what a seat
+last *said*, not what it is *doing*. The only other signal was ctx frozen at an
+identical value across two ticks, which means something **only when work is
+owed**.
+
+| pane state | meaning | repair |
+|---|---|---|
+| working indicator | running | **stand down** |
+| empty composer, idle | wedged, nothing queued | `-l "<text>"` + separate `Enter` |
+| **composer HOLDS TEXT, not working** | **never submitted** | **below — and a bare `Enter` will NOT do it** |
+
+**`tmux send-keys -t moot-<role> Enter` ALONE DOES NOT SUBMIT AN ALREADY-TYPED
+LINE.** Tried first and confirmed by `capture-pane` immediately after: the
+composer still showed the identical text, unchanged (`runtime-leader`,
+`evt_5e67ns94zkz50`). **What works is the ordinary two-call sequence, re-typing
+the text the composer is already holding:**
+
+```sh
+tmux send-keys -t moot-<role> -l "<the same text the composer already shows>"
+tmux send-keys -t moot-<role> Enter          # separate call
+```
+
+Confirmed by the pane flipping to a working indicator with an empty composer.
+**Unmeasured guess, recorded as a guess:** a fresh keystroke event before `Enter`
+is what registers, where a bare `Enter` replays into an already-settled buffer.
+
+> **Do not read the short form as "no local repair exists."** *"`send-keys` Enter
+> does not submit"* is true of a **bare** `Enter` and is **not** a claim that the
+> pane cannot be roused. Believing the blanket version costs a mention
+> round-trip on every stall — and rousing a worker directly is a last resort
+> (see the top of this file), so prefer routing the wake through its leader and
+> use this when the leader is also down or the work is time-critical.
 
 ## Verify pickup after every kickoff or handoff
 
