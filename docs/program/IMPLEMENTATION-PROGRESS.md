@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-17 05:35:33Z — from 654 issue file(s) in `docs/program/issues/`.
+2026-09-17 05:44:02Z — from 655 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -57,7 +57,8 @@ the committed file matches the generator's output.
 | `ABI-S4` | statx-shaped metadata with field-availability bits | draft | runtime | M | none | — |
 | `ABI-S5` | terminal basics and process signal disposition at the executable edge | draft | runtime | M | none | — |
 | `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` | Port the checked-IH post-call consumer machinery that main never grew, so ABI-S6-HS18 increment A can compile: one type family (CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep) plus three accessors on existing types (StaticTransitionPlan::checked_ih_generated_context_result_contract, StaticTransitionPlan::static_response_forwarded_result_identity, Lowering::checked_post_call_consumer_frame). Increment A holds the call sites and none of the definitions, so it cannot build without this. FIRST DELIVERABLE IS THE TRANSITIVE CENSUS, NOT THE PORT -- whether the consumer machinery itself calls anything else that is absent from main is UNMEASURED, and finding a fourth population after the port is the failure this node exists to prevent. | active | runtime | M | none | — |
-| `ABI-S6-HS18-MAIN-BASED-CLOSURE` | Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation. | ready | runtime | L | none | — |
+| `ABI-S6-HS18-D5B-SUBSTRATE-PORT` | Port the D5b prefix's PRODUCTION residue onto main so ABI-S6-HS18-MAIN-BASED-CLOSURE increment A has a substrate to stand on. Increment A was decomposed as a diff between two points on the preserved line, which measures what it ADDED to the checkpoint rather than what it NEEDS on main; the four prefix commits below it never landed. Scope is the ~117-item prefix-minus-main gap NARROWED to its production cluster (generated-context-result authority, checked-IH post-call/detached, recursive-position calls, source dynamic match, the absent acceptance test), not the raw +10472/-5307. Excludes the refused MappingAcquireFile arm BY CONSTRUCTION -- it is RT-D5B-MAPPING-AVAILABILITY-FLIP's, deliberately held. | ready | runtime | L | none | — |
+| `ABI-S6-HS18-MAIN-BASED-CLOSURE` | Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation. | draft | runtime | L | none | — |
 | `ABI-S6` | ordinary anonymous and file-backed mappings as opaque runtime-owned regions and bounded byte views | active | runtime | L | none | — |
 | `BUDGET-EFF` | TransferCount.remaining must be bounded by the effective request | merged | verify | M | none | — |
 | `BUDGET-EXHAUST` | transfer-budget bound checks are fail-open on variant extension | merged | verify | S | none | — |
@@ -698,6 +699,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `ABI-S6-HS18-D5B-SUBSTRATE-PORT` — Port the D5b prefix's PRODUCTION residue onto main so ABI-S6-HS18-MAIN-BASED-CLOSURE increment A has a substrate to stand on. Increment A was decomposed as a diff between two points on the preserved line, which measures what it ADDED to the checkpoint rather than what it NEEDS on main; the four prefix commits below it never landed. Scope is the ~117-item prefix-minus-main gap NARROWED to its production cluster (generated-context-result authority, checked-IH post-call/detached, recursive-position calls, source dynamic match, the absent acceptance test), not the raw +10472/-5307. Excludes the refused MappingAcquireFile arm BY CONSTRUCTION -- it is RT-D5B-MAPPING-AVAILABILITY-FLIP's, deliberately held.
 - `CI-MAIN-RUNS-CANCEL-EACH-OTHER` — Every push to main shares one concurrency group with cancel-in-progress, so each merge kills the CI still running for the previous merge; post-merge runs on main are a record of a specific tree, not a superseded attempt at the same one, and the fix is to stop cancelling them
 - `CI-WRITE-PARTITION-JOB-COMMENT-STALE` — ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
@@ -738,6 +740,7 @@ Items not yet `merged`/`closed` whose `depends_on` names an id that
 is itself not yet `merged`/`closed`:
 
 - `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` (status: active)
+- `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: active)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `LANG-STANDARD-INFIX-CALL-COMPLETION` (status: draft)
