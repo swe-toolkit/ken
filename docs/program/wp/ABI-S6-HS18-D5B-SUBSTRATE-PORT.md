@@ -109,7 +109,8 @@ at `:2812`, falls through `match operation` at `:3076`, and hits
 
 ⇒ **Exclude whole files rather than hand-separating hunks WHEREVER THE ONLY
 BOUNDARY AVAILABLE IS YOUR JUDGEMENT**, as the node mandates for site 5. **That
-is the rule's reason and its limit — see `§1b`, where a compiler-drawn boundary
+is the rule's reason and its limit — see the `effect_v1.rs` split below, where
+a compiler-drawn boundary
 licenses a split and whole-file exclusion would have broken the build.**
 **Treat six as a floor and close it with the
 parent's `AC-PREDICATE` — zero diff lines naming the operation at pathspec
@@ -118,7 +119,7 @@ site list.** Measured: Region 2's 13 files carry 17 such lines; the 10 files
 that remain after excluding the catalog, `lowering/effects.rs` and
 `st/effects.rs` carry **zero**.
 
-**1b. `ken-host/src/effect_v1.rs` IS SPLIT, and whole-file exclusion is
+**THE `ken-host/src/effect_v1.rs` SPLIT, and why whole-file exclusion is
 REFUSED.** Ruled by the Architect (`evt_2jzjsj3nhn2qm`), Steward-verified at
 `origin/main` and `30d35f625`:
 
@@ -212,6 +213,75 @@ the reason: *"TAKE THE PREDICATE, NOT THE COUNT. Every enumeration of this has
 been short."* It was enumerated twice there and came up short both times. **A
 list cannot report being incomplete.**
 
+## 3a. THE RECUT, 2026-09-17: ACCEPTANCE EVIDENCE IS A PROPERTY OF THE TREE
+
+**Authored by the Steward on the Architect's named predicate**
+(`evt_5htrzz3p2f6pb`), discharging `§11`'s predicate check at row 12. Per
+`steward/escalation.md`, a named predicate is the Architect saying the
+**representation** is the defect, and the recut is the Steward's to author.
+**It is small by construction: it changes what `§4` spends effort on and how
+`§6` is phrased. It does not change the mechanism, the region split, the
+six-site exclusion, or anything already proved.**
+
+### The predicate the twelve rows share
+
+The twelve entries are not twelve findings. Read by **what the instrument's
+UNIT was**, they are one finding re-derived at four strengths:
+
+| rung | the question | rows | what can answer it |
+|---|---|---|---|
+| name | does the item exist | 4 | the census |
+| shape | what KIND of thing is it | 5-8, 10 | reading |
+| reachability | is it visible to a consumer | 11 | a CONSUMER'S BUILD |
+| compilability | do its dependencies resolve | 12 | the RESULT compiling |
+
+> **ITEM-COMPLETENESS DOES NOT IMPLY TREE-EQUIVALENCE.** The port's obligation
+> is stated over a SET OF ITEMS; every property that has actually failed is a
+> property of the RESULTING TREE. An item-keyed instrument cannot see any of
+> them, by construction — and widening it (the seed of 5 closing to 29) makes it
+> **complete without re-aiming it**.
+
+**The predicate is UNRETIRED, not new**, and that is the part worth carrying. It
+is the one already ruled against the grant — *"membership in a plan is not
+evidence of native availability"* — generalised: **membership in the port's item
+list is not evidence that the item works in the tree.** Ruled once, then
+re-derived one property at a time across four hard stops.
+
+### The closure, phrased so a reviewer can run it
+
+> **A port's ACCEPTANCE EVIDENCE must be a property of the resulting tree. An
+> item census is a WORK PLAN and carries no evidential weight.**
+
+⇒ **Derive the list FROM the tree property; never validate the tree property
+against the list.** The candidate's 18 compiler errors naming Region 3 items is
+the closure already working by accident — a compiler-generated worklist is a
+tree property that yields the enumeration as a by-product.
+
+**What this does NOT say.** Not that the census was wasted: you cannot port
+without knowing what to move. **The list is needed to ACT; the defect is using
+it as EVIDENCE.** Two jobs, one artifact, and the chain has been running both.
+
+### What the recut RETAINS, REPLACES, and does NOT freeze
+
+**RETAINS — everything already proved.** A named predicate is not a licence to
+restart. The three regions (`§2b`), the ~117-item extent (`§2c`), the six-site
+grant exclusion (`§2e`), `§3`'s reaching-consumer predicate, and the candidate's
+closed default-config compile gate all stand unchanged.
+
+**REPLACES — only the evidential standing of the item list.** `§4`'s D0-2 and
+`§6`'s AC-5 are re-aimed below. **No AC is added and none is removed** — the
+Architect's reading is that the defect was never a missing AC.
+
+**DOES NOT FREEZE THE CHAIN COUNT — a departure from the recut shape in
+`steward/escalation.md`, stated rather than done silently.** That shape says
+*"freeze the old chain's count and open a fresh one"*, and its reason is that a
+changed representation of the **work** makes the old stops count against
+something superseded. **Here the predicate names the representation of the
+EVIDENCE; the mechanism chain is unchanged and continues.** The count is also
+not the Steward's to move: `escalation.md` duty 1 is explicit that the Architect
+holds it alone and *"their own record stands."* Theirs reads `§1a` 16, delta 0,
+predicate check discharged at row 12, next check at row 15.
+
 ## 4. D0 — answer before writing production. A hard stop here is a GOOD outcome.
 
 **D0-1. Does Region 2 actually replay onto `main`?** `§2b` says `main` sits at
@@ -220,11 +290,20 @@ is a different act from matching a blob. Apply and report, per file. **If some
 subset does not replay cleanly, say which and stop**; that converts Region 2
 into Region 3 and is a re-scope for the Steward, not something to force.
 
-**D0-2. For Region 3, is reconciliation bounded per file?** Twelve of sixteen
-are fully subsumed, so the real question is the four that are not. **Name, per
-file, whether `main`'s independent version SUBSUMES the prefix's behaviour or
-DIVERGES from it.** Subsumption is the favourable answer and makes those files
-no-ops.
+**D0-2. For Region 3, is reconciliation bounded per file? RE-AIMED BY `§3a` —
+do NOT pre-clear files by reading.** The original phrasing asked for a per-file
+subsumes-or-diverges verdict established **before** the tree exists. That is the
+rung the predicate names: rows 5-8 and 10 are all shape changes a reading
+audit was supposed to catch and **found only after** they had been read past
+once. **Twelve of sixteen "fully subsumed" is an item-list claim and carries no
+evidential weight.**
+
+⇒ **Apply, build, and let the compiler produce the divergence worklist.** The
+bound you report is the one the tree gives you — errors naming Region 3 items,
+counted and named, driven to zero. **A count that GROWS mid-run is the method
+working**, exactly as AC-1 already says. Reading stays in scope for
+**interpreting** a red the build raised; it is no longer the instrument that
+clears a file.
 
 **D0-3. Does the checked-IH cluster collide with
 [[RT-D5B-POSTCALL-REFUSAL-MECHANISM]]?** That node is `ready` and its subject
@@ -332,10 +411,19 @@ the effect trace — **that is NOT predicted by the exclusion and IS a finding.*
 **Quote which assertion failed, never only the test name.** Same discipline as
 the `CheckedIhDetachedCallerCut` reds: name the emitting site, not the symptom.
 
-**AC-5 — the excluded instruments are NAMED.** `§3`'s predicate produces
-exclusions; list them with the reason each failed the reaching-consumer test.
-**An exclusion you can name is reviewable; a silent one is indistinguishable
-from an oversight.**
+**AC-5 — the excluded instruments are NAMED, and the list is DERIVED FROM THE
+BUILD.** `§3`'s predicate produces exclusions; list them with the reason each
+failed the reaching-consumer test. **An exclusion you can name is reviewable; a
+silent one is indistinguishable from an oversight.**
+
+**RE-PHRASED BY `§3a`: the satisfying act is a tree property, not an authored
+list.** "Has a reaching consumer" is a **compile** question, so the answer comes
+from the compiler and the list is its by-product — never an enumeration written
+first and then checked. The candidate already ran it this way: *"`§3`'s predicate
+answered by the compiler: 33 instruments have reaching consumers."* **Report
+which build configuration produced the answer**, since an instrument reachable
+only under `px8-ds-test-support` is a different fact from one reachable in the
+default config, and the two configs have already disagreed on this node.
 
 **AC-6 — `trusted_base()` delta is ZERO.** No kernel change is in scope.
 
@@ -370,28 +458,104 @@ gets answered.
   (`10e75cb93656d5ea787bceaf754b2500b78de166`); the worked precedent for extent
   and review on this exact surface.
 
-## 11. Symptom inventory
+## 11. Symptom inventory — CONTINUES `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` `§1b`
 
-**Armed by the Steward 2026-09-17, after the Architect correctly reported that
-this WP had none** (`evt_yg6f1x2cpwez`). The omission was the Steward's: per
-`steward/escalation.md`, arming this line is the Steward's act and *"an unarmed
+**Armed by the Steward 2026-09-17** after the Architect reported this WP had
+none (`evt_yg6f1x2cpwez`). The omission was the Steward's: per
+`steward/escalation.md` arming this line is the Steward's act and *"an unarmed
 trigger is not a trigger."* The Architect appends entries and owns the predicate
 check.
 
+**THIS WP CONTINUES THE PREDECESSOR'S CHAIN, so entries do NOT restart at 1.**
+Same HS18 chain, same immediate predecessor, and the same node model — a port
+from an unlanded prefix onto `main`, scoped by what is missing (Architect
+`evt_73ynk31tang40`). The campaign-level inventory in
+`docs/program/issues/ABI-S6.md` sits **above** both and stays where it is;
+folding a WP-level chain into it would lose the level the predicate is about.
+
+> **AUTHORITATIVE COPY OF ROWS 1-11: the predecessor's `§1b`.** Reproduced below
+> in one-line form so the predicate check can run against an assembled list.
+> **Amend a row THERE, never here** — two mutable copies of an append-only
+> record is how the record stops being one.
+
+**THREE PEOPLE GUESSED THIS NUMBER AND ONLY THE FILE SETTLED IT.** The Architect
+wrote *"5"* (carried from context, withdrawn by them); the Steward wrote *"1"*
+(no record found, and I had not read the predecessor); **the file says 12.**
+Wrong in opposite directions, which is what a number nobody resolved against a
+file looks like. **Take the number from the file.**
+
+### The predicate this WP's entries are tested against
+
+The predecessor's predicate, **already WIDENED once** (Architect
+`evt_2qqye3tdnh4b1`, at row 11) from two shapes to three:
+
+| shape | what the census sees | what it misses |
+|---|---|---|
+| ABSENT from `main` | its subject | — |
+| PRESENT on `main` and CHANGING | the name is there, so unreported | the shape change (rows 5-8, 10) |
+| PRESENT at the port and UNREACHABLE | every census PASSES them | the module edge (row 11) |
+
+### Assembled rows
+
 ```text
 SYMPTOM INVENTORY (Architect appends one line per hard-stop; never rewritten)
-NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
+PREDICATE CHECK: 12th DISCHARGED 2026-09-17 -> NEXT = 15th, then 18th, ...
 
-1. a file holding BOTH grant content and an instrument the replayed region
-   imports -- keyed on COMPILE DEPENDENCY crossing the exclusion boundary,
-   not on what the lines mean          (ken-host/src/effect_v1.rs, evt_2jzjsj3nhn2qm)
+  1-3  NO DURABLE RECORD ANYWHERE -- see the gap note below
+
+  4    seed of 5 closes to 29 items                 D0 census
+  5    RequiredConsumerProjection resident on main and RESHAPING   read, not census
+  6    Copy DROPPED from the same derive; Ord/PartialOrd added     read, not census
+  7    three accessors go TOTAL -> PARTIAL, signatures unchanged   read, not census
+  8    ten variants behind a dev-dependency feature invisible to
+       every permitted local build                                 manifest read
+  9    a 26th host-effect consumer (HostOpV1::MappingAcquireFile),
+       ROUTED OUT; recorded because the inventory records what the
+       model failed to predict                                     D0b
+ 10    a second Copy drop, EliminatorRole                          D0b -- first row
+                                                                   found by an instrument
+ 11    four types PRESENT at the port but UNREACHABLE from
+       lowering; refused at the MODULE EDGE                        increment A's BUILD
+ -- entries below are THIS WP's --
+ 12    a file holding BOTH grant content and an instrument the
+       replayed region imports -- keyed on COMPILE DEPENDENCY
+       crossing the exclusion boundary, not on what the lines mean
+       (ken-host/src/effect_v1.rs)                                 evt_2jzjsj3nhn2qm
 ```
 
-**THE NUMBERING RESTARTS HERE, AT 1.** The Architect first wrote this entry as
-*"5."* and then withdrew the number themselves, because there is no durable
-record of entries 1-4 **on this WP** — the count was carried from context.
-**A number a reader cannot resolve against this file is not a record.** If this
-inventory is meant to continue a predecessor WP's, name that WP and its entries
-here; otherwise 1 is correct and the predicate check falls at the 3rd entry
-appended below.
+### The check at row 12: ANSWERED AND DISCHARGED
+
+**Architect `evt_5htrzz3p2f6pb`, 2026-09-17. YES, the rows share a predicate.**
+The answer and its closure are in `§3a`; the recut off it is authored there and
+is the Steward's, per `steward/escalation.md`. **`§3a` is the operative text —
+this section records that the check ran, not what it decided.**
+
+**A candidate was offered first and WITHDRAWN BY ITS AUTHOR**, and the
+withdrawal is kept because a discharged check should show what it ruled out:
+
+> *withdrawn:* the node's model is a SET and every surprise has been an EDGE.
+
+It failed on its own evidence. **Rows 5-8 and 10 are not edges at all** — they
+are shape changes on a single resident item (`Copy` dropped, struct becoming
+enum, accessors going total to partial), which is the majority of the list the
+candidate claimed to explain. It was generalised from the three rows its author
+had personally produced. **The surviving predicate covers all nine rows read.**
+
+**SCOPE OF THE ANSWER: nine of twelve rows.** The Architect read rows 4-12 and
+the widened three-shape table; **rows 1-3 they have not read, and neither has
+anyone else — there is no copy to read.** They asked to be checked against them.
+
+> **THE GAP IS THE SEED, AND IT IS THE STEWARD'S.** Rows 1-3 have never had a
+> durable home. The predecessor's `§1b` stubs them exactly as this section did —
+> *"the first three, from `thr_6azxdz555c2qy`"* — so **both copies of the record
+> are a citation pointing at a thread**, and the Steward wrote the first of them
+> at seeding on 2026-09-16. The predecessor's own opening line says why that
+> fails: *"the running count lived only in one seat's working context — which is
+> exactly what a compaction discards."* **The section's first row broke the
+> section's own rule, at the moment it was armed.**
+>
+> ⇒ **A row whose content is a pointer is not a row.** Reproduce the entry, or
+> record that it is lost. Asked of `runtime-implementer`, who appended them; if
+> they cannot be reproduced, they are struck and the count is re-based with that
+> said out loud rather than left as three silent placeholders.
 
