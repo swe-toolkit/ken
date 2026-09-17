@@ -12,10 +12,23 @@ on:
   push:
     branches: [main]
 
-# Cancel superseded runs on the same PR/ref so rapid pushes don't pile up CI
+# Cancel superseded runs on the same PR so rapid pushes don't pile up CI
 # (matters even though public-repo Actions minutes are free — it shortens queues).
+#
+# The push arm keys on `github.sha`, NOT `github.ref`. On a push to `main` the
+# PR-number operand is empty, so `github.ref` made the group the CONSTANT
+# `ci-CI-refs/heads/main` and `cancel-in-progress` then killed each main push's
+# jobs as soon as the next one landed. Measured 2026-09-17: 9a1b8247 ran
+# native-slow 8/8 SUCCESS, while f4229a16 and dcb848ea show 7-8 CANCELLED.
+# Those measurements were DESTROYED, not failed — and a cancelled required
+# check reads as a red nobody can attribute.
+#
+# Keying the push arm per-SHA is PR-neutral by construction: on a
+# `pull_request` event the left operand is always set, so `||` short-circuits
+# and this operand is never evaluated. The cost is that a superseded main push
+# is no longer cancelled, which is the point — each commit's gate completes.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
