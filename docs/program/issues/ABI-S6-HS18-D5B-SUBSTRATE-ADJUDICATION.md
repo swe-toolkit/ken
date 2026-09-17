@@ -79,9 +79,19 @@ the branch-based run still puts methods here; against `main`, both extractors
 report zero.
 
 **ADJUDICATE falls several-fold while OWED and ABSENT rise by roughly half.**
-This node shrinks; the predecessor grows. **Both extractors agree on every
-direction and on no absolute value** — with `origin/main` as the third tree
-their AGREE totals are 2064 and 2601. No number here is a target.
+This node shrinks; the predecessor grows. No number here is a target.
+
+A **third** extractor, the implementer's committed `cd17424e7`, first read
+ADJUDICATE **157**. Run down rather than absorbed: its classifier asked *"differs
+from base on both sides"*, which is **vacuously true on both sides when the
+method is new and there is no base** — 130 of the 157 had no base and **120 of
+those had byte-identical source and main bodies.** Correcting that one branch
+gives **37** (31 production, 6 test) with every other bucket unmoved, which is
+the Steward's 32 plus the byte-exact/normalised difference the implementer had
+already measured. See the predecessor's `AC-1c`: **neither named control could
+reach the broken branch**, because main-equals-base makes "absent from base" and
+"absent from the third tree" the same condition, routing those keys to ABSENT
+before the classification runs.
 
 # A `#[test]` row is a different adjudication, and its wrong answer is silent
 

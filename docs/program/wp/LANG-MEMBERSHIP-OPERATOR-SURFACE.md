@@ -172,20 +172,66 @@ relying on the third bullet; do not take it from the banner.
 
 ## 4. D0 — answer before writing production
 
-**D0-1. Does A1's landed role vocabulary have a slot for `∈`, or does this node
-add one?** A1's `D1a` is a **closed, compiler-owned** enumeration that names
-`∧ ∨ ≤ ≥ ≠` *"and `∈` when the B track lands"*. **Read what actually landed.**
-If the slot is present, this node fills it; if A1 closed the enum without it,
-adding a variant to a closed vocabulary is a change to A1's contract and comes
-back to the Steward. **Do not widen it silently.**
+> **D0-1 AND D0-2 ARE ANSWERED — Architect, 2026-09-17, `evt_4d6jab0wj9mjb`
+> then `evt_xx1v1qvksqke`, which REVERSES the first on D0-1. The reversal is
+> the operative ruling.** Both were raised while A1 was still open, on the
+> ground that they are cheap now and expensive afterwards; both were ruled
+> without a hard stop to A1's `§1a` chain. **They are recorded as answers, not
+> as questions to re-ask.** Each leaves one item this node must still *do*.
 
-**D0-2. Does `∈` satisfy A1's `D1c` SHAPE CONTRACT as written?** `D1c` errors
-when a role is *present but the binding has the wrong shape*, and it takes each
-role's signature from `33 §6.1`. **`∈`'s signature is in `§6.3`, not `§6.1`, and
-it is the only one of the six whose parameter type is a PROJECTION
-(`q : d.Query`).** If `D1c`'s shape check cannot express a projected parameter
-type, that is a genuine gap and it is A1's surface, not this node's to work
-around. **Name it and stop.**
+**D0-1. ANSWERED: A1's role vocabulary closes at FIVE, and `∈` arrives with its
+binding. This node adds the variant.** Not a gap and not a change to A1's
+contract.
+
+**A1's fixities attach to the `GlobalId`s its layer 3 certifies.** `∈` has no
+binding, so no `GlobalId`, so **A1 could not install its fixity even if its
+vocabulary named it.** A1 ships five roles and five fixities, coherently;
+`§6.1`'s table names six glyph-fixity pairs and A1 realises the five whose
+bindings exist. **A variant with no binding, no required-role entry and no
+completion path is a dead arm, and a dead arm reads as coverage to every later
+reader** — so the sixth arrives here, entering the **vocabulary** and the
+**required list** as two separate acts.
+
+**The Steward's premise for raising this was wrong and is struck:** *"B must
+widen a closed enum, which is a change to A1's contract"* assumed a `pub` enum.
+Crate-internal, widening is an **ordinary edit inside `ken-elaborator`**, and
+`COORDINATION §7`'s exhaustive-by-construction rule turns it into a
+**compiler-generated checklist handed to this node**, not a tax it pays.
+
+> **THE ONE CONDITION, AND THIS NODE IS THE PARTY THAT PAYS IF IT FAILED —
+> so VERIFY it at D0 rather than assuming it.** *"Crate-internal has to be a
+> property you HOLD, not one you state"* (Architect). If A1's role type leaks
+> through any `pub` signature in layers 1 or 3 — a `pub fn` taking or returning
+> it, a `pub` field, a re-export — the property **evaporates silently**, and
+> **this node is where it would be discovered, at widening time.** Check A1's
+> landed surface for such a leak **before** widening. A leak is A1's defect and
+> a hard stop back to the Steward, not something to work around here.
+
+**D0-2. ANSWERED: `∈` satisfies `D1c`, because `D1c`'s shape contract is
+specified over the ELABORATED TELESCOPE WITH BACK-REFERENCES, not as a signature
+template.** Ruled deliberately, in those terms.
+
+**And the contract is forced by `≤` before `∈` is mentioned at all** — the
+stronger form, measured by the language implementer rather than argued from
+prose:
+
+    ord_leq_at : Π Type 0. (Π (g641 @0). (Π @1. (Π @2. Dg3)))
+
+**Three of four domains are de Bruijn references to earlier binders**, so a flat
+signature match was never sufficient for the five either. A domain `d.Query` is
+a **projection** Term over `@k`; a domain `Ord a` is an **application** Term over
+`@k`; both are Terms carrying a back-reference, and `33 §6.3` asserts these are
+the same kind of dependency at the level the contract operates on — *"ordinary
+dependency exactly like `(a : Type) (x : a)`"*. **There is no non-dependent
+version of `D1c` anyone could accidentally build.**
+
+> **WHAT REMAINS IS A MEASUREMENT, NOT A RULING, and it is this node's to make.**
+> Whether `d.Query` is **representable at the point the check runs**. `32 §2`'s
+> `tproj` landed with [[LANG-TYPE-PROJECTION-SURFACE-FORM]] (`294cb5e28`) and
+> `§6.3` records that the telescope never changed and only the spelling was
+> missing — so the machinery is **plausibly** already there. **Measure it; do
+> not assume it from the ruling.** If it is not representable at that point, the
+> gap is A1's surface: **name it and stop**, unchanged.
 
 **D0-3. Is the `Ordered` evidence for the relation-edge view constructible in
 catalog today?** `58b §3` requires *"evidence every stored successor tree is
@@ -229,6 +275,15 @@ They are listed so the gap is visible rather than discovered:
 
 **Nothing else in this frame waits on A1.** `§3` is entirely landed-spec.
 
+**Endorsed, Architect 2026-09-17 (`evt_4d6jab0wj9mjb`): pinning these at release
+rather than at framing is *"the difference between a frame and a guess"*** — A1
+took three amendments in one day, each moving where an identity lives or how the
+elaborator acquires it. **The facade's path is left free deliberately**, not
+pending: a self-declaring home would move it without touching any layer. Layer 2
+has landed at `48662cbdc`; layers 1 and 3 are being built now, with `AC-9`'s
+role-present-wrong-shape case first so the contract cannot quietly degrade into
+a presence test.
+
 ## 6. Acceptance
 
 **AC-1 — `q ∈ c` elaborates to `membership_member_at` for all three views, and
@@ -265,13 +320,23 @@ behavioural.** Per `§3e` this cannot be shown by any behavioural test, so:
 
     (a) membership_member_at resolves to a CATALOG GlobalId at the use site --
         name it, from the elaborated form, not from the source text.
-    (b) REMOVING the catalog binding makes `q ∈ c` FAIL. If it still
+    (b) REMOVING the catalog binding makes the REQUIRED-ROLES CHECK HARD-ERROR,
+        NAMING THE UNFILLED ROLE, so `q ∈ c` cannot elaborate. If it still
         elaborates, there is a builtin path and this AC is refuted.
     (c) the elaborator carries NO membership-specific lowering -- `∈` reaches
         the same D1 completion path as the other five roles.
 
 **(b) is the load-bearing one and its evidence must be manufactured.** A green
 suite is consistent with both a correct binding and a builtin shadowing it.
+
+**It must fail AT THE REQUIRED-ROLES CHECK, naming the role — not merely fail.**
+Architect, 2026-09-17 (`evt_4d6jab0wj9mjb`): under the three-layer ruling the
+compiler owns **roles, never meanings**, and acquisition runs through the
+catalog's own re-export, so **`AC-5` is discharged structurally by layer 3 and
+that is on the record now rather than argued at review.** A bare "it stopped
+compiling" is the weaker observation and does not distinguish a structural
+discharge from an incidental resolution failure — *"the mechanism has to make it
+unrepresentable rather than merely untested."*
 
 **AC-6 — missing/ambiguous provider is an ORDINARY instance error at the
 occurrence.** Per `§3d`/`39 §6.7`. Three cases, each with its diagnostic quoted:

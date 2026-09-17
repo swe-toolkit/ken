@@ -26,6 +26,28 @@ origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with t
 > `§5a` lists the four items that are deliberately left unpinned because they
 > are A1's landed shape, and the Steward pins them at release.
 >
+> **THE FRAME'S TWO INTERFACE QUESTIONS ARE ANSWERED, 2026-09-17, and they are
+> answers rather than open D0s.** Raised to the language ring while A1 was still
+> open, on the ground that they are cheap now and expensive afterwards; both
+> ruled with no hard stop to A1's `§1a` chain.
+>
+> - **`D0-1` — A1's role vocabulary closes at FIVE; `∈` arrives with its
+>   binding, and this node adds the variant.** Architect `evt_xx1v1qvksqke`,
+>   **reversing** `evt_4d6jab0wj9mjb`. A1's fixities attach to the `GlobalId`s
+>   its layer 3 certifies, so `∈` — having no binding — could not carry a fixity
+>   in A1 either. **The Steward's premise for raising it was wrong and is
+>   struck:** widening is crate-internal, an ordinary edit, and `COORDINATION §7`
+>   makes it a compiler-generated checklist handed to this node. **One condition
+>   this node must VERIFY at D0, because this node is where a failure surfaces:**
+>   A1's role type must not leak through any `pub` signature.
+> - **`D0-2` — `∈` satisfies `D1c`, whose shape contract is specified over the
+>   ELABORATED TELESCOPE with back-references.** Ruled `evt_4d6jab0wj9mjb`,
+>   confirmed `evt_xx1v1qvksqke` on the implementer's stronger measurement:
+>   `ord_leq_at` already has three of four domains as de Bruijn references, so
+>   **the contract is forced by `≤` before `∈` is mentioned.** What remains is a
+>   **measurement** this node makes — whether `d.Query` is representable at the
+>   point the check runs. Not representable ⇒ name it and stop.
+>
 > **DO NOT re-frame against A1's working tree.** A1 took three amendments on
 > 2026-09-17 alone (FI-2a, FI-2b, FI-5), each moving where an identity lives or
 > how the elaborator acquires it. A frame written against a surface that moved

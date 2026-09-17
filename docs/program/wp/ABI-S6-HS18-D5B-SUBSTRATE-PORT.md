@@ -642,12 +642,40 @@ bare `except`, `unique demands=0` on an empty set, and the item predicate
 agreeing about a manifest with nothing to count. **A green AC-1 with no base
 reading beside it is not evidence.**
 
+**AC-1c — THE CLASSIFIER MUST DECIDE THE NO-BASE CASE BY COMPARING SOURCE
+AGAINST MAIN, AND BOTH CONTROLS MUST BE SHOWN TO REACH IT.** A method **new in
+both trees has no base to have moved from**, so a classifier phrased as *"differs
+from base on both sides"* answers **true on both sides vacuously** and routes
+every such row to ADJUDICATE without ever comparing the two bodies. Measured
+2026-09-17 on the implementer's committed instrument (`cd17424e7`): of its 157
+ADJUDICATE rows, **130 had no base, and 120 of those had byte-identical source
+and main bodies** — nothing to decide. Comparing source against main directly
+when base is absent, and changing nothing else, gives **ADJUDICATE 37** with
+OWED, ABSENT, MAIN'S and the population unmoved.
+
+> **NEITHER NAMED CONTROL CAN REACH THAT BRANCH, and the reason generalises.**
+> `units.rs` and the third-tree-equals-base positive control are both defined by
+> *main and base agreeing*, which makes **"absent from base" and "absent from the
+> third tree" the same condition** — so a no-base key is routed to ABSENT and
+> `continue`s **before the classification chain runs at all**. Both controls pass,
+> correctly, and prove nothing about the path that was wrong.
+>
+> ⇒ **A control has to be able to REACH the defect it is aimed at.** State, for
+> each control, which branch it exercises. Add a case with a method **present in
+> source and main but absent from base, with identical bodies**, asserting AGREE.
+
 **A COUNT THAT GROWS MID-RUN IS THE METHOD WORKING.** The parent's inventory
 was already short by one (`constructor_identity`). Report the number you
-observe; do not reconcile it against any number in this frame, including the
-Architect's census and the Steward's re-derivation — **different extractors
-produce different totals and neither is the contract.** The contract is *zero
-owed under YOUR extractor, with the base control beside it.*
+observe. **But a large gap against another extractor is a finding to run down,
+not an error bar to declare** — this frame said *"different extractors produce
+different totals and neither is the contract"*, and that sentence was used to
+carry a 5x ADJUDICATE gap that turned out to be a single defective branch. The
+extractors reconcile to within their own measured sensitivity once it is fixed
+(37 against 32, the remainder being byte-exact versus whitespace-normalised).
+The contract remains *zero owed under YOUR extractor, with the base control
+beside it* — and where your total diverges several-fold from another run of the
+same three trees, **partition your own bucket on the condition that distinguishes
+them before reporting either number as a size.**
 
 **AC-1a — the resulting tree builds, and increment A compiles against it.**
 `scripts/ken-cargo check -p ken-runtime --lib` exits 0, *"Checking ken-runtime"*
