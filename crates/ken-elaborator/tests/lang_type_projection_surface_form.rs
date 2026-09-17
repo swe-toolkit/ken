@@ -13,7 +13,7 @@
 //! loop does not admit, and it is why this node needed a named form at all.
 
 use ken_elaborator::{error::ElabError, ElabEnv};
-use ken_kernel::{GlobalEnv, GlobalId};
+use ken_kernel::{Decl, GlobalEnv, GlobalId, Term};
 use std::collections::BTreeSet;
 
 /// `58b §1`'s two-field shape with the specified UPPERCASE query field.
@@ -418,5 +418,228 @@ fn a_projection_in_a_data_declaration_is_refused_where_it_is_written() {
             );
         }
         other => panic!("a projection in a data telescope must be refused, located: {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------- AC-3 ------
+
+/// How a global is realised, in the one dimension the escape hatch would have
+/// to move it along.
+///
+/// `33 §6.1` requires every standard meaning to be an **ordinary top-level
+/// binding**, and `39 §6.9`'s completion policy keys on its `GlobalId`. An
+/// elaborator builtin has no such binding: it is registered as a kernel
+/// `Decl::Primitive` (or postulated as `Decl::Opaque`), which is precisely
+/// what has no body to unfold and nothing for the policy to key on.
+#[derive(Debug, PartialEq, Eq)]
+enum Realisation {
+    /// `Decl::Transparent` — a checked definition with a body. This is what
+    /// "ordinary top-level binding" means at the kernel.
+    OrdinaryTopLevelBinding,
+    /// Registered rather than defined: a builtin's shape.
+    PrimitiveOrPostulate,
+    Inductive,
+    Missing,
+}
+
+fn realisation_of(env: &GlobalEnv, id: GlobalId) -> Realisation {
+    match env.lookup(id) {
+        Some(Decl::Transparent { .. }) => Realisation::OrdinaryTopLevelBinding,
+        Some(Decl::Primitive { .. }) | Some(Decl::Opaque { .. }) => {
+            Realisation::PrimitiveOrPostulate
+        }
+        Some(Decl::Inductive(_)) => Realisation::Inductive,
+        None => Realisation::Missing,
+    }
+}
+
+/// Does this term mention a kernel projection anywhere?
+fn mentions_projection(term: &Term) -> bool {
+    match term {
+        Term::Proj1(_) | Term::Proj2(_) => true,
+        Term::Pi(domain, codomain) | Term::Sigma(domain, codomain) => {
+            mentions_projection(domain) || mentions_projection(codomain)
+        }
+        Term::Lam(domain, body) => mentions_projection(domain) || mentions_projection(body),
+        Term::App(f, a) => mentions_projection(f) || mentions_projection(a),
+        Term::Ascript(value, ty) => mentions_projection(value) || mentions_projection(ty),
+        _ => false,
+    }
+}
+
+/// **AC-3 — THE BUILTIN ESCAPE HATCH IS CLOSED, and this is the criterion the
+/// Architect said they cared about most.**
+///
+/// The hatch is to special-case the standard meaning in the elaborator instead
+/// of supplying the missing surface form. That would make every dependent test
+/// pass — **the observable behaviour is identical** — while falsifying the
+/// ordinary-top-level-binding premise `39 §6.9`'s completion policy rests on
+/// (`33 §6.1`, `SPEC-STANDARD-INFIX-BINDING §2f`). No test on the dependent
+/// node would catch it.
+///
+/// **So this is a measurement on HOW the bindings resolve, in the positive
+/// direction, not a grep for a builtin-shaped name coming back empty.** A
+/// criterion satisfied by *"I did not do that"* is satisfied by an implementer
+/// who did it without noticing.
+///
+/// Three arms, and the third is what makes the first two mean anything:
+///
+/// 1. each consumer binding realises as an **ordinary top-level binding**;
+/// 2. **the named positive control** — an ordinary `fn` with no projection
+///    anywhere in it — realises identically, so the predicate reports
+///    "ordinary" for something already known to be ordinary;
+/// 3. **the discriminator** — every one of `trusted_base()`'s members realises
+///    as `PrimitiveOrPostulate`. Without this the predicate could be constant
+///    and arms 1 and 2 would pass in a world where the hatch was taken.
+///
+/// The trusted-base arm keys on the **`Decl` shape**, never on trusted-base
+/// membership, so it is a claim about the environment rather than a
+/// restatement of how the set was built.
+#[test]
+fn ac3_the_consumer_bindings_resolve_as_ordinary_top_level_bindings_not_builtins() {
+    let mut env = env_with(UPPER_FIELD_CLASS);
+
+    // --- arm 3 first: the predicate can tell a builtin from a binding. -------
+    let trusted = env.env.trusted_base();
+    assert!(
+        !trusted.is_empty(),
+        "the discriminator is vacuous if the prelude declares no primitives"
+    );
+    let builtin_shaped = trusted.len();
+    for id in &trusted {
+        assert_eq!(
+            realisation_of(&env.env, *id),
+            Realisation::PrimitiveOrPostulate,
+            "trusted-base member {id:?} must NOT look like an ordinary binding, \
+             or this predicate cannot detect the escape hatch"
+        );
+    }
+
+    // --- arm 2: the named positive control. ---------------------------------
+    let control = elab(&mut env, "fn ordinary_control (x : Bool) : Bool = x")
+        .expect("the control binding must elaborate");
+    assert_eq!(
+        realisation_of(&env.env, control),
+        Realisation::OrdinaryTopLevelBinding,
+        "the predicate must report an ordinary binding as ordinary"
+    );
+    assert!(
+        !trusted.contains(&control),
+        "an ordinary binding is not in the trust base"
+    );
+    let control_ty = match env.env.lookup(control) {
+        Some(Decl::Transparent { ty, .. }) => ty.clone(),
+        other => panic!("control must be transparent: {other:?}"),
+    };
+    assert!(
+        !mentions_projection(&control_ty),
+        "the control must contain no projection, or it cannot contrast"
+    );
+
+    // --- arm 1: every consumer binding, each on the same footing. -----------
+    let bindings = [
+        (
+            "membership_member_at",
+            "fn membership_member_at (c : Type) (d : Sack c) (q : d.Query) (x : c) : Bool \
+             = d.member q x",
+        ),
+        (
+            "member_holds",
+            "fn member_holds (c : Type) (d : Sack c) (q : d.Query) (x : c) : Omega \
+             = Equal Bool (d.member q x) True",
+        ),
+        (
+            "same_members",
+            "fn same_members (c : Type) (d : Sack c) (x : c) (y : c) : Omega \
+             = (q : d.Query) -> Equal Bool (d.member q x) (d.member q y)",
+        ),
+    ];
+    for (name, source) in bindings {
+        let id =
+            elab(&mut env, source).unwrap_or_else(|e| panic!("`{name}` must elaborate: {e:?}"));
+        assert_eq!(
+            realisation_of(&env.env, id),
+            Realisation::OrdinaryTopLevelBinding,
+            "`{name}` must be an ordinary top-level binding, the same shape as the control"
+        );
+        assert!(
+            !env.env.trusted_base().contains(&id),
+            "`{name}` must not have entered the trust base"
+        );
+    }
+
+    // The trust base did not grow while three projection-typed bindings were
+    // added: no builtin was registered along the way.
+    assert_eq!(
+        env.env.trusted_base().len(),
+        builtin_shaped,
+        "elaborating the consumer bindings must register nothing new as a builtin"
+    );
+
+    // And the resolution really went THROUGH a projection: the first binding's
+    // elaborated type mentions a kernel projection, which the control's does
+    // not. A special-cased builtin would have no reason to carry one.
+    let member_at = elab(
+        &mut env,
+        "fn projection_reached (c : Type) (d : Sack c) (q : d.Query) : Bool = True",
+    )
+    .expect("must elaborate");
+    let ty = match env.env.lookup(member_at) {
+        Some(Decl::Transparent { ty, .. }) => ty.clone(),
+        other => panic!("must be transparent: {other:?}"),
+    };
+    assert!(
+        mentions_projection(&ty),
+        "the binding's own type must carry the kernel projection the surface form resolved to"
+    );
+}
+
+// ------------------------------------------- the chained fold path ----------
+
+/// `d.inner.Query` — a second segment, which folds the first back into an
+/// `Expr::EProj` before the outer `Type::TProj` is built. That fold is a
+/// distinct branch in the production and nothing else here reaches it.
+///
+/// It is not speculative generality: a class field holding another dictionary
+/// is an ordinary shape (`Applicative`'s `functor : Functor f` is one), so the
+/// chain is reachable from the class vocabulary that already exists.
+#[test]
+fn a_chained_projection_folds_left_and_resolves_through_both_fields() {
+    let mut env = ElabEnv::new().expect("prelude must elaborate");
+    env.elaborate_decl("class Inner A { Query : Type ; k : A }")
+        .expect("inner class must elaborate");
+    env.elaborate_decl("class Outer A { inner : Inner A ; j : A }")
+        .expect("outer class must elaborate");
+    assert!(
+        elab(
+            &mut env,
+            "fn chained (c : Type) (d : Outer c) (q : d.inner.Query) : Bool = True"
+        )
+        .is_ok(),
+        "a two-segment projection must resolve through both fields"
+    );
+}
+
+/// The chain's OUTER field is still looked up, and still refused where it is
+/// written — so the fold does not lose the span or silently accept.
+#[test]
+fn a_chained_projection_with_an_absent_outer_field_is_refused_at_the_chain() {
+    let mut env = ElabEnv::new().expect("prelude must elaborate");
+    env.elaborate_decl("class Inner A { Query : Type ; k : A }")
+        .expect("inner class must elaborate");
+    env.elaborate_decl("class Outer A { inner : Inner A ; j : A }")
+        .expect("outer class must elaborate");
+    let source = "fn chained_bad (c : Type) (d : Outer c) (q : d.inner.Nope) : Bool = True";
+    match elab(&mut env, source) {
+        Err(ElabError::UnresolvedCon { name, span }) => {
+            assert_eq!(name, "Nope");
+            let (start, end) = span_of(source, "d.inner.Nope");
+            assert_eq!(
+                (span.start, span.end),
+                (start, end),
+                "the span must cover the whole chain, head through final field"
+            );
+        }
+        other => panic!("an absent field on a chained projection must be refused: {other:?}"),
     }
 }
