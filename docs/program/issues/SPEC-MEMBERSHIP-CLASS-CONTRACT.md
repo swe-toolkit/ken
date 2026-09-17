@@ -12,8 +12,19 @@ tier: T1
 origin: "Steward cut 2026-09-13 on the operator directive (Pat, this session): 'Frame the L2 binop typeclass work to support membership ... a spec-enclave elaboration task after the frame.' This is the B track of the reserved-infix-glyph objective (Pat, 2026-09-12: 'membership seems categorically different since it involves some typeclass machinery not required by the others ... dig into typeclass dispatch for member'), which Pat set to run in PARALLEL with the A-track glyph fix. Grounded in the membership class/carrier Research advisory (research evt_10xwbzfz9vz77 + evt_62nsr14rm3zd0, thr_60s5rhqdh4ht8), itself recommended by the Architect (evt_5dar8wmwpxj8x). The Architect is the design authority for the class/carrier ruling and a required reviewer; that ruling is the first design step of the enclave elaboration. Advisory anchors were measured at main 5fb21c419; re-measure at the cut (main is now 5d1347aaf). IN-LANE, spec-enclave-owned: bounded normative surface, no new language/kernel mechanism (the dispatch reuses the existing dictionary-passing resolver that A1 factors), no new trust-root, no TCB -- same posture as SPEC-RESERVED-INFIX-NAMES / SPEC-STANDARD-INFIX-BINDING; no operator sign-off beyond the directive that authorized the work."
 ---
 
-> # ACTIVE — KICKED 2026-09-16, anchor `evt_72kh7zbht4pa2`. Frame:
-> `docs/program/wp/SPEC-MEMBERSHIP-CLASS-CONTRACT.md`.
+> # LANDED 2026-09-17. The deliverable is on `main`; this banner is history.
+>
+> **`spec/50-stdlib/58b-membership.md` §1-§5 and
+> `conformance/surface/operators/seed-membership-binding.md` are on `main`**,
+> landed by `a63eebe3e` / `a75a47010` from CV-approved candidate `9b9586dc0`.
+> The node read `status: active` for a day after that and **a Steward resume
+> kick was dispatched against it on 2026-09-17 in error** — caught by
+> `conformance-validator` and `spec-author`, who measured the object store
+> rather than the status line. **Nothing here is open. Do not re-author.**
+>
+> **Everything below is the kickoff banner as issued, retained because the
+> rulings it cites are still the authorities a reader needs** — with the two
+> clauses that went stale repaired in place rather than left to mislead.
 >
 > **The seat-contention hold is LIFTED.** @spec-leader ruled the enclave runs
 > one WP at a time (`evt_7crxbr742ddpm`), so [[SPEC-STANDARD-INFIX-BINDING]]
@@ -26,17 +37,34 @@ origin: "Steward cut 2026-09-13 on the operator directive (Pat, this session): '
 > retracted within the hour). **Author the completion policy normally**, keyed
 > on `membership_member_at`'s `GlobalId` in the `ord_leq_at` shape.
 >
-> **Three things the frame's top banner carries that change what you write:**
+> **`SameMembers` IS A STANDALONE DEFINITION, NOT A CLASS FIELD. The bullet
+> that said otherwise has been DELETED, not amended.** It cited
+> `evt_34fgmaq13mz07`, which was superseded the same day by the Architect's
+> Finding 3 on this very candidate (`evt_2wmeawkbqqv2x`), and it carried a
+> dangling pointer — it said *"Point 6 below"* when there are exactly five
+> numbered items. **Point 5 already states the correct reading** (the
+> observational quotient kept OUTSIDE the minimal two-field dictionary), and
+> `58b:143` on `main` agrees. So the bullet's authority was dead, its pointer
+> resolved to nothing, and its instruction contradicted both the item it
+> pointed at and the landed chapter. **Three independent defects, one deletion.**
+> Recorded here rather than silently dropped because a superseded ruling that
+> leaves no trace is how it gets restated as binding — which is exactly what the
+> Steward did with it on 2026-09-17.
 >
-> - **A paste-ready clause the contract MUST include:** the binding's surface
->   form needs a projection in type position, which `RType` does not have; that
->   is a prerequisite of [[LANG-TYPE-PROJECTION-SURFACE-FORM]] /
->   [[LANG-MEMBERSHIP-OPERATOR-SURFACE]], **and it must not be discharged by
->   making `∈` an elaborator builtin** — a builtin would falsify the premise
->   A-track's whole completion policy rests on, and no test here would catch it.
-> - **`SameMembers` must be stated as a CLASS FIELD**, not as a standalone over
->   a dictionary (`evt_34fgmaq13mz07`). Point 6 below writes it the unspellable
->   way. The fix is where the law lives, not what it says.
+> **Two things the frame's top banner carries that change what you write:**
+>
+> - **The projection prerequisite is DISCHARGED; the constraint attached to it
+>   is NOT.** This bullet read that the binding's surface form needs a
+>   projection in type position *"which `RType` does not have"*. That was true
+>   when written and is false since `294cb5e28`: `32 §2`'s `tproj` admits
+>   `d.Query` in type position, landed by [[LANG-TYPE-PROJECTION-SURFACE-FORM]]
+>   and specified by [[SPEC-TYPE-PROJECTION-SURFACE-NORMATIVE]]. **The telescope
+>   never changed — only its spelling was missing, and the spelling arrived.**
+>   What survives the discharge is the live half: **`∈` must not be made an
+>   elaborator builtin** — a builtin has no `GlobalId` to key on and would
+>   falsify the premise the A-track's whole completion policy rests on, for `∈`
+>   and by precedent for every operator after it. **No test in this node would
+>   catch that**, which is why it is stated here and not left to review.
 > - **The universe level is RULED, not open** (`evt_3krx0gyr74t5h`). The
 >   Architect routed it to the enclave (`evt_475nxrksyyxk9`) and the enclave had
 >   already answered: `Membership : Type ℓ → Type (suc ℓ)` is `33 §5.2`'s class
@@ -65,7 +93,10 @@ origin: "Steward cut 2026-09-13 on the operator directive (Pat, this session): '
 > rule, not a counterexample to it** — with `Query` as field 0, `d.Query` is
 > `Proj1(d)` and the telescope `[c : Type, d : Membership c, Proj1(d), c]` is
 > closed by the binding's own parameter `d`, hence kernel-checkable today. What
-> is missing is only **surface syntax**, and that lands on the build node. The
+> was missing was only **surface syntax**, and it has since LANDED
+> (`294cb5e28`) — this clause read *"is missing ... and that lands on the build
+> node"* when written, which was the third place in this file carrying the same
+> expired premise. The prediction was correct and is now discharged. The
 > `(type_id, field)` alternative **stays rejected on its original reason**: a
 > class field closes only once a dictionary is resolved, and resolution is what
 > completion is doing — circular.
