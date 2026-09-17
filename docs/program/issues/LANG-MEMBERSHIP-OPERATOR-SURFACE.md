@@ -12,21 +12,52 @@ tier: T1
 origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. RE-CUT AGAIN 2026-09-13 (Steward) on the operator directive (Pat, this session): the deferred split-(B) trigger has fired -- the typeclass-method-dispatch capability is now being cut for real demand (A1's factored resolver LANG-STANDARD-INFIX-CALL-COMPLETION + the SPEC-MEMBERSHIP-CLASS-CONTRACT contract), so this node is re-cut as the membership BUILD against them. Stays draft, HELD until its three deps land; then the Steward frames the full ACs and releases. See the 2026-09-13 banner."
 ---
 
-> # FOURTH DEPENDENCY ADDED 2026-09-16: [[LANG-TYPE-PROJECTION-SURFACE-FORM]].
-> # THIS NODE CANNOT WRITE ITS OWN SIGNATURES UNTIL THAT LANDS.
+> # FOURTH DEPENDENCY, ADDED 2026-09-16 AND **DISCHARGED 2026-09-17**:
+> # [[LANG-TYPE-PROJECTION-SURFACE-FORM]] IS ON `main`. THE SIGNATURES ARE NOW
+> # SPELLABLE, AND THE BLOCKING PREMISE BELOW IS RETAINED ONLY AS HISTORY.
 >
 > **Architect `evt_4tmt0n7era4w3`, ruling `SPEC-MEMBERSHIP-CLASS-CONTRACT`'s
 > D0-1.** The `∈` binding is `membership_member_at (c : Type) (d : Membership c)
 > (q : d.Query) (x : c) : Bool` — **a parameter typed by a projection from an
 > earlier parameter.** The kernel admits the telescope (`Proj1(d)` is closed by
-> `d`) and the spec contract specifies it, but **Ken's surface type grammar has
-> no projection form**: `RType` has eleven variants and none of them is a
-> projection (`RType::RProj`, 0 hits; control `RExpr::RProj`, 4 files —
-> Steward-verified at `24e9ce039`).
+> `d`) and the spec contract specifies it.
 >
-> **So the catalog bindings this node must author are currently UNSPELLABLE.**
-> The dependency is recorded now, at framing, rather than being met by an
-> implementer who cannot write the signatures.
+> **AS MEASURED AT `24e9ce039`, AND NO LONGER TRUE:** *"Ken's surface type
+> grammar has no projection form — `RType` has eleven variants and none of them
+> is a projection (`RType::RProj`, 0 hits; control `RExpr::RProj`, 4 files)."*
+> **That measurement was correct when taken and is now false in every part.**
+>
+> ⇒ **`LANG-TYPE-PROJECTION-SURFACE-FORM` landed at `294cb5e28843dff8e2edeae9945e1cdc20b0318f`**
+> (routed `ecd8fa875`, 9 files `+1052/-15`, blob-verified). Re-measured by the
+> Steward at that SHA:
+>
+> ```text
+>                          24e9ce039 / 03f2e65d0        origin/main 294cb5e28
+>   RType variants         11, no projection            12, RProj PRESENT
+>   RType::RProj           0 hits                       12 hits across 4 files
+>                                                       (data 1, elab 7,
+>                                                        modules 2, resolve 2)
+>   control RExpr::RProj   4 files                      4 files  (unmoved)
+> ```
+>
+> **THE CLOSING CLAIM — *"the catalog bindings this node must author are
+> currently UNSPELLABLE"* — IS FALSE.** It was this node's blocking premise, so a
+> seat picking the node up reads it as a live obstacle. It is not one.
+>
+> **A NEAR-MISS ON THE SUBJECT, worth keeping because the two enums are
+> deliberately parallel.** `spec-author` flagged this premise (`evt_2ng4xxdcc62wx`)
+> on the reading that *"the node says eleven and today's count is eleven, so a
+> re-measure agrees and stops."* **That is true of `Type` in `ast.rs` (10 → 11,
+> gaining `TProj`) and NOT of the enum this node names.** The premise is about
+> `RType` in `resolve.rs`, which went **11 → 12**. The conclusion they reached is
+> right and the route to it measured a different enum.
+>
+> ⇒ **The practical difference is the direction of the failure.** Their reading
+> would make this a premise that survives a re-measure — the dangerous kind. On
+> the actual subject it fails **loudly**: 11 against 12, and 0 hits against 12.
+> **Anyone who re-measures the thing the sentence names disagrees with it
+> immediately.** Recorded so the next reader does not inherit the quieter
+> diagnosis and go looking for a silent-staleness problem that is not here.
 >
 > ## CORRECTED 2026-09-16 (Steward): THIS NODE AUTHORS **THREE** PROJECTION-TYPED
 > ## BINDINGS, NOT ONE. The banner above said "the `∈` binding" and "its own

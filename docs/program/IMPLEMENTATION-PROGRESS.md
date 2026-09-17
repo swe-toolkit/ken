@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-17 06:12:41Z — from 655 issue file(s) in `docs/program/issues/`.
+2026-09-17 07:01:31Z — from 656 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -656,6 +656,7 @@ the committed file matches the generator's output.
 | `SPEC-STANDARD-INFIX-BINDING` | A1's spec prerequisite: a bounded standard-binding + use-site call-completion contract grounded in 33.5.4 (implicit argument/dictionary completion) and 39 (elaboration), specifying the STANDARD meanings of ∧ ∨ ≤ ≥ ≠ as ordinary checked standard-package functions (∧/∨ = bool_and/bool_or; ≤/≥ = Ord via an actual dictionary, ≥ reversing already-evaluated values; ≠ = negation of the exact NumericEnv `==` comparator on the SAME supported carriers), their standard fixities (∧ infixr 3, ∨ infixr 2, ≤ ≥ ≠ infix 4), and the completion policy bound to defining GlobalId + checked telescope; results Bool, no Ω connective, single left-to-right evaluation, no short-circuit guarantee; NO new Eq/DecEq instance, Float-equality law, or TCB entry | merged | spec | S | none | — |
 | `SPEC-STATUS-RECONCILE` | the spec's two status vocabularies do not correspond — define the correspondence (or replace the ladder), then apply it | merged | spec-enclave | M | none | — |
 | `SPEC-STORE-SPLIT` | Split durable canonical bytes from in-process maximal sharing: demote the store mechanism to private, retarget the conformance rows that assert it, and re-cut the runtime program against the relaxed contract | merged | spec-enclave | L | none | — |
+| `SPEC-TYPE-PROJECTION-SURFACE-NORMATIVE` | specify the type-position projection form normatively now that LANG-TYPE-PROJECTION-SURFACE-FORM has landed it: the admitted production is a CHAIN (`ident ('.' (ident | ConId))+`, left-associative, only the OUTERMOST field becoming the type node), the base is a VALUE binder rather than a type so the restriction to a binder-rooted chain is itself normative, and the two rejection cases are ASYMMETRIC -- positional `.N` in type position is a specified refusal with a located diagnostic and accepting it is non-conforming, while expression-position `d.Query` is claimed by no production at all and later admitting it is NOT non-conforming. Also discharges 58b's `unspellable` prerequisite clause at four sites and restates the catalog-zero's REASON without changing its value. | active | spec | S | none | — |
 | `SRC-ATTEST` | squash-stable whole-source attestation + fresh merge-result authorization | merged | doc | M | none | — |
 | `STR-BIJ-TEST-CARRIER` | The AC2 reverse-direction test claims a universal inverse and its sole operand is an NFC fixed point — it is green under the correct law AND under the false one it pins | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/1102 |
 | `STR-BIJ` | the String/List Char 'bijection' over-claim (adversary A1 + A2) | merged | spec-enclave | S | none | https://github.com/swe-toolkit/ken/pull/1096 |
@@ -750,6 +751,7 @@ is itself not yet `merged`/`closed`:
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
 - `RT-D5B-POSTCALL-REFUSAL-MECHANISM` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `SPEC-ELABORATION-COMPLETION-PRECONDITION-ERRATA` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: active)
+- `SPEC-TYPE-PROJECTION-SURFACE-NORMATIVE` blocked by `LANG-TYPE-PROJECTION-SURFACE-FORM` (status: ready)
 
 ## Gate progress
 
