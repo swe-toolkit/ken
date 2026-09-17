@@ -70,9 +70,29 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 > # READY. Frame:
 > `docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md`.
 >
-> **Increment A's base is `origin/main` `537fa2afbdab8962717d43640afbd04719d1b258`**
+> **Increment A's base is `origin/main` `10e75cb93656d5ea787bceaf754b2500b78de166`**
 > — B and C pin their own bases in frame 4a-pin, which is the only place
-> either value is written. **The pin need not equal the cut point**; it must
+> either value is written.
+>
+> **PIN MOVED 2026-09-17, `537fa2afbdab8962717d43640afbd04719d1b258` ->
+> `10e75cb93656d5ea787bceaf754b2500b78de166`.** The port node
+> `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT`
+> landed ten files in `crates/`, so the old value could no longer satisfy the
+> empty-`git diff` condition below — **the pin did not rot, its own test
+> refused it**, which is the whole reason that condition is a measurement taken
+> at adoption rather than an argument quoted from when it was proposed.
+>
+> **This banner is a PIN, not a record**, by frame §4a-pin's own predicate: *an
+> occurrence is a PIN if and only if it asserts what increment A's base IS.*
+> It therefore moves with §4a-pin and must move again at increment B. The
+> `origin:` line in this file's frontmatter is the opposite case — a provenance
+> RECORD of where the node was cut — and **must never be re-pointed.** The two
+> are the same forty characters and they age in opposite directions.
+>
+> Flagged by `runtime-implementer` (`evt_f51swjy5k7rf`), who moved the frame's
+> two pins and deliberately left this one rather than edit a file they do not
+> own. Correct call: the third pin is the one every enumeration of this has
+> missed. **The pin need not equal the cut point**; it must
 > satisfy frame 4a-pin's three conditions, of which the operative one is that
 > `git diff "$BASE" HEAD -- crates/` is empty, re-run at the moment the pin is
 > adopted. Requiring `pin == cut point` regresses: every commit that corrects
