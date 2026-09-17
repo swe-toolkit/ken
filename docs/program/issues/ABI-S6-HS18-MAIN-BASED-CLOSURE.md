@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-MAIN-BASED-CLOSURE
 title: "Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation."
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -12,16 +12,39 @@ tier: T1
 origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. CUT FROM origin/main 6f49f852141a66571c6126a569b954f63e2b6bde on 2026-09-16 -- this is a provenance RECORD of where the node was cut and must never be re-pointed; increment A's OPERATIVE base is a separate value living in frame 4a-pin and MAY DIFFER from this SHA -- it already does."
 ---
 
-> # INCREMENT A IS BLOCKED. `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` LANDS FIRST.
+> # UNBLOCKED 2026-09-17. The port LANDED; increment A is releasable.
 >
-> **`status:` corrected `ready` -> `draft`, Steward 2026-09-16.** This banner
-> said BLOCKED while the frontmatter said `ready`, and `ready` is what a team
-> pulls on. `check-issue-schema` had been reporting the contradiction on every
-> run -- *"depends_on ... is 'ready' (nothing has landed) -- a team pulling this
-> node will find its premise false"* -- and the Steward dismissed it twice as
-> pre-existing. It is not pre-existing to anyone; it is this lane. **Flip back to
-> `ready` when the port LANDS, measured by blob compare, not when it is
-> approved-as-built.**
+> **`status:` `draft` -> `ready`, Steward 2026-09-17, on the condition this
+> banner itself set.** `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` landed as squash
+> `10e75cb93656d5ea787bceaf754b2500b78de166` (candidate
+> `93fa1d2639144b89f432211c8d606dc4cd229117`).
+>
+> **Measured by BLOB COMPARE, which is what the condition below demanded — not
+> by the approval.** All ten of the candidate's paths are byte-identical to
+> `origin/main`, each guarded with `git cat-file -e origin/main:<path>` before
+> the compare, because `git rev-parse <sha>:<path>` fails open: it exits non-zero
+> and still echoes its input, so an ABSENT file reads as DIFFERS. Ancestry was
+> not consulted and must not be — the publisher squashes, so a routed commit is
+> never an ancestor of `main`.
+>
+> **The condition, preserved verbatim because it is the reason this node was
+> right to sit at `draft` for a day:**
+>
+> > **`status:` corrected `ready` -> `draft`, Steward 2026-09-16.** This banner
+> > said BLOCKED while the frontmatter said `ready`, and `ready` is what a team
+> > pulls on. `check-issue-schema` had been reporting the contradiction on every
+> > run -- *"depends_on ... is 'ready' (nothing has landed) -- a team pulling
+> > this node will find its premise false"* -- and the Steward dismissed it twice
+> > as pre-existing. It is not pre-existing to anyone; it is this lane. **Flip
+> > back to `ready` when the port LANDS, measured by blob compare, not when it is
+> > approved-as-built.**
+>
+> **What is now true that was not:** increment A's remaining compile errors were
+> *"planner machinery `main` never grew"*. `main` has now grown it — the landed
+> squash carries `continuations.rs` +1057 and `responses.rs` +1210 among ten
+> files in `cranelift_backend`. **Re-measure the error set against the landed
+> `main` before planning; do not carry the 21 / 11 / 10 split below**, which was
+> taken against a `main` that predates the port.
 >
 > **Added 2026-09-16 on the Architect's category-B ruling
 > (`evt_6mptkrtvysd8s`).** Increment A's D0-2 characterisation found 21 compile
