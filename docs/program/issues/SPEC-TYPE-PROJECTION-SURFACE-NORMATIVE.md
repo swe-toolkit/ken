@@ -1,7 +1,7 @@
 ---
 id: SPEC-TYPE-PROJECTION-SURFACE-NORMATIVE
 title: "specify the type-position projection form normatively now that LANG-TYPE-PROJECTION-SURFACE-FORM has landed it: the admitted production is a CHAIN (`ident ('.' (ident | ConId))+`, left-associative, only the OUTERMOST field becoming the type node), the base is a VALUE binder rather than a type so the restriction to a binder-rooted chain is itself normative, and the two rejection cases are ASYMMETRIC -- positional `.N` in type position is a specified refusal with a located diagnostic and accepting it is non-conforming, while expression-position `d.Query` is claimed by no production at all and later admitting it is NOT non-conforming. Also discharges 58b's `unspellable` prerequisite clause at four sites and restates the catalog-zero's REASON without changing its value."
-status: active
+status: merged
 owner: spec
 size: S
 gate: none
@@ -11,6 +11,13 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-17, filing a node for work already in candidate -- `spec-author` flagged its absence at AUTHORING time (evt_2ng4xxdcc62wx) rather than at routing, which is the repeat of the gap caught on SPEC-32-PROJECTION-PRECEDENCE. The node is the Steward's to create and was missing because the work was dispatched in-thread off the landing of LANG-TYPE-PROJECTION-SURFACE-FORM (294cb5e28843dff8e2edeae9945e1cdc20b0318f) without a framing step. Candidate 006c8fb00c689b341065db5ee3edf85f800615c8 on wp/SPEC-TYPE-PROJECTION-SURFACE-NORMATIVE, cut from origin/main 294cb5e28, 3 files +79/-19, zero crates/, under spec-leader review at filing time."
 ---
+
+> ## MERGED 2026-09-17 at `8f0f3753270b2d7639fc7aed457b759e6e6a57a1`
+>
+> Blob-verified subsumed: `diff(merge-base, 8f0f37532)` against current
+> `origin/main` is `LIVE=0` across all 3 touched files
+> (`spec/30-surface/32-grammar.md`, `spec/30-surface/33-declarations.md`,
+> `spec/50-stdlib/58b-membership.md`).
 
 > # FILED AFTER THE CANDIDATE EXISTED. That is the defect this node records.
 >

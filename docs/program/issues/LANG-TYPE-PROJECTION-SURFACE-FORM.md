@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-PROJECTION-SURFACE-FORM
 title: "the surface prerequisite LANG-MEMBERSHIP-OPERATOR-SURFACE cannot be written without: Ken's surface type grammar has no projection form, so a parameter typed by a projection from an earlier parameter (`(d : Membership c) (q : d.Query)`) is unspellable in a .ken.md declaration even though the kernel admits the telescope -- add a projection form to RType and resolve it to the kernel's existing Term::Proj1/Proj2, keeping the elaborator-builtin escape hatch CLOSED because a builtin would falsify the ordinary-top-level-binding premise A-track's completion policy rests on"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
@@ -11,6 +11,12 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-16 on the Architect's explicit routing consequence in evt_4tmt0n7era4w3 -- 'the only routing consequence is that LANG-MEMBERSHIP-OPERATOR-SURFACE gains a language prerequisite (a projection form in RType) that it does not currently carry. Worth a node before that build is cut, so it is discovered at framing rather than by an implementer who cannot write the signature.' Discovered while ruling SPEC-MEMBERSHIP-CLASS-CONTRACT's D0-1: the kernel CAN express the telescope (Term::Proj1/Proj2, class as right-nested Sigma per 33 §5.2) and the spec CAN state it, but the surface cannot spell it. Cut BEFORE the dependent build is framed, so the gap is a named dependency rather than an implementer's hard stop."
 ---
+
+> ## MERGED 2026-09-17 at `294cb5e28843dff8e2edeae9945e1cdc20b0318f`
+>
+> Blob-verified subsumed: `diff(merge-base, 294cb5e28)` against current
+> `origin/main` is `LIVE=0` across all 9 touched files under
+> `crates/ken-elaborator/`.
 
 > # READY 2026-09-17 (Steward). Frame:
 > # `docs/program/wp/LANG-TYPE-PROJECTION-SURFACE-FORM.md`.

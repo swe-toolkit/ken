@@ -1,7 +1,7 @@
 ---
 id: LANG-BARE-OPERATOR-ATOM-REJECTION
 title: "The third divergence from 32-grammar.md section 3's application-atom contract pin: an ungrouped operator_name with ZERO following atoms must reject syntactically, before resolution, but the A0 prefix-atom consumer admits an operator name as an atom unconditionally -- bare `<+>` and bare `≤` both parse as EVar. Admit an operator_name only as an operator_prefix head with at least one following atom, keeping the grouped form `(OP)` and the applied form `OP Zero` live."
-status: active
+status: merged
 owner: language
 size: S
 gate: none
@@ -11,6 +11,14 @@ github: null
 tier: T1
 origin: "Steward cut 2026-09-16 on the fold-or-spin call routed by language-implementer (evt_4wthdbfybzdq4), ruled SPIN. Carries the third of seed-reserved-infix-names.md's rows, `expect-negative`, which LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE's frame named at its section 2b as an open fifth question and excluded from its four-row AC table. Cut BEFORE the predecessor's disposition is written so the re-point names a node that exists -- a RED-UNTIL tag naming an absent node is not a gate, which is the defect that produced the predecessor itself."
 ---
+
+> ## MERGED 2026-09-17 at `5492ff97a4eb863986df9aad56efb82b5cb2c680`
+>
+> Blob-verified subsumed: `diff(merge-base, 5492ff97a)` against current
+> `origin/main` is `LIVE=0` across all 3 touched files
+> (`conformance/surface/operators/seed-reserved-infix-names.md`,
+> `crates/ken-elaborator/src/parser.rs`,
+> `crates/ken-elaborator/tests/lang_bare_operator_atom_rejection.rs`).
 
 > # READY 2026-09-17 — the hold is discharged
 >
