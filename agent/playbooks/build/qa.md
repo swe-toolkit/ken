@@ -160,29 +160,48 @@ load and follow it after this generic archetype.
 > **Provenance, because the rows are not one seat's.** Rows one and two are the
 > Architect's condition and QA's predicate; row three is the Architect's
 > diff-derived census. The quote above is the **implementer's**, diagnosing their
-> own instrument — which is what gives it its force. The merged-span rendering
-> was predicted by the Architect; **the dead-parent rendering was not predicted
-> by anyone and is the implementer's finding.**
+> own instrument — which is what gives it its force.
 >
-> **Three renderings defeated it in one candidate, and the third is the one
-> nobody predicts:**
+> **Two renderings, and the boundary between them is a measured threshold:**
 >
 > | rendering | what a keyed filter sees |
 > |---|---|
-> | `` `name` is never used `` | the headline — this is what filters key on |
-> | `multiple associated items are never used` | members appear as **source spans**, not backticked headlines; a headline key misses every one |
-> | a method of a **dead type** | nothing — rustc attributes deadness to the **outermost** dead item and never enumerates its members |
+> | `` `name` is never used ``, or `` methods `f1` … `f6` are never used `` | every member backticked in the headline — this is what filters key on |
+> | `multiple methods are never used` | the headline names **nobody**; each member is a **source span** below it, carrying its bare name |
 >
-> ⇒ **The third cannot be fixed by a better key at all.** No regex over the
-> diagnostic text will surface a member the compiler never printed, because the
-> finding is on the parent.
+> **The threshold is exactly 7.** At 6 or fewer dead associated items rustc
+> backticks every one in the headline; at 7 or more the headline collapses and
+> names none. Reproduce it in seconds — no workspace, no features, no build lock:
+>
+>     impl Live { pub(crate) fn f1(&self) {} ... }   // N methods, none called
+>     rustc --crate-type=lib --edition 2021 t.rs
+>
+>       N=6   warning: methods `f1`, `f2`, `f3`, `f4`, `f5`, and `f6` are never used
+>       N=7   warning: multiple methods are never used
+>
+> ⇒ **The span lines always carry the bare name, in both renderings.** So a
+> **bare-name** search over the full rendered output reaches every member; a
+> **headline-keyed** search reaches only the first rendering.
+>
+> **A third row stood here and was FALSE. It is recorded, not silently dropped,
+> because how it arose is the reusable half.** It claimed a method of a dead type
+> is absorbed into the parent's diagnostic and never uttered — so no key could
+> ever reach it. **A dead type's methods get their own diagnostic**, and the
+> 14-line file above refutes the claim outright. Its origin: three names came back
+> absent from a **backticked** grep and present in a later **bare-name** grep, and
+> the union of two different keys on one question was reported as two phenomena.
+> ⇒ **The same key applied inconsistently across one population manufactures a
+> phenomenon.** A not-found from an instrument that could not hit is not a
+> measurement — including when the instrument is your own grep. Note also that the
+> refuted absolute *sounded* stronger than the threshold that replaced it: a rule
+> resting on a false absolute is weaker than one resting on a number you can check.
 >
 > **The procedure.** Enumerate every named item the diff ADDS (`fn`, `struct`,
 > `enum`, `trait`, `type`, `const`, `static`) from `git diff` — which cannot omit
-> a member the candidate added — then interrogate the build **per name**. The
-> diagnostic is what you check the population AGAINST; it is never what you
-> derive the population FROM. And when a type is reported dead, **its members are
-> dead too and will not be listed** — expand them yourself.
+> a member the candidate added — then interrogate the build **per name, by bare
+> name, over the full rendered output**. The diagnostic is what you check the
+> population AGAINST; it is never what you derive the population FROM. **Use one
+> key for the whole population, and say which key it was.**
 
 ## What you verify
 
