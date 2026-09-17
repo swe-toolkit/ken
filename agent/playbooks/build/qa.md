@@ -138,6 +138,47 @@ load and follow it after this generic archetype.
 > condition was the Architect's own and a visibility change discharged it —
 > which is why this rule is stated as a category count, not as advice.)
 
+> ### A FILTER CANNOT REPORT BEING INCOMPLETE, AND IT LOOKS LIKE A PREDICATE
+>
+> **Companion to the rule above, and a DIFFERENT question.** That one asks *what
+> does the silence mean*; this one asks *where did the population come from*.
+> Satisfying one does not satisfy the other.
+>
+> Measured 2026-09-17, three instruments on one candidate, each a strict
+> improvement on the last, each still under-reporting:
+>
+>     Architect's condition   enumerated 6 symbols          QA's predicate found 13
+>     QA's predicate          keyed on the branch diff      found 4 more
+>     diff-derived census     computed from the diff itself found 10 more
+>
+> **All three were predicates**, and "hand a predicate, not an enumeration" did
+> not save any of them. The third one's author put it best: *"the predicate was
+> right and the oracle's OUTPUT was the wrong domain to evaluate it in."* A
+> predicate matched against a diagnostic's **rendering** is a filter wearing a
+> predicate's clothes.
+>
+> **Three renderings defeated it in one candidate, and the third is the one
+> nobody predicts:**
+>
+> | rendering | what a keyed filter sees |
+> |---|---|
+> | `` `name` is never used `` | the headline — this is what filters key on |
+> | `multiple associated items are never used` | members appear as **source spans**, not backticked headlines; a headline key misses every one |
+> | a method of a **dead type** | nothing — rustc attributes deadness to the **outermost** dead item and never enumerates its members |
+>
+> ⇒ **The third cannot be fixed by a better key at all.** No regex over the
+> diagnostic text will surface a member the compiler never printed, because the
+> finding is on the parent.
+>
+> **The procedure.** Enumerate every named item the diff ADDS (`fn`, `struct`,
+> `enum`, `trait`, `type`, `const`, `static`) from `git diff` — which cannot omit
+> a member the candidate added — then interrogate the build **per name**. The
+> diagnostic is what you check the population AGAINST; it is never what you
+> derive the population FROM. And when a type is reported dead, **its members are
+> dead too and will not be listed** — expand them yourself.
+
+
+
 ## What you verify
 
 1. **Conformance:** the change passes the relevant `/conformance` tests.
