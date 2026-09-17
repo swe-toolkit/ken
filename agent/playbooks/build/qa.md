@@ -152,10 +152,17 @@ load and follow it after this generic archetype.
 >     diff-derived census     computed from the diff itself found 10 more
 >
 > **All three were predicates**, and "hand a predicate, not an enumeration" did
-> not save any of them. The third one's author put it best: *"the predicate was
-> right and the oracle's OUTPUT was the wrong domain to evaluate it in."* A
-> predicate matched against a diagnostic's **rendering** is a filter wearing a
-> predicate's clothes.
+> not save any of them. The implementer whose instrument it was put it best:
+> *"the predicate was right and the oracle's OUTPUT was the wrong domain to
+> evaluate it in."* A predicate matched against a diagnostic's **rendering** is a
+> filter wearing a predicate's clothes.
+>
+> **Provenance, because the rows are not one seat's.** Rows one and two are the
+> Architect's condition and QA's predicate; row three is the Architect's
+> diff-derived census. The quote above is the **implementer's**, diagnosing their
+> own instrument — which is what gives it its force. The merged-span rendering
+> was predicted by the Architect; **the dead-parent rendering was not predicted
+> by anyone and is the implementer's finding.**
 >
 > **Three renderings defeated it in one candidate, and the third is the one
 > nobody predicts:**
@@ -176,8 +183,6 @@ load and follow it after this generic archetype.
 > diagnostic is what you check the population AGAINST; it is never what you
 > derive the population FROM. And when a type is reported dead, **its members are
 > dead too and will not be listed** — expand them yourself.
-
-
 
 ## What you verify
 
