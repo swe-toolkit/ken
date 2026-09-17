@@ -13,7 +13,7 @@ use super::aggregates::{
     checked_ih_post_call_consumer_frames, pair_detached_required_consumer, RequiredConsumerCall,
 };
 use super::continuations::{
-    checked_frame_for_consumer, continuation_call_selected_result_identity,
+    checked_frame_for_consumer, continuation_call_selected_result_identity_opt,
     continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
     generated_context_parameters,
     walk_continuation_value_environment, CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
@@ -4300,8 +4300,17 @@ pub(super) fn build_checked_ih_post_call_consumers(
                 "one checked-IH transport identity has disagreeing response-context Result demands",
             )),
         };
-        let actual =
-            continuation_call_selected_result_identity(plan, transport.source_call_identity())?;
+        // FORK 2 (Architect, evt_xew275ff898w): a shape this relation cannot model
+        // yields NO ROW, never a refusal. The builder runs on every plan build, so
+        // propagating here would give an observability derivation veto power over
+        // programs that compile on `main` -- which is what red-lit px8f_write_partition.
+        let Some(actual) = continuation_call_selected_result_identity_opt(
+            plan,
+            transport.source_call_identity(),
+        )?
+        else {
+            continue;
+        };
         if actual == demanded {
             continue;
         }

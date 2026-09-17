@@ -11078,6 +11078,156 @@ pub(super) fn derive_checked_ih_post_call_consumer_chain(
     Ok(Some(consumers))
 }
 
+/// What the post-call consumer relation OBSERVED when it declined to model a
+/// continuation target.
+///
+/// **These names state the observation, never a cause** (Architect,
+/// `evt_52b1542h0w8ba`). An earlier draft had a `NeverReturns` arm testing
+/// `continuation_result_origins(..).is_empty()` — structurally impossible, because
+/// that function inserts `root` before any guard can reject it, so every genuine
+/// never-returns target would have been misrouted into a bucket whose name
+/// asserted "coverage hole" and triggered work. **A category's name must not
+/// assert a cause its predicate does not establish.**
+///
+/// Bottom-versus-coverage-hole is decided by READING the shape record below, not
+/// by a predicate claiming it in advance.
+///
+/// **NEITHER CATEGORY HAS A DEMONSTRATED FIRING PATH ON THIS TREE, and that is
+/// recorded rather than left to be discovered.** Measured with a live-channel
+/// control, `-p ken-runtime --lib -- --nocapture --test-threads=1`:
+///
+/// ```text
+/// known-hot control (continuation_result_origins)   149 hits   channel LIVE
+/// this probe's entry                                  0 hits
+/// ```
+///
+/// The builder's loop over `checked_ih_environment_transports` never reaches a
+/// transport in any local fixture, so neither arm can be exercised here. The
+/// first CI run after this repair is what demonstrates them — and the same run
+/// produces the shape census that answers the bottom-versus-hole question.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum UnmodelledPostCallTarget {
+    /// Two or more distinct successful constructor identities. Ordinary: widen,
+    /// no information. Not a defect.
+    ManyIdentities,
+    /// No visited result origin was a `RuntimeExpr::Construct`. That is ALL this
+    /// says; it does not distinguish a target that never successfully returns
+    /// from one this relation fails to cover.
+    NoConstructorIdentity,
+}
+
+static UNMODELLED_MANY_IDENTITIES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+static UNMODELLED_NO_CONSTRUCTOR_IDENTITY: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+/// The `RuntimeExpr` shapes actually present in the origin set of a skipped
+/// target, counted by variant. **The set is already computed, so this is no new
+/// traversal**, and it is what makes the bottom-versus-hole question answerable
+/// by reading the first real run instead of by asserting a predicate nobody has
+/// validated.
+static UNMODELLED_SHAPES: std::sync::Mutex<Option<BTreeMap<&'static str, usize>>> =
+    std::sync::Mutex::new(None);
+
+fn runtime_expr_variant_name(expr: &RuntimeExpr) -> &'static str {
+    match expr {
+        RuntimeExpr::CheckedJoinSite { .. } => "CheckedJoinSite",
+        RuntimeExpr::CheckedSubcontinuationFrame { .. } => "CheckedSubcontinuationFrame",
+        RuntimeExpr::CheckedRecursiveInvocation { .. } => "CheckedRecursiveInvocation",
+        RuntimeExpr::CheckedComputationalIHSlots { .. } => "CheckedComputationalIHSlots",
+        RuntimeExpr::CheckedComputationalIHInvocation { .. } => "CheckedComputationalIHInvocation",
+        RuntimeExpr::Value { .. } => "Value",
+        RuntimeExpr::Var { .. } => "Var",
+        RuntimeExpr::Let { .. } => "Let",
+        RuntimeExpr::If { .. } => "If",
+        RuntimeExpr::PrimitiveCall { .. } => "PrimitiveCall",
+        RuntimeExpr::Construct { .. } => "Construct",
+        RuntimeExpr::Match { .. } => "Match",
+        RuntimeExpr::ComputationalMatch { .. } => "ComputationalMatch",
+        RuntimeExpr::Record { .. } => "Record",
+        RuntimeExpr::Project { .. } => "Project",
+        RuntimeExpr::Closure { .. } => "Closure",
+        RuntimeExpr::LexicalClosure { .. } => "LexicalClosure",
+        RuntimeExpr::DeclarationRef { .. } => "DeclarationRef",
+        RuntimeExpr::ImportedDeclarationRef { .. } => "ImportedDeclarationRef",
+        RuntimeExpr::Call { .. } => "Call",
+        RuntimeExpr::Effect { .. } => "Effect",
+        RuntimeExpr::Trap { .. } => "Trap",
+    }
+}
+
+/// Unmodelled post-call targets since process start: `(many, no_constructor)`.
+pub(in crate::cranelift_backend) fn unmodelled_post_call_targets() -> (usize, usize) {
+    use std::sync::atomic::Ordering::Relaxed;
+    (
+        UNMODELLED_MANY_IDENTITIES.load(Relaxed),
+        UNMODELLED_NO_CONSTRUCTOR_IDENTITY.load(Relaxed),
+    )
+}
+
+/// The observed shape census behind `NoConstructorIdentity` skips.
+pub(in crate::cranelift_backend) fn unmodelled_post_call_shapes(
+) -> BTreeMap<&'static str, usize> {
+    UNMODELLED_SHAPES
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
+        .unwrap_or_default()
+}
+
+/// Membership probe for the post-call consumer relation: is this target's
+/// selected source case a shape the relation models?
+///
+/// **Deliberately does NOT route through [`exact_result_identity`].** That
+/// assertion's text says *"please report this compiler bug"*, which is its author
+/// recording that it must be unreachable from valid input — so reaching it is a
+/// defect in the reacher, never a discovery about the program. This builder runs
+/// on EVERY plan build, including programs that never needed the capability, so it
+/// must ask a question that can answer "no" rather than one that can only assert.
+///
+/// **BOTH non-singleton outcomes yield `None`** — zero and many alike. The
+/// population this builder walks is never narrowed to targets having exactly one
+/// successful constructor identity, so a multi-identity target is unmodelled for
+/// precisely the reason a zero-identity one is. `None` means *not in this
+/// relation's population*; it does not mean the program is invalid, and a caller
+/// must never convert it into an error.
+pub(super) fn continuation_call_selected_result_identity_opt(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+) -> Result<Option<ConstructorIdentity>, CraneliftBackendError> {
+    let unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == identity.target())
+        .ok_or_else(|| {
+            planner_error("a checked-IH post-call consumer names no target specialization")
+        })?;
+    let body = plan.semantic.child_origin(
+        unit.continuation_origin(),
+        1 + unit.producer_alternative() as usize,
+    )?;
+    let identities = continuation_result_constructor_identities(plan, body)?;
+    if let [identity] = identities.as_slice() {
+        return Ok(Some(*identity));
+    }
+    use std::sync::atomic::Ordering::Relaxed;
+    if !identities.is_empty() {
+        UNMODELLED_MANY_IDENTITIES.fetch_add(1, Relaxed);
+        return Ok(None);
+    }
+    UNMODELLED_NO_CONSTRUCTOR_IDENTITY.fetch_add(1, Relaxed);
+    // Record the shapes actually seen, so the cause can be READ off the record
+    // rather than asserted by a category name.
+    if let Ok(mut guard) = UNMODELLED_SHAPES.lock() {
+        let census = guard.get_or_insert_with(BTreeMap::new);
+        for origin in continuation_result_origins(plan, body)? {
+            let name = runtime_expr_variant_name(plan.planned_occurrence_expr(origin)?);
+            *census.entry(name).or_insert(0) += 1;
+        }
+    }
+    Ok(None)
+}
+
 /// Derive the successful identity actually produced by a continuation target's
 /// selected source case. This is the source half of the post-call contract; it
 /// does not inspect the demanded response identity.
