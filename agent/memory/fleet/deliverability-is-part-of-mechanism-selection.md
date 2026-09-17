@@ -21,12 +21,42 @@ candidate edited `.github/workflows/ci.yml`. The mechanism was verified
 exhaustively: that doctests had no running home, that the step must be
 shard-gated, that the aggregator would gate it. All correct.
 
-**The publisher credential lacks workflow-write.** A branch touching that path
-is rejected **at push, before a PR exists**. The whole candidate was
-undeliverable, and a full review cycle was spent discovering it by rejection.
+The candidate was ruled undeliverable on the ground that **the publisher
+credential lacks workflow-write**, so a branch touching that path is rejected
+**at push, before a PR exists**.
 
-> **A green local signal cannot see a credential boundary.** The constraint
-> lived somewhere no build config, no test, and no lint reaches.
+> ## THAT GROUND WAS ALREADY FALSE ON THE DAY THIS LESSON WAS WRITTEN
+>
+> **This lesson is dated 2026-07-22. The operator granted the App the
+> `Workflows` permission on 2026-07-21.** Measured 2026-09-17 on `origin/main`:
+>
+>     2026-07-21  ken-ci[bot]  FIVE commits under .github/workflows/
+>     2026-07-22 22:35  ken-ci[bot]  CI-SKIPPED-NATIVE-TESTS
+>
+> That last one is **the very WP two seats declared undeliverable that day** —
+> landed by the publisher, into the path it supposedly could not push.
+>
+> ⇒ **The credential worked. The candidate was not "discovered by rejection";
+> it was declared undeliverable from a nine-day-old note.** The real push
+> rejection happened on **2026-07-13** (kenfmt capstone C), before the grant —
+> see [[publisher-app-workflow-push-was-permitted-2026-07-21]] for the verbatim
+> error.
+>
+> **So the lesson that records this hazard is itself an INSTANCE of it**, and it
+> preserved the false premise that caused it for two months, in the voice of the
+> seats who were taken in.
+>
+> **The abstract thesis below survives intact and is independently true** —
+> deliverability really is a separate axis from the reviewer-lane question, and
+> really is cheapest at mechanism selection. **Only the causal claim in this
+> case study is false.** Read the cost as *"a review cycle was spent on a
+> constraint nobody tested,"* which is the more useful version anyway.
+
+> **A green local signal cannot see a credential boundary.** That much holds:
+> the constraint lived somewhere no build config, no test, and no lint reaches
+> — **and neither did the fact that it had been lifted.** The same blindness
+> that hides a boundary hides its removal, which is why the answer is to test at
+> point of use rather than to keep better notes.
 
 ## It is a DIFFERENT AXIS from the review-lane question
 
@@ -51,10 +81,35 @@ the other**, and its greenness reads as reassurance.
 2. **Flag it at kickoff for any WP that might touch outside `crates/` or
    `spec/`** — leaders and framers, put it in the scope check next to the
    reviewer-lane question, not inside it.
-3. **Known boundary (2026-07-22):** the publisher credential cannot push
-   `.github/workflows/**`. Treat this list as *incomplete* — the general move is
-   to ask, not to memorize the enumeration. Cf.
-   [[an-enumeration-needs-a-proven-closure-not-a-better-grep]].
+3. **Do not carry an enumerated boundary here. Measure at point of use.** This
+   item used to read *"Known boundary (2026-07-22): the publisher credential
+   cannot push `.github/workflows/**`."* **That was false for two months before
+   anyone reading it noticed.** Measured 2026-09-17 against `origin/main`:
+
+       commits touching .github/workflows/ by ken-ci[bot]   23
+       of those, landed AFTER 2026-07-22                    18
+       most recent                                          2026-09-04
+
+   The operator granted the App the `Workflows` permission on 2026-07-21; see
+   [[publisher-app-workflow-push-was-permitted-2026-07-21]], which records the
+   supersession and the incident where two seats concluded a finished WP was
+   undeliverable from the stale note — the Steward escalating to ask for a
+   permission that had already been granted.
+
+   ⇒ **Ask the repository, not this list:**
+
+       git log --format='%an' origin/main -- <path> | sort | uniq -c
+
+   Cf. [[an-enumeration-needs-a-proven-closure-not-a-better-grep]].
+
+   > **Why the old item survived its own warning.** It said *"treat this list
+   > as incomplete — the general move is to ask, not to memorize the
+   > enumeration"* **and then memorized the enumeration, two sentences apart.**
+   > A rule stated next to its own violation does not prevent it: readers
+   > execute the concrete instance and skim the abstract caution. **An
+   > enumerated instance inside a How-to-apply list is an imperative**, whatever
+   > hedge sits beside it — so for mutable external state, carry the *query*,
+   > never the *answer*.
 4. **If a mechanism needs an undeliverable path, that is a mechanism fork, not
    a blocker** — pick a different mechanism, or escalate the credential. Do not
    build first and discover second.
