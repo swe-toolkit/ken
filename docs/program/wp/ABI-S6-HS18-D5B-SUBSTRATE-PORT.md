@@ -667,16 +667,17 @@ the Steward's.
 act is **re-running the `§3b` instrument with all FOUR trees**, `origin/main` as
 the third and the candidate as the fourth, and its output showing:
 
-    REMAINING    0     rows in OWED u ABSENT whose candidate body does not
-                       yet match the source's, EXCLUDING the grant rows
-                       below. THIS is the completion figure.
-    closed       every owed row satisfied, i.e. |OWED u ABSENT| - EXCLUDED
+    CLOSEABLE    (OWED u ABSENT) - DEFERRED.  The rows this node can close.
+    REMAINING    0     CLOSEABLE rows whose candidate body does not yet
+                       match the source's. THIS is the completion figure.
+    closed       |CLOSEABLE|, i.e. every row this node can close, closed
     ADJUDICATE   enumerated by name and file, non-zero, handed to the
                  adjudication node
-    EXCLUDED     rows in a file the six-site ruling excludes. Enumerated by
-                 name and file and HANDED TO RT-D5B-MAPPING-AVAILABILITY-FLIP,
-                 the same way ADJUDICATE rows are handed over. Reported as
-                 its own bucket, never subtracted silently.
+    DEFERRED     rows this node CANNOT close, by the predicate in AC-1e.
+                 Enumerated by name and file and HANDED TO
+                 RT-D5B-MAPPING-AVAILABILITY-FLIP, the same way ADJUDICATE
+                 rows are handed over. Reported as its own bucket, never
+                 subtracted silently.
     OWED/ABSENT  reported as the CLASSIFICATION totals, which are constants
                  of (B, S, M). They are the denominator, NOT the criterion.
     population   stated in the output: union of method names, over the
@@ -709,6 +710,45 @@ one way of deferring work, and it is handover to a named successor. **An
 exclusion set living only inside the instrument is the same deferral with no
 recipient.**
 
+### AC-1e, AMENDED SAME DAY: `DEFERRED` IS ONE PREDICATE AT EACH REGION'S OWN UNIT
+
+**The file-scoped form above was stated at the wrong unit and was unreachable by
+NINE MORE rows** (implementer, `evt_7wbjx9rsn3tzb`). It is superseded by the
+predicate below; the three rows remain correct and are simply an instance of it.
+
+    a row is DEFERRED if EITHER
+
+      (a) transplanting it would introduce a diff line naming the refused
+          operation at pathspec `crates/` -- i.e. would violate THIS FRAME'S
+          OWN AC-2.  Evaluated PER ROW.
+      (b) it sits in a file excluded wholesale, in a region where the FILE is
+          the smallest takeable unit (R1/R2, which replay as one checkout).
+
+    CLOSEABLE = (OWED u ABSENT) - DEFERRED       AC-1 is REMAINING = 0 over
+                                                  CLOSEABLE, and is therefore
+                                                  REACHABLE BY CONSTRUCTION
+
+> **THE UNIT OF A PREDICATE IS THE UNIT OF THE REGION IT APPLIES IN. This is
+> `AC-1d`'s lesson one level over, and it is what the file-scoped form got
+> wrong.** R1 and R2 replay as a single checkout, so the file is the smallest
+> thing that can be taken or left and the predicate applies **per file**. R3 is
+> transplanted **per method**, so the predicate applies **per row**. Applying
+> the file unit inside R3 would defer roughly **a hundred rows of unrelated owed
+> work** because one match arm in one method names the operation.
+>
+> ⇒ **Stating an exclusion at the wrong unit fails in BOTH directions** — it
+> over-excludes where the unit is too coarse, and it is blind where the unit is
+> too fine. The file form was blind: it reported `N == M == 3` and was correct
+> about those three while nine carriers sat in `REMAINING`.
+
+**THE FRAME ALREADY NAMED ONE OF THE NINE AND THE INSTRUMENT DISAGREED WITH IT.**
+`§2e` says *"EXCLUDE it and its `:3263` call site"* for
+`mapping_acquire_file_source_rights`, and `§4`'s table carries it as `EXCLUDED`.
+**The frame was right and the instrument was wrong** — the fourth carrier
+`AC-1e` predicted, arriving within the hour and by exactly the predicted
+mechanism. **Where the instrument and the frame's own measured exclusions
+disagree, the disagreement is the finding**; reconcile before trusting either.
+
 > **DERIVE `EXCLUDED` FROM THE FILE-EXCLUSION PREDICATE, NEVER FROM A LIST OF
 > THREE NAMES.** The implementer's reason for reporting the bucket rather than
 > subtracting it is adopted verbatim — *"subtracting three would make the
@@ -728,6 +768,58 @@ recipient.**
 > owner** — not the flip node's, because it is not the grant — and it would
 > vanish silently between two correctly-reasoned exclusions. **`N > M` comes
 > back to the Steward for placement.**
+>
+> **MEASURED: `N > M` IS ZERO AND THE CONVERSE, `P`, IS NINE.** `P` is a carrier
+> in a file that is *not* wholesale-excluded — where the refused grant **silently
+> LANDS** rather than being silently dropped. That is the direction that fails
+> open, and it is why `(a)` above is now the primary clause.
+
+### PLACEMENT OF THE NINE — ruled 2026-09-17, and two are NOT a judgement call
+
+**Four pure-grant rows go to [[RT-D5B-MAPPING-AVAILABILITY-FLIP]] by name.**
+Every changed line names the operation, so there is nothing else in them:
+
+    effect_v1.rs::availability                                   2 of 2 lines
+    effect_v1.rs::every_catalog_or_layout_value_mutation_...     2 of 2 lines
+    effect_v1.rs::abi_s6_d5b_file_acquire_identity_...           new fn, 8 refs
+    effect_v1.rs::mapping_acquire_file_source_rights             new fn, and
+                                                                 §2e ALREADY
+                                                                 excludes it
+
+**The three absent tests go as a WHOLE FILE, not as three rows.**
+`abi_s6_mapping_file_backed_native.rs` is **absent from `main` entirely**, so the
+file is the unit by `(b)`, and its subject *is* the grant — it is the refused
+capability's acceptance surface by name and by content. Nothing regresses by
+deferring a file `main` does not have.
+
+**The two mixed rows are decided by the COMPILER, not by the implementer.**
+
+    effect_v1.rs::host_effect_wire_layout_v1        2 of 6 changed lines
+    st/aggregates.rs::host_effect_recipe_tree       1 of 39 changed lines
+
+`host_effect_recipe_tree` is 38 lines of owed planner work plus one
+`| Op::MappingAcquireFile` arm, and `§2e`'s rule refuses hand-separation
+**wherever the only boundary available is your judgement** — but that rule
+carries its own stated limit: **a compiler-drawn boundary licenses a split.**
+So convert the judgement into a measurement:
+
+    1. transplant the row WITHOUT the lines naming the operation
+    2. AC-2 on the staged tree: zero op-naming diff lines at `crates/`
+    3. scripts/ken-cargo check -p <crate>
+
+    both green  ->  the boundary was mechanical, the row CLOSES here
+    build red   ->  the lines are entangled, the WHOLE row is DEFERRED
+
+**This fails safe and asks nobody to exercise judgement**: the separation is
+proposed, then the compiler and an existing AC either ratify it or refuse it.
+**Do not hand-tune toward green** — one attempt, then defer.
+
+> **Why a missing dispatch arm is SAFE here specifically, and is not the
+> `unreachable!()` hazard `§2e` warns about.** That hazard is landing the
+> **roster without the dispatch**. This node lands **neither**: `AC-2` keeps the
+> operation out of the roster entirely, so an unadmitted operation can never
+> reach the match. **The asymmetry is the whole reason this split is available
+> in this direction and not in the other.**
 
 **This replaces *"increment A compiles against this"* as the completion
 criterion.** A build answers *"does every name resolve"*; this answers *"is
