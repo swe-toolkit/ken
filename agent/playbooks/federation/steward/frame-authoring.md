@@ -416,6 +416,62 @@ impossible, and the missing AC was the tell.**
    four-row answer table to `RT-4B-C2-REACHABILITY` left a `D1` two paragraphs
    above still saying *"report yes or no"*; the convenient half was the one that
    loses the distinction.
+5. **After you change a thing, grep the diff you are about to commit for
+   references TO the thing you changed.** Not the whole frame — the diff. A
+   frame refers to its own parts by description (*"the SHA in the header
+   above"*, *"the table in D2"*, *"the count in §3"*), and those references are
+   invisible from the edit site.
+
+   > Measured 2026-09-17 on `LANG-ATOM-START-CLASSIFICATION-CLOSURE`. The header
+   > was rewritten from a release-time SHA to *"name your own base"* — correctly,
+   > because a pinned SHA decays between release and the cut. `AC-0` twenty lines
+   > down still said *"and not at the SHA in the header above if `main` has moved
+   > since"*, now pointing at a header that no longer names one. **The edit was
+   > right and it orphaned a pointer to itself.** One `git diff | grep -n
+   > 'header above\|above\|below'` would have caught it; the Architect caught it
+   > instead.
+   >
+   > **The general form: a reference by DESCRIPTION does not break when its
+   > target changes — it silently starts describing something else.** A reference
+   > by name breaks loudly. Prefer names, and grep for descriptions.
+
+## AC-0: THE FIRST AC MUST BE ABLE TO REFUTE THE FRAME'S OWN PREMISE
+
+**Ask of every frame: which AC fails if the defect does not exist?** If the
+answer is "none", the frame is a set of controls on a repair and cannot report
+that there was nothing to repair.
+
+**Write AC-0 before AC-1.** It re-establishes the frame's premise **at the
+implementer's own base**, by re-running the frame's own probes, with the output
+pasted. It carries a **stop condition**: if the premise does not reproduce,
+stop and report that — do not proceed to AC-1 and do not repair forward.
+
+> **Measured on `RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION`, closed REFUTED
+> 2026-09-17 with nothing landed.** Ten acceptance criteria, every one a control
+> on the repair. The premise — that a single slot is overwritten per
+> construction — was false on all four rows (`RTPROBE-WRITE = 1`, written exactly
+> once per compile). **None of the ten could have failed, because none of them
+> was about the premise.** The ring measured it in one turn; the frame had had no
+> way to ask.
+
+**Three properties, or it is not AC-0:**
+
+1. **It re-measures at the implementer's base, not at the framing SHA.** A
+   premise measured at framing time is a claim about a tree that has since
+   moved. Do not pin a base SHA in the frame for AC-0 to check against — tell
+   the implementer to name their own base and measure there.
+2. **Its probes are the frame's own**, quoted with expected output, so the
+   implementer runs the same instrument that produced the claim rather than
+   inventing one that agrees.
+3. **A null result is a REPORTABLE OUTCOME, stated as such.** If the frame does
+   not say "premise does not reproduce" is a result, it will be read as a
+   failure to reproduce — and the implementer will look harder instead of
+   reporting.
+
+**AC-0 is cheapest exactly where it is most likely to fire:** a frame whose
+premise was established by careful measurement the night before. Having spent
+the effort establishing that the defect is real, *"what if it isn't"* is the
+question you are least able to ask.
 
 ## Authoring acceptance criteria
 
