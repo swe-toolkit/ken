@@ -1,6 +1,6 @@
 ---
 id: LANG-STANDARD-INFIX-CALL-COMPLETION
-title: "A1 of the reserved-infix-glyph objective: the reusable use-site standard-call completion adapter that spec 39 section 6.9 specifies and that ships un-implemented, co-landing its first standard consumers ∧ ∨ ≤ ≥ ≠ bound to ordinary checked functions; ∧ ∨ ≤ bind to the ALREADY-LANDED `Core.Classes.LawfulClasses` bindings rather than to a second copy in a new package, because 6.9 keys completion on ONE defining GlobalId; ≥ and ≠ are the genuinely new bindings; the completion resolver is factored so later membership (6.10) reuses the SAME scoped/coherent dictionary resolver, not a second operator dispatcher; results Bool, single left-to-right eval, no short-circuit; the definition-time NoInstance gap for a generic `where Ord a` binding is repaired or explicitly split before the generic case is claimed delivered"
+title: "A1 of the reserved-infix-glyph objective: the reusable use-site standard-call completion adapter that spec 39 section 6.9 specifies and that ships un-implemented, co-landing its first standard consumers ∧ ∨ ≤ ≥ ≠ bound to ordinary checked functions; ∧ ∨ ≤ bind to the ALREADY-LANDED `Core.Classes.LawfulClasses` identities, reached through a separate standard-operator facade that RE-EXPORTS them rather than defining second copies, because 6.9 keys completion on ONE defining GlobalId and 33 section 6.1 requires exactly that home; ord_geq_at and ≠ are the genuinely new bindings; the completion resolver is factored so later membership (6.10) reuses the SAME scoped/coherent dictionary resolver, not a second operator dispatcher; results Bool, single left-to-right eval, no short-circuit; the definition-time NoInstance gap for a generic `where Ord a` binding is repaired or explicitly split before the generic case is claimed delivered"
 status: ready
 owner: language
 size: L
@@ -9,7 +9,7 @@ depends_on: [LANG-RESERVED-INFIX-NAMES, SPEC-STANDARD-INFIX-BINDING]
 blocks: [LANG-MEMBERSHIP-OPERATOR-SURFACE]
 github: null
 tier: T1
-origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy), grounded at main 4fdd4f0ad. A1: the reusable completion link, made its own node per the Architect (do not ship an unused framework nor a third wiring node -- co-land ∧ ∨ ≤ ≥ ≠). RELEASED 2026-09-17 by the Steward, re-grounded at main 8f0f3753270b2d7639fc7aed457b759e6e6a57a1: both prerequisites are merged, and the re-grounding refuted one of the stub's own scope lines (see the RELEASED banner). IN-LANE: bounded elaborator + catalog design; Architect required reviewer; no new TCB (Architect: no new Eq/DecEq instance, Float-equality law, or TCB entry needed)."
+origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy), grounded at main 4fdd4f0ad. A1: the reusable completion link, made its own node per the Architect (do not ship an unused framework nor a third wiring node -- co-land ∧ ∨ ≤ ≥ ≠). RELEASED 2026-09-17 by the Steward, re-grounded at main 8f0f3753270b2d7639fc7aed457b759e6e6a57a1: both prerequisites are merged, and the re-grounding refuted one of the stub's own scope lines (see the RELEASED banner). AMENDED same day with FI-2a after language-implementer attacked FI-2 as instructed (evt_70jn1q9r56ttr): FI-2 refuted second copies correctly but over-refuted the home, and spec 33 section 6.1 requires a re-exporting standard-operator module and fixes ≥'s binding as ord_geq_at. Architect then upheld the facade and overturned the Steward on ord_geq_at's home (evt_4jhrgeqse8k13, FI-2b): define it in LawfulClasses beside ord_leq_at, re-exported by the facade, because it is fully generic and section 2a puts only package-specific content in a package; the same ruling corrected the frame's stale 'actively contended' claim about LawfulClasses.ken.md to UNCONTENDED. IN-LANE: bounded elaborator + catalog design; Architect required reviewer; no new TCB (Architect: no new Eq/DecEq instance, Float-equality law, or TCB entry needed)."
 ---
 
 > # RELEASED 2026-09-17 (Steward), re-grounded at main `8f0f37532`.
@@ -24,6 +24,26 @@ origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_78
 > **Treat every anchor here as perishable. If a fixed input turns out false
 > against the landed code, say so and escalate — do not quietly build around
 > it.** One of them already was: see FI-2.
+>
+> ## AMENDED 2026-09-17 — FI-2a, and the instruction above working as intended.
+>
+> **The implementer attacked FI-2 first, as asked, and FI-2 was incomplete.**
+> It refuted *second copies* (correct, unchanged) but as written it read as
+> refuting *any new module*, and `33 section 6.1` positively requires a
+> **re-exporting standard-operator home**. `39 section 6.9` was the wrong
+> authority to settle placement from on its own; `33 section 6.1` is the
+> authority for the names and the home, and it also FIXES `≥`'s binding as
+> `ord_geq_at`. **FI-2a is the amendment; D2, the scope boundaries, AC-2,
+> AC-7 and the contention section were re-cut to match** — the Steward's error
+> is corrected in the operative text rather than noted beside it. See FI-2a.
+>
+> **The Architect then UPHELD the facade and OVERTURNED the Steward on
+> `ord_geq_at`'s home** (`evt_4jhrgeqse8k13`): it is defined in `LawfulClasses`
+> beside `ord_leq_at` and re-exported by the facade, because it is fully generic
+> and `section 2a` puts only what is SPECIFIC to a package in it. **FI-2b is the
+> operative text on placement.** It also corrects this frame's earlier
+> "actively contended" claim about `LawfulClasses.ken.md` — measured
+> UNCONTENDED, twice, independently. See FI-2b and the Contention section.
 
 ## What this is (Architect A1)
 
@@ -46,8 +66,8 @@ fixes that a failure at any step is **an ordinary elaboration error at the
 occurrence, never a silent fallback to a different meaning**. Do not re-derive
 this from the stub's prose; read section 6.9.
 
-**FI-2. THE STUB'S "new catalog package (proposed `Core.Operators`)" IS
-REFUTED FOR `∧ ∨ ≤`, AND THIS CHANGES THE DELIVERABLE.**
+**FI-2. THE STUB'S "new catalog package" MAY NOT DEFINE SECOND COPIES OF
+`∧ ∨ ≤`, AND THIS CHANGES THE DELIVERABLE.**
 Three of the five standard bindings already exist, are already `pub`, and
 already carry the exact telescope section 6.9 keys on:
 
@@ -59,31 +79,128 @@ all in `catalog/packages/Core/Classes/LawfulClasses.ken.md`, alongside
 `pub class Ord a` and `pub class DecEq a`. `catalog/packages/Core/` holds
 exactly `Classes` and `Logic`; there is no `Operators` package.
 
-⇒ **Authoring a second copy in a new package would mint a SECOND `GlobalId`
-for a meaning that already has a canonical one, and section 6.9's entire policy
-is that completion binds to THE defining `GlobalId` and its checked telescope,
-never to glyph text.** Two homes for one meaning is not untidiness here; it is
-a direct contradiction of the rule this node exists to implement, and it would
-make section 6.9's own stated consequence — *"a renamed standard binding still
-completes"* — ill-defined.
+⇒ **Authoring a second copy in a new package would mint a SECOND
+`GlobalId` for a meaning that already has a canonical one, and section
+6.9's entire policy is that completion binds to THE defining `GlobalId`
+and its checked telescope, never to glyph text.** Two homes for one
+meaning is not untidiness here; it is a direct contradiction of the rule
+this node exists to implement, and it would make section 6.9's own stated
+consequence — *"a renamed standard binding still completes"* —
+ill-defined.
 
-**So: `∧ ∨ ≤` bind to the landed `Core.Classes.LawfulClasses` bindings.** The
+**So: `∧ ∨ ≤` bind to the landed `Core.Classes.LawfulClasses` identities.** The
 genuinely new bindings are **`≥`** (reverses already-evaluated VALUES) and
 **`≠`** (negation of the exact NumericEnv `==` comparator on the same
-supported carriers). Their home is `Core.Classes.LawfulClasses` too, unless
-the Architect rules otherwise at review — **this is the Steward's call on a
-fork the stub left open with the word "proposed", resolved from FI-1 rather
-than escalated, and it is the first thing a reviewer should attack.**
+supported carriers).
+
+**FI-2a. THE HOME IS A SEPARATE RE-EXPORTING FACADE MODULE, AND `33 section
+6.1` REQUIRES IT. This amends FI-2 as first released** (`language-implementer`,
+`evt_70jn1q9r56ttr`, which attacked FI-2 as instructed and found it
+incomplete).
+
+FI-2 refuted *second copies*, and that holds. As first written it refuted
+*the package*, which reads as **"no home at all"** — and `33 section 6.1`
+positively requires one:
+
+> *"`bool_and`, `bool_or` and `ord_leq_at` **already exist** as ordinary
+> public functions in the standard package. The standard-operator home
+> **re-exports** them; it does not define second copies."*
+
+By `33 section 4.3` an `export` republishes the existing `GlobalId` and never
+mints another, so a re-exporting home is **not** the thing FI-2 rules out. The
+two claims are different and only one of them is true.
+
+**The home is a separate module, not an attachment inside `LawfulClasses`**, on
+four grounds, none of them aesthetic:
+
+1. **Section 6.1's verb settles it.** A module cannot re-export what it defines
+   — `4.3` states that for a locally defined name `export foo` has the same
+   interface effect as `pub foo`, no second identity. The three are already
+   `pub` in `LawfulClasses`, so `LawfulClasses` cannot be the re-exporting home.
+2. **`section 6.3` puts `∈` in the same home** — `membership_member_at` is an
+   ordinary top-level binding *"exactly as section 6.1's other four are"* — and
+   its provider is `50-stdlib/58b`'s `Membership`, not a lawful class. A
+   `LawfulClasses` home cannot host the B track without dragging `Membership`
+   into the classes module.
+3. **Fixity travels with identity** (`33 section 6`), so declaring the five
+   fixities at the facade is correct and needs no access to the defining module.
+4. **In-tree precedent for exactly this shape:**
+   `catalog/packages/Data/Numeric/Nat/Order.ken.md` is a facade that
+   re-exports `Ord`, `IsTrue` and `bool_or` without redeclaring them.
+
+⇒ **The stub's `Core.Operators` was right in SHAPE and wrong only in what it
+put there.** Author it as a facade: `export` the three landed identities,
+declare the five fixities, and define only what is SPECIFIC to it (FI-2b: not
+`ord_geq_at`, which is generic).
+
+**`≥`'s binding is `ord_geq_at (a : Type) (d : Ord a) (x : a) (y : a) :
+Bool`** — the name and telescope are FIXED by `33 section 6.1`, not yours
+to choose. It is *"derived over `leq`, not a class field"*: `class Ord a`
+declares `leq, refl, antisym, trans, total` and no `geq` member is added.
+It reverses its two **already-evaluated argument values inside its own
+body** and never reverses the operand expressions at the use site.
+
+**FI-2b. `ord_geq_at` IS DEFINED IN `LawfulClasses`, NOT IN THE FACADE.
+ARCHITECT RULING, `evt_4jhrgeqse8k13` — it OVERTURNS the Steward's
+recommendation and is the operative text.** The facade `export`s it along with
+the other three. The facade shape itself is UPHELD.
+
+The spec fixes `ord_geq_at`'s name and telescope and is silent on its defining
+module, so this was a factoring call, and the factoring rule is `section 2a` —
+in force on this node (operator, 2026-08-22), with Architect review as its
+design backstop.
+
+**The precedent read whole answers it.** `Data/Numeric/Nat/Order.ken.md`
+re-exports the GENERIC (`Ord`, `IsTrue`, `bool_or`, `leq_nat`) and defines the
+SPECIFIC (`min`, `max`, `sub`, `compare` — everything keyed on `Nat`). A facade
+defining things is fine; that one defines five. What it never does is define a
+generic. **`ord_geq_at` is fully generic over any `Ord a` — exactly as generic
+as `ord_leq_at`, which lives in `LawfulClasses`.** The facade's specific content
+is the glyph surface and the five fixity declarations, and an `Ord`-derived
+operation is not specific to an operator facade.
+
+**Two Steward errors this ruling corrects, recorded because inheriting either
+would be worse than the misplacement:**
+
+- **The contention reason was measurably FALSE**, and the refuting measurement
+  was in the very post the recommendation replied to. `LawfulClasses.ken.md`:
+  last landed touch `7663ad9b9` (2026-09-13); `wp/CAT-CAPEX` and
+  `wp/CAT-CC-ORACLE-BEHAVIORALIZE` touch it zero times; both foundation seat
+  branches are not ahead of main. **Uncontended.** And even if it had been
+  contended, contention is a SCHEDULING fact and this is a FACTORING question —
+  `section 2a` exists because soundness gates do not check factoring, and a
+  contention gate does not get to decide it either.
+- **"Cheap to move" was wrong about what moves.** The line is cheap; the
+  IDENTITY is not. By `33 section 4.3` identity is owned by the **defined-at**
+  module, so this choice permanently assigns `ord_geq_at`'s canonical owner, and
+  relocating it later re-homes a `GlobalId` — the exact property FI-2 exists to
+  protect — after consumers exist. They will: `ord_leq_at` already carries 376
+  uses in `PriorityQueue`, 66 in `InsertionSort`, 16 in `OrderedSearch`.
+
+⇒ **Put it where it still belongs in a year: beside `ord_leq_at`, in the module
+that owns the `Ord` vocabulary.** A reader opening `LawfulClasses` for the `Ord`
+surface must not find `ord_leq_at` with no `ord_geq_at` and nothing pointing
+onward.
+
+**The Architect ruled placement and factoring ONLY.** `section 6.1`'s telescopes
+against the elaborator seam, and `ord_geq_at`'s body (reversing two
+already-evaluated argument values rather than the operand expressions), are
+correctness questions he takes at candidate review.
+
+**`section 2a(b)` binds the facade, flagged now rather than at review:** lead
+with the headline — the operator surface and its fixities — and descend to
+plumbing, most-fundamental last. A module arranged bottom-up is a block at
+review.
 
 **FI-3. The definition-time `NoInstance` gap is real and located.**
 `crates/ken-elaborator/src/prelude.rs` states in its module header that
-`instance_search` runs **before the body elaborates**, emitting `NoInstance`;
-the construction sites are in `crates/ken-elaborator/src/elab.rs` and the
-variant is `ElabError::NoInstance { class, ty, span }` in
-`crates/ken-elaborator/src/error.rs`. A generic `where Ord a` binding therefore
-fails at definition time against the abstract tyvar `a`. **Repair it or split
-it explicitly — see AC-6. Do not claim the generic case delivered either way
-without discharging AC-6.**
+`instance_search` runs **before the body elaborates**, emitting
+`NoInstance`; the construction sites are in `crates/ken-elaborator/src/elab.rs`
+and the variant is `ElabError::NoInstance { class, ty, span }` in
+`crates/ken-elaborator/src/error.rs`. A generic `where Ord a` binding
+therefore fails at definition time against the abstract tyvar `a`. **Repair
+it or split it explicitly — see AC-6. Do not claim the generic case
+delivered either way without discharging AC-6.**
 
 **FI-4. `membership_member_at` is NOT a catalog binding today.** It appears
 only as a test fixture string in
@@ -94,9 +211,11 @@ correct and expected: it is the B track. Do not author it here.
 
 - Standard bindings are ordinary checked functions reached by ordinary imports:
   `∧`/`∨` = the landed `bool_and`/`bool_or`; `≤` = the landed `ord_leq_at`
-  (type + actual `Ord` dictionary); `≥` reverses already-evaluated VALUES; `≠`
-  = negation of the exact NumericEnv `==` comparator on the SAME supported
-  carriers. See FI-2 for where each lives.
+  (type + actual `Ord` dictionary); `≥` = `ord_geq_at`, reversing
+  already-evaluated VALUES; `≠` = negation of the exact NumericEnv `==`
+  comparator on the SAME supported carriers. They are reached through a
+  separate re-exporting facade module. See FI-2 and FI-2a for where each lives
+  and which module defines it.
 - The common call elaborator completes the omitted prefix (infer carrier;
   resolve dictionary via the existing class resolver OR select the existing
   equality comparator; check the saturated application in the kernel), bound to
@@ -119,8 +238,14 @@ correct and expected: it is the B track. Do not author it here.
 - **D1 — the completion adapter.** One use-site completion path in
   `crates/ken-elaborator`, keyed on the defining `GlobalId` + checked
   telescope, implementing section 6.9's ordering exactly.
-- **D2 — the five standard bindings wired.** `∧ ∨ ≤` bound to the landed
-  `Core.Classes.LawfulClasses` bindings (FI-2); `≥` and `≠` authored and bound.
+- **D2 — the five standard bindings wired, through a re-exporting facade.**
+  `∧ ∨ ≤` bound to the landed `Core.Classes.LawfulClasses` **identities**,
+  reached via `export` from a separate standard-operator module that does NOT
+  redeclare them (FI-2, FI-2a); `ord_geq_at` defined in `LawfulClasses`
+  beside `ord_leq_at` and re-exported by the facade (FI-2b, Architect ruling);
+  `≠` authored; each defined exactly once; the five fixities declared at the
+  facade, which is arranged headline-first per `section 2a(b)`. The facade is the
+  surface the B track's `∈` attaches to.
 - **D3 — the resolver factored once.** The dictionary completion that D1 uses
   is the same scoped/coherent resolver the B track will reuse for section 6.10,
   exposed so that reuse needs no second dispatcher.
@@ -144,6 +269,15 @@ would have to manufacture is the one to raise, not to skip.
   elaborates per its own declaration; (c) `ord_leq_at Nat d` stays a valid
   partial application and is not rewritten into a four-argument call. Each pair
   must FLIP if completion is keyed on glyph text instead of identity.
+  **FI-2a makes (a) degenerate unless you take care.** The facade's own
+  re-export is now the production path, so "a re-exported binding completes" is
+  satisfied by the delivery itself and controls nothing. (a) needs a witness
+  the delivery does not already produce: a **renaming** hop, or a second
+  re-export path, reaching the same identity under a different surface name and
+  completing identically. Separately, show the facade **republishes** rather
+  than mints — the identity behind the facade path and the identity behind
+  `Core.Classes.LawfulClasses`'s own path are the SAME `GlobalId`, which is the
+  property `33 section 4.3` promises and the one FI-2 exists to protect.
 - **AC-3 (one resolver, not two).** Name the single resolver entry point D1
   calls and show, by reading, that no second operator-dispatch path exists.
   **The satisfying act is a structural property of the tree, not an authored
@@ -168,7 +302,13 @@ would have to manufacture is the one to raise, not to skip.
   A silent third outcome is the failure this AC exists to catch.**
 - **AC-7 (Boolean truth tables).** Complete truth tables for `∧` and `∨` at the
   stated fixities, plus a case proving no short-circuit was invented (both
-  operands evaluate even when the first settles the result).
+  operands evaluate even when the first settles the result). **The case is
+  about OPERANDS and `18a section 5.4` is about the body's ARMS — `33 section
+  6.1` names the conflation explicitly.** `bool_and`'s body matches on its first
+  argument and forces one arm; under call-by-value both operands are already
+  evaluated before the body runs. An answer that cites arm laziness to explain
+  operand behaviour has answered a different question, and one that reports
+  no-short-circuit is CORRECT rather than a defect to fix.
 - **AC-8 (no regression).** Workspace-green **in CI**, never a local
   `--workspace` run (`COORDINATION` section 12). Enumerate the globbed catalog
   oracles your change reaches and name each in your handoff — a catalog-touching
@@ -186,19 +326,31 @@ would have to manufacture is the one to raise, not to skip.
 ## Sizing / tier
 
 **Size L, tier T1.** Soundness-adjacent completion machinery plus catalog
-design; the review turns on the resolver-factoring, the FI-2 placement call,
+design; the review turns on the resolver-factoring, the FI-2a/FI-2b placement call,
 and the `NoInstance` repair/split. Architect required reviewer.
 
 ## Contention
 
-Language ring: `crates/ken-elaborator/src` + tests, AND
-`catalog/packages/Core/Classes/LawfulClasses.ken.md` (not a new package — FI-2).
+Language ring: `crates/ken-elaborator/src` + tests, AND the new
+standard-operator facade module under `catalog/packages/Core/` (FI-2a), AND
+`catalog/packages/Core/Classes/LawfulClasses.ken.md`, which gains
+`ord_geq_at`'s definition per FI-2b.
 A1 is NOT parser-only; enumerate the globbed catalog consumers at the cut.
 CODE merge -> full CI, M8/M8a Adversary. Re-measure the NumericEnv carrier
 inventory and the class-resolver anchors at the cut.
 
-**`LawfulClasses.ken.md` is actively contended** — the foundation ring has been
-landing in it (for example `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT`, migrating
-`list_append` attached proofs to `Derived`). The foundation seats are currently
-walled on their provider quota, so the file is quiet right now, but **re-check
-contention at your cut rather than inheriting this sentence.**
+**`LawfulClasses.ken.md` measured UNCONTENDED at `775c9823b`** — by
+`language-implementer` and independently re-derived by the Architect:
+
+    last landed touch               7663ad9b9  2026-09-13  CAT-PRIORITY-QUEUE-LAWS
+    wp/CAT-CAPEX                    ahead 2, LawfulClasses touches = 0
+    wp/CAT-CC-ORACLE-BEHAVIORALIZE  ahead 3, LawfulClasses touches = 0
+    foundation-implementer/work     NOT ahead of main
+    foundation-leader/work          NOT ahead of main
+
+**This replaces an earlier "actively contended" sentence in this frame, which
+was wrong.** Two probes to know apart: `git diff origin/main...<branch>` answers
+a DIFFERENT question — a squash-merged branch still shows its own old changes
+against the merge-base, which reported 32 spurious hits. Sweep only branches
+genuinely ahead of `main` and held by a worktree. **Re-measure at your cut
+rather than inheriting either sentence.**
