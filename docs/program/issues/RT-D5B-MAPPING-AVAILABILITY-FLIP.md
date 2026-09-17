@@ -6,13 +6,56 @@ owner: runtime
 size: unsized
 gate: none
 depends_on: [RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE, RT-D5B-HOST-FILE-ACQUISITION-SURFACE]
-blocks: []
+blocks: [RT-D5B-POSTCALL-REFUSAL-MECHANISM]
 github: null
 tier: T1
 origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks + 3 shared with cluster B, plus 23 test hunks the runtime-implementer measured as belonging to this flip). Held out of slice 4 on Architect ruling evt_3wtg8w8krmmt: 'Membership is a plan, not evidence.' Unblocked for CUTTING -- not for release -- by Architect ruling evt_21f23zmgqfxsc on the permissive-by-design question."
 ---
 
 > # DRAFT. Not framed, not released. Do not start.
+>
+> ## 2026-09-17: THIS NODE NOW BLOCKS A `ready` NODE. Its priority is live.
+>
+> **The grant this node holds is the only thing that makes
+> [[RT-D5B-POSTCALL-REFUSAL-MECHANISM]] workable on `main`.** Measured at
+> `origin/main` `b0eb29e71` (Steward, `evt_30p9m0j8bj1f2`):
+>
+>     lowering/effects.rs :2812   if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation)
+>     abi_s6_mapping_file_backed_native.rs   13 tests, ONE program (const SOURCE),
+>                                            15 of 15 build/run sites pass it,
+>                                            SOURCE :67 acquires a FileBacked mapping
+>
+> With the grant excluded, every one of those tests is refused at `:2812` before
+> lowering. **The `CheckedIhDetachedCallerCut` refusal is unreachable on `main`
+> until this node lands** — which is why `ABI-S6-HS18-D5B-SUBSTRATE-PORT` does
+> **not** unblock it, contrary to what the Steward's first sequencing ruling
+> claimed.
+>
+> **THE GRANT'S FOOTPRINT IS SIX SITES, NOT FIVE.** The census of five was short.
+> The sixth is `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` membership plus the matching
+> removal from the named-unavailable-lanes arm, both in
+> `planning/static_transition/effects.rs` — **the site that actually operates the
+> gate**, and it carries site 3's signature of a pure deletion with no line to
+> grep for. Found by the runtime-implementer (`evt_316yppb8r4zxa`), confirmed by
+> the Architect (`evt_1jfpng6yvy89v`). There is also a seventh touch in
+> `st/aggregates.rs`. **Treat six as a floor, and close it with the
+> `AC-PREDICATE` — zero diff lines naming the operation at pathspec `crates/` —
+> not with a site list.**
+>
+> ### PRICING RULE, and it exists because of a disclosed conflict
+>
+> The Architect holds `gate: architect` on the node this now blocks **and** is
+> the seat that refused this grant twice and defined its scope both times. They
+> disclosed it unprompted (`evt_prasphavwv64`).
+>
+> **Price this node without deference to that refusal.** The correct input from
+> that seat is the refusal's **ground**, not its authority: *"membership is a
+> plan, not evidence"* (`evt_3wtg8w8krmmt`). If this node supplies evidence of
+> native availability, the refusal is discharged on its own terms.
+>
+> **And do NOT let this through on the argument that a blocked node needs it.**
+> That is precisely the argument the original refusal rejected. A downstream
+> block raises this node's **priority**; it supplies none of its **evidence**.
 >
 > **Gate 1 is CLEARED.** [[RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE]] landed at
 > `dcb848eaa68111a32f6bb135afbbba1d8e862ad1`, so site 2 is now the single flip
@@ -89,6 +132,16 @@ reasoning alone endorsed (see below), and it costs one command.
     4  effect_v1.rs NATIVE_TESTED_TARGETS_V1   [_; 25]       [_; 26]        ADD
     5  lowering/effects.rs                     0 occurrences 5+, incl. a
                                                              lowering arm   ADD
+
+**THIS TABLE OF FIVE IS A RECORD TAKEN AT `6f49f8521`, AND IT IS SHORT BY ONE.**
+Left unaltered because it records what was measured then. **The sixth site was
+found 2026-09-17** — `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` membership plus the
+matching removal from the named-unavailable-lanes arm, both in
+`planning/static_transition/effects.rs`, with a seventh touch in
+`st/aggregates.rs`. See the banner. **The lesson the miss carries: sites 3 and
+the sixth are pure DELETIONS with no added line, so any census built by grepping
+for what a diff ADDS is structurally blind to them. Use the `AC-PREDICATE`, not
+a site list.**
 
 Five is a **floor, not a census** — nobody has proven no sixth exists, which is
 the argument for a predicate over an enumeration.

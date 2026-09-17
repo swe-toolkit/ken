@@ -1,16 +1,93 @@
 ---
 id: RT-D5B-POSTCALL-REFUSAL-MECHANISM
-title: "What is the mechanism of the CheckedIhDetachedCallerCut refusal at lowering/core.rs:7720 -- the only distinct Packaging reason in abi_s6_mapping_file_backed_native and the cause of 8 of its 11 base reds, where a two-step SelfDefining post-call consumer receipt meets one computational eliminator frame. THREE mechanisms have been proposed and measured away in one session, all sharing the premise that the defect is reachable from the call site's inputs; the measurement says those inputs are internally consistent and the disagreement is upstream of them. The mechanism is UNKNOWN and this node exists to find it, not to carry a candidate"
-status: ready
+title: "What is the mechanism of the CheckedIhDetachedCallerCut refusal raised WHERE A TWO-STEP SelfDefining POST-CALL CONSUMER RECEIPT MEETS ONE COMPUTATIONAL ELIMINATOR FRAME -- the only distinct Packaging reason in abi_s6_mapping_file_backed_native. THE SUBJECT IS THAT CONDITION, NOT A LINE NUMBER: this node was cut against an unlanded tree, and every lowering/core.rs:7720 in its body is a coordinate ON THAT TREE recording where a measurement was taken, never a pin to re-resolve against main. THREE mechanisms have been proposed and measured away in one session, all sharing the premise that the defect is reachable from the call site's inputs; the measurement says those inputs are internally consistent and the disagreement is upstream of them. The mechanism is UNKNOWN and this node exists to find it, not to carry a candidate. NOT WORKABLE ON MAIN until RT-D5B-MAPPING-AVAILABILITY-FLIP lands -- the refusal sits behind the cranelift availability gate and no program can reach it without the grant"
+status: draft
 owner: runtime
 size: M
 gate: architect
-depends_on: []
+depends_on: [RT-D5B-MAPPING-AVAILABILITY-FLIP]
 blocks: []
 github: null
 tier: T1
 origin: "Cut by the Steward 2026-09-14, superseding two unlanded drafts withdrawn before commit (RT-POSTCALL-RECEIPT-ALIGNMENT-AUTHORITY, RT-SELFDEFINING-RECEIPT-FRAME-ARITY), each named for a mechanism refuted within minutes of being written. This node is deliberately named for the QUESTION. Chain: implementer evt_4y7sypns2j0v, Steward hold evt_5t0n56p3jvpck, implementer withdrawal evt_1281f1q5v7j9p, Architect evt_5x5cfwgp4bk24 + evt_41r81fdj0741f + evt_pzd11rqycqe, implementer measurements evt_49vn1p2c57e7b + evt_5ycnn29hy38qs + evt_3gyahpfpnja76. COORDINATION §1a fired by the Steward on the third refuted mechanism."
 ---
+
+> # DEMOTED `ready` -> `draft` 2026-09-17. DO NOT PULL THIS NODE.
+>
+> **It is not workable on `main` and nothing it needs has landed.** It was
+> `ready` on the premise that its subject was reproducible; the measurement below
+> refutes that. `depends_on: [RT-D5B-MAPPING-AVAILABILITY-FLIP]`, which is itself
+> `draft`. **The three refuted mechanisms and every measurement below remain
+> valid and are why this node still exists** — the demotion is about
+> reachability, not about the question going away.
+
+> # RE-ANCHORED 2026-09-17: THE SUBJECT IS A PREDICATE.
+> # `:7720` IS A RECORD, NOT A PIN.
+>
+> **This node's subject is the CONDITION named in the title** — a two-step
+> `SelfDefining` post-call consumer receipt meeting one computational eliminator
+> frame. It was previously named for `lowering/core.rs:7720`, **a coordinate on
+> a tree that never landed.** Measured at `origin/main` `b0eb29e71`:
+>
+>     crates/ken-runtime/src/cranelift_backend/lowering/core.rs
+>       origin/main   16487 lines      :7720 is a comment about recursive positions
+>       30d35f625     17388 lines      the tree this node was cut against
+>
+>     CheckedIhDetachedCallerCut, tree-wide in crates/
+>       origin/main    9 occurrences, 1 file  (planning/static_transition/responses.rs)
+>       30d35f625     29 occurrences, 4 files
+>
+> ⇒ **Whatever sits at `:7720` on `main` is a different site.** The 32
+> occurrences of `7720` in the body below are left in place deliberately: each
+> **records where a measurement was taken on the checkpoint tree**, and rewriting
+> them would destroy the argument the three refutations rest on. **A record must
+> not change; a pin must. Do not resolve any of them against `main`.**
+>
+> ## NOT WORKABLE ON `main` TODAY, AND THE SUBSTRATE PORT DOES NOT CHANGE THAT
+>
+> The Steward's 2026-09-17 sequencing ruling (`evt_14chw4xj920d4`) said the
+> `ABI-S6-HS18-D5B-SUBSTRATE-PORT` would give this node *"a reproduction on main
+> for the first time."* **That premise was refuted by reading**
+> (`evt_30p9m0j8bj1f2`), and the claim is withdrawn:
+>
+>     lowering/effects.rs :2812   if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation)
+>                                    { return Err(unsupported(...)) }     at origin/main
+>
+>     abi_s6_mapping_file_backed_native.rs at 30d35f625  (ken-cli/tests/, not ken-runtime/)
+>       raw strings in the file                 exactly ONE   const SOURCE
+>       build/run call sites                             15
+>         passing SOURCE                                 15
+>         passing anything else                           0
+>       SOURCE :67   (withMapping ... (FileBacked file (8 : Int)) ReadWrite ...)
+>
+> **Thirteen tests, one program, and that program acquires a file-backed
+> mapping.** With the `MappingAcquireFile` grant excluded the op is absent from
+> the roster, so every test is refused at `:2812` **before lowering** — the
+> refusal this node is chartered to find is not reachable at all.
+>
+> ⇒ **`depends_on: [RT-D5B-MAPPING-AVAILABILITY-FLIP]`.** Until the grant lands
+> there is no reproduction on `main` for anyone. The port lands the test file and
+> nothing in it reaches the refusal.
+>
+> **The 11-base-red population is a CHECKPOINT-TREE measurement.** Those 11 reds,
+> 8 of them this refusal, were taken on a tree **with** the grant. The node's own
+> text already concedes they *"were never a stable population"*; the port will
+> produce a different population by construction, and that is not a discrepancy
+> to reconcile.
+>
+> ## ARCHITECT DISCLOSURE, on the record before anyone prices the new edge
+>
+> The Architect is `gate: architect` on this node **and** is the seat that
+> refused the `MappingAcquireFile` grant twice and defined its scope both times
+> (`evt_prasphavwv64`, unprompted). The new edge puts their own refusal on this
+> node's critical path.
+>
+> **Price `RT-D5B-MAPPING-AVAILABILITY-FLIP` without deference to that refusal,
+> and do not let it through on the argument that a blocked node needs it** —
+> that is precisely the argument the original refusal rejected (*"membership is
+> a plan, not evidence"*). The correct input is the refusal's **ground**, not its
+> authority: if the flip node supplies evidence of native availability, the
+> refusal is discharged on its own terms.
 
 > # READ FIRST: THREE REFUTED MECHANISMS. THIS NODE CARRIES NO CANDIDATE.
 >

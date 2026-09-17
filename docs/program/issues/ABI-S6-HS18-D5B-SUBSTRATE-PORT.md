@@ -140,13 +140,27 @@ can name is reviewable, and a silent one is indistinguishable from an oversight.
 
 # NOT this node
 
-- **The refused `MappingAcquireFile` grant.** `lowering/effects.rs` +46/-5 is
-  census site 5, 8 of 42 lines. **Do NOT hand-separate it.** It is already
-  carved out as [[RT-D5B-MAPPING-AVAILABILITY-FLIP]] (`draft`), held out of
-  slice 4 on Architect ruling `evt_3wtg8w8krmmt` — *"Membership is a plan, not
-  evidence"* — and unblocked for **cutting, not release** (`evt_21f23zmgqfxsc`).
-  **Excluded here BY CONSTRUCTION**, which is a boundary a reviewer can check
-  rather than one they must trust.
+- **The refused `MappingAcquireFile` grant — SIX sites, not five (amended
+  2026-09-17).** `lowering/effects.rs` +46/-5 is census site 5, 8 of 42 lines.
+  **Do NOT hand-separate it.** It is already carved out as
+  [[RT-D5B-MAPPING-AVAILABILITY-FLIP]] (`draft`), held out of slice 4 on
+  Architect ruling `evt_3wtg8w8krmmt` — *"Membership is a plan, not evidence"* —
+  and unblocked for **cutting, not release** (`evt_21f23zmgqfxsc`). **Excluded
+  here BY CONSTRUCTION**, which is a boundary a reviewer can check rather than
+  one they must trust.
+
+  **The census of five was SHORT.** The sixth site is
+  `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` membership plus the matching removal from
+  the named-unavailable-lanes arm, both in
+  `planning/static_transition/effects.rs` — a **Region 2** file, so the exclusion
+  is surgical inside Region 2 rather than a clean Region 2/3 split. **That is
+  the site that operates the gate** at `lowering/effects.rs:2812`, and its
+  removal is a pure deletion with no added line to grep for. A seventh touch
+  sits in `st/aggregates.rs`. **The roster ADMITS and the dispatch HANDLES —
+  excluding either alone lands a `:3713` `unreachable!()` panic**, so exclude
+  whole files and treat six as a floor. The closing instrument is the parent's
+  `AC-PREDICATE` (zero diff lines naming the operation at pathspec `crates/`),
+  which catches all seven without a complete site list. See the frame's `§2e`.
 - **Increment A's own substance.** Nine files, `units.rs` +4083. This node
   makes it landable; it does not absorb it.
 - **Increments B and C.** B is `source.rs`'s resume-exit repair, C is amendment
@@ -166,3 +180,11 @@ can name is reviewable, and a silent one is indistinguishable from an oversight.
   `CheckedIhDetachedCallerCut` refusal mechanism is UNKNOWN and that node exists
   to find it. **Overlaps this node's checked-IH cluster; check contention before
   releasing both.**
+
+  **This node does NOT unblock it (amended 2026-09-17).** The acceptance test is
+  13 tests over **one** program, and that program acquires a file-backed
+  mapping — so with the grant excluded every test is refused at
+  `lowering/effects.rs:2812` before lowering and the refusal is unreachable. That
+  node now `depends_on` [[RT-D5B-MAPPING-AVAILABILITY-FLIP]]. **This node still
+  proceeds**: the sequencing ruling's other leg — that node is not workable on
+  `main` today regardless — is measured and stands alone. Frame `§2e`.
