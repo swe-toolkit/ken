@@ -11090,13 +11090,22 @@ pub(super) fn derive_checked_ih_post_call_consumer_chain(
     actual: ConstructorIdentity,
     demanded: ConstructorIdentity,
 ) -> Result<Option<Vec<CheckedIhPostCallConsumerStep>>, CraneliftBackendError> {
-    // CALLER CONTRACT, not a gate. `build_checked_ih_post_call_consumers` obtains
-    // `actual` from `continuation_call_selected_result_identity_opt` on THIS same
-    // identity and plan, so for that caller this re-derivation is a pure function
-    // of the same inputs and CANNOT disagree -- it is a debug assertion, and a
-    // reader should not count it as protection. It has a real firing path only for
-    // a future caller that passes an `actual` obtained some other way, which is
-    // why it is documented rather than deleted.
+    // CALLER CONTRACT, not a gate -- and the reason is STRUCTURAL, not "both are
+    // pure". Two different pure functions of the same inputs disagree all the time.
+    // What establishes it: `_opt` and `continuation_call_selected_result_identity`
+    // both route through `continuation_result_constructor_identities` on an
+    // identically computed `body` (the same `continuation_units()` lookup by
+    // `identity.target()`, the same `child_origin(continuation_origin,
+    // 1 + producer_alternative)`), and `_opt`'s `[identity] => Some` arm and
+    // `exact_result_identity`'s `[identity] => Ok` arm are the SAME singleton arm of
+    // the SAME vector. It is ONE producer read twice, not two producers that agree.
+    //
+    // That distinction is load-bearing: if these were genuinely independent
+    // derivations, this guard would be a live veto hard-erroring on a program `_opt`
+    // had just declared modellable -- reintroducing the FORK 2 veto inside the
+    // function the FORK 2 repair calls. It has a real firing path only for a future
+    // caller that obtains `actual` some other way, which is why it is documented
+    // rather than deleted.
     let rederived_actual = continuation_call_selected_result_identity(plan, identity)?;
     if rederived_actual != actual {
         return Err(planner_error(
@@ -11197,8 +11206,7 @@ pub(in crate::cranelift_backend) fn note_transport_examined() {
     TRANSPORTS_EXAMINED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }
 
-/// Emits the unmodelled-target record ONCE per run, UNCONDITIONALLY, including the
-/// zeros.
+/// Emits the unmodelled-target record, UNCONDITIONALLY, including the zeros.
 ///
 /// **Gated on `px8-ds-test-support`, deliberately NOT on `cfg(test)`.** A
 /// `#[cfg(test)]` reader is compiled into exactly the processes where this record is
@@ -11207,6 +11215,14 @@ pub(in crate::cranelift_backend) fn note_transport_examined() {
 /// and compiled OUT of the `ken-cli` test targets, the only processes that can
 /// populate it. A reader present only where the thing it reads cannot exist is not a
 /// reader.
+///
+/// **Called from a site the run reaches, not from a destructor.** An earlier version
+/// emitted from a thread-local `Drop`. "End of run" was never the requirement — it
+/// was a proxy for "the total" — and since the counters are monotone process-global
+/// atomics, EVERY emission already carries the total as of that moment. A
+/// process-exit hook would have produced one more sample, not a different kind of
+/// sample. Dropping the destructor removes `process::exit`, `panic = abort` and
+/// main-thread TLS from the threat model entirely.
 ///
 /// **Unconditional, not silent-when-zero.** A silent zero is indistinguishable from
 /// an absent emitter, and someone would re-add a silence condition later to quiet
@@ -11220,68 +11236,49 @@ pub(in crate::cranelift_backend) fn note_transport_examined() {
 /// N > 0, M > 0, counters 0   examined transports, declined none -- a real zero
 /// ```
 ///
-/// **There is deliberately no `N = 0` row: it cannot occur.** The thread-local is
-/// armed by the same `#[cfg]` block that increments `N`, so the emitter exists only
-/// on a path that has already counted an invocation — the block can never appear
-/// with `N == 0`. Writing that row would be the dead-arm shape this whole record was
-/// built to remove: a category whose population is silently relabelled into its
-/// neighbour.
+/// **There is deliberately no `N = 0` row: it cannot occur.** The emission sits in
+/// the same `#[cfg]` block that increments `N`, immediately after it, so a block can
+/// never appear with `N == 0`. Writing that row would be the dead-arm shape this
+/// record was built to remove: a category whose population is silently relabelled
+/// into its neighbour.
 ///
-/// **Arming earlier would not recover it.** `publish_checked_ih_post_call_consumers`
-/// runs on every plan build, so "the publisher never ran" means "this run built no
-/// plans at all", and there is no crate-load hook to arm from without a constructor
-/// dependency. That population therefore lands in `block absent` — merged with the
-/// uninstrumented case, and **that merge is stated here rather than hidden**: a
-/// feature-on run that builds no plans is indistinguishable from a feature-off run
-/// by this record alone, and only the invocation separates them.
+/// **Arming or emitting earlier would not recover it.**
+/// `publish_checked_ih_post_call_consumers` runs on every plan build, so "the
+/// publisher never ran" means "this run built no plans at all", and any emission
+/// point inside the plan path has the identical population — moving it relocates the
+/// collapse one level out and makes it harder to see. That population therefore
+/// lands in `block absent`, merged with the uninstrumented case, and **that merge is
+/// stated here rather than hidden**: a feature-on run that builds no plans is
+/// indistinguishable from a feature-off run by this record alone, and only the
+/// invocation separates them. Those are the only two causes of an absent block.
 ///
-/// **Limits, stated because they bound the claim — and the second one I got wrong
-/// in an earlier draft:**
-///
-/// 1. This fires from a thread-local `Drop`, so it emits at thread exit rather than
-///    at a process-wide barrier, and a `Drop` is not guaranteed to run at all —
-///    `process::exit` skips TLS destructors entirely. **It is not a process-exit
-///    hook and must not be read as one.** A populated record with no emission is
-///    possible, which is why clause 3a attributes absence via the INVOCATION rather
-///    than from inside the record.
-/// 2. The counters are process-GLOBAL atomics, so **every emission reports the
-///    running total, not a per-thread slice. A reader takes the LAST/largest
-///    emission and MUST NOT SUM them** — measured: a parallel `-p ken-runtime`
-///    union run emitted 652 lines with 536 distinct `publisher_invocations` values,
-///    monotonically increasing. Summing would multiply the true count by hundreds.
-///    An earlier version of this comment said "the reader must sum", which was
-///    exactly backwards.
-#[cfg(feature = "px8-ds-test-support")]
-struct UnmodelledPostCallRecordEmitter;
-
-#[cfg(feature = "px8-ds-test-support")]
-impl Drop for UnmodelledPostCallRecordEmitter {
-    fn drop(&mut self) {
-        use std::sync::atomic::Ordering::Relaxed;
-        let (many, no_constructor) = unmodelled_post_call_targets();
-        eprintln!(
-            "ken-planner post-call consumer record: publisher_invocations={} \
-             transports_examined={} declined_many_identities={} \
-             declined_no_constructor_identity={} (bottom is not separable from a \
-             coverage hole in this record)",
-            PUBLISHER_INVOCATIONS.load(Relaxed),
-            TRANSPORTS_EXAMINED.load(Relaxed),
-            many,
-            no_constructor,
-        );
-    }
-}
-
-#[cfg(feature = "px8-ds-test-support")]
-thread_local! {
-    static UNMODELLED_RECORD_EMITTER: UnmodelledPostCallRecordEmitter =
-        const { UnmodelledPostCallRecordEmitter };
-}
-
-/// Arm the once-per-thread emission. Cheap and idempotent.
-#[cfg(feature = "px8-ds-test-support")]
-pub(in crate::cranelift_backend) fn arm_unmodelled_post_call_record() {
-    UNMODELLED_RECORD_EMITTER.with(|_| {});
+/// **Reading the counters: take the MAXIMUM, never the sum, and never "the last".**
+/// They are process-GLOBAL, so every emission reports a running total — summing
+/// multiplies the true count by the emission count. And **file order is not value
+/// order**: two threads may load 100 and 200 and reach the stderr lock in the other
+/// order, so the last line can read below the largest. The load and the print are
+/// two steps and only the print is ordered. A single run of 652 emissions was
+/// observed monotonically increasing, which is one interleaving, not a guarantee.
+pub(in crate::cranelift_backend) fn emit_unmodelled_post_call_record() {
+    use std::io::Write as _;
+    use std::sync::atomic::Ordering::Relaxed;
+    let (many, no_constructor) = unmodelled_post_call_targets();
+    // Written to the raw stderr handle rather than via `eprintln!`. A test harness
+    // captures the `print!` machinery, so an `eprintln!` from a call site the run
+    // reaches is INVISIBLE under a plain `cargo test` -- measured: 17 emissions with
+    // `--nocapture`, 0 without. That would reintroduce a third cause of an absent
+    // block, which is the collapse this emitter exists to avoid.
+    let _ = writeln!(
+        std::io::stderr(),
+        "ken-planner post-call consumer record: publisher_invocations={} \
+         transports_examined={} declined_many_identities={} \
+         declined_no_constructor_identity={} (bottom is not separable from a \
+         coverage hole in this record; take the MAX across emissions, never the sum)",
+        PUBLISHER_INVOCATIONS.load(Relaxed),
+        TRANSPORTS_EXAMINED.load(Relaxed),
+        many,
+        no_constructor,
+    );
 }
 
 /// Membership probe for the post-call consumer relation: is this target's

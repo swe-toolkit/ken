@@ -4379,12 +4379,14 @@ pub(super) fn publish_checked_ih_post_call_consumers(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<CheckedIhPostCallConsumer>, CraneliftBackendError> {
     let mut rows = build_checked_ih_post_call_consumers(plan)?;
-    // Arm the once-per-thread record emission and count this invocation, so the
-    // skip counters have a denominator a reader can use.
+    // Count this invocation, then emit the record from a call site the run
+    // REACHES -- not from a destructor. The counters are monotone process-global
+    // atomics, so this emission already carries the running total; there is nothing
+    // an end-of-run hook would add but one more sample.
     #[cfg(feature = "px8-ds-test-support")]
     {
-        super::continuations::arm_unmodelled_post_call_record();
         super::continuations::note_publisher_invocation();
+        super::continuations::emit_unmodelled_post_call_record();
     }
     #[cfg(feature = "px8-ds-test-support")]
     if d5b_hs17_post_call_consumer_mutation() == D5bHs17PostCallConsumerMutation::TransplantConsumer
