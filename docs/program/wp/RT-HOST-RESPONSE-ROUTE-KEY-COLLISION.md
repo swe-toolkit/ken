@@ -45,6 +45,15 @@ pre-existing debt.
 
 ## 3. THE MEASUREMENT THAT DECIDES IT — RUN THIS FIRST
 
+> ### RUN AND ANSWERED, 2026-09-17, AND BOTH BRANCHES BELOW WERE WRONG.
+>
+> **`SAME` on all four rows** — every colliding pair carries
+> `EntropyOp::RandomBytes` / `EntropyRandomBytes` (runtime-implementer,
+> `evt_73vfttwb7ncya`, rows re-derived at `89dc3b0e5`). **Read the amendment in
+> §3a before acting on anything in this section.** The two branches below are
+> retained because the measurement was taken against them, not because either
+> is the disposition.
+
 **For each of the four rows: do the two colliding cases carry the SAME
 operation or DIFFERENT operations?**
 
@@ -64,6 +73,49 @@ it is exactly the kind of reading that is refuted by one run. If it comes back
 
 **Report the answer per row, not in aggregate.** Four rows can split across the
 two outcomes, and a summary would hide that.
+
+## 3a. AMENDMENT — THE TWO BRANCHES ARE NOT EXHAUSTIVE. THE KEY OMITS THE OCCURRENCE.
+
+**Steward, 2026-09-17. The defect above is mine and it is the second instance
+in this ledger-derived series**, the first being
+`RT-CARRIED-RESIDUAL-IH-ARITY`'s binary disposition. **§3 is exhaustive over
+*operation equality* and not over *why two entries collide*, and the answer sits
+in the gap.**
+
+**Measured, per row** — same constructor, same operation, **different
+occurrences**:
+
+    PREV   effect=23    producer_call=20    response=18     (px7n: 25 / 22 / 20)
+    NEW    effect=340   producer_call=337   response=335    (px7n: 390 / 387 / 385)
+
+⇒ **`SAME` does not imply a genuine duplicate claim.** A program that performs
+`RandomBytes` at two sites with two response handlers is valid Ken, so **the
+four tests are not asserting anything false and the `SAME` branch's disposition
+does not follow.**
+
+⇒ **And the `DIFFERENT` branch's repair is equally dead: adding `operation` to
+the key changes nothing, because both entries already carry
+`EntropyRandomBytes`.**
+
+**What the key actually omits is the OCCURRENCE.** `host_response_routes` maps
+`case.constructor` over *every* `Match` in the plan, so the invariant encodes
+**"one host-operation constructor ⇒ one response-handling site in the whole
+program"**, and `selected_host_response_route` then resolves a `Vis` site's
+operation subtree against that single entry.
+
+**The invariant is too strong. The repair is NOT a tuple widening.** Pairing N
+`Vis` sites to N handlers is planner work. **`AC-4` still governs it** — justify
+against purpose, name a case that must still be refused — and `AC-4` is
+unchanged by this amendment.
+
+**Open, and being measured rather than reasoned about** (implementer, same
+post): `PREV` sits at origins 18-25 and `NEW` at 335-390 in all four. That
+spread is large and consistent, so the two entries **may not be peers** — one
+may be a library/prelude occurrence rather than a second program site. **The
+disposition changes materially if so, and it is not settled here.**
+
+**Nothing in this amendment directs the disposition.** It retires two refuted
+branches so they stop reading as the decision procedure.
 
 ## 4. Deliverables
 
