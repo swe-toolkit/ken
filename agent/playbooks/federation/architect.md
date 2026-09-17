@@ -60,6 +60,31 @@ asked for, or a recut checkpoint is **non-advancing**: it keeps the current
 `steward/escalation.md`, "What counts as a hard stop"). On the **3rd** — and
 again at every **3rd** after (6th, 9th, 12th, …) — **before you rule**:
 
+> **ONE COUNTER PER LIVE CHAIN. NOT ONE ARCHITECT-WIDE NUMBER.** Steward
+> ruling, 2026-09-17, on the Architect's own question — he had been carrying a
+> single number across two concurrent WPs and asked which convention binds
+> before it decided itself.
+>
+> *"On one WP"* and *"the same design question"* are both load-bearing, and the
+> rationale above says why: the trigger fires when **a pair** circling **one**
+> question has stopped making unaided progress. **A single architect-wide sum
+> does not measure that in either direction.** It fires a research hold on a WP
+> at its FIRST stop because two unrelated chains elsewhere happened to total a
+> multiple of three, and it fails to fire on a genuine third stop whose
+> siblings were quiet. The number stops tracking the thing it was built for.
+>
+> **Carry one count per (WP, design question).** Concurrent chains do not pool.
+>
+> **The reason this is written down rather than left in a thread:** the
+> Architect's own framing of the hazard was *"redefining the counter at the
+> exact moment the redefinition would skip a trigger is how a mechanical count
+> stops being one."* That is correct, and it is why the convention is a
+> standing rule here rather than a call on any instance. **A convention settled
+> in-thread is re-litigated at the next compaction by whichever seat compacts
+> first.** Do not apply a convention change retroactively to cancel a stop that
+> has already fired — rule it forward, and let the advisory already framed run
+> on its merits.
+
 1. **Hold your own ruling.** Post in-thread that you are holding the ruling on
    `<WP>` pending a research prior-art advisory. Do **not** keep grinding the
    ruling in parallel — your tokens are better spent *with* the advisory in hand
