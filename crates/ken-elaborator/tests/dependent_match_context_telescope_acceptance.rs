@@ -282,12 +282,7 @@ fn elim_carries_convoy_telescope_in_motive_methods_and_application() {
     }
     app_args.reverse();
     let (motive, methods) = match head {
-        Term::Elim {
-            fam,
-            motive,
-            methods,
-            ..
-        } => {
+        Term::Elim { fam, motive, methods, .. } => {
             assert_eq!(*fam, env.globals["Fin"], "must eliminate over Fin");
             (motive.as_ref(), methods)
         }
@@ -298,10 +293,7 @@ fn elim_carries_convoy_telescope_in_motive_methods_and_application() {
     // eliminator is applied to the ambient convoy actuals in dependency order.
     // Ambient de Bruijn after the 6 param lambdas: xs=3, h=2, z=1.
     let na = app_args.len();
-    assert!(
-        na >= 3,
-        "expected the three convoy actuals among the applications"
-    );
+    assert!(na >= 3, "expected the three convoy actuals among the applications");
     assert!(
         matches!(app_args[na - 3], Term::Var(3)),
         "outer convoy actual must be `xs` (@3): {:?}",
@@ -331,11 +323,7 @@ fn elim_carries_convoy_telescope_in_motive_methods_and_application() {
         Term::Pi(a, b) => (a.as_ref(), b.as_ref()),
         o => panic!("Env binder must be followed by the Wit binder, got {o:?}"),
     };
-    assert_eq!(
-        spine_head_id(wit_dom),
-        Some(wit_id),
-        "second binder is Wit (`h'`)"
-    );
+    assert_eq!(spine_head_id(wit_dom), Some(wit_id), "second binder is Wit (`h'`)");
     assert!(
         matches!(spine_last_arg(wit_dom), Some(Term::Var(0))),
         "Wit binder must name the outer Env binder (Var 0): {wit_dom:?}"
@@ -344,11 +332,7 @@ fn elim_carries_convoy_telescope_in_motive_methods_and_application() {
         Term::Pi(a, _) => a.as_ref(),
         o => panic!("Wit binder must be followed by the Fam binder, got {o:?}"),
     };
-    assert_eq!(
-        spine_head_id(fam_dom),
-        Some(fam_id),
-        "third binder is Fam (`z'`)"
-    );
+    assert_eq!(spine_head_id(fam_dom), Some(fam_id), "third binder is Fam (`z'`)");
     assert!(
         matches!(spine_last_arg(fam_dom), Some(Term::Var(0))),
         "Fam binder must name the outer Wit binder (Var 0): {fam_dom:?}"

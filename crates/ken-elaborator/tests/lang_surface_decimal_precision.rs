@@ -54,7 +54,8 @@ fn wide_decimal_reaches_kernel_carrier_and_evaluation_exactly() {
     let result = env
         .elaborate_decl_v1(&format!("const wide = {WIDE}d"))
         .expect("wide coefficient must elaborate");
-    let Decl::Transparent { body, .. } = env.env.lookup(result.def_id).expect("transparent") else {
+    let Decl::Transparent { body, .. } = env.env.lookup(result.def_id).expect("transparent")
+    else {
         panic!("expected transparent wide decimal")
     };
     let literal_id = match body {
@@ -74,7 +75,9 @@ fn wide_decimal_reaches_kernel_carrier_and_evaluation_exactly() {
 
 #[test]
 fn decimal_eq_decides_wide_exactness_through_target() {
-    let result = eval_view("const equal = (9223372036854775808d + 1d) == 9223372036854775809d");
+    let result = eval_view(
+        "const equal = (9223372036854775808d + 1d) == 9223372036854775809d",
+    );
     assert_eq!(result, EvalVal::Bool(true));
 }
 

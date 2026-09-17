@@ -37,8 +37,11 @@ fn mk_env_with_map() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env construction failed");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::load_derived_importing_fixture(&mut env, "list_append");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
-        .expect("Map's canonical Nat addition provider must roots-load");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Numeric.Nat.Arithmetic",
+    )
+    .expect("Map's canonical Nat addition provider must roots-load");
     for imported in ["add", "cong", "sym", "trans", "list_append"] {
         assert!(
             !env.globals.contains_key(imported),
@@ -51,8 +54,7 @@ fn mk_env_with_map() -> ElabEnv {
         !env.globals.contains_key("is_some"),
         "the legacy Map fixture must not prebind an unqualified is_some alias"
     );
-    env.elaborate_ken_md_file(MAP_KEN_MD)
-        .expect("map.ken.md must elaborate");
+    env.elaborate_ken_md_file(MAP_KEN_MD).expect("map.ken.md must elaborate");
     env
 }
 
@@ -102,15 +104,7 @@ fn bool_is_a_real_inductive() {
 fn demoted_predicates_absent_from_trusted_base() {
     let env = mk_env();
     let tb = env.env.trusted_base();
-    for name in [
-        "Equal",
-        "And",
-        "Bool",
-        "IO",
-        "print_line",
-        "is_sorted",
-        "Perm",
-    ] {
+    for name in ["Equal", "And", "Bool", "IO", "print_line", "is_sorted", "Perm"] {
         let id = env.globals[name];
         assert!(
             !tb.contains(&id),
@@ -186,32 +180,18 @@ fn issorted_and_perm_applications_reduce_past_their_own_head() {
     let nil_id = env.globals["Nil"];
 
     let bool_t = Term::indformer(bool_id, vec![]);
-    let nil_bool = Term::app(
-        Term::Constructor {
-            id: nil_id,
-            level_args: vec![],
-        },
-        bool_t.clone(),
-    );
-    let true_ctor = Term::Constructor {
-        id: true_id,
-        level_args: vec![],
-    };
+    let nil_bool =
+        Term::app(Term::Constructor { id: nil_id, level_args: vec![] }, bool_t.clone());
+    let true_ctor = Term::Constructor { id: true_id, level_args: vec![] };
     // `leq := \_ _. True` — a trivial but well-typed `Bool -> Bool -> Bool`.
     let leq = Term::lam(bool_t.clone(), Term::lam(bool_t.clone(), true_ctor));
 
     let issorted_app = Term::app(
-        Term::app(
-            Term::app(Term::const_(issorted_id, vec![]), bool_t.clone()),
-            leq,
-        ),
+        Term::app(Term::app(Term::const_(issorted_id, vec![]), bool_t.clone()), leq),
         nil_bool.clone(),
     );
     let perm_app = Term::app(
-        Term::app(
-            Term::app(Term::const_(perm_id, vec![]), bool_t.clone()),
-            nil_bool.clone(),
-        ),
+        Term::app(Term::app(Term::const_(perm_id, vec![]), bool_t.clone()), nil_bool.clone()),
         nil_bool,
     );
 
@@ -244,10 +224,7 @@ fn issorted_and_perm_applications_reduce_past_their_own_head() {
 fn perm_body_is_a_truncation() {
     let env = mk_env();
     let perm_id = env.globals["Perm"];
-    let (_, body) = env
-        .env
-        .transparent_body(perm_id)
-        .expect("Perm is transparent");
+    let (_, body) = env.env.transparent_body(perm_id).expect("Perm is transparent");
     // Peel the 3 lambdas (a, xs, ys) to the truncation.
     let mut inner = &body;
     while let Term::Lam(_, b) = inner {
@@ -275,10 +252,7 @@ fn match_on_comparison_result_elaborates() {
              match eq_int a b { True |-> 1 ; False |-> 0 }",
         )
         .expect("AC3: match on eq_int's Bool result must elaborate");
-    assert!(
-        env.env.const_type(id).is_some(),
-        "isZero registered with a type"
-    );
+    assert!(env.env.const_type(id).is_some(), "isZero registered with a type");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -322,25 +296,13 @@ fn map_replacement_is_derived_not_primitive() {
         matches!(env.env.lookup(tree_id), Some(Decl::Inductive { .. })),
         "AC1(b): the replacement carrier 'Tree' must be Decl::Inductive (declare_inductive), never a primitive"
     );
-    for name in [
-        "insert",
-        "lookup",
-        "member",
-        "to_list",
-        "from_list",
-        "set_insert",
-        "set_member",
-        "set_to_list",
-    ] {
+    for name in ["insert", "lookup", "member", "to_list", "from_list", "set_insert", "set_member", "set_to_list"] {
         let id = env.globals[name];
         assert!(
             matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
             "AC1(b): '{name}' must be Decl::Transparent (declare_def), never declare_primitive/declare_postulate"
         );
         let delta = trusted_base_delta(&env.env, id);
-        assert!(
-            delta.is_empty(),
-            "AC1(b): '{name}' must add ZERO new trusted_base() entries, got {delta:?}"
-        );
+        assert!(delta.is_empty(), "AC1(b): '{name}' must add ZERO new trusted_base() entries, got {delta:?}");
     }
 }

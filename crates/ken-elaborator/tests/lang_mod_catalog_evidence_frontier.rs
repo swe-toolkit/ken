@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use ken_elaborator::modules::{
-    catalog_module_from_path, PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES,
+    PRELUDE_COMPANION_BINDING_NAMES, PRELUDE_FLOOR_NAMES, catalog_module_from_path,
 };
-use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, Span};
+use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, Span, literate, parser};
 use ken_kernel::{
     ConstructorDecl, Decl, GlobalId, InductiveDecl, KernelError, Level, ParameterPolarity,
     PrimReduction, Term,

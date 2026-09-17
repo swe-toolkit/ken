@@ -164,9 +164,7 @@ fn minimal_fok_derivation_eliminator_builds_without_trust_growth() {
              DummyFokDerivInit gamma delta left right g d left_ok right_ok same |-> True \
            }",
     )
-    .expect(
-        "the minimal DummyFokDerivation eliminator must build after demand-driven shape derivation",
-    );
+    .expect("the minimal DummyFokDerivation eliminator must build after demand-driven shape derivation");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         before, after,

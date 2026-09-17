@@ -277,8 +277,10 @@ fn if_condition_validation_closes_an_active_result_premise() {
          }",
     )
     .expect("IfOut");
-    env.elaborate_decl("fn inspect_if_cell (index : Nat) (cell : IfCell index) : Bool = True")
-        .expect("inspect_if_cell");
+    env.elaborate_decl(
+        "fn inspect_if_cell (index : Nat) (cell : IfCell index) : Bool = True",
+    )
+    .expect("inspect_if_cell");
 
     env.elaborate_file(
         "fn if_live_a (fuel : Nat) (index : Nat) (flag : Bool) \

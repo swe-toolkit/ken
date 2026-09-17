@@ -322,7 +322,8 @@ fn comparator_semantic_duplicates_are_subsumed_and_finite_sets_stay_open() {
     }
 
     let mut broad = ElabEnv::new().expect("base environment");
-    let broad_source = "fn broad_first (x : Int) : Nat = match x { _ |-> Zero ; 0 |-> Suc Zero }";
+    let broad_source =
+        "fn broad_first (x : Int) : Nat = match x { _ |-> Zero ; 0 |-> Suc Zero }";
     match broad.elaborate_decl(broad_source) {
         Err(ElabError::ReachabilityError {
             cause: ArmDeadCause::Subsumed { first, rest },
@@ -433,9 +434,7 @@ fn boolean_constructor_patterns_and_general_top_catchall_refusal_are_unchanged()
     assert_eq!(eval_nat(&booleans, selected), 1);
 
     let mut wildcard = ElabEnv::new().expect("base environment");
-    match wildcard
-        .elaborate_decl("const top_wildcard_still_refused : Nat = match true { _ |-> Zero }")
-    {
+    match wildcard.elaborate_decl("const top_wildcard_still_refused : Nat = match true { _ |-> Zero }") {
         Err(ElabError::Internal(reason)) => {
             assert!(reason.contains("wildcard/var not yet supported"));
         }

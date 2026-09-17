@@ -21,7 +21,9 @@ use ken_elaborator::ElabEnv;
 use ken_kernel::conv::whnf;
 use ken_kernel::env::Context;
 use ken_kernel::term::{Level, Term};
-use ken_kernel::{declare_inductive, infer, CtorSpec, Decl, GlobalEnv, GlobalId, InductiveSpec};
+use ken_kernel::{
+    declare_inductive, infer, CtorSpec, Decl, GlobalEnv, GlobalId, InductiveSpec,
+};
 const EMPTY_DEC: &str = "Core.Logic.EmptyDec";
 const LAWFUL: &str = "Core.Classes.LawfulClasses";
 const TRANSPORT: &str = "Core.Logic.Transport";
@@ -72,10 +74,7 @@ fn ac1_dec_admits_and_elim_dec_large_eliminates_into_type0() {
         indices: vec![],
         level: lv0(),
         constructors: vec![
-            CtorSpec {
-                args: vec![Term::var(0)],
-                target_indices: vec![],
-            },
+            CtorSpec { args: vec![Term::var(0)], target_indices: vec![] },
             CtorSpec {
                 args: vec![Term::pi(Term::var(0), Term::indformer(empty_id, vec![]))],
                 target_indices: vec![],
@@ -160,10 +159,7 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
         indices: vec![],
         level: lv0(),
         constructors: vec![
-            CtorSpec {
-                args: vec![Term::var(0)],
-                target_indices: vec![],
-            },
+            CtorSpec { args: vec![Term::var(0)], target_indices: vec![] },
             CtorSpec {
                 args: vec![Term::pi(Term::var(0), Term::indformer(empty_id, vec![]))],
                 target_indices: vec![],
@@ -192,21 +188,12 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
     );
     let yes_method = Term::lam(
         p.clone(),
-        Term::app(
-            Term::app(Term::constructor(yes_id, vec![]), Term::var(2)),
-            Term::var(0),
-        ),
+        Term::app(Term::app(Term::constructor(yes_id, vec![]), Term::var(2)), Term::var(0)),
     );
     // BOGUS: domain is `Empty -> Empty`, not `P -> Empty`.
     let bogus_no_method = Term::lam(
-        Term::pi(
-            Term::indformer(empty_id, vec![]),
-            Term::indformer(empty_id, vec![]),
-        ),
-        Term::app(
-            Term::app(Term::constructor(no_id, vec![]), Term::var(2)),
-            Term::var(0),
-        ),
+        Term::pi(Term::indformer(empty_id, vec![]), Term::indformer(empty_id, vec![])),
+        Term::app(Term::app(Term::constructor(no_id, vec![]), Term::var(2)), Term::var(0)),
     );
     let elim = Term::Elim {
         fam: dec_id,
@@ -229,26 +216,11 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
 fn ac2_empty_and_absurd_empty_elaborate() {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
     catalog_or::load_core_logic_compare(&mut env);
-    assert!(
-        env.globals.contains_key("Empty"),
-        "Empty must be a prelude global"
-    );
-    assert!(
-        env.globals.contains_key("Dec"),
-        "Dec must be a prelude global"
-    );
-    assert!(
-        env.globals.contains_key("Yes"),
-        "Yes must be a prelude global"
-    );
-    assert!(
-        env.globals.contains_key("No"),
-        "No must be a prelude global"
-    );
-    assert!(
-        env.globals.contains_key("decide"),
-        "decide must be a prelude global"
-    );
+    assert!(env.globals.contains_key("Empty"), "Empty must be a prelude global");
+    assert!(env.globals.contains_key("Dec"), "Dec must be a prelude global");
+    assert!(env.globals.contains_key("Yes"), "Yes must be a prelude global");
+    assert!(env.globals.contains_key("No"), "No must be a prelude global");
+    assert!(env.globals.contains_key("decide"), "decide must be a prelude global");
 
     env.elaborate_decl("fn absurdEmpty (C : Type) (e : Empty) : C = match e { }")
         .expect("absurdEmpty must elaborate (large elim via ordinary surface match)");
@@ -298,10 +270,7 @@ fn ac3_trusted_base_delta_is_ordinary_inductive_admission_only() {
         "Dec must be a registered global"
     );
     let env = ElabEnv::empty().expect("prelude bootstrap");
-    assert!(
-        env.globals.contains_key("Empty"),
-        "Empty must be a registered global"
-    );
+    assert!(env.globals.contains_key("Empty"), "Empty must be a registered global");
 }
 
 /// Promise class: durable invariant. MEASURED: the real EmptyDec entry loads

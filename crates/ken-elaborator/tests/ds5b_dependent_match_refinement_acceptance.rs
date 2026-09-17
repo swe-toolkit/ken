@@ -738,9 +738,9 @@ fn production_source_preserves_reachable_non_sort_prefilter_skip() {
                 "final Pi admission must name the malformed D3Flag domain",
             );
         }
-        other => {
-            panic!("the non-sort must be silently skipped until final Pi admission: {other:?}")
-        }
+        other => panic!(
+            "the non-sort must be silently skipped until final Pi admission: {other:?}"
+        )
     }
 }
 
@@ -892,8 +892,5 @@ fn omega_branch_goal_uses_tagged_direct_j_restoration() {
     assert_transparent_body_kernel_checks(&env, id);
 
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    assert_eq!(
-        before, after,
-        "D2 branch-goal restoration must add no trust"
-    );
+    assert_eq!(before, after, "D2 branch-goal restoration must add no trust");
 }

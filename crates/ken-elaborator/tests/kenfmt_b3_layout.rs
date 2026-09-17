@@ -3,9 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ken_elaborator::layout::{
-    display_width, format_ken, render, Doc, CANONICAL_WIDTH, INDENT_WIDTH,
-};
+use ken_elaborator::layout::{display_width, format_ken, render, Doc, CANONICAL_WIDTH, INDENT_WIDTH};
 use ken_elaborator::lossless::parse_lossless;
 use ken_elaborator::resolve::resolve_decls;
 use ken_elaborator::{Decl, ElabEnv, ElabError, ExportForm, ImportKind};
@@ -560,9 +558,7 @@ fn ac6_comma_boundary_break_carries_the_module_surface_wrap() {
     );
     assert!(
         mutated.lines().count() == 1
-            && mutated
-                .lines()
-                .any(|line| display_width(line) > CANONICAL_WIDTH),
+            && mutated.lines().any(|line| display_width(line) > CANONICAL_WIDTH),
         "dropping the comma-boundary break must revert to a single over-width run: {mutated}"
     );
 }

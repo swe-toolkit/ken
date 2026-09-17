@@ -99,10 +99,7 @@ fn ac_if_rejects_affirmatively_from_the_argument_loop() {
 fn the_affirmative_rejection_is_located_at_the_if() {
     let (msg, start) = parse_error(UNGROUPED_IF_ARG);
     assert!(msg.contains(ARGUMENT_LOOP_MARKER), "producer first: {msg}");
-    assert_eq!(
-        start,
-        UNGROUPED_IF_ARG.find("if").expect("fixture has `if`")
-    );
+    assert_eq!(start, UNGROUPED_IF_ARG.find("if").expect("fixture has `if`"));
 }
 
 /// AC-IF-REJECTS controls. A candidate that made `if` unparseable everywhere
@@ -161,11 +158,7 @@ fn ac_inline_ken_census_reaches_rust_test_sources() {
         let Ok(text) = std::fs::read_to_string(&path) else {
             continue;
         };
-        let name = path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
+        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         // Test the KEN inside the string literals, not the Rust line. The Rust
         // syntax around it (`:`, `"`, `=`) is what let a Rust `match` guard
         // satisfy an earlier version.
@@ -179,9 +172,7 @@ fn ac_inline_ken_census_reaches_rust_test_sources() {
     // The control is on the matching LINE, not the filename: the occurrence is
     // the evidence, and a file can stop carrying one without anything failing.
     assert!(
-        sites
-            .iter()
-            .any(|(_, _, frag)| frag.contains(UNGROUPED_IF_ARG)),
+        sites.iter().any(|(_, _, frag)| frag.contains(UNGROUPED_IF_ARG)),
         "KNOWN-ANSWER CONTROL FAILED: the census must return the line carrying \
          UNGROUPED_IF_ARG. A census that misses a member it is guaranteed to \
          contain is blind, and its zero is not a measurement. Found: {sites:?}"
@@ -285,9 +276,7 @@ fn argument_position_predicate_admits_only_the_forbidden_shape() {
         has_argument_position_if(UNGROUPED_IF_ARG),
         "the forbidden shape must be admitted"
     );
-    assert!(has_argument_position_if(
-        "const k : Nat = f x if c then a else b"
-    ));
+    assert!(has_argument_position_if("const k : Nat = f x if c then a else b"));
     // QUALIFIED heads. The flat char test dropped these silently; QA built the
     // first and it genuinely reaches the rejection.
     assert!(has_argument_position_if(
@@ -456,10 +445,7 @@ fn no_false_negative_across_the_test_corpus() {
         }
     }
 
-    assert!(
-        misses.is_empty(),
-        "FALSE NEGATIVES in the corpus: {misses:#?}"
-    );
+    assert!(misses.is_empty(), "FALSE NEGATIVES in the corpus: {misses:#?}");
     // Positive control: a sweep that examined nothing proves nothing.
     assert!(
         checked > 0,
@@ -501,11 +487,7 @@ fn every_file_fixture_passes_the_one_directional_check() {
         }
         println!(
             "  {:<12} predicate={:<5} {}",
-            if rejected_from_loop {
-                "FORBIDDEN"
-            } else {
-                "legal"
-            },
+            if rejected_from_loop { "FORBIDDEN" } else { "legal" },
             has_argument_position_if(fixture),
             fixture
         );
@@ -599,10 +581,7 @@ fn ken_fragments(source: &str) -> Vec<String> {
                     // the following indentation are consumed. This is the case
                     // a per-line extractor cannot see at all.
                     Some('\n') => {
-                        while chars
-                            .peek()
-                            .is_some_and(|n| n.is_whitespace() && *n != '\n')
-                        {
+                        while chars.peek().is_some_and(|n| n.is_whitespace() && *n != '\n') {
                             chars.next();
                         }
                     }
@@ -661,3 +640,4 @@ fn extractor_reaches_continuation_lines() {
         "the fixture must really BE the forbidden shape, or it is not a control"
     );
 }
+

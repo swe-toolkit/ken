@@ -241,7 +241,12 @@ fn erase_checked_package_with_host_root(
                 metadata: metadata_for_symbol(package, target),
             });
         } else if let Some(plans) = native_plans.as_deref_mut() {
-            declarations.push(lower_symbol_with_plans(package, &targets, target, plans)?);
+            declarations.push(lower_symbol_with_plans(
+                package,
+                &targets,
+                target,
+                plans,
+            )?);
         } else {
             declarations.push(lower_symbol(package, &targets, target)?);
         }
@@ -2543,7 +2548,8 @@ fn lower_body_term_with_plans(
             // standalone declaration is also emitted, giving one affine
             // template two declaration owners. Keep the complete application
             // as a declaration call; no operand or call identity is inferred.
-            if parameter_count == arguments.len() && native_plans.owner_has_computational_ih(symbol)
+            if parameter_count == arguments.len()
+                && native_plans.owner_has_computational_ih(symbol)
             {
                 let mut args = Vec::with_capacity(arguments.len());
                 for (index, argument) in arguments.iter().enumerate() {
@@ -2786,7 +2792,8 @@ fn lower_body_term_with_plans(
         }
         CheckedCoreBodyTerm::Match(view) => {
             reject_level_args_for_family(root, &view.level_args, semantic, &view.family_symbol)?;
-            if !view.indices.is_empty() && !is_generated_all_support(semantic, &view.family_symbol)
+            if !view.indices.is_empty()
+                && !is_generated_all_support(semantic, &view.family_symbol)
             {
                 return Err(expression_lowering_error(
                     root,
@@ -2846,7 +2853,8 @@ fn lower_body_term_with_plans(
                     &constructor.constructor_lowerability,
                     "constructor_lowerability_blocked",
                 )?;
-                if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
+                if (constructor.family_index_count != 0
+                    || constructor.target_index_count != 0)
                     && !is_generated_all_support(semantic, &constructor.family_symbol)
                 {
                     return Err(expression_lowering_error(
@@ -3508,13 +3516,15 @@ fn lower_checked_host_computation(
                     checked_occurrence_path: continuation_path,
                     kind: ComputationalIHConsumptionRoute::CheckedHostVisContinuation
                         .runtime_kind(),
-                    binder_morphism: binder_morphism.shifted_runtime(1, 0).ok_or_else(|| {
-                        expression_lowering_error(
-                            root,
-                            "variable_index_overflow",
-                            "computational IH runtime binder shift overflows",
-                        )
-                    })?,
+                    binder_morphism: binder_morphism
+                        .shifted_runtime(1, 0)
+                        .ok_or_else(|| {
+                            expression_lowering_error(
+                                root,
+                                "variable_index_overflow",
+                                "computational IH runtime binder shift overflows",
+                            )
+                        })?,
                     body: Box::new(RuntimeExpr::Call {
                         callee: Box::new(callee),
                         args,
@@ -3754,14 +3764,15 @@ fn decode_checked_host_operation<'a>(
                     "ambient tail coproduct arm is empty",
                 )
             })?;
-            let (tail_arm, tail_args) = constructor_application_spine(tail).ok_or_else(|| {
-                expression_lowering_error(
-                    root,
-                    "host_coproduct_shape",
-                    "ambient tail operation is not a checked coproduct \
+            let (tail_arm, tail_args) =
+                constructor_application_spine(tail).ok_or_else(|| {
+                    expression_lowering_error(
+                        root,
+                        "host_coproduct_shape",
+                        "ambient tail operation is not a checked coproduct \
                          constructor",
-                )
-            })?;
+                    )
+                })?;
             if tail_arm.symbol != spine.in_l && tail_arm.symbol != spine.in_r {
                 return Err(expression_lowering_error(
                     root,
@@ -3911,12 +3922,13 @@ fn lower_runtime_selected_host_operation(
                     "host operation arity does not fit runtime IR",
                 )
             })?;
-            let expected_family = match crate::export::host_operation_family_v1(host_operation) {
-                crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
-                crate::export::HostOpFamilyV1::Console => &spine.console_family,
-                crate::export::HostOpFamilyV1::Fs => &spine.fs_family,
-                crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
-            };
+            let expected_family =
+                match crate::export::host_operation_family_v1(host_operation) {
+                    crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
+                    crate::export::HostOpFamilyV1::Console => &spine.console_family,
+                    crate::export::HostOpFamilyV1::Fs => &spine.fs_family,
+                    crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
+                };
             if family != expected_family {
                 return Err(expression_lowering_error(
                     root,
@@ -4262,7 +4274,12 @@ fn lower_symbol_with_plans(
     } else if let Some(meta) = semantic.class_instance_metadata.get(symbol) {
         lower_class_instance(symbol, meta)?
     } else if semantic.declarations.contains_key(symbol) {
-        lower_transparent_declaration_with_plans(package, target_closure, symbol, native_plans)?
+        lower_transparent_declaration_with_plans(
+            package,
+            target_closure,
+            symbol,
+            native_plans,
+        )?
     } else {
         return Err(ErasureError::MissingRuntimeMetadata {
             symbol: symbol.clone(),
@@ -5938,7 +5955,12 @@ fn lower_match_view(
     context_depth: usize,
     branch_remap: Option<&BranchBinderRemap>,
 ) -> Result<RuntimeExpr, ErasureError> {
-    reject_level_args_for_family(root_symbol, &view.level_args, semantic, &view.family_symbol)?;
+    reject_level_args_for_family(
+        root_symbol,
+        &view.level_args,
+        semantic,
+        &view.family_symbol,
+    )?;
     if !view.indices.is_empty() && !is_generated_all_support(semantic, &view.family_symbol) {
         return Err(expression_lowering_error(
             root_symbol,
@@ -6639,9 +6661,7 @@ fn read_role_symbol(bytes: &[u8], offset: &mut usize) -> Result<String, ErasureE
         .checked_add(8)
         .ok_or_else(|| role_record_error("length prefix overflows the record"))?;
     if header_end > bytes.len() {
-        return Err(role_record_error(
-            "record ends inside a symbol length prefix",
-        ));
+        return Err(role_record_error("record ends inside a symbol length prefix"));
     }
     let mut length_bytes = [0u8; 8];
     length_bytes.copy_from_slice(&bytes[*offset..header_end]);
@@ -7490,11 +7510,9 @@ mod px7l_tests {
     ) -> Option<(&'static str, String)> {
         let owner = StableSymbol::declaration("d7-1b-arity", &[], "main");
         let symbol = owner.to_string();
-        let constructor = StableSymbol::constructor(
-            &StableSymbol::declaration("d7-1b-arity", &[], "Tree"),
-            "Step",
-        )
-        .to_string();
+        let constructor =
+            StableSymbol::constructor(&StableSymbol::declaration("d7-1b-arity", &[], "Tree"), "Step")
+                .to_string();
         let cases = vec![RuntimeComputationalMatchCase {
             constructor: constructor.clone(),
             argument_binders: 1,
@@ -8066,17 +8084,32 @@ mod px7l_tests {
                 &family("FileOperation"),
                 "ChangeMode",
             ),
-            file_operation_append: StableSymbol::constructor(&family("FileOperation"), "Append"),
+            file_operation_append: StableSymbol::constructor(
+                &family("FileOperation"),
+                "Append",
+            ),
             file_operation_metadata: StableSymbol::constructor(
                 &family("FileOperation"),
                 "Metadata",
             ),
-            file_metadata: StableSymbol::constructor(&family("FileMetadata"), "Metadata"),
+            file_metadata: StableSymbol::constructor(
+                &family("FileMetadata"),
+                "Metadata",
+            ),
             file_kind_file: StableSymbol::constructor(&family("FileKind"), "File"),
-            file_kind_directory: StableSymbol::constructor(&family("FileKind"), "Directory"),
-            file_kind_symlink: StableSymbol::constructor(&family("FileKind"), "Symlink"),
+            file_kind_directory: StableSymbol::constructor(
+                &family("FileKind"),
+                "Directory",
+            ),
+            file_kind_symlink: StableSymbol::constructor(
+                &family("FileKind"),
+                "Symlink",
+            ),
             file_kind_other: StableSymbol::constructor(&family("FileKind"), "Other"),
-            file_operation_rename: StableSymbol::constructor(&family("FileOperation"), "Rename"),
+            file_operation_rename: StableSymbol::constructor(
+                &family("FileOperation"),
+                "Rename",
+            ),
             file_operation_read_directory: StableSymbol::constructor(
                 &family("FileOperation"),
                 "ReadDirectory",
@@ -8561,142 +8594,88 @@ mod d1b_role_b_decoder_alignment {
 
         let spine = &decoded.spine;
         let pairs: Vec<(&str, &str)> = vec![
-            (spine.ret.as_str(), "ret"),
-            (spine.vis.as_str(), "vis"),
-            (spine.in_l.as_str(), "in_l"),
-            (spine.in_r.as_str(), "in_r"),
-            (spine.fs_family.as_str(), "fs_family"),
-            (spine.console_family.as_str(), "console_family"),
-            (spine.clock_family.as_str(), "clock_family"),
-            (spine.entropy_family.as_str(), "entropy_family"),
-            (spine.capability.as_str(), "capability"),
-            (spine.result_err.as_str(), "result_err"),
-            (spine.result_ok.as_str(), "result_ok"),
-            (spine.option_some.as_str(), "option_some"),
-            (spine.file_error.as_str(), "file_error"),
-            (spine.file_operation_read.as_str(), "file_operation_read"),
-            (spine.file_operation_write.as_str(), "file_operation_write"),
-            (
-                spine.file_operation_change_mode.as_str(),
-                "file_operation_change_mode",
-            ),
-            (spine.resource_host_io.as_str(), "resource_host_io"),
-            (spine.resource_closed.as_str(), "resource_closed"),
-            (spine.resource_malformed.as_str(), "resource_malformed"),
-            (
-                spine.resource_right_not_held.as_str(),
-                "resource_right_not_held",
-            ),
-            (
-                spine.resource_release_failed.as_str(),
-                "resource_release_failed",
-            ),
-            (
-                spine.resource_kind_mismatch.as_str(),
-                "resource_kind_mismatch",
-            ),
-            (
-                spine.resource_buffer_limit.as_str(),
-                "resource_buffer_limit",
-            ),
-            (
-                spine.resource_allocation_failed.as_str(),
-                "resource_allocation_failed",
-            ),
-            (
-                spine.resource_invalid_offset.as_str(),
-                "resource_invalid_offset",
-            ),
-            (
-                spine.resource_invalid_bounds.as_str(),
-                "resource_invalid_bounds",
-            ),
-            (spine.resource_no_progress.as_str(), "resource_no_progress"),
-            (
-                spine.resource_kind_fs_handle.as_str(),
-                "resource_kind_fs_handle",
-            ),
-            (spine.resource_kind_buffer.as_str(), "resource_kind_buffer"),
-            (
-                spine.resource_trace_identity.as_str(),
-                "resource_trace_identity",
-            ),
-            (spine.nat_zero.as_str(), "nat_zero"),
-            (spine.nat_suc.as_str(), "nat_suc"),
-            (spine.private_buffer_span.as_str(), "private_buffer_span"),
-            (
-                spine.private_transfer_count.as_str(),
-                "private_transfer_count",
-            ),
-            (spine.read_some.as_str(), "read_some"),
-            (spine.read_eof.as_str(), "read_eof"),
-            (spine.wrote.as_str(), "wrote"),
-            (spine.mk_instant.as_str(), "mk_instant"),
-            (spine.read_chunk.as_str(), "read_chunk"),
-            (spine.read_result_eof.as_str(), "read_result_eof"),
-            (spine.unit.as_str(), "unit"),
-            (spine.bool_false.as_str(), "bool_false"),
-            (spine.bool_true.as_str(), "bool_true"),
-            (
-                spine.file_operation_append.as_str(),
-                "file_operation_append",
-            ),
-            (
-                spine.file_operation_metadata.as_str(),
-                "file_operation_metadata",
-            ),
-            (spine.file_metadata.as_str(), "file_metadata"),
-            (spine.file_kind_file.as_str(), "file_kind_file"),
-            (spine.file_kind_directory.as_str(), "file_kind_directory"),
-            (spine.file_kind_symlink.as_str(), "file_kind_symlink"),
-            (spine.file_kind_other.as_str(), "file_kind_other"),
-            (
-                spine.file_operation_rename.as_str(),
-                "file_operation_rename",
-            ),
-            (
-                spine.file_operation_read_directory.as_str(),
-                "file_operation_read_directory",
-            ),
-            (
-                spine.file_operation_create_directory.as_str(),
-                "file_operation_create_directory",
-            ),
-            (
-                spine.file_operation_remove_file.as_str(),
-                "file_operation_remove_file",
-            ),
-            (
-                spine.file_operation_remove_directory.as_str(),
-                "file_operation_remove_directory",
-            ),
-            (spine.dir_entry.as_str(), "dir_entry"),
-            (spine.file_operation_seek.as_str(), "file_operation_seek"),
-            (
-                spine.file_operation_set_length.as_str(),
-                "file_operation_set_length",
-            ),
-            (spine.file_operation_sync.as_str(), "file_operation_sync"),
-            (
-                spine.file_operation_get_inheritance.as_str(),
-                "file_operation_get_inheritance",
-            ),
-            (
-                spine.file_operation_set_inheritance.as_str(),
-                "file_operation_set_inheritance",
-            ),
-            (
-                spine.file_operation_duplicate.as_str(),
-                "file_operation_duplicate",
-            ),
-            (
-                spine.resource_mapping_limit.as_str(),
-                "resource_mapping_limit",
-            ),
-            (
-                spine.resource_kind_mapping.as_str(),
-                "resource_kind_mapping",
-            ),
+        (spine.ret.as_str(), "ret"),
+        (spine.vis.as_str(), "vis"),
+        (spine.in_l.as_str(), "in_l"),
+        (spine.in_r.as_str(), "in_r"),
+        (spine.fs_family.as_str(), "fs_family"),
+        (spine.console_family.as_str(), "console_family"),
+        (spine.clock_family.as_str(), "clock_family"),
+        (spine.entropy_family.as_str(), "entropy_family"),
+        (spine.capability.as_str(), "capability"),
+        (spine.result_err.as_str(), "result_err"),
+        (spine.result_ok.as_str(), "result_ok"),
+        (spine.option_some.as_str(), "option_some"),
+        (spine.file_error.as_str(), "file_error"),
+        (spine.file_operation_read.as_str(), "file_operation_read"),
+        (spine.file_operation_write.as_str(), "file_operation_write"),
+        (spine.file_operation_change_mode.as_str(), "file_operation_change_mode"),
+        (spine.resource_host_io.as_str(), "resource_host_io"),
+        (spine.resource_closed.as_str(), "resource_closed"),
+        (spine.resource_malformed.as_str(), "resource_malformed"),
+        (spine.resource_right_not_held.as_str(), "resource_right_not_held"),
+        (spine.resource_release_failed.as_str(), "resource_release_failed"),
+        (spine.resource_kind_mismatch.as_str(), "resource_kind_mismatch"),
+        (spine.resource_buffer_limit.as_str(), "resource_buffer_limit"),
+        (spine.resource_allocation_failed.as_str(), "resource_allocation_failed"),
+        (spine.resource_invalid_offset.as_str(), "resource_invalid_offset"),
+        (spine.resource_invalid_bounds.as_str(), "resource_invalid_bounds"),
+        (spine.resource_no_progress.as_str(), "resource_no_progress"),
+        (spine.resource_kind_fs_handle.as_str(), "resource_kind_fs_handle"),
+        (spine.resource_kind_buffer.as_str(), "resource_kind_buffer"),
+        (spine.resource_trace_identity.as_str(), "resource_trace_identity"),
+        (spine.nat_zero.as_str(), "nat_zero"),
+        (spine.nat_suc.as_str(), "nat_suc"),
+        (spine.private_buffer_span.as_str(), "private_buffer_span"),
+        (spine.private_transfer_count.as_str(), "private_transfer_count"),
+        (spine.read_some.as_str(), "read_some"),
+        (spine.read_eof.as_str(), "read_eof"),
+        (spine.wrote.as_str(), "wrote"),
+        (spine.mk_instant.as_str(), "mk_instant"),
+        (spine.read_chunk.as_str(), "read_chunk"),
+        (spine.read_result_eof.as_str(), "read_result_eof"),
+        (spine.unit.as_str(), "unit"),
+        (spine.bool_false.as_str(), "bool_false"),
+        (spine.bool_true.as_str(), "bool_true"),
+        (spine.file_operation_append.as_str(), "file_operation_append"),
+        (spine.file_operation_metadata.as_str(), "file_operation_metadata"),
+        (spine.file_metadata.as_str(), "file_metadata"),
+        (spine.file_kind_file.as_str(), "file_kind_file"),
+        (spine.file_kind_directory.as_str(), "file_kind_directory"),
+        (spine.file_kind_symlink.as_str(), "file_kind_symlink"),
+        (spine.file_kind_other.as_str(), "file_kind_other"),
+        (spine.file_operation_rename.as_str(), "file_operation_rename"),
+        (spine.file_operation_read_directory.as_str(), "file_operation_read_directory"),
+        (spine.file_operation_create_directory.as_str(), "file_operation_create_directory"),
+        (spine.file_operation_remove_file.as_str(), "file_operation_remove_file"),
+        (spine.file_operation_remove_directory.as_str(), "file_operation_remove_directory"),
+        (spine.dir_entry.as_str(), "dir_entry"),
+        (spine.file_operation_seek.as_str(), "file_operation_seek"),
+        (
+            spine.file_operation_set_length.as_str(),
+            "file_operation_set_length",
+        ),
+        (spine.file_operation_sync.as_str(), "file_operation_sync"),
+        (
+            spine.file_operation_get_inheritance.as_str(),
+            "file_operation_get_inheritance",
+        ),
+        (
+            spine.file_operation_set_inheritance.as_str(),
+            "file_operation_set_inheritance",
+        ),
+        (
+            spine.file_operation_duplicate.as_str(),
+            "file_operation_duplicate",
+        ),
+        (
+            spine.resource_mapping_limit.as_str(),
+            "resource_mapping_limit",
+        ),
+        (
+            spine.resource_kind_mapping.as_str(),
+            "resource_kind_mapping",
+        ),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(
@@ -8725,11 +8704,7 @@ mod d1b_role_b_decoder_alignment {
             ("exit_success", &decoded.exit_success),
             ("exit_failure", &decoded.exit_failure),
         ] {
-            assert_eq!(
-                *symbol,
-                sentinel(field).to_string(),
-                "field {field} misaligned"
-            );
+            assert_eq!(*symbol, sentinel(field).to_string(), "field {field} misaligned");
         }
     }
 }

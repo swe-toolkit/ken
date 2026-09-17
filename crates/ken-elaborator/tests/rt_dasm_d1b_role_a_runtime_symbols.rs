@@ -20,12 +20,10 @@
 //! the first assertion here is that the record is *present at all* — a missing
 //! record fails loudly rather than reading as a clean absence.
 
-use ken_elaborator::checked_core::{
-    semantic_fingerprint, CheckedCorePackage, StableSymbol, SymbolNamespace,
-};
+use ken_elaborator::checked_core::{semantic_fingerprint, CheckedCorePackage, StableSymbol, SymbolNamespace};
 use ken_elaborator::compiler_driver::{
-    checked_runtime_symbols_v1_key, compile_ken_package_sources, CompilerManifest, CompilerSource,
-    CompilerTargetKind, TargetSelector,
+    checked_runtime_symbols_v1_key, compile_ken_package_sources, CompilerManifest,
+    CompilerTargetKind, CompilerSource, TargetSelector,
 };
 
 /// A package whose `Nat` is the one the prelude `GlobalId`s denote — the same
@@ -53,7 +51,10 @@ fn emit_package() -> CheckedCorePackage {
         &CompilerManifest::new(PACKAGE, Vec::new()),
         vec![CompilerSource::new("src/main.ken", SOURCE)],
         TargetSelector::StableSymbol {
-            package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PACKAGE.to_string()]),
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![PACKAGE.to_string()],
+            ),
             symbol: StableSymbol::new(
                 SymbolNamespace::Declaration,
                 vec![PACKAGE.to_string(), "two".to_string()],
@@ -73,16 +74,14 @@ fn d1b_role_a_generic_package_emission_produces_the_package_qualified_nat_pair()
     // UNCONDITIONAL: the record must EXIST on this path. A missing key is the
     // exact defect under repair, and it must fail here rather than fall through
     // to a vacuously-satisfied comparison below.
-    let record = metadata
-        .get(&checked_runtime_symbols_v1_key())
-        .unwrap_or_else(|| {
-            panic!(
+    let record = metadata.get(&checked_runtime_symbols_v1_key()).unwrap_or_else(|| {
+        panic!(
             "no CheckedRuntimeSymbolsV1 in the generic package's semantic metadata -- the record \
              is not being produced on the path a plain package takes, which is the defect this \
              deliverable repairs. Keys present: {:?}",
             metadata.keys().collect::<Vec<_>>()
         )
-        });
+    });
 
     let text = String::from_utf8_lossy(record);
 
@@ -123,14 +122,7 @@ fn d1b_role_a_generic_package_emission_produces_the_package_qualified_nat_pair()
     // starter path takes from the entrypoint plan are resolved here through the
     // same table, so a generic package carries them too. A spine-only record
     // would reproduce this defect at the first of them.
-    for role in [
-        "MkProcessInput",
-        "Nil",
-        "Cons",
-        "MkProd",
-        "Success",
-        "Failure",
-    ] {
+    for role in ["MkProcessInput", "Nil", "Cons", "MkProd", "Success", "Failure"] {
         assert!(
             text.contains(role),
             "the record is missing the entry-plan role {role}; a spine-only record reproduces this \

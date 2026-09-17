@@ -201,7 +201,10 @@ fn compile_shadowing_package() -> Result<(), CompilerDriverError> {
         &CompilerManifest::new(PACKAGE, Vec::new()),
         vec![CompilerSource::new("src/main.ken", SHADOWING_SOURCE)],
         TargetSelector::StableSymbol {
-            package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PACKAGE.to_string()]),
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![PACKAGE.to_string()],
+            ),
             symbol: StableSymbol::new(
                 SymbolNamespace::Declaration,
                 vec![PACKAGE.to_string(), "two".to_string()],

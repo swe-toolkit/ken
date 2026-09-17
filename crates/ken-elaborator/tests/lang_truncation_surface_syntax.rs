@@ -593,11 +593,8 @@ fn d1_annotation_trunc_as_let_annotation_elaborates() {
 #[test]
 fn d1_annotation_trunc_as_ascription_elaborates() {
     let mut env = mk_env();
-    env.elaborate_expr(
-        "trunc_intro_ascription_probe",
-        "(trunc_intro True : ‖Bool‖)",
-    )
-    .expect("the diagnostic's ascription remedy `(trunc_intro a : ‖A‖)` must parse and elaborate");
+    env.elaborate_expr("trunc_intro_ascription_probe", "(trunc_intro True : ‖Bool‖)")
+        .expect("the diagnostic's ascription remedy `(trunc_intro a : ‖A‖)` must parse and elaborate");
 }
 
 // ----- traversal-closure coverage (QA respin) -----
@@ -638,9 +635,13 @@ fn d1_truncation_headed_constrained_instance_resolves_by_a_consistent_head() {
     // The constrained instance's constraint head is `TruncProp ‖a‖` — `a` occurs
     // UNDER the truncation. `‖a‖` is not a bare type variable, so the constraint
     // needs an explicit binder.
-    env.elaborate_decl("instance Boxed (TBox a) where (dtp : TruncProp ‖a‖) { boxed = True }")
-        .expect("the constrained instance with a truncation-headed constraint must register");
-    let use_site = env.elaborate_decl("const boxedUse : Bool where Boxed (TBox Bool) = d.boxed");
+    env.elaborate_decl(
+        "instance Boxed (TBox a) where (dtp : TruncProp ‖a‖) { boxed = True }",
+    )
+    .expect("the constrained instance with a truncation-headed constraint must register");
+    let use_site = env.elaborate_decl(
+        "const boxedUse : Bool where Boxed (TBox Bool) = d.boxed",
+    );
     // Resolving `Boxed (TBox Bool)` substitutes `a := Bool` into the constraint
     // head `TruncProp ‖a‖` -> `TruncProp ‖Bool‖`, which is registered. With the
     // truncation left as a substitution leaf, `‖a‖` stays unbound and no such

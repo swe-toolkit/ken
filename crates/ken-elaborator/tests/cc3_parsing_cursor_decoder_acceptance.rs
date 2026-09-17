@@ -6,7 +6,7 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
 fn dependency_env() -> ElabEnv {

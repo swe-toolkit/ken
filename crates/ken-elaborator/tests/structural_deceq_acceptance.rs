@@ -5,7 +5,7 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use ken_elaborator::{trusted_base_delta, ElabEnv};
+use ken_elaborator::{ElabEnv, trusted_base_delta};
 use ken_kernel::env::Decl;
 
 fn mk_env() -> ElabEnv {

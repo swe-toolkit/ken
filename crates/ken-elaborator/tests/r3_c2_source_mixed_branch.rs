@@ -540,7 +540,10 @@ fn r3_4b_feature_artifact_worker_impl() {
     let compile = || {
         compile_native_program_sources(
             "r3_4b_feature_identity_pkg",
-            vec![CompilerSource::new("src/main.ken", R3_4B_IDENTITY_SOURCE)],
+            vec![CompilerSource::new(
+                "src/main.ken",
+                R3_4B_IDENTITY_SOURCE,
+            )],
             &output_dir,
         )
     };

@@ -24,8 +24,8 @@
 
 use ken_elaborator::{
     fo_kripke::{
-        check_cert, declare_fo_slice_signature, embed, find_certificate, negative_control_term,
-        positive_control_term, quote_fo, FoBoundary,
+        check_cert, declare_fo_slice_signature, embed, find_certificate,
+        negative_control_term, positive_control_term, quote_fo, FoBoundary,
     },
     prover::{attempt_fo_with_signature, Verdict},
 };
@@ -41,14 +41,8 @@ fn quote_fo_accepts_both_controls_refuses_outside_the_slice() {
     let positive = positive_control_term(&sig);
     let negative = negative_control_term(&env, &sig);
 
-    assert!(
-        quote_fo(&env, &sig, &positive).is_ok(),
-        "positive control must quote"
-    );
-    assert!(
-        quote_fo(&env, &sig, &negative).is_ok(),
-        "negative control must quote"
-    );
+    assert!(quote_fo(&env, &sig, &positive).is_ok(), "positive control must quote");
+    assert!(quote_fo(&env, &sig, &negative).is_ok(), "negative control must quote");
 
     let out_of_slice = Term::Type(Level::zero());
     assert_eq!(
@@ -68,10 +62,7 @@ fn positive_control_certificate_computes_true() {
     let problem = quote_fo(&env, &sig, &positive).expect("positive control quotes");
     let cert = find_certificate(&problem.f).expect("a positive certificate must be found");
     let target = embed(&problem.f);
-    assert!(
-        check_cert(&target, &cert),
-        "check_cert must compute True for the positive cert"
-    );
+    assert!(check_cert(&target, &cert), "check_cert must compute True for the positive cert");
 }
 
 /// `D4`/`AC-1`: the negative control does NOT obtain an accepted
@@ -189,9 +180,7 @@ fn fo_withheld_and_ordinary_unknown_holes_carry_distinct_trusted_base_labels() {
     let negative = negative_control_term(&env, &sig);
     assert!(
         find_certificate(
-            &quote_fo(&env, &sig, &negative)
-                .expect("negative control quotes")
-                .f
+            &quote_fo(&env, &sig, &negative).expect("negative control quotes").f
         )
         .is_none(),
         "precondition: the negative control must not obtain a certificate"
@@ -203,20 +192,14 @@ fn fo_withheld_and_ordinary_unknown_holes_carry_distinct_trusted_base_labels() {
         other => panic!("unestablishable obligation must yield Unknown, got {other:?}"),
     };
 
-    assert_ne!(
-        accepted_id, ordinary_id,
-        "the two exits must register distinct postulates"
-    );
+    assert_ne!(accepted_id, ordinary_id, "the two exits must register distinct postulates");
 
     let base = env.trusted_base();
     assert!(
         base.contains(&accepted_id),
         "the accepted-but-withheld hole must be in trusted_base()"
     );
-    assert!(
-        base.contains(&ordinary_id),
-        "the ordinary unknown hole must be in trusted_base()"
-    );
+    assert!(base.contains(&ordinary_id), "the ordinary unknown hole must be in trusted_base()");
 
     let accepted_name = match env.lookup(accepted_id) {
         Some(Decl::Opaque { name, .. }) => name.clone(),

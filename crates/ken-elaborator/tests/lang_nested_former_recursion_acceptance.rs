@@ -74,7 +74,9 @@ fn make_store(env: &ElabEnv) -> EvalStore {
                     ken_interp::eval::EvalVal::Bytes(b.clone())
                 }
                 ken_elaborator::NumericLitVal::Float(f) => ken_interp::eval::EvalVal::Float(*f),
-                ken_elaborator::NumericLitVal::Float32(f) => ken_interp::eval::EvalVal::Float32(*f),
+                ken_elaborator::NumericLitVal::Float32(f) => {
+                    ken_interp::eval::EvalVal::Float32(*f)
+                }
                 ken_elaborator::NumericLitVal::Decimal { coeff, exp } => {
                     ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
                 }
@@ -130,7 +132,8 @@ fn ac_nested_former_fold_admitted_direct_stays_green() {
     assert!(direct.globals.contains_key("dsize"));
 
     // AC-NO-TCB-WIDENING: surfacing an already-built IH adds no trusted decl.
-    let trusted_after: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    let trusted_after: std::collections::BTreeSet<_> =
+        env.env.trusted_base().into_iter().collect();
     assert_eq!(
         trusted_after, trusted_before,
         "surfacing the nested IH must add zero trusted-base declarations"

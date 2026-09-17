@@ -6,7 +6,7 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, apply, eval};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const VALIDATION_VALID: &str = "Data.Sums.Validation.Valid";

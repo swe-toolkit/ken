@@ -136,8 +136,7 @@ fn c1_a_clean_package_has_roster_equal_to_its_trust_targets() {
     let targets = tuple_targets(&program);
 
     assert_eq!(
-        roster,
-        targets,
+        roster, targets,
         "a package with no user-introduced trust must claim exactly the pre-source roster; \
          claimed-not-in-roster={:?}, roster-not-claimed={:?}",
         targets.difference(&roster).collect::<Vec<_>>(),
@@ -209,7 +208,8 @@ fn c1_one_user_foreign_is_roster_plus_one_and_is_refused_on_the_roster_mismatch(
         .expect_err("a package claiming source-introduced trust must not be admitted");
     let rendered = error.to_string();
     assert!(
-        rendered.contains("pre-source trusted-base roster") && rendered.contains("c1_user_trust"),
+        rendered.contains("pre-source trusted-base roster")
+            && rendered.contains("c1_user_trust"),
         "admission refused for the wrong reason -- it must name the roster mismatch and the \
          source-introduced target, got: {rendered}"
     );
@@ -285,11 +285,7 @@ fn c1_a_retargeted_assumption_identity_is_refused() {
 #[test]
 fn c1_a_package_without_a_roster_is_refused() {
     let mut program = erased(CLEAN_SOURCE);
-    program
-        .erased_core
-        .metadata
-        .checked_core
-        .native_trusted_base = None;
+    program.erased_core.metadata.checked_core.native_trusted_base = None;
 
     let rendered = ken_runtime::native_program_admission(&program)
         .expect_err("a package-backed program without a roster must not be admitted")
@@ -333,8 +329,8 @@ fn native_identity(program: &RuntimeProgram) -> ken_runtime::NativeArtifactIdent
 #[test]
 fn c1_a_real_carrier_reaches_lowering_and_its_reports_carry_the_admitted_trust() {
     let program = erased(CLEAN_SOURCE);
-    let admission =
-        ken_runtime::native_program_admission(&program).expect("the clean carrier is admitted");
+    let admission = ken_runtime::native_program_admission(&program)
+        .expect("the clean carrier is admitted");
     let admitted = admission.admitted_trust().clone();
     assert!(
         !admitted.is_empty(),

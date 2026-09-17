@@ -64,10 +64,7 @@ fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
     let env = mk_env_with_package();
     let id = env.globals["DecEq_instance_Char"];
     let dec_eq_int_id = env.globals["DecEq_instance_Int"];
-    assert!(matches!(
-        env.env.lookup(id),
-        Some(KernelDecl::Transparent { .. })
-    ));
+    assert!(matches!(env.env.lookup(id), Some(KernelDecl::Transparent { .. })));
     let (_, body) = env
         .env
         .transparent_body(id)

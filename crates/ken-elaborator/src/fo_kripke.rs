@@ -197,13 +197,8 @@ impl FoSliceSignature {
 /// `discharge_attenuation` and the prelude's own `Or`/`Perm_rel` already use
 /// for internal, non-surface-syntax term construction.
 pub fn declare_fo_slice_signature(env: &mut GlobalEnv) -> FoSliceSignature {
-    let a_id = declare_postulate(
-        env,
-        "FO slice sort A".to_string(),
-        vec![],
-        Term::Type(Level::zero()),
-    )
-    .expect("declare_postulate for FO slice sort A must succeed");
+    let a_id = declare_postulate(env, "FO slice sort A".to_string(), vec![], Term::Type(Level::zero()))
+        .expect("declare_postulate for FO slice sort A must succeed");
     let sort_a = Term::const_(a_id, vec![]);
 
     let pred_p = declare_postulate(
@@ -224,15 +219,9 @@ pub fn declare_fo_slice_signature(env: &mut GlobalEnv) -> FoSliceSignature {
         level: Level::Zero,
         constructors: vec![
             // Inl : a -> Or a b
-            CtorSpec {
-                args: vec![Term::Var(1)],
-                target_indices: vec![],
-            },
+            CtorSpec { args: vec![Term::Var(1)], target_indices: vec![] },
             // Inr : b -> Or a b
-            CtorSpec {
-                args: vec![Term::Var(0)],
-                target_indices: vec![],
-            },
+            CtorSpec { args: vec![Term::Var(0)], target_indices: vec![] },
         ],
     })
     .expect("declare_inductive for FO slice Or family must succeed");
@@ -915,15 +904,30 @@ fn encode_quantified_form(
 fn encode_form(handles: &FoCatalogHandles, zero: GlobalId, suc: GlobalId, f: &Form) -> Term {
     match f {
         Form::Bottom => Term::constructor(handles.fok_bottom, vec![]),
-        Form::Access(left, right) => {
-            encode_qterm_relation(handles, zero, suc, handles.fok_access, *left, *right)
-        }
-        Form::DomainA(world, object) => {
-            encode_qterm_relation(handles, zero, suc, handles.fok_domain_a, *world, *object)
-        }
-        Form::ForcingP(world, object) => {
-            encode_qterm_relation(handles, zero, suc, handles.fok_forcing_p, *world, *object)
-        }
+        Form::Access(left, right) => encode_qterm_relation(
+            handles,
+            zero,
+            suc,
+            handles.fok_access,
+            *left,
+            *right,
+        ),
+        Form::DomainA(world, object) => encode_qterm_relation(
+            handles,
+            zero,
+            suc,
+            handles.fok_domain_a,
+            *world,
+            *object,
+        ),
+        Form::ForcingP(world, object) => encode_qterm_relation(
+            handles,
+            zero,
+            suc,
+            handles.fok_forcing_p,
+            *world,
+            *object,
+        ),
         Form::And(left, right) => {
             encode_binary_form(handles, zero, suc, handles.fok_and, left, right)
         }
@@ -1117,9 +1121,7 @@ pub fn quote_fo(
 ) -> Result<FOProblem, FoBoundary> {
     let f = quote_iform(env, sig, phi_closed)?;
     Ok(FOProblem {
-        carriers: Carriers {
-            sort_a: sig.sort_a.clone(),
-        },
+        carriers: Carriers { sort_a: sig.sort_a.clone() },
         atoms: AtomEnv { pred_p: sig.pred_p },
         f,
     })
@@ -1246,20 +1248,10 @@ fn mentions_var0(term: &Term) -> bool {
             Term::QuotClass(t) | Term::Trunc(t) | Term::TruncProj(t) | Term::Refl(t) => {
                 go(t, depth)
             }
-            Term::QuotElim {
-                motive,
-                method,
-                respect,
-                scrut,
-            } => go(motive, depth) || go(method, depth) || go(respect, depth) || go(scrut, depth),
-            Term::Elim {
-                params,
-                motive,
-                methods,
-                indices,
-                scrut,
-                ..
-            } => {
+            Term::QuotElim { motive, method, respect, scrut } => {
+                go(motive, depth) || go(method, depth) || go(respect, depth) || go(scrut, depth)
+            }
+            Term::Elim { params, motive, methods, indices, scrut, .. } => {
                 params.iter().any(|p| go(p, depth))
                     || go(motive, depth)
                     || methods.iter().any(|m| go(m, depth))
@@ -1289,8 +1281,10 @@ fn mentions_var0(term: &Term) -> bool {
 /// possibly-empty `Dom_A` with growth, and `Force_P` domain + persistence.
 fn k_sigma() -> Form {
     // `forall w. Le w w`.
-    let preorder_reflexive =
-        Form::ForallWorld(Box::new(Form::Access(QTerm::Bound(0), QTerm::Bound(0))));
+    let preorder_reflexive = Form::ForallWorld(Box::new(Form::Access(
+        QTerm::Bound(0),
+        QTerm::Bound(0),
+    )));
 
     // `forall w v u. (Le w v and Le v u) => Le w u`.
     let preorder_transitive = Form::ForallWorld(Box::new(Form::ForallWorld(Box::new(
@@ -1341,10 +1335,7 @@ fn k_sigma() -> Form {
             )),
             Box::new(domain_growth_a),
         )),
-        Box::new(Form::And(
-            Box::new(atom_domain_p),
-            Box::new(atom_persistence_p),
-        )),
+        Box::new(Form::And(Box::new(atom_domain_p), Box::new(atom_persistence_p))),
     )
 }
 
@@ -1355,7 +1346,9 @@ fn k_sigma() -> Form {
 fn w_forces(world: usize, object_env: &[usize], f: &IForm) -> Form {
     match f {
         IForm::Bottom => Form::Bottom,
-        IForm::Atom(IVar(k)) => Form::ForcingP(QTerm::Bound(world), QTerm::Bound(object_env[*k])),
+        IForm::Atom(IVar(k)) => {
+            Form::ForcingP(QTerm::Bound(world), QTerm::Bound(object_env[*k]))
+        }
         IForm::Or(p, q) => Form::Or(
             Box::new(w_forces(world, object_env, p)),
             Box::new(w_forces(world, object_env, q)),
@@ -1408,10 +1401,7 @@ pub fn embed(f: &IForm) -> Form {
 /// slice's three rules. A Ken-level total function, distinct from the
 /// kernel API `check` (`18 §4`).
 pub fn check_cert(q: &Form, pi: &Cert) -> bool {
-    let root = Sequent {
-        gamma: vec![],
-        delta: vec![q.clone()],
-    };
+    let root = Sequent { gamma: vec![], delta: vec![q.clone()] };
     check_tree(&root, pi)
 }
 
@@ -1473,15 +1463,19 @@ fn validate_form(
     }
 }
 
-fn validate_sequent(sequent: &Sequent, parameters: &mut HashMap<usize, DerivedSort>) -> bool {
-    sequent
-        .gamma
-        .iter()
-        .chain(&sequent.delta)
-        .all(|form| validate_form(form, &mut Vec::new(), parameters))
+fn validate_sequent(
+    sequent: &Sequent,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
+    sequent.gamma.iter().chain(&sequent.delta).all(|form| {
+        validate_form(form, &mut Vec::new(), parameters)
+    })
 }
 
-fn validate_certificate(node: &Cert, parameters: &mut HashMap<usize, DerivedSort>) -> bool {
+fn validate_certificate(
+    node: &Cert,
+    parameters: &mut HashMap<usize, DerivedSort>,
+) -> bool {
     if !validate_sequent(&node.conclusion, parameters) {
         return false;
     }
@@ -1535,13 +1529,7 @@ fn check_tree_structural(expected_conclusion: &Sequent, node: &Cert) -> bool {
             expected_gamma.push((**p).clone());
             let mut expected_delta = node.conclusion.delta.clone();
             expected_delta[*right] = (**q).clone();
-            check_tree_structural(
-                &Sequent {
-                    gamma: expected_gamma,
-                    delta: expected_delta,
-                },
-                child,
-            )
+            check_tree_structural(&Sequent { gamma: expected_gamma, delta: expected_delta }, child)
         }
         Rule::ForallRight { right, eigen } => {
             // The eigen is a fresh parameter (`D1`: parameter-only, bound
@@ -1574,10 +1562,7 @@ fn check_tree_structural(expected_conclusion: &Sequent, node: &Cert) -> bool {
             let mut expected_delta = node.conclusion.delta.clone();
             expected_delta[*right] = instantiated;
             check_tree_structural(
-                &Sequent {
-                    gamma: node.conclusion.gamma.clone(),
-                    delta: expected_delta,
-                },
+                &Sequent { gamma: node.conclusion.gamma.clone(), delta: expected_delta },
                 child,
             )
         }
@@ -1585,22 +1570,14 @@ fn check_tree_structural(expected_conclusion: &Sequent, node: &Cert) -> bool {
 }
 
 fn sequent_mentions_parameter(sequent: &Sequent, target: &QTerm) -> bool {
-    sequent
-        .gamma
-        .iter()
-        .any(|f| form_mentions_parameter(f, target))
-        || sequent
-            .delta
-            .iter()
-            .any(|f| form_mentions_parameter(f, target))
+    sequent.gamma.iter().any(|f| form_mentions_parameter(f, target))
+        || sequent.delta.iter().any(|f| form_mentions_parameter(f, target))
 }
 
 fn form_mentions_parameter(form: &Form, target: &QTerm) -> bool {
     match form {
         Form::Bottom => false,
-        Form::Access(a, b) | Form::DomainA(a, b) | Form::ForcingP(a, b) => {
-            a == target || b == target
-        }
+        Form::Access(a, b) | Form::DomainA(a, b) | Form::ForcingP(a, b) => a == target || b == target,
         Form::And(p, q) | Form::Or(p, q) | Form::Imp(p, q) => {
             form_mentions_parameter(p, target) || form_mentions_parameter(q, target)
         }
@@ -1646,9 +1623,7 @@ fn subst_form_at(form: &Form, depth: usize, replacement: &QTerm) -> Form {
             Box::new(subst_form_at(p, depth, replacement)),
             Box::new(subst_form_at(q, depth, replacement)),
         ),
-        Form::ForallWorld(b) => {
-            Form::ForallWorld(Box::new(subst_form_at(b, depth + 1, replacement)))
-        }
+        Form::ForallWorld(b) => Form::ForallWorld(Box::new(subst_form_at(b, depth + 1, replacement))),
         Form::ForallObj(b) => Form::ForallObj(Box::new(subst_form_at(b, depth + 1, replacement))),
     }
 }
@@ -1674,10 +1649,7 @@ fn subst_qterm_at(q: &QTerm, depth: usize, replacement: &QTerm) -> QTerm {
 /// arguing the calculus cannot derive it.
 pub fn find_certificate(f: &IForm) -> Option<Cert> {
     let target = embed(f);
-    let root = Sequent {
-        gamma: vec![],
-        delta: vec![target],
-    };
+    let root = Sequent { gamma: vec![], delta: vec![target] };
     let mut next_param = 0usize;
     // `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` `D0`/`D1`: `fuel` bounds `search`'s
     // own Rust recursion depth one-for-one (each `ImpRight`/`ForallRight`
@@ -1757,19 +1729,13 @@ fn search(sequent: &Sequent, next_param: &mut usize, fuel: usize) -> Option<Cert
         let mut delta = sequent.delta.clone();
         delta[j] = instantiated;
         if let Some(child) = search(
-            &Sequent {
-                gamma: sequent.gamma.clone(),
-                delta,
-            },
+            &Sequent { gamma: sequent.gamma.clone(), delta },
             next_param,
             fuel - 1,
         ) {
             return Some(Cert {
                 conclusion: sequent.clone(),
-                rule: Rule::ForallRight {
-                    right: j,
-                    eigen: param,
-                },
+                rule: Rule::ForallRight { right: j, eigen: param },
                 children: vec![child],
             });
         }
@@ -1906,28 +1872,10 @@ mod tests {
         // ── Leaves: no Term subterm position; oracle and traversal both false ──
         check("Type", Term::Type(Level::zero()));
         check("Omega", Term::Omega(Level::zero()));
-        check(
-            "Const",
-            Term::Const {
-                id: gid,
-                level_args: vec![],
-            },
-        );
+        check("Const", Term::Const { id: gid, level_args: vec![] });
         check("IntLit", Term::IntLit(num_bigint::BigInt::from(0)));
-        check(
-            "IndFormer",
-            Term::IndFormer {
-                id: gid,
-                level_args: vec![],
-            },
-        );
-        check(
-            "Constructor",
-            Term::Constructor {
-                id: gid,
-                level_args: vec![],
-            },
-        );
+        check("IndFormer", Term::IndFormer { id: gid, level_args: vec![] });
+        check("Constructor", Term::Constructor { id: gid, level_args: vec![] });
 
         // ── Var: the base case itself ──
         check("Var(0)", Term::Var(0));
@@ -1941,19 +1889,11 @@ mod tests {
         check("Sigma.a", Term::sigma(Term::Var(0), leaf()));
         check(
             "Let.ty",
-            Term::Let {
-                ty: Box::new(Term::Var(0)),
-                val: Box::new(leaf()),
-                body: Box::new(leaf()),
-            },
+            Term::Let { ty: Box::new(Term::Var(0)), val: Box::new(leaf()), body: Box::new(leaf()) },
         );
         check(
             "Let.val",
-            Term::Let {
-                ty: Box::new(leaf()),
-                val: Box::new(Term::Var(0)),
-                body: Box::new(leaf()),
-            },
+            Term::Let { ty: Box::new(leaf()), val: Box::new(Term::Var(0)), body: Box::new(leaf()) },
         );
         // Binder position at depth+1: Var(1) is a reference to the OUTER
         // var0 (crosses the binder), mentioned.
@@ -1962,11 +1902,7 @@ mod tests {
         check("Sigma.b (outer ref)", Term::sigma(leaf(), Term::Var(1)));
         check(
             "Let.body (outer ref)",
-            Term::Let {
-                ty: Box::new(leaf()),
-                val: Box::new(leaf()),
-                body: Box::new(Term::Var(1)),
-            },
+            Term::Let { ty: Box::new(leaf()), val: Box::new(leaf()), body: Box::new(Term::Var(1)) },
         );
         // Binder position at depth+1: Var(0) is the BINDER'S OWN variable,
         // not the outer one -- NOT mentioned.
@@ -1975,11 +1911,7 @@ mod tests {
         check("Sigma.b (own var)", Term::sigma(leaf(), Term::Var(0)));
         check(
             "Let.body (own var)",
-            Term::Let {
-                ty: Box::new(leaf()),
-                val: Box::new(leaf()),
-                body: Box::new(Term::Var(0)),
-            },
+            Term::Let { ty: Box::new(leaf()), val: Box::new(leaf()), body: Box::new(Term::Var(0)) },
         );
 
         // ── Depth 2: the PER-BINDER INCREMENT itself, which no single-binder
@@ -2010,10 +1942,7 @@ mod tests {
                 body: Box::new(Term::lam(leaf(), Term::Var(2))),
             },
         );
-        check(
-            "Sigma.b/Lam.t Var(2)",
-            Term::sigma(leaf(), Term::lam(leaf(), Term::Var(2))),
-        );
+        check("Sigma.b/Lam.t Var(2)", Term::sigma(leaf(), Term::lam(leaf(), Term::Var(2))));
 
         // ── The parent mistake, isolated: Pair vs Sigma on the SAME
         // b=Var(0) input. Sigma is a binder (b at depth+1): Var(0) there is
@@ -2039,83 +1968,33 @@ mod tests {
         check("App.a", Term::app(leaf(), Term::Var(0)));
         check("Proj1", Term::proj1(Term::Var(0)));
         check("Proj2", Term::proj2(Term::Var(0)));
-        check(
-            "Ascript.t",
-            Term::Ascript(Box::new(Term::Var(0)), Box::new(leaf())),
-        );
-        check(
-            "Ascript.a",
-            Term::Ascript(Box::new(leaf()), Box::new(Term::Var(0))),
-        );
-        check(
-            "Eq.ty",
-            Term::Eq(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())),
-        );
-        check(
-            "Eq.t",
-            Term::Eq(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())),
-        );
-        check(
-            "Eq.u",
-            Term::Eq(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))),
-        );
+        check("Ascript.t", Term::Ascript(Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Ascript.a", Term::Ascript(Box::new(leaf()), Box::new(Term::Var(0))));
+        check("Eq.ty", Term::Eq(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())));
+        check("Eq.t", Term::Eq(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Eq.u", Term::Eq(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))));
         check("Refl", Term::Refl(Box::new(Term::Var(0))));
         check(
             "Cast.a",
-            Term::Cast(
-                Box::new(Term::Var(0)),
-                Box::new(leaf()),
-                Box::new(leaf()),
-                Box::new(leaf()),
-            ),
+            Term::Cast(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf()), Box::new(leaf())),
         );
         check(
             "Cast.b",
-            Term::Cast(
-                Box::new(leaf()),
-                Box::new(Term::Var(0)),
-                Box::new(leaf()),
-                Box::new(leaf()),
-            ),
+            Term::Cast(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())),
         );
         check(
             "Cast.e",
-            Term::Cast(
-                Box::new(leaf()),
-                Box::new(leaf()),
-                Box::new(Term::Var(0)),
-                Box::new(leaf()),
-            ),
+            Term::Cast(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())),
         );
         check(
             "Cast.t",
-            Term::Cast(
-                Box::new(leaf()),
-                Box::new(leaf()),
-                Box::new(leaf()),
-                Box::new(Term::Var(0)),
-            ),
+            Term::Cast(Box::new(leaf()), Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))),
         );
-        check(
-            "J.m",
-            Term::J(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())),
-        );
-        check(
-            "J.d2",
-            Term::J(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())),
-        );
-        check(
-            "J.e",
-            Term::J(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))),
-        );
-        check(
-            "Quot.a",
-            Term::Quot(Box::new(Term::Var(0)), Box::new(leaf())),
-        );
-        check(
-            "Quot.r",
-            Term::Quot(Box::new(leaf()), Box::new(Term::Var(0))),
-        );
+        check("J.m", Term::J(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())));
+        check("J.d2", Term::J(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())));
+        check("J.e", Term::J(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))));
+        check("Quot.a", Term::Quot(Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Quot.r", Term::Quot(Box::new(leaf()), Box::new(Term::Var(0))));
         check("QuotClass", Term::QuotClass(Box::new(Term::Var(0))));
         check(
             "QuotElim.motive",
@@ -2155,14 +2034,8 @@ mod tests {
         );
         check("Trunc", Term::Trunc(Box::new(Term::Var(0))));
         check("TruncProj", Term::TruncProj(Box::new(Term::Var(0))));
-        check(
-            "Absurd.motive",
-            Term::Absurd(Box::new(Term::Var(0)), Box::new(leaf())),
-        );
-        check(
-            "Absurd.proof",
-            Term::Absurd(Box::new(leaf()), Box::new(Term::Var(0))),
-        );
+        check("Absurd.motive", Term::Absurd(Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Absurd.proof", Term::Absurd(Box::new(leaf()), Box::new(Term::Var(0))));
 
         // ── Elim: five term-bearing positions (fam/level_args carry no
         // Term subterms) ──
@@ -2276,10 +2149,7 @@ mod tests {
     #[test]
     fn subst_form_at_matches_hand_written_expectations_at_binder_depth() {
         fn check(label: &str, actual: Form, expected: Form) {
-            assert_eq!(
-                actual, expected,
-                "{label}: subst_form_at must match the hand-written expectation"
-            );
+            assert_eq!(actual, expected, "{label}: subst_form_at must match the hand-written expectation");
         }
 
         let p = QTerm::Parameter(7);

@@ -65,8 +65,10 @@ fn surf1_d2_fn_calling_proc_reuses_escape_gate() {
         "fn calling a proc must reject via the row escape gate: {bad_fn}"
     );
 
-    env.elaborate_decl("proc surf1_load_ok (p : String) : String visits [FS] = surf1_read p")
-        .expect("same body under proc with matching row must accept");
+    env.elaborate_decl(
+        "proc surf1_load_ok (p : String) : String visits [FS] = surf1_read p",
+    )
+    .expect("same body under proc with matching row must accept");
 }
 
 #[test]
@@ -146,10 +148,7 @@ fn view_is_an_ordinary_free_identifier() {
 
     env.elaborate_decl("const view : Int = 5")
         .expect("`view` must be usable as an ordinary const name");
-    assert!(
-        env.globals.contains_key("view"),
-        "the binding must register under its own name"
-    );
+    assert!(env.globals.contains_key("view"), "the binding must register under its own name");
 
     env.elaborate_decl("fn view_user (view : Int) : Int = view")
         .expect("`view` must be usable as an ordinary parameter name and resolve in its body");

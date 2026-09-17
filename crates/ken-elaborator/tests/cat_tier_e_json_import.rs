@@ -7,7 +7,7 @@ mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind};
+use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind, literate, parser};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const JSON: &str = "Data.Serialization.Json";

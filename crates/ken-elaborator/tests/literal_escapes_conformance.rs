@@ -34,10 +34,7 @@ fn eval_const_in(env: &mut ElabEnv, src: &str) -> EvalVal {
     }
     match env.env.lookup(r.def_id) {
         Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, &mut store),
-        other => panic!(
-            "expected a checked Transparent const, got {:?}",
-            other.map(|_| ())
-        ),
+        other => panic!("expected a checked Transparent const, got {:?}", other.map(|_| ())),
     }
 }
 
@@ -87,12 +84,8 @@ fn common_escape_matrix_decodes_exactly() {
         let char_src = format!("const escape_char_{i} : Char = '\\{spelling}'");
         match eval_const_in(&mut env, &char_src) {
             EvalVal::Int(n) => assert_eq!(n, scalar as i64, "{char_src}"),
-            EvalVal::BigInt(n) => {
-                assert_eq!(n, num_bigint::BigInt::from(scalar as u32), "{char_src}")
-            }
-            other => {
-                panic!("{char_src} -> expected Int (Char is {{c:Int|isScalar c}}), got {other:?}")
-            }
+            EvalVal::BigInt(n) => assert_eq!(n, num_bigint::BigInt::from(scalar as u32), "{char_src}"),
+            other => panic!("{char_src} -> expected Int (Char is {{c:Int|isScalar c}}), got {other:?}"),
         }
         // Byte string, exactly the one decoded byte.
         let bytes_src = format!("const escape_bytes_{i} : Bytes = b\"\\{spelling}\"");
@@ -125,27 +118,15 @@ fn escape_repertoire_is_closed_and_kind_selected() {
 
         let str_src = format!("const t_str_{disc} : String = \"\\{disc_char}\"");
         let str_res = env.elaborate_decl(&str_src);
-        assert_eq!(
-            str_res.is_ok(),
-            accepted,
-            "String \\{disc_char}: {str_res:?}"
-        );
+        assert_eq!(str_res.is_ok(), accepted, "String \\{disc_char}: {str_res:?}");
 
         let char_src = format!("const t_char_{disc} : Char = '\\{disc_char}'");
         let char_res = env.elaborate_decl(&char_src);
-        assert_eq!(
-            char_res.is_ok(),
-            accepted,
-            "Char \\{disc_char}: {char_res:?}"
-        );
+        assert_eq!(char_res.is_ok(), accepted, "Char \\{disc_char}: {char_res:?}");
 
         let bytes_src = format!("const t_bytes_{disc} : Bytes = b\"\\{disc_char}\"");
         let bytes_res = env.elaborate_decl(&bytes_src);
-        assert_eq!(
-            bytes_res.is_ok(),
-            accepted,
-            "Bytes \\{disc_char}: {bytes_res:?}"
-        );
+        assert_eq!(bytes_res.is_ok(), accepted, "Bytes \\{disc_char}: {bytes_res:?}");
 
         if !accepted {
             for res in [str_res, char_res, bytes_res] {
@@ -165,34 +146,21 @@ fn escape_repertoire_is_closed_and_kind_selected() {
 
     // well-shaped `\u{41}` in all three kinds: accepted in String/Char,
     // rejected (wrong-kind, full-escape span) in a byte string.
-    assert!(ElabEnv::new()
-        .unwrap()
-        .elaborate_decl("const t : String = \"\\u{41}\"")
-        .is_ok());
-    assert!(ElabEnv::new()
-        .unwrap()
-        .elaborate_decl("const t : Char = '\\u{41}'")
-        .is_ok());
+    assert!(ElabEnv::new().unwrap().elaborate_decl("const t : String = \"\\u{41}\"").is_ok());
+    assert!(ElabEnv::new().unwrap().elaborate_decl("const t : Char = '\\u{41}'").is_ok());
     let u_wrong_kind = elaborate_err("const t : Bytes = b\"\\u{41}\"");
     match &u_wrong_kind {
         ElabError::InvalidEscape { span, .. } => {
             let src = "const t : Bytes = b\"\\u{41}\"";
             let start = src.find('\\').unwrap();
-            assert_eq!(
-                (span.start, span.end),
-                (start, start + 6),
-                "\\u{{41}} complete-escape span"
-            );
+            assert_eq!((span.start, span.end), (start, start + 6), "\\u{{41}} complete-escape span");
         }
         other => panic!("expected InvalidEscape, got {other:?}"),
     }
 
     // well-shaped `\x41` in all three kinds: accepted in byte-string,
     // rejected (wrong-kind, full-escape span) in String/Char.
-    assert!(ElabEnv::new()
-        .unwrap()
-        .elaborate_decl("const t : Bytes = b\"\\x41\"")
-        .is_ok());
+    assert!(ElabEnv::new().unwrap().elaborate_decl("const t : Bytes = b\"\\x41\"").is_ok());
     for (kind, src) in [
         ("String", "const t : String = \"\\x41\""),
         ("Char", "const t : Char = '\\x41'"),
@@ -201,11 +169,7 @@ fn escape_repertoire_is_closed_and_kind_selected() {
         match &err {
             ElabError::InvalidEscape { span, .. } => {
                 let start = src.find('\\').unwrap();
-                assert_eq!(
-                    (span.start, span.end),
-                    (start, start + 4),
-                    "{kind} \\x41 complete-escape span"
-                );
+                assert_eq!((span.start, span.end), (start, start + 4), "{kind} \\x41 complete-escape span");
             }
             other => panic!("{kind}: expected InvalidEscape, got {other:?}"),
         }
@@ -216,11 +180,7 @@ fn escape_repertoire_is_closed_and_kind_selected() {
 #[test]
 fn unicode_escape_shape_scalar_and_char_cardinality() {
     // Valid escapes decode to the exact scalar, in both String and Char.
-    for (escape, scalar) in [
-        ("\\u{0}", 0u32),
-        ("\\u{1F600}", 0x1F600),
-        ("\\u{10FFFF}", 0x10FFFF),
-    ] {
+    for (escape, scalar) in [("\\u{0}", 0u32), ("\\u{1F600}", 0x1F600), ("\\u{10FFFF}", 0x10FFFF)] {
         let str_src = format!("const t : String = \"{escape}\"");
         match eval_const(&str_src) {
             EvalVal::Str(s) => {
@@ -239,12 +199,7 @@ fn unicode_escape_shape_scalar_and_char_cardinality() {
     }
 
     // Malformed shapes: exact spans, boundary excluded where applicable.
-    for (escape, tail_len) in [
-        ("\\u{}", 4),
-        ("\\u{0000041}", 10),
-        ("\\u{4_}", 5),
-        ("\\u{G}", 4),
-    ] {
+    for (escape, tail_len) in [("\\u{}", 4), ("\\u{0000041}", 10), ("\\u{4_}", 5), ("\\u{G}", 4)] {
         let src = format!("const t : String = \"{escape}\"");
         let err = elaborate_err(&src);
         let start = src.find('\\').unwrap();
@@ -261,18 +216,9 @@ fn unicode_escape_shape_scalar_and_char_cardinality() {
 
     // Cardinality: one decoded scalar accepts; empty/two-scalar reject
     // (name/span not pinned by the seed -- just confirm rejection).
-    assert!(ElabEnv::new()
-        .unwrap()
-        .elaborate_decl("const t : Char = 'A'")
-        .is_ok());
-    assert!(ElabEnv::new()
-        .unwrap()
-        .elaborate_decl("const t : Char = ''")
-        .is_err());
-    assert!(ElabEnv::new()
-        .unwrap()
-        .elaborate_decl("const t : Char = 'AB'")
-        .is_err());
+    assert!(ElabEnv::new().unwrap().elaborate_decl("const t : Char = 'A'").is_ok());
+    assert!(ElabEnv::new().unwrap().elaborate_decl("const t : Char = ''").is_err());
+    assert!(ElabEnv::new().unwrap().elaborate_decl("const t : Char = 'AB'").is_err());
 }
 
 /// surface/literals/byte-string-ascii-and-x-domain
@@ -282,10 +228,7 @@ fn byte_string_ascii_and_x_domain() {
     let mut env = ElabEnv::new().expect("prelude");
     for byte in 0u16..256 {
         let byte = byte as u8;
-        for (case, hex) in [
-            ("upper", format!("{byte:02X}")),
-            ("lower", format!("{byte:02x}")),
-        ] {
+        for (case, hex) in [("upper", format!("{byte:02X}")), ("lower", format!("{byte:02x}"))] {
             let src = format!("const t_{byte}_{case} : Bytes = b\"\\x{hex}\"");
             match eval_const_in(&mut env, &src) {
                 EvalVal::Bytes(bs) => assert_eq!(bs, vec![byte], "{src}"),
@@ -307,10 +250,7 @@ fn byte_string_ascii_and_x_domain() {
     }
 
     // Unescaped non-ASCII scalar rejects (name/span not pinned).
-    assert!(ElabEnv::new()
-        .unwrap()
-        .elaborate_decl("const t : Bytes = b\"\u{e9}\"")
-        .is_err());
+    assert!(ElabEnv::new().unwrap().elaborate_decl("const t : Bytes = b\"\u{e9}\"").is_err());
 
     // Malformed: `b"\x4"` (incomplete, closing quote excluded) and
     // `b"\xG0"` (non-hex, span excludes the trailing 0).
@@ -363,9 +303,7 @@ fn invalid_escape_span_precedes_unterminated() {
     // reclassified as InvalidEscape.
     for src in ["\"abc", "'abc", "b\"abc"] {
         match Lexer::lex(src).unwrap_err() {
-            ElabError::ParseError { msg, .. } => {
-                assert!(msg.contains("unterminated"), "{src}: {msg}")
-            }
+            ElabError::ParseError { msg, .. } => assert!(msg.contains("unterminated"), "{src}: {msg}"),
             other => panic!("{src}: expected ordinary unterminated, got {other:?}"),
         }
     }
@@ -395,9 +333,7 @@ fn d0_foreign_names_decode_escapes_uniformly() {
         .expect("foreign decl with escaped symbol/library names must parse");
     assert_eq!(decls.len(), 1);
     match &decls[0] {
-        Decl::ForeignDecl {
-            symbol, library, ..
-        } => {
+        Decl::ForeignDecl { symbol, library, .. } => {
             assert_eq!(symbol, "sym'bol", "the symbol name must be escape-decoded");
             assert_eq!(library, "li\\b", "the library name must be escape-decoded");
         }

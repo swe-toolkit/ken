@@ -39,10 +39,7 @@ fn same_constructor_spelling_across_two_sum_families_is_rejected_with_both_sites
             first_span,
             second_span,
         }) => {
-            assert_eq!(
-                name, "ShadowRed",
-                "the diagnostic must name the colliding spelling"
-            );
+            assert_eq!(name, "ShadowRed", "the diagnostic must name the colliding spelling");
             assert!(
                 first_span.end > first_span.start,
                 "the EARLIER declaration site must be a real span (registry consulted, not the \

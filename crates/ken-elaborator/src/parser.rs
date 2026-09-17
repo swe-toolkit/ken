@@ -2670,7 +2670,9 @@ impl Parser {
             Token::Nat(value) => LiteralPat::Numeric(NumLit::Int(value.into())),
             Token::IntLit(value) => LiteralPat::Numeric(NumLit::Int(value)),
             Token::FloatLit(value) => LiteralPat::Numeric(NumLit::Float(value)),
-            Token::DecimalLit(coeff, exp) => LiteralPat::Numeric(NumLit::Decimal(coeff, exp)),
+            Token::DecimalLit(coeff, exp) => {
+                LiteralPat::Numeric(NumLit::Decimal(coeff, exp))
+            }
             Token::Float32Lit(value) => LiteralPat::Numeric(NumLit::Float32(value)),
             Token::Str(value) => LiteralPat::String(value),
             Token::CharLit(value) => LiteralPat::Char(value),
@@ -3231,7 +3233,10 @@ fn reduce_default_surface(values: &mut Vec<Expr>, operator: InfixOperator) {
     values.push(combined);
 }
 
-fn associate_surface_spine(operands: Vec<Expr>, operators: Vec<InfixOperator>) -> Expr {
+fn associate_surface_spine(
+    operands: Vec<Expr>,
+    operators: Vec<InfixOperator>,
+) -> Expr {
     let mut operands = operands.into_iter();
     let mut values = vec![operands.next().expect("a spine has one more operand")];
     let mut pending: Vec<InfixOperator> = Vec::new();
@@ -3240,7 +3245,10 @@ fn associate_surface_spine(operands: Vec<Expr>, operators: Vec<InfixOperator>) -
             .last()
             .is_some_and(|top| default_precedence(top) >= default_precedence(&operator))
         {
-            reduce_default_surface(&mut values, pending.pop().expect("pending operator exists"));
+            reduce_default_surface(
+                &mut values,
+                pending.pop().expect("pending operator exists"),
+            );
         }
         pending.push(operator);
         values.push(rhs);
@@ -3298,7 +3306,10 @@ fn reassociate_default_expr(expr: Expr) -> Expr {
             operators,
             ..
         } => associate_surface_spine(
-            operands.into_iter().map(reassociate_default_expr).collect(),
+            operands
+                .into_iter()
+                .map(reassociate_default_expr)
+                .collect(),
             operators,
         ),
         Expr::EMatch {
@@ -3421,7 +3432,9 @@ fn reassociate_default_type(ty: Type) -> Type {
         // `RTrunc` arm, which IS reaching (it runs at DECLARED fixity and rejects
         // an ambiguous-fixity truncated predicate; see that arm and its test).
         // The traversal must still not silently leaf a `‖…‖`.
-        Type::TTrunc(inner, span) => Type::TTrunc(Box::new(reassociate_default_type(*inner)), span),
+        Type::TTrunc(inner, span) => {
+            Type::TTrunc(Box::new(reassociate_default_type(*inner)), span)
+        }
         leaf => leaf,
     }
 }

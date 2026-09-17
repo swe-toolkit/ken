@@ -23,11 +23,9 @@ fn base_env() -> ElabEnv {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
     catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
-        .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
+    env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD).expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
     catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
-    env.elaborate_ken_md_file(SUMS_KEN_MD)
-        .expect("Data/Sums/Combinators.ken.md must elaborate");
+    env.elaborate_ken_md_file(SUMS_KEN_MD).expect("Data/Sums/Combinators.ken.md must elaborate");
     env
 }
 
@@ -72,10 +70,7 @@ fn zero_axiom_in_sums_ken() {
     let tangled = ken_elaborator::literate::extract_ken_md(SUMS_KEN_MD)
         .expect("Data/Sums/Combinators.ken.md must extract")
         .source;
-    assert!(
-        !tangled.contains("Axiom"),
-        "Combinators.ken.md's tangled code must contain zero Axiom literals"
-    );
+    assert!(!tangled.contains("Axiom"), "Combinators.ken.md's tangled code must contain zero Axiom literals");
 }
 
 #[test]
@@ -85,12 +80,10 @@ fn trusted_base_delta_is_empty_across_the_file() {
     catalog_or::expose_core_logic_transport(&mut env);
     catalog_or::load_derived_importing_fixture_many(&mut env, &["list_append"]);
     catalog_or::withhold_lc_bool_and_flat_aliases(&mut env);
-    env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
-        .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
+    env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD).expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
     catalog_or::restore_lc_bool_and_flat_aliases(&mut env);
     let before: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_ken_md_file(SUMS_KEN_MD)
-        .expect("Data/Sums/Combinators.ken.md must elaborate");
+    env.elaborate_ken_md_file(SUMS_KEN_MD).expect("Data/Sums/Combinators.ken.md must elaborate");
     let after: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(
         before, after,

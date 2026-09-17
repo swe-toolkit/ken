@@ -23,11 +23,7 @@ fn lex_agrees_with_lossless(src: &str) -> Result<(), String> {
 fn roundtrip(src: &str) {
     lex_agrees_with_lossless(src).unwrap();
     let source = parse_lossless(src).unwrap_or_else(|e| panic!("{src:?} must parse: {e:?}"));
-    assert_eq!(
-        source.reconstruct(),
-        src,
-        "round-trip must reproduce {src:?} exactly"
-    );
+    assert_eq!(source.reconstruct(), src, "round-trip must reproduce {src:?} exactly");
 }
 
 /// AC-1 -- the two scanners agree, over a corpus covering every form, both
@@ -65,10 +61,7 @@ fn ac1_two_scanners_agree_over_the_corpus() {
         "const t : Int = {-- {- -} still unterminated",
     ] {
         lex_agrees_with_lossless(src).unwrap();
-        assert!(
-            Lexer::lex(src).is_err(),
-            "{src:?} must be rejected by the lexer"
-        );
+        assert!(Lexer::lex(src).is_err(), "{src:?} must be rejected by the lexer");
     }
 }
 
@@ -80,11 +73,7 @@ fn ac2_two_level_nesting() {
     // `{- {- -} -}` is ONE comment: both inner and outer close, net token
     // stream has nothing left over from the comment.
     assert_eq!(
-        Lexer::lex("{- {- -} -} 1")
-            .unwrap()
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect::<Vec<_>>(),
+        Lexer::lex("{- {- -} -} 1").unwrap().into_iter().map(|(t, _)| t).collect::<Vec<_>>(),
         vec![Token::Nat(1), Token::Eof]
     );
     roundtrip("const t : Int = {- {- -} -} 1");
@@ -109,8 +98,9 @@ fn ac2_two_level_nesting() {
 #[test]
 fn ac3_doc_comment_attaches_to_following_declaration_discriminatingly() {
     for (doc_open, doc_close) in [("---", ""), ("{--", " --}")] {
-        let src =
-            format!("const a : Int = 1\n{doc_open} doc for b{doc_close}\nconst b : Int = 2\n");
+        let src = format!(
+            "const a : Int = 1\n{doc_open} doc for b{doc_close}\nconst b : Int = 2\n"
+        );
         let source = parse_lossless(&src).unwrap_or_else(|e| panic!("{src:?}: {e:?}"));
         let doc_start = src.find(doc_open).unwrap();
         let decl_span = |prefix: &str| {
@@ -130,14 +120,8 @@ fn ac3_doc_comment_attaches_to_following_declaration_discriminatingly() {
             .find(|a| a.comment_span.start == doc_start)
             .unwrap_or_else(|| panic!("doc comment in {src:?} must have an attachment"));
         assert_eq!(attachment.placement, CommentPlacement::Leading, "{src:?}");
-        assert_eq!(
-            attachment.home_span, b_span,
-            "{src:?}: must attach to the FOLLOWING decl (b)"
-        );
-        assert_ne!(
-            attachment.home_span, a_span,
-            "{src:?}: must NOT attach to the preceding decl (a)"
-        );
+        assert_eq!(attachment.home_span, b_span, "{src:?}: must attach to the FOLLOWING decl (b)");
+        assert_ne!(attachment.home_span, a_span, "{src:?}: must NOT attach to the preceding decl (a)");
     }
 }
 
@@ -181,11 +165,7 @@ fn ac4_unterminated_errors_have_spans_in_both_scanners() {
 fn ac5_prefix_relations_enumerated() {
     // `--` -- ordinary line comment: consumes to end of line, nothing left.
     assert_eq!(
-        Lexer::lex("1 -- x\n2")
-            .unwrap()
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect::<Vec<_>>(),
+        Lexer::lex("1 -- x\n2").unwrap().into_iter().map(|(t, _)| t).collect::<Vec<_>>(),
         vec![Token::Nat(1), Token::Nat(2), Token::Eof],
         "--"
     );
@@ -193,54 +173,35 @@ fn ac5_prefix_relations_enumerated() {
     // `---` -- doc line comment: same shape as `--`, tagged DocLineComment.
     let src = "1\n--- doc\n2";
     assert_eq!(
-        Lexer::lex(src)
-            .unwrap()
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect::<Vec<_>>(),
+        Lexer::lex(src).unwrap().into_iter().map(|(t, _)| t).collect::<Vec<_>>(),
         vec![Token::Nat(1), Token::Nat(2), Token::Eof],
         "---"
     );
     let decl_src = "const a : Int = 1\n--- doc\nconst b : Int = 2\n";
     let source = parse_lossless(decl_src).unwrap();
     assert!(
-        source
-            .trivia()
-            .iter()
-            .any(|t| decl_src[t.span.start..t.span.end].starts_with("---")),
+        source.trivia().iter().any(|t| decl_src[t.span.start..t.span.end].starts_with("---")),
         "--- must be retained as trivia"
     );
 
     // `----` -- the doc-line marker `---` plus a literal `-` as the FIRST
     // character of the comment's own text; not a fourth comment form.
     assert_eq!(
-        Lexer::lex("1\n---- text\n2")
-            .unwrap()
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect::<Vec<_>>(),
+        Lexer::lex("1\n---- text\n2").unwrap().into_iter().map(|(t, _)| t).collect::<Vec<_>>(),
         vec![Token::Nat(1), Token::Nat(2), Token::Eof],
         "----"
     );
 
     // `{-` -- ordinary nestable block comment: opens, needs a matching `-}`.
     assert_eq!(
-        Lexer::lex("1 {- x -} 2")
-            .unwrap()
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect::<Vec<_>>(),
+        Lexer::lex("1 {- x -} 2").unwrap().into_iter().map(|(t, _)| t).collect::<Vec<_>>(),
         vec![Token::Nat(1), Token::Nat(2), Token::Eof],
         "open-block-marker"
     );
 
     // `{--` -- doc block comment: opens, needs a matching `--}`, non-nesting.
     assert_eq!(
-        Lexer::lex("1 {-- x --} 2")
-            .unwrap()
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect::<Vec<_>>(),
+        Lexer::lex("1 {-- x --} 2").unwrap().into_iter().map(|(t, _)| t).collect::<Vec<_>>(),
         vec![Token::Nat(1), Token::Nat(2), Token::Eof],
         "open-doc-block-marker"
     );
@@ -248,11 +209,7 @@ fn ac5_prefix_relations_enumerated() {
     // `{---` -- the doc-block opener `{--` plus a literal `-` as the FIRST
     // character of the comment's own text; still closed by `--}`.
     assert_eq!(
-        Lexer::lex("1 {--- x --} 2")
-            .unwrap()
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect::<Vec<_>>(),
+        Lexer::lex("1 {--- x --} 2").unwrap().into_iter().map(|(t, _)| t).collect::<Vec<_>>(),
         vec![Token::Nat(1), Token::Nat(2), Token::Eof],
         "open-doc-block-marker-plus-dash"
     );
@@ -292,14 +249,8 @@ fn ac7_formatter_round_trips_a_block_comment() {
     let src = "{- leading -}\nconst a : Int = 1\n";
     let out1 = format_ken(src).expect("must format");
     let out2 = format_ken(&out1).expect("must re-format");
-    assert_eq!(
-        out1, out2,
-        "format must be idempotent with a block comment present"
-    );
-    assert!(
-        out1.contains("{- leading -}"),
-        "the block comment text must survive formatting: {out1:?}"
-    );
+    assert_eq!(out1, out2, "format must be idempotent with a block comment present");
+    assert!(out1.contains("{- leading -}"), "the block comment text must survive formatting: {out1:?}");
 }
 
 /// AC-D0 -- `true`/`false` elaborate at `Bool`; `trueish` still resolves as
@@ -308,24 +259,16 @@ fn ac7_formatter_round_trips_a_block_comment() {
 #[test]
 fn acd0_bool_literals_and_trueish_preserved() {
     let mut env = ElabEnv::new().expect("prelude");
-    env.elaborate_decl("const b1 : Bool = true")
-        .expect("true must elaborate at Bool");
-    env.elaborate_decl("const b2 : Bool = false")
-        .expect("false must elaborate at Bool");
+    env.elaborate_decl("const b1 : Bool = true").expect("true must elaborate at Bool");
+    env.elaborate_decl("const b2 : Bool = false").expect("false must elaborate at Bool");
 
     assert_eq!(
         Lexer::lex("trueish").unwrap()[0].0,
         Token::Ident("trueish".to_string()),
         "trueish must tokenize as a plain identifier"
     );
-    assert_eq!(
-        Lexer::lex("true").unwrap()[0].0,
-        Token::ConId("True".to_string())
-    );
-    assert_eq!(
-        Lexer::lex("false").unwrap()[0].0,
-        Token::ConId("False".to_string())
-    );
+    assert_eq!(Lexer::lex("true").unwrap()[0].0, Token::ConId("True".to_string()));
+    assert_eq!(Lexer::lex("false").unwrap()[0].0, Token::ConId("False".to_string()));
 
     // `trueish` reaches ordinary name resolution (fails only because it is
     // genuinely undefined, the same failure any unbound name gets -- not

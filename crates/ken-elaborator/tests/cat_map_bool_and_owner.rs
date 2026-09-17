@@ -80,8 +80,11 @@ fn map_dependency_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base environment");
     catalog_or::load_core_logic_compare(&mut env);
     catalog_or::load_derived_importing_fixture(&mut env, "list_append");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
-        .expect("Map's canonical Nat addition provider must roots-load");
+    env.elaborate_module_from_roots(
+        &[catalog_or::catalog_root()],
+        "Data.Numeric.Nat.Arithmetic",
+    )
+    .expect("Map's canonical Nat addition provider must roots-load");
     for imported in ["add", "cong", "sym", "trans", "list_append"] {
         assert!(
             !env.globals.contains_key(imported),

@@ -77,7 +77,10 @@ fn erased_d5_program() -> RuntimeProgram {
             NESTED_LIFT_NAT_THREE_SOURCE,
         )],
         TargetSelector::StableSymbol {
-            package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PACKAGE.to_string()]),
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![PACKAGE.to_string()],
+            ),
             symbol: target,
             kind: CompilerTargetKind::Executable,
         },
@@ -117,8 +120,7 @@ fn d1b_role_b_erasure_carries_the_exact_nat_role_identity_without_widening_the_c
     // dba42b0a, which is precisely why it cannot discriminate this slice.
     let nat_family = format!("decl:{PACKAGE}::Nat");
     let data = program
-        .erased_core
-        .metadata
+        .erased_core.metadata
         .checked_core
         .data_metadata
         .get(&nat_family)
@@ -126,8 +128,7 @@ fn d1b_role_b_erasure_carries_the_exact_nat_role_identity_without_widening_the_c
             panic!(
                 "checked-core data metadata lost the Nat family {nat_family}; present: {:?}",
                 program
-                    .erased_core
-                    .metadata
+                    .erased_core.metadata
                     .checked_core
                     .data_metadata
                     .keys()
@@ -156,8 +157,7 @@ fn d1b_role_b_erasure_carries_the_exact_nat_role_identity_without_widening_the_c
 
     // ── HALF 3: the typed record, and the ONLY discriminating half ───────────
     let record = program
-        .erased_core
-        .metadata
+        .erased_core.metadata
         .checked_core
         .runtime_symbols
         .as_ref()
