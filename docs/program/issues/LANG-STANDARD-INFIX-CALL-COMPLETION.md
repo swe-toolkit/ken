@@ -44,6 +44,16 @@ origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_78
 > operative text on placement.** It also corrects this frame's earlier
 > "actively contended" claim about `LawfulClasses.ken.md` — measured
 > UNCONTENDED, twice, independently. See FI-2b and the Contention section.
+>
+> **AMENDED AGAIN — FI-5 rules how the elaborator learns the five identities**
+> (`evt_51m59k0zh8z5t`), discharging a `section 1a` hold taken on a research
+> prior-art advisory. **Three layers: role vocabulary, acquisition from the
+> facade's existing export table, and a required-roles check WITH A SHAPE
+> CONTRACT.** The implementer's stop was correct — a bare runtime string
+> comparison fails open — and the advisory's finding is that **acquisition
+> without a contract lands in the silent tier no matter how few strings it
+> names**, so fewer paths was never the fix. D1 is now D1a/D1b/D1c and AC-9
+> discharges the hardness layer. **The fixity half is UNBLOCKED.**
 
 ## What this is (Architect A1)
 
@@ -207,6 +217,40 @@ only as a test fixture string in
 `crates/ken-elaborator/tests/lang_type_projection_surface_form.rs`. That is
 correct and expected: it is the B track. Do not author it here.
 
+**FI-5. HOW THE ELABORATOR LEARNS THE FIVE IDENTITIES IS RULED — THREE LAYERS,
+AND THE HARDNESS LAYER IS THE ONE THAT WAS MISSING.** Architect
+`evt_51m59k0zh8z5t`, discharging a `section 1a` hold taken on a research
+prior-art advisory (`evt_34sa9cvyags83`). See D1a/D1b/D1c.
+
+The implementer's stop was correct and the fork it raised was real: **a bare
+runtime string comparison FAILS OPEN.** The advisory's finding is that
+acquisition without a contract lands in the silent tier **no matter how few
+strings it names** — so fewer paths was never the fix.
+
+    layer 1  ROLE VOCABULARY   compiler-owned, closed, names no paths
+    layer 2  ACQUISITION       the facade's existing `export` table
+    layer 3  HARDNESS          required-roles check + SHAPE contract
+
+**The shape contract is the load-bearing part: a role is not filled by whatever
+happens to sit under the glyph, it is filled by a binding of the required
+form.** Presence-checking alone would accept a wrong-but-present binding.
+
+**The residual coupling is stated, not buried: the elaborator holds ONE string,
+the standard-operator home's module path.** That is this design's minimum.
+Under layer 3 it fails **closed and loud** — a moved home is a hard error
+naming every unfilled role, never a silent completion miss.
+
+**A self-declaring home would remove even that string. It is a DEFERRED
+improvement and explicitly NOT a blocker — do not build it here.** It moves
+where one string lives without changing any of the three layers, so it can land
+later without re-opening this ruling.
+
+**Fixity falls out and needs no widening.** Once layer 3 certifies the five
+roles, `section 6.1`'s fixities attach to the `GlobalId`s just certified. No
+locality gate (nothing is declared at a module), and **no first-writer race
+over an identity's fixity, because there is exactly one home.**
+`collect_scope_fixities`' `GlobalId` keying carries it unchanged.
+
 ## Scope boundaries
 
 - Standard bindings are ordinary checked functions reached by ordinary imports:
@@ -235,9 +279,32 @@ correct and expected: it is the B track. Do not author it here.
 
 ## Deliverables
 
-- **D1 — the completion adapter.** One use-site completion path in
-  `crates/ken-elaborator`, keyed on the defining `GlobalId` + checked
-  telescope, implementing section 6.9's ordering exactly.
+- **D1 — the completion adapter, in THREE LAYERS (FI-5, Architect ruling).**
+  One use-site completion path in `crates/ken-elaborator`, keyed on the
+  defining `GlobalId` + checked telescope, implementing section 6.9's ordering
+  exactly — built as:
+  - **D1a — role vocabulary.** A compiler-owned, closed enumeration of the
+    standard operator ROLES (`∧ ∨ ≤ ≥ ≠`, and `∈` when the B track lands). It
+    names roles only: **never a module path, never a qualified identifier.**
+    This is `31 section 1c`'s admission made available to elaboration —
+    *"admission fixes names, not meanings"* — so it concedes nothing new to
+    the compiler.
+  - **D1b — acquisition, from the facade's EXISTING export table. No new
+    surface form.** `export Core.Classes.LawfulClasses (bool_and as ∧, …)`
+    already states glyph-to-identity, in Ken, at the home `33 section 6.1`
+    designates, and by `4.3` it republishes the existing `GlobalId`. **The
+    acquisition statement exists; do not invent one.** The elaborator resolves
+    the home and reads its export table.
+  - **D1c — a separate REQUIRED-ROLES check, with a SHAPE CONTRACT, at a
+    defined point in elaboration.** Hardness does not come from making the
+    lookup total; it comes from an independently maintained statement of what
+    must be present. **Role absent from the export table: hard error naming the
+    role. Role present but the binding has the WRONG SHAPE: hard error naming
+    the role and the mismatch.** `section 6.1` supplies both inputs verbatim —
+    the role list and each role's signature. A catalog rename is a non-event
+    (the glyph binding travels with the `export`); a wrong-but-present binding
+    is caught at the moment of binding, which is the case a bare string
+    comparison cannot see.
 - **D2 — the five standard bindings wired, through a re-exporting facade.**
   `∧ ∨ ≤` bound to the landed `Core.Classes.LawfulClasses` **identities**,
   reached via `export` from a separate standard-operator module that does NOT
@@ -309,6 +376,19 @@ would have to manufacture is the one to raise, not to skip.
   evaluated before the body runs. An answer that cites arm laziness to explain
   operand behaviour has answered a different question, and one that reports
   no-short-circuit is CORRECT rather than a defect to fix.
+- **AC-9 (the hardness layer FAILS CLOSED — D1c, FI-5).** Three observations,
+  and **all three require evidence you must manufacture, which by this frame's
+  own standard makes them the ones to raise rather than skip.**
+  (a) **Role absent:** remove or rename a role out of the facade's export table
+  and show a HARD ERROR naming the role — not a silent completion miss, not a
+  fallback to glyph text. (b) **Role present, WRONG SHAPE:** bind a role to a
+  binding of the wrong telescope and show a hard error naming the role AND the
+  mismatch. **This is the case a presence-only check accepts, and it is why the
+  contract is on shape.** (c) **Home moved:** relocate the standard-operator
+  home and show every unfilled role named. Positive control for all three: a
+  build that is green before the perturbation and red after, with the role name
+  in the message — **a red build alone does not discharge this; the diagnostic
+  must name the role.**
 - **AC-8 (no regression).** Workspace-green **in CI**, never a local
   `--workspace` run (`COORDINATION` section 12). Enumerate the globbed catalog
   oracles your change reaches and name each in your handoff — a catalog-touching
@@ -322,6 +402,13 @@ would have to manufacture is the one to raise, not to skip.
   ([[LANG-MEMBERSHIP-OPERATOR-SURFACE]]), which reuses this node's resolver
   when it lands. FI-4.
 - The name/fixity admission (A0) and the spec contracts.
+- **A self-declaring standard-operator home** — the surface form that would let
+  the facade announce itself and remove the elaborator's one remaining module
+  path. Architect-deferred and explicitly not a blocker (FI-5): it relocates a
+  string without touching any of D1's three layers, so it lands later without
+  re-opening the ruling. **Do not build it here, and do not treat its absence
+  as a gap in D1c** — under the hardness layer the residual string already
+  fails closed and loud.
 
 ## Sizing / tier
 
