@@ -131,25 +131,36 @@ fn contains_recursive_bind_ir(expr: &ken_runtime::RuntimeExpr) -> bool {
     }
 }
 
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
+// Owner node: RT-CARRIED-RESIDUAL-IH-ARITY.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it cannot observe in CarriedWord
+// Observed signature, exactly, re-measured 2026-09-17 at origin/main
+// 3f4ae2d83 (NOT carried from the ledger):
+//   unsupported runtime-IR lowering: BoundaryCarrier: a carried recursive
+//   hypothesis is an eliminated value, not a callable, so it takes no
+//   arguments, but the call provides 1
 //
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
+// SUPERSEDED OWNER, recorded because it is what this row was filed under and
+// the old text asserted a signature this row no longer produces:
+// RT-CARRIER-BYTESPAN-OBSERVE, whose signature was
+//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it
+//   cannot observe in CarriedWord
+// That refusal no longer reaches this row -- RT-SITEOP-CARRIED-WITNESS D2
+// landed the carried SiteOperand port and the labels record it succeeding.
+// The four px4b rows still carry RT-CARRIER-BYTESPAN-OBSERVE, with the
+// OPPOSITE provenance: those were branch-introduced, this one predates the
+// branch.
+//
 // Pre-existing base debt, NOT a bind-order regression: measured failing at
 // the frozen base 21fd46dc by the D10 differential, before any
 // RT-SRCBODY-BIND-ORDER commit.
 // It refuses at object emission, so the program never executes and no
 // binding order is observable in it.
-// The four px4b rows carry this same owner with the OPPOSITE provenance:
-// those were branch-introduced, this one predates the branch.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
+#[ignore = "RT-CARRIED-RESIDUAL-IH-ARITY, measured at 3f4ae2d83: RT-SITEOP-CARRIED-WITNESS D2 still succeeds and the BoundaryCarrier arity text is a FALLBACK SYMPTOM, not the mechanism. The recursive-position argument IS a LexicalClosure with a callable body; resolve_recursive_unit_body declines the callable route, and control then falls to the zero-argument route, which reports the arity. The decline is NOT a capture shortfall: function_local.constructed_context_frame is a single Option slot overwritten per construction, so when one function constructs frames for two worker bodies the slot holds only the last, and the admission query for the other body sees frame.worker_body_origin != body_origin and falls through. MEASURED HERE: the live frame matches on both cardinalities (3 worker captures, 3 context captures) but is keyed to a sibling body, so the fallthrough then refuses on claim 0 having no availability.context_capture. Readmits when that slot is keyed by worker_body_origin rather than holding one frame per function. The arity refusal itself is correct and must not be relaxed."]
 fn delayed_capturing_generic_bind_agrees_across_real_executors() {
     let dir = output_dir("agreement");
     let output = ken_cli::build_native_program(
@@ -198,25 +209,36 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
     );
 }
 
-// Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
+// Owner node: RT-CARRIED-RESIDUAL-IH-ARITY.
 //
-// Observed signature, exactly:
-//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it cannot observe in CarriedWord
+// Observed signature, exactly, re-measured 2026-09-17 at origin/main
+// 3f4ae2d83 (NOT carried from the ledger):
+//   unsupported runtime-IR lowering: BoundaryCarrier: a carried recursive
+//   hypothesis is an eliminated value, not a callable, so it takes no
+//   arguments, but the call provides 1
 //
-// Owner node: RT-CARRIER-BYTESPAN-OBSERVE.
+// SUPERSEDED OWNER, recorded because it is what this row was filed under and
+// the old text asserted a signature this row no longer produces:
+// RT-CARRIER-BYTESPAN-OBSERVE, whose signature was
+//   Effect: seat Argument(0) of FsReadFile needs BytesPointerLength, which it
+//   cannot observe in CarriedWord
+// That refusal no longer reaches this row -- RT-SITEOP-CARRIED-WITNESS D2
+// landed the carried SiteOperand port and the labels record it succeeding.
+// The four px4b rows still carry RT-CARRIER-BYTESPAN-OBSERVE, with the
+// OPPOSITE provenance: those were branch-introduced, this one predates the
+// branch.
+//
 // Pre-existing base debt, NOT a bind-order regression: measured failing at
 // the frozen base 21fd46dc by the D10 differential, before any
 // RT-SRCBODY-BIND-ORDER commit.
 // It refuses at object emission, so the program never executes and no
 // binding order is observable in it.
-// The four px4b rows carry this same owner with the OPPOSITE provenance:
-// those were branch-introduced, this one predates the branch.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
+#[ignore = "RT-CARRIED-RESIDUAL-IH-ARITY, measured at 3f4ae2d83: RT-SITEOP-CARRIED-WITNESS D2 still succeeds and the BoundaryCarrier arity text is a FALLBACK SYMPTOM, not the mechanism. The recursive-position argument IS a LexicalClosure with a callable body; resolve_recursive_unit_body declines the callable route, and control then falls to the zero-argument route, which reports the arity. The decline is NOT a capture shortfall: function_local.constructed_context_frame is a single Option slot overwritten per construction, so when one function constructs frames for two worker bodies the slot holds only the last, and the admission query for the other body sees frame.worker_body_origin != body_origin and falls through. MEASURED HERE: the live frame matches on both cardinalities (3 worker captures, 3 context captures) but is keyed to a sibling body, so the fallthrough then refuses on claim 0 having no availability.context_capture. Readmits when that slot is keyed by worker_body_origin rather than holding one frame per function. The arity refusal itself is correct and must not be relaxed."]
 fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
     let dir = output_dir("consumed-response");
     let output = ken_cli::build_native_program(
