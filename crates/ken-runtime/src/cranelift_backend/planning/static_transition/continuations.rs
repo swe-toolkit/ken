@@ -11213,12 +11213,27 @@ pub(in crate::cranelift_backend) fn note_transport_examined() {
 /// dev builds. Emitting the zeros is what makes them readable:
 ///
 /// ```text
-/// block absent     the build was UNINSTRUMENTED -- attribute via the invocation,
-///                  not from inside the record
-/// N = 0            instrumented; the builder never ran here
+/// block absent     the build was UNINSTRUMENTED, or instrumented with no plan
+///                  built -- attribute via the invocation, not from inside the
+///                  record
 /// N > 0, M = 0     the builder ran and examined no transports
 /// N > 0, M > 0, counters 0   examined transports, declined none -- a real zero
 /// ```
+///
+/// **There is deliberately no `N = 0` row: it cannot occur.** The thread-local is
+/// armed by the same `#[cfg]` block that increments `N`, so the emitter exists only
+/// on a path that has already counted an invocation — the block can never appear
+/// with `N == 0`. Writing that row would be the dead-arm shape this whole record was
+/// built to remove: a category whose population is silently relabelled into its
+/// neighbour.
+///
+/// **Arming earlier would not recover it.** `publish_checked_ih_post_call_consumers`
+/// runs on every plan build, so "the publisher never ran" means "this run built no
+/// plans at all", and there is no crate-load hook to arm from without a constructor
+/// dependency. That population therefore lands in `block absent` — merged with the
+/// uninstrumented case, and **that merge is stated here rather than hidden**: a
+/// feature-on run that builds no plans is indistinguishable from a feature-off run
+/// by this record alone, and only the invocation separates them.
 ///
 /// **Limits, stated because they bound the claim — and the second one I got wrong
 /// in an earlier draft:**
