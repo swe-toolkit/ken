@@ -1,7 +1,7 @@
 ---
 id: LANG-BARE-OPERATOR-ATOM-REJECTION
 title: "The third divergence from 32-grammar.md section 3's application-atom contract pin: an ungrouped operator_name with ZERO following atoms must reject syntactically, before resolution, but the A0 prefix-atom consumer admits an operator name as an atom unconditionally -- bare `<+>` and bare `≤` both parse as EVar. Admit an operator_name only as an operator_prefix head with at least one following atom, keeping the grouped form `(OP)` and the applied form `OP Zero` live."
-status: draft
+status: ready
 owner: language
 size: S
 gate: none
@@ -12,18 +12,26 @@ tier: T1
 origin: "Steward cut 2026-09-16 on the fold-or-spin call routed by language-implementer (evt_4wthdbfybzdq4), ruled SPIN. Carries the third of seed-reserved-infix-names.md's rows, `expect-negative`, which LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE's frame named at its section 2b as an open fifth question and excluded from its four-row AC table. Cut BEFORE the predecessor's disposition is written so the re-point names a node that exists -- a RED-UNTIL tag naming an absent node is not a gate, which is the defect that produced the predecessor itself."
 ---
 
-> # DRAFT — held on its predecessor, not on framing. Do not start.
+> # READY 2026-09-17 — the hold is discharged
 >
-> **`draft` is the honest status and the reason is mechanical:**
-> [[LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE]] has not landed, so a team
-> pulling this node would find its premise false. It rewrites the same
-> postfix/argument loop in `parser.rs` — one file's worth of contention with no
-> upside to overlapping.
+> Frame: `docs/program/wp/LANG-BARE-OPERATOR-ATOM-REJECTION.md`
 >
-> **This node exists NOW so the predecessor's `AC-SEED-ROWS` disposition can
-> re-point the `expect-negative` row at a real id.** That is its whole job
-> today. The Steward flips it `ready` and frames it when the predecessor
-> merges; nothing else gates it.
+> The `draft` hold was mechanical and is now lifted:
+> [[LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE]] is **`merged` on
+> `origin/main`** (verified against the node's status in the object store, not a
+> branch ref), so the `parser.rs` contention that motivated serializing this
+> node behind it is discharged.
+>
+> **Read the frame, not this node, for the build.** The node states the
+> reasoning and the boundary; the frame carries the fixed inputs measured at
+> `a749618aa334f3e55747a7255cd41cbd1f21b31c`, the located mechanism site, and
+> the acceptance criteria with their controls.
+>
+> **One input changed while this node sat.** The `expect-negative` row's
+> `RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE` tag now names a
+> **merged** node while the row is still red — so the disposition this node was
+> cut to receive did not happen. The frame resolves it by **retiring** the tag
+> on a green row rather than re-pointing it at a new name.
 
 # Objective
 
