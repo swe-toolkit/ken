@@ -79,9 +79,11 @@ Signature is the observed failure text, read from a run. Label is the current
 **Label agreement: 9 agree, 6 do not.** Rows 3-6 are counted as agreeing on the
 symptom only — the observed text is what the label predicts, while the label's
 *mechanism* and its readmission condition were refuted by
-`RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION` and are rewritten by candidate
-`a4f231aa0`, approved and not yet landed. **This column therefore has a known
-expiry with a named cause.**
+`RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION` and are rewritten by
+`RT-CONTEXT-FRAME-LABEL-CORRECTION`, landed at
+`fb414cb78de6cc82cdf247be85270a2da0e47f3e`. **This column therefore has a known
+expiry with a named cause**, and the quotations above remain a correct record of
+`04d4dd38a` rather than of `main`.
 
 ## `AC-3` — the clustering question, MEASURED AT SIGNATURE DEPTH
 
