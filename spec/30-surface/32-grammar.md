@@ -221,6 +221,8 @@ type ::=
   | tyvar | atype
 atype ::= ConId | tyvar | "(" type ")"
   | "‖" type "‖"  -- propositional truncation (16 §6)
+  | tproj  -- field of a value binder (58b §2)
+tproj ::= ident ("." (ident | ConId))+  -- left-assoc; base is a VALUE binder
 label ::= expr | "ct"  -- a lattice label ℓ, or timing-sensitive ct (61 §3,§5a)
 ```
 
@@ -229,6 +231,45 @@ inferred `ℓ`. Implicit arguments `{…}` are inserted by elaboration (`39`). T
 application is shown by juxtaposition (`ConId atype*`); the chapters also use
 the bracketed spelling `F[T]` (e.g. `Wrapping[T]`, `35 §3`) — the same
 construct, spelling `[OQ-syntax]`.
+
+**Projection in type position `d.Query`.** `tproj` lets a parameter be typed by
+a field of an **earlier parameter in the same telescope** — the form
+`58b §2`'s `member_holds` needs for `(q : d.Query)`. The projected object is a
+**value** binder (`d : Membership c`); only its *field* is a type. So the head
+is an `ident`, not a `tyvar`: a bare lowercase head with no field is an
+ordinary type variable, and **the dot is what distinguishes them**.
+
+The chain is left-associative and may be longer than one segment. In
+`d.a.Query` the inner steps project values and only the **outermost** field
+yields the type, so a `tproj` is exactly a projection chain rooted at a binder.
+Field resolution is shared with expression-position projection rather than
+duplicated, so a field name means the same thing in both categories.
+
+**Neither category's admitted set contains the other's**, and this is a
+property of the surface, not an accident of one parser:
+
+    spelling        expression position   type position
+    d.query           admitted              admitted
+    d.Query           not claimed           admitted
+    d.1 / d.2         admitted              REJECTED
+
+**The two absences are different in kind and a conforming implementation must
+not treat them alike.** Positional projection in type position is a
+**specified rejection**: `d.1` in a type must be refused with a diagnostic
+locating the projection and directing the author to name the field. The
+uppercase spelling in *expression* position is **unclaimed surface** — no
+production claims `d.Query` there; it is not ambiguous, not reserved, and not
+deferred to a competing reading. It is unbuilt because no consumer has reached
+it. An implementation that later admits it is **not** thereby non-conforming;
+one that accepts `d.1` in a type **is**.
+
+**The base is a binder-rooted chain, never an arbitrary parenthesized
+expression.** `(e).field` is not a `tproj`, and the restriction is normative
+rather than incidental: consumers that ask structural questions of a type —
+whether it carries an effect row, for one — answer from the narrowness of this
+base, and they answer in the permissive direction. Widening the base to an
+arbitrary expression is a coherent future extension, but it is one that **owes
+those consumers a re-derivation** rather than inheriting their current answers.
 
 **Propositional truncation `‖A‖`.** `‖A‖` (ASCII `||A||`; the `‖`/`||`
 delimiter, `31 §1b`) is the surface spelling of the kernel propositional-

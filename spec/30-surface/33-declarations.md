@@ -995,12 +995,17 @@ kernel admits this — with `Query` as the provider's first field the telescope
 dependency exactly like `(a : Type) (x : a)` — and this section specifies the
 binding at that level.
 
-> **Ken's surface type grammar has no projection form**, so the catalog
-> binding cannot be *written* until one exists. That is a prerequisite of
-> `LANG-MEMBERSHIP-OPERATOR-SURFACE`, the build node that authors the binding,
-> not of this contract, and the distinction is
-> real: the telescope is closed and kernel-checkable today, and only its
-> spelling is missing.
+> **The surface form now exists, and this prerequisite is discharged.** This
+> clause previously read that Ken's surface type grammar had no projection
+> form, so the catalog binding could not be *written* until one existed. That
+> was true when the contract was authored and is no longer: `32 §2`'s `tproj`
+> admits `d.Query` in type position, landed by
+> `LANG-TYPE-PROJECTION-SURFACE-FORM`. The prerequisite is recorded rather
+> than deleted because it was load-bearing — it is why
+> `LANG-MEMBERSHIP-OPERATOR-SURFACE` could not be authored earlier, and the
+> distinction it drew was the right one: the telescope was closed and
+> kernel-checkable all along, and only its spelling was missing. **The
+> spelling arrived; nothing about the telescope changed.**
 >
 > **It must not be discharged by making `∈` an elaborator builtin.** `§6.1`
 > requires every standard meaning to be an ordinary top-level binding, and

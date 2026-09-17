@@ -85,12 +85,17 @@ proposition and is proof-irrelevant.
 **Its signature is given in full because its third parameter is typed by a
 projection**, `d.Query`, exactly as `membership_member_at`'s is (`33 §6.3`).
 It is a standalone binding over a dictionary, not a class field, so the class
-stays at its two fields — and it therefore carries the **same** surface
-prerequisite: Ken's type grammar has no projection form, so this binding cannot
-be *written* until one exists, and `LANG-MEMBERSHIP-OPERATOR-SURFACE` authors
-**three** projection-typed bindings rather than one — this, `§4`'s
+stays at its two fields — and `LANG-MEMBERSHIP-OPERATOR-SURFACE` therefore
+authors **three** projection-typed bindings rather than one: this, `§4`'s
 `same_members`, and `membership_member_at`. A defining equation with no
 ascription would have hidden that, which is why the type is stated.
+
+**The surface prerequisite all three carried is discharged.** Each was
+unwritable while Ken's type grammar had no projection form; `../30-surface/32
+§2`'s `tproj` now admits `d.Query` in type position, landed by
+`LANG-TYPE-PROJECTION-SURFACE-FORM`. **The count is unchanged by that
+landing** — three counts *bindings whose types project*, not obstacles
+standing in their way, and it stays three whether or not they are writable.
 
 **`member_holds` is a definition over the `Bool` result, never an elimination
 from `Ω`.** There is no law recovering a `Bool` from a proof of `member_holds`,
@@ -144,10 +149,10 @@ as a field this would be a slot each provider fills with **any** relation, with
 nothing tying it to the observational one.
 
 Being standalone, it takes the dictionary as a parameter and so writes
-`d.Query` in type position, exactly as `§2`'s `member_holds` does. **It carries
-the same surface prerequisite**, which brings the count in `§2` to **three**
-projection-typed bindings: `membership_member_at`, `member_holds` and
-`same_members`.
+`d.Query` in type position, exactly as `§2`'s `member_holds` does — which is
+what brings the count in `§2` to **three** projection-typed bindings:
+`membership_member_at`, `member_holds` and `same_members`. The surface form
+all three needed has landed (`§2`).
 
 It is `Ω`-clean with no truncation: `Equal Bool _ _ : Ω`, and a `Π` whose
 codomain is `Ω` is itself `Ω` (`13 §4`). Its reflexivity, symmetry and
@@ -219,14 +224,23 @@ class method needs a binding of its own.
 The two obstructions are therefore different, and reading them as one has
 already misled once: *unspellable* and *unclosable* are not the same defect.
 The field route is **unclosable** at the point of use and stays rejected. The
-minted route is closed and kernel-checkable today, and is merely **unspellable**
-in Ken's current surface type grammar — a gap in the surface, recorded with the
-binding, not a defect in this design.
+minted route was closed and kernel-checkable all along and merely
+**unspellable** — and **that gap has since closed** (`../30-surface/32 §2`'s
+`tproj`). That is the distinction paying out, not an amendment to it: the
+surface grew a projection form and the minted route became writable, while the
+field route did not and will not. A gap in the surface is the kind of
+obstruction a later landing removes; an unclosable key is not.
 
 **No catalog binding today types a parameter by projecting an earlier one**, so
 the minted binding would be the first. Again a measurement rather than an
 impression, and the control is what makes it one: projection itself is in
 ordinary catalog use — a class dictionary's field is projected in binding
 **bodies** in several places — so the zero is specifically about projection in
-**type** position, not about projection being unavailable. The gap is narrow
-and it is exactly where this design meets it.
+**type** position, not about projection being unavailable.
+
+**The zero survives the surface landing, but it no longer means what it meant.**
+It was once a consequence of the form being unspellable; now that `32 §2`
+admits it, the same zero records only that **no consumer has been authored
+yet** — `LANG-MEMBERSHIP-OPERATOR-SURFACE` is that consumer, and these three
+bindings are what will take it off zero. A reader who carries the old reason
+forward will conclude the form is still missing. It is not.
