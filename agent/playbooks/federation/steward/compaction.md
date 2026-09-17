@@ -71,6 +71,43 @@ before-work threshold *invites* the "still under it" rationalization, so there
 is none. Compaction is not lossy for what matters: the summary preserves recent
 detail and the agent re-fetches any source from the filesystem at pickup.
 
+## The COMPACT-THEN-KICK sequence: four beats, and the order is load-bearing
+
+**The rule above says compact before new work. This says the two acts are
+ORDERED and separated by a verification, not issued together.** The Adversary
+section below states the same four beats for one seat; they are general.
+
+    1. COMPACT       every member of the unit, unconditionally, ctx unread
+    2. VERIFY        the drop, per "verifying a drop" -- search the FULL
+                     stream, never a truncated tail
+    3. KICK          post the mention (the thread anchor, COORDINATION §4a/§4b)
+    4. ROUSE         a separate pane rouse; a compacted no-poll seat does not
+                     wake on a mention alone
+
+**Never collapse 1 and 3 into one gesture, and never issue 3 while 2 is
+unanswered.** A mention delivered to a seat that is **about to compact, or
+mid-compaction, is consumed by the compaction** — the seat comes back with a
+summary of a turn in which it was told to do something, and no work in hand. It
+then sits idle at an empty composer looking correctly quiet, which is
+indistinguishable from a seat that was never kicked.
+
+> **The failure is silent on both sides and that is why the order is a rule.**
+> You see a posted mention; the seat sees nothing. Nothing in the channel
+> records that a kick was lost, so the symptom arrives later as *"the ring never
+> started"* — and the natural next action, re-posting the kick, opens a second
+> thread for the same WP unless you go back for the original anchor's event id.
+
+**A seat at high ctx that is MID-TURN is the dangerous case and the one to leave
+alone.** Do not compact or kick it; wait for the turn to end. The footer's ctx
+**lags the turn**, so read the pane **body** for a spinner before acting on the
+number — a seat showing 83% with an active composer is working, and both a
+compact and a kick land in the worst possible place. Check the body, not the
+footer, every time.
+
+**Corollary for the release path: publish, THEN kick.** Kick on the **landed**
+change, never the routed one. A kick naming a SHA that has not landed sends the
+seat to look for content that is not on `main` yet.
+
 ## Compacting the ADVERSARY: yours, at the merge notification
 
 **Operator, 2026-08-17: *"There is nothing that compacts adversary and the
