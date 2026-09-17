@@ -1,7 +1,7 @@
 ---
 id: ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT
 title: "Port the checked-IH post-call consumer machinery that main never grew, so ABI-S6-HS18 increment A can compile: one type family (CheckedIhPostCallConsumer, CheckedIhPostCallConsumerStep) plus three accessors on existing types (StaticTransitionPlan::checked_ih_generated_context_result_contract, StaticTransitionPlan::static_response_forwarded_result_identity, Lowering::checked_post_call_consumer_frame). Increment A holds the call sites and none of the definitions, so it cannot build without this. FIRST DELIVERABLE IS THE TRANSITIVE CENSUS, NOT THE PORT -- whether the consumer machinery itself calls anything else that is absent from main is UNMEASURED, and finding a fourth population after the port is the failure this node exists to prevent."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
