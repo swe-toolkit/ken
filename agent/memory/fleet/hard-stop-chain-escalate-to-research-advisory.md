@@ -36,8 +36,16 @@ re-trigger, scope the ask to the *exact new fork*, and a confident "prior art ha
 nothing new — current approach is known-best" is a first-class answer. The
 Architect **re-derives its count from the thread across its own self-compactions**.
 
-**Steward backstop (`steward.md §5a`):** (1) hold the **authoritative count of
-record** in the tracker and carry every operator count-anchor to the Architect;
+**Steward backstop (`steward/escalation.md`):** (1) carry every **operator
+count-anchor** to the Architect, armed as a `next research pull = N` line —
+**and nothing more. The Steward does NOT hold a count of record.** This clause
+used to say it held the *"authoritative count of record"*; there is no such
+tracker, and `architect.md` §1a deleted its half of that claim on 2026-09-16
+(`6471ad1e701c2aade7a5d9076a945e18fb433889`) while this copy survived. **The
+count lives with the Architect alone** — in `ARCHITECT-STATE.md` and
+republished with its delta and reason in each ruling post. If a seat cites the
+Steward's count at it, the answer is that none is held and the Architect's own
+record stands;
 (2) if the Architect reaches a trigger and rules **without** self-holding (e.g. a
 post-compaction miscount), the watchdog **catches the miss** — hold the Architect
 the old way and kick research **transport/framing-only** (no design opinion, or

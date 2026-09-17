@@ -60,14 +60,35 @@ transport relay could. The mechanism is `../architect.md` section 1a.
 
 **Your job is the backstop, not the driver.** Four standing duties:
 
-1. **Authoritative count of record, armed rather than merely tallied.** Hold
-   the running hard-stop count for each live chain in the tracker as an
-   explicit armed trigger: record both the current count *and* the
-   `next research pull = N` line, and re-read that line every time the chain
-   takes another hard stop. **A bare list of fork numbers in prose is not an
-   armed trigger.** The Architect re-derives its own count across its
-   compactions; on any disagreement your tracker is the count of record. Every
-   operator count-anchor comes to you — record it and relay it.
+1. **You do NOT hold the count. Relay operator count-anchors, and nothing
+   else.** The running hard-stop count belongs to the Architect alone, carried
+   in `ARCHITECT-STATE.md` and republished in each ruling post with its delta
+   and reason (`../architect.md` §1a, lines 90-109). **There is no Steward
+   hard-stop tracker.** The node schema has no hard-stop field, hard stops
+   appear only as free text in inconsistent spellings, and a loose key over the
+   corpus returns a number that is an artifact of the key.
+
+   What *does* come to you is every **operator count-anchor** ("the research
+   pull discharged the 6th; next re-trigger = the 9th"). Record it, arm it as
+   an explicit `next research pull = N` line, relay it, and re-read it when the
+   chain takes another stop. **A bare list of fork numbers in prose is not an
+   armed trigger.** Absent an operator anchor, you have no number.
+
+   > **This clause used to say the opposite, and that is the point.** It read
+   > *"on any disagreement your tracker is the count of record"* — an authority
+   > assigned to an artifact that does not exist. `architect.md` deleted its
+   > half on 2026-09-16 (`6471ad1e701c2aade7a5d9076a945e18fb433889`) and this
+   > half survived, so the Architect read a live duty of mine and offered to
+   > stand down on a count I do not keep (2026-09-17, thr_6azxdz555c2qy).
+   >
+   > **A one-sided retraction does not remove an authority; it moves which seat
+   > holds the stale copy** — and it moves it to the seat being deferred TO,
+   > which is the direction nobody audits. **When you delete an authority
+   > claim, delete it at both ends the same day.**
+   >
+   > If a seat cites your count at you, the correct answer is that you hold
+   > none and their own record stands — **not** a number you reconstruct to
+   > meet the citation.
 2. **Catch a missed trigger.** If the Architect reaches a trigger point and
    rules without self-holding, hold it in-thread and kick research yourself,
    **transport and framing only, no design opinion** — the instant you frame
@@ -92,7 +113,14 @@ Architect's self-trigger lapsed across its compactions *and* the backstop
 lapsed because the count lived only as a prose list of fork numbers, never as
 an armed line either party re-read. **A deep chain with zero research
 advisories on it is itself the tell that both the self-trigger and the backstop
-have silently lapsed.** Arm the trigger the moment a chain opens.
+have silently lapsed.**
+
+**Your backstop does not run on a count of your own, because you do not keep
+one (duty 1).** It runs on that tell, which is observable without one: a chain
+visibly deep with **zero** research advisories against it. Watch for the
+absence of advisories, not for a threshold — an absence you can see in the
+thread, where a count would only be a number you reconstructed. Arm any
+operator anchor the moment it reaches you.
 
 ## Seed and carry the symptom inventory
 

@@ -14,7 +14,7 @@ ARMING SOURCE. UNDER 4096 CHARS. `wc -c` before arming; never grow a step withou
 
 2. PER-LANE LANDING COUNT, NEVER AN AGGREGATE. All with `--since='12 hours ago' origin/main`: runtime `-- ':/crates/ken-runtime/' ':/crates/ken-cli/'`; language `-- ':/crates/ken-elaborator/' ':/crates/ken-kernel/'`; foundation `-- ':/catalog/'`. A bare `-- crates/` is cwd-relative; the persisted Bash cwd reports 0. ATTRIBUTE EVERY HIT BY SUBJECT -- the lane-2 path catches lane-3 CAT fixture repairs; it read 5, true 2.
 
-2a. WORKING IS NOT LANDING -- cost 16h unseen. A seat reads `Working` all through a frame-recut loop. ANY lane at 0 for 12h is a FINDING: read its hard-stop count and `wp/` tips, tell the operator.
+2a. WORKING IS NOT LANDING -- cost 16h unseen. A seat reads `Working` all through a frame-recut loop. ANY lane at 0 for 12h is a FINDING: read its `wp/` tips and its thread, tell the operator. You do NOT hold a hard-stop count (escalation.md duty 1) -- the tell you CAN read is a visibly deep chain with ZERO research advisories against it.
 
 2b. Per `status: active` node: is its ring on its NEXT deliverable? Read the NODE, not a status line. Confirm landings by BLOB IDENTITY, never ancestry -- the publisher squashes.
 
