@@ -121,6 +121,26 @@ dispatchable**, and its label is one of the five that the signature confirms.
 S1's four rows and S4's one match their label's mechanism; the other ten
 name a mechanism the run does not exhibit.
 
+## 6. A measured input the sweep cannot reach: the `ken-runtime` lib baseline
+
+    origin/main   ken-cargo test -p ken-runtime --lib
+                  1035 passed   0 FAILED   2 ignored
+
+Recorded here on the Steward's instruction because nothing else holds it. **The
+ignored-row sweep runs `--run-ignored=only`**, so the ordinary suite is outside
+its population by construction, and no CI job publishes this number.
+
+**Why it belongs in THIS ledger rather than a note somewhere.** Whoever sizes
+the repair program off the eight signatures will be changing planner and
+lowering code that those 1035 tests exercise. **They need to know the baseline
+is clean**, because a repair that regresses part of it is otherwise
+indistinguishable from one that does not: a red appearing during the repair
+could be pre-existing debt, and this says it cannot be.
+
+It was measured by running the suite on `origin/main` at `c041de7c3`, which
+took about 30 seconds. The two ignored rows in that count are the registry
+exemptions inside `ken-runtime`, not part of the 15.
+
 ## 6. What this ledger does NOT establish
 
 - **It does not say the six nodes are wrong about the code.** A merged node
