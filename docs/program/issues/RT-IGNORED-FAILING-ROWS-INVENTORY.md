@@ -1,7 +1,7 @@
 ---
 id: RT-IGNORED-FAILING-ROWS-INVENTORY
 title: "Record the actual failure signature and owning node for every ignored row that the sweep runs and that FAILS at the implementation base, and produce a ledger -- repairing nothing. The frame's hypothesis that most of the failing set is one interp/native differential defect is a naming-pattern observation checked against zero signatures; the ledger confirms or kills it, and decides whether the repair program is two nodes or sixteen."
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none

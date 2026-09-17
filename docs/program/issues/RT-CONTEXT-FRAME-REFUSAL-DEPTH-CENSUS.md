@@ -1,7 +1,7 @@
 ---
 id: RT-CONTEXT-FRAME-REFUSAL-DEPTH-CENSUS
 title: "MEASUREMENT NODE, nothing lands in crates/: how many refusals deep are the four RT-CARRIED-RESIDUAL-IH-ARITY rows, and is the stack finite. Three nodes in this series each closed one layer and each found the refusal at its own layer was CORRECT and the cause upstream, so a fourth blind repair is a fourth cycle to learn the same shape. The refuted predecessor forced the admission arm at core.rs:13577 to Ok(true) unconditionally -- strictly more permissive than any key, making the negative result an upper bound rather than a failed attempt -- and the rows still failed at agreeing_recursive_body_unit (core.rs:1230), a deliberate refusal carrying its own two-direction unit test. That was measured to its FIRST STOP AND NO FURTHER. Walk each row's stack, record every stop by file/function/message and every forced arm beside the result it produced, report depth PER ROW never summed, and verdict against the outcome menu: finite-repairable, finite-terminal (then these rows are correctly refused and the disposition is an exemption row plus a rewritten label, not a repair), not-bottomed-out at the six-layer budget, or the rows diverge."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
