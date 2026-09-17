@@ -954,6 +954,73 @@ what answers `D0-1`'s open half, since file-level replay is conflict-freedom
 and says nothing about whether the result compiles. **Zero errors, never "the
 eleven are gone".**
 
+**AC-1b — NO PORTED TEST GETS QUIETER. Written down 2026-09-17, having been
+operated for a day without existing.**
+
+> ### THIS AC WAS BEING REPORTED, FLAGGED AND RULED ON WHILE PRESENT IN NO FRAME
+>
+> **`AC-1b` appears in ZERO revisions of this frame's history**, and no document
+> on `main` mentions an assertion delta. Yet the implementer reported against it
+> (*"131 closed test rows, 669 → 746 assertions, QUIETER 0"*), QA flagged it
+> **unverified-by-QA**, the merge Decision `dec_74b8gs68nmgzr` recorded that
+> flag, the Architect ruled on what it does and does not discharge, and an
+> instrument for it — `scripts/hs18-d5b-assertion-delta.py` — was built and
+> shipped inside the candidate. **Four seats treated a criterion as normative
+> when no normative text existed.**
+>
+> **Nobody did anything wrong with it and that is the point.** The measurement
+> is real and useful, the reports were honest, and QA's *"unverified"* was the
+> correct response to a criterion it could not read. **An AC that lives only in
+> conversation cannot be checked, cannot be disputed, and cannot be discharged
+> — but it can still be cited in a merge Decision.** Third instance in one day
+> of a ruling that existed only in a thread; this is the one that grew an
+> instrument.
+>
+> **This block RECORDS existing practice. It adds no work to the respin.**
+
+A ported test that arrives with **fewer live assertions than its source** has
+been silently weakened, and a port is exactly where that happens without
+malice — a body transplanted around a signature change loses an `assert!` and
+still compiles, still passes, and still counts as a closed row. Measure it:
+
+    for each CLOSED test row:  assertions(candidate) vs assertions(source)
+      LOUDER    more    fine -- includes every row absent from main (before = 0)
+      SAME      equal   fine
+      QUIETER   fewer   REPORT EVERY ONE, BY NAME. Zero is the target.
+
+**`QUIETER` is the whole criterion; `LOUDER` and `SAME` are bookkeeping.**
+
+> ### `AC-1b` DOES NOT DISCHARGE `AC-4`, AND ITS DEFERRAL CLAUSE IS BLIND TO IT
+>
+> Architect, `evt_28kkrew4xdtss`, measured on the candidate's own instrument.
+> The script carries a grant-deferral filter keyed on the operation being
+> **named**:
+>
+>     OP = re.compile(r"MappingAcquireFile|mapping_acquire_file")
+>     if OP.search(S_[2]): continue          # DEFERRED clause (a)
+>
+> The failing grant-presupposing test **is in the population**, its body names
+> the operation **zero** times, so the clause never fires — and because the test
+> is absent from `main`, `before = 0` and it scored **LOUDER**. **The instrument
+> saw it, declined to defer it, and reported it as a healthy row in the positive
+> direction.**
+>
+> **An assertion that presupposes the grant does so by OMITTING the operation** —
+> this one asserts the grant landed by listing nine arms and not naming the
+> tenth. `AC-2` already wrote the sentence: **an omission has no complainant.**
+>
+> ⇒ **A clean `QUIETER 0` says NOTHING about whether a grant-presupposing
+> assertion is present, and on `0b653a894` it said so while one was. Clause (a)
+> must never be cited as `AC-4` evidence.**
+>
+> **Do NOT strengthen the script.** `AC-4`'s tell — *the expected value differs
+> between the pre-grant and post-grant rosters* — **is not decidable by a regex
+> over a body.** It is decidable by one thing: the test fails on a tree that
+> correctly refuses the grant. That decision procedure is **running the tests**,
+> which CI already owns (`§9`/`§11`). The rule states the class; the instrument
+> implements the old name-based version; **the fix is to stop citing the
+> instrument for that class, not to grow it.**
+
 **AC-2 — the refused grant is ABSENT, measured in the direction that fails
 open.** `MappingAcquireFile` must not be promoted out of the
 `RepresentedUnavailable` tail. The instrument is the parent's `AC-UNAVAILABLE-ROSTER`:
