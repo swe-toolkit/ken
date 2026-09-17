@@ -1,20 +1,47 @@
 ---
 id: ABI-S6-HS18-MAIN-BASED-CLOSURE
 title: "Close ABI-S6 HS18 on a main-based line, in three increments. Preserves the verifier substance the Architect protected by name (units.rs +4083, re-derived against main's five moved files) and drops the MappingAcquireFile capability grant they refused, which the preserved checkpoint carries across five coordinated sites. Increment A is the protected verifier substance; B extracts Q1's resume-exit repair, which never landed; C is amendment 8's consumer relocation."
-status: ready
+status: draft
 owner: runtime
 size: L
 gate: none
-depends_on: [ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT]
+depends_on: [ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT, ABI-S6-HS18-D5B-SUBSTRATE-PORT]
 blocks: []
 github: null
 tier: T1
 origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction ('do not build on an unmerged commit... the base commit needs to be on main') after the Architect ruled RE-DERIVE rather than rebase (evt_ma144e8mt7sn) and narrowed their own no-revert by name. Supersedes the circulating name ABI-S6-HS18-CLOSURE-AMENDMENT-8, which runtime-qa read a kickoff against (evt_2e58kcb0zd4h9) and which never had a file behind it. CUT FROM origin/main 6f49f852141a66571c6126a569b954f63e2b6bde on 2026-09-16 -- this is a provenance RECORD of where the node was cut and must never be re-pointed; increment A's OPERATIVE base is a separate value living in frame 4a-pin and MAY DIFFER from this SHA -- it already does."
 ---
 
-> # UNBLOCKED 2026-09-17. The port LANDED; increment A is releasable.
+> # BLOCKED AGAIN, on a SECOND dependency. `ABI-S6-HS18-D5B-SUBSTRATE-PORT` LANDS FIRST.
 >
-> **`status:` `draft` -> `ready`, Steward 2026-09-17, on the condition this
+> **`status:` back to `draft`, Steward 2026-09-17, SAME DAY as the flip below
+> and for a different reason.** The port dependency is genuinely discharged —
+> that part of the banner stands and is not retracted. What was discovered
+> after it is that **increment A has a second, previously unnamed
+> dependency**, and `ready` is what a team pulls on.
+>
+> **The premise that broke is `§2a`'s DECOMPOSITION, not the objective.**
+> Increment A was sized as *"9 files, `units.rs` +4083"* — a diff between two
+> points **on the preserved line**, which measures what A ADDED to the
+> checkpoint, never what A NEEDS on `main`. Increment A is the top of a
+> six-commit stack whose bottom four never landed.
+>
+> ⇒ **A measurement correct on one tree becomes a cross-tree claim only through
+> a carry argument, and the carry is what fails.** Read
+> `ABI-S6-HS18-D5B-SUBSTRATE-PORT` before re-planning this node; do not
+> re-derive the finding here.
+>
+> Ruled by the Steward (`evt_2dgjc1h7as88w`) on `runtime-leader`'s measured fork
+> (`evt_1yma657vq6bkg`), with both extent questions answered by the Architect
+> from measurement (`evt_6fr79bx4cjhsw`). **The disposition is NEITHER of the
+> two that were offered:** widening A to carry the substrate makes A the whole
+> substance again — which the increment split exists to prevent, as this banner
+> says below — and re-sequencing behind B fails because B supplies `source.rs`,
+> one row of an eight-row table.
+>
+> ## The port dependency, which IS discharged
+>
+> **`status:` `draft` -> `ready` was correct on 2026-09-17, on the condition this
 > banner itself set.** `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` landed as squash
 > `10e75cb93656d5ea787bceaf754b2500b78de166` (candidate
 > `93fa1d2639144b89f432211c8d606dc4cd229117`).
@@ -67,12 +94,34 @@ origin: "Steward cut 2026-09-16, executing the operator's 2026-09-16 direction (
 >
 > B and C are unaffected.
 
-> # READY. Frame:
-> `docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md`.
+> # Frame: `docs/program/wp/ABI-S6-HS18-MAIN-BASED-CLOSURE.md`.
 >
-> **Increment A's base is `origin/main` `537fa2afbdab8962717d43640afbd04719d1b258`**
+> **Not releasable while the banner above stands.** The pin below is current and
+> correct; it is not what blocks.
+>
+> **Increment A's base is `origin/main` `10e75cb93656d5ea787bceaf754b2500b78de166`**
 > — B and C pin their own bases in frame 4a-pin, which is the only place
-> either value is written. **The pin need not equal the cut point**; it must
+> either value is written.
+>
+> **PIN MOVED 2026-09-17, `537fa2afbdab8962717d43640afbd04719d1b258` ->
+> `10e75cb93656d5ea787bceaf754b2500b78de166`.** The port node
+> `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT`
+> landed ten files in `crates/`, so the old value could no longer satisfy the
+> empty-`git diff` condition below — **the pin did not rot, its own test
+> refused it**, which is the whole reason that condition is a measurement taken
+> at adoption rather than an argument quoted from when it was proposed.
+>
+> **This banner is a PIN, not a record**, by frame §4a-pin's own predicate: *an
+> occurrence is a PIN if and only if it asserts what increment A's base IS.*
+> It therefore moves with §4a-pin and must move again at increment B. The
+> `origin:` line in this file's frontmatter is the opposite case — a provenance
+> RECORD of where the node was cut — and **must never be re-pointed.** The two
+> are the same forty characters and they age in opposite directions.
+>
+> Flagged by `runtime-implementer` (`evt_f51swjy5k7rf`), who moved the frame's
+> two pins and deliberately left this one rather than edit a file they do not
+> own. Correct call: the third pin is the one every enumeration of this has
+> missed. **The pin need not equal the cut point**; it must
 > satisfy frame 4a-pin's three conditions, of which the operative one is that
 > `git diff "$BASE" HEAD -- crates/` is empty, re-run at the moment the pin is
 > adopted. Requiring `pin == cut point` regresses: every commit that corrects
