@@ -1035,14 +1035,23 @@ eleven are gone".**
 > the workspace's 8 — `ken-foundation` and `ken-kernel` depend on nothing in the
 > touched set — so this is a real closure and not `--workspace` wearing a list.
 >
-> **Re-run the derivation to a FIXPOINT, do not copy the six and do not take one
-> hop.** The touched set is a property of the candidate; a later cut that
-> touches a different crate has a different closure, and there is no guarantee
-> its first hop is closed.
+> **Re-run the derivation to a FIXPOINT, do not copy the six.** The touched set
+> is a property of the candidate; a later cut that touches a different crate has
+> a different closure, and there is no guarantee its first hop is closed.
 >
 > **Re-run it MECHANICALLY.** A derivation whose re-run means reading manifests
-> by hand is prose, and it will decay exactly the way the four-crate number
-> did — `evt_6tm4wpntt1dpa` supplies it in command form.
+> by hand is prose, and it will decay exactly the way the four-crate number did.
+> `evt_6tm4wpntt1dpa` supplies it in command form.
+>
+> **THE ONE-HOP WARNING IS ABOUT HAND-DERIVATION AND IS NOT A CAVEAT ON THAT
+> COMMAND.** The command already computes the fixpoint; **do not wrap it in an
+> outer loop and do not read the warning as distrust of it.** The defect it
+> guards against is the manual read that produced the first version of this
+> table — a human walking one level of `Cargo.toml` and calling the result a
+> closure. **A tool that iterates to a fixpoint has already discharged it.**
+> Corrected by @research before landing (`evt_68a1rzrfc198n`), who flagged that
+> the instruction sitting beside their command would be read as a correction
+> OF it.
 >
 > **No mutation AC is added here.** Mutation at the change surface
 > (`agent/playbooks/tools/mutation-prove-a-pin.md`) is the instrument that would
