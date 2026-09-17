@@ -25,7 +25,8 @@ Measured in a single session, all traceable to one 38-commit unmerged stack
 - **Four rings parked on candidates that had landed days earlier** — one of them
   six days. Their tracker nodes correctly read `merged`; only the convo status
   lines were stale, and the seats believed the status lines.
-- A team leader **waiting on Steward M3-M4 for a node closed six days prior.**
+- A team leader **waiting on the Steward's routing steps for a node closed six
+  days prior.**
 - A code candidate whose merge into `main` **would have moved 38 commits**
   under a `+96/-4` comment-only label — the scope a gate voted on and the scope
   a merge would move were different scopes, and nobody had measured it.

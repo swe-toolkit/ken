@@ -19,8 +19,13 @@ The merge to `main` splits across two seats, and conflating them races them.
   corpus-closes the node. It has no gate-verification authority — it executes
   only what was routed, on the SHA that was routed.
 
-The binding statement is `COORDINATION §14b`; the mechanics split as M1-M4
-(Steward) / M5-M9 (lieutenant) in `steward/merge-procedure.md`.
+The binding statement is `COORDINATION §14b`; the mechanics split as M1-M3a
+(Steward) / M4-M9 (lieutenant) in `steward/merge-procedure.md`. **M3a is the
+`ROUTED:` post itself** — the authorization got a step number on 2026-09-16, so
+that the file's own *"run every step"* clause reaches the one act that cannot
+be undone. M4 is the token mint, which is why the executor's range starts
+there. **An older artifact saying M1-M4 / M5-M9 predates that and is stale;
+records of past routings correctly keep the old spelling.**
 
 **The failure this records.** The Steward launched a publisher for a kernel PR
 while the lieutenant was already executing that same merge. Two publisher
