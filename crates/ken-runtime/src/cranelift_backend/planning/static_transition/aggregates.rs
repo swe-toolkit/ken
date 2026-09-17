@@ -12881,6 +12881,15 @@ thread_local! {
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+/// Test-support harness with NO CALLER ON THIS TREE.
+///
+/// Its consumer at the port source is a `ken-cli` test that is not present here
+/// or on `main` -- so this is ported machinery awaiting a driver, not an unused
+/// item. It is deliberately NOT re-exported to `ken_runtime::`: lifting its
+/// visibility would make `dead_code` exempt it from analysis, which removes the
+/// warning without removing the condition, and that silence is indistinguishable
+/// from having acquired a caller. The `never used` diagnostic on this function is
+/// CORRECT and is the only live record that the driver is missing.
 pub fn with_required_consumer_call_observations<T>(
     f: impl FnOnce() -> T,
 ) -> (T, Vec<RequiredConsumerCallObservation>) {
@@ -12901,6 +12910,15 @@ pub fn with_required_consumer_call_observations<T>(
 }
 
 #[cfg(feature = "px8-ds-test-support")]
+/// Test-support harness with NO CALLER ON THIS TREE.
+///
+/// Its consumer at the port source is a `ken-cli` test that is not present here
+/// or on `main` -- so this is ported machinery awaiting a driver, not an unused
+/// item. It is deliberately NOT re-exported to `ken_runtime::`: lifting its
+/// visibility would make `dead_code` exempt it from analysis, which removes the
+/// warning without removing the condition, and that silence is indistinguishable
+/// from having acquired a caller. The `never used` diagnostic on this function is
+/// CORRECT and is the only live record that the driver is missing.
 pub fn with_required_consumer_call_mutation<T>(
     mutation: RequiredConsumerCallMutation,
     f: impl FnOnce() -> T,

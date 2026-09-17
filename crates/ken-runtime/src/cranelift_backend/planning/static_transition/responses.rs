@@ -4396,6 +4396,22 @@ pub(super) fn publish_checked_ih_post_call_consumers(
     Ok(rows)
 }
 
+/// The post-call consumer relation's MUTATION ORACLE, whose driver is absent.
+///
+/// **What this detects, stated because a required check with no stated failure
+/// mode is satisfied by a tautology.** The stored value comes from
+/// `publish_checked_ih_post_call_consumers`, which is
+/// `build_checked_ih_post_call_consumers` PLUS the `px8-ds-test-support`
+/// transplant. This compares the stored value against a fresh `build_`, so it
+/// refuses exactly when that transplant has moved a consumer, and is inert by
+/// design when it has not. It is not `f(x) == f(x)`.
+///
+/// **Its driver is absent on this tree, so it cannot fire.** Firing needs the feature on, the mutation set
+/// to `TransplantConsumer`, and at least two rows to transplant between. The
+/// population is empty at every plan build here (measured: 0 non-empty of 17
+/// publisher invocations), and the harness that would set the mutation has no
+/// caller on this tree. So it currently detects post-publication drift and
+/// nothing else, and is additionally vacuous while the population is empty.
 pub(super) fn validate_checked_ih_post_call_consumers(
     plan: &StaticTransitionPlan<'_>,
     consumers: &[CheckedIhPostCallConsumer],
