@@ -203,6 +203,59 @@ match any`. Always an explicit SHA.
 > are checking whether something has *landed*, which is M6's job and M6 uses
 > blob identity for exactly that reason.
 
+> ### BUT: if the wp/ branch DOES exist on origin, its CI history is not the candidate's
+>
+> The rule above says an empty `git branch -r --contains` is lawful. **The
+> dangerous case is the opposite one — the branch exists, carries a pile of green
+> check-runs, and its head is an ancestor the ring has since moved past.**
+>
+> Measured 2026-09-17, `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT`. The candidate was
+> `b53bccda5`; the remote head was `fe7dc542b0fe`, **three commits behind**, and
+> those three were the entire repair under review — a reverted re-export, the
+> restored oracle, the documented drivers.
+>
+>     remote wp/ head   fe7dc542b0fe    26 check-runs
+>     candidate         b53bccda5        0 check-runs
+>
+> The hazard is not an *absent* measurement — an absence announces itself. It is a
+> **present** one about a different tree, and it reads as coverage.
+>
+> #### AND THE SECOND HALF, WHICH THE STEWARD WALKED INTO WHILE WRITING THIS
+>
+> **`total_count` is a ROW COUNT, not a verdict.** The Steward read that `26` and
+> reported it, twice in the channel and once in the first draft of this very
+> block, as *"26 check-runs, all green."* The actual breakdown:
+>
+>     fe7dc542b0fe    18 FAILURE / 8 success
+>                     build + test, all 8 test shards, verify-realized-shard-union
+>
+> **The ancestor was not green. It was deeply red**, and the sentence claiming
+> otherwise was written into a playbook block whose entire subject is not reading
+> a green off the wrong object. Nothing in the API response says "green" — the
+> conclusion lives per-row in `conclusion`, and a bare `total_count` is compatible
+> with every row having failed.
+>
+> ⇒ **Never report a check-run figure without its conclusion split.** `26` is not
+> a status. Print `Counter(r['conclusion'] for r in runs)` or name the failing
+> leaves; see `a-surface-that-names-its-own-status-is-not-a-measurement-of-that-status`
+> for why an aggregate cannot distinguish *failed* from *never ran*.
+>
+> ⇒ **Before reading any green off a wp/ branch, resolve what the remote head
+> actually points at and compare it to the candidate SHA:**
+>
+>     git ls-remote --heads origin 'refs/heads/wp/<BRANCH>'
+>     git rev-list --count <REMOTE_HEAD>..<CANDIDATE>     # 0 means they agree
+>
+> **A CI verdict belongs to a commit, never to a branch name.** This is the same
+> exact-SHA discipline M1 applies to the Decision, applied to the check-runs.
+>
+> **Pushing the candidate yourself at M3 is permitted and is sometimes right** —
+> it starts CI in parallel with the Decision instead of serially after it, which
+> is worth doing when the local box cannot carry the build shape. **It is an
+> optimization, not a repair, and it does not make an unpushed candidate a
+> defect.** Verify a clean fast-forward over the current remote head first, and
+> never force-push a ring's branch.
+
 > ### A commit-count mismatch is a REVIEW defect first. POST IT.
 >
 > When the count you measure disagrees with the handback, the damage lands
