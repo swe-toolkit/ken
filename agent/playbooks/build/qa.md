@@ -24,6 +24,79 @@ load and follow it after this generic archetype.
 > verdict rests on the targeted areas being green plus the change's blast radius
 > being covered by CI — do **not** reproduce CI locally.
 
+> ### A TARGETED GREEN IS UNMEASURED ON A FEATURE-GATED DIFF. DERIVE THE UNION.
+>
+> **`-p <crate>` builds that crate's DEFAULT features.** When a package declares
+> a feature as `[]` and a sibling turns it on, the mandated targeted build
+> compiles the gated regions **out**, and green means *not compiled*, not
+> *correct*.
+>
+> Measured 2026-09-16: a runtime candidate was Architect-approved and
+> QA-approved at `1035 / 0 / 2` and **called four functions defined nowhere in
+> the tree**. The call sites sat under `#[cfg(feature = "px8-ds-test-support")]`;
+> `ken-runtime`'s `default = []`, so `-p ken-runtime` was genuinely green. CI
+> activates the union every workspace member demands, and reds. 235 gated
+> regions in that candidate's nine files, zero compiled by any permitted local
+> build. **Nobody misused an instrument** — `COORDINATION §12` mandates the
+> targeted build; the defect is that it cannot reach a gated region.
+>
+> **Carry the QUERY, never the feature list.** A memorised triple rots; the
+> manifests do not:
+>
+> ```sh
+> grep -rn -A4 'path = "\.\./<crate>"' --include=Cargo.toml crates/
+> ```
+>
+> Union the `features = [...]` on every sibling entry pointing at your crate, in
+> `[dependencies]` **and `[dev-dependencies]`**. The dev-dependency half is the
+> half that surprises people: it is invisible to `cargo tree` on your crate
+> alone, and it is exactly what CI turns on. On the candidate above, all three
+> features came only from dev-dependencies — `ken-cli` and `ken-elaborator`.
+>
+> **Then run the cell CI runs, which is not the cell §12 names:**
+>
+> ```sh
+> scripts/ken-cargo check -p <crate> --all-targets --features <union>
+> ```
+>
+> `--all-targets` is load-bearing: without it the build excludes `#[cfg(test)]`
+> code, so a helper consumed only by the crate's own tests compiles as unused.
+> This is still one targeted crate — it neither violates §12 nor reproduces CI.
+>
+> **Verdict language.** A bare `-p <crate>` green on a diff touching a
+> feature-gated region is **UNMEASURED, not passing**, and an Approved verdict
+> resting on it is unsupported. Say which of the two you have.
+
+> ### READ `never used` OFF THAT BUILD — THE ONLY COMPLEMENT-DIRECTION INSTRUMENT
+>
+> The compiler asks exactly one question: **does a live caller's callee exist?**
+> Five defects found on that same candidate all lived in the complement — a
+> definition with no caller, a variant matched but never constructed, a field
+> with five readers whose only write is an empty initialiser. No compile error
+> can name any of them, because the compiler never asks in that direction.
+>
+> **`never used` on a completed build under the union is the instrument that
+> does.** Read it **by name, never by count**, under a predicate — *every symbol
+> this diff adds that appears in `never used`* — so the population is either
+> empty or each survivor is named with a reason. A bare warning count is not a
+> finding, and silencing a survivor is not closing it.
+>
+> **What the lint reaches, because the safe-sounding version is false.**
+> `dead_code` **exempts** externally-reachable items: anything a sibling crate
+> could call is a root and is never warned about. So a `never used` diagnostic
+> is itself proof the item has no cross-crate caller — the lint is not *blind*
+> to sibling consumers, it is *exempt* from them. Its real gap is `#[cfg(test)]`,
+> and `--all-targets` closes it. Recorded in the wrong-then-right order because
+> "a local lint cannot see sibling callers" is what a careful reader
+> reconstructs, and it is false (Steward asserted it; Architect refuted it at
+> `evt_4hx95mr0kp565`).
+>
+> **Before trusting an absence, prove the instrument hits.** "These names must be
+> GONE from `never used`" is an absence criterion, and an absence read from an
+> instrument never shown to fire is not a measurement. Run it on the pre-fix SHA
+> first and record which names it prints. A name it does not print today has no
+> post-fix silence worth reading — census that one by call site instead.
+
 ## What you verify
 
 1. **Conformance:** the change passes the relevant `/conformance` tests.
