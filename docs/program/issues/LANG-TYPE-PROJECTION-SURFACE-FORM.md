@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-PROJECTION-SURFACE-FORM
 title: "the surface prerequisite LANG-MEMBERSHIP-OPERATOR-SURFACE cannot be written without: Ken's surface type grammar has no projection form, so a parameter typed by a projection from an earlier parameter (`(d : Membership c) (q : d.Query)`) is unspellable in a .ken.md declaration even though the kernel admits the telescope -- add a projection form to RType and resolve it to the kernel's existing Term::Proj1/Proj2, keeping the elaborator-builtin escape hatch CLOSED because a builtin would falsify the ordinary-top-level-binding premise A-track's completion policy rests on"
-status: draft
+status: ready
 owner: language
 size: M
 gate: none
@@ -12,8 +12,29 @@ tier: T1
 origin: "Steward cut 2026-09-16 on the Architect's explicit routing consequence in evt_4tmt0n7era4w3 -- 'the only routing consequence is that LANG-MEMBERSHIP-OPERATOR-SURFACE gains a language prerequisite (a projection form in RType) that it does not currently carry. Worth a node before that build is cut, so it is discovered at framing rather than by an implementer who cannot write the signature.' Discovered while ruling SPEC-MEMBERSHIP-CLASS-CONTRACT's D0-1: the kernel CAN express the telescope (Term::Proj1/Proj2, class as right-nested Sigma per 33 §5.2) and the spec CAN state it, but the surface cannot spell it. Cut BEFORE the dependent build is framed, so the gap is a named dependency rather than an implementer's hard stop."
 ---
 
-> # DRAFT — cut so the gap is DISCOVERED AT FRAMING, not by an implementer who
-> # cannot write the signature. Not framed; do not start.
+> # READY 2026-09-17 (Steward). Frame:
+> # `docs/program/wp/LANG-TYPE-PROJECTION-SURFACE-FORM.md`.
+>
+> **Released as the language lane's next work.** `depends_on: []`, verified at
+> `origin/main` `ac4b5957120c3da8b63409d161f4290cb72fcc45` — nothing gates it,
+> so it can lead.
+>
+> **Cut AFTER `LANG-BARE-OPERATOR-ATOM-REJECTION` (`ca4ef3472`) lands.** That
+> candidate is in the publisher and touches `parser.rs`, which this node also
+> touches. This is a contention instruction, not a dependency: cut from a
+> `main` that already contains it, per frame §7's base pin.
+>
+> **The frame corrects this node's scope in one respect: the gap is in TWO
+> surface layers, not one.** `Type` (ast.rs, ten variants) needs a variant as
+> well as `RType` (resolve.rs, eleven), plus the parser production that builds
+> it. Re-measured at `ac4b59571`. The frame also carries the `TTrunc`/`RTrunc`
+> path as the worked precedent — it is this exact three-layer shape, already
+> landed and reviewed.
+>
+> The original cut note, retained:
+>
+> **This node was cut so the gap is DISCOVERED AT FRAMING, not by an
+> implementer who cannot write the signature.**
 >
 > **This node exists because of where the obstruction STOPPED.** The Architect
 > ruled `SPEC-MEMBERSHIP-CLASS-CONTRACT`'s D0-1 by measuring which layer is
