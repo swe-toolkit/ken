@@ -14,6 +14,28 @@ origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks 
 
 > # DRAFT. Not framed, not released. Do not start.
 >
+> ## 2026-09-17: THIS NODE NOW RECEIVES A NAMED ROW POPULATION FROM THE D5b PORT
+>
+> **Three OWED method rows are being handed to this node by name**, per
+> [[ABI-S6-HS18-D5B-SUBSTRATE-PORT]]'s `AC-1e`. They are owed work the port
+> cannot close, because they sit in files the six-site ruling excludes from
+> hand-separation, and they are **the refused grant's own carriers** rather than
+> bystanders — measured references to the operation in each source body:
+>
+>     lowering/effects.rs::lower_process_host_effect        8    census site 5
+>     st/effects.rs::host_effect_seat_contract              5    the sixth site
+>     st/effects.rs::host_effect_constructor_dispatch       1    the sixth site
+>
+> **This does not raise this node's priority, start it, or change its gates** —
+> same as the retracted claim recorded below, and stated here so the two are not
+> confused. It records that the port's `REMAINING = 0` is satisfiable **only
+> because these rows have a recipient**, and this node is it.
+>
+> **The count is a PREDICATE, not a fixed three.** `AC-1e` derives the bucket
+> from the file-exclusion rule, so a fourth carrier would arrive here on its own.
+> **A row excluded by file that does NOT reference the refused operation is not
+> this node's** — it is owed work with no owner and goes back to the Steward.
+>
 > ## 2026-09-17: A "THIS NODE BLOCKS A `ready` NODE" CLAIM WAS MADE AND WITHDRAWN
 >
 > **RETRACTED THE SAME HOUR. This node's priority is UNCHANGED, and nothing below
