@@ -628,6 +628,9 @@ with `origin/main` as the third tree, and its output showing:
                  adjudication node
     population   stated in the output: union of method names, over the
                  file set, with the production/test split
+    unit         stated in the output: what counts as ONE ROW. Specifically
+                 whether a NESTED `fn` is its own row or is absorbed into
+                 the body of the `fn` that encloses it.
 
 **This replaces *"increment A compiles against this"* as the completion
 criterion.** A build answers *"does every name resolve"*; this answers *"is
@@ -664,6 +667,21 @@ OWED, ABSENT, MAIN'S and the population unmoved.
 > each control, which branch it exercises. Add a case with a method **present in
 > source and main but absent from base, with identical bodies**, asserting AGREE.
 
+**THE SAME CONDITION HAS A SECOND FAILURE MODE, AND IT LEAVES NO TRACE.** The
+Architect's extractor (`evt_4xw41pcc03je8`) opened its loop with `if k not in p
+or k not in b: continue` — **a name absent from the base is skipped before any
+comparison runs.** So one instrument routed every no-base row *into* ADJUDICATE
+and the other **dropped them from every bucket**: same condition, opposite
+directions. Reclassified over the union, theirs gains ADJUDICATE 6 -> 13,
+ABSENT 131 -> 153, plus **36 no-base-identical and 50 main-only rows in buckets
+it did not previously have at all.**
+
+⇒ **The over-admitting failure at least leaves a trace to notice; the dropping
+failure produces no output anywhere.** This is what makes `§3b`'s union rule an
+**instrument requirement rather than a caution** — a silently narrowed
+population cannot be caught by inspecting any bucket, only by stating the
+population and reconciling it.
+
 **A COUNT THAT GROWS MID-RUN IS THE METHOD WORKING.** The parent's inventory
 was already short by one (`constructor_identity`). Report the number you
 observe. **But a large gap against another extractor is a finding to run down,
@@ -676,6 +694,35 @@ The contract remains *zero owed under YOUR extractor, with the base control
 beside it* — and where your total diverges several-fold from another run of the
 same three trees, **partition your own bucket on the condition that distinguishes
 them before reporting either number as a size.**
+
+**AC-1d — THE INSTRUMENT'S UNIT IS PART OF ITS CONTRACT AND MUST BE STATED.**
+Architect, 2026-09-17 (`evt_4xw41pcc03je8`), on their own extractor: **two
+instruments that agree on method and disagree on UNIT diverge several-fold while
+both remain internally correct.** Theirs takes the **outermost `fn`** as the
+unit, so a nested `fn` never becomes a row — it is absorbed into its parent's
+body, where the parent then lands in OWED or AGREE by the rest of that body.
+Measured, consistent across all three trees:
+
+    BASE    fn-lines 2583   extracted 2417   absorbed 166   unterminated 0
+    SOURCE  fn-lines 2778   extracted 2600   absorbed 178   unterminated 0
+    MAIN    fn-lines 2665   extracted 2497   absorbed 168   unterminated 0
+
+`compiler_driver.rs` loses exactly 54 in every tree, `eval.rs` exactly 29 —
+**stable, not a runaway brace** (zero unterminated bodies refutes that). A
+coarser unit yields strictly fewer rows, which is why that extractor's AGREE is
+2064 against 2601 and its ADJUDICATE 13 against 37.
+
+> **THIS IS THE ONE SHAPE `AC-1c` DOES NOT COVER, and it is why it gets its own
+> criterion.** `AC-1c` is about a **branch** that decides wrongly; a unit
+> mismatch has **no wrong answer to print** and no branch to exercise, so no
+> control keyed on classification can see it — **a row that was never a row
+> cannot be misclassified.** A divergence in unit is therefore invisible to
+> every control in this node, including the one the Architect and the Steward
+> each wrote.
+>
+> ⇒ **Two instruments differing in unit are not answering one question with an
+> error bar between them; they are answering differently-shaped questions.**
+> State the unit so the comparison is possible at all.
 
 **AC-1a — the resulting tree builds, and increment A compiles against it.**
 `scripts/ken-cargo check -p ken-runtime --lib` exits 0, *"Checking ken-runtime"*
