@@ -25,23 +25,40 @@ they were not provisioned for.
 node's candidate. **Take it from there; do not re-derive it here and do not
 take a count from this frame as the contract.**
 
-Two independent re-derivations at `origin/main`, given so the node can be sized
+Three independent re-derivations at `origin/main`, given so the node can be sized
 and **not** so it can be checked against:
 
     Architect's extractor      6 methods, of which dispatch_host_op_v1 arrives
                                ALREADY DECIDED (KEEP MAIN'S) => 5 live
     Steward's extractor       32 methods (~30 production, ~2 test)
+    Implementer's extractor   37 methods (31 production, 6 test), after the
+                              no-base branch is corrected -- 157 before
     concentrated in   planning/static_transition/{continuations,aggregates,
-                      responses,construction,immediate_bridge}.rs
-                      ken-interp/src/eval.rs
-                      ken-elaborator/src/{prelude,compiler_driver}.rs
-                      ken-host/src/{abi_v1,effect_v1}.rs
+                      responses,construction,immediate_bridge}.rs   22
+                      ken-host/src/{abi_v1,effect_v1}.rs             5
+                      ken-interp/src/eval.rs                         3
+                      ken-elaborator/src/{prelude,compiler_driver}.rs 3
+                      lowering/core/tests/control.rs                  4
 
-**Different extractors produce different totals and these two differ by ~5x on
-this bucket.** They also differ on AGREE (2064 against 2601), so the gap is the
-extractors, not a disagreement about the tree. **Neither number is the
-contract** — the contract is that every row on the predecessor's actual
-worklist has a disposition. **Sized `S` on the range, not on either end.**
+**The implementer's run first read 157, and that gap was run down rather than
+absorbed as an error bar.** Its classifier asked *"differs from base on both
+sides"*, which is **vacuously true on both sides when there is no base**: 130 of
+the 157 rows were methods new in both trees, and **120 of those had
+byte-identical source and main bodies.** Correcting only that branch gives 37,
+with every other bucket unmoved. See the predecessor's `AC-1c`.
+
+**37 against 32 is the byte-exact/whitespace-normalised axis** the implementer
+had already measured in their own sensitivity block, so the two now agree within
+their stated error bars, and both land in the same files. **Neither number is
+the contract** — the contract is that every row on the predecessor's actual
+worklist has a disposition. **Sized `S` on a reconciled measurement.**
+
+> **The earlier text here read *"different extractors produce different totals
+> and neither is the contract"*, and that is how a 5x gap went unexamined for a
+> turn.** The sentence is true and it is not a licence: a several-fold divergence
+> between two runs of the **same three trees** is a finding about an instrument,
+> and the partition that settles it is usually one condition wide. **State error
+> bars from a sensitivity you ran, never from the existence of disagreement.**
 
 > **THE SHRINK IS AN ARGUMENT AGAINST THIS NODE EXISTING, so it is answered
 > here rather than left implicit.** The Architect's census read **20** before
@@ -58,6 +75,24 @@ worklist has a disposition. **Sized `S` on the range, not on either end.**
 > ⇒ **The move that WOULD have defeated the split is the opposite one.** Had
 > the correction ballooned the judgment surface, the compile-safety argument
 > would have been carrying a node too large to be an afterthought to a T2 port.
+>
+> **THAT FALSIFIER FIRED, on 2026-09-17, and it is recorded here because it
+> fired rather than in spite of it.** The implementer's first run read
+> **ADJUDICATE 157, 150 of them production** — the balloon this block names, in
+> the direction this block names, raised by the seat that would have had to
+> carry it. It was tested and the reading was **refuted**: 120 of those rows
+> were methods added identically in both trees, admitted by a classifier branch
+> that cannot compare bodies when there is no base. The real surface is 37.
+>
+> **A falsifier that fires, is run down, and survives is worth more than one
+> that never fires** — before this the split rested on an argument, and it now
+> rests on the one measurement that could have overturned it. **Note also what
+> would NOT have followed from a real 157:** compile-safety is per-method by
+> construction (an ADJUDICATE method exists on `main`, so `main`'s body stands),
+> so it is **scale-free**, and the *"do not hand a T2 seat a judgment call"*
+> argument gets **stronger** with more rows, not weaker. A genuine balloon would
+> have defeated the node's **sizing** and strained `ABI-S6-HS18-MAIN-BASED-CLOSURE`,
+> which inherits every deferred row — never the split itself.
 > It did not.
 
 ### 2b. THE THIRD TREE IS `origin/main`. The branch-based reading is an artifact.
