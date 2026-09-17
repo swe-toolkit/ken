@@ -12884,15 +12884,15 @@ thread_local! {
 pub fn with_required_consumer_call_observations<T>(
     f: impl FnOnce() -> T,
 ) -> (T, Vec<RequiredConsumerCallObservation>) {
-    struct Restore;
-    impl Drop for Restore {
+    struct ResetOnDrop;
+    impl Drop for ResetOnDrop {
         fn drop(&mut self) {
             REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(false));
         }
     }
     REQUIRED_CONSUMER_CALL_OBSERVATIONS.with(|rows| rows.borrow_mut().clear());
     REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(true));
-    let restore = Restore;
+    let restore = ResetOnDrop;
     let result = f();
     let rows = REQUIRED_CONSUMER_CALL_OBSERVATIONS
         .with(|rows| std::mem::take(&mut *rows.borrow_mut()));
@@ -12905,8 +12905,8 @@ pub fn with_required_consumer_call_mutation<T>(
     mutation: RequiredConsumerCallMutation,
     f: impl FnOnce() -> T,
 ) -> (T, usize) {
-    struct Restore;
-    impl Drop for Restore {
+    struct ResetOnDrop;
+    impl Drop for ResetOnDrop {
         fn drop(&mut self) {
             REQUIRED_CONSUMER_CALL_MUTATION
                 .with(|active| active.set(RequiredConsumerCallMutation::Exact));
@@ -12914,7 +12914,7 @@ pub fn with_required_consumer_call_mutation<T>(
     }
     REQUIRED_CONSUMER_CALL_MUTATION.with(|active| active.set(mutation));
     REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(|count| count.set(0));
-    let restore = Restore;
+    let restore = ResetOnDrop;
     let result = f();
     let applications = REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(Cell::get);
     drop(restore);

@@ -161,6 +161,7 @@ pub use aggregates::{
     with_composed_return_forward_edge_collapsibility_observations,
     with_composed_return_forward_ret_authority_mutation,
     with_composed_return_forward_ret_role_witnesses,
+    with_required_consumer_call_mutation, with_required_consumer_call_observations,
     with_retained_result_closure_proof_mutation, CheckedIhContinuationInheritanceMutation,
     CheckedIhContinuationInheritanceObservation, CheckedIhGeneratedEntryAdmissionMutation,
     CheckedIhGeneratedEntryAdmissionObservation, CheckedIhGeneratedEntryArrivalMutation,

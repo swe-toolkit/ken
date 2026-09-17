@@ -9,15 +9,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
-use super::aggregates::{pair_detached_required_consumer, RequiredConsumerCall};
+use super::aggregates::{
+    checked_ih_post_call_consumer_frames, pair_detached_required_consumer, RequiredConsumerCall,
+};
 use super::continuations::{
-    checked_frame_for_consumer, continuation_owner_entry_sources, generated_context_parameters,
+    checked_frame_for_consumer, continuation_call_selected_result_identity,
+    continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
+    generated_context_parameters,
     walk_continuation_value_environment, CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
     ContinuationContextId,
     ContinuationEmissionOwner, ContinuationInputProjection, ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
     ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
-    SourceReturnContextTemplate,
+    RequiredConsumerProjection, SourceReturnContextRole, SourceReturnContextTemplate,
 };
 use super::occurrences::StaticOriginId;
 use super::semantic_ir::ConstructorIdentity;
@@ -4261,4 +4265,237 @@ fn checked_ih_detached_caller_cut_for_consumer(
             caller_transport: caller_transport.clone(),
         }),
     ))
+}
+
+
+pub(super) fn build_checked_ih_post_call_consumers(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<CheckedIhPostCallConsumer>, CraneliftBackendError> {
+    let mut result = Vec::new();
+    for transport in &plan.checked_ih_environment_transports {
+        let ContinuationEmissionOwner::Specialization(enclosing) = transport.destination_owner()
+        else {
+            continue;
+        };
+        let Some(context) =
+            plan.continuation_context_for(enclosing, transport.destination_body_origin())?
+        else {
+            continue;
+        };
+        let mut demanded = Vec::new();
+        for identity in plan
+            .static_response_continuations
+            .iter()
+            .filter(|row| row.k_context == context.id())
+            .map(|row| row.k_ret_identity)
+        {
+            if !demanded.contains(&identity) {
+                demanded.push(identity);
+            }
+        }
+        let demanded = match demanded.as_slice() {
+            [] => continue,
+            [identity] => *identity,
+            _ => return Err(planner_error(
+                "one checked-IH transport identity has disagreeing response-context Result demands",
+            )),
+        };
+        let actual =
+            continuation_call_selected_result_identity(plan, transport.source_call_identity())?;
+        if actual == demanded {
+            continue;
+        }
+        let detached_return_context = plan
+            .detached_return_context_for(transport.source_call_identity())
+            .cloned();
+        let frame_origins = if let Some(context) = &detached_return_context {
+            let mut frames = Vec::new();
+            detached_post_call_consumer_frames(plan, context, &mut frames)?;
+            if frames.is_empty() {
+                return Err(planner_error(
+                    "a detached checked-IH return context has no exact source consumer exit",
+                ));
+            }
+            frames
+        } else {
+            let Some(frames) = checked_ih_post_call_consumer_frames(plan, transport)? else {
+                continue;
+            };
+            frames
+        };
+        let Some(derived_steps) = derive_checked_ih_post_call_consumer_chain(
+            plan,
+            transport.source_call_identity(),
+            &frame_origins,
+            actual,
+            demanded,
+        )?
+        else {
+            continue;
+        };
+        if derived_steps.is_empty() {
+            return Err(planner_error(
+                "a mismatched checked-IH transport Result produced no source return steps",
+            ));
+        }
+        let exact_transport = match detached_return_context.as_ref() {
+            Some(context) => CheckedIhPostCallTransport::Required(
+                pair_detached_required_consumer(plan, transport, context)?,
+            ),
+            None => CheckedIhPostCallTransport::Ordinary(transport.clone()),
+        };
+        let (consumers, selected_case_exits) = if detached_return_context.is_some() {
+            (Vec::new(), derived_steps)
+        } else {
+            (derived_steps, Vec::new())
+        };
+        result.push(CheckedIhPostCallConsumer {
+            transport: exact_transport,
+            actual_result_identity: actual,
+            demanded_result_identity: demanded,
+            consumers,
+            selected_case_exits,
+            detached_return_context,
+            required_consumer_edge: None,
+        });
+    }
+    result.sort_by(|left, right| left.transport().cmp(right.transport()));
+    attach_required_consumer_incoming_edges(plan, &mut result)?;
+    Ok(result)
+}
+
+pub(super) fn publish_checked_ih_post_call_consumers(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<CheckedIhPostCallConsumer>, CraneliftBackendError> {
+    let mut rows = build_checked_ih_post_call_consumers(plan)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    if d5b_hs17_post_call_consumer_mutation() == D5bHs17PostCallConsumerMutation::TransplantConsumer
+    {
+        let mut pair = None;
+        'outer: for left in 0..rows.len() {
+            for right in left + 1..rows.len() {
+                if rows[left].transport().source_call_identity()
+                    != rows[right].transport().source_call_identity()
+                    && rows[left].consumers.len() == rows[right].consumers.len()
+                {
+                    pair = Some((left, right));
+                    break 'outer;
+                }
+            }
+        }
+        let (left, right) = pair.ok_or_else(|| {
+            planner_error(
+                "the HS15 transplant control found no distinct equal-length consumer pair",
+            )
+        })?;
+        let left_consumers = rows[left].consumers.clone();
+        rows[left].consumers = rows[right].consumers.clone();
+        rows[right].consumers = left_consumers;
+        record_d5b_hs17_post_call_consumer_application();
+    }
+    Ok(rows)
+}
+
+pub(super) fn validate_checked_ih_post_call_consumers(
+    plan: &StaticTransitionPlan<'_>,
+    consumers: &[CheckedIhPostCallConsumer],
+) -> Result<(), CraneliftBackendError> {
+    if consumers != build_checked_ih_post_call_consumers(plan)? {
+        return Err(planner_error(
+            "the checked-IH post-call consumer relation is not its exact identity-and-endpoint derivation",
+        ));
+    }
+    Ok(())
+}
+
+
+fn attach_required_consumer_incoming_edges(
+    _plan: &StaticTransitionPlan<'_>,
+    rows: &mut [CheckedIhPostCallConsumer],
+) -> Result<(), CraneliftBackendError> {
+    for row in rows {
+        let Some(required_call) = row.required_consumer() else {
+            continue;
+        };
+        let consumer_occurrence = required_call.destination().consumer_occurrence();
+        let matches = row
+            .selected_case_exits
+            .iter()
+            .enumerate()
+            .filter(|(_, step)| {
+                (
+                    step.occurrence().eliminator_origin(),
+                    step.checked_frame_id(),
+                ) == consumer_occurrence
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let incoming_consumer_edge_index = match matches.as_slice() {
+            [index] => *index,
+            [] => {
+                return Err(planner_error(
+                    "a self-defining required consumer has no exact incoming edge",
+                ))
+            }
+            _ => {
+                return Err(planner_error(
+                    "a self-defining required consumer has more than one exact incoming edge",
+                ))
+            }
+        };
+        row.required_consumer_edge = Some(
+            RequiredConsumerIncomingEdgeSelection::SelfDefining {
+                incoming_consumer_edge_index,
+            },
+        );
+    }
+    Ok(())
+}
+
+fn detached_post_call_consumer_frames(
+    plan: &StaticTransitionPlan<'_>,
+    context: &SourceReturnContextTemplate,
+    frames: &mut Vec<StaticOriginId>,
+) -> Result<(), CraneliftBackendError> {
+    for step in context.steps().iter().rev() {
+        if matches!(
+            step.role(),
+            SourceReturnContextRole::ComputationalMatchCase(_)
+        ) {
+            frames.push(step.parent_origin());
+        }
+    }
+    if let Some(boundary) = context.worker_return() {
+        let selecting = boundary.selecting_call();
+        let target = plan
+            .continuation_specializations
+            .get(selecting.target().0 as usize)
+            .ok_or_else(|| {
+                planner_error(
+                    "a detached return context names an uninstalled selecting specialization",
+                )
+            })?;
+        if target.key.worker.body_origin != context.root_origin()
+            || target.key.producer_construct_origin != boundary.caller_context().result_origin()
+        {
+            return Err(planner_error(
+                "a detached return context does not join its worker root to the selecting call's exact caller result position",
+            ));
+        }
+        frames.push(target.key.continuation_origin);
+        if let Some(source) = target.key.consuming_occurrence {
+            if frames.last().copied() != Some(source.eliminator_origin()) {
+                frames.push(source.eliminator_origin());
+            }
+            if let Some(RequiredConsumerProjection::DirectOuter { required, .. }) =
+                plan.required_consumer_projections.get(selecting)
+            {
+                if frames.last().copied() != Some(required.eliminator_origin()) {
+                    frames.push(required.eliminator_origin());
+                }
+            }
+        }
+        detached_post_call_consumer_frames(plan, boundary.caller_context(), frames)?;
+    }
+    Ok(())
 }
