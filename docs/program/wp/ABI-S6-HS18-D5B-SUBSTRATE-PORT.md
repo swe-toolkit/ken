@@ -827,8 +827,7 @@ anything still owed"*, which is the node's actual contract.
 
 **POSITIVE CONTROL, REQUIRED, AND IT IS THE HALF THAT USUALLY GETS SKIPPED.**
 Run the identical instrument in the same report with the **fourth tree set to
-the candidate's base** (`C := B`). It must show **`closed` = 0 and `REMAINING` =
-the full `|OWED u ABSENT|`** — nothing satisfied before any work was done. A zero
+the candidate's base** (`C := B`). A zero
 from a real port and a zero from an instrument whose file set matched nothing
 **print the same word**, and this node has already been bitten three times by
 exactly that — `ci-doc-only.py`'s bare `except`, `unique demands=0` on an empty
@@ -839,8 +838,34 @@ green AC-1 with no base reading beside it is not evidence.**
 > Against the old wording it re-ran a computation that **ignored the candidate**,
 > so the base run and the candidate run were the *same numbers by construction*
 > — the control could not have disagreed with the criterion it was checking. It
-> is a control only because the fourth tree makes `closed` vary: **0 at the base,
-> `|OWED u ABSENT|` at a complete candidate.** State both readings side by side.
+> is a control only because the fourth tree makes `closed` vary between the base
+> and a complete candidate. State both readings side by side.
+
+> ### THE EXPECTED VALUE WAS A CONSTANT AND THE CONSTANT IS WRONG BY 3
+>
+> **This AC previously demanded `closed = 0` and `REMAINING = |OWED u ABSENT|`
+> at `C := B`. A CORRECT run does not produce that**, and QA measured the real
+> figures on `e575e8058`: `C := b4c8df33a` gives **`REMAINING` 551, `closed` 3**
+> against the true run's `REMAINING` 0, `closed` 554. The 3 are ABSENT rows whose
+> **base body is already byte-identical to their source body** — a method absent
+> from `main` and unchanged from base to source is satisfied at the base, with no
+> work done and nothing wrong. **An AC phrased as a constant convicts the correct
+> reading**, which is the same shape as an `AC` phrased *"must not say X"*
+> tripping on the right text.
+>
+> **State the expectation as a COMPUTABLE PREDICATE, and the instrument prints
+> both sides:**
+>
+>     closed(C := B)  ==  |{ rows in OWED u ABSENT whose BASE body is
+>                            byte-identical to their SOURCE body }|
+>
+>     non-vacuity is the GAP, not either endpoint:
+>       REMAINING(C := B)  -  REMAINING(C := candidate)     551 - 0 = 551
+>
+> Both sides are independently computable, so the control can now **fail in
+> either direction** — a vacuous extractor collapses the gap, and a miscounted
+> identical-body set shows up as a `closed` mismatch. A bare `closed = 0` could
+> only ever have failed in one.
 
 **AC-1c — THE CLASSIFIER MUST DECIDE THE NO-BASE CASE BY COMPARING SOURCE
 AGAINST MAIN, AND BOTH CONTROLS MUST BE SHOWN TO REACH IT.** A method **new in
@@ -944,7 +969,38 @@ file the candidate DOES change in the same command, so a green AC-3 is
 distinguishable from a command that matched nothing.
 
 **AC-4 — the acceptance test's state is REPORTED, not assumed.**
-`abi_s6_mapping_file_backed_native.rs` arrives with reds. **Do not repair toward
+
+> ### AC-4 IS DISCHARGED BY WHOLE-FILE DEFERRAL ON THIS NODE. Amended 2026-09-17.
+>
+> **`crates/ken-cli/tests/abi_s6_mapping_file_backed_native.rs` is NOT in the
+> candidate tree and must not be**, so everything below about landing it and
+> naming its reds **does not apply to this node**. It is a whole-file `DEFERRED`
+> case under `AC-1e(b)`: the file is **absent from `main` entirely**, which makes
+> the FILE the smallest takeable unit, and its subject *is* the refused grant —
+> its three tests carry 4 / 4 / 2 references to the operation, so landing it at
+> all would violate this frame's own `AC-2`.
+>
+> **It is HANDED to [[RT-D5B-MAPPING-AVAILABILITY-FLIP]]**, by name, as a whole
+> file, alongside the four pure-grant rows. **Deliverable `§5` item 3 is
+> DEFERRED, not unmet** — and the difference is only real because the receiving
+> node's frame records the file as received. Ruled `evt_jcfntthp14d9`.
+>
+> **The predicted red goes with it.** `file_source_admission_uses_read_not_
+> destination_protection_rights` lives *in* the deferred file, so the
+> predicted-red procedure below is moot here and becomes the flip node's to run
+> once the grant lands and `applications` can be non-zero.
+>
+> **Why this block exists rather than a quiet edit.** The ruling was made in a
+> convo thread and the frame was never amended, so for one review cycle the
+> written `AC-4` said *land the file* while the ruling said *defer it*. QA
+> refused to read the AC as discharged on an unwritten ruling and asked — which
+> is correct, and is the only reason this is a paragraph rather than a silently
+> unmet deliverable. **A ruling that lives only in a thread is not a deliverable;
+> the obligation lands in the target WP's FRAME** (`COORDINATION §4c`).
+
+**The text below governs the FLIP node's run of this test, and stands
+unamended for it.** `abi_s6_mapping_file_backed_native.rs` arrives with reds.
+**Do not repair toward
 green.** Land it with its actual state named
 per-red, and if any red is to be accepted it needs a row in
 `.github/ignored-test-exemptions.toml` — whose schema is `class` +
