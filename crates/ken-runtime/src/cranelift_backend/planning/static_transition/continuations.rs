@@ -7702,8 +7702,10 @@ impl<'src> StaticTransitionPlan<'src> {
     /// path and filters this variant out, so the two consumers of a projection
     /// never share one funnel. That filter is what makes the direct-outer
     /// accessors on [`RequiredConsumerProjection`] total at every reachable
-    /// call; it is load-bearing and pinned by
-    /// `a_detached_projection_is_in_the_map_and_refused_by_the_direct_outer_accessor`.
+    /// call, and it is load-bearing: remove it and those accessors stop being
+    /// total, with no compile error to say so. The guard that fails if it is
+    /// removed reaches this function by CALLING it, which is a reference the
+    /// compiler checks; a test name written here would not be.
     pub(in crate::cranelift_backend) fn detached_return_context_for(
         &self,
         identity: &ContinuationCallIdentity,
