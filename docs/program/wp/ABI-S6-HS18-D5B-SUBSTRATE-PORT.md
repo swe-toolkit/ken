@@ -166,9 +166,26 @@ reason). **Do not repair toward green.** Land it with its actual state named
 per-red, and if any red is to be accepted it needs a row in
 `.github/ignored-test-exemptions.toml` — whose schema is `class` +
 `readmission` + `test_path`, i.e. **an accepted red names what would readmit
-it.** Steward-verified at `6036f9f5d`: that register is 44 lines and carries
-**zero** entries matching `abi_s6`, `mapping`, `d5b`, `file_backed` or `px8f`.
-**A red with no row is not an accepted state; it is just red.**
+it.** Steward-verified at `origin/main` `6036f9f5d`: 44 lines, 8 `[[exemption]]`
+entries, and **zero** matching `abi_s6`, `mapping`, `d5b`, `file_backed` or
+`px8f`. **A red with no row is not an accepted state; it is just red.**
+
+**READ THIS REGISTER FROM `origin/main`, NEVER FROM YOUR WORKTREE:**
+
+```sh
+git show origin/main:.github/ignored-test-exemptions.toml
+```
+
+**The failure mode is a FALSE NEGATIVE on the exact question this AC turns on,
+and it is silent.** A branch that lags `main` has *fewer* rows, so a row added
+to `main` after your branch point is invisible — and the answer you get,
+*"no row exists, therefore this red is not accepted"*, is wrong in the direction
+that convicts a red the fleet already accepted. **Demonstrated live** while this
+frame was being written: the Architect first reported 34 lines, read from a
+worktree on a lagging branch, and corrected it themselves to 44 at `origin/main`
+(`evt_f3y5ffna32kv`). **The conclusion survived; the method did not.** A
+measurement correct on one tree is not a claim about another without naming
+which tree it was taken on.
 
 **AC-5 — the excluded instruments are NAMED.** `§3`'s predicate produces
 exclusions; list them with the reason each failed the reaching-consumer test.
