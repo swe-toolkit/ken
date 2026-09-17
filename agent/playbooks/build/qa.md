@@ -120,6 +120,18 @@ load and follow it after this generic archetype.
 > finds public API that nothing calls and has no way to tell whether that was
 > intended.
 >
+> **A criterion handed to you with no stated failing appearance is not yours to
+> discharge — it is yours to send back.** Before you verify any condition, ask
+> *"what would this look like if the claim were false?"* If the answer is "the
+> same," the condition is decorative and a green on it is worth nothing, however
+> carefully you ran it. That is the authoring-side rule in
+> `agent/memory/fleet/an-acceptance-criterion-must-name-an-observation-the-failing-configuration-does-not-also-produce.md`,
+> and **the discharging seat is the last place it can be caught.** Say which of
+> three you have before proposing a repair: a **gameable criterion** (satisfiable
+> without the property) needs rewriting; an **unexercised detector** (sound, but
+> nothing drives it) needs a driver, not deletion; a **blind instrument** needs a
+> different venue. Calling the second one decorative destroys a real check.
+>
 > (Measured 2026-09-17 on `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT`: two functions
 > were re-exported to crate-public in the same diff, left `never used`, and were
 > reported as closed. Zero callers on the tree, then or after. The acceptance

@@ -44,6 +44,59 @@ goes green" would be discharged equally by the guard-removed build. **If the
 failing configuration yields the same observation, the observation is not
 evidence.**
 
+**4. The discharging ACT removes the instrument's jurisdiction over the
+subject.** Added 2026-09-17; a variant of 3 sharp enough to name separately,
+because the repair differs. `ABI-S6-HS18-CHECKED-IH-CONSUMER-PORT` carried an
+Architect condition: *"after the fix, these six names must be GONE from `never
+used`."* Two of them went quiet — because the same diff re-exported them to
+crate-public, and **`dead_code` exempts externally-reachable items**. Zero
+callers before, zero after.
+
+    a name leaves `never used` because it acquired a CALLER          -> CLOSED
+    a name leaves `never used` because it became EXTERNALLY REACHABLE -> EXEMPT
+
+In shape 3 the broken configuration *produces* the passing observation. Here the
+discharging act **withdraws the subject from the instrument's analysis**, so
+there is no observation at all and absence reads as success. Worse, it is
+**permanent and leaves no artifact**: an `#[allow]` leaves a token a reviewer can
+grep and a lint config can forbid; a lifted `pub` leaves nothing, and the item is
+gone from that census for good. The implementer's account of why they could not
+see their own act is the reusable half — *"I did not write a suppression and then
+rationalise it. I wrote what looked like ordinary port content, and the
+suppression was a side effect of the visibility it carried. Nothing in the diff
+says silenced, so nothing prompted the question."*
+
+⇒ **For any criterion keyed on an instrument's silence, ask what else makes that
+instrument silent.** Report **CLOSED / EXEMPT / STILL DEAD**, never a binary, and
+count a disappearance as closure **only if the subject's visibility did not
+change in the same diff**. The build-QA playbook carries the operational form.
+
+## An uninformative GREEN has three causes and they need different repairs
+
+Also 2026-09-17, same night: three criteria failed, all producing the identical
+symptom — *a green carrying no information* — which is precisely what let one
+reader (the Steward) collapse them into one defect and get corrected. **They are
+not one defect. The symptom is shared; the remedy is not.**
+
+| cause | what happened | remedy |
+|---|---|---|
+| **GAMEABLE CRITERION** | satisfiable without the property — shape 4 above | state what must be able to FAIL, at authoring time |
+| **UNEXERCISED DETECTOR** | the check is real and sound; the driver that makes it fire does not exist | build or name the driver; positive-control it |
+| **BLIND INSTRUMENT** | structurally cannot reach the subject — a `-p <crate>` build over a `cfg`-gated region, green at `1035/0/2` while four called functions were undefined | change the VENUE |
+
+**Distinguishing two and one is where the judgment is, and two seats got it
+backwards.** A required validator was read as a tautology (`f(x) == f(x)`,
+comparing a stored population against a fresh call to the builder that produced
+it) by both the Architect who required it and the Steward who wrote it up. The
+implementer refuted both: the publisher applies a test-harness mutation
+**between** build and validate, so the validator can genuinely disagree with its
+own builder. **It was a detector awaiting a driver, not a tautology.** A sound
+check with no driver looks exactly like a decorative one, and calling it
+decorative destroys a real instrument.
+
+⇒ **Say which of the three you have before proposing a fix.** "This check is
+useless" and "this check has never been run" license opposite actions.
+
 ## What to do instead
 
 Before writing the AC down, answer two questions in one line each:
@@ -76,6 +129,31 @@ the *claim*. Attention goes to getting the property right, and the discharge
 clause is appended as bookkeeping — so the claim gets the scrutiny and the
 observation gets none. **The discharge is the half that executes.** Give it the
 same scrutiny, and expect to catch this in your own text, not someone else's.
+
+> ### THIS FILE WAS RESIDENT AND IT DID NOT FIRE. 2026-09-17.
+>
+> Three seats — Architect, implementer, Steward — wrote or accepted
+> non-discriminating criteria on one node in one night, and the Architect then
+> **re-derived this file's central rule from scratch** and proposed it as a new
+> fleet lesson: *"a required check needs a stated failure mode at the moment it
+> is required, or the requirement is satisfied by a tautology."* That is the
+> `What to do instead` question below, already written here on 2026-08-27, at
+> `fleet` scope, in everyone's startup read.
+>
+> **A re-derivation is a measurement on the corpus, not a contribution to it.**
+> The useful response is to extend the existing file — which is why shape 4 and
+> the three-cause table are here rather than in a second lesson that would have
+> split the audience for one rule.
+>
+> **Why it did not fire, and this is the generalisable part:** every violation
+> occurred while the author was reasoning hard about a *mechanism* — a lint's
+> exemption rules, a feature union, a mutation transplant. **Deep mechanism work
+> is exactly when the authoring-time question feels like bookkeeping**, and
+> exactly when the criterion being written is most likely to be keyed on an
+> instrument whose failure modes the author has not yet enumerated. **If you are
+> writing a criterion about an instrument you just learned something surprising
+> about, that is the trigger to re-read this file, not a reason you can skip
+> it.**
 
 ## The nearby failure this is NOT
 
