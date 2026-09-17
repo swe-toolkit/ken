@@ -12,6 +12,31 @@ tier: T1
 origin: "CONF-BLOCKER-MARKER-RECONCILE's D3, answered by the spec enclave with the citation its AC-4 demanded and corroborated independently by the conformance-validator (31-lexical.md:33-35, :79, :101-113). Steward ruling evt_bgat447r9s6w: this is an unowned surface gap, not a keyword-role decision -- the endpoint-(b) reading is refuted by citation. Steward-filed per COORDINATION §2. Supplies the blocker for seed-canonical-format.md:387 and FMT1's aggregate at :52. RECUT 2026-09-06 (Steward) on the Architect hard-stop ruling evt_356e6vfg2hrs6: the node is NOT buildable as framed -- AC-1's parse+elaborate has no honest semantic target -- so it is split, deferred, and returned to draft. RE-CUT AGAIN 2026-09-13 (Steward) on the operator directive (Pat, this session): the deferred split-(B) trigger has fired -- the typeclass-method-dispatch capability is now being cut for real demand (A1's factored resolver LANG-STANDARD-INFIX-CALL-COMPLETION + the SPEC-MEMBERSHIP-CLASS-CONTRACT contract), so this node is re-cut as the membership BUILD against them. Stays draft, HELD until its three deps land; then the Steward frames the full ACs and releases. See the 2026-09-13 banner."
 ---
 
+> # FRAMED 2026-09-17. Frame: `docs/program/wp/LANG-MEMBERSHIP-OPERATOR-SURFACE.md`.
+> # STILL `draft`, AND HELD ON EXACTLY ONE THING.
+>
+> **Three of the four dependencies are landed, verified in the TREE at
+> `origin/main` `4bc5f0eee` rather than read off a status field:** `58b` is
+> present with `membership_member_at` (its node's `active` is unflipped M7, not
+> unlanded work), `Token::Member` is in `lexer.rs` and `parser.rs`, and
+> `LANG-TYPE-PROJECTION-SURFACE-FORM` merged at `294cb5e28`.
+>
+> **The hold is [[LANG-STANDARD-INFIX-CALL-COMPLETION]] (A1), which is being
+> built right now.** The frame's `§3` is entirely landed-spec and is final;
+> `§5a` lists the four items that are deliberately left unpinned because they
+> are A1's landed shape, and the Steward pins them at release.
+>
+> **DO NOT re-frame against A1's working tree.** A1 took three amendments on
+> 2026-09-17 alone (FI-2a, FI-2b, FI-5), each moving where an identity lives or
+> how the elaborator acquires it. A frame written against a surface that moved
+> three times in one day is a frame written against a guess.
+>
+> **Two things the frame settles that this body does not:** `∈` must not become
+> an elaborator builtin — `AC-5` gives that a structural control, because no
+> behavioural test on this node would catch it — and carrier-first completion
+> needs a fixture that *discriminates*, because an LHS-first implementation
+> passes every case where the query type is unambiguous.
+>
 > # FOURTH DEPENDENCY, ADDED 2026-09-16 AND **DISCHARGED 2026-09-17**:
 > # [[LANG-TYPE-PROJECTION-SURFACE-FORM]] IS ON `main`. THE SIGNATURES ARE NOW
 > # SPELLABLE, AND THE BLOCKING PREMISE BELOW IS RETAINED ONLY AS HISTORY.
