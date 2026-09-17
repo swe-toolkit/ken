@@ -33,9 +33,20 @@ origin: "Steward cut 2026-09-17, ruling runtime-leader's measured scope fork (ev
 > there, and a growing list is the split working.**
 >
 > **The third tree is `origin/main`, never the port branch `879f00c99`.**
-> Steward-measured, one variable changed: the branch-based run reports
-> ADJUDICATE **154**, the main-based run **32**. Classifying against the branch
-> makes *"already ported"* indistinguishable from *"`main` moved it"*.
+> Classifying against the branch makes *"already ported"* indistinguishable
+> from *"`main` moved it"*. **AMENDED 2026-09-17: the correction moves THREE
+> buckets in TWO directions**, measured independently in both extractors —
+> ADJUDICATE falls several-fold (Steward 154 -> 32, Architect 20 -> 6) while
+> **OWED and ABSENT RISE by roughly half** (Steward 252 -> 372 and 90 -> 151;
+> Architect 200 -> 322 and 88 -> 131).
+>
+> ⇒ **THIS NODE IS BIGGER THAN ANY BRANCH-BASED SIZING SAYS**, since OWED and
+> ABSENT are its entire content, and `§2c`'s "~117 items" predates all of it.
+> The adjudication node shrinks correspondingly and is now `S`. **The first
+> version of the recut published only the falling bucket; the Architect
+> supplied the rest** (`evt_55pw9gwz3vqm4`). **A correction that moves buckets
+> in opposite directions is one finding, and reporting half of it is a
+> different claim, not a partial one.**
 >
 > **Retained unchanged, not re-opened:** the three regions, the ~117-item
 > extent, the six-site grant exclusion, `§3`'s reaching-consumer predicate, the

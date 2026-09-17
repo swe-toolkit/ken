@@ -1,6 +1,6 @@
 # WP frame — `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION`
 
-    owner   runtime        tier   T1        size   M
+    owner   runtime        tier   T1        size   S
     depends ABI-S6-HS18-D5B-SUBSTRATE-PORT  (its only dependency)
     blocks  ABI-S6-HS18-MAIN-BASED-CLOSURE
     node    docs/program/issues/ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION.md
@@ -25,21 +25,40 @@ they were not provisioned for.
 node's candidate. **Take it from there; do not re-derive it here and do not
 take a count from this frame as the contract.**
 
-Steward's own re-derivation at `origin/main` `9bd5f8513`, given so the node can
-be sized and **not** so it can be checked against:
+Two independent re-derivations at `origin/main`, given so the node can be sized
+and **not** so it can be checked against:
 
-    ADJUDICATE, production      ~30 methods
-    ADJUDICATE, test             ~2 methods
+    Architect's extractor      6 methods, of which dispatch_host_op_v1 arrives
+                               ALREADY DECIDED (KEEP MAIN'S) => 5 live
+    Steward's extractor       32 methods (~30 production, ~2 test)
     concentrated in   planning/static_transition/{continuations,aggregates,
                       responses,construction,immediate_bridge}.rs
                       ken-interp/src/eval.rs
                       ken-elaborator/src/{prelude,compiler_driver}.rs
                       ken-host/src/{abi_v1,effect_v1}.rs
 
-**Different extractors produce different totals.** The Architect's census
-reported 20 with his own extractor (`evt_7tx7a1n71qa9g`); the Steward's reports
-32 with a different one. **Neither number is the contract** — the contract is
-that every row on the predecessor's actual worklist has a disposition.
+**Different extractors produce different totals and these two differ by ~5x on
+this bucket.** They also differ on AGREE (2064 against 2601), so the gap is the
+extractors, not a disagreement about the tree. **Neither number is the
+contract** — the contract is that every row on the predecessor's actual
+worklist has a disposition. **Sized `S` on the range, not on either end.**
+
+> **THE SHRINK IS AN ARGUMENT AGAINST THIS NODE EXISTING, so it is answered
+> here rather than left implicit.** The Architect's census read **20** before
+> the third-tree correction and **6** after (`evt_55pw9gwz3vqm4`) — a judgment
+> surface of five live rows is small enough to ask why it is not simply folded
+> back into the predecessor.
+>
+> **Because the split's basis was never volume.** It is that a T2 seat should
+> not be handed a judgment call, and that deferring these rows is compile-safe.
+> Five rows needing `dispatch_host_op_v1`-grade checking are still five rows a
+> mechanical seat should not be guessing at, and the cost of the separate node
+> is one frame.
+>
+> ⇒ **The move that WOULD have defeated the split is the opposite one.** Had
+> the correction ballooned the judgment surface, the compile-safety argument
+> would have been carrying a node too large to be an afterthought to a T2 port.
+> It did not.
 
 ### 2b. THE THIRD TREE IS `origin/main`. The branch-based reading is an artifact.
 
@@ -108,6 +127,55 @@ neither tree's testing. **If a RECONCILE row cannot name what exercises the
 merged body, say so in the row** — that is a coverage gap worth surfacing, not
 a detail to leave implicit.
 
+## 3a. A `#[test]` ROW IS A DIFFERENT ADJUDICATION, AND ITS WRONG ANSWER IS SILENT
+
+**Two kinds of row wear one bucket name** (Architect, `evt_4qmypzdync30x`,
+applying the production/test filter the predecessor's `§3b` requires but which
+had not been applied to this bucket).
+
+| row kind | "which body survives" is a question about | a wrong call is |
+|---|---|---|
+| production method | behaviour | caught by whatever exercises it |
+| `#[test]` function | **what the suite ASSERTS** | **SILENT** |
+
+⇒ **A test that keeps the weaker of two bodies still passes.** There is no red
+to find, so nothing downstream reports the loss — the disposition is the only
+place it can be caught.
+
+**THE `dispatch_host_op_v1` DISCRIMINATOR DOES NOT TRANSFER TO THESE ROWS.**
+Checking a test against `main` tells you **which assertions `main` currently
+makes**, never which ones the port owes. `§2c`'s template answers a production
+question and applying it to a test row produces a confident wrong answer.
+
+⇒ **A test row's disposition must state the ASSERTION DELTA** — what each body
+asserts that the other does not — and name which assertions survive. *"Checked
+against `main`"* is not a disposition for these rows.
+
+**They may not belong to the same reader.** A test-body adjudication is closer
+to `runtime-qa`'s question than to the implementer's; routing them there is the
+leader's call, not this frame's.
+
+### The Architect's five, classified. Fixed input, not a target.
+
+His extractor at `origin/main`, classified by the attribute immediately
+preceding each `fn`:
+
+    PRODUCTION (3)
+      construction.rs   :254   Planner::new
+      construction.rs  :1296   Planner::finish
+      continuations.rs :6294   build_continuation_specialization_plan
+
+    TEST (2)   both #[test] under #[cfg(target_os = "linux")]
+      effect_v1.rs :6431  abi_s6_d4_file_acquire_enforces_rights_exact_
+                          length_lineage_and_capacity
+      effect_v1.rs :7915  abi_s1_duplicate_preserves_policy_rights_and_
+                          revocation_lineage
+
+**This classification is his extractor's five and has NOT been applied to the
+Steward's 32.** The proportion does not carry across extractors — *"roughly two
+fifths of the raw population is tests"* says nothing about which rows land in
+**this** bucket. **Re-derive the split over the worklist you actually receive.**
+
 ## 4. D0 — answer before writing production
 
 **D0-1. Does any row need a decision that is not the runtime ring's to make?**
@@ -142,6 +210,17 @@ three-way instrument at the candidate, third tree `origin/main`, reports
 same instrument at this node's base must report ADJUDICATE **non-zero**. A zero
 from real adjudication and a zero from a file set that matched nothing print
 the same word.
+
+**AC-1b — every `#[test]` row states its ASSERTION DELTA (`§3a`).** The
+worklist is split production/test in the report, and each test row names what
+each body asserts that the other does not, and which assertions survive.
+**"Checked against `main`" does not discharge a test row** — that reports which
+assertions `main` makes, not which the port owes.
+
+**This is an AC whose evidence must be MANUFACTURED, which is why it is stated
+separately.** Every test row will pass in both configurations no matter which
+body is chosen — **a wrong call here produces no red at all.** A green suite is
+not evidence for this criterion and must not be offered as it.
 
 **AC-2 — no ADJUDICATE row was closed by transplanting over `main`'s work.**
 For every TRANSPLANT row, the recorded check shows what `main`'s move was and
