@@ -14,10 +14,13 @@ therefore dead-end before the ordinary name path. The generic-operator and
 `let … in` controls below are live on that base and must remain green. The
 application-atom boundary cases are not an A0 aggregate: they state
 `32 §3`'s contract pin, which is independent of reserved-name admission. The
-rows this base does not yet satisfy carry
-**RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE**: the `if` row, the
-projection row, and the bare-operator negatives. The lambda, `let`, `match`,
-and arrow rows conform on this base and carry no gate. Their temporal rows
+the `if` row and the bare-operator negatives carried
+**RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE**; that gate is
+**retired**, not re-pointed. `LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE`
+closed the `if` row and merged, and `LANG-BARE-OPERATOR-ATOM-REJECTION` closes
+the bare-operator negatives. The projection row was named by that gate too and
+had already been retired separately on its own merits. The lambda, `let`,
+`match`, and arrow rows conform on this base and carry no gate. Their temporal rows
 instead carry **RED-UNTIL-TEMPORAL-EXPRESSION-SURFACE** (`OQ-syntax`; no build
 WP is framed in this candidate): landing the reserved-name build cannot clear
 a grouped expression form that is not yet available. The reserved-head temporal
@@ -123,19 +126,38 @@ add a tree node.
   `A(G(OP), Zero)`. The generic grouped and applied arms are live before A0 and
   must remain so; the reserved arms turn green when A0 admits `Le` to the same
   grammar.
-- expect-negative: **RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE** —
-  bare `<+>` and bare `≤` each reject syntactically before resolution: neither
-  is an `application_atom` or a complete `operator_prefix`, because each has
-  zero following atoms. Neither may produce a global-value tree for its
-  `G(OP)`. This is `32 §3`'s restriction, which `:362-363` states applies
-  equally to generic and reserved operator names — so the row's target is the
-  spec's, not A0's. The generic refusal is a required behavior change, not a
-  pre-existing token dead end; the reserved refusal must occur after `Le`
-  reaches `operator_name`, so the reserved arm additionally presupposes A0.
-  **MEASURED on this base:** bare `<+>` parses as an ordinary global-value
-  reference rather than rejecting, so the generic arm is red against the
-  successor; bare `≤` rejects at the `Le` token, which is the pre-A0 dead end
-  and not yet this restriction being enforced.
+- expect-negative: bare `<+>` and bare `≤` each reject syntactically before
+  resolution: neither is an `application_atom` or a complete `operator_prefix`,
+  because each has zero following atoms. Neither may produce a global-value
+  tree for its `G(OP)`. This is `32 §3`'s restriction, which `:362-363`
+  states applies equally to generic and reserved operator names — so the
+  row's target is the spec's, not A0's. The generic refusal is a required
+  behavior change, not a pre-existing token dead end; the reserved refusal
+  must occur after `Le` reaches `operator_name`, so the reserved arm
+  additionally presupposes A0.
+  **MEASURED, `LANG-BARE-OPERATOR-ATOM-REJECTION`, and scoped to the position
+  this row's fixture occupies:** the fixture's bare `OP` is
+  EXPRESSION-INITIAL (it replaces `(OP)` as the whole body of `grouped_op`).
+  In that position both arms now reject, and each rejection is raised by the
+  atom parser's `operator_name` arm at the operator's own leading token -- not
+  by a later production tripping over the leftover tokens, which reports at
+  the same coordinate and would satisfy a span-only assertion. The adjacent
+  positives are unaffected: `(<+>)` and `(≤)` still resolve, and `<+> Zero`
+  and `≤ Zero` still apply.
+
+  **The `application_atom` half of the ground above is NOT closed by that arm,
+  and is not reachable to be closed.** An operator TRAILING an application head
+  (`f <+>`) never becomes an argument: `can_start_atom_expr` does not admit an
+  operator token, so the argument loop breaks, and `parse_mixed_infix_expr`
+  then claims the token as an INFIX OPERATOR. Measured: `f <+>` rejects with
+  `expected an expression, found Eof` at the MISSING OPERAND, after the
+  operator -- while `f <+> g` parses as an `EInfixSpine`. So `f <+>` is an
+  incomplete infix expression, not an operator misused as an
+  `application_atom`; there is no argument-position reading for the grammar to
+  refuse. The refusal the row requires holds, by a different production and at
+  a different coordinate. Pinned by
+  `ac_argument_position_rejects_but_not_via_this_arm`, so an argument-loop
+  change cannot move it silently.
 - why: rejecting every ungrouped operator would make both negatives pass for the
   wrong reason, while special-casing only one token class would make one triple
   pass. The adjacent grouped and nonzero-application positives keep each route
@@ -168,12 +190,12 @@ add a tree node.
 - expect-leading-conforming: the ungrouped `lambda`, `let`, and `match` rows
   reject with a primary span covering exactly the named leading token. Live on
   this base; these three conform to `32 §3` today and carry no gate.
-- expect-leading-if: **RED-UNTIL-LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE** —
-  `32 §3` names `if` among the five leading forms that must reject at their
-  leading token when ungrouped after an application head. **MEASURED on this
-  base:** `keep if true then Zero else Zero` is accepted and yields exactly the
-  grouped tree, so the parser diverges from the pin here. The row states the
-  spec and is red until the successor closes the divergence.
+- expect-leading-if: `32 §3` names `if` among the five leading forms that must
+  reject at their leading token when ungrouped after an application head.
+  **MEASURED on this base:** `keep if true then Zero else Zero` now rejects
+  at the leading `if`, and the grouped form still yields exactly the stated
+  tree. Closed by `LANG-APPLICATION-ATOM-CONTRACT-CONFORMANCE`; the row
+  carries no gate.
 - expect-arrow: the ungrouped arrow row accepts with exactly its stated outer
   tree and does not silently acquire the grouped interpretation. Live on this
   base; conforms to `32 §3`'s `(keep Nat) -> Nat` and carries no gate.

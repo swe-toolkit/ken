@@ -2963,11 +2963,37 @@ impl Parser {
                 }
             }
             operator if canonical_operator_name(&operator).is_some() => {
+                // `32 Section 3`: an ungrouped `operator_name` is admitted only
+                // as an `operator_prefix` head with at least one following
+                // atom. With zero following atoms it rejects AT ITS LEADING
+                // TOKEN -- hence `span`, captured before the advance.
+                //
+                // This rejection is raised by THIS production. Letting the
+                // operator through and leaving the caller to trip over the
+                // leftover tokens also produces an error at this coordinate,
+                // and it is the wrong error: a span is a coordinate, and the
+                // requirement is about authorship.
+                //
+                // The infix path (`parse_mixed_infix_expr`) is untouched: it
+                // consumes its operator directly and never routes one through
+                // this arm, because `can_start_atom_expr` does not admit an
+                // operator token, so an operator is only ever seen here when an
+                // expression STARTS with it.
                 let span = self.peek_span().clone();
                 let name = canonical_operator_name(&operator)
                     .expect("guarded by operator-name recognition")
                     .to_owned();
                 self.advance();
+                if !self.can_start_atom_expr() {
+                    return Err(ElabError::ParseError {
+                        msg: format!(
+                            "`{name}` is an operator name, not an atom: group it as \
+                             `({name})` to use it as a value, or apply it to at least \
+                             one argument"
+                        ),
+                        span,
+                    });
+                }
                 Ok(Expr::EVar(name, span))
             }
             Token::ConId(s) => {
@@ -3018,6 +3044,36 @@ impl Parser {
             }
             Token::LParen => {
                 self.advance();
+                // DO NOT DELETE THIS AS REDUNDANT WITH THE `operator_name`
+                // ARM BELOW. It is not a convenience: that arm now REJECTS an
+                // operator with no following atom, so without this production
+                // `(<+>)` -- which `32 Section 3` preserves -- would reject
+                // too. This is what keeps the guard from eating the grouped
+                // form.
+                //
+                // `( operator_name )` is the sanctioned way to use an operator
+                // as a value. It is recognised
+                // HERE, as its own production, rather than by peeking `RParen`
+                // from inside the operator arm below: the parens must ENCLOSE
+                // the operator, and a peek cannot tell `(<+>)` from the `<+>`
+                // in `(a, <+>)`, which is ungrouped and must still reject.
+                //
+                // The span deliberately covers both parens, which is what the
+                // re-span at the end of this arm would have produced. Grouped
+                // and bare therefore yield the SAME node and the discriminator
+                // is the source byte AT `span.start` -- not the node type, and
+                // not the start offset.
+                if canonical_operator_name(self.peek()).is_some()
+                    && matches!(self.lookahead(1), Token::RParen)
+                {
+                    let name = canonical_operator_name(self.peek())
+                        .expect("guarded by the condition above")
+                        .to_owned();
+                    self.advance();
+                    let end = self.peek_span().end;
+                    self.advance();
+                    return Ok(Expr::EVar(name, Span::new(start, end)));
+                }
                 if matches!(self.peek(), Token::KwProof) {
                     self.advance();
                     let (proof_name, _) = self.expect_ident()?;
