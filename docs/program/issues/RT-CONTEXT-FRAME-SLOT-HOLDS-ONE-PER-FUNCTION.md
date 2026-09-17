@@ -1,7 +1,7 @@
 ---
 id: RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION
 title: "FunctionLocalRefs holds ONE constructed_context_frame per function while the value it stores carries the coordinate key that identifies it, so a function constructing frames for two worker bodies keeps only the last and the admission query for the other falls through SILENTLY to a route that refuses on a missing context_capture -- surfacing as a BoundaryCarrier arity message that is a fallback symptom, not the mechanism. The sibling field generated_context_captures has the identical single-slot shape and a diagnostic that asserts a universal its own container cannot support."
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,57 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-17. Successor cut on the diagnosis RT-CARRIED-RESIDUAL-IH-ARITY landed (762d24347, Decision dec_5dv5ppn0a4msj), which explicitly scoped the repair OUT of that S/T1 node and named the sizing a Steward call. That node established the arity refusal is CORRECT at all four sites and must not be relaxed; this node is the actual repair for its four rows. Steward-filed per COORDINATION section 2."
 ---
+
+> # CLOSED REFUTED 2026-09-17 (Steward, `evt_339x9h7ys4pe9`). Nothing landed.
+>
+> **The node's premise is FALSE, measured at `b0421afd0` by the runtime ring in
+> one turn, on all four rows:**
+>
+>     RTPROBE-WRITE = 1 on every row.  constructed_context_frame is written
+>     EXACTLY ONCE per compile, never overwritten. No frame is lost to a
+>     second write, so the single-slot-overwritten-per-construction mechanism
+>     below does not occur.
+>
+>     Keying the slot by worker_body_origin READMITS NOTHING. With the frame
+>     arm forced to return Ok(true) unconditionally -- strictly more permissive
+>     than ANY key, so the result is an upper bound and not a failed attempt --
+>     all four rows still fail at agreeing_recursive_body_unit (core.rs:1230):
+>     "plain Match branches declare different recursive body units: N versus M".
+>     The resolved body origins come from the closure structure, not from the
+>     frame, so no setting of this gate passes these rows.
+>
+> **The admission axis is red at BOTH ends.** That is what makes this a
+> refutation rather than a smaller scope.
+>
+> ## THE DEFECT WAS THE FRAME'S, NOT THE RING'S
+>
+> Ten acceptance criteria, every one of them a control on the **repair**.
+> **None could fail if the defect did not exist** — which is what happened.
+> The general lesson is
+> `agent/memory/fleet/a-frame-controls-its-repair-and-never-its-premise.md`,
+> and the remedy that came out of it is an **AC-0** placed before AC-1,
+> now being written into `frame-authoring.md`.
+>
+> ## FOUR-ITEM DISPOSITION, AND WHERE EACH ITEM WENT
+>
+> 1. **The four `#[ignore]` labels were FALSE on `main`.** Corrected by
+>    `RT-CONTEXT-FRAME-LABEL-CORRECTION` — two refuted clauses replaced, two
+>    confirmed clauses kept verbatim, inherited clauses marked as such, and
+>    **no readmission condition predicted** where none was measured.
+> 2. **§3's soundness hazard is RE-HOMED, not closed here** →
+>    `[[RT-CONTEXT-FRAME-ADMISSION-EVIDENCE-KEY]]`. It never depended on this
+>    node's premise, and a deleted node is a common way for the only statement
+>    of a hazard to vanish.
+> 3. **No fourth repair node until the queue of refusals is MEASURED** →
+>    `[[RT-CONTEXT-FRAME-REFUSAL-DEPTH-CENSUS]]`, released. Three one-layer
+>    nodes, three layers, each discovering the next; a fourth blind cut is a
+>    fourth cycle to learn the same shape.
+> 4. **AC-5's sibling-field finding carries forward UNMEASURED.** It was never
+>    run. It is not evidence, and nothing may cite it as though it were.
+>
+> **Everything below this banner is the node as framed and is now HISTORY.**
+> It is retained because the enumeration in it is correct and re-measurable —
+> the mechanism it infers from that enumeration is not.
 
 # The mechanism, measured at `origin/main` `89dc3b0e5`
 

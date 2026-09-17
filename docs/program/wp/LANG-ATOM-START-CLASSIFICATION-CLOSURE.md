@@ -303,8 +303,7 @@ move explicitly.
 
 **AC-0 — THE DEFECT STILL OCCURS AT YOUR BASE. RUN THIS BEFORE AC-1.**
 Re-run this frame's own two-sided probes **at your implementation base** — not
-at `6acd40705`, and not at the SHA in the header above if `main` has moved
-since — and paste the output:
+at `6acd40705` — and paste the output:
 
     REJECTED  f proof p for s          PARSED  f (proof p for s)
     REJECTED  f ‖x‖                    PARSED  f (‖x‖)
