@@ -1,7 +1,7 @@
 ---
 id: LANG-BARE-OPERATOR-ATOM-REJECTION
 title: "The third divergence from 32-grammar.md section 3's application-atom contract pin: an ungrouped operator_name with ZERO following atoms must reject syntactically, before resolution, but the A0 prefix-atom consumer admits an operator name as an atom unconditionally -- bare `<+>` and bare `≤` both parse as EVar. Admit an operator_name only as an operator_prefix head with at least one following atom, keeping the grouped form `(OP)` and the applied form `OP Zero` live."
-status: ready
+status: active
 owner: language
 size: S
 gate: none
