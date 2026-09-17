@@ -51,6 +51,51 @@ be reproduced, restated as properties:
    host that ignores the argument entirely, which is precisely the failure it
    exists to catch.
 
+## A SECOND CARRIER EXISTS, WRITTEN, AND THIS NODE INHERITS IT BY NAME
+
+**Steward, 2026-09-17.** The section above states the two properties and their
+controls, which is what a deferral needs to survive. It names **no carrier** —
+and a property with no carrier is reconstructed from prose by whoever frames
+this. **Two written bodies exist. They are recorded here so they do not have to
+be.**
+
+`ABI-S6-HS18-D5B-SUBSTRATE-PORT`'s source tree carries **post-promotion** forms
+of both assertions, in the same file and module as `main`'s pre-promotion ones:
+
+    crates/ken-interp/src/eval.rs, mod px5b_effect_observation_tests
+
+    PROPERTY 1  source b601e2ec7898:8955  ac2_monotonic_readings_survive_a_wall_clock_step_backwards   ~84 lines
+                main             :8972    ac2_monotonic_is_refused_while_the_wall_clock_still_reads_and_steps_back
+
+    PROPERTY 2  source b601e2ec7898:9039  ac3_the_deadline_a_caller_passes_is_the_deadline_honoured    ~50 lines
+                main             :9071    ac3_sleep_until_is_refused_on_a_path_that_still_serves_an_available_op
+
+    CONTROL     source b601e2ec7898:9089  ac3b_the_deadline_decoder_refuses_a_second_argument
+                main             :9135    ac3b_the_deadline_decoder_refuses_a_second_argument   <- IDENTICAL
+
+**The third row is byte-identical in both trees.** It is the alignment control:
+it establishes that these are the same module at the same ordinal positions, so
+the first two rows are a genuine pre/post pair rather than two similarly-named
+tests. `ac3b` is also **property 2's discriminator**, already written and
+already on `main` — the second-deadline case the section above requires.
+
+**Why they are not in the D5B candidate.** The port initially took the source
+bodies, which asserts reification against a tree that refuses. The Steward ruled
+them `ADJUDICATE` rather than `OWED` (`evt_3a9n197g3y627`) and the implementer
+restored `main`'s refusal bodies — `f877914b4` carries
+`ac2_monotonic_is_refused…` at `:8974` and `ac3_sleep_until_is_refused…` at
+`:9073`, `ken-interp` 82/0. **`main`'s coverage was never dropped; the
+post-promotion forms were simply not taken.**
+
+⇒ **When this node lands the promotion, the two source bodies are the
+starting point** — they are the assertions in their post-promotion form, and
+they are what `main`'s two refusal tests must be inverted back into. They still
+need the value-capturing backend below; a written body does not make an op-tag
+recorder able to express it.
+
+**Do not read the coordinates as current.** They are positions in
+`b601e2ec7898`, a fixed tree. Re-find by symbol name, not by line.
+
 ## Why they could not simply move to `ken-host`
 
 Measured, not assumed. `ken-host`'s test backend is an **op-tag recorder, not a

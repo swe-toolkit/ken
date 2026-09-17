@@ -954,6 +954,76 @@ what answers `D0-1`'s open half, since file-level replay is conflict-freedom
 and says nothing about whether the result compiles. **Zero errors, never "the
 eleven are gone".**
 
+> ### THE TARGET SELECTION IS PART OF THE CLAIM. `check` NEVER COMPILED A TEST.
+> Amended 2026-09-17.
+>
+> **`cargo check` does not compile `#[cfg(test)]` code, and every `AC-1a` green
+> ever reported on this node was a `check`** — the implementer's five configs
+> and QA's five, which rested on them. Reported by the implementer against its
+> own evidence (`evt_310e4mfnhk6w7`). **The test surface of the crate this port
+> is about was never compiled by anyone, at any point, and the first time it
+> was, it did not build.**
+>
+> **This is NOT a QA miss.** The population was unreachable from the method both
+> seats were told to use. **The verification method IS the gate**, so an
+> instrument that cannot reach the population reports green for the same reason
+> it reports nothing.
+>
+> ⇒ **The criterion is now `scripts/ken-cargo test -p ken-runtime --lib`**, and
+> the command's **target selection is written beside the claim**:
+>
+>     --lib           the library only            <- what `check` selected
+>     --tests         targets with test = true
+>     --all-targets   everything
+>
+> **State the selection as something you CHOSE.** Research advisory
+> `evt_7hscbvr36bhgj`: in all five instrument failures on this node the
+> population was a **default nobody selected** — `check`'s target set, a grep's
+> implicit file set, `src/*.rs` not descending, nested `fn`s absorbed by a unit
+> rule. **A default that is never named is never audited**, and this one is a
+> documented flag, not a subtlety. The literature's name for the whole shape is
+> **collateral evolution** (Padioleau/Lawall/Muller, EuroSys 2008), whose
+> measured result is that careful manual porting has a nonzero error rate at
+> scale — five instances on one WP is the expected number, not an anomaly.
+>
+> **No mutation AC is added here.** Mutation at the change surface
+> (`agent/playbooks/tools/mutation-prove-a-pin.md`) is the instrument that would
+> have exhibited this in one run, and it is the right instrument for a later
+> node. Adding it to a respinning node is scope this frame does not need: the
+> fix is one string in a command line.
+>
+> ### IT DOES NOT REOPEN THE ONE-STEP COUPLING RULING
+>
+> Stated explicitly so nobody re-runs the fixpoint. **Signature conflict among
+> PRODUCTION rows is decided by `check`**, which type-checks the lib in full,
+> and that is the configuration the ruling was taken over. What `check` could
+> not see is **test-code callers of ported rows** — which is exactly where the
+> six `E0063`s below came from. The falsifier named with that ruling was *"CI
+> reds on a signature mismatch"*; CI runs `test`, so it was always going to fire
+> there. **It fired locally first, which is cheaper. Reading unchanged, and a
+> red comes back to the Steward, not to the implementer.**
+>
+> ### SIX INITIALIZERS DIVERGE FROM SOURCE, DELIBERATELY. "BYTE-FAITHFUL" IS
+> NOW FALSE IN SIX NAMED PLACES.
+>
+> `ken-cargo test -p ken-runtime --lib` did not compile: six `FunctionLocalRefs`
+> initializers under `crates/ken-runtime/src/core/tests/` omit
+> `checked_ih_detached_consumer_authorities`, a field this port introduces.
+> **The port source omits it in the same six places** — candidate and source
+> carry the field in four locations each, so the copy is faithful and **the
+> source does not compile its own lib tests either.**
+>
+> **Ruling: the tree builds, and that wins over byte-faithfulness here.**
+> Byte-faithfulness in those six places reproduces a defect; `AC-2`/`AC-3` are
+> about production code, not test scaffolding; and the value is **forced, not
+> chosen** — the same empty map the production initializer uses — so no
+> judgment is being exercised by the seat that writes it.
+>
+> **Record it as a divergence, because a later differential review will trip on
+> it.** The implementer names the six locations in the handover; *"byte-faithful
+> port"* is false there and the frame says so rather than leaving a reviewer to
+> discover it as a discrepancy.
+
 **AC-1b — NO PORTED TEST GETS QUIETER. Written down 2026-09-17, having been
 operated for a day without existing.**
 
@@ -1140,6 +1210,67 @@ distinguishable from a command that matched nothing.
 > criteria are complete about what the port must CONTAIN. This corrects the
 > scope of an exclusion I stated too narrowly; it adds no obligation the frame
 > did not already intend.
+>
+> ### THE WORD WAS "THE GRANT" AND THE CLASS IS "ANY CAPABILITY THIS TREE
+> DEFERS". A NAME COMPARISON DECIDES IT. Amended 2026-09-17.
+>
+> **The predicate above says *the grant*, singular. The class is wider and two
+> more members were already in the candidate** — found only by building
+> `ken-interp`, a crate this node touches and which no reported coverage had
+> ever built (`evt_310e4mfnhk6w7`):
+>
+>     ac2_monotonic_readings_survive_a_wall_clock_step_backwards
+>     ac3_the_deadline_a_caller_passes_is_the_deadline_honoured
+>
+> Both assert that **clock and sleep reify**. Both operations sit in the
+> represented-unavailable roster at this base, so both assertions hold only once
+> a **different** promotion lands. A sweep keyed on the mapping grant cannot see
+> them, and neither can this AC as it was worded.
+>
+> **THE DETECTOR IS SYNTACTIC AND IT IS EXACT.** `main` holds the **same-numbered
+> siblings, in the same module, asserting the opposite** — measured in
+> `crates/ken-interp/src/eval.rs`, `mod px5b_effect_observation_tests`:
+>
+>     main       :8972  ac2_monotonic_is_refused_while_the_wall_clock_still_reads_and_steps_back
+>     source     :8955  ac2_monotonic_readings_survive_a_wall_clock_step_backwards
+>
+>     main       :9071  ac3_sleep_until_is_refused_on_a_path_that_still_serves_an_available_op
+>     source     :9039  ac3_the_deadline_a_caller_passes_is_the_deadline_honoured
+>
+>     main       :9135  ac3b_the_deadline_decoder_refuses_a_second_argument    <- IDENTICAL
+>     source     :9089  ac3b_the_deadline_decoder_refuses_a_second_argument       in both
+>
+> **REFUSED against SURVIVE; REFUSED against HONOURED.** The third row is
+> byte-identical in both trees and is the **alignment control** — it proves the
+> two modules are the same module, so the pairing of the first two is a
+> comparison and not a coincidence.
+>
+> ⇒ **Run this before any semantic sweep, because it is cheaper and it is
+> exact:**
+>
+>     For each row this port CHANGES in a test module: does `main` hold a
+>     same-numbered sibling whose name asserts the OPPOSITE disposition?
+>     If yes, the source body is a POST-promotion assertion and the tree is
+>     PRE-promotion.
+>
+> **AND THE REPAIR IS *RESTORE MAIN'S BODY*, NOT *DELETE*.** These are not rows
+> the port adds — they are `ADJUDICATE` rows the port misclassified as `OWED`.
+> Deleting them would drop `main`'s refusal coverage; pinning them to `main`'s
+> body keeps it. **The implementer did exactly this** — `f877914b4` carries
+> `ac2_monotonic_is_refused…` at `:8974` and `ac3_sleep_until_is_refused…` at
+> `:9073`, `ken-interp` **82/0**. Verified here against the object.
+>
+> **Placement: [[RT-CLOCK-OP-NATIVE-PROMOTION]] inherits both by name**, which
+> is the node the Architect's `evt_rsbhqs2tfamg` condition 2 cut for exactly
+> this purpose on 2026-09-16 — a day before they were rediscovered. **Nothing
+> new is filed.** The source coordinates are recorded in that node so the bodies
+> can be reconstructed when the promotion lands.
+>
+> **Fourth statement of one lesson on this node: filename, then singular grant,
+> then a semantic sweep where a name comparison decides it.** Each time the
+> stated class was narrower than the property. The pattern is not that I pick
+> bad predicates — it is that **I state the class at the shape of the first
+> instance I met.**
 
 **The text below governs the FLIP node's run of this test, and stands
 unamended for it.** `abi_s6_mapping_file_backed_native.rs` arrives with reds.
