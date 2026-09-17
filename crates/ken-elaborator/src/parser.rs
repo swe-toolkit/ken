@@ -23,6 +23,58 @@ use crate::temporal::TemporalExpr;
 /// Generic `Operator` tokens retain their carried spelling. The six dedicated
 /// notation tokens admitted by `31 §1c` collapse their ASCII/Unicode source
 /// twins to one canonical glyph identity. No other fixed token is a name.
+/// What a projection admits after its `.`, for BOTH categories.
+///
+/// ONE definition with two callers, deliberately. The two categories diverge,
+/// and a divergence written as two independently hand-written guards is the
+/// shape that drifts apart. Here the whole admitted set is enumerated once and
+/// each call site decides by a `match` on this enum, so adding a token class
+/// forces both sites to say what they do with it.
+///
+/// **Neither category's admitted set contains the other's** (`33 §6.3`,
+/// `../50-stdlib/58b §1`):
+///
+/// ```text
+///   spelling         expression position   type position
+///   d.query            admitted              admitted
+///   d.Query            REJECTED              admitted
+///   d.1 / d.2          admitted              REJECTED
+/// ```
+///
+/// **The expression side's uppercase rejection is an UNBUILT HALF, not a
+/// reserved spelling.** `parse_atom_expr_base`'s `Ident` arm returns
+/// `Expr::EVar` and never calls `parse_dotted` (which is reachable only from a
+/// `ConId` start), so in expression position `d.Query` is claimed by no
+/// production at all: it is not ambiguous, not reserved, and not deferred to a
+/// competing reading. It stayed unbuilt because no consumer on
+/// `LANG-TYPE-PROJECTION-SURFACE-FORM` reached it and widening it is a separate
+/// reachable-surface change. **Close it when a consumer appears.**
+///
+/// The type side's positional rejection is the mirror image: `Term::Proj1` /
+/// `Proj2` are already reachable positionally from expression position, and no
+/// binding on that node spells one in a type.
+#[derive(Debug)]
+enum ProjectionFieldToken {
+    /// A lowercase field name. Admitted in both categories.
+    Ident(String),
+    /// An uppercase field name -- `Membership`'s `Query` (`58b §1`).
+    /// Admitted in type position only.
+    ConId(String),
+    /// `.1` / `.2`. Admitted in expression position only.
+    Positional(u8),
+}
+
+/// Classify the token following a projection's `.`; `None` means the dot does
+/// not begin a projection at all.
+fn projection_field_token(token: &Token) -> Option<ProjectionFieldToken> {
+    match token {
+        Token::Ident(name) => Some(ProjectionFieldToken::Ident(name.clone())),
+        Token::ConId(name) => Some(ProjectionFieldToken::ConId(name.clone())),
+        Token::Nat(index @ (1 | 2)) => Some(ProjectionFieldToken::Positional(*index as u8)),
+        _ => None,
+    }
+}
+
 fn canonical_operator_name(token: &Token) -> Option<&str> {
     match token {
         Token::Operator(name) => Some(name.as_str()),
@@ -77,6 +129,13 @@ impl Parser {
     fn lookahead(&self, n: usize) -> &Token {
         let idx = (self.pos + n).min(self.tokens.len() - 1);
         &self.tokens[idx].0
+    }
+
+    /// The span of the token `lookahead(n)` returns, clamped identically, so a
+    /// diagnostic can point at a token the cursor has not reached yet.
+    fn lookahead_span(&self, n: usize) -> &Span {
+        let idx = (self.pos + n).min(self.tokens.len() - 1);
+        &self.tokens[idx].1
     }
 
     fn advance(&mut self) -> (Token, Span) {
@@ -2078,9 +2137,88 @@ impl Parser {
                 Ok(Type::TVar(name, span))
             }
             Token::Ident(s) => {
-                let span = self.peek_span().clone();
+                let head_span = self.peek_span().clone();
                 self.advance();
-                Ok(Type::TVar(s, span))
+                // `d.Query` -- named-field projection in TYPE position
+                // (`33 §6.3`, `58b §1`), so a parameter can be typed by a
+                // projection from an EARLIER parameter in the same telescope.
+                //
+                // THE HEAD'S CASE IS THE DISAMBIGUATOR, and it already was
+                // before this production existed. `parse_dotted` -- which folds
+                // `.segment` chains into a qualified module-path name
+                // (`33 §3.2`) -- is reachable ONLY from the `ConId` arm above,
+                // because module components are `conid` (`31 §1`). A LOWERCASE
+                // head therefore cannot begin a module path, so nothing here
+                // competes with a qualified reference and no lookahead past the
+                // dot is needed to tell them apart. Measured at `5492ff97a`:
+                // `(q : Bag.Query)` reached RESOLUTION and failed as
+                // `UnresolvedCon "Bag.Query"`, while `(q : d.query)` failed in
+                // the PARSER at the dot -- two different stages, decided by the
+                // head's case alone.
+                //
+                // This strictly WIDENS the grammar: before this arm a lowercase
+                // head followed by `.` was a parse error in every type
+                // position, so no program that parsed before it changes
+                // meaning.
+                //
+                // Which tokens may follow the dot, and how the two categories
+                // diverge, is stated once at `ProjectionFieldToken`. Read it
+                // there; do not re-derive the divergence from this guard.
+                if !matches!(self.peek(), Token::Dot) {
+                    return Ok(Type::TVar(s, head_span));
+                }
+                match projection_field_token(self.lookahead(1)) {
+                    Some(ProjectionFieldToken::Ident(_) | ProjectionFieldToken::ConId(_)) => {}
+                    Some(ProjectionFieldToken::Positional(index)) => {
+                        // Not optional and not new scope: consuming `Token::Dot`
+                        // here is what brings `(q : d.1)` into this production's
+                        // reach at all. Without this arm the input falls through
+                        // to a generic `expected RParen, found Dot`, which points
+                        // at the paren rather than at the unsupported form.
+                        let dot_span = self.peek_span().clone();
+                        let index_span = self.lookahead_span(1).clone();
+                        return Err(ElabError::ParseError {
+                            msg: format!(
+                                "positional projection `.{index}` is not available in type \
+                                 position; name the field instead"
+                            ),
+                            span: Span::new(dot_span.start, index_span.end),
+                        });
+                    }
+                    None => return Ok(Type::TVar(s, head_span)),
+                }
+                let mut base = Expr::EVar(s, head_span.clone());
+                let mut field = String::new();
+                let mut span = head_span.clone();
+                let mut consumed_one = false;
+                while matches!(self.peek(), Token::Dot)
+                    && matches!(
+                        projection_field_token(self.lookahead(1)),
+                        Some(ProjectionFieldToken::Ident(_) | ProjectionFieldToken::ConId(_))
+                    )
+                {
+                    // Fold the previously-taken field back into the expression
+                    // spine so `d.a.Query` nests left-associatively and only the
+                    // OUTERMOST projection becomes the type node.
+                    if consumed_one {
+                        base = Expr::EProj(Box::new(base), field.clone(), span.clone());
+                    }
+                    consumed_one = true;
+                    self.advance(); // consume '.'
+                    let segment = match projection_field_token(self.peek()) {
+                        Some(ProjectionFieldToken::Ident(segment))
+                        | Some(ProjectionFieldToken::ConId(segment)) => segment,
+                        _ => unreachable!("guarded by the lookahead above"),
+                    };
+                    let segment_span = self.peek_span().clone();
+                    self.advance();
+                    field = segment;
+                    // The span covers the projection itself -- head through
+                    // field -- never the enclosing declaration. Both rejection
+                    // diagnostics are located by it.
+                    span = Span::new(head_span.start, segment_span.end);
+                }
+                Ok(Type::TProj(Box::new(base), field, span))
             }
             Token::LParen => {
                 self.advance();
@@ -2828,20 +2966,26 @@ impl Parser {
     /// their own dots (`d.leq`, `(sort xs).leq`, etc).
     fn parse_atom_expr(&mut self) -> Result<Expr, ElabError> {
         let mut e = self.parse_atom_expr_base()?;
+        // The admitted set is `projection_field_token`'s `Ident` and
+        // `Positional`; `ConId` is NOT admitted here, and the reason is stated
+        // once, at that enum, rather than inferred from this guard.
         while matches!(self.peek(), Token::Dot)
-            && matches!(self.lookahead(1), Token::Ident(_) | Token::Nat(1 | 2))
+            && matches!(
+                projection_field_token(self.lookahead(1)),
+                Some(ProjectionFieldToken::Ident(_) | ProjectionFieldToken::Positional(_))
+            )
         {
             self.advance(); // consume '.'
-            let (field, index, projection_span) = match self.peek().clone() {
-                Token::Ident(s) => {
+            let (field, index, projection_span) = match projection_field_token(self.peek()) {
+                Some(ProjectionFieldToken::Ident(s)) => {
                     self.advance();
                     let field_span = self.tokens[self.pos - 1].1.clone();
                     (Some(s), None, field_span)
                 }
-                Token::Nat(index @ (1 | 2)) => {
+                Some(ProjectionFieldToken::Positional(index)) => {
                     self.advance();
                     let index_span = self.tokens[self.pos - 1].1.clone();
-                    (None, Some(index as u8), index_span)
+                    (None, Some(index), index_span)
                 }
                 _ => unreachable!("guarded by lookahead above"),
             };
@@ -3441,6 +3585,12 @@ fn reassociate_default_type(ty: Type) -> Type {
         // The traversal must still not silently leaf a `‖…‖`.
         Type::TTrunc(inner, span) => {
             Type::TTrunc(Box::new(reassociate_default_type(*inner)), span)
+        }
+        // A projection's base is an expression, and this is the DEFAULT-fixity
+        // pass: `reassociate_default_expr` is the expression half, so recurse
+        // into the base through it rather than leaving the subtree unvisited.
+        Type::TProj(base, field, span) => {
+            Type::TProj(Box::new(reassociate_default_expr(*base)), field, span)
         }
         leaf => leaf,
     }

@@ -865,6 +865,28 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         // kernel's own `Term::Trunc` inference (`‖A‖ : Ω_l` for `A : Type l`)
         // validates it when the surrounding declaration is checked.
         RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(elab_type(cx, inner)?))),
+
+        // `d.Query` in type position (`33 §6.3`, `58b §1`). Delegates to the
+        // SAME `infer_proj` the expression-position `RExpr::RProj` uses, so the
+        // name-to-index map, the owner-identity rule (the base's type is read
+        // AS ELABORATED, never `whnf`'d, or a transparent owner unfolds into a
+        // raw Sigma chain and the owner identity is lost) and BOTH rejections
+        // are shared rather than reimplemented here. A second copy of that
+        // lookup is the thing most likely to drift out of agreement with the
+        // class's field list.
+        //
+        // We keep the projected VALUE and discard the field's own type: in type
+        // position `d.Query` denotes the field's value, which for a field
+        // declared `Query : Type` is itself a type. A field whose value is not
+        // a type (`d.member`) is refused downstream by the kernel, where the
+        // resulting term is checked against the sort its use demands -- this
+        // arm deliberately mints no third rejection of its own, because `AC-2`
+        // names two and a third with no reaching fixture would be an
+        // unexercised arm.
+        RType::RProj(base, field, span) => {
+            let (value, _field_type) = infer_proj(cx, base, field, span)?;
+            Ok(value)
+        }
     }
 }
 
@@ -9505,6 +9527,13 @@ fn rtype_head_name(ty: &RType) -> String {
         RType::RVarTy(_, name, _) => name.clone(),
         // A truncation head, consistent with head_type_name.
         RType::RTrunc(_, _) => "‖‖".to_string(),
+        // A PROJECTION HAS NO STATIC HEAD, and the empty string is the right
+        // answer rather than an oversight: `d.Query`'s identity is not known
+        // until `d`'s dictionary is, which is AFTER instance search rather than
+        // before it. Naming a head here would key `instance_search` on
+        // something that is not a type constructor. Stated explicitly because
+        // the `_` below would give the same value silently.
+        RType::RProj(_, _, _) => String::new(),
         _ => String::new(),
     }
 }
@@ -9538,6 +9567,13 @@ fn instantiate_instance_rtype(ty: &RType, args: &[RType], param_count: usize) ->
             Box::new(instantiate_instance_rtype(inner, args, param_count)),
             span.clone(),
         ),
+        // A projection is cloned WITHOUT substituting into its base, exactly as
+        // `RRefine` above clones its predicate. This function substitutes types
+        // for type parameters and has no expression-side counterpart, so an
+        // embedded `RExpr` is carried through untouched. Written out rather
+        // than left to the `_` below, because in a substitution function "did
+        // not recurse" reads as a bug unless it says why.
+        RType::RProj(_, _, _) => ty.clone(),
         _ => ty.clone(),
     }
 }
@@ -9840,6 +9876,11 @@ fn type_contains_effect_row(ty: &RType) -> bool {
         RType::RApp(f, a, _) => type_contains_effect_row(f) || type_contains_effect_row(a),
         RType::RRefine(_, carrier, _, _) => type_contains_effect_row(carrier),
         RType::RTrunc(inner, _) => type_contains_effect_row(inner),
+        // A projection's base is an EXPRESSION, and this walk is type-side
+        // only -- `RRefine` above inspects its carrier and not its predicate
+        // for the same reason. An effect row is surface type syntax
+        // (`REffectArr`) and cannot appear inside the projected base.
+        RType::RProj(_, _, _) => false,
         RType::RUniv(_, _)
         | RType::RCon(_, _)
         | RType::RVarTy(_, _, _)
@@ -10944,9 +10985,16 @@ fn declaration_param_context(
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
+    class_env: &ClassEnv,
     rdecl: &RDecl,
 ) -> Result<Context, ElabError> {
-    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+    // This walks the declaration's OWN parameter telescope, so it is the FIRST
+    // place `(q : d.Query)` is elaborated on the `fn`/`const` path -- ahead of
+    // both the `ensure_not_omega_type` pre-check and `elaborate_v0`. It needs
+    // the class env for the same reason they do: the name-to-index lookup
+    // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
+    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+        .with_classes(class_env);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
         let domain_core = elab_type(&mut cx, domain)?;
@@ -11026,7 +11074,16 @@ fn elaborate_associated_rdecl(
         }
     ) {
         if let Some(ty) = &rdecl.ty {
-            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+            // `.with_classes` is load-bearing even though this pre-pass throws
+            // its result away. It exists only to run `ensure_not_omega_type`,
+            // but it ELABORATES the declared type to get there -- so a
+            // telescope containing `(q : d.Query)` reaches `infer_proj` HERE,
+            // ahead of the real elaboration in `elaborate_v0` (which has had
+            // the class env all along). Without it the projection's
+            // name-to-index lookup has no field list and a well-formed binding
+            // is refused by a sort pre-check.
+            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                .with_classes(&*class_env);
             let ty = elab_type(&mut cx, ty)?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
@@ -11036,7 +11093,7 @@ fn elaborate_associated_rdecl(
         RDeclKind::View { constraints, .. } => {
             let effect_row_type = check_view_visits_row(rdecl)?;
             let dictionary_ctx =
-                declaration_param_context(env, globals, num_values, numeric_env, rdecl)?;
+                declaration_param_context(env, globals, num_values, numeric_env, class_env, rdecl)?;
             // Resolve each constraint into its fully applied dictionary term.
             // A generic instance is not a bare global: its type arguments and
             // recursively-required dictionaries must be applied at this use
@@ -11099,7 +11156,7 @@ fn elaborate_associated_rdecl(
         ),
         RDeclKind::Prove => elaborate_prove(env, globals, num_values, numeric_env, rdecl),
         RDeclKind::Prop { intros } => {
-            elaborate_prop_decl(env, globals, num_values, numeric_env, rdecl, intros)
+            elaborate_prop_decl(env, globals, num_values, numeric_env, class_env, rdecl, intros)
         }
         RDeclKind::Theorem => elaborate_checked_theorem(
             env,
@@ -11402,6 +11459,13 @@ fn head_type_name(ty: &RType) -> String {
         RType::RSigma(_, _, _, _) => "×".to_string(),
         RType::RRefine(_, inner, _, _) => head_type_name(inner),
         RType::RTrunc(_, _) => "‖‖".to_string(),
+        // No static head: `d.Query`'s identity is not known until `d`'s
+        // dictionary is, which is AFTER instance search rather than before it.
+        // The empty name is what `rtype_head_name` already yields for every
+        // headless shape, and both feed instance keying -- so a projection
+        // matches no instance and fails closed, which is the correct direction
+        // for a key that cannot be computed.
+        RType::RProj(_, _, _) => String::new(),
     }
 }
 
@@ -13200,6 +13264,13 @@ pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
             rtype_mentions_name(carrier, name) || rexpr_mentions_name(predicate, name)
         }
         RType::RTrunc(inner, _) => rtype_mentions_name(inner, name),
+        // MUST recurse into the base, exactly as `RRefine` does into its
+        // predicate. This walk decides declaration dependency order, and the
+        // projected object is an expression that can name a top-level binding
+        // -- missing it would mis-order an SCC and the failure would surface
+        // far from here as an unresolved name. The FIELD name is deliberately
+        // not consulted: a class field is not a top-level binding.
+        RType::RProj(base, _, _) => rexpr_mentions_name(base, name),
         RType::RUniv(_, _) | RType::RVarTy(_, _, _) | RType::RPatternAliasTy(_, _, _) => false,
     }
 }
@@ -13467,6 +13538,7 @@ fn elaborate_prop_decl(
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
+    class_env: &ClassEnv,
     rdecl: &RDecl,
     intros: &[RPropIntro],
 ) -> Result<ElabResult, ElabError> {
@@ -13479,7 +13551,11 @@ fn elaborate_prop_decl(
     validate_seed_prop_shape(prop_ty, &rdecl.name, intros, &rdecl.span)?;
 
     let (ty_core, body_core) = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+        // Carries the class env for the same reason the `fn`/`const` pre-pass
+        // does: a `prop`'s telescope may be typed by a projection, and the
+        // name-to-index lookup that resolves it is a `ClassEnv` fact.
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+            .with_classes(class_env);
         let ty = elab_type(&mut cx, prop_ty)?;
         let ty = cx.metas.zonk_term(&ty);
         let body = top_body_for_prop_type(env, &ty, &rdecl.span)?;

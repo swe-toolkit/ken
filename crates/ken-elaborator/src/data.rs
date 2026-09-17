@@ -744,6 +744,19 @@ fn rtype_to_kernel_checked(
         RType::RRefine(_, carrier, _, _) => {
             rtype_to_kernel_checked(carrier, d_name, d_id, globals, ind_id_set, ctor_id_set)
         }
+        // A projection needs the class's field list to turn a field NAME into
+        // an index, and that map lives in `classes::ClassEnv`, which this
+        // data-declaration path does not carry. Refuse with the PROJECTION's
+        // own span rather than fabricating an index or panicking: the shape is
+        // reachable from ordinary syntax (`data D (d : C a) (x : d.Field) …`),
+        // so it owes a located diagnostic.
+        RType::RProj(_, field, span) => Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: format!(
+                "`.{field}` projection is not available in a data declaration's \
+                 type; the class field list is not in scope here"
+            ),
+        }),
         RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(rtype_to_kernel_checked(
             inner, d_name, d_id, globals, ind_id_set, ctor_id_set,
         )?))),

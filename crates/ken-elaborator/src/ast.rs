@@ -844,6 +844,17 @@ pub enum Type {
     /// `Expr::ETrunc`; this is the type-annotation-position sibling so `‖A‖` is
     /// writable where a type is expected (`x : ‖A‖`, `fn f : ‖A‖`, `let y : ‖A‖`).
     TTrunc(Box<Type>, Span),
+    /// `d.Query` — named-field projection in TYPE position (`33 §6.3`,
+    /// `../50-stdlib/58b §1`), so a parameter may be typed by a projection
+    /// from an EARLIER parameter in the same telescope.
+    ///
+    /// **The base is an `Expr`, not a `Type`, and that is not a shortcut.**
+    /// The projected object is a *value* binder (`d : Membership c`); only its
+    /// FIELD is a type. `Type::TRefine` already embeds an `Expr` for the same
+    /// reason. The expression-position sibling is `Expr::EProj`, and the two
+    /// share `elab.rs`'s `infer_proj` rather than reimplementing the
+    /// name-to-index map.
+    TProj(Box<Expr>, String, Span),
 }
 
 impl Type {
@@ -858,7 +869,8 @@ impl Type {
             | Type::TVar(_, s)
             | Type::TRefine(_, _, _, s)
             | Type::TApp(_, _, s)
-            | Type::TTrunc(_, s) => s,
+            | Type::TTrunc(_, s)
+            | Type::TProj(_, _, s) => s,
         }
     }
 }
