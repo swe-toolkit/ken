@@ -1,0 +1,346 @@
+# WP frame — `LANG-MEMBERSHIP-OPERATOR-SURFACE`
+
+    owner   language       tier   T1        size   L
+    depends SPEC-MEMBERSHIP-CLASS-CONTRACT        LANDED
+            LANG-RESERVED-INFIX-NAMES             LANDED
+            LANG-TYPE-PROJECTION-SURFACE-FORM     LANDED  294cb5e28
+            LANG-STANDARD-INFIX-CALL-COMPLETION   IN FLIGHT -- the hold
+    node    docs/program/issues/LANG-MEMBERSHIP-OPERATOR-SURFACE.md
+    review  Architect REQUIRED. CODE merge -> full CI + M8/M8a Adversary.
+
+## 1. Objective
+
+Build membership: define the `Membership` class and its three provider views in
+catalog, author `membership_member_at`, and wire `∈` elaboration to
+member-dispatch **through A1's existing resolver** — never a second dispatcher.
+
+**This is the B track of the reserved-infix-glyph objective.** A1
+([[LANG-STANDARD-INFIX-CALL-COMPLETION]]) builds the completion adapter and its
+first five consumers; this node is the sixth consumer and the first one whose
+dictionary is not a lawful class.
+
+## 2. THE HOLD, stated first because it is the whole sequencing story
+
+**Three of four dependencies are landed and verified in the tree, not read off
+a status field.** Measured by the Steward at `origin/main` `4bc5f0eee`:
+
+    SPEC-MEMBERSHIP-CLASS-CONTRACT     spec/50-stdlib/58b-membership.md present,
+                                       membership_member_at x3.  Its node still
+                                       reads `active` -- that is UNFLIPPED M7,
+                                       not unlanded work.
+    LANG-RESERVED-INFIX-NAMES          Token::Member present in lexer.rs and
+                                       parser.rs on main.
+    LANG-TYPE-PROJECTION-SURFACE-FORM  merged 294cb5e28.
+
+**`LANG-STANDARD-INFIX-CALL-COMPLETION` (A1) is NOT landed and is being built
+right now.** It is the only remaining hold and it is a real one: `§4`'s
+deliverables attach to surfaces A1 is still authoring.
+
+> **DO NOT RELEASE THIS NODE UNTIL A1 LANDS, AND DO NOT RE-FRAME `§5` AGAINST
+> A1's WORKING TREE.** A1 took **three amendments on 2026-09-17 alone** (FI-2a,
+> FI-2b, FI-5), each changing where an identity lives or how the elaborator
+> acquires it. **A frame written against a surface that moved three times in one
+> day is a frame written against a guess.** The node's own instruction — *"then
+> the Steward frames the full ACs from the landed contract + A1 surface"* — is
+> obeyed by framing everything A1-independent now and pinning the rest at
+> release.
+
+**What is already settled and does NOT wait for A1** (`§3`), and what is
+deliberately left open until it lands (`§5a`), are separated below so the
+release step is a pin rather than a re-framing.
+
+## 3. Fixed inputs — measured, all from the LANDED spec
+
+### 3a. The class, `58b §1`. Unary, with an associated query type.
+
+```
+class Membership (container : Type) {
+  Query  : Type
+  member : Query → container → Bool
+}
+```
+
+**Not `Membership query container`.** Instance resolution keys on **one
+outermost head** (`39 §6.1`), so a second class parameter has nowhere to live;
+the query type is carried *in* the dictionary. `Query` precedes `member` in the
+telescope so `member` may name it.
+
+**It is an ordinary structure class that lands one universe up**, and the
+contract says so rather than leaving it to be discovered:
+
+    Membership : Type ℓ → Type (suc ℓ)
+
+A field whose *type* is `Type ℓ` contributes at `Type (suc ℓ)` (`12 §1`) and the
+Σ-sort takes the maximum (`13 §4`). **This is `33 §5.2`'s class former
+operating, not an exception to it** — do not treat the level as a problem to
+engineer around.
+
+### 3b. The three providers, `58b §3`. Nominal, witness-bound views.
+
+    list view          (d : Ord a, xs : List a)                    Query = a
+    ordered-key view   (d : Ord k, t : Tree k v,
+                        ordered : Ordered d.leq t)                 Query = k
+    relation-edge view (d, adjacency, the outer Ordered, and
+                        evidence every stored successor tree is
+                        Ordered under that same d)                 Query = Pair k k
+
+**The ordered-key view at `v = Unit` serves set membership.** It mints **no
+`Set` carrier and no second head.**
+
+**`Membership Tree` is FORBIDDEN.** Key, set and relation-edge membership are
+three meanings over one raw head and at most one could be canonical.
+
+**THE COMPARATOR MUST BE THE ONE THE VIEW VALUE WAS VALIDATED WITH.** A raw
+`Tree` binds no comparator in its type, so an implementation that resolves a
+canonical `Ord` at each `member` call can use an order different from the one
+the tree is `Ordered` under **and answer wrongly on a well-typed input**. The
+witness travels in the view value for exactly this reason. ⇒ **An implicit
+resolver choosing a fresh `Ord` at the use site is NON-CONFORMING** — this is a
+criterion, see `AC-4`.
+
+### 3c. The binding, `33 §6.3`. An ordinary top-level binding, not a method.
+
+    membership_member_at (c : Type) (d : Membership c) (q : d.Query) (x : c) : Bool
+
+`∈` takes **`infix 4`**, in the comparison band with `≤ ≥ ≠`.
+
+**It is NOT a class method.** `d.member` is a field projection and has no
+`GlobalId` for `39 §6.9`'s policy to key on.
+
+**The query type is reached as a projection from an earlier parameter**, and the
+kernel admits it: with `Query` as the provider's first field, the telescope
+`[c, d, Proj1(d), c]` is closed by the binding's own parameter `d` — ordinary
+dependency, exactly like `(a : Type) (x : a)`.
+
+**The projection prerequisite is DISCHARGED, not outstanding.** `32 §2`'s
+`tproj` admits `d.Query` in type position, landed by
+`LANG-TYPE-PROJECTION-SURFACE-FORM`. The node's banner recording this as a
+blocker is **stale and known stale** — see `§3f`.
+
+### 3d. Carrier-first completion, `39 §6.10`. The one rule specific to `∈`.
+
+**INFER THE RHS CARRIER FIRST.** For `q ∈ c`: elaborate `c`, resolve the one
+canonical `Membership` dictionary for its head by the ordinary search of
+`§6.2`, project the provider's `Query`, and **only then** check `q` against that
+type. **The LHS is never used to guess among carrier meanings.**
+
+> **The order is not a preference and the frame states the reason, because an
+> implementation that gets it wrong LOOKS CORRECT.** A provider is keyed on the
+> container's head (`33 §5.5`) and the query type is determined *by* the
+> provider — so inferring from the LHS would have to guess which carrier was
+> meant in order to know what the LHS should be. **An LHS-first implementation
+> will appear to work wherever the query type happens to be unambiguous, and
+> will diverge exactly where two providers accept the same query type over
+> different containers.** That is a test you must construct; it will not arise
+> by accident. See `AC-3`.
+
+A missing provider, an ambiguous one, or a container with no admitted provider
+is an **ordinary instance-resolution error** at the occurrence (`§6.7`) — never
+a fallback to a different meaning, never a silent acceptance.
+
+### 3e. THE BUILTIN ESCAPE HATCH IS CLOSED BY THE SPEC, and no test here catches it
+
+`33 §6.3`, verbatim in substance: **`∈` must not be discharged by making it an
+elaborator builtin.** `§6.1` requires every standard meaning to be an ordinary
+top-level binding, and `§6.9`'s completion policy rests on that premise — **a
+builtin has no `GlobalId` to key on and falsifies the precondition the whole
+completion policy is built on, for `∈` and by precedent for every operator
+after it.**
+
+⇒ **This is the criterion most likely to be satisfied by accident and the one
+with no natural failing test.** A builtin `∈` would parse, elaborate, evaluate,
+and pass every behavioural test in this node. **`AC-5` gives it a control.**
+
+### 3f. Two readings already corrected in the node. VERIFY, do not re-derive.
+
+- **`:44` — the closing claim *"the catalog bindings this node must author are
+  currently UNSPELLABLE"* is FALSE.** It was this node's blocking premise, so a
+  seat picking it up reads it as a live obstacle. It is not one.
+- **`:74` — `same_members` is a STANDALONE binding, not a class field.** The
+  earlier D0 ruling requiring it as a class field is **SUPERSEDED**
+  (`evt_2wmeawkbqqv2x`). Do not inherit it.
+- **`:88` — all three bindings are unblocked by ONE production.** `same_members`
+  puts its projection in the **body** (the domain of a `Π` in an
+  expression-position definition), not the signature — and both `Π` forms
+  annotate their domain with an `RType`, so a single projection variant on
+  `RType` serves all three. **A fix scoped to parameter telescopes would have
+  satisfied two of three and left this one unspellable**; it was checked and it
+  is one production.
+
+**`RType`'s shape is perishable** — the node says so itself. Re-measure before
+relying on the third bullet; do not take it from the banner.
+
+## 4. D0 — answer before writing production
+
+**D0-1. Does A1's landed role vocabulary have a slot for `∈`, or does this node
+add one?** A1's `D1a` is a **closed, compiler-owned** enumeration that names
+`∧ ∨ ≤ ≥ ≠` *"and `∈` when the B track lands"*. **Read what actually landed.**
+If the slot is present, this node fills it; if A1 closed the enum without it,
+adding a variant to a closed vocabulary is a change to A1's contract and comes
+back to the Steward. **Do not widen it silently.**
+
+**D0-2. Does `∈` satisfy A1's `D1c` SHAPE CONTRACT as written?** `D1c` errors
+when a role is *present but the binding has the wrong shape*, and it takes each
+role's signature from `33 §6.1`. **`∈`'s signature is in `§6.3`, not `§6.1`, and
+it is the only one of the six whose parameter type is a PROJECTION
+(`q : d.Query`).** If `D1c`'s shape check cannot express a projected parameter
+type, that is a genuine gap and it is A1's surface, not this node's to work
+around. **Name it and stop.**
+
+**D0-3. Is the `Ordered` evidence for the relation-edge view constructible in
+catalog today?** `58b §3` requires *"evidence every stored successor tree is
+Ordered under that same `d`"* — a nested invariant. **If the catalog cannot
+express or discharge it, say which view is blocked and deliver the other two**;
+that is a re-scope for the Steward, not something to fake with an axiom. **A
+hard stop here is a good outcome.**
+
+**D0-4. Does the one-universe-up class (`§3a`) elaborate today?** `Membership :
+Type ℓ → Type (suc ℓ)` is ordinary per `33 §5.2`, but no catalog class has
+needed it. **Check before building on it.** If it does not, this is a
+language-capability finding and it precedes everything else in this node.
+
+## 5. Deliverables
+
+1. **The `Membership` class in catalog**, per `§3a`.
+2. **The three provider views**, per `§3b`, each carrying its validity witness
+   **in the value** — subject to `D0-3`.
+3. **`membership_member_at`** per `§3c`, an ordinary checked top-level binding,
+   defined exactly once.
+4. **`member_holds` and `same_members`** as standalone bindings.
+   `member_holds := IsTrue(member)`. **`same_members` is not a class field
+   (`§3f`).**
+5. **`∈` on the standard-operator facade**, at `infix 4`, re-exporting the
+   binding's identity — **not a second definition.**
+6. **`∈` wired through A1's `D1a`/`D1b`/`D1c` and its `D3` resolver**, with
+   carrier-first order per `§3d`.
+
+**NOT a second dispatcher.** A1's `D3` exists so this reuse needs none; if the
+resolver cannot serve `∈` as landed, that is `D0-2` and it comes back.
+
+## 5a. PINNED AT RELEASE, deliberately left open here
+
+**These depend on A1's landed shape and the Steward pins them when it lands.**
+They are listed so the gap is visible rather than discovered:
+
+    the facade's module PATH and name           A1 D2
+    the role vocabulary's variant spelling      A1 D1a
+    the required-roles/shape declaration site   A1 D1c
+    the resolver's exposed entry point          A1 D3
+
+**Nothing else in this frame waits on A1.** `§3` is entirely landed-spec.
+
+## 6. Acceptance
+
+**AC-1 — `q ∈ c` elaborates to `membership_member_at` for all three views, and
+the result is `Bool`.** Single left-to-right evaluation, no short-circuit.
+**Name the provider resolved in each case**, not just that it type-checked.
+
+**AC-2 — the binding is defined EXACTLY ONCE and `∈` republishes that identity.**
+Count defining occurrences of `membership_member_at` across the catalog; it is
+**one**. The facade `export`s it, and by `33 §4.3` that republishes the existing
+`GlobalId` rather than minting a second. **State the count.** `39 §6.9` keys
+completion on one defining `GlobalId`, so two definitions silently break
+completion for every consumer.
+
+**AC-3 — CARRIER-FIRST IS DEMONSTRATED BY A CASE THAT DISCRIMINATES, and you
+must construct it.** Two providers accepting **the same `Query` type over
+different containers**, with `q ∈ c` resolving by `c`'s head.
+
+**An LHS-first implementation passes every test where the query type is
+unambiguous** (`§3d`), so the ordinary cases are not evidence for this AC and
+must not be offered as such. **The discriminating fixture is the AC.** If the
+catalog's three views cannot produce two same-`Query` providers, construct the
+pair in a test fixture and say that is what you did.
+
+**AC-4 — the comparator is the view's own, and the wrong one is DETECTABLE.**
+Per `§3b`: an implementation resolving a fresh canonical `Ord` at the use site
+is non-conforming. **The control is a fixture where a second, different `Ord` is
+in scope and the answer differs under it** — a tree `Ordered` under one
+comparator, queried where another is resolvable. **Passing with only one `Ord`
+in scope is vacuous**: both implementations agree there, so that run
+distinguishes nothing.
+
+**AC-5 — `∈` IS NOT A BUILTIN, and the evidence is structural rather than
+behavioural.** Per `§3e` this cannot be shown by any behavioural test, so:
+
+    (a) membership_member_at resolves to a CATALOG GlobalId at the use site --
+        name it, from the elaborated form, not from the source text.
+    (b) REMOVING the catalog binding makes `q ∈ c` FAIL. If it still
+        elaborates, there is a builtin path and this AC is refuted.
+    (c) the elaborator carries NO membership-specific lowering -- `∈` reaches
+        the same D1 completion path as the other five roles.
+
+**(b) is the load-bearing one and its evidence must be manufactured.** A green
+suite is consistent with both a correct binding and a builtin shadowing it.
+
+**AC-6 — missing/ambiguous provider is an ORDINARY instance error at the
+occurrence.** Per `§3d`/`39 §6.7`. Three cases, each with its diagnostic quoted:
+no provider; two canonical providers for one head; a container with no admitted
+provider. **Never a fallback to a different meaning, never silent acceptance.**
+
+**AC-7 — `Membership Tree` is REFUSED.** Per `§3b`. Installing it is forbidden;
+show the refusal and its diagnostic. **Positive control: show that the
+ordered-key view over the same underlying `Tree` IS admitted**, so a green AC-7
+is distinguishable from a rule that refuses everything.
+
+**AC-8 — no Prop-to-Bool elimination.** `member` is `Bool`-valued and
+`member_holds := IsTrue(member)` goes the other way. **Show no `Ω`-to-`Bool`
+elimination was introduced.**
+
+**AC-9 — `trusted_base()` delta is ZERO.** The Architect has ruled no new TCB
+entry is needed. If this node appears to need one, that is a hard stop.
+
+## 7. Base
+
+Cut from a `main` containing A1's landed candidate. **Pin a literal SHA at the
+moment you adopt it, never the ref.**
+
+## 8. Contention
+
+**A1 is the live contention AND the dependency, which is why this node is held
+rather than coordinated.** It is actively authoring the standard-operator
+facade and the `ken-elaborator` completion path — exactly the two surfaces
+`§5` items 5 and 6 touch. **Sequencing resolves it; there is nothing to
+negotiate.**
+
+Second surface, `catalog/`: the foundation ring's `CAT-*` branches touch it, and
+**all three foundation seats are hard-walled until ~2026-09-19 11:30 UTC**, so
+they are not moving. Last landed touches, measured at `4bc5f0eee`:
+
+    catalog/                 7663ad9b9   2026-09-13   CAT-PRIORITY-QUEUE-LAWS
+    crates/ken-elaborator/   294cb5e28   2026-09-17   LANG-TYPE-PROJECTION-SURFACE-FORM
+
+> **A branch scan is the WRONG instrument here and reports merged nodes as
+> live.** `git diff origin/main...<branch>` against a squash-merged branch still
+> shows that branch's old changes, because the merge-base predates the squash.
+> Run at framing time it returned dozens of `wp/` branches "touching" catalog —
+> nearly all already landed. **Ask the last landed touch and the live ring, not
+> the branch list.**
+
+## 9. Not this node
+
+- **A1's completion adapter itself** — [[LANG-STANDARD-INFIX-CALL-COMPLETION]].
+  This node is its sixth consumer, not a second dispatcher.
+- **The `∈` name/fixity admission** — [[LANG-RESERVED-INFIX-NAMES]], landed.
+- **Any ASCII form of `∈`.** It is **glyph-only** (A0), so there is no
+  `let ... in` collision to resolve and no standard `in` alias. **The A0/A1
+  ASCII-role material in the node's pre-2026-09-13 body is SUBSUMED** — it
+  belongs to the superseded reading and must not be revived.
+- **The formatter's `§1b` notation row** — spec's, discharged separately.
+- **A `Set` carrier.** The ordered-key view at `v = Unit` serves set membership
+  and mints no second head (`§3b`).
+- **Any kernel change.**
+
+## 10. Related
+
+- [[LANG-STANDARD-INFIX-CALL-COMPLETION]] — A1, the hold. Its `D1a` reserves
+  `∈`'s role, its `D2` facade is the surface `∈` attaches to, and its `D3`
+  resolver is what this node reuses. Its `FI-4` states that
+  `membership_member_at` is deliberately **not** authored there.
+- [[SPEC-MEMBERSHIP-CLASS-CONTRACT]] — `58b`, the class and provider contract.
+  Landed; its node's `active` status is unflipped M7.
+- [[SPEC-TYPE-PROJECTION-SURFACE-NORMATIVE]] — specifies the projection form
+  `d.Query` relies on, and discharges the `unspellable` clause at four sites.
+- [[LANG-TYPE-PROJECTION-SURFACE-FORM]] — the landed implementation,
+  `294cb5e28843dff8e2edeae9945e1cdc20b0318f`.
+- [[LANG-RESERVED-INFIX-NAMES]] — A0, admits `∈` as a name.
