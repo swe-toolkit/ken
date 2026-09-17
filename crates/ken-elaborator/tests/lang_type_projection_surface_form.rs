@@ -643,3 +643,62 @@ fn a_chained_projection_with_an_absent_outer_field_is_refused_at_the_chain() {
         other => panic!("an absent field on a chained projection must be refused: {other:?}"),
     }
 }
+
+// -------------------------------------- the declined third rejection --------
+
+/// `(q : d.member)` — a field whose VALUE is not a type, written where a type
+/// is expected. `elab_type`'s projection arm deliberately mints no rejection of
+/// its own for this and leaves it to the kernel, on the ground that `AC-2`
+/// names two rejections and a third arm with no reaching fixture would be
+/// unexercised.
+///
+/// **That reasoning covers the arm I did not add and says nothing about the
+/// fallback I chose instead — so the fallback is measured here rather than
+/// asserted.** `d.member` is reachable from ordinary syntax, by the same
+/// standard that earned the `data` declaration its own located diagnostic.
+///
+/// The measurement, and the part worth knowing: the kernel **does** refuse, as
+/// a sort mismatch — but its span is the **enclosing declaration's**, not the
+/// projection's, because a kernel term carries no surface coordinate. That is a
+/// worse diagnostic than `AC-2`'s two, and it is recorded rather than left for
+/// someone to discover. No soundness exposure: the refusal is real either way.
+#[test]
+fn a_non_type_field_in_type_position_is_refused_by_the_kernel_not_located() {
+    let mut env = env_with(UPPER_FIELD_CLASS);
+    let source = "fn non_type_field (c : Type) (d : Sack c) (q : d.member) : Bool = True";
+    match elab(&mut env, source) {
+        Err(ElabError::KernelRejected { span, .. }) => {
+            let (projection_start, projection_end) = span_of(source, "d.member");
+            assert_ne!(
+                (span.start, span.end),
+                (projection_start, projection_end),
+                "if this ever becomes located, the comment above is stale -- update it"
+            );
+            assert_eq!(
+                (span.start, span.end),
+                (0, source.len()),
+                "the kernel's refusal carries the declaration's span, not the projection's"
+            );
+        }
+        other => panic!(
+            "a field whose value is not a type must still be refused, by the kernel \
+             if not by the elaborator: {other:?}"
+        ),
+    }
+}
+
+/// The control for the case above: the SAME class, the SAME shape, projecting
+/// the field that IS a type. Without it, "the kernel refuses `d.member`" is
+/// consistent with the kernel refusing every projection in type position.
+#[test]
+fn a_non_type_field_control_the_type_valued_field_on_the_same_class_accepts() {
+    let mut env = env_with(UPPER_FIELD_CLASS);
+    assert!(
+        elab(
+            &mut env,
+            "fn type_field (c : Type) (d : Sack c) (q : d.Query) : Bool = True"
+        )
+        .is_ok(),
+        "the type-valued field on the same class must still be accepted"
+    );
+}

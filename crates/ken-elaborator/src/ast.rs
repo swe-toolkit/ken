@@ -854,6 +854,20 @@ pub enum Type {
     /// reason. The expression-position sibling is `Expr::EProj`, and the two
     /// share `elab.rs`'s `infer_proj` rather than reimplementing the
     /// name-to-index map.
+    ///
+    /// **INVARIANT ON THE BASE, AND CONSUMERS RELY ON IT.** The field is typed
+    /// as an arbitrary `Expr`, but the only producer — `parse_atom_type`'s
+    /// lowercase-head arm — emits an `Expr::EVar` wrapped in zero or more
+    /// `Expr::EProj`, and nothing else constructs a `TProj`. So the base is a
+    /// projection chain off a binder: it carries no operator spine, no
+    /// refinement, no effect row, and no application.
+    ///
+    /// `elab.rs`'s `type_contains_effect_row` answers `false` for this variant
+    /// **because of that**, not because the type forbids it — and that answer
+    /// fails OPEN. **A `(expr).field` type production would be a natural
+    /// extension** (the expression side already admits an arbitrary atom before
+    /// the dot), and it is exactly the change that invalidates this paragraph.
+    /// Widen the base's producers and you owe both consumers a re-derivation.
     TProj(Box<Expr>, String, Span),
 }
 

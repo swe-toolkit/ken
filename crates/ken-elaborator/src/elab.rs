@@ -9876,10 +9876,15 @@ fn type_contains_effect_row(ty: &RType) -> bool {
         RType::RApp(f, a, _) => type_contains_effect_row(f) || type_contains_effect_row(a),
         RType::RRefine(_, carrier, _, _) => type_contains_effect_row(carrier),
         RType::RTrunc(inner, _) => type_contains_effect_row(inner),
-        // A projection's base is an EXPRESSION, and this walk is type-side
-        // only -- `RRefine` above inspects its carrier and not its predicate
-        // for the same reason. An effect row is surface type syntax
-        // (`REffectArr`) and cannot appear inside the projected base.
+        // A projection's base is an EXPRESSION and this walk is type-side only,
+        // exactly as `RRefine` above inspects its carrier and not its predicate.
+        //
+        // **`false` here rests on `Type::TProj`'s stated base invariant, NOT on
+        // the type forbidding a row.** The base is declared `Box<Expr>`; what
+        // rules a row out is that the sole producer emits an `EVar`/`EProj`
+        // chain. This answer therefore fails OPEN if that producer set widens —
+        // see the invariant paragraph at `Type::TProj`, which names this
+        // function as one of its two dependants.
         RType::RProj(_, _, _) => false,
         RType::RUniv(_, _)
         | RType::RCon(_, _)
@@ -10731,6 +10736,23 @@ fn reassociate_rtype(
         RType::RTrunc(inner, span) => {
             RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities)?), span)
         }
+        // `d.Query` — descend into the base through the EXPRESSION half, the
+        // same split `RRefine` above makes for its predicate.
+        //
+        // **Descending rather than leafing is compliance with this function's
+        // own standard, not a reachability claim.** The parser emits a `TProj`
+        // base of `Expr::EVar` wrapped only in `Expr::EProj` (see `Type::TProj`),
+        // so no operator spine can occur there today and a leaf would be correct
+        // on every input the grammar can currently produce. But this function
+        // justifies each arm as reaching or not, its sibling
+        // `reassociate_default_type` was given a descending arm in the same
+        // change, and the unreachability argument is the part that rots when
+        // the base's shape widens. Three lines cost less than the argument.
+        RType::RProj(base, field, span) => RType::RProj(
+            Box::new(reassociate_rexpr(*base, globals, fixities)?),
+            field,
+            span,
+        ),
         leaf => leaf,
     })
 }
