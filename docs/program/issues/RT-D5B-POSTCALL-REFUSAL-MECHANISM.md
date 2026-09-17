@@ -1,11 +1,11 @@
 ---
 id: RT-D5B-POSTCALL-REFUSAL-MECHANISM
-title: "What is the mechanism of the CheckedIhDetachedCallerCut refusal raised WHERE A TWO-STEP SelfDefining POST-CALL CONSUMER RECEIPT MEETS ONE COMPUTATIONAL ELIMINATOR FRAME -- the only distinct Packaging reason in abi_s6_mapping_file_backed_native. THE SUBJECT IS THAT CONDITION, NOT A LINE NUMBER: this node was cut against an unlanded tree, and every lowering/core.rs:7720 in its body is a coordinate ON THAT TREE recording where a measurement was taken, never a pin to re-resolve against main. THREE mechanisms have been proposed and measured away in one session, all sharing the premise that the defect is reachable from the call site's inputs; the measurement says those inputs are internally consistent and the disagreement is upstream of them. The mechanism is UNKNOWN and this node exists to find it, not to carry a candidate. NOT WORKABLE ON MAIN until RT-D5B-MAPPING-AVAILABILITY-FLIP lands -- the refusal sits behind the cranelift availability gate and no program can reach it without the grant"
+title: "What is the mechanism of the CheckedIhDetachedCallerCut refusal raised WHERE A TWO-STEP SelfDefining POST-CALL CONSUMER RECEIPT MEETS ONE COMPUTATIONAL ELIMINATOR FRAME -- the only distinct Packaging reason in abi_s6_mapping_file_backed_native. THE SUBJECT IS THAT CONDITION, NOT A LINE NUMBER: this node was cut against an unlanded tree, and every lowering/core.rs:7720 in its body is a coordinate ON THAT TREE recording where a measurement was taken, never a pin to re-resolve against main. THREE mechanisms have been proposed and measured away in one session, all sharing the premise that the defect is reachable from the call site's inputs; the measurement says those inputs are internally consistent and the disagreement is upstream of them. The mechanism is UNKNOWN and this node exists to find it, not to carry a candidate. NOT WORKABLE ON MAIN TODAY: main can NAME this refusal and cannot EMIT it -- CheckedIhDetachedCallerCut appears in crates/ only in planning/static_transition/responses.rs, 9 occurrences, and the emitter bind_checked_ih_detached_caller_cut is absent. WHICH blocker unblocks it is OPEN and there are three live readings -- see the banner; do not assert one in this frontmatter"
 status: draft
 owner: runtime
 size: M
 gate: architect
-depends_on: [RT-D5B-MAPPING-AVAILABILITY-FLIP]
+depends_on: [ABI-S6-HS18-D5B-SUBSTRATE-PORT]
 blocks: []
 github: null
 tier: T1
@@ -16,10 +16,19 @@ origin: "Cut by the Steward 2026-09-14, superseding two unlanded drafts withdraw
 >
 > **It is not workable on `main` and nothing it needs has landed.** It was
 > `ready` on the premise that its subject was reproducible; the measurement below
-> refutes that. `depends_on: [RT-D5B-MAPPING-AVAILABILITY-FLIP]`, which is itself
-> `draft`. **The three refuted mechanisms and every measurement below remain
-> valid and are why this node still exists** — the demotion is about
-> reachability, not about the question going away.
+> refutes that: at `origin/main` `b0eb29e71`, `CheckedIhDetachedCallerCut`
+> appears in `crates/` **only** in `planning/static_transition/responses.rs`
+> (9 occurrences), and the emitter `bind_checked_ih_detached_caller_cut` is
+> **absent**. **`main` can NAME this refusal and cannot EMIT it** — measured by
+> two independent routes (runtime-implementer `evt_4gscc5na6pywv`, Architect
+> `evt_1grgpvv8cjq66`).
+>
+> **The three refuted mechanisms and every measurement below remain valid and
+> are why this node still exists** — the demotion is about reachability, not
+> about the question going away.
+>
+> **WHICH blocker unblocks it is OPEN. See "Three readings" below. Do not pull
+> this node, and do not assert a blocker that has not been measured.**
 
 > # RE-ANCHORED 2026-09-17: THE SUBJECT IS A PREDICATE.
 > # `:7720` IS A RECORD, NOT A PIN.
@@ -62,12 +71,87 @@ origin: "Cut by the Steward 2026-09-14, superseding two unlanded drafts withdraw
 >
 > **Thirteen tests, one program, and that program acquires a file-backed
 > mapping.** With the `MappingAcquireFile` grant excluded the op is absent from
-> the roster, so every test is refused at `:2812` **before lowering** — the
-> refusal this node is chartered to find is not reachable at all.
+> the roster, so every test is refused at `:2812` **before lowering** — **no test
+> in the acceptance file can reach the refusal.**
 >
-> ⇒ **`depends_on: [RT-D5B-MAPPING-AVAILABILITY-FLIP]`.** Until the grant lands
-> there is no reproduction on `main` for anyone. The port lands the test file and
-> nothing in it reaches the refusal.
+> ## THAT MEASUREMENT IS ABOUT ONE POPULATION. IT WAS OVER-READ ONCE ALREADY.
+>
+> **The Steward first wrote `depends_on: [RT-D5B-MAPPING-AVAILABILITY-FLIP]` off
+> the paragraph above, and that edge is WITHDRAWN.** The acceptance test's census
+> is complete and correct, and it answers *"can the ACCEPTANCE TEST reach the
+> refusal"* — **not** *"can anything on `main` reach the refusal."* The Architect
+> measured under it rather than inheriting it (`evt_1grgpvv8cjq66`), and the
+> generalisation does not hold:
+>
+>     lowering/source.rs :4412  fn bind_checked_ih_detached_caller_cut
+>                               11 x Err(unsupported("CheckedIhDetachedCallerCut", ...))
+>                               in that one body, :4425 .. :4544
+>     lowering/source.rs :4558  fn bind_checked_ih_detached_caller_cut_from_call  (+1 at :4573)
+>
+>     scope = source.rs ONLY      bind_ / CheckedIhDetachedCallerCut
+>       prefix base 2a74775ae         0 / 0
+>       prefix tip  30d35f625         7 / 12
+>       origin/main b0eb29e71         0 / 0
+>
+> **`source.rs` is a REGION 2 file (`+669/-266`, on the 13/13 clean-replay list).
+> The port LANDS the emitter.** And its four live call sites sit in
+> `source_call_state` — general call lowering — gated on **tail shape**
+> (`tail_worker_body_is_ret_kmatch`, `tail_route_is_forward_edge_collapsible`,
+> `ComposedReturnForwardRetAuthorityOutcome::{NonApplicable, SuppressedForInertness}`),
+> with the comment above `:4985` routing the **effect** case the other way.
+> **The detached-caller-cut path is the NON-effect branch**, so an op-invoking
+> program is the case routed AWAY from this emitter, not the paradigm case for
+> reaching it.
+>
+> ## THREE LIVE READINGS OF THE BLOCKER. None is asserted; the port discriminates.
+>
+>     (A) subject is the source.rs EMITTER      Region 2 -- LANDS with the port.
+>                                               Reachable by TAIL SHAPE; the grant
+>                                               is not what gates it.
+>     (B) subject is the core.rs VALIDATE path  validate_checked_ih_detached_result_shape
+>                                               at core.rs:9181, called :6736/:6836 --
+>                                               all REGION 3, which the port does NOT
+>                                               carry. Blocker is Region 3, and the
+>                                               flip node would never discharge it.
+>     (C) the grant gates reachability          the Steward's original edge. TRUE for
+>                                               the acceptance test, UNPROVEN in general.
+>
+> The retired coordinate `core.rs:7720` sits between (B)'s two call sites and what
+> is there is the
+> `EliminatorFrame::{Computational,Ordinary,PendingLet,InvocationReturn,Active}`
+> match — which matches this node's re-anchored subject wording closely, so **(B)
+> is live and not a formality.**
+>
+> **What nobody has measured: whether any program in the ported corpus actually
+> HAS the tail shape.** A general guard is not a reachable path. One of the four
+> sites (`:5093`) additionally needs `#[cfg(feature = "px8-ds-test-support")]`.
+>
+> Two facts that constrain it cheaply: the two symbol sets are **independently
+> closed** — `source.rs` never names `validate_`, `core.rs` never names `bind_` —
+> so the port lands no dangling reference under either reading.
+>
+> ⇒ **`depends_on: [ABI-S6-HS18-D5B-SUBSTRATE-PORT]`**, which is what every
+> reading agrees moves the tree next. **Do not add a blocker edge that has not
+> been measured.**
+>
+> ## THE REFUTATION TRIGGER — this node's re-examination must not depend on memory
+>
+> A `draft` node is pulled by nobody, so **if the demotion is too strong nothing
+> re-examines it.** Written so the re-examination has a cause:
+>
+> > **If the port's AC-1/AC-4 build produces any red carrying the
+> > `CheckedIhDetachedCallerCut` Packaging reason WITH THE GRANT FULLY EXCLUDED,
+> > then reading (C) is refuted, reading (A) is confirmed, and this node returns
+> > to `ready` with no dependency on `RT-D5B-MAPPING-AVAILABILITY-FLIP`.**
+>
+> **That is an unblock path that does NOT run through the Architect's refusal**,
+> and the Architect asked for it in writing knowing that (`evt_1grgpvv8cjq66`) —
+> having just disclosed that they gate this node and authored that refusal. A
+> node whose only route to `ready` runs through one seat's prior decision is worse
+> than one with two routes, whoever holds the decision.
+>
+> **Quote a `CheckedIhDetachedCallerCut` red's reason string exactly rather than
+> classifying it** — it is now evidence for two nodes, not one.
 >
 > **The 11-base-red population is a CHECKPOINT-TREE measurement.** Those 11 reds,
 > 8 of them this refusal, were taken on a tree **with** the grant. The node's own
@@ -75,12 +159,13 @@ origin: "Cut by the Steward 2026-09-14, superseding two unlanded drafts withdraw
 > produce a different population by construction, and that is not a discrepancy
 > to reconcile.
 >
-> ## ARCHITECT DISCLOSURE, on the record before anyone prices the new edge
+> ## ARCHITECT DISCLOSURE — live under (C), and why (C) gets no benefit of the doubt
 >
 > The Architect is `gate: architect` on this node **and** is the seat that
 > refused the `MappingAcquireFile` grant twice and defined its scope both times
-> (`evt_prasphavwv64`, unprompted). The new edge puts their own refusal on this
-> node's critical path.
+> (`evt_prasphavwv64`, unprompted). **Under reading (C) their own refusal is this
+> node's only blocker** — which is precisely the configuration they then went and
+> measured against, producing (A).
 >
 > **Price `RT-D5B-MAPPING-AVAILABILITY-FLIP` without deference to that refusal,
 > and do not let it through on the argument that a blocked node needs it** —

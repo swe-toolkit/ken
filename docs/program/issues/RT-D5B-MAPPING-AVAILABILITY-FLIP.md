@@ -6,7 +6,7 @@ owner: runtime
 size: unsized
 gate: none
 depends_on: [RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE, RT-D5B-HOST-FILE-ACQUISITION-SURFACE]
-blocks: [RT-D5B-POSTCALL-REFUSAL-MECHANISM]
+blocks: []
 github: null
 tier: T1
 origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks + 3 shared with cluster B, plus 23 test hunks the runtime-implementer measured as belonging to this flip). Held out of slice 4 on Architect ruling evt_3wtg8w8krmmt: 'Membership is a plan, not evidence.' Unblocked for CUTTING -- not for release -- by Architect ruling evt_21f23zmgqfxsc on the permissive-by-design question."
@@ -14,22 +14,35 @@ origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks 
 
 > # DRAFT. Not framed, not released. Do not start.
 >
-> ## 2026-09-17: THIS NODE NOW BLOCKS A `ready` NODE. Its priority is live.
+> ## 2026-09-17: A "THIS NODE BLOCKS A `ready` NODE" CLAIM WAS MADE AND WITHDRAWN
 >
-> **The grant this node holds is the only thing that makes
-> [[RT-D5B-POSTCALL-REFUSAL-MECHANISM]] workable on `main`.** Measured at
-> `origin/main` `b0eb29e71` (Steward, `evt_30p9m0j8bj1f2`):
+> **RETRACTED THE SAME HOUR. This node's priority is UNCHANGED, and nothing below
+> raises it.** Recorded because the claim was broadcast fleet-wide
+> (`evt_30p9m0j8bj1f2`) before it was withdrawn, and a retraction that is not
+> written where the claim lives does not travel.
 >
->     lowering/effects.rs :2812   if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation)
+> **What was claimed:** that the grant this node holds is the only thing making
+> [[RT-D5B-POSTCALL-REFUSAL-MECHANISM]] workable on `main`, so this node sat on a
+> `ready` node's critical path. **What was actually measured** (Steward, at
+> `origin/main` `b0eb29e71`):
+>
 >     abi_s6_mapping_file_backed_native.rs   13 tests, ONE program (const SOURCE),
 >                                            15 of 15 build/run sites pass it,
 >                                            SOURCE :67 acquires a FileBacked mapping
+>     lowering/effects.rs :2812              if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1
+>                                              .contains(&operation) { refuse }
 >
-> With the grant excluded, every one of those tests is refused at `:2812` before
-> lowering. **The `CheckedIhDetachedCallerCut` refusal is unreachable on `main`
-> until this node lands** — which is why `ABI-S6-HS18-D5B-SUBSTRATE-PORT` does
-> **not** unblock it, contrary to what the Steward's first sequencing ruling
-> claimed.
+> That census is complete and correct, and it answers **"can the ACCEPTANCE TEST
+> reach the refusal"** — not **"can anything on `main` reach it."** The Architect
+> measured under the edge instead of inheriting it (`evt_1grgpvv8cjq66`): the
+> emitter `bind_checked_ih_detached_caller_cut` lives in `lowering/source.rs`, a
+> **Region 2** file the substrate port lands, and its call sites are gated on
+> **tail shape** rather than on any effect — so an op-invoking program is routed
+> **away** from that emitter, not toward it.
+>
+> ⇒ **The `blocks` edge is removed and the grant is NOT established as that
+> node's blocker.** Three readings are live there and the substrate port's build
+> discriminates them; see that node's banner.
 >
 > **THE GRANT'S FOOTPRINT IS SIX SITES, NOT FIVE.** The census of five was short.
 > The sixth is `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` membership plus the matching
@@ -42,11 +55,17 @@ origin: "Steward cut 2026-09-16. Cluster A of the backup-branch census (3 hunks 
 > `AC-PREDICATE` — zero diff lines naming the operation at pathspec `crates/` —
 > not with a site list.**
 >
-> ### PRICING RULE, and it exists because of a disclosed conflict
+> ### PRICING RULE — it OUTLIVES the retracted edge. Do not delete both.
 >
-> The Architect holds `gate: architect` on the node this now blocks **and** is
-> the seat that refused this grant twice and defined its scope both times. They
-> disclosed it unprompted (`evt_prasphavwv64`).
+> The Architect holds `gate: architect` on [[RT-D5B-POSTCALL-REFUSAL-MECHANISM]]
+> **and** is the seat that refused this grant twice and defined its scope both
+> times. They disclosed it unprompted (`evt_prasphavwv64`), and then measured
+> against their own position — the finding that withdrew the edge above is
+> **theirs**, and it removed the pressure that would have pushed this grant
+> through.
+>
+> **The rule stands whether or not any node blocks on this one.** It is about how
+> this node gets priced, not about who is waiting.
 >
 > **Price this node without deference to that refusal.** The correct input from
 > that seat is the refusal's **ground**, not its authority: *"membership is a
