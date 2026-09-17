@@ -146,7 +146,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
 // same file, and it refuses identically.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-FRAME-MARKER-ONCE: the checked Runtime frame marker is consumed more than once; fails at base 21fd46dc"]
+#[ignore = "RT-HOST-RESPONSE-ROUTE-KEY-COLLISION, measured at 89dc3b0e5: this row refuses EARLIER than its label says, at the planner invariant two host response cases claim one operation constructor. That collision is a FALSE ALARM. Both rows in this file build the SAME single program (const PROGRAM, reached via assert_case), so one census covers both. Measured on THIS program (px7n-nested-computational-eliminator), census run to completion and counted by the probe itself rather than by grep: 29 colliding constructors, all 29 agreeing on their operation, and the effect-origin deltas a single distinct value of 365. A constant offset across the whole set is a duplicated block, not 29 competing claims. The count is of COLLISIONS OBSERVED IN THIS PLAN; it is not a claim about how many host-operation constructors exist. THIS LABEL IS NOT STALE, IT IS SHADOWED: with the collision deferred to the point of use the run reaches exactly the labelled mechanism, OrientedSubcontinuationPlanV1: checked Runtime frame marker was consumed more than once. Readmits when the duplicate prelude block is resolved AND the frame-marker single-consumption holds. Base 21fd46dc in the prior label was stale and is dropped."]
 fn nested_ok_payload_reaches_both_real_executors() {
     assert_case(&[], b"seed:ok-payload", 0);
 }
@@ -167,7 +167,7 @@ fn nested_ok_payload_reaches_both_real_executors() {
 // (RT-ENTRY-TRAP-PX7O) -- do not read the two annotations as copies.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-FRAME-MARKER-ONCE: the checked Runtime frame marker is consumed more than once; fails at base 21fd46dc"]
+#[ignore = "RT-HOST-RESPONSE-ROUTE-KEY-COLLISION, measured at 89dc3b0e5: this row refuses EARLIER than its label says, at the planner invariant two host response cases claim one operation constructor. That collision is a FALSE ALARM. Both rows in this file build the SAME single program (const PROGRAM, reached via assert_case), so one census covers both. Measured on THIS program (px7n-nested-computational-eliminator), census run to completion and counted by the probe itself rather than by grep: 29 colliding constructors, all 29 agreeing on their operation, and the effect-origin deltas a single distinct value of 365. A constant offset across the whole set is a duplicated block, not 29 competing claims. The count is of COLLISIONS OBSERVED IN THIS PLAN; it is not a claim about how many host-operation constructors exist. THIS LABEL IS NOT STALE, IT IS SHADOWED: with the collision deferred to the point of use the run reaches exactly the labelled mechanism, OrientedSubcontinuationPlanV1: checked Runtime frame marker was consumed more than once. Readmits when the duplicate prelude block is resolved AND the frame-marker single-consumption holds. Base 21fd46dc in the prior label was stale and is dropped."]
 fn nested_err_payload_reaches_both_real_executors() {
     assert_case(&["err"], b"seed:err-payload", 7);
 }
