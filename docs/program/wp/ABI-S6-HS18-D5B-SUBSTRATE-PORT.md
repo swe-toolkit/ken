@@ -997,6 +997,41 @@ distinguishable from a command that matched nothing.
 > is correct, and is the only reason this is a paragraph rather than a silently
 > unmet deliverable. **A ruling that lives only in a thread is not a deliverable;
 > the obligation lands in the target WP's FRAME** (`COORDINATION §4c`).
+>
+> ### THE EXCLUSION IS A PROPERTY. I WROTE IT AS A FILE PATH. Amended 2026-09-17.
+>
+> **The block above named ONE FILE and gave the reason as *"its subject is the
+> refused grant — landing it at all would violate this frame's own `AC-2`."*
+> That reason is a property of ASSERTIONS THAT PRESUPPOSE THE GRANT. I enforced
+> it as a fact about a path.** Any file can carry such an assertion, and one did
+> — inside `crates/ken-host/src/effect_v1.rs`'s own `mod tests`, which is the
+> grant file itself. Found by the Architect on `0b653a894`
+> (`evt_7ypb79qvbcp39`), demonstrated 6 of 6, `ken-host --lib` 123/1 against
+> `main`'s 123/0.
+>
+> **THE DEFERRAL PREDICATE, stated at the unit it actually has:**
+>
+>     DEFER any test whose assertion is TRUE ONLY IF THE GRANT LANDED --
+>     wherever it lives, whatever file it is in, however it arrives.
+>
+>     The tell: the assertion's EXPECTED VALUE differs between the pre-grant
+>     and post-grant rosters.  `abi_s6_d5b_promotes_only_file_acquisition_
+>     from_the_unavailable_tail` expects NINE unavailable arms; the correct
+>     pre-grant tree has TEN.  The code refuses the grant, the test asserts it
+>     landed, and THE CANDIDATE CONTRADICTS ITSELF.
+>
+> **This is the same failure I ruled against one AC earlier and then committed
+> in the next one.** `AC-1e` replaced an enumeration of exclusions with a single
+> predicate *precisely because* enumerating leaves the next instance uncovered;
+> `AC-4` then enumerated by filename. **The unit of a predicate is the unit of
+> the property, not the unit of the first instance you met** — fifth and sixth
+> statements of the same lesson on this one node.
+>
+> **It is NOT a new gate and does not add a greenness AC.** The Architect is
+> right that whether the tree is green is CI's job (`§9`/`§11`) and that the
+> criteria are complete about what the port must CONTAIN. This corrects the
+> scope of an exclusion I stated too narrowly; it adds no obligation the frame
+> did not already intend.
 
 **The text below governs the FLIP node's run of this test, and stands
 unamended for it.** `abi_s6_mapping_file_backed_native.rs` arrives with reds.
