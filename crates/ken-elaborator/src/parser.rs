@@ -3044,8 +3044,15 @@ impl Parser {
             }
             Token::LParen => {
                 self.advance();
+                // DO NOT DELETE THIS AS REDUNDANT WITH THE `operator_name`
+                // ARM BELOW. It is not a convenience: that arm now REJECTS an
+                // operator with no following atom, so without this production
+                // `(<+>)` -- which `32 Section 3` preserves -- would reject
+                // too. This is what keeps the guard from eating the grouped
+                // form.
+                //
                 // `( operator_name )` is the sanctioned way to use an operator
-                // as a value, and `32 Section 3` preserves it. It is recognised
+                // as a value. It is recognised
                 // HERE, as its own production, rather than by peeking `RParen`
                 // from inside the operator arm below: the parens must ENCLOSE
                 // the operator, and a peek cannot tell `(<+>)` from the `<+>`

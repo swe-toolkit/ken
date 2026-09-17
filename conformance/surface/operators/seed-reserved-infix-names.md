@@ -135,12 +135,29 @@ add a tree node.
   behavior change, not a pre-existing token dead end; the reserved refusal
   must occur after `Le` reaches `operator_name`, so the reserved arm
   additionally presupposes A0.
-  **MEASURED, `LANG-BARE-OPERATOR-ATOM-REJECTION`:** both arms now reject, and
-  each rejection is raised by the atom parser's `operator_name` arm at the
-  operator's own leading token -- not by a later production tripping over the
-  leftover tokens, which reports at the same coordinate and would satisfy a
-  span-only assertion. The adjacent positives are unaffected: `(<+>)` and `(≤)`
-  still resolve, and `<+> Zero` and `≤ Zero` still apply.
+  **MEASURED, `LANG-BARE-OPERATOR-ATOM-REJECTION`, and scoped to the position
+  this row's fixture occupies:** the fixture's bare `OP` is
+  EXPRESSION-INITIAL (it replaces `(OP)` as the whole body of `grouped_op`).
+  In that position both arms now reject, and each rejection is raised by the
+  atom parser's `operator_name` arm at the operator's own leading token -- not
+  by a later production tripping over the leftover tokens, which reports at
+  the same coordinate and would satisfy a span-only assertion. The adjacent
+  positives are unaffected: `(<+>)` and `(≤)` still resolve, and `<+> Zero`
+  and `≤ Zero` still apply.
+
+  **The `application_atom` half of the ground above is NOT closed by that arm,
+  and is not reachable to be closed.** An operator TRAILING an application head
+  (`f <+>`) never becomes an argument: `can_start_atom_expr` does not admit an
+  operator token, so the argument loop breaks, and `parse_mixed_infix_expr`
+  then claims the token as an INFIX OPERATOR. Measured: `f <+>` rejects with
+  `expected an expression, found Eof` at the MISSING OPERAND, after the
+  operator -- while `f <+> g` parses as an `EInfixSpine`. So `f <+>` is an
+  incomplete infix expression, not an operator misused as an
+  `application_atom`; there is no argument-position reading for the grammar to
+  refuse. The refusal the row requires holds, by a different production and at
+  a different coordinate. Pinned by
+  `ac_argument_position_rejects_but_not_via_this_arm`, so an argument-loop
+  change cannot move it silently.
 - why: rejecting every ungrouped operator would make both negatives pass for the
   wrong reason, while special-casing only one token class would make one triple
   pass. The adjacent grouped and nonzero-application positives keep each route

@@ -36,9 +36,16 @@ fn reject(src: &str) -> (String, usize) {
     }
 }
 
-/// The divergent shape in eight distinct positions. These are not eight
-/// spellings of one case: each puts the operator in a different enclosing
-/// expression, so a fix that only closed the declaration body would fail here.
+/// The divergent shape in eight distinct ENCLOSURES -- and, read by PARSE
+/// POSITION, all eight are the same position: expression-initial. Each reaches
+/// the atom parser's `operator_name` arm because the operator STARTS a
+/// sub-expression. A fix closing only the declaration body fails these; a fix
+/// closing only the expression-initial position passes all eight.
+///
+/// That is stated plainly because the enclosure axis is the tempting one and it
+/// is not the axis that matters. The OTHER position an ungrouped operator could
+/// occupy -- trailing an application head -- is covered by
+/// `ARGUMENT_POSITION`, below, and it does NOT reach this arm.
 const DIVERGENT: [(&str, &str); 8] = [
     ("decl body", "const k : Nat = <+>"),
     ("decl body, glyph", "const k : Nat = \u{2264}"),
@@ -72,6 +79,75 @@ const PRESERVED: [(&str, &str); 11] = [
         "const k : Nat = map (\u{2264}) xs",
     ),
 ];
+
+/// The trailing-argument position, `f <+>`. This is the other half of the
+/// conformance row's ground ("neither is an `application_atom` or a complete
+/// `operator_prefix`"), and it does NOT route through the narrowed arm.
+///
+/// MEASURED, and it is neither of the two paths one would guess:
+///
+///     f <+>       REJECTS  "expected an expression, found Eof"  span 21
+///                          (the operator sits at 18)
+///     f <+> g     PARSES   EInfixSpine { operands: [f, g],
+///                                        operators: [User("<+>")] }
+///
+/// The second line is the one that explains the first. `can_start_atom_expr`
+/// does not admit an operator token, so the argument loop BREAKS rather than
+/// taking `<+>` as an argument; `parse_mixed_infix_expr` then claims the token
+/// as an INFIX OPERATOR and fails looking for its right operand.
+///
+/// So there is no "operator in argument position" reading in this grammar to
+/// reject: `f <+>` is an INCOMPLETE INFIX EXPRESSION. The rejection is real but
+/// it is raised elsewhere, at the missing operand rather than at the operator.
+///
+/// This is pinned rather than left unmeasured because the conformance row cites
+/// `application_atom`, and because an argument-loop change would silently move
+/// these.
+const ARGUMENT_POSITION: [(&str, &str); 4] = [
+    ("bare, at eof", "const k : Nat = f <+>"),
+    ("bare glyph, at eof", "const k : Nat = f \u{2264}"),
+    ("identifier head", "const k : Nat = keep <+>"),
+    ("inside a group", "const k : Nat = f (g <+>)"),
+];
+
+#[test]
+fn ac_argument_position_rejects_but_not_via_this_arm() {
+    for (what, src) in ARGUMENT_POSITION {
+        let (msg, start) = reject(src);
+        let op = src
+            .find("<+>")
+            .or_else(|| src.find('\u{2264}'))
+            .expect("fixture has an operator");
+
+        assert!(
+            !msg.contains(ATOM_PRODUCTION_MARKER),
+            "{what}: expected this position NOT to reach the operator_name arm, \
+             but it did -- the grammar changed and the conformance row's \
+             narrowing needs re-reading: {msg:?}"
+        );
+        assert!(
+            !msg.contains(DECL_PARSER_SIGNATURE),
+            "{what}: leftover tokens reached the declaration parser: {msg:?}"
+        );
+        assert!(
+            start > op,
+            "{what}: rejected at {start}, at or before the operator at {op}; \
+             this position rejects at the MISSING OPERAND, which is after it"
+        );
+    }
+
+    // The discriminator, and the reason the rows above read as they do: the
+    // same token between two atoms is an infix operator. That is why it is
+    // never available as an argument, and why `f <+>` is an incomplete infix
+    // expression rather than an operator misused as an atom.
+    let decls = parse_decls("const k : Nat = f <+> g").expect("infix must parse");
+    let rendered = format!("{decls:?}");
+    assert!(
+        rendered.contains("EInfixSpine"),
+        "if this stops being an infix spine, ARGUMENT_POSITION's whole \
+         explanation is void: {rendered}"
+    );
+}
 
 #[test]
 fn ac_bare_operator_rejects_affirmatively() {
