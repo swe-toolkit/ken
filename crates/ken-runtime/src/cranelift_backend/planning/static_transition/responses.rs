@@ -4304,6 +4304,8 @@ pub(super) fn build_checked_ih_post_call_consumers(
         // yields NO ROW, never a refusal. The builder runs on every plan build, so
         // propagating here would give an observability derivation veto power over
         // programs that compile on `main` -- which is what red-lit px8f_write_partition.
+        #[cfg(feature = "px8-ds-test-support")]
+        super::continuations::note_transport_examined();
         let Some(actual) = continuation_call_selected_result_identity_opt(
             plan,
             transport.source_call_identity(),
@@ -4377,6 +4379,13 @@ pub(super) fn publish_checked_ih_post_call_consumers(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<CheckedIhPostCallConsumer>, CraneliftBackendError> {
     let mut rows = build_checked_ih_post_call_consumers(plan)?;
+    // Arm the once-per-thread record emission and count this invocation, so the
+    // skip counters have a denominator a reader can use.
+    #[cfg(feature = "px8-ds-test-support")]
+    {
+        super::continuations::arm_unmodelled_post_call_record();
+        super::continuations::note_publisher_invocation();
+    }
     #[cfg(feature = "px8-ds-test-support")]
     if d5b_hs17_post_call_consumer_mutation() == D5bHs17PostCallConsumerMutation::TransplantConsumer
     {

@@ -9387,6 +9387,49 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     /// same defect this port had to repair in the
     /// `REQUIRED_CONSUMER_PROJECTION_MUTATION` harness one channel over, where
     /// widening the type turned a control into one that stops firing rather than
+    /// `R1a` — a detached proof is present in the plan AND refused by the
+    /// direct-outer accessor.
+    ///
+    /// Two facts about one population, asserted on the MAP. The observation
+    /// channel cannot carry this: `RequiredConsumerProjectionDisposition` has
+    /// three arms that partition the world as it stood before
+    /// `DetachedReturnContext` existed, and the drain that installs a detached
+    /// proof pushes no observation at all, so a pin keyed on
+    /// `take_continuation_required_consumer_observations` would read identically
+    /// whether the detached arm never ran, ran and was miscategorised, or ran
+    /// correctly. Widening that enum touches rows `recursor_fusion.rs` already
+    /// asserts against; it is a follow-up, deliberately not folded in here.
+    ///
+    /// **The first assertion is carried by the TYPE, not by this test.**
+    /// `required_consumer_projection_for` returns `Option<DirectOuterProjection>`,
+    /// and `direct_outer`'s `DetachedReturnContext` arm cannot return `Some`
+    /// compile-preservingly — there is no `DirectOuterProjection` to build from a
+    /// `SourceReturnContextTemplate`. So no mutation reddens it, and that green is
+    /// correct rather than a broken harness. It is stated here as intent, and the
+    /// coverage in this test is the other two facts.
+    ///
+    /// The subject is selected by a predicate on the VARIANT, never positionally.
+    /// A `.next()` selector would pass on whichever projection came first — the
+    /// same defect this port had to repair in the
+    /// `REQUIRED_CONSUMER_PROJECTION_MUTATION` harness one channel over, where
+    /// widening the type turned a control into one that stops firing rather than
+    /// The unmodelled-target record is READABLE, which is what makes it a record
+    /// rather than storage.
+    ///
+    /// A counter no execution path can read is write-only, and the previous
+    /// revision shipped exactly that: an enum nothing constructed and two accessors
+    /// nothing called. This test is the reader. It deliberately asserts only that
+    /// the accessor returns — **not** that either counter is non-zero, because
+    /// neither has a demonstrated firing path on this tree: the builder's loop over
+    /// `checked_ih_environment_transports` never reaches a transport in any local
+    /// fixture, measured with a live-channel control (149 hits on a known-hot
+    /// function, 0 on this probe's entry).
+    ///
+    /// An assertion of non-zero here would be a pin that cannot pass, and one of
+    /// zero would freeze a number that SHOULD change the moment a fixture reaches
+    /// the builder. So it pins reachability of the record and nothing else, and
+    /// says so.
+
     /// failing.
     #[test]
     fn a_detached_projection_is_in_the_map_and_refused_by_the_direct_outer_accessor() {
@@ -11047,6 +11090,13 @@ pub(super) fn derive_checked_ih_post_call_consumer_chain(
     actual: ConstructorIdentity,
     demanded: ConstructorIdentity,
 ) -> Result<Option<Vec<CheckedIhPostCallConsumerStep>>, CraneliftBackendError> {
+    // CALLER CONTRACT, not a gate. `build_checked_ih_post_call_consumers` obtains
+    // `actual` from `continuation_call_selected_result_identity_opt` on THIS same
+    // identity and plan, so for that caller this re-derivation is a pure function
+    // of the same inputs and CANNOT disagree -- it is a debug assertion, and a
+    // reader should not count it as protection. It has a real firing path only for
+    // a future caller that passes an `actual` obtained some other way, which is
+    // why it is documented rather than deleted.
     let rederived_actual = continuation_call_selected_result_identity(plan, identity)?;
     if rederived_actual != actual {
         return Err(planner_error(
@@ -11081,18 +11131,24 @@ pub(super) fn derive_checked_ih_post_call_consumer_chain(
 /// What the post-call consumer relation OBSERVED when it declined to model a
 /// continuation target.
 ///
-/// **These names state the observation, never a cause** (Architect,
-/// `evt_52b1542h0w8ba`). An earlier draft had a `NeverReturns` arm testing
-/// `continuation_result_origins(..).is_empty()` — structurally impossible, because
-/// that function inserts `root` before any guard can reject it, so every genuine
-/// never-returns target would have been misrouted into a bucket whose name
-/// asserted "coverage hole" and triggered work. **A category's name must not
-/// assert a cause its predicate does not establish.**
+/// **DISPOSITION 2** (Architect, `evt_55rdwzh2q0tef`): a two-way record with the
+/// gap named, rather than a shape census. Disposition 1 was preferred on the basis
+/// that the origin set "is already computed, so this is no new traversal" — and
+/// reading the producer showed that false. `continuation_result_constructor_identities`
+/// walks `continuation_result_origins` and calls `planned_occurrence_expr` per
+/// origin WITHOUT RETAINING the set, so a census would walk it a second time. At
+/// twice the traversal, answering a question that gates nothing, the census is not
+/// worth its cost; the honest two-way record is.
 ///
-/// Bottom-versus-coverage-hole is decided by READING the shape record below, not
-/// by a predicate claiming it in advance.
+/// **NAMED GAP: bottom is not separable here.** A target that never successfully
+/// returns and one this relation fails to cover both land in
+/// `UNMODELLED_NO_CONSTRUCTOR_IDENTITY`, and nothing in this function distinguishes
+/// them. `continuation_result_origins(..).is_empty()` is NOT the discriminator — it
+/// inserts `root` before any guard can reject it, so it is structurally never empty.
+/// Separating them needs a bottom-predicate nobody has validated, and that is a
+/// follow-on question that gates nothing here.
 ///
-/// **NEITHER CATEGORY HAS A DEMONSTRATED FIRING PATH ON THIS TREE, and that is
+/// **NEITHER COUNTER HAS A DEMONSTRATED FIRING PATH ON THIS TREE, and that is
 /// recorded rather than left to be discovered.** Measured with a live-channel
 /// control, `-p ken-runtime --lib -- --nocapture --test-threads=1`:
 ///
@@ -11102,59 +11158,16 @@ pub(super) fn derive_checked_ih_post_call_consumer_chain(
 /// ```
 ///
 /// The builder's loop over `checked_ih_environment_transports` never reaches a
-/// transport in any local fixture, so neither arm can be exercised here. The
-/// first CI run after this repair is what demonstrates them — and the same run
-/// produces the shape census that answers the bottom-versus-hole question.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) enum UnmodelledPostCallTarget {
-    /// Two or more distinct successful constructor identities. Ordinary: widen,
-    /// no information. Not a defect.
-    ManyIdentities,
-    /// No visited result origin was a `RuntimeExpr::Construct`. That is ALL this
-    /// says; it does not distinguish a target that never successfully returns
-    /// from one this relation fails to cover.
-    NoConstructorIdentity,
-}
-
+/// transport in any local fixture, so neither arm can be exercised here.
+///
+/// Both names state only what their predicate establishes: one counts targets with
+/// two or more distinct successful constructor identities, the other counts targets
+/// where no visited result origin was a `RuntimeExpr::Construct`. Neither asserts a
+/// cause.
 static UNMODELLED_MANY_IDENTITIES: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
 static UNMODELLED_NO_CONSTRUCTOR_IDENTITY: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
-
-/// The `RuntimeExpr` shapes actually present in the origin set of a skipped
-/// target, counted by variant. **The set is already computed, so this is no new
-/// traversal**, and it is what makes the bottom-versus-hole question answerable
-/// by reading the first real run instead of by asserting a predicate nobody has
-/// validated.
-static UNMODELLED_SHAPES: std::sync::Mutex<Option<BTreeMap<&'static str, usize>>> =
-    std::sync::Mutex::new(None);
-
-fn runtime_expr_variant_name(expr: &RuntimeExpr) -> &'static str {
-    match expr {
-        RuntimeExpr::CheckedJoinSite { .. } => "CheckedJoinSite",
-        RuntimeExpr::CheckedSubcontinuationFrame { .. } => "CheckedSubcontinuationFrame",
-        RuntimeExpr::CheckedRecursiveInvocation { .. } => "CheckedRecursiveInvocation",
-        RuntimeExpr::CheckedComputationalIHSlots { .. } => "CheckedComputationalIHSlots",
-        RuntimeExpr::CheckedComputationalIHInvocation { .. } => "CheckedComputationalIHInvocation",
-        RuntimeExpr::Value { .. } => "Value",
-        RuntimeExpr::Var { .. } => "Var",
-        RuntimeExpr::Let { .. } => "Let",
-        RuntimeExpr::If { .. } => "If",
-        RuntimeExpr::PrimitiveCall { .. } => "PrimitiveCall",
-        RuntimeExpr::Construct { .. } => "Construct",
-        RuntimeExpr::Match { .. } => "Match",
-        RuntimeExpr::ComputationalMatch { .. } => "ComputationalMatch",
-        RuntimeExpr::Record { .. } => "Record",
-        RuntimeExpr::Project { .. } => "Project",
-        RuntimeExpr::Closure { .. } => "Closure",
-        RuntimeExpr::LexicalClosure { .. } => "LexicalClosure",
-        RuntimeExpr::DeclarationRef { .. } => "DeclarationRef",
-        RuntimeExpr::ImportedDeclarationRef { .. } => "ImportedDeclarationRef",
-        RuntimeExpr::Call { .. } => "Call",
-        RuntimeExpr::Effect { .. } => "Effect",
-        RuntimeExpr::Trap { .. } => "Trap",
-    }
-}
 
 /// Unmodelled post-call targets since process start: `(many, no_constructor)`.
 pub(in crate::cranelift_backend) fn unmodelled_post_call_targets() -> (usize, usize) {
@@ -11165,23 +11178,103 @@ pub(in crate::cranelift_backend) fn unmodelled_post_call_targets() -> (usize, us
     )
 }
 
-/// The observed shape census behind `NoConstructorIdentity` skips.
-pub(in crate::cranelift_backend) fn unmodelled_post_call_shapes(
-) -> BTreeMap<&'static str, usize> {
-    UNMODELLED_SHAPES
-        .lock()
-        .ok()
-        .and_then(|guard| guard.clone())
-        .unwrap_or_default()
+/// Denominators for the unmodelled-target record.
+///
+/// **A counter with no denominator cannot distinguish "reached, found nothing"
+/// from "never reached"** (Architect, `evt_5vzr8yeht8mbv`). `N` counts publisher
+/// invocations and `M` counts transports examined, so a reader sees what the two
+/// skip counters are a fraction OF.
+static PUBLISHER_INVOCATIONS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+static TRANSPORTS_EXAMINED: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+pub(in crate::cranelift_backend) fn note_publisher_invocation() {
+    PUBLISHER_INVOCATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub(in crate::cranelift_backend) fn note_transport_examined() {
+    TRANSPORTS_EXAMINED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Emits the unmodelled-target record ONCE per run, UNCONDITIONALLY, including the
+/// zeros.
+///
+/// **Gated on `px8-ds-test-support`, deliberately NOT on `cfg(test)`.** A
+/// `#[cfg(test)]` reader is compiled into exactly the processes where this record is
+/// provably empty — measured: the builder's loop never reaches a transport in any
+/// `-p ken-runtime` fixture, live-channel control 149 hits against 0 on the probe —
+/// and compiled OUT of the `ken-cli` test targets, the only processes that can
+/// populate it. A reader present only where the thing it reads cannot exist is not a
+/// reader.
+///
+/// **Unconditional, not silent-when-zero.** A silent zero is indistinguishable from
+/// an absent emitter, and someone would re-add a silence condition later to quiet
+/// dev builds. Emitting the zeros is what makes them readable:
+///
+/// ```text
+/// block absent     the build was UNINSTRUMENTED -- attribute via the invocation,
+///                  not from inside the record
+/// N = 0            instrumented; the builder never ran here
+/// N > 0, M = 0     the builder ran and examined no transports
+/// N > 0, M > 0, counters 0   examined transports, declined none -- a real zero
+/// ```
+///
+/// **Limits, stated because they bound the claim — and the second one I got wrong
+/// in an earlier draft:**
+///
+/// 1. This fires from a thread-local `Drop`, so it emits at thread exit rather than
+///    at a process-wide barrier, and a `Drop` is not guaranteed to run at all —
+///    `process::exit` skips TLS destructors entirely. **It is not a process-exit
+///    hook and must not be read as one.** A populated record with no emission is
+///    possible, which is why clause 3a attributes absence via the INVOCATION rather
+///    than from inside the record.
+/// 2. The counters are process-GLOBAL atomics, so **every emission reports the
+///    running total, not a per-thread slice. A reader takes the LAST/largest
+///    emission and MUST NOT SUM them** — measured: a parallel `-p ken-runtime`
+///    union run emitted 652 lines with 536 distinct `publisher_invocations` values,
+///    monotonically increasing. Summing would multiply the true count by hundreds.
+///    An earlier version of this comment said "the reader must sum", which was
+///    exactly backwards.
+#[cfg(feature = "px8-ds-test-support")]
+struct UnmodelledPostCallRecordEmitter;
+
+#[cfg(feature = "px8-ds-test-support")]
+impl Drop for UnmodelledPostCallRecordEmitter {
+    fn drop(&mut self) {
+        use std::sync::atomic::Ordering::Relaxed;
+        let (many, no_constructor) = unmodelled_post_call_targets();
+        eprintln!(
+            "ken-planner post-call consumer record: publisher_invocations={} \
+             transports_examined={} declined_many_identities={} \
+             declined_no_constructor_identity={} (bottom is not separable from a \
+             coverage hole in this record)",
+            PUBLISHER_INVOCATIONS.load(Relaxed),
+            TRANSPORTS_EXAMINED.load(Relaxed),
+            many,
+            no_constructor,
+        );
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static UNMODELLED_RECORD_EMITTER: UnmodelledPostCallRecordEmitter =
+        const { UnmodelledPostCallRecordEmitter };
+}
+
+/// Arm the once-per-thread emission. Cheap and idempotent.
+#[cfg(feature = "px8-ds-test-support")]
+pub(in crate::cranelift_backend) fn arm_unmodelled_post_call_record() {
+    UNMODELLED_RECORD_EMITTER.with(|_| {});
 }
 
 /// Membership probe for the post-call consumer relation: is this target's
 /// selected source case a shape the relation models?
 ///
 /// **Deliberately does NOT route through [`exact_result_identity`].** That
-/// assertion's text says *"please report this compiler bug"*, which is its author
-/// recording that it must be unreachable from valid input — so reaching it is a
-/// defect in the reacher, never a discovery about the program. This builder runs
+/// assertion's text declares itself unreachable from valid input, so reaching it is
+/// a defect in the reacher, never a discovery about the program. This builder runs
 /// on EVERY plan build, including programs that never needed the capability, so it
 /// must ask a question that can answer "no" rather than one that can only assert.
 ///
@@ -11207,25 +11300,18 @@ pub(super) fn continuation_call_selected_result_identity_opt(
         1 + unit.producer_alternative() as usize,
     )?;
     let identities = continuation_result_constructor_identities(plan, body)?;
-    if let [identity] = identities.as_slice() {
-        return Ok(Some(*identity));
-    }
     use std::sync::atomic::Ordering::Relaxed;
-    if !identities.is_empty() {
-        UNMODELLED_MANY_IDENTITIES.fetch_add(1, Relaxed);
-        return Ok(None);
-    }
-    UNMODELLED_NO_CONSTRUCTOR_IDENTITY.fetch_add(1, Relaxed);
-    // Record the shapes actually seen, so the cause can be READ off the record
-    // rather than asserted by a category name.
-    if let Ok(mut guard) = UNMODELLED_SHAPES.lock() {
-        let census = guard.get_or_insert_with(BTreeMap::new);
-        for origin in continuation_result_origins(plan, body)? {
-            let name = runtime_expr_variant_name(plan.planned_occurrence_expr(origin)?);
-            *census.entry(name).or_insert(0) += 1;
+    match identities.as_slice() {
+        [identity] => Ok(Some(*identity)),
+        [] => {
+            UNMODELLED_NO_CONSTRUCTOR_IDENTITY.fetch_add(1, Relaxed);
+            Ok(None)
+        }
+        _ => {
+            UNMODELLED_MANY_IDENTITIES.fetch_add(1, Relaxed);
+            Ok(None)
         }
     }
-    Ok(None)
 }
 
 /// Derive the successful identity actually produced by a continuation target's

@@ -30,7 +30,21 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [features]
 default = []
-px8-ds-test-support = []
+# `px8-ds-test-support` IMPLIES `checked-ih-realization-observation`.
+#
+# The mutation hooks this feature enables call accessors gated on
+# `checked-ih-realization-observation` (e.g. `StaticOriginId::observation_ordinal`),
+# so enabling the first without the second compiles callers whose callees are gated
+# out -- E0599 in CI, which is the configuration `ken-cli`'s dev-dependency produces.
+#
+# Cost-free: the only enabling edge is in `[dev-dependencies]`, and resolver v2 does
+# not unify dev-dependency features into a normal build, so no production build gains
+# a feature from this line.
+#
+# Do not read this as "these two are the whole implication set" -- the criterion is a
+# COMMAND, not an enumeration:
+#   scripts/ken-cargo check -p ken-runtime --lib --features px8-ds-test-support
+px8-ds-test-support = ["checked-ih-realization-observation"]
 r3-4b-observation = []
 dasm-c2-observation = []
 checked-ih-realization-observation = []
