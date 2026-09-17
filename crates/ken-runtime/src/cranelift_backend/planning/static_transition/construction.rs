@@ -112,6 +112,9 @@ use super::joins_traps::{
 use super::occurrences::{
     build_occurrence_authority_plan, origin_of, validate_occurrence_authority_plan, StaticOriginId,
 };
+use super::responses::{
+    publish_checked_ih_post_call_consumers, validate_checked_ih_post_call_consumers,
+};
 use super::semantic_ir::{
     build_bool_constructor_inventory, build_semantic_plane,
     build_synthesized_constructor_inventory, positioned_sources, RuntimeExprShape,
@@ -262,6 +265,7 @@ impl<'src> Planner<'src> {
         };
         let mut planner = Self {
             plan: StaticTransitionPlan {
+                checked_ih_post_call_consumers: Vec::new(),
                 entries: Vec::new(),
                 planned_entry_bodies: Vec::new(),
                 nodes: Vec::new(),
@@ -1492,6 +1496,12 @@ impl<'src> Planner<'src> {
         validate_checked_ih_continuation_inheritances(
             &self.plan,
             &self.plan.checked_ih_continuation_inheritances,
+        )?;
+        self.plan.checked_ih_post_call_consumers =
+            publish_checked_ih_post_call_consumers(&self.plan)?;
+        validate_checked_ih_post_call_consumers(
+            &self.plan,
+            &self.plan.checked_ih_post_call_consumers,
         )?;
         self.plan.checked_ih_generated_entry_confluences =
             build_checked_ih_generated_entry_confluences(&self.plan)?;

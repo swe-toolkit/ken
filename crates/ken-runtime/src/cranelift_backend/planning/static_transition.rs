@@ -96,6 +96,7 @@ pub(in crate::cranelift_backend) use immediate_bridge::{
 pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
+    CheckedIhPostCallConsumer,
     DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
@@ -117,7 +118,7 @@ pub(in crate::cranelift_backend) use units::{
 
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use continuations::{
-    ContinuationSpecializationId, ContinuationEmissionOwner, ContinuationContextId, PlannedContinuationContext, ContinuationContextView, ContinuationInputSource, ProducerLocalBinding, ProducerLocalLocator, ContinuationSourceCoordinate, ContinuationEnvironmentClaimOver, ContinuationEnvironmentClaim, ContinuationEnvironmentDraft, ContinuationFrameRequirement, ContinuationFrameIdentity, ContinuationAvailabilityOver, ContinuationAvailabilityViews, ContinuationAvailabilityDraft, ContinuationSourceSlotAuthority, ContinuationWorkerCaptureSource, ContinuationWorkerCaptureProvenance, ContinuationConsumingOccurrence, RequiredConsumerProjection, ContinuationCallIdentity, ContinuationUnitView, ContinuationOrdinaryEnvelopeRole, ComposedWorkerRouteEligibility, ComposedWorkerView, ComposedCallTarget, ContinuationInputView, ContinuationCallView, ContinuationResultEdge, verify_current_lexical_availability, verify_predeclared_entry_frame_membership, FusionComposedEdge, FusionOwnedOuterRealization, FusionCompositionLayer, AdmittedContinuationDiscovery, CheckedCaseBinderRole, CheckedCaseBinderLayout, CheckedIhBinding, CheckedTransportCoordinate, StaticContinuationFusionId, StaticContinuationFusionKey, StaticContinuationFusionDescriptor, StaticContinuationFusionPlan, StaticContinuationFusionView, fusion_redirect_target, BodyEmissionDisposition, FusionOwnedBody, FusionRegionClaim, FusionClaimRefusal, FusionRegionClaimLedger, build_static_continuation_fusion_plan, StaticContinuationFusionCandidate,
+    ContinuationSpecializationId, ContinuationEmissionOwner, ContinuationContextId, PlannedContinuationContext, ContinuationContextView, ContinuationInputSource, ProducerLocalBinding, ProducerLocalLocator, ContinuationSourceCoordinate, ContinuationEnvironmentClaimOver, ContinuationEnvironmentClaim, ContinuationEnvironmentDraft, ContinuationFrameRequirement, ContinuationFrameIdentity, ContinuationAvailabilityOver, ContinuationAvailabilityViews, ContinuationAvailabilityDraft, ContinuationSourceSlotAuthority, ContinuationWorkerCaptureSource, ContinuationWorkerCaptureProvenance, ContinuationConsumingOccurrence, RequiredConsumerProjection, DirectOuterProjection, CheckedIhPostCallConsumerStep, ContinuationCallIdentity, ContinuationUnitView, ContinuationOrdinaryEnvelopeRole, ComposedWorkerRouteEligibility, ComposedWorkerView, ComposedCallTarget, ContinuationInputView, ContinuationCallView, ContinuationResultEdge, verify_current_lexical_availability, verify_predeclared_entry_frame_membership, FusionComposedEdge, FusionOwnedOuterRealization, FusionCompositionLayer, AdmittedContinuationDiscovery, CheckedCaseBinderRole, CheckedCaseBinderLayout, CheckedIhBinding, CheckedTransportCoordinate, StaticContinuationFusionId, StaticContinuationFusionKey, StaticContinuationFusionDescriptor, StaticContinuationFusionPlan, StaticContinuationFusionView, fusion_redirect_target, BodyEmissionDisposition, FusionOwnedBody, FusionRegionClaim, FusionClaimRefusal, FusionRegionClaimLedger, build_static_continuation_fusion_plan, StaticContinuationFusionCandidate,
 };
 #[cfg(test)]
 #[allow(unused_imports)]
@@ -689,6 +690,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// every admitted host effect occurrence. Read by lowering, which claims
     /// exactly one of these per seat it consumes.
     host_effect_seats: Vec<PlannedEffectSeat>,
+    /// Exact post-call source consumers for checked-IH transports whose actual
+    /// continuation result differs from the response context's demanded Result.
+    /// Compiler-only: no ABI descriptor or runtime frame references this plane.
+    checked_ih_post_call_consumers: Vec<CheckedIhPostCallConsumer>,
 }
 
 fn planner_error(detail: impl Into<String>) -> CraneliftBackendError {

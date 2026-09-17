@@ -9957,6 +9957,19 @@ impl<'a> Lowering<'a> {
         // selector; no operation tag, closure, environment or runtime route is
         // consulted here. Non-response identities retain the byte-for-behaviour
         // required-consumer path below.
+        //
+        // R1b -- THE SECOND ROUTE-AWAY FROM THIS FUNNEL, stated here rather than
+        // left implicit in an accessor. A call identity can carry a DETACHED
+        // return-context proof instead of a direct-outer projection.
+        // `required_consumer_projection_for` returns `Option<DirectOuterProjection>`,
+        // so a detached identity arrives here as `None` and takes the ordinary
+        // call path below -- it is NOT an absent projection and NOT an error.
+        // Its consumer is `detached_return_context_for`, a different accessor on
+        // a different route. The type is what excludes it: there is no value of
+        // `DirectOuterProjection` a detached proof could become, so this funnel
+        // cannot be handed one, and no runtime check here is load-bearing for
+        // that. If this ever returns the enum again, the exclusion is gone and
+        // the three direct-outer accessors stop being total.
         if let Some(required) = required_consumer.filter(|_| {
             !self
                 .static_transition_plan
@@ -11088,7 +11101,7 @@ impl<'a> Lowering<'a> {
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         identity: &ContinuationCallIdentity,
-        required: RequiredConsumerProjection,
+        required: DirectOuterProjection,
         fields: &[LoweringOperand],
         recursive_position: usize,
         producer_env: &[LoweringEnvironmentBinding],

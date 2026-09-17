@@ -59,6 +59,13 @@ pub(in crate::cranelift_backend) use fusion::{
 #[repr(transparent)]
 pub(in crate::cranelift_backend) struct ContinuationSpecializationId(pub(super) u32);
 
+impl ContinuationSpecializationId {
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(in crate::cranelift_backend) const fn observation_ordinal(self) -> u32 {
+        self.0
+    }
+}
+
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the generalized emission-owner domain.**
 ///
 /// Architect ruling `evt_609am4v7cdt5b`. The planner had been conflating three
@@ -1188,6 +1195,111 @@ impl ContinuationConsumingOccurrence {
     }
 }
 
+/// One exact forward edge from a result-flow root toward a result position.
+///
+/// The role is closed because lowering must be able to reject a template whose
+/// recorded source child no longer has the semantics under which it was issued.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum SourceReturnContextRole {
+    CheckedBody,
+    LetBody,
+    IfThen,
+    IfElse,
+    MatchCase(u32),
+    ComputationalMatchCase(u32),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceReturnContextStep {
+    parent_origin: StaticOriginId,
+    child_origin: StaticOriginId,
+    child_position: u32,
+    role: SourceReturnContextRole,
+}
+
+impl SourceReturnContextStep {
+    pub(in crate::cranelift_backend) fn parent_origin(self) -> StaticOriginId {
+        self.parent_origin
+    }
+
+    pub(in crate::cranelift_backend) fn child_origin(self) -> StaticOriginId {
+        self.child_origin
+    }
+
+    pub(in crate::cranelift_backend) fn child_position(self) -> u32 {
+        self.child_position
+    }
+
+    pub(in crate::cranelift_backend) fn role(self) -> SourceReturnContextRole {
+        self.role
+    }
+}
+
+/// A generated worker's result returns through the exact call that selected it
+/// before it reaches the caller-owned suffix. This is a symbolic boundary: it
+/// contains no lowering activation, cursor, selected scope, or runtime value.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceWorkerReturnBoundary {
+    selecting_call: ContinuationCallIdentity,
+    caller_context: Box<SourceReturnContextTemplate>,
+}
+
+impl SourceWorkerReturnBoundary {
+    pub(in crate::cranelift_backend) fn selecting_call(&self) -> &ContinuationCallIdentity {
+        &self.selecting_call
+    }
+
+    pub(in crate::cranelift_backend) fn caller_context(&self) -> &SourceReturnContextTemplate {
+        &self.caller_context
+    }
+}
+
+/// The exact static result-position-to-return-boundary path retained by the
+/// common forward result traversal. `steps` run root-to-result; lowering binds
+/// their reverse against the continuation it actually owns. The optional
+/// worker boundary composes one generated result domain with its exact caller
+/// without inventing a concrete source-machine continuation.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct SourceReturnContextTemplate {
+    root_origin: StaticOriginId,
+    result_origin: StaticOriginId,
+    steps: Vec<SourceReturnContextStep>,
+    /// Computational consumers already pending outside this result root, in
+    /// exact inner-to-outer return order.
+    caller_suffix: Vec<StaticOriginId>,
+    worker_return: Option<Box<SourceWorkerReturnBoundary>>,
+}
+
+impl SourceReturnContextTemplate {
+    pub(in crate::cranelift_backend) fn root_origin(&self) -> StaticOriginId {
+        self.root_origin
+    }
+
+    pub(in crate::cranelift_backend) fn result_origin(&self) -> StaticOriginId {
+        self.result_origin
+    }
+
+    pub(in crate::cranelift_backend) fn steps(&self) -> &[SourceReturnContextStep] {
+        &self.steps
+    }
+
+    pub(in crate::cranelift_backend) fn caller_suffix(&self) -> &[StaticOriginId] {
+        &self.caller_suffix
+    }
+
+    pub(in crate::cranelift_backend) fn worker_return(
+        &self,
+    ) -> Option<&SourceWorkerReturnBoundary> {
+        self.worker_return.as_deref()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ContinuationResultPositionWitness {
+    origin: StaticOriginId,
+    return_context: SourceReturnContextTemplate,
+}
+
 /// A continuation call's independently derived consumer-level occurrence.
 ///
 /// This is deliberately separate from
@@ -1198,15 +1310,66 @@ impl ContinuationConsumingOccurrence {
 /// outer consumer from depth two onward.
 ///
 /// The fields are private and there is no constructor outside planning.
-/// Lowering can only receive a value that the whole-plan validator has matched
-/// against [`derive_required_consumer_occurrence`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) struct RequiredConsumerProjection {
-    pub(super) source: ContinuationConsumingOccurrence,
-    pub(super) required: ContinuationConsumingOccurrence,
+///
+/// Lowering never receives this enum. It receives [`DirectOuterProjection`],
+/// which is the direct-outer arm's payload and nothing else — see
+/// `required_consumer_projection_for`. That return type is `R1a`'s enforcer:
+/// the detached arm is excluded by the type lowering is handed, not by a
+/// runtime filter and not by a panic, so the sentence above is true of what
+/// lowering can hold rather than of what it is trusted not to ask for.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum RequiredConsumerProjection {
+    DirectOuter {
+        source: ContinuationConsumingOccurrence,
+        required: ContinuationConsumingOccurrence,
+    },
+    DetachedReturnContext(SourceReturnContextTemplate),
 }
 
 impl RequiredConsumerProjection {
+    pub(in crate::cranelift_backend) fn direct_outer(&self) -> Option<DirectOuterProjection> {
+        match self {
+            Self::DirectOuter { source, required } => Some(DirectOuterProjection {
+                source: *source,
+                required: *required,
+            }),
+            Self::DetachedReturnContext(_) => None,
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn detached_return_context(
+        &self,
+    ) -> Option<&SourceReturnContextTemplate> {
+        match self {
+            Self::DirectOuter { .. } => None,
+            Self::DetachedReturnContext(context) => Some(context),
+        }
+    }
+}
+
+/// The direct-outer arm's payload, and the only projection shape lowering ever
+/// holds.
+///
+/// These are `main`'s two original fields, unchanged. The three accessors below
+/// are **total**: there is no variant they can be asked about and fail on,
+/// because the detached arm cannot be one of these values. `R1a` — the
+/// direct-outer route's authority is carried by the type rather than asserted
+/// by an `expect` at the point where the assertion would fail.
+///
+/// `R1c` — and so `main`'s original sentence holds again, of this type: the
+/// fields are private, there is no constructor outside planning, and **lowering
+/// can only receive a value that the whole-plan validator has matched against
+/// [`derive_required_consumer_occurrence`]**. That sentence was false while the
+/// enum was what lowering received, because the detached arm is matched against
+/// a different rule; it is true of `DirectOuterProjection`, which is reachable
+/// only through the `DirectOuter` arm the validator checks that way.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct DirectOuterProjection {
+    source: ContinuationConsumingOccurrence,
+    required: ContinuationConsumingOccurrence,
+}
+
+impl DirectOuterProjection {
     pub(in crate::cranelift_backend) fn source(self) -> ContinuationConsumingOccurrence {
         self.source
     }
@@ -1217,6 +1380,31 @@ impl RequiredConsumerProjection {
 
     pub(in crate::cranelift_backend) fn eliminator_origin(self) -> StaticOriginId {
         self.required.eliminator_origin
+    }
+}
+
+/// One exact source computational consumer in a checked-IH transport result
+/// chain. The optional frame marker is derived from the source wrapper whose
+/// sole body is this occurrence; lowering re-enters that existing marker rather
+/// than minting a new checked frame.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedIhPostCallConsumerStep {
+    occurrence: ContinuationConsumingOccurrence,
+    demanded_body_origin: StaticOriginId,
+    checked_frame_id: Option<u64>,
+}
+
+impl CheckedIhPostCallConsumerStep {
+    pub(in crate::cranelift_backend) fn occurrence(self) -> ContinuationConsumingOccurrence {
+        self.occurrence
+    }
+
+    pub(in crate::cranelift_backend) fn demanded_body_origin(self) -> StaticOriginId {
+        self.demanded_body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn checked_frame_id(self) -> Option<u64> {
+        self.checked_frame_id
     }
 }
 
@@ -1319,6 +1507,14 @@ impl ContinuationCallIdentity {
     /// conflation `evt_609am4v7cdt5b` ruled against.
     pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
         self.token.emission_owner
+    }
+
+    pub(in crate::cranelift_backend) fn producer_result_origin(&self) -> StaticOriginId {
+        self.token.producer_result_origin
+    }
+
+    pub(in crate::cranelift_backend) fn producer_construct_origin(&self) -> StaticOriginId {
+        self.token.producer_construct_origin
     }
 }
 
@@ -2407,6 +2603,164 @@ fn record_worker_prefix_deferral(row: WorkerPrefixDeferral) {
             rows.push(row);
         }
     });
+}
+
+pub(super) fn checked_frame_for_consumer(
+    plan: &StaticTransitionPlan<'_>,
+    consumer: StaticOriginId,
+) -> Result<Option<u64>, CraneliftBackendError> {
+    let mut frames = Vec::new();
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        let RuntimeExpr::CheckedSubcontinuationFrame { frame_id, .. } = occurrence.expr else {
+            continue;
+        };
+        if plan.semantic.child_origin(occurrence.static_origin, 0)? == consumer {
+            frames.push(*frame_id);
+        }
+    }
+    frames.sort_unstable();
+    frames.dedup();
+    match frames.as_slice() {
+        [] => Ok(None),
+        [frame] => Ok(Some(*frame)),
+        _ => Err(planner_error(
+            "one post-call computational consumer is wrapped by more than one checked frame",
+        )),
+    }
+}
+
+fn continuation_result_positions(
+    plan: &StaticTransitionPlan<'_>,
+    root_context: &SourceReturnContextTemplate,
+) -> Result<Vec<ContinuationResultPositionWitness>, CraneliftBackendError> {
+    if root_context.root_origin != root_context.result_origin || !root_context.steps.is_empty() {
+        return Err(planner_error(
+            "a continuation result-flow seed is not the empty context at its exact root",
+        ));
+    }
+    let root = root_context.root_origin;
+    let owner = occurrence_authority(plan, root)?.owner;
+    let mut pending = vec![(root, Vec::<SourceReturnContextStep>::new())];
+    let mut results = BTreeMap::<StaticOriginId, SourceReturnContextTemplate>::new();
+    while let Some((origin, steps)) = pending.pop() {
+        let authority = occurrence_authority(plan, origin)?;
+        if authority.owner != owner {
+            continue;
+        }
+        let context = SourceReturnContextTemplate {
+            root_origin: root,
+            result_origin: origin,
+            steps: steps.clone(),
+            caller_suffix: root_context.caller_suffix.clone(),
+            worker_return: root_context.worker_return.clone(),
+        };
+        if let Some(prior) = results.insert(origin, context.clone()) {
+            if prior != context {
+                return Err(planner_error(
+                    "one continuation result position has two incompatible source return contexts",
+                ));
+            }
+            continue;
+        }
+        let expr = plan.planned_occurrence_expr(origin)?;
+        let mut push =
+            |position: usize, role: SourceReturnContextRole| -> Result<(), CraneliftBackendError> {
+                let child_origin = plan.semantic.child_origin(origin, position)?;
+                let mut child_steps = steps.clone();
+                child_steps.push(SourceReturnContextStep {
+                    parent_origin: origin,
+                    child_origin,
+                    child_position: u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("source return-context child position exhausted")
+                    })?,
+                    role,
+                });
+                pending.push((child_origin, child_steps));
+                Ok(())
+            };
+        match expr {
+            RuntimeExpr::CheckedJoinSite { .. }
+            | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedRecursiveInvocation { .. }
+            | RuntimeExpr::CheckedComputationalIHSlots { .. }
+            | RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
+                push(0, SourceReturnContextRole::CheckedBody)?;
+            }
+            RuntimeExpr::Let { .. } => push(1, SourceReturnContextRole::LetBody)?,
+            RuntimeExpr::If { .. } => {
+                push(1, SourceReturnContextRole::IfThen)?;
+                push(2, SourceReturnContextRole::IfElse)?;
+            }
+            RuntimeExpr::Match { cases, .. } => {
+                let records = plan
+                    .case_emissions
+                    .iter()
+                    .filter(|record| record.match_origin == origin)
+                    .collect::<Vec<_>>();
+                if records.len() != cases.len() {
+                    return Err(planner_error(
+                        "continuation result flow has no exact D1 case population",
+                    ));
+                }
+                for (index, record) in records.into_iter().enumerate() {
+                    if record.status == CaseEmissionStatus::Reachable {
+                        let position = 1 + index;
+                        if plan.semantic.child_origin(origin, position)? != record.body_origin {
+                            return Err(planner_error(
+                                "a continuation result-flow case record disagrees with source child authority",
+                            ));
+                        }
+                        push(
+                            position,
+                            SourceReturnContextRole::MatchCase(u32::try_from(index).map_err(
+                                |_| {
+                                    planner_capacity_error(
+                                        "source return-context match alternative exhausted",
+                                    )
+                                },
+                            )?),
+                        )?;
+                    }
+                }
+            }
+            RuntimeExpr::ComputationalMatch { cases, .. } => {
+                for index in 0..cases.len() {
+                    push(
+                        1 + index,
+                        SourceReturnContextRole::ComputationalMatchCase(
+                            u32::try_from(index).map_err(|_| {
+                                planner_capacity_error(
+                                    "source return-context computational alternative exhausted",
+                                )
+                            })?,
+                        ),
+                    )?;
+                }
+            }
+            RuntimeExpr::Value(_)
+            | RuntimeExpr::Var(_)
+            | RuntimeExpr::PrimitiveCall { .. }
+            | RuntimeExpr::Construct { .. }
+            | RuntimeExpr::Record { .. }
+            | RuntimeExpr::Project { .. }
+            | RuntimeExpr::Closure { .. }
+            | RuntimeExpr::LexicalClosure { .. }
+            | RuntimeExpr::DeclarationRef { .. }
+            | RuntimeExpr::ImportedDeclarationRef { .. }
+            | RuntimeExpr::Call { .. }
+            | RuntimeExpr::Effect { .. }
+            | RuntimeExpr::Trap(_) => {}
+        }
+    }
+    Ok(results
+        .into_iter()
+        .map(
+            |(origin, return_context)| ContinuationResultPositionWitness {
+                origin,
+                return_context,
+            },
+        )
+        .collect())
 }
 
 pub(super) fn continuation_result_origins(
@@ -4576,6 +4930,9 @@ pub(super) enum ContinuationRequiredConsumingOccurrence {
 pub(super) struct ContinuationDiscovery {
     pub(super) continuation_origin: StaticOriginId,
     pub(super) result_root: StaticOriginId,
+    /// Symbolic result-root-to-caller return context retained from the forward
+    /// traversal that still owned the exact source child relation.
+    pub(super) return_context: SourceReturnContextTemplate,
     /// **`D5a` — the enclosing generated emission context, retained across
     /// descent.**
     ///
@@ -5556,15 +5913,17 @@ pub(super) fn initial_continuation_discoveries(
         .declaration_occurrences
         .values()
         .copied()
-        .map(|origin| (origin, None, None))
+        .map(|origin| (origin, None, None, Vec::<StaticOriginId>::new()))
         .collect::<Vec<_>>();
     if let Some(root) = plan.root_occurrence {
-        roots.push((root, None, None));
+        roots.push((root, None, None, Vec::new()));
     }
 
     let mut walked = BTreeSet::new();
     let mut pending = Vec::new();
-    while let Some((origin, consuming_occurrences, required_consuming_occurrence)) = roots.pop() {
+    while let Some((origin, consuming_occurrences, required_consuming_occurrence, caller_suffix)) =
+        roots.pop()
+    {
         if !walked.insert(origin) {
             return Err(planner_error(
                 "the forward continuation seed walk reached one source occurrence twice",
@@ -5583,6 +5942,13 @@ pub(super) fn initial_continuation_discoveries(
             pending.push(ContinuationDiscovery {
                 continuation_origin: origin,
                 result_root: scrutinee,
+                return_context: SourceReturnContextTemplate {
+                    root_origin: scrutinee,
+                    result_origin: scrutinee,
+                    steps: Vec::new(),
+                    caller_suffix: caller_suffix.clone(),
+                    worker_return: None,
+                },
                 enclosing_specialization: None,
                 consuming_occurrences: consuming_occurrences.clone(),
                 required_consuming_occurrence,
@@ -5592,8 +5958,7 @@ pub(super) fn initial_continuation_discoveries(
             for alternative in 0..cases.len() {
                 let body_origin = plan.semantic.child_origin(origin, 1 + alternative)?;
                 #[cfg(test)]
-                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED
-                    .with(Cell::get)
+                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(Cell::get)
                     == Some(ContinuationConsumingOccurrenceSeedMutation::BodyOrigin)
                 {
                     // The exact wrong relation from AC-2: the continuation's
@@ -5625,16 +5990,47 @@ pub(super) fn initial_continuation_discoveries(
                         },
                     ))
                 });
+            let mut scrutinee_suffix = Vec::with_capacity(1 + caller_suffix.len());
+            scrutinee_suffix.push(origin);
+            scrutinee_suffix.extend(caller_suffix.iter().copied());
             roots.push((
                 scrutinee,
                 Some(ContinuationConsumingOccurrenceSeeds { candidates }),
                 required_consuming_occurrence,
+                scrutinee_suffix,
             ));
             for child in children.into_iter().skip(1) {
-                roots.push((child, None, None));
+                roots.push((child, None, None, caller_suffix.clone()));
             }
         } else {
-            roots.extend(children.into_iter().map(|child| (child, None, None)));
+            match expr {
+                RuntimeExpr::CheckedComputationalIHInvocation { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. } => {
+                    for (position, child) in children.into_iter().enumerate() {
+                        let suffix = if position == 0 {
+                            Vec::new()
+                        } else {
+                            caller_suffix.clone()
+                        };
+                        roots.push((child, None, None, suffix));
+                    }
+                }
+                RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. } => {
+                    for (position, child) in children.into_iter().enumerate() {
+                        let suffix = if position == 0 {
+                            Vec::new()
+                        } else {
+                            caller_suffix.clone()
+                        };
+                        roots.push((child, None, None, suffix));
+                    }
+                }
+                _ => roots.extend(
+                    children
+                        .into_iter()
+                        .map(|child| (child, None, None, caller_suffix.clone())),
+                ),
+            }
         }
     }
 
@@ -5923,6 +6319,7 @@ pub(super) fn build_continuation_specialization_plan(
     let mut calls = BTreeSet::new();
     let mut required_consumer_projections = BTreeMap::new();
     let mut pending_required_consumer_projections = Vec::new();
+    let mut pending_detached_return_contexts = BTreeMap::new();
     let mut sequences = BTreeMap::<
         (PredeclaredFunctionId, StaticOriginId, StaticOriginId),
         u32,
@@ -5963,9 +6360,8 @@ pub(super) fn build_continuation_specialization_plan(
             ));
         };
         let consumer_owner = occurrence_authority(plan, discovery.continuation_origin)?.owner;
-        for producer_construct_origin in
-            continuation_result_origins(plan, discovery.result_root)?
-        {
+        for result_position in continuation_result_positions(plan, &discovery.return_context)? {
+            let producer_construct_origin = result_position.origin;
             let producer = plan.planned_occurrence_expr(producer_construct_origin)?;
             let RuntimeExpr::Construct { args, .. } = producer else {
                 continue;
@@ -6210,11 +6606,21 @@ pub(super) fn build_continuation_specialization_plan(
                     }
                     if let Some(required) = required_consuming_occurrence {
                         pending_required_consumer_projections.push((
-                            identity,
+                            identity.clone(),
                             required,
                             discovery.continuation_origin,
                             discovery.result_root,
                         ));
+                    } else if result_position.return_context.worker_return.is_some() {
+                        let detached = result_position.return_context.clone();
+                        if pending_detached_return_contexts
+                            .insert(identity.clone(), detached.clone())
+                            .is_some_and(|prior| prior != detached)
+                        {
+                            return Err(planner_error(
+                                "one continuation call identity has two incompatible detached source return contexts",
+                            ));
+                        }
                     }
                     let call = PlannedContinuationSpecializationCall { token };
                     if calls.insert(call) {
@@ -6286,6 +6692,18 @@ pub(super) fn build_continuation_specialization_plan(
                             pending.push(ContinuationDiscovery {
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
+                                return_context: SourceReturnContextTemplate {
+                                    root_origin: worker.body_origin,
+                                    result_origin: worker.body_origin,
+                                    steps: Vec::new(),
+                                    caller_suffix: Vec::new(),
+                                    worker_return: Some(Box::new(SourceWorkerReturnBoundary {
+                                        selecting_call: identity.clone(),
+                                        caller_context: Box::new(
+                                            result_position.return_context.clone(),
+                                        ),
+                                    })),
+                                },
                                 enclosing_specialization: Some(target),
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
                                 required_consuming_occurrence,
@@ -6306,6 +6724,13 @@ pub(super) fn build_continuation_specialization_plan(
                             pending.push(ContinuationDiscovery {
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
+                                return_context: SourceReturnContextTemplate {
+                                    root_origin: worker.body_origin,
+                                    result_origin: worker.body_origin,
+                                    steps: Vec::new(),
+                                    caller_suffix: Vec::new(),
+                                    worker_return: None,
+                                },
                                 enclosing_specialization: None,
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
                                 required_consuming_occurrence: discovery
@@ -6346,9 +6771,9 @@ pub(super) fn build_continuation_specialization_plan(
         #[cfg(test)]
         let projection_minted = required != source;
         if required != source {
-            let projection = RequiredConsumerProjection { source, required };
+            let projection = RequiredConsumerProjection::DirectOuter { source, required };
             if required_consumer_projections
-                .insert(identity, projection)
+                .insert(identity, projection.clone())
                 .is_some_and(|prior| prior != projection)
             {
                 return Err(planner_error(
@@ -6375,15 +6800,38 @@ pub(super) fn build_continuation_specialization_plan(
                 });
         });
     }
+
+    for (identity, context) in pending_detached_return_contexts {
+        let projection = RequiredConsumerProjection::DetachedReturnContext(context);
+        if required_consumer_projections
+            .insert(identity, projection.clone())
+            .is_some_and(|prior| prior != projection)
+        {
+            return Err(planner_error(
+                "one continuation call identity claims incompatible direct and detached consumer proofs",
+            ));
+        }
+    }
     #[cfg(test)]
     if let Some(mutation) = REQUIRED_CONSUMER_PROJECTION_MUTATION.with(Cell::get) {
-        if let Some(projection) = required_consumer_projections.values_mut().next() {
+        // The mutation targets a DIRECT-OUTER projection specifically. `.next()`
+        // was sound while every projection had these two fields; now that a
+        // detached proof can sit in this map, taking the first entry could land
+        // on one that has neither, and the mutation would silently not apply --
+        // a control that stops firing rather than failing.
+        if let Some(RequiredConsumerProjection::DirectOuter { source, required }) =
+            required_consumer_projections
+                .values_mut()
+                .find(|projection| {
+                    matches!(projection, RequiredConsumerProjection::DirectOuter { .. })
+                })
+        {
             match mutation {
                 RequiredConsumerProjectionMutation::BodyOrigin => {
-                    projection.required.body_origin = projection.source.body_origin;
+                    required.body_origin = source.body_origin;
                 }
                 RequiredConsumerProjectionMutation::EliminatorOrigin => {
-                    projection.required.eliminator_origin = projection.source.eliminator_origin;
+                    required.eliminator_origin = source.eliminator_origin;
                 }
             }
             REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS
@@ -6569,6 +7017,86 @@ pub(super) fn validate_continuation_specialization_closure(
     Ok(())
 }
 
+fn validate_source_return_context(
+    plan: &StaticTransitionPlan<'_>,
+    context: &SourceReturnContextTemplate,
+    call_identities: &BTreeSet<ContinuationCallIdentity>,
+) -> Result<(), CraneliftBackendError> {
+    let mut current = context.root_origin;
+    for step in &context.steps {
+        if step.parent_origin != current
+            || plan
+                .semantic
+                .child_origin(step.parent_origin, step.child_position as usize)?
+                != step.child_origin
+        {
+            return Err(planner_error(
+                "a detached source return context does not follow its exact forward source child",
+            ));
+        }
+        let expr = plan.planned_occurrence_expr(step.parent_origin)?;
+        let role_matches = match (step.role, expr) {
+            (
+                SourceReturnContextRole::CheckedBody,
+                RuntimeExpr::CheckedJoinSite { .. }
+                | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. }
+                | RuntimeExpr::CheckedComputationalIHSlots { .. }
+                | RuntimeExpr::CheckedComputationalIHInvocation { .. },
+            ) => step.child_position == 0,
+            (SourceReturnContextRole::LetBody, RuntimeExpr::Let { .. }) => step.child_position == 1,
+            (SourceReturnContextRole::IfThen, RuntimeExpr::If { .. }) => step.child_position == 1,
+            (SourceReturnContextRole::IfElse, RuntimeExpr::If { .. }) => step.child_position == 2,
+            (SourceReturnContextRole::MatchCase(index), RuntimeExpr::Match { cases, .. }) => {
+                (index as usize) < cases.len() && step.child_position as usize == 1 + index as usize
+            }
+            (
+                SourceReturnContextRole::ComputationalMatchCase(index),
+                RuntimeExpr::ComputationalMatch { cases, .. },
+            ) => {
+                (index as usize) < cases.len() && step.child_position as usize == 1 + index as usize
+            }
+            _ => false,
+        };
+        if !role_matches {
+            return Err(planner_error(
+                "a detached source return context role disagrees with its source expression",
+            ));
+        }
+        current = step.child_origin;
+    }
+    if current != context.result_origin {
+        return Err(planner_error(
+            "a detached source return context does not end at its claimed result position",
+        ));
+    }
+    let mut suffix_seen = BTreeSet::new();
+    for origin in &context.caller_suffix {
+        if !suffix_seen.insert(*origin)
+            || !matches!(
+                plan.planned_occurrence_expr(*origin)?,
+                RuntimeExpr::ComputationalMatch { .. }
+            )
+        {
+            return Err(planner_error(
+                "a detached source return context has a duplicate or non-computational caller suffix",
+            ));
+        }
+    }
+    if let Some(boundary) = context.worker_return.as_deref() {
+        if !call_identities.contains(&boundary.selecting_call)
+            || boundary.caller_context.result_origin
+                != boundary.selecting_call.producer_construct_origin()
+        {
+            return Err(planner_error(
+                "a detached worker return boundary is not bound to its exact selecting call",
+            ));
+        }
+        validate_source_return_context(plan, &boundary.caller_context, call_identities)?;
+    }
+    Ok(())
+}
+
 pub(super) fn validate_required_consumer_projections(
     plan: &StaticTransitionPlan<'_>,
     units: &[PlannedContinuationSpecialization],
@@ -6599,32 +7127,64 @@ pub(super) fn validate_required_consumer_projections(
                 "a required-consumer projection's call position disagrees with its target",
             ));
         }
-        let derived = derive_required_consumer_occurrence(plan, &target.key)?;
-        let source = rederive_consuming_occurrence(plan, &target.key, projection.source)?;
-        if source != Some(projection.source) {
-            return Err(planner_error(
-                "a required-consumer projection's source occurrence does not match the exact \
-                 source-level occurrence independently derived from its target",
-            ));
-        }
-        if derived != Some(projection.required) {
-            #[cfg(test)]
-            {
-                let reason = match derived {
-                    Some(expected)
-                        if expected.eliminator_origin != projection.required.eliminator_origin =>
+        match projection {
+            RequiredConsumerProjection::DirectOuter { source, required } => {
+                let derived = derive_required_consumer_occurrence(plan, &target.key)?;
+                let rederived = rederive_consuming_occurrence(plan, &target.key, *source)?;
+                if rederived != Some(*source) {
+                    return Err(planner_error(
+                        "a required-consumer projection's source occurrence does not match the exact \
+                         source-level occurrence independently derived from its target",
+                    ));
+                }
+                if derived != Some(*required) {
+                    #[cfg(test)]
                     {
-                        "a required-consumer projection has a mismatched eliminator_origin"
+                        let reason = match derived {
+                            Some(expected)
+                                if expected.eliminator_origin != required.eliminator_origin =>
+                            {
+                                "a required-consumer projection has a mismatched eliminator_origin"
+                            }
+                            _ => "a required-consumer projection has a mismatched body_origin",
+                        };
+                        return Err(planner_error(reason));
                     }
-                    _ => "a required-consumer projection has a mismatched body_origin",
-                };
-                return Err(planner_error(reason));
+                    #[cfg(not(test))]
+                    return Err(planner_error(
+                        "a required-consumer projection is not the exact consumer-level occurrence \
+                         independently derived from its target",
+                    ));
+                }
             }
-            #[cfg(not(test))]
-            return Err(planner_error(
-                "a required-consumer projection is not the exact consumer-level occurrence \
-                 independently derived from its target",
-            ));
+            RequiredConsumerProjection::DetachedReturnContext(context) => {
+                if target.key.consuming_occurrence.is_some()
+                    || context.root_origin != identity.token.producer_result_origin
+                    || context.result_origin != identity.token.producer_construct_origin
+                {
+                    return Err(planner_error(
+                        "a detached return-context proof is not bound to an absent source consumer and its exact call result position",
+                    ));
+                }
+                let ContinuationEmissionOwner::Specialization(enclosing) =
+                    identity.token.emission_owner
+                else {
+                    return Err(planner_error(
+                        "a detached return-context proof was issued outside a generated context",
+                    ));
+                };
+                let Some(boundary) = context.worker_return.as_deref() else {
+                    return Err(planner_error(
+                        "a detached return-context proof has no generated-worker return boundary",
+                    ));
+                };
+                if boundary.selecting_call.target() != enclosing {
+                    return Err(planner_error(
+                        "a detached return-context proof's selecting call does not own its generated context",
+                    ));
+                }
+                validate_source_return_context(plan, context, &call_identities)?;
+            }
         }
     }
     Ok(())
@@ -7135,8 +7695,31 @@ impl<'src> StaticTransitionPlan<'src> {
     pub(in crate::cranelift_backend) fn required_consumer_projection_for(
         &self,
         identity: &ContinuationCallIdentity,
-    ) -> Option<RequiredConsumerProjection> {
-        self.required_consumer_projections.get(identity).copied()
+    ) -> Option<DirectOuterProjection> {
+        self.required_consumer_projections
+            .get(identity)
+            .and_then(RequiredConsumerProjection::direct_outer)
+    }
+
+    /// The detached return-context proof for this call identity, if the planner
+    /// issued one.
+    ///
+    /// Deliberately a second accessor rather than a variant test on the value
+    /// returned above: `required_consumer_projection_for` is the direct-outer
+    /// path and filters this variant out, so the two consumers of a projection
+    /// never share one funnel. That filter is what makes the direct-outer
+    /// accessors on [`RequiredConsumerProjection`] total at every reachable
+    /// call, and it is load-bearing: remove it and those accessors stop being
+    /// total, with no compile error to say so. The guard that fails if it is
+    /// removed reaches this function by CALLING it, which is a reference the
+    /// compiler checks; a test name written here would not be.
+    pub(in crate::cranelift_backend) fn detached_return_context_for(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<&SourceReturnContextTemplate> {
+        self.required_consumer_projections
+            .get(identity)
+            .and_then(RequiredConsumerProjection::detached_return_context)
     }
 
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D7a` — the planner-issued composed worker
@@ -8778,6 +9361,118 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     /// CLAIMED: D1-D5 are a closed planner population before any consumer is
     /// exposed. GAP: Slice 2 still has to declare the ABI unit arm, and Slice 3
     /// still has to lower a call; this test claims neither.
+    /// `R1a` — a detached proof is present in the plan AND refused by the
+    /// direct-outer accessor.
+    ///
+    /// Two facts about one population, asserted on the MAP. The observation
+    /// channel cannot carry this: `RequiredConsumerProjectionDisposition` has
+    /// three arms that partition the world as it stood before
+    /// `DetachedReturnContext` existed, and the drain that installs a detached
+    /// proof pushes no observation at all, so a pin keyed on
+    /// `take_continuation_required_consumer_observations` would read identically
+    /// whether the detached arm never ran, ran and was miscategorised, or ran
+    /// correctly. Widening that enum touches rows `recursor_fusion.rs` already
+    /// asserts against; it is a follow-up, deliberately not folded in here.
+    ///
+    /// **The first assertion is carried by the TYPE, not by this test.**
+    /// `required_consumer_projection_for` returns `Option<DirectOuterProjection>`,
+    /// and `direct_outer`'s `DetachedReturnContext` arm cannot return `Some`
+    /// compile-preservingly — there is no `DirectOuterProjection` to build from a
+    /// `SourceReturnContextTemplate`. So no mutation reddens it, and that green is
+    /// correct rather than a broken harness. It is stated here as intent, and the
+    /// coverage in this test is the other two facts.
+    ///
+    /// The subject is selected by a predicate on the VARIANT, never positionally.
+    /// A `.next()` selector would pass on whichever projection came first — the
+    /// same defect this port had to repair in the
+    /// `REQUIRED_CONSUMER_PROJECTION_MUTATION` harness one channel over, where
+    /// widening the type turned a control into one that stops firing rather than
+    /// `R1a` — a detached proof is present in the plan AND refused by the
+    /// direct-outer accessor.
+    ///
+    /// Two facts about one population, asserted on the MAP. The observation
+    /// channel cannot carry this: `RequiredConsumerProjectionDisposition` has
+    /// three arms that partition the world as it stood before
+    /// `DetachedReturnContext` existed, and the drain that installs a detached
+    /// proof pushes no observation at all, so a pin keyed on
+    /// `take_continuation_required_consumer_observations` would read identically
+    /// whether the detached arm never ran, ran and was miscategorised, or ran
+    /// correctly. Widening that enum touches rows `recursor_fusion.rs` already
+    /// asserts against; it is a follow-up, deliberately not folded in here.
+    ///
+    /// **The first assertion is carried by the TYPE, not by this test.**
+    /// `required_consumer_projection_for` returns `Option<DirectOuterProjection>`,
+    /// and `direct_outer`'s `DetachedReturnContext` arm cannot return `Some`
+    /// compile-preservingly — there is no `DirectOuterProjection` to build from a
+    /// `SourceReturnContextTemplate`. So no mutation reddens it, and that green is
+    /// correct rather than a broken harness. It is stated here as intent, and the
+    /// coverage in this test is the other two facts.
+    ///
+    /// The subject is selected by a predicate on the VARIANT, never positionally.
+    /// A `.next()` selector would pass on whichever projection came first — the
+    /// same defect this port had to repair in the
+    /// `REQUIRED_CONSUMER_PROJECTION_MUTATION` harness one channel over, where
+    /// widening the type turned a control into one that stops firing rather than
+    /// The unmodelled-target record is READABLE, which is what makes it a record
+    /// rather than storage.
+    ///
+    /// A counter no execution path can read is write-only, and the previous
+    /// revision shipped exactly that: an enum nothing constructed and two accessors
+    /// nothing called. This test is the reader. It deliberately asserts only that
+    /// the accessor returns — **not** that either counter is non-zero, because
+    /// neither has a demonstrated firing path on this tree: the builder's loop over
+    /// `checked_ih_environment_transports` never reaches a transport in any local
+    /// fixture, measured with a live-channel control (149 hits on a known-hot
+    /// function, 0 on this probe's entry).
+    ///
+    /// An assertion of non-zero here would be a pin that cannot pass, and one of
+    /// zero would freeze a number that SHOULD change the moment a fixture reaches
+    /// the builder. So it pins reachability of the record and nothing else, and
+    /// says so.
+
+    /// failing.
+    #[test]
+    fn a_detached_projection_is_in_the_map_and_refused_by_the_direct_outer_accessor() {
+        let plan = contspec_plan();
+
+        let detached = plan
+            .required_consumer_projections
+            .iter()
+            .filter(|(_, projection)| {
+                matches!(
+                    projection,
+                    RequiredConsumerProjection::DetachedReturnContext(_)
+                )
+            })
+            .map(|(identity, _)| identity.clone())
+            .collect::<Vec<_>>();
+
+        // Vacuity control. Without it the assertions below hold trivially on any
+        // tree whose producer stopped minting, which is exactly the regression
+        // that would make the direct-outer accessors total for the wrong reason.
+        assert!(
+            !detached.is_empty(),
+            "this fixture must mint at least one detached return-context proof; \
+             if it does not, the producer regressed and every assertion below is \
+             vacuous",
+        );
+
+        for identity in &detached {
+            assert!(
+                plan.required_consumer_projection_for(identity).is_none(),
+                "R1a: the direct-outer accessor must refuse a detached proof, so \
+                 the three accessors on DirectOuterProjection stay total at every \
+                 reachable call; identity {identity:?}",
+            );
+            assert!(
+                plan.detached_return_context_for(identity).is_some(),
+                "a detached proof must stay reachable through its own accessor; \
+                 refusing it on both routes would lose the capability rather than \
+                 route it; identity {identity:?}",
+            );
+        }
+    }
+
     #[test]
     fn contspec_planner_closes_ordered_keys_units_and_causal_edges_dormantly() {
         let plan = contspec_plan();
@@ -10380,5 +11075,321 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
             .unwrap_err(),
             planner_error("continuation edge token disagrees with its exact target")
         );
+    }
+}
+
+
+/// Derive the complete ordered source-consumer chain from one continuation
+/// target's actual selected-case Result to the independently demanded context
+/// Result. Every hop is a position-zero computational consumer selected by the
+/// prior hop's exact constructor identity. Absence or ambiguity refuses.
+pub(super) fn derive_checked_ih_post_call_consumer_chain(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+    frame_origins: &[StaticOriginId],
+    actual: ConstructorIdentity,
+    demanded: ConstructorIdentity,
+) -> Result<Option<Vec<CheckedIhPostCallConsumerStep>>, CraneliftBackendError> {
+    // CALLER CONTRACT, not a gate -- and the reason is STRUCTURAL, not "both are
+    // pure". Two different pure functions of the same inputs disagree all the time.
+    // What establishes it: `_opt` and `continuation_call_selected_result_identity`
+    // both route through `continuation_result_constructor_identities` on an
+    // identically computed `body` (the same `continuation_units()` lookup by
+    // `identity.target()`, the same `child_origin(continuation_origin,
+    // 1 + producer_alternative)`), and `_opt`'s `[identity] => Some` arm and
+    // `exact_result_identity`'s `[identity] => Ok` arm are the SAME singleton arm of
+    // the SAME vector. It is ONE producer read twice, not two producers that agree.
+    //
+    // That distinction is load-bearing: if these were genuinely independent
+    // derivations, this guard would be a live veto hard-erroring on a program `_opt`
+    // had just declared modellable -- reintroducing the FORK 2 veto inside the
+    // function the FORK 2 repair calls. It has a real firing path only for a future
+    // caller that obtains `actual` some other way, which is why it is documented
+    // rather than deleted.
+    let rederived_actual = continuation_call_selected_result_identity(plan, identity)?;
+    if rederived_actual != actual {
+        return Err(planner_error(
+            "a checked-IH post-call consumer's actual Result identity disagrees with its target's selected source case",
+        ));
+    }
+    if actual == demanded {
+        return Ok(Some(Vec::new()));
+    }
+
+    if frame_origins.is_empty() {
+        return Ok(None);
+    }
+    let mut consumers = Vec::with_capacity(frame_origins.len());
+    for frame_origin in frame_origins {
+        let Some(consumer) = post_call_consumer_in_frame(plan, *frame_origin, actual)? else {
+            return Ok(None);
+        };
+        let Some(demanded_case) = post_call_consumer_in_frame(plan, *frame_origin, demanded)?
+        else {
+            return Ok(None);
+        };
+        consumers.push(CheckedIhPostCallConsumerStep {
+            occurrence: consumer,
+            demanded_body_origin: demanded_case.body_origin,
+            checked_frame_id: checked_frame_for_consumer(plan, *frame_origin)?,
+        });
+    }
+    Ok(Some(consumers))
+}
+
+/// What the post-call consumer relation OBSERVED when it declined to model a
+/// continuation target.
+///
+/// **DISPOSITION 2** (Architect, `evt_55rdwzh2q0tef`): a two-way record with the
+/// gap named, rather than a shape census. Disposition 1 was preferred on the basis
+/// that the origin set "is already computed, so this is no new traversal" — and
+/// reading the producer showed that false. `continuation_result_constructor_identities`
+/// walks `continuation_result_origins` and calls `planned_occurrence_expr` per
+/// origin WITHOUT RETAINING the set, so a census would walk it a second time. At
+/// twice the traversal, answering a question that gates nothing, the census is not
+/// worth its cost; the honest two-way record is.
+///
+/// **NAMED GAP: bottom is not separable here.** A target that never successfully
+/// returns and one this relation fails to cover both land in
+/// `UNMODELLED_NO_CONSTRUCTOR_IDENTITY`, and nothing in this function distinguishes
+/// them. `continuation_result_origins(..).is_empty()` is NOT the discriminator — it
+/// inserts `root` before any guard can reject it, so it is structurally never empty.
+/// Separating them needs a bottom-predicate nobody has validated, and that is a
+/// follow-on question that gates nothing here.
+///
+/// **NEITHER COUNTER HAS A DEMONSTRATED FIRING PATH ON THIS TREE, and that is
+/// recorded rather than left to be discovered.** Measured with a live-channel
+/// control, `-p ken-runtime --lib -- --nocapture --test-threads=1`:
+///
+/// ```text
+/// known-hot control (continuation_result_origins)   149 hits   channel LIVE
+/// this probe's entry                                  0 hits
+/// ```
+///
+/// The builder's loop over `checked_ih_environment_transports` never reaches a
+/// transport in any local fixture, so neither arm can be exercised here.
+///
+/// Both names state only what their predicate establishes: one counts targets with
+/// two or more distinct successful constructor identities, the other counts targets
+/// where no visited result origin was a `RuntimeExpr::Construct`. Neither asserts a
+/// cause.
+static UNMODELLED_MANY_IDENTITIES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+static UNMODELLED_NO_CONSTRUCTOR_IDENTITY: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+/// Unmodelled post-call targets since process start: `(many, no_constructor)`.
+pub(in crate::cranelift_backend) fn unmodelled_post_call_targets() -> (usize, usize) {
+    use std::sync::atomic::Ordering::Relaxed;
+    (
+        UNMODELLED_MANY_IDENTITIES.load(Relaxed),
+        UNMODELLED_NO_CONSTRUCTOR_IDENTITY.load(Relaxed),
+    )
+}
+
+/// Denominators for the unmodelled-target record.
+///
+/// **A counter with no denominator cannot distinguish "reached, found nothing"
+/// from "never reached"** (Architect, `evt_5vzr8yeht8mbv`). `N` counts publisher
+/// invocations and `M` counts transports examined, so a reader sees what the two
+/// skip counters are a fraction OF.
+static PUBLISHER_INVOCATIONS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+static TRANSPORTS_EXAMINED: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+pub(in crate::cranelift_backend) fn note_publisher_invocation() {
+    PUBLISHER_INVOCATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub(in crate::cranelift_backend) fn note_transport_examined() {
+    TRANSPORTS_EXAMINED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Emits the unmodelled-target record, UNCONDITIONALLY, including the zeros.
+///
+/// **Gated on `px8-ds-test-support`, deliberately NOT on `cfg(test)`.** A
+/// `#[cfg(test)]` reader is compiled into exactly the processes where this record is
+/// provably empty — measured: the builder's loop never reaches a transport in any
+/// `-p ken-runtime` fixture, live-channel control 149 hits against 0 on the probe —
+/// and compiled OUT of the `ken-cli` test targets, the only processes that can
+/// populate it. A reader present only where the thing it reads cannot exist is not a
+/// reader.
+///
+/// **Called from a site the run reaches, not from a destructor.** An earlier version
+/// emitted from a thread-local `Drop`. "End of run" was never the requirement — it
+/// was a proxy for "the total" — and since the counters are monotone process-global
+/// atomics, EVERY emission already carries the total as of that moment. A
+/// process-exit hook would have produced one more sample, not a different kind of
+/// sample. Dropping the destructor removes `process::exit`, `panic = abort` and
+/// main-thread TLS from the threat model entirely.
+///
+/// **Unconditional, not silent-when-zero.** A silent zero is indistinguishable from
+/// an absent emitter, and someone would re-add a silence condition later to quiet
+/// dev builds. Emitting the zeros is what makes them readable:
+///
+/// ```text
+/// block absent     the build was UNINSTRUMENTED, or instrumented with no plan
+///                  built -- attribute via the invocation, not from inside the
+///                  record
+/// N > 0, M = 0     the builder ran and examined no transports
+/// N > 0, M > 0, counters 0   examined transports, declined none -- a real zero
+/// ```
+///
+/// **There is deliberately no `N = 0` row: it cannot occur.** The emission sits in
+/// the same `#[cfg]` block that increments `N`, immediately after it, so a block can
+/// never appear with `N == 0`. Writing that row would be the dead-arm shape this
+/// record was built to remove: a category whose population is silently relabelled
+/// into its neighbour.
+///
+/// **Arming or emitting earlier would not recover it.**
+/// `publish_checked_ih_post_call_consumers` runs on every plan build, so "the
+/// publisher never ran" means "this run built no plans at all", and any emission
+/// point inside the plan path has the identical population — moving it relocates the
+/// collapse one level out and makes it harder to see. That population therefore
+/// lands in `block absent`, merged with the uninstrumented case, and **that merge is
+/// stated here rather than hidden**: a feature-on run that builds no plans is
+/// indistinguishable from a feature-off run by this record alone, and only the
+/// invocation separates them. Those are the only two causes of an absent block.
+///
+/// **Reading the counters: take the MAXIMUM, never the sum, and never "the last".**
+/// They are process-GLOBAL, so every emission reports a running total — summing
+/// multiplies the true count by the emission count. And **file order is not value
+/// order**: two threads may load 100 and 200 and reach the stderr lock in the other
+/// order, so the last line can read below the largest. The load and the print are
+/// two steps and only the print is ordered. A single run of 652 emissions was
+/// observed monotonically increasing, which is one interleaving, not a guarantee.
+pub(in crate::cranelift_backend) fn emit_unmodelled_post_call_record() {
+    use std::io::Write as _;
+    use std::sync::atomic::Ordering::Relaxed;
+    let (many, no_constructor) = unmodelled_post_call_targets();
+    // Written to the raw stderr handle rather than via `eprintln!`. A test harness
+    // captures the `print!` machinery, so an `eprintln!` from a call site the run
+    // reaches is INVISIBLE under a plain `cargo test` -- measured: 17 emissions with
+    // `--nocapture`, 0 without. That would reintroduce a third cause of an absent
+    // block, which is the collapse this emitter exists to avoid.
+    let _ = writeln!(
+        std::io::stderr(),
+        "ken-planner post-call consumer record: publisher_invocations={} \
+         transports_examined={} declined_many_identities={} \
+         declined_no_constructor_identity={} (bottom is not separable from a \
+         coverage hole in this record; take the MAX across emissions, never the sum)",
+        PUBLISHER_INVOCATIONS.load(Relaxed),
+        TRANSPORTS_EXAMINED.load(Relaxed),
+        many,
+        no_constructor,
+    );
+}
+
+/// Membership probe for the post-call consumer relation: is this target's
+/// selected source case a shape the relation models?
+///
+/// **Deliberately does NOT route through [`exact_result_identity`].** That
+/// assertion's text declares itself unreachable from valid input, so reaching it is
+/// a defect in the reacher, never a discovery about the program. This builder runs
+/// on EVERY plan build, including programs that never needed the capability, so it
+/// must ask a question that can answer "no" rather than one that can only assert.
+///
+/// **BOTH non-singleton outcomes yield `None`** — zero and many alike. The
+/// population this builder walks is never narrowed to targets having exactly one
+/// successful constructor identity, so a multi-identity target is unmodelled for
+/// precisely the reason a zero-identity one is. `None` means *not in this
+/// relation's population*; it does not mean the program is invalid, and a caller
+/// must never convert it into an error.
+pub(super) fn continuation_call_selected_result_identity_opt(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+) -> Result<Option<ConstructorIdentity>, CraneliftBackendError> {
+    let unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == identity.target())
+        .ok_or_else(|| {
+            planner_error("a checked-IH post-call consumer names no target specialization")
+        })?;
+    let body = plan.semantic.child_origin(
+        unit.continuation_origin(),
+        1 + unit.producer_alternative() as usize,
+    )?;
+    let identities = continuation_result_constructor_identities(plan, body)?;
+    use std::sync::atomic::Ordering::Relaxed;
+    match identities.as_slice() {
+        [identity] => Ok(Some(*identity)),
+        [] => {
+            UNMODELLED_NO_CONSTRUCTOR_IDENTITY.fetch_add(1, Relaxed);
+            Ok(None)
+        }
+        _ => {
+            UNMODELLED_MANY_IDENTITIES.fetch_add(1, Relaxed);
+            Ok(None)
+        }
+    }
+}
+
+/// Derive the successful identity actually produced by a continuation target's
+/// selected source case. This is the source half of the post-call contract; it
+/// does not inspect the demanded response identity.
+pub(super) fn continuation_call_selected_result_identity(
+    plan: &StaticTransitionPlan<'_>,
+    identity: &ContinuationCallIdentity,
+) -> Result<ConstructorIdentity, CraneliftBackendError> {
+    let unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == identity.target())
+        .ok_or_else(|| {
+            planner_error("a checked-IH post-call consumer names no target specialization")
+        })?;
+    let body = plan.semantic.child_origin(
+        unit.continuation_origin(),
+        1 + unit.producer_alternative() as usize,
+    )?;
+    exact_result_identity(plan, body, "a continuation target's selected source case")
+}
+
+fn post_call_consumer_in_frame(
+    plan: &StaticTransitionPlan<'_>,
+    frame_origin: StaticOriginId,
+    result_identity: ConstructorIdentity,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(frame_origin)?
+    else {
+        return Ok(None);
+    };
+    let mut matching = Vec::new();
+    for alternative in 0..cases.len() {
+        let case_identity = plan.case_constructor_identity(frame_origin, alternative)?;
+        if case_identity != result_identity {
+            continue;
+        }
+        matching.push(ContinuationConsumingOccurrence {
+            body_origin: plan.semantic.child_origin(frame_origin, 1 + alternative)?,
+            eliminator_origin: frame_origin,
+        });
+    }
+    match matching.as_slice() {
+        [] => Ok(None),
+        [consumer] => Ok(Some(*consumer)),
+        _ => Err(planner_error(
+            "one checked-IH transport result selects more than one case in its source consumer",
+        )),
+    }
+}
+
+fn exact_result_identity(
+    plan: &StaticTransitionPlan<'_>,
+    body: StaticOriginId,
+    context: &'static str,
+) -> Result<ConstructorIdentity, CraneliftBackendError> {
+    let identities = continuation_result_constructor_identities(plan, body)?;
+    match identities.as_slice() {
+        [identity] => Ok(*identity),
+        [] => Err(planner_error(format!(
+            "{context} has no successful constructor result identity"
+        ))),
+        _ => Err(planner_error(format!(
+            "{context} has more than one successful constructor result identity"
+        ))),
     }
 }

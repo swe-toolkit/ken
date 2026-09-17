@@ -220,6 +220,111 @@ pub(in crate::cranelift_backend) struct CheckedIhEnvironmentTransport {
     )>,
 }
 
+/// Construction authority for a required consumer paired with the exact
+/// emitted call whose Result is its before-value. The generated-entry quotient
+/// remains unchanged; this discriminator is carried beside it.
+mod required_consumer_destination {
+    use super::super::continuations::{
+        checked_frame_for_consumer, SourceReturnContextRole,
+    };
+    use super::*;
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub(in crate::cranelift_backend) struct RequiredConsumerDestination {
+        defining_transport: CheckedIhEnvironmentTransport,
+        consumer_occurrence: (StaticOriginId, Option<u64>),
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub(in crate::cranelift_backend) struct RequiredConsumerCall {
+        destination: RequiredConsumerDestination,
+    }
+
+    pub(in crate::cranelift_backend::planning::static_transition) fn
+    pair_detached_required_consumer(
+        plan: &StaticTransitionPlan<'_>,
+        transport: &CheckedIhEnvironmentTransport,
+        projection: &super::super::continuations::SourceReturnContextTemplate,
+    ) -> Result<RequiredConsumerCall, CraneliftBackendError> {
+        #[cfg(feature = "px8-ds-test-support")]
+        let transport = required_consumer_defining_transport(plan, transport)?;
+        // Template steps run root-to-result; reversing selects the first
+        // computational consumer reached by this exact result on return.
+        let consumer_origin = projection
+            .steps()
+            .iter()
+            .rev()
+            .find_map(|step| {
+                matches!(
+                    step.role(),
+                    SourceReturnContextRole::ComputationalMatchCase(_)
+                )
+                .then_some(step.parent_origin())
+            })
+            .ok_or_else(|| {
+                planner_error(
+                    "an exact detached required consumer has no computational occurrence",
+                )
+            })?;
+        let consumer_occurrence = (
+            consumer_origin,
+            checked_frame_for_consumer(plan, consumer_origin)?,
+        );
+        let destination = RequiredConsumerDestination {
+            defining_transport: transport.clone(),
+            consumer_occurrence,
+        };
+        Ok(RequiredConsumerCall { destination })
+    }
+
+    impl RequiredConsumerCall {
+        pub(in crate::cranelift_backend) fn destination(
+            &self,
+        ) -> &RequiredConsumerDestination {
+            &self.destination
+        }
+    }
+
+    impl RequiredConsumerDestination {
+        pub(in crate::cranelift_backend) fn defining_transport(
+            &self,
+        ) -> &CheckedIhEnvironmentTransport {
+            &self.defining_transport
+        }
+
+        pub(in crate::cranelift_backend) fn defining_call_identity(
+            &self,
+        ) -> &ContinuationCallIdentity {
+            self.defining_transport.source_call_identity()
+        }
+
+        pub(in crate::cranelift_backend) fn defining_owner(
+            &self,
+        ) -> ContinuationEmissionOwner {
+            self.defining_transport.destination_owner
+        }
+
+        pub(in crate::cranelift_backend) fn defining_body_origin(&self) -> StaticOriginId {
+            self.defining_transport.destination_body_origin
+        }
+
+        pub(in crate::cranelift_backend) fn defining_result_origin(&self) -> StaticOriginId {
+            self.defining_transport.source_result_origin
+        }
+
+        pub(in crate::cranelift_backend) fn consumer_occurrence(
+            &self,
+        ) -> (StaticOriginId, Option<u64>) {
+            self.consumer_occurrence
+        }
+    }
+}
+
+pub(super) use required_consumer_destination::pair_detached_required_consumer;
+pub(in crate::cranelift_backend) use required_consumer_destination::{
+    RequiredConsumerCall, RequiredConsumerDestination,
+};
+
 /// Which destination environment one transported continuation input indexes.
 /// The domain tag is part of the morphism; the same integer in these two
 /// frames is not the same coordinate.
@@ -1062,6 +1167,10 @@ impl CheckedIhEnvironmentTransport {
 
     pub(in crate::cranelift_backend) fn continuation_input_count(&self) -> usize {
         self.continuation_input_morphism.len()
+    }
+
+    pub(in crate::cranelift_backend) fn destination_body_origin(&self) -> StaticOriginId {
+        self.destination_body_origin
     }
 }
 /// Which aggregate shape one producer occurrence builds.
@@ -12625,4 +12734,274 @@ mod checked_ih_captured_env_schema {
              issuing no record is the fail-open shape this slice exists to close"
         );
     }
+}
+
+
+pub(in crate::cranelift_backend::planning::static_transition) fn checked_ih_post_call_consumer_frames(
+    plan: &StaticTransitionPlan<'_>,
+    transport: &CheckedIhEnvironmentTransport,
+) -> Result<Option<Vec<StaticOriginId>>, CraneliftBackendError> {
+    let source_identity = transport.source_call_identity();
+    let source_unit = plan
+        .continuation_units()?
+        .into_iter()
+        .find(|unit| unit.id() == source_identity.target())
+        .ok_or_else(|| {
+            planner_error("a mismatched checked-IH transport's target has no continuation unit")
+        })?;
+    let consumer_frame = source_unit.continuation_origin();
+    if source_unit
+        .consuming_occurrence()
+        .is_some_and(|occurrence| occurrence.eliminator_origin() != consumer_frame)
+    {
+        return Err(planner_error(
+            "a checked-IH target's exact consuming occurrence disagrees with its continuation origin",
+        ));
+    }
+    let own = plan
+        .checked_ih_continuation_inheritances
+        .iter()
+        .filter(|inheritance| inheritance.transport == *transport)
+        .collect::<Vec<_>>();
+    match own.as_slice() {
+        [inheritance] => {
+            let final_step = inheritance
+                .capability
+                .self_resumption_steps
+                .last()
+                .ok_or_else(|| {
+                    planner_error(
+                        "a checked-IH transport's canonical inheritance has no final step",
+                    )
+                })?;
+            return Ok(
+                match checked_ih_fresh_result_route(plan, inheritance, final_step)? {
+                    CheckedIhFreshResultRoute::TailProducerToRet {
+                        active_frame_origin,
+                        ..
+                    } => {
+                        if active_frame_origin != consumer_frame {
+                            return Err(planner_error(
+                            "a checked-IH Tail route disagrees with its exact source consumer frame",
+                        ));
+                        }
+                        Some(vec![consumer_frame])
+                    }
+                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => None,
+                },
+            );
+        }
+        [] => {}
+        _ => {
+            return Err(planner_error(
+                "one checked-IH transport has more than one canonical inheritance",
+            ))
+        }
+    }
+
+    let binder_provenance = build_checked_binder_provenance(plan)?;
+    let identity = &transport.source_call_identity;
+    let worker = &identity.token.worker;
+    let mut matching = Vec::new();
+    for inheritance in &plan.checked_ih_continuation_inheritances {
+        let destination = &inheritance.fresh_result_destination;
+        if destination.ret_case_body_origin != identity.token.producer_construct_origin
+            || destination.closure_origin != worker.closure_origin
+            || destination.closure_body_origin != worker.body_origin
+            || destination.closure_parameter_count != worker.declared_arity
+        {
+            continue;
+        }
+        let Some(capture) = worker.captures.get(destination.capture_ordinal as usize) else {
+            continue;
+        };
+        if capture.owner != identity.token.producer_owner
+            || capture.closure_origin != destination.closure_origin
+            || capture.source
+                != ContinuationWorkerCaptureSource::Lexical(destination.capture_occurrence)
+            || !destination.body_capture_reads.iter().all(|origin| {
+                binder_provenance.get(origin).is_some_and(|resolution| {
+                    resolution.provenance
+                        == CheckedBinderProvenance::LexicalClosureCapture {
+                            closure_origin: destination.closure_origin,
+                            capture_ordinal: destination.capture_ordinal,
+                            source_origin: destination.capture_occurrence,
+                        }
+                })
+            })
+        {
+            continue;
+        }
+        matching.push(vec![destination.active_frame_origin]);
+    }
+    match matching.as_slice() {
+        [] => Ok(None),
+        [frames] => Ok(Some(frames.clone())),
+        _ => Err(planner_error(
+            "one checked-IH transport has more than one exact fresh-result predecessor",
+        )),
+    }
+}
+
+/// Exact-call selection report for the discriminator carried alongside the
+/// unchanged generated-entry quotient.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RequiredConsumerCallObservation {
+    pub context: u32,
+    pub worker_body_origin: u32,
+    pub transport_call_count: usize,
+    pub candidate_targets: Vec<u32>,
+    pub candidate_result_origins: Vec<u32>,
+    pub selected_target: u32,
+    pub selected_result_origin: u32,
+}
+
+/// Production-side mutation proving that the exact defining transport selects
+/// the required-consumer relation rather than decorating an already-made choice.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RequiredConsumerCallMutation {
+    Exact,
+    SubstituteDefiningTransport {
+        defining_body_origin: u32,
+        selected_target: u32,
+        substitute_target: u32,
+    },
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static REQUIRED_CONSUMER_CALL_MUTATION: Cell<RequiredConsumerCallMutation> =
+        const { Cell::new(RequiredConsumerCallMutation::Exact) };
+    static REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS: Cell<usize> = const { Cell::new(0) };
+    static REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static REQUIRED_CONSUMER_CALL_OBSERVATIONS:
+        RefCell<Vec<RequiredConsumerCallObservation>> = const { RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+/// Test-support harness with NO CALLER ON THIS TREE.
+///
+/// Its consumer at the port source is a `ken-cli` test that is not present here
+/// or on `main` -- so this is ported machinery awaiting a driver, not an unused
+/// item. It is deliberately NOT re-exported to `ken_runtime::`: lifting its
+/// visibility would make `dead_code` exempt it from analysis, which removes the
+/// warning without removing the condition, and that silence is indistinguishable
+/// from having acquired a caller. The `never used` diagnostic on this function is
+/// CORRECT and is the only live record that the driver is missing.
+pub fn with_required_consumer_call_observations<T>(
+    f: impl FnOnce() -> T,
+) -> (T, Vec<RequiredConsumerCallObservation>) {
+    struct ResetOnDrop;
+    impl Drop for ResetOnDrop {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(false));
+        }
+    }
+    REQUIRED_CONSUMER_CALL_OBSERVATIONS.with(|rows| rows.borrow_mut().clear());
+    REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(|active| active.set(true));
+    let restore = ResetOnDrop;
+    let result = f();
+    let rows = REQUIRED_CONSUMER_CALL_OBSERVATIONS
+        .with(|rows| std::mem::take(&mut *rows.borrow_mut()));
+    drop(restore);
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+/// Test-support harness with NO CALLER ON THIS TREE.
+///
+/// Its consumer at the port source is a `ken-cli` test that is not present here
+/// or on `main` -- so this is ported machinery awaiting a driver, not an unused
+/// item. It is deliberately NOT re-exported to `ken_runtime::`: lifting its
+/// visibility would make `dead_code` exempt it from analysis, which removes the
+/// warning without removing the condition, and that silence is indistinguishable
+/// from having acquired a caller. The `never used` diagnostic on this function is
+/// CORRECT and is the only live record that the driver is missing.
+pub fn with_required_consumer_call_mutation<T>(
+    mutation: RequiredConsumerCallMutation,
+    f: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct ResetOnDrop;
+    impl Drop for ResetOnDrop {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_CALL_MUTATION
+                .with(|active| active.set(RequiredConsumerCallMutation::Exact));
+        }
+    }
+    REQUIRED_CONSUMER_CALL_MUTATION.with(|active| active.set(mutation));
+    REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(|count| count.set(0));
+    let restore = ResetOnDrop;
+    let result = f();
+    let applications = REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS.with(Cell::get);
+    drop(restore);
+    (result, applications)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn required_consumer_defining_transport<'plan>(
+    plan: &'plan StaticTransitionPlan<'_>,
+    selected: &'plan CheckedIhEnvironmentTransport,
+) -> Result<&'plan CheckedIhEnvironmentTransport, CraneliftBackendError> {
+    let RequiredConsumerCallMutation::SubstituteDefiningTransport {
+        defining_body_origin,
+        selected_target,
+        substitute_target,
+    } = REQUIRED_CONSUMER_CALL_MUTATION.with(Cell::get)
+    else {
+        return Ok(selected);
+    };
+    if selected.destination_body_origin.observation_ordinal() != defining_body_origin
+        || selected.source_call_identity.target().observation_ordinal() != selected_target
+    {
+        return Ok(selected);
+    }
+    let mut substitutes = plan.checked_ih_environment_transports.iter().filter(|candidate| {
+        candidate.destination_owner == selected.destination_owner
+            && candidate.destination_body_origin == selected.destination_body_origin
+            && candidate.source_call_identity.target().observation_ordinal() == substitute_target
+    });
+    let Some(substitute) = substitutes.next() else {
+        return Err(planner_error(
+            "the required-consumer defining-call mutation has no exact substitute transport",
+        ));
+    };
+    if substitutes.next().is_some() {
+        return Err(planner_error(
+            "the required-consumer defining-call mutation has an ambiguous substitute transport",
+        ));
+    }
+    REQUIRED_CONSUMER_CALL_MUTATION_APPLICATIONS
+        .with(|count| count.set(count.get().saturating_add(1)));
+    Ok(substitute)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_required_consumer_call_selection(
+    context: super::ContinuationContextId,
+    worker_body_origin: StaticOriginId,
+    transports: &[&CheckedIhEnvironmentTransport],
+    selected: &CheckedIhEnvironmentTransport,
+) {
+    if !REQUIRED_CONSUMER_CALL_OBSERVATION_ACTIVE.with(Cell::get) {
+        return;
+    }
+    REQUIRED_CONSUMER_CALL_OBSERVATIONS.with(|rows| {
+        rows.borrow_mut().push(RequiredConsumerCallObservation {
+            context: context.0,
+            worker_body_origin: worker_body_origin.0,
+            transport_call_count: transports.len(),
+            candidate_targets: transports
+                .iter()
+                .map(|transport| transport.source_call_identity.target().0)
+                .collect(),
+            candidate_result_origins: transports
+                .iter()
+                .map(|transport| transport.source_result_origin.0)
+                .collect(),
+            selected_target: selected.source_call_identity.target().0,
+            selected_result_origin: selected.source_result_origin.0,
+        });
+    });
 }
