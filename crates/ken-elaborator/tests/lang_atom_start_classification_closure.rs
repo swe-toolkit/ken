@@ -165,14 +165,120 @@ fn the_effect_row_veto_governs_the_expression_position_too() {
     const SOURCE: &str = "const k : Nat = g visits [x]";
     let visits_at = SOURCE.find("visits").expect("fixture contains `visits`");
 
+    // STRUCTURAL, not a string oracle. `rendered.contains("start: 18, end: 24")`
+    // pins "these two numbers appear somewhere in a Debug rendering", never
+    // "the parse error is at `visits`", and it checks no variant -- in the one
+    // increment that moved the premise test off `Debug` specifically to stop
+    // depending on one.
     let error = parse_decls(SOURCE).expect_err("`g visits [x]` is not a valid expression");
-    let rendered = format!("{error:?}");
-    let expected = format!("start: {visits_at}, end: {}", visits_at + "visits".len());
+    match error {
+        ken_elaborator::ElabError::ParseError { span, .. } => assert_eq!(
+            (span.start, span.end),
+            (visits_at, visits_at + "visits".len()),
+            "the error must land on `visits` -- landing on `[` means `visits` was \
+             consumed as an argument and the Expression membership is inert"
+        ),
+        other => panic!("expected a ParseError at `visits`, got {other:?}"),
+    }
+}
 
+// ---------------------------------------------------------------------------
+// The brace exclusion's two scan invariants.
+//
+// `brace_starts_match_arms` is correct today, and its correctness rests on two
+// properties nothing states and nothing checks. Encoding the brace without
+// these buys tidiness and no safety: `StartExclusion`'s closure is over
+// EXCLUSIONS, and neither invariant is threatened by a new exclusion -- both
+// are threatened by a new TOKEN FORM, which that closure cannot see.
+//
+// THEY ARE NOT THE SAME KIND OF PIN, and presenting them as a matched pair
+// was wrong. Invariant 2's is a DETECTOR -- it reds at the moment of
+// breakage. Invariant 1's is a TRIPWIRE -- it cannot red when the invariant
+// breaks, only when someone later repairs the scan. Each says which it is.
+//
+// Invariant 1 is also the likelier of the two to break (a comma-bearing or
+// bracketed pattern form is far more plausible than legalising `{}`), so the
+// weaker instrument guards the more exposed invariant. The compensating
+// warning is a note on `parse_pattern`, where the author who breaks it is
+// actually reading.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn invariant_1_no_depth_zero_comma_precedes_the_first_arrow_in_an_arm_block() {
+    // Every pattern form that can carry a comma carries it inside parens or
+    // braces, so the scan is at depth > 0 when it passes one and reaches the
+    // `MapsTo` still believing this is an arm block.
     assert!(
-        rendered.contains(&expected),
-        "the error must land on `visits` -- the expression loop stopping there is \
-         the exclusion firing. Landing on `[` means `visits` was consumed as an \
-         argument and the Expression membership is inert. got {rendered}"
+        parses("fn f (v : T) : Bool = match v { (a, b) ↦ a }"),
+        "a tuple pattern's comma is at paren depth 1 and must not end the scan"
+    );
+    assert!(
+        parses("fn f (v : T) : Bool = match v { { x = a } ↦ a }"),
+        "a record pattern's contents are at brace depth 1"
+    );
+
+    // THE PIN -- AND IT IS A TRIPWIRE, NOT A DETECTOR. I first wrote that it
+    // "reds and says the scan's first invariant has gone". It does not, and
+    // the trace is short: legalise multi-pattern arms, and
+    //
+    //   the scan hits `Comma` at depth 0        -> returns FALSE
+    //   the `{` is taken as a record literal    -> parse_record_expr errors
+    //   parses(..) is still FALSE               -> assert!(!parses(..)) PASSES
+    //
+    // The pin is SUPPRESSED BY EXACTLY THE DEFECT IT EXISTS TO DETECT: the
+    // scan misclassifies, the parse fails for the wrong reason, and an
+    // assertion of failure reads that as success. It fires only once someone
+    // REPAIRS the scan, at which point the source starts parsing and this
+    // reds. That is real value -- it lands the next author in this file -- but
+    // it is a trailing indicator, and the warning that reaches the author who
+    // BREAKS it is the note on `parse_pattern`.
+    assert!(
+        !parses("fn f (v : T) : Bool = match v { a, b ↦ x }"),
+        "a depth-0 comma in an arm block must stay illegal -- if it becomes \
+         legal, `brace_starts_match_arms` misclassifies every arm block \
+         containing one"
+    );
+}
+
+#[test]
+fn invariant_2_an_empty_brace_is_not_a_legal_record_literal() {
+    // A GENUINE DETECTOR, unlike invariant 1's tripwire -- and MEASURED, not
+    // reasoned. The Architect derived this and language-qa declined to test it
+    // ("would require changing `parse_record_expr`, out of scope for a QA
+    // probe"), so it was the last claim here standing on argument alone.
+    //
+    // Run: `parse_record_expr` mutated to accept `{}` as an empty record
+    // literal. Result -- this test's PIN ROW reds, "an empty record literal
+    // must stay illegal", and the other NINE cases stay green. One test, its
+    // pin, nothing else. That is the detector firing at the moment of
+    // breakage, which is exactly what invariant 1's tripwire cannot do.
+    //
+    // The mechanism is as derived: `{}` becoming legal makes it the FIRST atom
+    // of this const's body, so the argument loop's exclusion never gates it,
+    // `parse_record_expr` accepts, and `parses(..)` flips TRUE.
+    //
+    // `RBrace if offset == 1 => return true` classifies `{}` as an arm block,
+    // and that is safe ONLY because `{}` is not a record literal:
+    // `parse_record_expr` calls `expect_ident()` straight after `{`.
+    assert!(
+        !parses("const k : R = {}"),
+        "an empty record literal must stay illegal -- if it becomes legal, \
+         `f {{}}` silently misclassifies as a match arm block"
+    );
+
+    // Both sides of the classification still work, so the pin above is not
+    // passing because braces broke generally.
+    assert!(
+        parses("const k : R = { x = a }"),
+        "a non-empty record literal must parse"
+    );
+    assert!(
+        parses("fn f (v : T) : Bool = g { x = a }"),
+        "a record literal in ARGUMENT position must parse -- this is the case \
+         the exclusion must NOT fire on"
+    );
+    assert!(
+        parses("fn f (v : T) : Bool = match v {}"),
+        "an empty arm block must parse -- the `offset == 1` arm"
     );
 }
