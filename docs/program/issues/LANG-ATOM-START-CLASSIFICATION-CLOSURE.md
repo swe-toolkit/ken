@@ -153,14 +153,26 @@ carries. It is **not** an ancestor of `main` and never will be — cite
 
 **The third row is a negative control, not an open obligation.** The first
 version of this ledger, published at `096f2f0dd`, scored it
-`OPEN … KwProof — UNBUILT`. That is wrong and it is forbidden in terms by this
-node's own frame:
+`OPEN … KwProof — UNBUILT`. That is wrong, and it is forbidden in terms by the
+frame's **§5 position taxonomy** — see the structural-refusal paragraph there
+(`docs/program/wp/LANG-ATOM-START-CLASSIFICATION-CLOSURE.md`, §5). In this
+node's own words: Ken has no declaration terminator, so the atom-start roster's
+complement *is* the declaration separator, and admitting `proof` bare in
+argument position makes a declaration body swallow the next declaration. That
+holds for any parser of this grammar. The refusal is therefore a property of
+the grammar, not an implementation shortfall, and the row is discharged by the
+third ledger value — **closed by explicit classification as refused** — not by
+the unification and not by an increment.
 
-> `expression, app argument, bracket depth 0` — **STAYS REFUSED, structurally.**
-> Ken has no declaration terminator, so the roster's complement IS the
-> declaration separator; admitting `proof` at depth 0 makes a declaration body
-> swallow the next declaration. That holds for any parser of this grammar.
-> ⇒ **Do not score the depth-0 row as an unmet AC.**
+> **Cited by SECTION, not quoted, and the reason is the correction itself.**
+> This paragraph previously quoted the frame verbatim, and the quoted block
+> ended `⇒ Do not score the depth-0 row as an unmet AC.` **The bracket-depth
+> coordinate that sentence is keyed on was RETIRED** the same day
+> (`evt_17x6mx5bg96bv`; frame §5's SUPERSEDED sub-block), and the frame was
+> rewritten around that — so the quote outlived the text it copied and kept a
+> dead coordinate alive in a second file. **Quoting mutable text is an
+> untracked read dependency**: the frame's author had no way to see this node
+> was carrying their retired sentence. A section citation fails loudly instead.
 
 **RULED 2026-09-18: OPTION A — UNCONDITIONAL EXCLUSION AT EVERY DEPTH.**
 Spec-leader's design call (`evt_17x6mx5bg96bv`), routed to Spec by the

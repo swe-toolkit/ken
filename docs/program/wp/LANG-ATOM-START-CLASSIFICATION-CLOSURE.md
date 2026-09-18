@@ -231,6 +231,43 @@ duplicating.
 a WORKED EXAMPLE of the target shape, not a site to repair** — which is the
 direction an implementer is rarely told: where not to go.
 
+> ### AMENDED 2026-09-18 (Steward), measured at `b53dd9fcf`: the pattern side
+> ### was the worked example on a SECOND axis nobody had named.
+>
+> This section compares the three rosters on **content** — which tokens each
+> admits, 12 vs 12 on the pattern side. There is a second axis, **where the
+> exclusion is applied**, and the pattern side was already right on that one
+> too. Re-measured in `parser.rs`:
+>
+>     can_start_atom_expr    SELF-GUARDS   atom_start_exclusion(Expression)
+>     can_start_atom_type    SELF-GUARDS   atom_start_exclusion(Type)
+>     can_start_atom_pat     SELF-GUARDS   atom_start_exclusion(Pattern)
+>     can_start_pattern      NO GUARD, AND SHOULD NOT HAVE ONE
+>
+> `can_start_atom_expr` acquired its guard from the adversary's hardening; the
+> other two had theirs already. **The three ATOM entry points self-guard.**
+> `can_start_pattern` is the shared base predicate that `can_start_atom_pat`
+> wraps, exactly as §4c says above — it is not a fourth site and not an
+> unguarded hole.
+>
+> **The defect the guard closes is not a missing token; it is a per-CALLER
+> obligation.** While `can_start_atom_expr` was a pure token predicate,
+> applying the exclusions was every caller's job, and such an obligation is
+> discharged by whoever remembers. The bare-operator-name gate did not, so
+> admitting `KwProof` to the roster would have made
+> `fn f (x : Int) : Int = <=` legal whenever the next token was `proof`.
+> Guarding at the entry point covers every consumer by construction, including
+> the ones nobody has written yet — the same closure AC-1 states over tokens,
+> taken over consumers.
+>
+> **Correcting my own carried note, because it was wrong in the direction that
+> manufactures work:** I had this recorded as *"all three rosters self-guard."*
+> They do not. The three that self-guard are the atom entry points, and
+> `can_start_pattern` — one of the three ROSTERS this section names — is
+> deliberately not among them. A note that conflates the two would have sent an
+> implementer to put a guard on the base predicate, duplicating
+> `can_start_atom_pat`'s and re-creating the asymmetry the hardening removed.
+
 > **The census's own instrument failed twice, and only one direction mattered.**
 > An arm regex missed or-pattern continuations and manufactured seven phantom
 > entries — it **invented** a finding. A roster regex over-collected the type
