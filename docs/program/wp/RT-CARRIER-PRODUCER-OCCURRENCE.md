@@ -504,26 +504,54 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
 - **Do not re-baseline or re-scope the row's assertions** to fit whatever the
   repaired edge produces. If the row cannot assert its stated property after the
   repair, that is a finding to report, not an assertion to adjust.
-  **EXCEPTION, and it is not optional — an expected value that came from THE
-  DEFECT ITSELF was never a criterion, and repairing it is MANDATORY.** That is
-  the opposite act from re-baselining, it is easy to mistake for it, and the
-  carve-out below states the test and the three obligations that come with it.
+  **Replacing an assertion is TWO acts needing TWO authorizations, on different
+  evidence — see the carve-out below. Removing the old value and installing a
+  new one are never authorized together.**
 
-  > **CARVE-OUT, added 2026-09-18 (Steward). This ban as first written stopped
-  > work it should not have, and the ring was right to stop.** It does not
-  > distinguish two opposite acts. **The question is WHERE THE EXPECTED VALUE
-  > CAME FROM:**
+  > **CARVE-OUT, 2026-09-18 (Steward). This ban as first written stopped `D4`
+  > one line from green, and the ring was right to stop.**
   >
-  >     from THE RUN YOU JUST FIXED   -> re-baselining. BANNED, no exceptions.
-  >     from THE DEFECT ITSELF        -> it was never a criterion. Repairing it
-  >                                      is MANDATORY, not merely permitted.
+  > **CORRECTION, same day, Architect at `evt_7sz14dsfcz0a3`. The first version
+  > of this carve-out — landed in `daa4c010c` and replaced here — asked WHERE
+  > THE EXPECTED VALUE CAME FROM. That test fails on the very case it was
+  > written for**, because replacing an assertion involves *two* values that can
+  > point opposite ways: `D4` removes `ImmediateBool`, which came from the
+  > defect, and installs `PersistentGround`, which was read off the repaired
+  > run's own output. One edit, both cells, nothing discriminated. **Provenance
+  > is also a claim about history made by the party it relieves, and it is not
+  > checkable from the file.**
+  >
+  > **THE TEST:**
+  >
+  > > **Does the artifact state a derivation that would have PREDICTED this
+  > > value BEFORE the run?**
+  >
+  >     the row can only say WHAT THE RUN EMITTED   -> re-baselining, whatever
+  >                                                    the history was. BANNED.
+  >     the row can say WHY THAT VALUE AND NOT       -> a repair, whatever the
+  >       ANOTHER, independently of any run             history was. Permitted.
+  >
+  > **A reader holding the file and nothing else can apply this.** That is the
+  > whole reason it replaces the provenance test.
+  >
+  > **THE TWO AUTHORIZATIONS, resting on different evidence:**
+  >
+  >     REMOVING the old expected value   authorized by the OLD value's
+  >                                       provenance -- it is the defect's own
+  >                                       fingerprint sitting in the oracle
+  >     INSTALLING a new one              authorized ONLY by a derivation stated
+  >                                       independently of any run, IN THIS FILE
+  >                                       -- never in a thread, a post, or a
+  >                                       commit message
+  >
+  > Written as one rule they collapse, and the installation borrows evidence
+  > that reaches only the removal.
   >
   > **Measured instance, `D4`:** the error-path equality compared a projected
   > boundary tag against `ImmediateBool` — **the value the pre-`D3` rig itself
-  > chose for `Wrote`.** The assertion was comparing the fixture's own input
-  > against itself, so the defect's fingerprint was sitting inside the oracle.
-  > Leaving it there is not rigour; it preserves the bug in the thing that is
-  > supposed to catch the bug.
+  > chose for `Wrote`.** The assertion compared the fixture's own input against
+  > itself, so the defect's fingerprint sat inside the oracle. Leaving it there
+  > is not rigour; it preserves the bug in the thing meant to catch the bug.
   >
   > **The premise does not reach the wider conclusion.** *"It was never an
   > independent oracle"* licenses **repairing** the oracle. It does not license
@@ -531,18 +559,29 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
   > asserting. Both readings follow from the same true sentence and only the
   > weaker one is entailed; prefer it.
   >
-  > **Repairing under this carve-out carries three obligations, all three:**
-  > assert a **derived property, never an observed literal** (an arena index is
-  > sound as a measurement and unsound as a criterion); **state the derivation
-  > with its citation**, and route it to the Architect if it cannot be grounded
-  > in the plan — an ungrounded replacement is wrong the same way the original
-  > was; and **show the repaired assertion reddens under a mutation on the path
-  > it guards**, not merely on some other path the row also covers.
+  > **OBLIGATIONS ON ANY INSTALLATION, all three:**
+  >
+  > 1. **A derived property, never an observed literal.** `517` pins an arena
+  >    index: sound as a measurement, unsound as a criterion.
+  > 2. **The derivation is written INTO THIS ROW with its citations**, and every
+  >    link is grounded in a producer rather than in a name that looks right. If
+  >    a link cannot be grounded it goes to the Architect — an ungrounded
+  >    replacement is wrong in exactly the way the original was.
+  > 3. **The repaired assertion reddens under a mutation ON THE PATH IT
+  >    GUARDS**, not merely on some other path the row also covers.
   >
   > **If no mutation on that path can redden it, retiring it is then honest —
   > but the row must SAY it does not cover that path.** An assertion that cannot
   > fail quietly retired, and one loudly retired, are the same coverage and very
   > different artifacts.
+  >
+  > **Why obligation 2 says IN THIS FILE.** Measured on candidate `d20afe1be` by
+  > a grep of the whole file rather than the diff: the only derivation present
+  > was *"517 is tag 5 = `PersistentGround`"*, with the reasoning that justifies
+  > it living solely in a convo post. **A later reader opening the file finds a
+  > value read off the fixed run, sitting beneath the rule forbidding exactly
+  > that, and nothing to tell it apart from re-baselining.** A justification that
+  > is not in the artifact does not travel with it.
 - **Do not repair the other census row.** `two_same_shape_workers_are_distinguished`
   is `RT-WORKER-FIXTURE-DECODE`'s, and it is `ready`.
 
