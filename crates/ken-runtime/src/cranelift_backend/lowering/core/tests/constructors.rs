@@ -3312,52 +3312,7 @@ fn generated_context_pairing_refuses_raw_owner_header_mismatch() {
     );
 }
 
-// Ignored pending RT-CARRIER-PRODUCER-OCCURRENCE `D4`. Re-measured at
-// origin/main 4d20a1cb5, with `D3` (60df2cfd2) landed and the child-shape
-// repair below applied.
-//
-// THE CARRIER EDGE NOW EMITS. All three edges compile, the row runs, and it
-// evaluates the property it was written for -- which no run of it had ever
-// reached before. The signature this block used to quote,
-//
-//   Unsupported(UnsupportedLowering { construct: "Constructor", reason: "a source aggregate reached the carrier with no planner-issued producer occurrence, so it would name no ownership record and could only be given the authority of wherever it happened to be transferred" })
-//
-// does not reproduce anywhere in this row any more.
-//
-// TWO SENTENCES THAT STOOD HERE ARE STRUCK, not softened:
-//
-//   1. "IT DIES AT ITS `expect` BEFORE THE PROPERTY IS EVALUATED." It reaches
-//      every assertion.
-//   2. "Un-ignoring the row is therefore NOT the repair and would only restore
-//      a refusal." The frame said in advance that this sentence would expire
-//      the moment `D3` landed. It has.
-//
-// WHY THE ROW IS STILL IGNORED, and it is ONE ASSERTION. Run un-ignored at
-// this tip:
-//
-//   success path                                 PASSES
-//   assert_ne!, the selection discriminator      PASSES
-//   ordinary source Result route                 PASSES
-//   error path                                   FAILS   left 517  right 0
-//
-// 517 is tag 5 = `PersistentGround`, payload index 2: the projected field is
-// the nested `PrivateTransferCount(nat, nat)` that the plan requires `Wrote`
-// to carry. `right` is `BoundaryTag::ImmediateBool`, which is the `Bool` this
-// rig used to hand `Wrote` before the child-shape repair below. The
-// expectation is a fossil of a payload the fixture is no longer free to
-// choose, so it compared the rig's own input against itself.
-//
-// IT IS REPORTED RATHER THAN ADJUSTED, because the frame bans adjusting it:
-// `§4`, do not re-baseline or re-scope the row's assertions to fit whatever
-// the repaired edge produces; a row that cannot assert its stated property
-// after the repair is a finding to report, not an assertion to adjust.
-//
-// THE ROW IS NOT VACUOUS WHILE IT WAITS. With that one assertion bypassed the
-// row passes, and the `AC-3` population-side mutation -- swapping the two arm
-// constructors in the consumer's match -- reddens it (the success-path
-// assertion goes 0 against 256). Both measured here, at this tip.
 #[test]
-#[ignore = "RT-CARRIER-PRODUCER-OCCURRENCE D4: the carrier edge now emits and the row reaches its property; its error-path assertion still expects the Bool payload the pre-D3 rig handed Wrote, and re-baselining that expectation is banned by frame section 4 -- reported, not adjusted"]
 fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let nested_default = || RuntimeTrap {
@@ -3539,6 +3494,82 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     );
     let producer_defining_unit = holding_units[0];
     let producer_emission_owner = ContinuationEmissionOwner::Predeclared(producer_defining_unit);
+    // `D4` -- the error path's expected boundary tag, READ FROM THE PLAN.
+    //
+    // What stood here until `D4` was `BoundaryTag::ImmediateBool`: the `Bool`
+    // this rig itself handed `Wrote` before the child-shape repair below. The
+    // criterion carried the defect's own fingerprint, so it could not fail the
+    // way it was meant to. Its replacement must not be sourced from the run
+    // either -- so it is not the observed word, not the observed tag, and
+    // emphatically not the payload index, which is an arena position: sound as
+    // a measurement, unsound as a criterion.
+    //
+    // WHICH aggregate. The consumer's error branch matches `Wrote` with one
+    // binder and returns that binder, so the value it projects is `Wrote`'s
+    // CHILD -- the `PrivateTransferCount` at `ok_root.field(0)`, named by the
+    // same path and role the producer builds it at below.
+    //
+    // WHERE THE TAG COMES FROM. Production reads the ruled allocation lane off
+    // the ownership record and maps it to a tag in a closed two-arm match, at
+    // `CarrierAllocationRequest::PlannedAggregate` in `aggregates.rs`, under
+    // its own comment: "the LANE is read from the record, never from the
+    // caller". This mirrors that match, so the expected side of the comparison
+    // below is a PLAN QUERY, not a constant: it would predict the same tag
+    // with no run to read, and it moves if the planner's ruling moves.
+    //
+    // WHY THAT LANE IS `PersistentGround` HERE, stated as the rule rather than
+    // as this instance, all at `4d20a1cb5`:
+    //
+    //   boundary_value.rs:129-140  an aggregate's lifetime is a MEET over its
+    //                              children; `Constructor` is a persistable
+    //                              SHAPE, so it keeps `PersistentGround` only
+    //                              when every child outlives it, and falls to
+    //                              `InvocationAggregate = 9` when one child is
+    //                              an invocation-arena referent.
+    //   boundary_value.rs:216-218  the closed roster of what IS invocation-
+    //                              owned: `InvocationBorrowed`,
+    //                              `InvocationHostResult`,
+    //                              `InvocationAggregate`.
+    //   boundary_value.rs:211-212  `ImmediateBoundedNat` is `NoReferent`, so a
+    //                              `BoundedNat` child is not on that roster.
+    //
+    // The one link that is about THIS fixture rather than about the rule is
+    // that what it builds really is an `ImmediateBoundedNat`, and that link is
+    // closed at a producer rather than read off the type's name:
+    //
+    //   boundary.rs:110            `Lowered::BoundedNat(_) ->
+    //                              LoweredVariant::BoundedNat`, in an
+    //                              exhaustive no-`_` match.
+    //   boundary.rs:1149-1152      `LoweredVariant::BoundedNat ->
+    //                              RepresentedImmediate { tag:
+    //                              ImmediateBoundedNat, spill: Some(Int) }`.
+    //   mod.rs:8231-8245           `BoundedNatV1` is a one-field newtype and
+    //                              both of its constructors are `Self { value
+    //                              }`, so `derived_from_validated` carries no
+    //                              representational difference from
+    //                              `mint_after_reply_validation`. The name
+    //                              records provenance for a reader; it does
+    //                              not change the disposition.
+    let projected_error_occurrence = plan
+        .synthesized_aggregate_occurrence(
+            producer_emission_owner,
+            effect_seat,
+            &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk).field(0),
+            SynthesizedConstructorRole::Fixed(
+                SynthesizedFixedConstructorRole::PrivateTransferCount,
+            ),
+        )
+        .expect("the planned nested transfer count has an ownership record");
+    let expected_error_tag = match plan
+        .aggregate_allocation_at(
+            projected_error_occurrence,
+            PlannedAggregateShape::Constructor,
+        )
+        .expect("the planned nested transfer count has a ruled allocation lane")
+    {
+        PlannedAggregateAllocation::PersistentGround => BoundaryTag::PersistentGround,
+        PlannedAggregateAllocation::InvocationAggregate => BoundaryTag::InvocationAggregate,
+    };
     let read_some = plan
         .synthesized_constructor_identity(SynthesizedConstructorRole::Fixed(
             SynthesizedFixedConstructorRole::ReadSome,
@@ -3754,12 +3785,15 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
 
     let error_word = c2_run_edge_with_arg(producer, base, 0);
     let error_observed = c2_run_edge_with_arg(consumer, base, error_word);
+    // Derived above, from the plan's ruled allocation lane -- never from this
+    // run. The payload is an arena index and is deliberately not asserted.
     assert_eq!(
-        error_observed as u64,
-        BoundaryTag::ImmediateBool as u64,
+        (error_observed as u64) & crate::boundary_value::BOUNDARY_TAG_MASK,
+        expected_error_tag as u64,
         "runtime error must select the synthesized Constructor payload, preserve \
          its D2 identity, match it through the ordinary tag helper, and project \
-         its field"
+         its field -- whose boundary tag is the lane the plan ruled for that \
+         aggregate"
     );
     assert_ne!(
         success_observed, error_observed,
