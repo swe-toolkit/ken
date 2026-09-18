@@ -524,6 +524,59 @@ scripts/scripted-pr-automerge.sh \
 > comment-only diff that adds a fenced code block inside `///` adds a compiled,
 > executed test. That is a code change wearing a comment's syntax. Check for an
 > added fence before treating a `///` diff as doc-only.
+
+> ### ON `doc-only`, RUN THE `§14a` READ SEPARATELY. ALWAYS.
+>
+> **`doc-only` decides WHICH CI MATRIX RUNS. `§14a` decides WHO MUST REVIEW.**
+> Different questions over different criteria. A correct `doc-only` line
+> sitting in your routing post **reads as evidence for the review question
+> nobody asked it.**
+>
+> `§14a` names **`library/`** specifically — not "documentation", so a candidate
+> can be `doc-only` to the classifier and still need the Architect's vote.
+> Measured 2026-09-18 on `fefde16e`, a 162-line proof-obligation survey under
+> `docs/program/`: `doc-only` to the classifier, outside `library/` to `§14a`.
+> Raised by the Architect (`evt_2zeccsvspa4g1`).
+>
+> **THE GUARD IS ONE-DIRECTIONAL. Only `doc-only` can mislead.**
+>
+>     ON doc-only  ->  run the §14a read separately. ALWAYS.
+>     ON full      ->  nothing owed; it cannot cause a skip.
+>
+> Reading `doc-only` as the predicate **skips a gate**. Reading `full` as the
+> predicate costs at most a review nobody needed. That is half the work of "two
+> reads, never one" and catches the same failures — and this step runs on every
+> candidate, so the cheap version is the one that survives a hundred runs
+> (Architect, `evt_6fa01xrvj9t3j`).
+>
+> **One divergent instance is enough, and only a divergent one counts.** Four
+> cells, classifier against `§14a`:
+>
+>     doc-only x escalates      fefde16e   DIVERGENT -- the instance
+>     full     x escalates                 concordant, both say heavy
+>     doc-only x no-Architect              concordant, library-confined
+>     full     x no-Architect              STRUCTURALLY EMPTY
+>
+> Library-confined implies `doc-only` by path, so the fourth cell is reachable
+> only by the classifier being **wrong** about paths — an instrument failure,
+> not a case. And a concordant row **cannot discriminate**: it is consistent
+> with the classifier determining the review answer, so it corroborates
+> nothing. **Do not add one to this evidence.** I did — `b3cacccd2`, cited as a
+> `full`-CI mirror — and the Architect caught it before it landed. By path it is
+> a single zero-`crates/` file, so the `full` half was never derivable from the
+> diff, and the row sat in the concordant cell either way. **A supporting row
+> inside a finding you authored gets adopted, not audited** — by its author most
+> of all.
+>
+> **And the `docs/program/` exception is CONJUNCTIVE.** Verbatim from `§14a`:
+>
+>     the change is **currency or editorial**, and the Steward
+>     **authorized the expansion when routing the WP**.
+>
+> Two conditions joined by "and". When you claim the exception, **state both.**
+> The second is the one that goes unsaid, because it is a fact about **your own
+> prior act** rather than about the diff in front of you — nothing in the
+> candidate can remind you of it.
 - **Never `git fetch` while it runs** — a lost ref-CAS reads as unverified.
 - **Never pipe its output through `grep`** — block buffering swallows the poll
   lines.
