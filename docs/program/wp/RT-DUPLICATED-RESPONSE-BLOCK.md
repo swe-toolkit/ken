@@ -158,10 +158,38 @@ site in the whole program` too strong?**
   NODE, not this one.** This node closes by delivering the ruling and the `D0`,
   and the Steward cuts the successor.
 
-**Do not pick an arm to get started.** The two have disjoint deliverables. The
-predecessor diagnosis's surviving *"too strong"* verdict **is not a ruling** —
-its only supporting case was measured false and no replacement was offered.
-See the node's *"THE CONCLUSION THAT OUTLIVED ITS PREMISE"*.
+*"Do not pick an arm to get started"* was this section's instruction while the
+fork was open. **It is SPENT — the fork is ruled, and the ruling is below.**
+Kept as the record of what was asked, not as live direction. The predecessor
+diagnosis's surviving *"too strong"* verdict was never a ruling: its only
+supporting case was measured false and no replacement was offered. See the
+node's *"THE CONCLUSION THAT OUTLIVED ITS PREMISE"*.
+
+### THE FORK IS RULED, AND THE ANSWER IS NEITHER ARM
+
+**Architect, `evt_4eghtvj2fhpz0`. `Dr` IS DISCHARGED BY CITING IT.** The two
+arms above are the record of what was asked; **neither is the answer, and
+nothing below is to be read as choosing between them.**
+
+    THE RULING   the invariant is CORRECT, and `responses.rs:1279` is the only
+                 thing preventing a SILENT WRONG-CONTINUATION ROUTE.
+                 The repair unit is a THIRD thing, LARGER than either arm:
+                 PRODUCER AND CONSUMER MOVE TOGETHER.
+
+⇒ **Arm B is rejected** — the invariant is not too strong. **Arm A is also
+rejected**: de-duplicating alone leaves the consumer selecting by a key the
+producer may not have inserted under, which is the mis-route the guard is
+currently the only barrier against. **`RT-HOST-RESPONSE-OCCURRENCE-KEY` is ONE
+PART of the repair and is not sufficient alone.**
+
+> **This section previously posed the fork as a live binary after it had been
+> ruled**, and `AC-6` required *"the arm"* — wording a no-arm ruling cannot
+> satisfy. **The gate could not be discharged in its own terms by the ruling
+> that discharges it.** Corrected here; Architect, `evt_7ct1bwa50pne7`. The
+> shape is the one this whole section exists to repair, one turn later: **an
+> obligation stated where it cannot bind.** It was recorded in a thread while
+> the tree carried the old text, and **a correction that lives in a thread has
+> not landed.**
 
 **This matches what the issue node already says and the frame previously did
 not:** *"This node does not pick. The fork is a design question about
@@ -175,13 +203,29 @@ hand."*
 - **D1** — on (1): the repair at the site D0 names, with the four rows
   re-measured individually and each given a named disposition.
 - **Dr — THE RULING ON §3a's FORK, cited by `evt_`/`dec_` id, with the arm
-  recorded.** This is a deliverable, not a courtesy. It is required before any
-  edit to `host_response_routes`' key or loop shape, and before any retirement
-  or relocation of the uniqueness assertion.
-- **D1'** — on (2): **GATED BEHIND `Dr`, and only if the ruling returns Arm
-  A.** If the ruling returns Arm B, the repair is a successor node and **this
-  node closes on `Dr` + `D0` without touching the check.** The relaxation is
-  not this node's to perform on its own judgment.
+  **or the recorded rejection of both** recorded.** This is a deliverable, not
+  a courtesy. It is required before any edit to `host_response_routes`' key or
+  loop shape, and before any retirement or relocation of the uniqueness
+  assertion. **DISCHARGED: `evt_4eghtvj2fhpz0`, neither arm** — see §3a.
+- **D1' — STRUCK. It is not this node's work under any answer the fork
+  returned, and it was never this node's work under either arm as written.**
+  `D1'` was *"the check retired or relocated to the point of use."* The ruling
+  says the invariant is **correct**, so there is nothing to retire.
+
+> **`D1'` also carried an INVERTED gate, and that is a separate defect from
+> its being spent.** It read *"only if the ruling returns Arm A"* — licensing
+> the relaxation by the arm that says the invariant is RIGHT, and forbidding it
+> by the arm that says it is too strong. **Backwards.** And under both arms as
+> §3a writes them it had no home either way: Arm A says *"the invariant is
+> untouched, this node closes here"* (that is `D1`, not `D1'`), Arm B says
+> *"successor node, not this one."*
+>
+> **It is a splice defect and it lives exactly on the seam** — §3a came from
+> the closed frame, `D1'` from the survivor. **The by-position sweep that
+> recovered five missing obligations cannot find this class**, because nothing
+> is missing: two present pieces were joined wrongly. **Enumeration finds
+> omissions; only reading the join finds recombinations.** Architect,
+> `evt_7ct1bwa50pne7`.
 - **D2** — the four `#[ignore]` labels rewritten to whatever D0/D1 establish,
   including for any row that stays ignored. A row that stays ignored gets its
   reason restated in current terms, not left carrying a prediction this node
@@ -221,7 +265,10 @@ hand."*
   relaxation by itself. An implementer who satisfies `AC-4` and proceeds has
   taken the decision §3a reserves.
 - **AC-6. THE FORK IS ANSWERED BY A CITED RULING BEFORE ANY PLANNER EDIT.**
-  Record the `evt_`/`dec_` id and the arm.
+  Record the `evt_`/`dec_` id and **the arm, or the recorded rejection of
+  both.** A no-arm ruling discharges this AC; **an AC that can only be
+  satisfied by a binary outcome is not satisfiable by the ruling that actually
+  came back**, which is how this one read before `evt_7ct1bwa50pne7`.
   **Control, and it is mechanical:** an edit to `host_response_routes`' key or
   loop shape, or a retirement or relocation of the uniqueness assertion, that
   lands without that citation is **out of scope by construction** — not a
@@ -258,6 +305,34 @@ hand."*
   conformance suite run in CI. **State your target selection beside the
   claim:** `cargo check` does not compile `#[cfg(test)]`, so a green `check` is
   **not** evidence that any test built.
+- **AC-11. CLAUSE 3 OF THE BAR — THE CONSUMER SELECTS BY THE KEY THE PRODUCER
+  INSERTED UNDER, AND AN ABSENT COPY REFUSES RATHER THAN FALLS BACK.**
+  Show that a `Vis` site whose route copy is absent **refuses**; a fallback to
+  the last-written route is the silent wrong-continuation mis-route the ruling
+  identifies as the thing the invariant is currently the only barrier against.
+  **Control — and building it is part of the AC:** revert clause 3 alone,
+  keeping the de-duplication, and **exhibit the mis-route.** If the exhibit
+  cannot be built, **that failure is itself the finding and is reported**, not
+  treated as the control passing.
+
+> **WHY THIS AC EXISTS AND WHY IT WAS MISSING. Every producer-side control
+> passes on a repair that mis-routes.** `AC-0`-`AC-10` are census,
+> dispositions, `S6`, no-regression, relaxation-vs-purpose,
+> `RT-FRAME-MARKER-ONCE`, fork-cited, repair-reaches-site,
+> invariant-still-refuses, crate-set-derived, second-blockers. **`AC-8` is
+> clause 1 of the bar. Nothing was clause 3.**
+>
+> **`AC-8` in particular is satisfied by a repair that keeps the guard firing
+> on the within-one-occurrence case while routing every `Vis` site to the wrong
+> copy** — the guard still refuses something, so the control is green, and the
+> defect ships. The ruling's *"producer and consumer move together"* is exactly
+> this: a bar with only producer-side clauses cannot see a consumer-side
+> failure.
+>
+> **The identical gap was in the Architect's own two-clause bar**, which is
+> evidence the shape is easy to miss rather than that anyone was careless.
+> Architect, `evt_7ct1bwa50pne7`.
+
 - **AC-10. The second blockers are checked and NOT pulled in.** For each row
   that does not readmit, say which blocker it now stops at, **measured**.
   Specifically: does the `px7n` pair reach `[[RT-FRAME-MARKER-ONCE]]`'s

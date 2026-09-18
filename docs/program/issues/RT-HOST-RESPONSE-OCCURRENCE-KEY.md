@@ -101,16 +101,39 @@ arrival.
 
 # THE ACCEPTANCE BAR, SET BY THE ARCHITECT
 
-Both halves are required and the second is the one a tuple-widening satisfies
-by accident:
+> ### THIS BAR WAS TWO CLAUSES AND IS NOW THREE. THE THIRD REPLACES, NOT EXTENDS.
+>
+> **Architect, `evt_4eghtvj2fhpz0`, 2026-09-18.** The two-clause bar below was
+> published here as *"THE ACCEPTANCE BAR"* and **was insufficient on its own**
+> — both its clauses are producer-side, and **every producer-side control
+> passes on a repair that mis-routes.**
+>
+> **Say "replaces", not "gains".** A reader arriving at a bar that looks
+> complete will not go looking for a third clause, which is the whole failure
+> mode: the two clauses below are individually correct and jointly **not a
+> bar.** Architect, `evt_7ct1bwa50pne7`; Steward sweep.
+>
+> **And this node is ONE PART of the repair, not the whole of it.** The ruling
+> is that producer and consumer move together. Re-keying alone does not clear
+> the rows.
+
+All three are required. Clause 2 is the one a tuple-widening satisfies by
+accident; **clause 3 is the one nothing else in this chain checks.**
 
     MUST STILL REFUSE   two response-handling sites within ONE occurrence
                         claiming one operation constructor
     MUST NOT REFUSE     N legitimate instantiations each contributing one
                         response handler
+    MUST NOT MIS-ROUTE  the consumer selects by the key the producer inserted
+                        under, and a Vis site whose route copy is ABSENT
+                        REFUSES rather than falling back to the last-written
+                        route
 
 **A repair that cannot still refuse the first has relaxed the invariant, not
-re-keyed it.**
+re-keyed it.** **A repair that satisfies the first two and fails the third has
+kept the guard green while routing every `Vis` site to the wrong copy** — which
+is a silent wrong-continuation route, and is what `responses.rs:1279` is
+currently the only barrier against.
 
 # THE POPULATION IS ALL FOUR ROWS
 
