@@ -220,6 +220,32 @@ panic tells you nothing about how many more sit behind it.**
 
 Edge 1 is compiled first, so its `.expect` is the one that fires.
 
+> **CORRECTION — `§0`, runtime-implementer, measured at `e75f1fe27` during
+> `D3`. The table above assigns ONE defect per edge, and edge 1 carries TWO,
+> of different kinds.**
+>
+> Edge 1's `ok` value is a `Lowered::DynamicConstructor` whose single
+> `DynamicConstructorAlternativeV1` is written `occurrence: None` **by hand** —
+> the same kind of defect `§1e` attributes to edge 2, sitting in edge 1. Edge
+> 1's `error` value is the `synthesized_constructor` one the table names. The
+> table lists only the second.
+>
+>     ANCHOR
+>       c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload
+>       :: its `ok` alternative carries a hand-written absent occurrence
+>
+> **The second defect is invisible from the panic, and that is structural
+> rather than bad luck.** The walker reaches the `error` template first, so
+> the `Lowered::Constructor` refusal is the only one reported. Measured: with
+> the alternative's occurrence threaded, and then with both of edge 2's
+> threaded as well, the panic was byte-identical to the baseline. It moved
+> only when the ambient body authority was bound.
+>
+> ⇒ **A panic reporting the first refusal on an edge bounds how many defects
+> the READER can see, never how many the edge carries.** `§1c` already states
+> this across the tree; the table is where it stops being applied, because one
+> row per edge reads as one defect per edge.
+
 ### 1e. Edge 2's `occurrence: None` is written into the fixture by hand
 
 `:2727-2740` constructs `Lowered::Constructor { .. occurrence: None .. }`

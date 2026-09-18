@@ -704,3 +704,204 @@ fn d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation(
          truncated predicate (not some unrelated error): {reason}"
     );
 }
+
+// ---------------------------------------------------------------------
+// AC-2 / AC-5: the POSITION axis.
+//
+// Everything above varies the SPELLING (`‖A‖` vs `||A||`) and holds the
+// POSITION constant -- formation at a declaration head, and every
+// argument-position fixture PARENTHESIZED (`elim_trunc (‖ Nat ‖) ...` at the
+// three `elim_trunc` call sites). The head call site is ungated; the roster
+// gates the argument loop. So every fixture above routes around the predicate
+// under test, and the suite cannot see a regression in it.
+//
+// These vary the position instead, with the grouped form beside each bare
+// one. Parse-level on purpose: AC-2 is a property of what the application
+// ARGUMENT LOOP consumes, which is settled before elaboration.
+// ---------------------------------------------------------------------
+
+use ken_elaborator::parser::parse_decls;
+use ken_elaborator::{Decl, Expr};
+
+/// The body of a single-declaration source.
+fn body_of(src: &str) -> Expr {
+    let decls = parse_decls(src).unwrap_or_else(|e| panic!("{src:?} must parse: {e:?}"));
+    match decls.into_iter().next().expect("exactly one declaration") {
+        Decl::ViewDecl { body, .. } => body,
+        other => panic!("expected a const/view declaration, got {other:?}"),
+    }
+}
+
+/// Flatten an application spine: `f a b` becomes `(f, [a, b])`.
+fn spine(mut expr: &Expr) -> (&Expr, Vec<&Expr>) {
+    let mut args = Vec::new();
+    while let Expr::EApp(fun, arg, _) = expr {
+        args.push(&**arg);
+        expr = &**fun;
+    }
+    args.reverse();
+    (expr, args)
+}
+
+fn is_var(expr: &Expr, want: &str) -> bool {
+    matches!(expr, Expr::EVar(name, _) if name == want)
+}
+
+/// AC-2 -- THE REQUIRED CASE, and it is the fail-OPEN direction.
+///
+/// Every failure this node repairs is fail-CLOSED: a valid program refused,
+/// nothing misparsed. Admitting `TruncBar` to the roster widens what the
+/// application-argument loop CONSUMES, which is the opposite direction, and a
+/// repair measured only on its rejections going away cannot see what it
+/// started swallowing.
+///
+/// So the assertion is not "it parses" -- it is that the truncation CLOSES and
+/// the loop then CONTINUES, leaving `y` as a sibling argument rather than
+/// swallowing it into the truncation body.
+#[test]
+fn ac2_a_bare_truncation_argument_closes_and_the_loop_continues() {
+    let body = body_of("const k : Nat = f \u{2016} Bool \u{2016} y");
+    let (head, args) = spine(&body);
+
+    assert!(is_var(head, "f"), "head must still be `f`, got {head:?}");
+    assert_eq!(
+        args.len(),
+        2,
+        "the truncation must CLOSE and the loop CONTINUE, leaving two sibling \
+         arguments. One argument means `y` was swallowed into the truncation \
+         body -- the fail-open direction this criterion exists to catch. Got: \
+         {args:?}"
+    );
+    assert!(
+        matches!(args[0], Expr::ETrunc(..)),
+        "first argument must be the truncation itself, got {:?}",
+        args[0]
+    );
+    assert!(
+        is_var(args[1], "y"),
+        "second argument must be `y`, still a SIBLING of the truncation rather \
+         than part of it, got {:?}",
+        args[1]
+    );
+}
+
+/// AC-5 -- the position axis, with the grouped form beside each bare one.
+///
+/// THE ROWS ARE ORDERED DELIBERATELY: invariant positions first, the
+/// load-bearing one last, so a roster regression reds on a row whose label
+/// names it rather than aborting in a shared helper.
+///
+/// MEASURED at this base, by removing `TruncBar` from `can_start_atom_expr`:
+///
+/// ```text
+/// head        PARSES    ungated -- the head call site never consults the roster
+/// annotation  PARSES    a DIFFERENT predicate (`can_start_atom_type`)
+/// grouped     PARSES    grouping bypasses the roster entirely
+/// bare arg    REJECTS   the only position the expression roster gates
+/// ```
+///
+/// ⇒ **Three of the four positions are invariant under that mutation, and the
+/// pre-existing fixtures are all in those three.** That is why the green
+/// suite above could not see a regression here: not because it was careless,
+/// but because every fixture it has sits in a position the predicate does not
+/// govern.
+#[test]
+fn ac5_truncation_head_bare_argument_and_grouped_argument_all_parse() {
+    // HEAD position -- ungated, and the only position the suite above covers.
+    assert!(
+        matches!(
+            body_of("const k : Omega = \u{2016} Bool \u{2016}"),
+            Expr::ETrunc(..)
+        ),
+        "head position must still be a bare truncation"
+    );
+
+    // ANNOTATION position -- the type side, a different roster function.
+    let decls = parse_decls("const k : \u{2016} Bool \u{2016} = x")
+        .expect("a truncation in annotation position must parse");
+    assert!(
+        format!("{decls:?}").contains("TTrunc"),
+        "annotation position must reach the TYPE roster's truncation form"
+    );
+
+    // ARGUMENT position. GROUPED FIRST -- it is invariant under a roster
+    // regression, so if it reds the cause is something other than the roster.
+    for (label, src) in [
+        ("grouped", "const k : Nat = f (\u{2016} Bool \u{2016}) y"),
+        (
+            "bare -- THE LOAD-BEARING ROW",
+            "const k : Nat = f \u{2016} Bool \u{2016} y",
+        ),
+    ] {
+        // Labelled BEFORE the shared helper, so a regression reds on a row
+        // that names itself instead of inside `body_of`.
+        assert!(
+            parse_decls(src).is_ok(),
+            "{label}: must parse. If the grouped row above passed and this one \
+             did not, the EXPRESSION roster has stopped admitting `TruncBar` in \
+             argument position -- grouping and the head position are invariant \
+             under that change, so this is the only row that can see it."
+        );
+        let body = body_of(src);
+        let (head, args) = spine(&body);
+        assert!(is_var(head, "f"), "{label}: head must be `f`");
+        assert_eq!(args.len(), 2, "{label}: must yield two sibling arguments");
+        assert!(
+            matches!(args[0], Expr::ETrunc(..)),
+            "{label}: first argument must be the truncation"
+        );
+        assert!(is_var(args[1], "y"), "{label}: second argument must be `y`");
+    }
+}
+
+/// TRANSITION SENTINEL -- NOT a statement that this behaviour is correct.
+///
+/// Inside a truncation body the parser WITHHOLDS argument-position truncation,
+/// because a self-delimiting delimiter is genuinely ambiguous there. That
+/// withholding is not uniformly a refusal: at ONE argument it refuses, and at
+/// TWO it SILENTLY RE-ASSOCIATES, turning a source the base rejected into a
+/// misparse with no diagnostic. That is the fail-open direction, admitted in
+/// `Parser::truncation_depth`'s own policy comment rather than discovered
+/// later.
+///
+/// A policy comment is structurally exempt from execution, so this pins the
+/// three documented rows as BEHAVIOUR. All three were re-measured at this
+/// base and agree with that comment.
+///
+/// WHAT RETIRES THIS TEST: any change that makes the two-argument case refuse
+/// instead of re-associating. When that lands, the second row below goes red.
+/// That redness is the POINT -- it is the review trigger, not a regression.
+/// Delete the row then, and say in the commit that the fail-open closed.
+#[test]
+fn sentinel_inside_a_truncation_body_two_arguments_reassociate_instead_of_refusing() {
+    // ONE argument: refused. Probing only this suggests the enclosed form is
+    // closed, and it is not -- the refusal depends on arity.
+    assert!(
+        parse_decls("const k : Omega = \u{2016} f \u{2016} Bool \u{2016} \u{2016}").is_err(),
+        "the one-argument enclosed form is refused today"
+    );
+
+    // TWO arguments: parses, re-associated. `‖ f ‖Bool‖ ‖Nat‖ ‖` becomes an
+    // application of `‖f‖` rather than a truncation of `f ‖Bool‖ ‖Nat‖`.
+    let body = body_of(
+        "const k : Omega = \u{2016} f \u{2016} Bool \u{2016} \u{2016} Nat \u{2016} \u{2016}",
+    );
+    let (head, args) = spine(&body);
+    assert!(
+        matches!(head, Expr::ETrunc(..)),
+        "TODAY the head is `‖f‖` -- the author wrote a truncation OF an \
+         application and got an application OF a truncation. If this is now \
+         a refusal, the fail-open has been closed: retire this test. Got \
+         head {head:?}"
+    );
+    assert_eq!(args.len(), 2, "today's re-association yields two arguments");
+
+    // GROUPED: the sanctioned escape hatch, and it nests correctly.
+    assert!(
+        matches!(
+            body_of("const k : Omega = \u{2016} f (\u{2016} Bool \u{2016}) \u{2016}"),
+            Expr::ETrunc(..)
+        ),
+        "the grouped form must remain a truncation OF an application"
+    );
+}
