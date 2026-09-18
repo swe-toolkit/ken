@@ -153,14 +153,26 @@ carries. It is **not** an ancestor of `main` and never will be — cite
 
 **The third row is a negative control, not an open obligation.** The first
 version of this ledger, published at `096f2f0dd`, scored it
-`OPEN … KwProof — UNBUILT`. That is wrong and it is forbidden in terms by this
-node's own frame:
+`OPEN … KwProof — UNBUILT`. That is wrong, and it is forbidden in terms by the
+frame's **§5 position taxonomy** — see the structural-refusal paragraph there
+(`docs/program/wp/LANG-ATOM-START-CLASSIFICATION-CLOSURE.md`, §5). In this
+node's own words: Ken has no declaration terminator, so the atom-start roster's
+complement *is* the declaration separator, and admitting `proof` bare in
+argument position makes a declaration body swallow the next declaration. That
+holds for any parser of this grammar. The refusal is therefore a property of
+the grammar, not an implementation shortfall, and the row is discharged by the
+third ledger value — **closed by explicit classification as refused** — not by
+the unification and not by an increment.
 
-> `expression, app argument, bracket depth 0` — **STAYS REFUSED, structurally.**
-> Ken has no declaration terminator, so the roster's complement IS the
-> declaration separator; admitting `proof` at depth 0 makes a declaration body
-> swallow the next declaration. That holds for any parser of this grammar.
-> ⇒ **Do not score the depth-0 row as an unmet AC.**
+> **Cited by SECTION, not quoted, and the reason is the correction itself.**
+> This paragraph previously quoted the frame verbatim, and the quoted block
+> ended `⇒ Do not score the depth-0 row as an unmet AC.` **The bracket-depth
+> coordinate that sentence is keyed on was RETIRED** the same day
+> (`evt_17x6mx5bg96bv`; frame §5's SUPERSEDED sub-block), and the frame was
+> rewritten around that — so the quote outlived the text it copied and kept a
+> dead coordinate alive in a second file. **Quoting mutable text is an
+> untracked read dependency**: the frame's author had no way to see this node
+> was carrying their retired sentence. A section citation fails loudly instead.
 
 **RULED 2026-09-18: OPTION A — UNCONDITIONAL EXCLUSION AT EVERY DEPTH.**
 Spec-leader's design call (`evt_17x6mx5bg96bv`), routed to Spec by the
@@ -246,3 +258,78 @@ release, not the remaining work.
 it** — three stacking instances on 2026-09-18 each cost a re-review, because an
 approval names an exact SHA and does not travel across a re-cut. The rule now
 sits in the release playbook at RELEASE (`e09558f53`).
+
+## TRACKED OBLIGATION ON THE NEXT INCREMENT — a noun correction that rides, not a node
+
+**Recorded by the Steward 2026-09-18 when ruling NOT to withdraw `92a0339fb`
+(`evt_5q7fwct1ktqhf`).** The candidate lands carrying a test name that
+overclaims, and this block exists so the correction is a tracked obligation
+rather than an intention. It does NOT get its own node; it rides the next
+increment.
+
+    RENAME     all_three_rosters_refuse_every_exclusion_trigger
+            -> all_three_atom_entry_points_refuse_every_exclusion_trigger
+    DOCSTRING  "roster functions" -> "ATOM ENTRY POINTS"
+    ADD        can_start_pattern is the third ROSTER and is deliberately
+               unguarded, because can_start_atom_pat wraps it -- guarding both
+               duplicates the check and re-creates the asymmetry the KwProof
+               hardening removed
+
+**Nothing behavioural is wrong with the landed commit.** The assertions are
+correct and the Pattern arm is mutation-proven (guard removed + branch = RED
+naming `AsAlias`; guard removed - branch = GREEN). The defect is a name and one
+docstring noun: the test asserts over the three atom ENTRY POINTS
+(`can_start_atom_expr`, `can_start_atom_type`, `can_start_atom_pat`) and calls
+them rosters. By the frame's own vocabulary the three ROSTERS are expr, type,
+and `can_start_pattern`.
+
+**Why it was worth tracking rather than leaving to the next reader.** The error
+runs toward guarding `can_start_pattern` — a duplicate of `can_start_atom_pat`'s
+guard. It manufactures a bad commit rather than a re-measurement, so the cheap
+window to fix it is before someone acts on it.
+
+**The generator is the frame, not the test, and it is repaired.** Frame `:33`
+introduced the pair `can_start_pattern` / `can_start_atom_pat` as "a third
+roster" and §4c corrected it 190 lines later; two readers (Steward,
+language-implementer) made the identical error independently inside one hour
+before reaching the correction. The disclaimer now sits at `:33`, at the point
+of introduction.
+
+## TRACKED OBLIGATION ON INCREMENT B2 — `atom_form_drift`, from B1's Finding 3
+
+**Recorded by the Steward 2026-09-18, on language-leader's request
+(`evt_46yeeq7cqzdge`, `evt_69dp5gfxkrv9d`), at B1's routing. This is a WRITE,
+not a promise in a channel. Every symbol below was re-measured at the routed
+candidate `a85c35b67c60a0ee49fb9e45d9a8907d0d19952d` before recording.**
+
+**The obligation.** `atom_form_drift`'s signature and **both** its call sites
+need the same *"leaves production byte-identical"* carry-property treatment as
+the rest of `B1`. Measured at the candidate:
+
+    crates/ken-elaborator/src/parser.rs
+      :3801   fn atom_form_drift(&self, form: &str) -> ElabError
+      :3730   return Err(self.atom_form_drift("Var"));
+      :3743   return Err(self.atom_form_drift("Ctor"));
+
+**Two call sites, and the count is measured rather than inherited from the
+phrase "both call sites."**
+
+**It was correctly left OUT of `B1`, and the reason is the part worth
+keeping.** The Architect's carry was bounded by a **property**, not by a list.
+A list appended to it would have **widened past the property** — an
+admitting-direction failure, and the Architect confirmed it was the same
+failure they had just flagged, occurring inside their own text. ⇒ **Do not
+"complete" a property-bounded carry by enumerating members. The enumeration is
+what breaks it.**
+
+**A bound `B2` should know in advance, from the leader:**
+`no_two_forms_admit_the_same_token` only sees overlaps on tokens already in
+`historical_roster()` (both in the `#[cfg(test)]` module — `historical_roster`
+at `:513`, the test at `:616`). On the **expression** side that is exactly
+where it needs to fire, because `Token::Ident(_)` is in the roster and the real
+collision risk is ordinary variables against `Ident`-headed contextual
+selectors. **So there is no gap in practice — but the scope is a property of
+the roster, not of the test, and a later roster change moves it silently.**
+
+**This obligation rides `B2`. It is not a node** — it closes when `B2` closes,
+and `B2` states which arm it took.

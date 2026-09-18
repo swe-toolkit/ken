@@ -33,6 +33,23 @@ way and both are on the record (§2). The node does not re-litigate them.
 > **A third roster pair, `can_start_pattern` / `can_start_atom_pat`, is
 > genuinely uncensused** and is AC-9.
 >
+> > **"PAIR" IS LOAD-BEARING AND THIS LINE IS WHERE READERS LOSE IT.** Only
+> > `can_start_pattern` is the third ROSTER. `can_start_atom_pat` is a derived
+> > wrapper —
+> > `can_start_pattern() && !is_contextual_ident("as")` — plus the exclusion
+> > guard; it is an atom ENTRY POINT, not a roster. §4c says so at length, but
+> > it says so ~190 lines below this sentence, and **two readers independently
+> > took the pair as one roster before reaching it** (Steward, a carried note
+> > saying "all three rosters self-guard"; language-implementer, a test renamed
+> > to `all_three_rosters_…` while asserting over the three entry points). Both
+> > errors ran the same way: toward guarding `can_start_pattern`, which
+> > duplicates `can_start_atom_pat`'s guard and re-creates the asymmetry the
+> > `KwProof` hardening removed. **Two independent instances inside one hour is
+> > a reading on this line, not on either reader.** Say "the three atom entry
+> > points" when you mean guard placement and "the three rosters" when you mean
+> > admitted-token content; they are different sets of three that overlap in two
+> > members.
+>
 > **A node scoped to `can_start_atom_expr` fixes two of three occurrences and
 > leaves an identical third behind a different function name.**
 >
@@ -230,6 +247,43 @@ duplicating.
 ⇒ **Close `can_start_atom_expr` and `can_start_atom_type`. The pattern side is
 a WORKED EXAMPLE of the target shape, not a site to repair** — which is the
 direction an implementer is rarely told: where not to go.
+
+> ### AMENDED 2026-09-18 (Steward), measured at `b53dd9fcf`: the pattern side
+> ### was the worked example on a SECOND axis nobody had named.
+>
+> This section compares the three rosters on **content** — which tokens each
+> admits, 12 vs 12 on the pattern side. There is a second axis, **where the
+> exclusion is applied**, and the pattern side was already right on that one
+> too. Re-measured in `parser.rs`:
+>
+>     can_start_atom_expr    SELF-GUARDS   atom_start_exclusion(Expression)
+>     can_start_atom_type    SELF-GUARDS   atom_start_exclusion(Type)
+>     can_start_atom_pat     SELF-GUARDS   atom_start_exclusion(Pattern)
+>     can_start_pattern      NO GUARD, AND SHOULD NOT HAVE ONE
+>
+> `can_start_atom_expr` acquired its guard from the adversary's hardening; the
+> other two had theirs already. **The three ATOM entry points self-guard.**
+> `can_start_pattern` is the shared base predicate that `can_start_atom_pat`
+> wraps, exactly as §4c says above — it is not a fourth site and not an
+> unguarded hole.
+>
+> **The defect the guard closes is not a missing token; it is a per-CALLER
+> obligation.** While `can_start_atom_expr` was a pure token predicate,
+> applying the exclusions was every caller's job, and such an obligation is
+> discharged by whoever remembers. The bare-operator-name gate did not, so
+> admitting `KwProof` to the roster would have made
+> `fn f (x : Int) : Int = <=` legal whenever the next token was `proof`.
+> Guarding at the entry point covers every consumer by construction, including
+> the ones nobody has written yet — the same closure AC-1 states over tokens,
+> taken over consumers.
+>
+> **Correcting my own carried note, because it was wrong in the direction that
+> manufactures work:** I had this recorded as *"all three rosters self-guard."*
+> They do not. The three that self-guard are the atom entry points, and
+> `can_start_pattern` — one of the three ROSTERS this section names — is
+> deliberately not among them. A note that conflates the two would have sent an
+> implementer to put a guard on the base predicate, duplicating
+> `can_start_atom_pat`'s and re-creating the asymmetry the hardening removed.
 
 > **The census's own instrument failed twice, and only one direction mattered.**
 > An arm regex missed or-pattern continuations and manufactured seven phantom
