@@ -639,6 +639,13 @@ predecessor could not reach.
 **The Architect's, recorded here because a ruling delivered in thread is not
 a deliverable.** I did not reach it and am not restating it as mine.
 
+    Dr   CITATION   evt_4eghtvj2fhpz0, architect, 2026-09-18T17:10:36Z
+         ARM        NEITHER. Not Arm A, not Arm B. A third answer.
+
+`Dr` and `AC-6` were restored to section 4 and section 5 at `831e521e5`, after
+this section was written; the citation line above is what they ask for and is
+added by position rather than from memory.
+
 Both arms in 8.2 are about the **producer**: is the second entry legitimate.
 The consumer is where it is settled, and nobody had quoted it:
 
@@ -706,6 +713,78 @@ repair is observable, and it is worth more than a green run.
 **What this changes in the sections above: nothing measured.** 8.1 through 8.6
 stand as taken. What it replaces is 8.9's "no repair unit is selected here" —
 one is now selected, it is neither arm, and it is larger than either.
+
+### 8.9b The restored obligations, enumerated BY POSITION
+
+`831e521e5` restored `Dr`, `D4`, `AC-6` and the `AC-7`..`AC-10` controls after
+this candidate was first handed off. **Enumerated from section 4 and section 5
+in order rather than from recall**, which is the discipline that recovered
+them in the first place.
+
+**`Dr` — DISCHARGED.** `evt_4eghtvj2fhpz0`, arm NEITHER. See 8.9a.
+
+**`D1` — DOES NOT FIRE.** It is written for outcome `(1)`; `D0` returned the
+third answer (8.1).
+
+**`D1'` — DOES NOT FIRE, and this is the gate working.** It is gated behind
+`Dr` and fires only on Arm A. The ruling returned neither arm, so **this node
+closes on `Dr` + `D0` without touching the check**, which is exactly what
+section 4 prescribes. No relaxation was performed on implementer judgment.
+
+**`D4` — VACUOUS, and said so rather than skipped.** It asks for a registry
+row in `.github/ignored-test-exemptions.toml` **for any row readmitted with an
+accepted red**. `AC-1` readmits none, so there is no row to register.
+**Control:** that file is not in this candidate's diff at all
+(`git diff --name-only origin/main HEAD` lists five files and it is not one).
+
+**`AC-6` — SATISFIED, and its mechanical control run.** Section 5 says to
+check the diff for three shapes: an edit to `host_response_routes`' key, an
+edit to its loop shape, or a retirement or relocation of the uniqueness
+assertion. Measured:
+
+    responses.rs in the diff                     NO (zero hits by name)
+    non-#[ignore] lines anywhere under crates/   NONE
+    crates/ footprint                            4 #[ignore] attribute lines
+
+**`AC-7` — VACUOUS, and it is a vacuity worth naming rather than a pass.** It
+asks to revert the repair and confirm the readmitted rows go red again. **No
+repair landed and no row was readmitted**, so there is nothing to revert and
+nothing whose redness could discriminate. Recording this as satisfied would be
+a control defined by its own absent subject.
+
+**`AC-8` — SATISFIED in its strongest available form.** It asks that the
+invariant still refuses something. **It refuses in production, today, on all
+four rows**: the unforced baseline in 8.5 stops every one of them at
+`responses.rs:1279`. The concern behind the AC — a guard that now fires on
+nothing — cannot arise here, because nothing was removed.
+
+**`AC-9` — the crate set, DERIVED.** Touched set is two files, both
+`crates/ken-cli/tests/`. `ken-cli` is a leaf here — `ken-runtime` depends on
+nothing in it — so the reverse-dependency closure is the two test targets
+themselves, and nothing else needs testing on account of this change.
+
+**Target selection, stated beside the claim as the AC requires:** the check
+run was `ken-cargo test -p ken-cli --test px7n_nested_computational_eliminator
+--test rt_escape_second_resource_native -- --list`, `exit=0`, **8 tests
+listed**. That builds and executes each test binary in listing mode. `cargo
+check` would **not** have been evidence, because it does not compile
+`#[cfg(test)]` — and the entire risk in `D2` is that the rewritten labels are
+string literals inside a test file. `AC-3`'s `-p ken-runtime --lib` run
+(8.8a) is beyond this closure and was run anyway.
+
+**`AC-10` — the second blockers, measured, and NOT pulled in.**
+
+    px7n:149, px7n:170   reach RT-FRAME-MARKER-ONCE's frame-marker message,
+                         OrientedSubcontinuationPlanV1: checked Runtime frame
+                         marker was consumed more than once. CONFIRMED.
+    esc:653, esc:713     reach ComputationalMatch: tree-producing match
+                         scrutinee is not Bool or a constructor.
+
+**On `[[RT-CLOSURE-BOUNDARY-LANE]]`: UNDETERMINED, and that is not "ruled
+out".** Something has now been seen past the collision on the `rt_escape`
+pair, and what it reached is a **different** mechanism; nothing has seen past
+**that**. The durable-lane claim is neither confirmed nor refuted, and the
+labels say so in those words. Neither blocker is absorbed here.
 
 ### 8.10 Attribution
 
