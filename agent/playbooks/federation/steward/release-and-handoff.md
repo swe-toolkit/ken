@@ -309,6 +309,46 @@ elaborated brief and spec. The team cuts `wp/<ID>-<slug>` fresh from current
 `origin/main`. **Confirm your own worktree is off the frame branch before you
 kick.** Leaders do not compact their members; compaction is yours.
 
+## Release step 4a: a MULTI-INCREMENT node needs its cut rule IN THE FRAME
+
+**If the release text tells a ring to deliver in increments, it must also say
+where each increment is cut from. Put this in the frame, verbatim:**
+
+> **Each increment is cut fresh from `origin/main`, never stacked on the
+> increment below it.** Each increment is SQUASHED when it lands, so the moment
+> the one below lands, the base of the one above ceases to exist. Fetch, re-cut
+> from the new `main`, and name that SHA in the increment's first post.
+
+**Say it at release or it does not get said in time.** A frame that says
+*"deliver in increments, post one and stop"* and is silent on the base is not
+neutral — it reads as an instruction to keep working on the branch you are on,
+which is the wrong answer and the natural one.
+
+> ### WHY THIS IS A RELEASE-TIME RULE AND NOT A ROUTING-TIME REMINDER
+>
+> Measured on `LANG-ATOM-START-CLASSIFICATION-CLOSURE`, 2026-09-18. **Three
+> stacked increments in one day, from three different positions:**
+>
+> | | |
+> |---|---|
+> | `0dd5fdd75` | committed **18 seconds after** the Steward's M9 warning. The implementer had not read it. |
+> | `b76d93f5a` | second commit in the same window, same cause |
+> | `fd5164f9e` | stacked **after** the rule was stated explicitly in the `ROUTED:` post, and QA had already approved it at that SHA |
+>
+> **An instruction that must be read between a route and the next commit is not
+> a control — it is a race, and it was lost three times.** The routing post is
+> the wrong place because it arrives after the ring is already building. The
+> frame is read before the first commit.
+>
+> **The cost is a RE-REVIEW, not a rebase — this is what makes it worth a rule.**
+> A reviewer's approval names an exact SHA. Re-cutting the stack onto the new
+> `main` gives every commit a new hash, so **the approval does not travel** and
+> every verdict must be re-anchored. Stacking does not cost a `git rebase`; it
+> costs a second review round on work that was already reviewed.
+>
+> The routing-time check is still worth running (`merge-procedure.md` M9) — it
+> catches a ring that stacked anyway. It is the backstop, not the control.
+
 ## Release step 5: stay one release ahead
 
 Run the successor check in `../steward.md`, section 4, as the last step.
