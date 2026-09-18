@@ -68,6 +68,37 @@ composer must fall back to its true empty placeholder (`Write tests for
 @filename` on Codex). A finished-turn marker with composer content is the tell;
 an empty-composer placeholder under `Working` is the all-clear.
 
+## THE PROBE IS DEFEATED BY YOUR OWN WATCHDOG PROMPT, NOT BY FORGETTING IT
+
+**Measured 2026-09-18, and this is the half that actually fails.** The Steward
+read `language-implementer`'s composer twice — at 03:45Z and again at 04:15Z —
+saw `build layer 3` sitting in it under a finished turn from **ten hours
+earlier**, and discounted it **both times**. The probe above was in scope. It
+was not forgotten. It was **overridden by a line in the Steward's own watchdog
+interval prompt**:
+
+> *"Composer lines are FOSSILS."*
+
+That sentence is true of a seat that has completed a turn **since** the text
+appeared, which is the common case and the one it was written from. It is
+**exactly false** for the strand, because a strand is defined by the seat
+**not** having run since. So the heuristic reads as sound, fires on every tick,
+and **silently disables the probe precisely in the situation the probe exists
+for.** The language ring was stopped ten hours; the leader, told to look, found
+the unsent draft in one pass.
+
+⇒ **The discriminator is one comparison, and it is cheap:** does the seat's
+**last completed turn** predate the composer text? If yes, and work is owed,
+that line is a **candidate strand** and gets probed. If no, it is a fossil.
+Never classify a composer line without that timestamp.
+
+**The general form, which is worth more than the instance:** a lesson you have
+loaded does not compete on equal terms with a heuristic you wrote into your own
+standing prompt. The prompt is re-read every tick, in your own voice, and
+carries no citation to argue with. **When a scoped lesson and your own tick text
+disagree, the tick text is the one that is unreviewed** — audit it, and fix the
+prompt, not just the instance.
+
 ## When to reach for this
 
 **A review request, handoff, or kickoff with no pickup after a few minutes, on
