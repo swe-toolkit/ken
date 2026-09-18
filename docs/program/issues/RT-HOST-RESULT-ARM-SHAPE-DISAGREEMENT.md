@@ -21,9 +21,12 @@ origin: "Steward, 2026-09-18. Architect ruling in evt_760sbdhcgwx80, which took 
 > has either changed the assertion or changed the operation, and both of those
 > are design decisions, not fixture work.**
 >
-> The design question is the **Architect's** and they have said they will take
-> it once this node exists. The measurement below is already done; what is owed
-> is a ruling, not a census.
+> The design question is the **Architect's** and they have now ruled
+> (`evt_2w5kz75w4bp94`): **the leading outcome is that the error arm should
+> never have been recipe-derived at all.** That ruling is a LEAN WITH A
+> DISCRIMINATOR, not a finding — it names what to test first and what must be
+> checked before building. The measurement is done; what is owed is the
+> discriminator, not a census.
 
 # What the row asserts
 
@@ -102,7 +105,52 @@ swaps a two-nat aggregate for a twelve-alternative surface.
     GENERATED nested payload" -- expressible on the ERROR arm against
     `FsWriteAt` at all?
 
-Three shapes an answer can take, and they are genuinely different work:
+## LEADING OUTCOME `(c)` — the error arm should not be recipe-derived at all
+
+**Architect ruling, `evt_2w5kz75w4bp94`: this is the leading outcome, not one
+of three equals.** The deciding fact is one both the Steward and the
+implementer noticed and neither pressed on:
+
+    the `error` slot is filled by
+      synthesized_constructor(effect_seat,
+                              root(SynthesizedAggregateRoot::HostResultOk),
+                              SynthesizedFixedConstructorRole::Wrote, ...)
+
+> **The author reached into the OK recipe — the SUCCESS node — to fill the
+> ERROR slot, and then asserted the result is an `ImmediateBool`.** Nobody
+> modelling a real `FsWriteAt` error path does that.
+
+⇒ **THE RECIPE WAS NEVER LOAD-BEARING FOR THIS ROW'S PROPERTY. It was a source
+of a plausible well-formed value.** And that reframes the entire layer
+sequence this chain spent itself on:
+
+**BORROWING A RECIPE FOR A VALUE YOU DO NOT NEED RECIPE-DERIVED DRAGS IN EVERY
+CONSTRAINT THE RECIPE CARRIES** — the seat must exist, some unit must hold the
+record, the child shapes must match. **Four layers, and all four were the price
+of the borrow rather than defects in the row's subject.**
+
+It also explains the provenance asymmetry recorded above. **That is not two
+design choices — it is one arm doing the right thing and one arm taking a
+shortcut that looked more rigorous.**
+
+### The discriminator — this is the whole ruling
+
+    Does this row's stated property depend on the error arm being a
+    COMPILER-SYNTHESIZED aggregate, or only on its being a WELL-FORMED one?
+
+**If only well-formed:** the repair is `ac_c7_lowered_ctor`'s shape — hand-built
+with a plan-resolved occurrence, exactly what `D3` adopted for the other three
+— and **the `ImmediateBool` assertion most likely survives untouched.** That is
+the cheapest outcome and the one consistent with what `D3` already established,
+so **test it first.**
+
+> **STATED AS A LEAN WITH ITS DISCRIMINATOR, NOT AS A FINDING.** The Architect
+> has read the row's structure and the recipe; they have **not** established
+> that nothing downstream requires a synthesized identity in that slot.
+> **Whoever takes this node checks that before building.** The lean tells you
+> where to look first; it does not licence skipping the check.
+
+## The alternatives, if the discriminator comes back the other way
 
     (a) the ERROR ASSERTION is wrong for this operation
         => rewrite it against what FsWriteAt's error arm actually yields. The
@@ -112,20 +160,10 @@ Three shapes an answer can take, and they are genuinely different work:
         => re-point it at an operation whose ERROR arm IS an immediate bool.
            The assertion survives; the fixture's operation changes. Requires
            naming such an operation and showing it still exercises SELECTION.
-    (c) the error arm should not be recipe-derived here at all
-        => the success arm is hand-built and the error arm is synthesized;
-           that asymmetry may itself be the defect, in which case the fix is
-           to build the error template the same way rather than to change what
-           is asserted about it.
 
-**Do not pick (a) because it is the smallest diff.** Which one is right turns on
-what the row was for, and that is the design question.
-
-> **(c) exists because of what the provenance split showed.** It was not in the
-> Architect's ruling and is not a disagreement with it — the ruling established
-> that no *recipe* yields the asserted shape, which leaves open whether the
-> error arm should be drawing on the recipe. Flagged for the ruling, not
-> asserted.
+**Do not pick (a) because it is the smallest diff.** Under `(c)` it is not even
+addressing the right thing — it would rewrite an assertion to match a value the
+row never needed to borrow.
 
 # BANNED — switching the root and re-running
 
@@ -138,6 +176,14 @@ another name."*
 root the shape is not an immediate bool, **so the run's outcome is known before
 you make it**: it fails, one layer deeper, having told you nothing. An edit
 whose result you can predict is not a measurement.
+
+> **THE BAN WIDENS UNDER `(c)`, and this is the stronger reason.** The original
+> ban said switching the root buys a layer and still fails. Under the leading
+> outcome it is worse than useless: **the defect is that the row borrowed from a
+> recipe at all, so switching to the "correct" root is a DEEPER BORROW — it
+> takes on the twelve-alternative surface's constraints on top of the ones
+> already being paid.** It is not a smaller version of the right move; it is a
+> larger version of the wrong one.
 
 # What must not happen
 
