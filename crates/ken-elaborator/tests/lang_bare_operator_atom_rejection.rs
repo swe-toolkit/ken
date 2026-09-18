@@ -205,9 +205,21 @@ fn ac_grouped_and_prefix_head_forms_are_preserved() {
 /// did, every infix expression in the corpus would reject.
 #[test]
 fn ac_infix_path_untouched() {
+    // ALL SEVEN tokens `canonical_operator_name` recognises, not a sample.
+    // `ExprAtomForm::OperatorName` admits exactly this set and
+    // `StartExclusion::OperatorName` refuses it in argument position by
+    // YIELDING -- which is correct only if every admitted token is a legal
+    // infix continuation. The structural argument is that `parse_mixed_infix_
+    // expr` decides continuation with the same `canonical_operator_name` call,
+    // so the sets cannot diverge; these rows are its empirical complement.
     for src in [
         "const k : Nat = x <+> y",
         "const k : Nat = x \u{2264} y",
+        "const k : Nat = x \u{2265} y",
+        "const k : Nat = x \u{2260} y",
+        "const k : Nat = x \u{2227} y",
+        "const k : Nat = x \u{2228} y",
+        "const k : Nat = x \u{2208} y",
         "const k : Nat = x \u{2264} y \u{2227} z",
     ] {
         let decls = parse_decls(src).unwrap_or_else(|e| panic!("infix must parse: {e:?} -- {src}"));
@@ -216,11 +228,19 @@ fn ac_infix_path_untouched() {
             rendered.contains("EInfixSpine"),
             "an operator between atoms is an infix spine, not an atom: {src}"
         );
-        assert!(
-            !rendered.contains("EVar(\"<+>\")") && !rendered.contains("EVar(\"\u{2264}\")"),
-            "the infix operator became an OPERAND, which means it routed \
-             through the atom arm: {src}"
-        );
+        // Keyed on the WHOLE operator set, not on a fixed pair of names. The
+        // old form named `<+>` and one other symbol, so the rows spelled with
+        // a third could not fail this way -- an assertion about a token those
+        // rows do not contain, which reads as coverage and is not.
+        for operator in [
+            "<+>", "\u{2264}", "\u{2265}", "\u{2260}", "\u{2227}", "\u{2228}", "\u{2208}",
+        ] {
+            assert!(
+                !rendered.contains(&format!("EVar({operator:?})")),
+                "the infix operator `{operator}` became an OPERAND, which means \
+                 it routed through the atom arm: {src}"
+            );
+        }
     }
 }
 

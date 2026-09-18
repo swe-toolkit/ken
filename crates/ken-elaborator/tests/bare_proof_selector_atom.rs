@@ -234,3 +234,65 @@ fn ac5_a_grouped_selector_argument_does_not_swallow_the_following_argument() {
         "the bare form followed by another argument stays refused"
     );
 }
+
+/// The YIELD half of `ProofSelector`'s speak-or-yield decision, and it is
+/// LOAD-BEARING rather than a default.
+///
+/// The exclusion layer decides, per member, whether stopping the
+/// application-argument loop raises a diagnostic or stops quietly.
+/// `IfExpression` speaks; `ProofSelector` yields. **Yielding is not the safe
+/// choice — it is the only correct one**, because Ken has no declaration
+/// terminator: a declaration's extent ends exactly where its body expression
+/// stops, so the atom-start roster's COMPLEMENT is the declaration separator.
+/// `proof` opening the next declaration is the ordinary case, not the exotic
+/// one.
+///
+/// **Measured, both outcomes producible (base `7cb535be5`).** Giving
+/// `ProofSelector` a distinctly-marked `Some(...)` in `argument_diagnostic`:
+///
+/// ```text
+/// const k : Int = f proof p for s    marker at byte 18   the ARGUMENT case
+/// fn s .. = x  /  proof p for s ..   marker at byte 25   THIS case
+/// ```
+///
+/// So the arm is wired — `None` is consulted, not decorative — and flipping it
+/// turns the two-declaration program below into a parse error at the `proof`
+/// that opens the second declaration. That is this node's opening hazard
+/// (*"admitting `proof` makes the declaration sequence lose its separator"*)
+/// reproduced from the other side: not by admitting the token to the roster,
+/// but by letting the loop speak about it.
+#[test]
+fn a_declaration_beginning_with_proof_terminates_the_previous_declarations_body() {
+    let decls = parse_decls(PRELUDE).expect(
+        "a `fn` whose body is a bare identifier, followed by an attached-proof \
+         declaration, is an ordinary two-declaration program",
+    );
+    assert_eq!(
+        decls.len(),
+        2,
+        "the `proof` must START a second declaration rather than be consumed as \
+         an argument to the first one's body: {decls:?}"
+    );
+    assert!(
+        matches!(&decls[0], Decl::ViewDecl { name, .. } if name == "s"),
+        "the first declaration must be `fn s`, with its body ending at `x`: \
+         {:?}",
+        decls[0]
+    );
+
+    // POSITIVE CONTROL. Without it, "two declarations" is satisfied by a parser
+    // that splits everywhere -- the property under test is that the split
+    // happens HERE and not inside an application spine.
+    let applied = parse_decls("fn s (x : Int) : Int = x\nconst k : Int = s 1 2\n")
+        .expect("an applied body must still absorb its arguments");
+    assert_eq!(
+        applied.len(),
+        2,
+        "the argument loop must still CONSUME `1` and `2` into one body"
+    );
+    assert!(
+        format!("{applied:?}").matches("EApp").count() >= 2,
+        "`s 1 2` must be a two-argument application spine, not three \
+         declarations: {applied:?}"
+    );
+}

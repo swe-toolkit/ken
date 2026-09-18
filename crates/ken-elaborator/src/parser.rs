@@ -215,6 +215,61 @@ enum StartExclusion {
     /// call site does not consult the roster at all. Refusing the token
     /// outright would break a live form.
     IfExpression,
+    /// An OPERATOR NAME in argument position -- an infix operator, not an
+    /// argument.
+    ///
+    /// **AC-4's premise, restated as a stated refusal instead of an
+    /// omission.** `parse_atom_expr_base`'s operator arm reasons FROM this
+    /// roster being narrow: *"an operator is only ever seen here when an
+    /// expression STARTS with it."* That held because the hand-written
+    /// `matches!` happened not to list operator tokens -- but the arm exists,
+    /// so a roster DERIVED from the form set lists them, and the premise would
+    /// have gone false as a side effect of deriving the roster.
+    ///
+    /// `32 §3` is position-keyed in terms: an ungrouped `operator_name` is
+    /// admitted only as an `operator_prefix` HEAD with at least one following
+    /// atom. So this is the same shape as [`Self::IfExpression`] -- a live head
+    /// form, refused as an argument -- and not a new kind of thing.
+    ///
+    /// **It YIELDS, and that is not a free choice.** `a <+> b` reaches this
+    /// with `<+>` at the cursor and the infix path must get it; speaking here
+    /// would turn every infix expression into a parse error. The
+    /// `refuses()` string exists for a control to NAME the refusal, not for a
+    /// diagnostic.
+    ///
+    /// **YIELD IS UNIFORMLY RIGHT BECAUSE THE TWO SETS SHARE AN AUTHORITY, not
+    /// because a sample agreed.** A categorical exclusion hides exactly one
+    /// hazard -- an admitted token that is NOT a legal infix continuation,
+    /// where stopping the loop defers the real error to a worse place. There
+    /// cannot be one here: this predicate is `canonical_operator_name(..)
+    /// .is_some()`, and `parse_mixed_infix_expr`'s loop decides whether to
+    /// continue by calling the SAME function (`other => match
+    /// canonical_operator_name(&other) { Some(..) => user operator, None =>
+    /// break }`). The admitted set and the infix-continuable set are one set
+    /// written once. Asked by the Architect (`evt_5yyddp3cam1bd`);
+    /// `ac_infix_path_untouched` carries the empirical complement over all
+    /// seven tokens.
+    OperatorName,
+    /// `‖` CLOSING a truncation body, not opening a nested one.
+    ///
+    /// **The one CONDITIONAL roster membership, and the only member here whose
+    /// trigger is parser STATE rather than lookahead.** `‖A‖` uses the same
+    /// token both sides, so inside a body the bar is the closer; admitting it
+    /// as an atom start lets a type- or expression-application loop consume the
+    /// terminator and run off the end of the construct.
+    ///
+    /// **It governs TWO positions**, which no other member does, and for a
+    /// reason of substance: `TruncBar` is position-polymorphic -- it has a
+    /// parse arm in both `parse_atom_expr_base` and `parse_atom_type` -- so one
+    /// token crossing one roster moved two independently-measured AC-0 rows.
+    ///
+    /// **Why an exclusion rather than a condition on the form's `admits`.**
+    /// `admits` is consulted by the roster AND by dispatch, and only the roster
+    /// is depth-sensitive: a nested `‖‖x‖‖` reaches `parse_atom_expr_base` at
+    /// depth 1 and must find the arm. Measured -- folding the condition into
+    /// `ExprAtomForm::Truncation::admits` compiles, derives a byte-identical
+    /// roster, and rejects `‖‖x‖‖` in both positions.
+    TruncationBodyCloser,
     /// `x :` -- a BINDER NAME, not a type argument.
     ///
     /// The load-bearing one. `can_start_atom_type` feeds two `while` loops
@@ -226,7 +281,7 @@ enum StartExclusion {
 impl StartExclusion {
     /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
     /// length is checked against it rather than maintained independently.
-    const COUNT: usize = 7;
+    const COUNT: usize = 9;
 
     /// The iteration source `atom_start_exclusion` consults.
     const ALL: [Self; Self::COUNT] = [
@@ -236,6 +291,8 @@ impl StartExclusion {
         Self::BraceOpensMatchArms,
         Self::AsAlias,
         Self::IfExpression,
+        Self::OperatorName,
+        Self::TruncationBodyCloser,
         Self::BinderName,
     ];
 
@@ -249,7 +306,9 @@ impl StartExclusion {
             Self::BraceOpensMatchArms => 3,
             Self::AsAlias => 4,
             Self::IfExpression => 5,
-            Self::BinderName => 6,
+            Self::OperatorName => 6,
+            Self::TruncationBodyCloser => 7,
+            Self::BinderName => 8,
         }
     }
 
@@ -267,11 +326,15 @@ impl StartExclusion {
                 matches!(position, AtomPosition::Type | AtomPosition::Expression)
             }
             Self::BinderName => matches!(position, AtomPosition::Type),
+            Self::TruncationBodyCloser => {
+                matches!(position, AtomPosition::Type | AtomPosition::Expression)
+            }
             Self::AsAlias => matches!(position, AtomPosition::Pattern),
             Self::MatchEquationBinder
             | Self::ProofSelector
             | Self::BraceOpensMatchArms
-            | Self::IfExpression => matches!(position, AtomPosition::Expression),
+            | Self::IfExpression
+            | Self::OperatorName => matches!(position, AtomPosition::Expression),
         }
     }
 
@@ -289,6 +352,10 @@ impl StartExclusion {
             }
             Self::ProofSelector => matches!(parser.peek(), Token::KwProof),
             Self::IfExpression => matches!(parser.peek(), Token::KwIf),
+            Self::OperatorName => canonical_operator_name(parser.peek()).is_some(),
+            Self::TruncationBodyCloser => {
+                matches!(parser.peek(), Token::TruncBar) && parser.truncation_depth > 0
+            }
             Self::BraceOpensMatchArms => parser.brace_starts_match_arms(),
             Self::BinderName => {
                 matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
@@ -297,35 +364,62 @@ impl StartExclusion {
         }
     }
 
-    /// A token sequence that triggers this exclusion.
+    /// A PARSER POSITIONED so this exclusion holds -- tokens AND state.
     ///
     /// **Exhaustive, no `_ =>`, so a NEW MEMBER IS A COMPILE ERROR HERE** --
     /// the same device the operator-premise roster uses over `Token`, applied
     /// to the member set. Without it the closure test hand-enumerates members
     /// and a member added tomorrow gets no coverage while the test's name says
     /// otherwise.
+    ///
+    /// **It returns a PARSER and not a token vector, and that is what keeps the
+    /// closure honest.** [`Self::TruncationBodyCloser`] holds at
+    /// `truncation_depth > 0` and at no token; under the old signature its row
+    /// could only ever be built at depth 0, where the exclusion does not fire
+    /// -- so the row would assert the roster REFUSES a bar it correctly ADMITS,
+    /// and the only available repairs are to skip the member or to weaken the
+    /// assertion. A fixture that cannot reach its own trigger is not a row.
+    /// The caller asserts [`Self::holds_at`] on what comes back, which is the
+    /// positive control for exactly that.
     #[cfg(test)]
-    fn fixture(self) -> Vec<Token> {
+    fn fixture_parser(self) -> Parser {
+        fn positioned(tokens: Vec<Token>) -> Parser {
+            let mut spanned: Vec<(Token, Span)> = tokens
+                .into_iter()
+                .enumerate()
+                .map(|(i, token)| (token, Span::new(i, i + 1)))
+                .collect();
+            spanned.push((Token::Eof, Span::new(99, 99)));
+            Parser::new(spanned, String::new())
+        }
         match self {
             Self::EffectRowAnnotation => {
-                vec![Token::Ident("visits".to_string()), Token::LBracket]
+                positioned(vec![Token::Ident("visits".to_string()), Token::LBracket])
             }
             Self::MatchEquationBinder => {
-                vec![Token::Ident("eqn".to_string()), Token::Colon]
+                positioned(vec![Token::Ident("eqn".to_string()), Token::Colon])
             }
-            Self::ProofSelector => vec![Token::KwProof],
-            Self::BraceOpensMatchArms => vec![
+            Self::ProofSelector => positioned(vec![Token::KwProof]),
+            Self::BraceOpensMatchArms => positioned(vec![
                 Token::LBrace,
                 Token::Ident("x".to_string()),
                 Token::MapsTo,
                 Token::Ident("y".to_string()),
                 Token::RBrace,
-            ],
-            Self::AsAlias => vec![Token::Ident("as".to_string())],
-            Self::IfExpression => vec![Token::KwIf],
-            Self::BinderName => {
-                vec![Token::Ident("x".to_string()), Token::Colon]
+            ]),
+            Self::AsAlias => positioned(vec![Token::Ident("as".to_string())]),
+            Self::IfExpression => positioned(vec![Token::KwIf]),
+            Self::OperatorName => positioned(vec![Token::Operator("<+>".to_string())]),
+            // The ONLY member whose trigger is parser STATE. Its tokens are a
+            // bare bar, which at depth 0 is a perfectly good atom START -- the
+            // depth is the whole trigger, so this arm is the reason the
+            // signature is a `Parser`.
+            Self::TruncationBodyCloser => {
+                let mut parser = positioned(vec![Token::TruncBar]);
+                parser.truncation_depth = 1;
+                parser
             }
+            Self::BinderName => positioned(vec![Token::Ident("x".to_string()), Token::Colon]),
         }
     }
 
@@ -347,6 +441,8 @@ impl StartExclusion {
             Self::ProofSelector => "an attached-proof declaration",
             Self::BraceOpensMatchArms => "a match arm block",
             Self::IfExpression => "an `if` expression",
+            Self::OperatorName => "an operator name",
+            Self::TruncationBodyCloser => "a truncation terminator",
             Self::BinderName => "a binder name",
         }
     }
@@ -367,6 +463,23 @@ impl StartExclusion {
     /// is why a span assertion cannot tell the two apart and
     /// `lang_application_atom_if_rejection.rs` asserts the PRODUCER instead.
     ///
+    /// **`None` IS CONSULTED, NOT DECORATIVE -- measured at `7cb535be5`, both
+    /// outcomes producible.** Giving [`Self::ProofSelector`] a
+    /// distinctly-marked `Some(...)` and feeding the two inputs below puts the
+    /// marker at both coordinates:
+    ///
+    /// ```text
+    /// const k : Int = f proof p for s    marker at byte 18   argument position
+    /// fn s .. = x / proof p for s ..     marker at byte 25   the NEXT DECLARATION
+    /// ```
+    ///
+    /// The first says the arm is wired. **The second is why the answer must be
+    /// yield**: flipping it turns an ordinary two-declaration program into a
+    /// parse error at the `proof` that opens the second one -- this node's
+    /// opening hazard reproduced from the other side, not by admitting the
+    /// token to the roster but by letting the loop speak about it. Pinned by
+    /// `a_declaration_beginning_with_proof_terminates_the_previous_declarations_body`.
+    ///
     /// Exhaustive, no `_ =>`: a new exclusion must decide which it is.
     fn argument_diagnostic(self) -> Option<String> {
         match self {
@@ -380,6 +493,8 @@ impl StartExclusion {
             | Self::ProofSelector
             | Self::BraceOpensMatchArms
             | Self::AsAlias
+            | Self::OperatorName
+            | Self::TruncationBodyCloser
             | Self::BinderName => None,
         }
     }
@@ -395,6 +510,100 @@ fn canonical_operator_name(token: &Token) -> Option<&str> {
         Token::Or => Some("∨"),
         Token::Member => Some("∈"),
         _ => None,
+    }
+}
+
+/// One classification per atom-start ROSTER, and the ONLY way into a parse arm.
+///
+/// **AC-10: adding a roster is not free.** Before this, the three rosters were
+/// three hand-written predicates that happened to look alike, and nothing
+/// stopped a fourth from being written as a bare `matches!` over `peek()` --
+/// which is how the two this node repairs came to drift apart in the first
+/// place. A roster is now a `impl AtomFormRoster for <SomeForm>`: you cannot
+/// write one without naming its POSITION (so the exclusion layer reaches it)
+/// and enumerating its FORMS (so every parse arm is paired with a start test).
+///
+/// **The position lives on the roster, not at the call site.** Applying the
+/// exclusions used to be a per-CALLER obligation and a per-caller obligation is
+/// discharged by whoever remembers; [`Parser::can_start_atom`] now applies
+/// `POSITION`'s exclusions for every roster by construction. That closure is
+/// over CONSUMERS, and it is a different property from AC-1's closure over
+/// forms -- both are needed and neither implies the other.
+///
+/// **[`Self::admits`] takes the PARSER, not a `&Token`, and the REASON is
+/// narrower than it looks.** The expression side's multi-word selectors
+/// (`recursive result for xs`) are four ordinary `Ident` tokens in sequence, so
+/// no predicate over `peek()` can recognize them. **That is what killed this
+/// node's first proposed repair** -- a `Token`-total function maps `Ident(_)`
+/// to "atom" and is finished, so the closure property held for token-keyed
+/// forms and silently failed for contextual ones.
+///
+/// **`TruncBar`'s depth condition looks like a second reason and is NOT one.**
+/// It is a property of the POSITION, not of the form, and it lives in
+/// [`StartExclusion::TruncationBodyCloser`] -- see that member for the
+/// measurement. Every `admits` arm in every roster here is a pure function of
+/// the token stream ahead of the cursor; none reads parser state. The parameter
+/// is a `&Parser` because lookahead needs one.
+///
+/// **THE INVARIANT, AND IT IS WHAT MAKES "IS ANOTHER EXCLUSION SCOPE CREEP?"
+/// STOP BEING A JUDGMENT CALL:**
+///
+/// ```text
+/// roster  =  dispatch set  MINUS  StartExclusion
+/// ```
+///
+/// A form is dispatchable because a parse arm exists for it; it is admissible
+/// because an argument position may START with it. Those are different
+/// questions and the expression side answers them differently three times
+/// (`if`, `proof`, an operator name). **So [`StartExclusion`] is not a bag of
+/// special cases -- it is the DIFFERENCE between two sets**, and a member is
+/// warranted exactly when a form is dispatchable and not admissible. Stated at
+/// the Architect's direction (`evt_5yyddp3cam1bd`), who unified the two
+/// findings this candidate reported into that one sentence.
+///
+/// [`Parser::can_start_atom`] is the equation, so a test of the equation would
+/// be green by construction. What is NOT definitional is which side each form
+/// sits on: `the_expression_partition_is_the_form_set_minus_the_exclusions`
+/// pins that as an exhaustive ledger.
+///
+/// **[`Self::at`] returns the FIRST admitting form, so the ORDER of
+/// [`Self::FORMS`] is a correctness property wherever two forms can admit one
+/// token.** On the expression side they do, deliberately: `recursive result
+/// for` and an ordinary variable both start at `Token::Ident(_)`, and the
+/// contextual forms are listed first because the specific must shadow the
+/// general, never the reverse. [`Self::fixture`] is what makes that auditable
+/// -- every form must be reachable THROUGH `at`, in `FORMS`'s actual order, or
+/// its parse arm is dead.
+trait AtomFormRoster: Copy + PartialEq + std::fmt::Debug + Sized + 'static {
+    /// The position whose [`StartExclusion`] members govern this roster.
+    const POSITION: AtomPosition;
+
+    /// Every form, in the order [`Self::at`] consults them. Each impl points
+    /// this at its own inherent `ALL`, whose array length is tied to a `COUNT`
+    /// beside it.
+    const FORMS: &'static [Self];
+
+    /// Does this form's start condition hold at the cursor?
+    ///
+    /// Position is NOT a parameter: it is carried by the exclusion layer
+    /// ([`Parser::atom_start_exclusion`]), exactly as it is for
+    /// [`StartExclusion`], whose [`StartExclusion::holds_at`] is likewise
+    /// position-agnostic.
+    fn admits(self, parser: &Parser) -> bool;
+
+    /// A token sequence this form admits, used to prove it is reachable
+    /// through [`Self::at`] rather than merely present in [`Self::FORMS`].
+    ///
+    /// **Exhaustive in every impl, no `_ =>`, so a new form is a compile error
+    /// here** -- the same device [`StartExclusion::fixture`] uses over the
+    /// member set.
+    #[cfg(test)]
+    fn fixture(self) -> Vec<Token>;
+
+    /// The form admitted at the cursor, if any. **The only way into a parse
+    /// arm**, which is what makes the pairing structural.
+    fn at(parser: &Parser) -> Option<Self> {
+        Self::FORMS.iter().copied().find(|form| form.admits(parser))
     }
 }
 
@@ -428,13 +637,19 @@ fn canonical_operator_name(token: &Token) -> Option<&str> {
 /// arm-count matching, which is the instrument that recorded `12 vs 12` while
 /// enforcing nothing.
 ///
-/// **[`Self::admits`] takes the PARSER, not a `&Token`, and that is
-/// load-bearing rather than uniform.** A token-keyed predicate cannot express
-/// a member whose admission is conditional on parser state --
-/// `can_start_atom_expr` has exactly one such member today (`TruncBar`,
-/// admitted only at `truncation_depth == 0`). Patterns have none, and the
-/// signature still takes the parser so the expression-side extension is not a
-/// signature change. [`StartExclusion::holds_at`] is the precedent.
+/// **[`Self::admits`] takes the PARSER, not a `&Token`, and the reason this
+/// comment originally gave was REFUTED by the extension it anticipated.** It
+/// said `can_start_atom_expr` had exactly one member conditional on parser
+/// state -- `TruncBar` at `truncation_depth == 0` -- and that the parser
+/// parameter was there for it. Building [`ExprAtomForm`] measured that folding
+/// the depth test into `admits` BREAKS nested `‖‖x‖‖`: the condition belongs to
+/// the position, not to the form, and it now lives in
+/// [`StartExclusion::TruncationBodyCloser`].
+///
+/// The signature is still right and the surviving reason is the one that
+/// mattered: the expression side's four-token contextual selectors cannot be
+/// recognized from `peek()` at all. [`StartExclusion::holds_at`] is the
+/// precedent for both.
 ///
 /// **WHAT THIS DOES NOT CATCH.** The exhaustive `match` in [`Self::admits`]
 /// ties an arm to every variant -- and [`Self::ALL`] is a hand-written
@@ -509,12 +724,12 @@ impl PatternAtomForm {
         Self::Paren,
         Self::Record,
     ];
+}
 
-    /// Does this form's start condition hold at the cursor?
-    ///
-    /// Position is NOT a parameter here: it is carried by the exclusion layer
-    /// (`atom_start_exclusion`), exactly as it is for [`StartExclusion`],
-    /// whose [`StartExclusion::holds_at`] is likewise position-agnostic.
+impl AtomFormRoster for PatternAtomForm {
+    const POSITION: AtomPosition = AtomPosition::Pattern;
+    const FORMS: &'static [Self] = &Self::ALL;
+
     fn admits(self, parser: &Parser) -> bool {
         match self {
             Self::Literal => matches!(
@@ -535,10 +750,302 @@ impl PatternAtomForm {
         }
     }
 
-    /// The form admitted at the cursor, if any. **The only way into a parse
-    /// arm**, which is what makes the pairing structural.
-    fn at(parser: &Parser) -> Option<Self> {
-        Self::ALL.into_iter().find(|form| form.admits(parser))
+    #[cfg(test)]
+    fn fixture(self) -> Vec<Token> {
+        match self {
+            Self::Literal => vec![Token::Nat(0)],
+            Self::Var => vec![Token::Ident("x".to_string())],
+            Self::Ctor => vec![Token::ConId("C".to_string())],
+            Self::Paren => vec![Token::LParen],
+            Self::Record => vec![Token::LBrace],
+        }
+    }
+}
+
+/// Does a CONTEXTUAL multi-word selector begin at the cursor?
+///
+/// `32 §3:406`: *"Each four-word sequence is contextual... its words remain
+/// ordinary identifier tokens."* So the recognizer is a four-token lookahead
+/// over `Ident`s and **there is no token a roster could have listed for it** --
+/// these forms clear `can_start_atom_expr` today only because `Token::Ident(_)`
+/// is already in it for ordinary variables. They ride in by accident, and
+/// nothing in the roster knows they exist. That is what this classification
+/// changes.
+fn contextual_selector_at(parser: &Parser, first: &str, second: &str, joiner: &str) -> bool {
+    matches!(parser.peek(), Token::Ident(word) if word == first)
+        && matches!(parser.lookahead(1), Token::Ident(word) if word == second)
+        && matches!(parser.lookahead(2), Token::Ident(word) if word == joiner)
+        && matches!(parser.lookahead(3), Token::Ident(_))
+}
+
+/// The atom forms of EXPRESSION position, as ONE classification.
+///
+/// **THIS IS AC-1'S CONTEXTUAL HALF, and it is the half that killed the node's
+/// first proposed repair.** A `Token`-total classification maps `Ident(_)` to
+/// "atom" and is finished; it cannot separate `recursive result for xs` from a
+/// variable named `recursive`. Three of the fourteen forms below are recognized
+/// by a four-token lookahead and by nothing else, so they are invisible to any
+/// predicate over `peek()` -- which is why [`AtomFormRoster::admits`] takes the
+/// parser.
+///
+/// **THE ORDER OF [`Self::ALL`] IS A CORRECTNESS PROPERTY HERE, and it was not
+/// on the pattern side.** [`AtomFormRoster::at`] returns the FIRST admitting
+/// form, and the three contextual forms overlap [`Self::Var`] on
+/// `Token::Ident(_)` **deliberately** -- the specific must shadow the general.
+/// Reverse two entries and the contextual arm becomes unreachable while every
+/// existing test stays green, because `recursive result for xs` would then
+/// parse as the variable `recursive` applied to three arguments. That is the
+/// SILENT direction, and `every_form_is_reachable_through_at` is what reports
+/// it: a form is proven reachable through `at` in `ALL`'s actual order, never
+/// merely present in the array.
+///
+/// **NOT EVERY FORM IS A ROSTER ADMISSION, and conflating the two is how `if`
+/// came to be refused by ABSENCE.** A form says *"this is an atom shape and
+/// here is its parse"*; the roster answers *"may an atom START here, in THIS
+/// position?"*, which is the form set MINUS the [`StartExclusion`] members
+/// governing the position. Three forms are excluded in argument position and
+/// all three remain live at the head, where no roster is consulted:
+///
+/// ```text
+/// If             `const k = if c then a else b`   head: parses
+///                `f if c then a else b`           argument: REFUSED, speaks
+/// ProofSelector  `const k = proof p for s`        head: parses
+///                `f proof p for s`                argument: REFUSED, yields
+/// OperatorName   `const k = <+> a b`              head: parses
+///                `a <+> b`                        argument: YIELDS to infix
+/// ```
+///
+/// **[`Self::OperatorName`] is new as an exclusion and it is AC-4's premise,
+/// restated.** `parse_atom_expr_base`'s operator arm reasons FROM the roster
+/// being narrow -- *"an operator is only ever seen here when an expression
+/// STARTS with it"* -- and until now that held because the hand-written
+/// `matches!` happened not to list operator tokens. A roster derived from the
+/// form set WOULD list them, since the arm exists. Filing the refusal as a
+/// stated exclusion keeps the premise true for a REASON rather than by
+/// omission, which is the same move `KwProof` and `KwIf` already made.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ExprAtomForm {
+    /// `structural result of x` -- the RETIRED nested-result selector.
+    ///
+    /// **A form whose parse is a rejection is still a form.** Leaving it out
+    /// would make the four tokens fall to [`Self::Var`], which parses
+    /// `structural` as a variable applied to three arguments -- a silent
+    /// misparse where today there is a named diagnostic.
+    RetiredNestedResult,
+    /// `recursive result for x` (`32 §3:406`).
+    RecursiveResult,
+    /// `induction hypothesis for x` (`32 §3:406`).
+    InductionHypothesis,
+    /// `Token::Ident` -- an ordinary variable, or `x::p`.
+    Var,
+    /// `Token::ConId` -- a constructor, a dotted path, or `C::p`.
+    Ctor,
+    /// An operator token as an `operator_prefix` HEAD (`32 §3`). Refused in
+    /// argument position by [`StartExclusion::OperatorName`].
+    OperatorName,
+    /// The eight literal tokens. One parse arm, already.
+    Literal,
+    /// `Token::LBrace` -- a record literal.
+    Record,
+    /// `Token::KwIf`. Refused in argument position by
+    /// [`StartExclusion::IfExpression`].
+    If,
+    /// `Token::KwType` -- a universe.
+    Universe,
+    /// `Token::KwOld` -- a pre-state reference (`21 §6.4`).
+    Old,
+    /// `Token::KwProof` -- a bare attached-proof selector. Refused in argument
+    /// position by [`StartExclusion::ProofSelector`].
+    ProofSelector,
+    /// `Token::LParen` -- grouping, tuples, and `( operator_name )`.
+    Paren,
+    /// `Token::TruncBar` -- propositional-truncation formation (`16 §6`).
+    ///
+    /// **The depth condition is NOT here, and putting it here is a MEASURED
+    /// regression.** Inside a truncation body the bar is the CLOSER rather
+    /// than an opener, which was an early-return guard in front of
+    /// `can_start_atom_expr`'s `matches!`. Folding that guard into `admits`
+    /// compiles, derives a byte-identical roster, and **breaks `‖‖x‖‖`** --
+    /// because `admits` is consulted by TWO questions and the condition
+    /// answers only one of them:
+    ///
+    /// ```text
+    /// may an atom START here?        roster     -- depth-sensitive
+    /// which arm parses this token?   dispatch   -- depth-INSENSITIVE
+    /// ```
+    ///
+    /// A nested truncation reaches `parse_atom_expr_base` at depth 1 and needs
+    /// this arm. The condition is a property of the POSITION, so it lives in
+    /// the exclusion layer as [`StartExclusion::TruncationBodyCloser`], which
+    /// only the roster consults. Measured at 7cb535be5: `‖‖x‖‖` and
+    /// `fn f (x : ‖‖Bool‖‖)` both PARSE.
+    Truncation,
+}
+
+impl ExprAtomForm {
+    const COUNT: usize = 14;
+
+    /// **Contextual forms FIRST.** See the type-level doc: `at` takes the
+    /// first match and these three overlap `Var` on `Token::Ident(_)`.
+    const ALL: [Self; Self::COUNT] = [
+        Self::RetiredNestedResult,
+        Self::RecursiveResult,
+        Self::InductionHypothesis,
+        Self::Var,
+        Self::Ctor,
+        Self::OperatorName,
+        Self::Literal,
+        Self::Record,
+        Self::If,
+        Self::Universe,
+        Self::Old,
+        Self::ProofSelector,
+        Self::Paren,
+        Self::Truncation,
+    ];
+}
+
+impl AtomFormRoster for ExprAtomForm {
+    const POSITION: AtomPosition = AtomPosition::Expression;
+    const FORMS: &'static [Self] = &Self::ALL;
+
+    fn admits(self, parser: &Parser) -> bool {
+        match self {
+            Self::RetiredNestedResult => {
+                contextual_selector_at(parser, "structural", "result", "of")
+            }
+            Self::RecursiveResult => contextual_selector_at(parser, "recursive", "result", "for"),
+            Self::InductionHypothesis => {
+                contextual_selector_at(parser, "induction", "hypothesis", "for")
+            }
+            Self::Var => matches!(parser.peek(), Token::Ident(_)),
+            Self::Ctor => matches!(parser.peek(), Token::ConId(_)),
+            Self::OperatorName => canonical_operator_name(parser.peek()).is_some(),
+            Self::Literal => matches!(
+                parser.peek(),
+                Token::Nat(_)
+                    | Token::IntLit(_)
+                    | Token::FloatLit(_)
+                    | Token::DecimalLit(_, _)
+                    | Token::Float32Lit(_)
+                    | Token::Str(_)
+                    | Token::CharLit(_)
+                    | Token::ByteStr(_)
+            ),
+            Self::Record => matches!(parser.peek(), Token::LBrace),
+            Self::If => matches!(parser.peek(), Token::KwIf),
+            Self::Universe => matches!(parser.peek(), Token::KwType),
+            Self::Old => matches!(parser.peek(), Token::KwOld),
+            Self::ProofSelector => matches!(parser.peek(), Token::KwProof),
+            Self::Paren => matches!(parser.peek(), Token::LParen),
+            Self::Truncation => matches!(parser.peek(), Token::TruncBar),
+        }
+    }
+
+    #[cfg(test)]
+    fn fixture(self) -> Vec<Token> {
+        let ident = |word: &str| Token::Ident(word.to_string());
+        match self {
+            Self::RetiredNestedResult => vec![
+                ident("structural"),
+                ident("result"),
+                ident("of"),
+                ident("xs"),
+            ],
+            Self::RecursiveResult => vec![
+                ident("recursive"),
+                ident("result"),
+                ident("for"),
+                ident("xs"),
+            ],
+            Self::InductionHypothesis => vec![
+                ident("induction"),
+                ident("hypothesis"),
+                ident("for"),
+                ident("xs"),
+            ],
+            Self::Var => vec![ident("x")],
+            Self::Ctor => vec![Token::ConId("C".to_string())],
+            Self::OperatorName => vec![Token::Operator("<+>".to_string())],
+            Self::Literal => vec![Token::Nat(0)],
+            Self::Record => vec![Token::LBrace],
+            Self::If => vec![Token::KwIf],
+            Self::Universe => vec![Token::KwType],
+            Self::Old => vec![Token::KwOld],
+            Self::ProofSelector => vec![Token::KwProof],
+            Self::Paren => vec![Token::LParen],
+            Self::Truncation => vec![Token::TruncBar],
+        }
+    }
+}
+
+/// The atom forms of TYPE position, as ONE classification.
+///
+/// **The type side is where AC-9 said the work is, and the reason is the
+/// exclusions rather than the forms.** There are only five forms here and all
+/// five are token-keyed, so this half looks like the pattern side -- but the
+/// type roster carries two NEGATIVE start conditions that the pattern side has
+/// none of ([`StartExclusion::BinderName`] and
+/// [`StartExclusion::EffectRowAnnotation`]), and a closure that admits what a
+/// guard was excluding is a fail-open regression in type parsing. Those live in
+/// the exclusion layer, which [`Parser::can_start_atom`] applies for
+/// [`Self::POSITION`]; **this enum must not restate them.** The frame's warning
+/// is exact: the pattern side is clean AND guardless, which makes it the
+/// misleading example.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TypeAtomForm {
+    /// `Token::KwType` -- a universe.
+    Universe,
+    /// `Token::ConId` -- a type constructor or a dotted module path.
+    Ctor,
+    /// `Token::Ident` -- a type variable, or a named-field projection
+    /// (`33 §6.3`).
+    Var,
+    /// `Token::LParen` -- grouping.
+    Paren,
+    /// `Token::TruncBar`, exactly as [`ExprAtomForm::Truncation`] -- including
+    /// why the depth condition is NOT here. `TruncBar` is
+    /// position-polymorphic: it has a parse arm on both sides, which is why one
+    /// increment closed an AC-0 row on each, and the nested-truncation
+    /// regression would have landed on both too.
+    Truncation,
+}
+
+impl TypeAtomForm {
+    const COUNT: usize = 5;
+
+    const ALL: [Self; Self::COUNT] = [
+        Self::Universe,
+        Self::Ctor,
+        Self::Var,
+        Self::Paren,
+        Self::Truncation,
+    ];
+}
+
+impl AtomFormRoster for TypeAtomForm {
+    const POSITION: AtomPosition = AtomPosition::Type;
+    const FORMS: &'static [Self] = &Self::ALL;
+
+    fn admits(self, parser: &Parser) -> bool {
+        match self {
+            Self::Universe => matches!(parser.peek(), Token::KwType),
+            Self::Ctor => matches!(parser.peek(), Token::ConId(_)),
+            Self::Var => matches!(parser.peek(), Token::Ident(_)),
+            Self::Paren => matches!(parser.peek(), Token::LParen),
+            Self::Truncation => matches!(parser.peek(), Token::TruncBar),
+        }
+    }
+
+    #[cfg(test)]
+    fn fixture(self) -> Vec<Token> {
+        match self {
+            Self::Universe => vec![Token::KwType],
+            Self::Ctor => vec![Token::ConId("C".to_string())],
+            Self::Var => vec![Token::Ident("a".to_string())],
+            Self::Paren => vec![Token::LParen],
+            Self::Truncation => vec![Token::TruncBar],
+        }
     }
 }
 
@@ -654,7 +1161,7 @@ mod atom_form_closure {
     /// while the assertion compared VARIANTS -- a claim about the array against
     /// evidence about its elements. The hazard that can actually occur is two
     /// DISTINCT forms whose `admits` predicates overlap, and it is invisible
-    /// here; [`no_two_forms_admit_the_same_token`] is where it lives.
+    /// here; [`no_two_pattern_forms_admit_the_same_token`] is where it lives.
     #[test]
     fn all_lists_each_variant_once() {
         for (i, a) in PatternAtomForm::ALL.iter().enumerate() {
@@ -664,21 +1171,31 @@ mod atom_form_closure {
         }
     }
 
-    /// `at` is `ALL.into_iter().find(..)`, so it returns the FIRST form whose
-    /// `admits` holds -- **`ALL`'s ORDER is load-bearing the moment two forms
-    /// can admit one token**, and the later one is then silently unreachable.
+    /// `at` is a `find`, so it returns the FIRST form whose `admits` holds --
+    /// **`ALL`'s ORDER is load-bearing the moment two forms can admit one
+    /// token**, and the later one is then silently unreachable.
     ///
-    /// **Installed while it is GREEN, which is the only time it is cheap.**
-    /// Today the five pattern forms are pairwise disjoint, so this costs one
-    /// test and asserts a real property. It will not stay free: on the
-    /// expression side `Token::Ident(_)` is admitted for ordinary variables
-    /// AND heads the contextual multi-word selectors (`recursive result for`,
-    /// `induction hypothesis for`), so the moment both are forms this is the
-    /// control that reports the overlap. Writing it then would mean authoring
-    /// it against a mechanism still being shaped, at the moment it is already
-    /// failing.
+    /// **THE PREDICTION THIS TEST WAS INSTALLED ON HAS NOW HAPPENED, and the
+    /// prediction was right about the overlap and wrong about the remedy.** It
+    /// said: *"on the expression side `Token::Ident(_)` is admitted for
+    /// ordinary variables AND heads the contextual multi-word selectors, so the
+    /// moment both are forms this is the control that reports the overlap."*
+    /// Three expression forms now overlap `ExprAtomForm::Var` on `Ident(_)` --
+    /// and the overlap is INTENDED, so a `<= 1` claimant assertion is not a
+    /// control over it; it is a criterion the correct code fails.
+    ///
+    /// ⇒ **This test stays PATTERN-SCOPED, where disjointness is a real
+    /// property, and the expression side is covered by
+    /// [`every_form_is_reachable_through_at`]** -- which asks whether a
+    /// shadowed form can still be REACHED and is answerable either way. A
+    /// disjointness test is a special case of it that happens to be checkable
+    /// without fixtures.
+    ///
+    /// The scope is deliberate: the residual is that this sees overlaps only on
+    /// ROSTERED tokens, which is exactly right for a roster derived from these
+    /// five forms and would NOT be right for the expression side.
     #[test]
-    fn no_two_forms_admit_the_same_token() {
+    fn no_two_pattern_forms_admit_the_same_token() {
         for token in historical_roster() {
             let parser = parser_at(vec![token.clone()]);
             let claimants: Vec<PatternAtomForm> = PatternAtomForm::ALL
@@ -691,6 +1208,373 @@ mod atom_form_closure {
                  FIRST, so every form after it is unreachable for this token \
                  and nothing else reports it -- if the overlap is intended, \
                  `at`'s order is now a correctness property and must say so"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // AC-1's CONTEXTUAL half, AC-9's type side, and AC-10.
+    //
+    // Everything above this line is about ONE roster whose forms are
+    // token-keyed and pairwise disjoint. Neither property survives the
+    // expression side, and the rows below are what replaces them.
+    // -----------------------------------------------------------------
+
+    /// AC-1 -- every form is reachable THROUGH [`AtomFormRoster::at`], in
+    /// [`AtomFormRoster::FORMS`]'s ACTUAL ORDER.
+    ///
+    /// **This is the order-sensitive successor to
+    /// [`no_two_pattern_forms_admit_the_same_token`], and it is strictly stronger.**
+    /// That test asks whether any token has two claimants, which is answerable
+    /// only while the answer is no. Once overlap is INTENDED -- and on the
+    /// expression side it is, three times -- the real question is whether the
+    /// shadowed form can still be reached, and a disjointness assertion cannot
+    /// ask it.
+    ///
+    /// **MEASURED, and the claim this docstring first made was WRONG.** It said
+    /// swapping `Var` ahead of the contextual selectors in `ExprAtomForm::ALL`
+    /// would red nothing else in the crate. It reds SEVEN, and only two are
+    /// these rows:
+    ///
+    /// ```text
+    /// elab::nested_lift_association_tests   5 rows, all pre-existing
+    /// every_form_is_reachable_through_at    this one
+    /// the_contextual_selectors_shadow_..    its sibling
+    /// ```
+    ///
+    /// So the shadowing is NOT silent -- the elaborator has behavioural
+    /// coverage of the `recursive result for` spelling and it bites. What these
+    /// two rows add is WHERE the failure is reported: five elaboration tests
+    /// failing on a selector's semantics do not say that a form ordering made
+    /// an arm unreachable, and a reader would debug the elaborator.
+    ///
+    /// The correction is kept rather than the claim deleted, because the
+    /// overclaim is the reusable part: *"nothing else reds"* is a statement
+    /// about a whole crate written from having read one file.
+    fn every_form_is_reachable_through_at<F: AtomFormRoster>() {
+        for form in F::FORMS.iter().copied() {
+            let parser = parser_at(form.fixture());
+            let reached = F::at(&parser);
+            assert_eq!(
+                reached,
+                Some(form),
+                "{form:?}'s own fixture resolves to {reached:?}. `at` returns \
+                 the FIRST admitting form, so {form:?}'s parse arm is \
+                 UNREACHABLE and nothing else reports it -- either the form is \
+                 dead and should go, or `FORMS`'s order is wrong"
+            );
+        }
+    }
+
+    #[test]
+    fn every_expression_form_is_reachable_through_at() {
+        every_form_is_reachable_through_at::<ExprAtomForm>();
+    }
+
+    #[test]
+    fn every_type_form_is_reachable_through_at() {
+        every_form_is_reachable_through_at::<TypeAtomForm>();
+    }
+
+    #[test]
+    fn every_pattern_form_is_reachable_through_at() {
+        every_form_is_reachable_through_at::<PatternAtomForm>();
+    }
+
+    /// The SHADOWING direction, as its own row.
+    ///
+    /// [`every_form_is_reachable_through_at`] would catch a bad order, but it
+    /// reports it in a message about reachability -- a reader asking *"is the
+    /// overlap real, and does the specific form win?"* would not find the
+    /// answer there. **The first assertion is the positive control**: without
+    /// it, a `Var` that had stopped admitting `Ident` would make the ordering
+    /// property vacuously true and this test would still pass.
+    #[test]
+    fn the_contextual_selectors_shadow_the_ordinary_variable() {
+        for (form, words) in [
+            (
+                ExprAtomForm::RetiredNestedResult,
+                ["structural", "result", "of", "xs"],
+            ),
+            (
+                ExprAtomForm::RecursiveResult,
+                ["recursive", "result", "for", "xs"],
+            ),
+            (
+                ExprAtomForm::InductionHypothesis,
+                ["induction", "hypothesis", "for", "xs"],
+            ),
+        ] {
+            let parser = parser_at(
+                words
+                    .iter()
+                    .map(|word| Token::Ident((*word).to_string()))
+                    .collect(),
+            );
+            assert!(
+                ExprAtomForm::Var.admits(&parser),
+                "{form:?}'s overlap with Var must be REAL, or the ordering \
+                 property below is vacuous"
+            );
+            assert_eq!(
+                ExprAtomForm::at(&parser),
+                Some(form),
+                "the SPECIFIC form must shadow the general one, never the \
+                 reverse -- `{words:?}` reaching Var parses it as a variable \
+                 applied to three arguments, silently"
+            );
+        }
+    }
+
+    /// AC-1 -- the expression derivation is FAITHFUL. Every token
+    /// `can_start_atom_expr`'s hand-written `matches!` listed at `7cb535be5`
+    /// must still be claimed by some form. A refactor that quietly narrowed the
+    /// expression surface would pass every other test that does not happen to
+    /// use the dropped form.
+    fn historical_expression_roster() -> Vec<Token> {
+        vec![
+            Token::KwProof,
+            Token::KwIf,
+            Token::LBrace,
+            Token::Ident(String::new()),
+            Token::ConId(String::new()),
+            Token::KwType,
+            Token::LParen,
+            Token::KwOld,
+            Token::Nat(0),
+            Token::IntLit(0.into()),
+            Token::FloatLit(0.0),
+            Token::DecimalLit(0.into(), 0),
+            Token::Float32Lit(0.0),
+            Token::Str(String::new()),
+            Token::CharLit('x'),
+            Token::ByteStr(Vec::new()),
+            Token::TruncBar,
+        ]
+    }
+
+    #[test]
+    fn the_derived_expression_roster_claims_exactly_the_historical_set() {
+        for token in historical_expression_roster() {
+            let parser = parser_at(vec![token.clone()]);
+            assert!(
+                ExprAtomForm::at(&parser).is_some(),
+                "{token:?} started an expression atom before the derivation and \
+                 no form claims it now -- `parse_atom_expr_base` would take the \
+                 `expected an expression` fallthrough"
+            );
+        }
+        for token in [
+            Token::Arrow,
+            Token::KwThen,
+            Token::KwElse,
+            Token::RParen,
+            Token::Comma,
+            Token::LBracket,
+        ] {
+            let parser = parser_at(vec![token.clone()]);
+            assert!(
+                ExprAtomForm::at(&parser).is_none(),
+                "{token:?} is not an expression atom start and no form may \
+                 claim it"
+            );
+        }
+    }
+
+    /// AC-9 -- the type derivation is faithful, in both directions. The type
+    /// side's four tokens are a STRICT SUBSET of the expression side's, and the
+    /// negative rows are what say so: a literal or a record brace admitted here
+    /// would be a fail-open widening of type parsing.
+    #[test]
+    fn the_derived_type_roster_claims_exactly_the_historical_four() {
+        for token in [
+            Token::ConId(String::new()),
+            Token::Ident(String::new()),
+            Token::KwType,
+            Token::LParen,
+            Token::TruncBar,
+        ] {
+            let parser = parser_at(vec![token.clone()]);
+            assert!(
+                TypeAtomForm::at(&parser).is_some(),
+                "{token:?} started a type atom before the derivation and must \
+                 still"
+            );
+        }
+        for token in [
+            Token::KwProof,
+            Token::KwIf,
+            Token::KwOld,
+            Token::LBrace,
+            Token::Nat(0),
+            Token::Str(String::new()),
+            Token::Arrow,
+        ] {
+            let parser = parser_at(vec![token.clone()]);
+            assert!(
+                TypeAtomForm::at(&parser).is_none(),
+                "{token:?} is not a type atom start -- the type roster is a \
+                 strict subset of the expression one and admitting this would \
+                 be a fail-open widening"
+            );
+        }
+    }
+
+    /// The CONDITIONAL membership, and that it survived the derivation IN THE
+    /// RIGHT LAYER. Both halves are the pin.
+    ///
+    /// **The second pair of assertions is the regression this measured.**
+    /// Folding the depth test into `Truncation::admits` compiles, derives a
+    /// byte-identical roster, passes the first pair -- and rejects `‖‖x‖‖` in
+    /// both positions, because a nested truncation reaches
+    /// `parse_atom_expr_base` at depth 1 and needs the arm. `admits` is
+    /// consulted by the roster AND by dispatch; only the roster is
+    /// depth-sensitive.
+    ///
+    /// **This row is NOT the only detector, and the other three are worth
+    /// naming because of where they came from.** The fold reds four tests:
+    ///
+    /// ```text
+    /// a_truncation_bar_starts_an_atom_only_outside_a_truncation_body  this row
+    /// ac2_the_self_delimiting_bar_still_nests_and_groups              AC-2
+    /// ac2_the_enclosed_form_is_withheld_and_at_two_arguments_..       AC-2
+    /// sentinel_inside_a_truncation_body_two_arguments_reassociate_..  increment A
+    /// ```
+    ///
+    /// All three are THIS NODE's own earlier increments, not base coverage that
+    /// happened to be there. The expression side is well covered by them; what
+    /// this row adds is the TYPE side, which none of them exercises, and a
+    /// message naming the layer rather than the symptom.
+    #[test]
+    fn a_truncation_bar_starts_an_atom_only_outside_a_truncation_body() {
+        for depth in [0usize, 1, 2] {
+            let mut parser = parser_at(vec![Token::TruncBar]);
+            parser.truncation_depth = depth;
+
+            assert_eq!(
+                parser.can_start_atom_expr(),
+                depth == 0,
+                "at truncation_depth {depth} the expression ROSTER must {} the \
+                 bar -- inside a body it is the CLOSER, and admitting it lets \
+                 the argument loop eat the terminator",
+                if depth == 0 { "admit" } else { "refuse" }
+            );
+            assert_eq!(
+                parser.can_start_atom_type(),
+                depth == 0,
+                "the type roster must agree with the expression roster: \
+                 `TruncBar` is position-polymorphic"
+            );
+
+            assert_eq!(
+                ExprAtomForm::at(&parser),
+                Some(ExprAtomForm::Truncation),
+                "DISPATCH must stay depth-INSENSITIVE at depth {depth} -- this \
+                 is what makes `‖‖x‖‖` parse, and it is what breaks if the \
+                 depth test is moved into `admits`"
+            );
+            assert_eq!(
+                TypeAtomForm::at(&parser),
+                Some(TypeAtomForm::Truncation),
+                "and the same on the type side: `fn f (x : ‖‖Bool‖‖)` parses"
+            );
+        }
+    }
+
+    /// **A FORM IS NOT A ROSTER ADMISSION**, and conflating the two is how `if`
+    /// came to be refused by ABSENCE.
+    ///
+    /// Three expression forms are live at the HEAD -- where no roster is
+    /// consulted -- and refused as arguments by a stated exclusion. Each
+    /// assertion is one of the two halves that makes its exclusion
+    /// mutation-provable:
+    ///
+    /// ```text
+    /// at() == Some(form)          the arm is reachable; the form is not dead
+    /// exclusion.holds_at()        the refusal has a stated REASON
+    /// !can_start_atom_expr()      and the roster actually applies it
+    /// ```
+    ///
+    /// **Drop the first and the exclusion goes inert** -- the token is refused
+    /// by absence, neutering the member reds nothing, and a member that cannot
+    /// fail is documentation rather than mechanism. Measured for `KwIf` at
+    /// `7cb535be5`: with the form absent, neutering `IfExpression::holds_at`
+    /// left `all_three_atom_entry_points_refuse_every_exclusion_trigger` green.
+    #[test]
+    fn three_expression_forms_are_live_at_the_head_and_refused_as_arguments() {
+        for (form, exclusion) in [
+            (ExprAtomForm::If, StartExclusion::IfExpression),
+            (ExprAtomForm::ProofSelector, StartExclusion::ProofSelector),
+            (ExprAtomForm::OperatorName, StartExclusion::OperatorName),
+        ] {
+            let parser = parser_at(form.fixture());
+            assert_eq!(
+                ExprAtomForm::at(&parser),
+                Some(form),
+                "{form:?} must stay a LIVE form: `parse_atom_expr_base` \
+                 dispatches to its arm at the head, where no roster is \
+                 consulted"
+            );
+            assert!(
+                exclusion.holds_at(&parser),
+                "{exclusion:?} must be what refuses {form:?} -- otherwise the \
+                 refusal is by absence and the member is inert"
+            );
+            assert!(
+                !parser.can_start_atom_expr(),
+                "{form:?} is a head-only form and must be refused in argument \
+                 position"
+            );
+        }
+    }
+
+    /// `roster = dispatch set MINUS StartExclusion`, as an exhaustive LEDGER.
+    ///
+    /// **The equation itself is definitional** -- `Parser::can_start_atom` IS
+    /// that subtraction, so a test asserting it would be green by construction
+    /// and would be documentation rather than mechanism. What is NOT
+    /// definitional is WHICH SIDE each form sits on, and that is a language
+    /// decision rather than a refactor's to make.
+    ///
+    /// So the `match` below is hand-written and exhaustive: **a new form is a
+    /// compile error here** and must be classified deliberately instead of
+    /// landing on the admissible side by default, which is the direction that
+    /// fails open. Pairs with
+    /// [`three_expression_forms_are_live_at_the_head_and_refused_as_arguments`],
+    /// which asserts the same three rows behaviourally rather than by ledger.
+    #[test]
+    fn the_expression_partition_is_the_form_set_minus_the_exclusions() {
+        for form in ExprAtomForm::ALL {
+            let expected: Option<StartExclusion> = match form {
+                ExprAtomForm::If => Some(StartExclusion::IfExpression),
+                ExprAtomForm::ProofSelector => Some(StartExclusion::ProofSelector),
+                ExprAtomForm::OperatorName => Some(StartExclusion::OperatorName),
+                ExprAtomForm::RetiredNestedResult
+                | ExprAtomForm::RecursiveResult
+                | ExprAtomForm::InductionHypothesis
+                | ExprAtomForm::Var
+                | ExprAtomForm::Ctor
+                | ExprAtomForm::Literal
+                | ExprAtomForm::Record
+                | ExprAtomForm::Universe
+                | ExprAtomForm::Old
+                | ExprAtomForm::Paren
+                | ExprAtomForm::Truncation => None,
+            };
+            let parser = parser_at(form.fixture());
+            assert_eq!(
+                parser.atom_start_exclusion(AtomPosition::Expression),
+                expected,
+                "{form:?} sits on the other side of the partition than this \
+                 ledger says. An exclusion appearing here without the ledger \
+                 moving is a silently NARROWED argument position; one \
+                 disappearing is a silently WIDENED one"
+            );
+            assert_eq!(
+                parser.can_start_atom_expr(),
+                expected.is_none(),
+                "{form:?}: the roster must be exactly the form set minus the \
+                 exclusions"
             );
         }
     }
@@ -852,14 +1736,17 @@ mod atom_start_premise {
     #[test]
     fn all_three_atom_entry_points_refuse_every_exclusion_trigger() {
         for exclusion in StartExclusion::ALL {
-            let mut tokens: Vec<(Token, Span)> = exclusion
-                .fixture()
-                .into_iter()
-                .enumerate()
-                .map(|(i, t)| (t, Span::new(i, i + 1)))
-                .collect();
-            tokens.push((Token::Eof, Span::new(99, 99)));
-            let parser = Parser::new(tokens, String::new());
+            let parser = exclusion.fixture_parser();
+
+            // POSITIVE CONTROL, per row. Without it a fixture that does not
+            // reach its own trigger passes every assertion below for any
+            // member whose token no roster admits -- "refused" and "never
+            // looked" are indistinguishable from the outside.
+            assert!(
+                exclusion.holds_at(&parser),
+                "{exclusion:?}'s fixture does not trigger it, so the rows \
+                 below assert nothing about this member"
+            );
 
             if exclusion.applies_in(AtomPosition::Expression) {
                 assert!(
@@ -900,6 +1787,16 @@ mod atom_start_premise {
     }
 
     /// AC-4's premise: no operator token is admitted as an atom start.
+    ///
+    /// **The premise is unchanged; WHAT MAKES IT TRUE HAS CHANGED.** It used to
+    /// hold because `can_start_atom_expr`'s hand-written `matches!` happened
+    /// not to list operator tokens -- refusal by ABSENCE. The roster is now
+    /// derived from [`ExprAtomForm`], which DOES claim every operator token
+    /// (the arm exists), and the refusal is
+    /// [`StartExclusion::OperatorName`]. So this test's failure mode moved too:
+    /// it used to red if someone added a token to a list, and now reds if
+    /// someone neuters a stated exclusion -- which is the direction that
+    /// carries a reason.
     #[test]
     fn no_operator_token_is_admitted_as_an_atom_start() {
         for token in every_operator_token() {
@@ -2907,23 +3804,13 @@ impl Parser {
         self.parse_atom_type()
     }
 
+    /// AC-1 and AC-9: DERIVED from [`TypeAtomForm`], with the type side's two
+    /// negative guards preserved in the exclusion layer rather than restated
+    /// here. `BinderName` is the load-bearing one -- without it `(x : T)`
+    /// offers `x` to a type-application loop as another atom argument and the
+    /// binder is consumed.
     fn can_start_atom_type(&self) -> bool {
-        if self.atom_start_exclusion(AtomPosition::Type).is_some() {
-            return false;
-        }
-        // Conditional membership; the sole statement of it. See the same
-        // guard in `can_start_atom_expr` for why the token must not also
-        // appear in the `matches!` below.
-        if matches!(self.peek(), Token::TruncBar) {
-            return self.truncation_depth == 0;
-        }
-        matches!(
-            self.peek(),
-            Token::ConId(_)
-                | Token::Ident(_)
-                | Token::KwType
-                | Token::LParen
-        )
+        self.can_start_atom::<TypeAtomForm>()
     }
 
     /// The first [`StartExclusion`] that vetoes an atom start here, if any.
@@ -2997,8 +3884,21 @@ impl Parser {
 
     fn parse_atom_type(&mut self) -> Result<Type, ElabError> {
         let start = self.peek_span().start;
-        match self.peek().clone() {
-            Token::KwType => {
+        // AC-1: the ONLY way into an arm below. A parse arm is reachable iff
+        // `admits` said yes, so the start test and the parse cannot drift.
+        //
+        // The exclusions are NOT consulted here. This is the head of a type
+        // atom, and `can_start_atom_type` is what governs whether a
+        // CONTINUATION may begin one -- which is why a nested `‖‖A‖‖` reaches
+        // the truncation arm at depth 1.
+        let Some(form) = TypeAtomForm::at(self) else {
+            return Err(ElabError::ParseError {
+                msg: format!("expected a type, found {:?}", self.peek()),
+                span: self.peek_span().clone(),
+            });
+        };
+        match form {
+            TypeAtomForm::Universe => {
                 self.advance();
                 let level = if let Token::Nat(n) = self.peek().clone() {
                     self.advance();
@@ -3011,13 +3911,19 @@ impl Parser {
                     Span::new(start, self.tokens[self.pos - 1].1.end),
                 ))
             }
-            Token::ConId(s) => {
+            TypeAtomForm::Ctor => {
+                let Token::ConId(s) = self.peek().clone() else {
+                    return Err(self.atom_form_drift(form));
+                };
                 let span = self.peek_span().clone();
                 self.advance();
                 let (name, span) = self.parse_dotted(s, span);
                 Ok(Type::TVar(name, span))
             }
-            Token::Ident(s) => {
+            TypeAtomForm::Var => {
+                let Token::Ident(s) = self.peek().clone() else {
+                    return Err(self.atom_form_drift(form));
+                };
                 let head_span = self.peek_span().clone();
                 self.advance();
                 // `d.Query` -- named-field projection in TYPE position
@@ -3101,7 +4007,7 @@ impl Parser {
                 }
                 Ok(Type::TProj(Box::new(base), field, span))
             }
-            Token::LParen => {
+            TypeAtomForm::Paren => {
                 self.advance();
                 let ty = self.parse_type()?;
                 self.expect(&Token::RParen)?;
@@ -3111,7 +4017,7 @@ impl Parser {
             // D1). Same token both sides, symmetric with `(A)`: consume the
             // opener, parse a full type, require the matching closer. Mirrors the
             // expression-position `Expr::ETrunc` production.
-            Token::TruncBar => {
+            TypeAtomForm::Truncation => {
                 self.advance();
                 self.truncation_depth += 1;
                 let inner = self.parse_type();
@@ -3121,10 +4027,6 @@ impl Parser {
                 let end = self.tokens[self.pos - 1].1.end;
                 Ok(Type::TTrunc(Box::new(inner), Span::new(start, end)))
             }
-            other => Err(ElabError::ParseError {
-                msg: format!("expected a type, found {:?}", other),
-                span: self.peek_span().clone(),
-            }),
         }
     }
 
@@ -3419,61 +4321,47 @@ impl Parser {
         }
     }
 
-    fn can_start_atom_expr(&self) -> bool {
-        // SELF-GUARDING, exactly as `can_start_atom_type` is. The asymmetry
-        // between the two was a defect GENERATOR, not a style difference:
-        // while this one was a pure token predicate, applying the exclusions
-        // was a per-CALLER obligation, and a per-caller obligation is
-        // discharged by whoever remembers. The bare-operator-name gate did
-        // not, so admitting `KwProof` to the roster below made
-        // `fn f (x : Int) : Int = <=` a legal declaration whenever the next
-        // token was `proof` -- a bare operator name as a function body, with
-        // the following declaration silently split off. Measured against the
-        // base, which rejected both.
-        //
-        // Guarding here covers every consumer by construction, including the
-        // ones nobody has written yet. AC-1's closure property is stated over
-        // TOKENS; this is the same closure over CONSUMERS.
-        if self.atom_start_exclusion(AtomPosition::Expression).is_some() {
+    /// AC-10: the ONE place the exclusion layer meets a roster, for every
+    /// roster there is.
+    ///
+    /// **The asymmetry this replaces was a defect GENERATOR, not a style
+    /// difference.** While `can_start_atom_expr` was a pure token predicate,
+    /// applying the exclusions was a per-CALLER obligation -- and a per-caller
+    /// obligation is discharged by whoever remembers. The bare-operator-name
+    /// gate did not, so admitting `KwProof` to the roster made
+    /// `fn f (x : Int) : Int = <=` a legal declaration whenever the next token
+    /// was `proof`: a bare operator name as a function body, with the following
+    /// declaration silently split off. Measured against the base, which
+    /// rejected both.
+    ///
+    /// Guarding here covers every consumer by construction, **including the
+    /// rosters nobody has written yet** -- a new roster is an
+    /// `impl AtomFormRoster`, and it reaches its position's exclusions through
+    /// this function or it does not reach callers at all. AC-1's closure
+    /// property is over FORMS; this is the closure over CONSUMERS, and neither
+    /// implies the other.
+    fn can_start_atom<F: AtomFormRoster>(&self) -> bool {
+        if self.atom_start_exclusion(F::POSITION).is_some() {
             return false;
         }
-        // `TruncBar`'s membership is CONDITIONAL, and this guard is the only
-        // statement of it. Do NOT also list the token in the `matches!` below
-        // "for symmetry": that arm would be unreachable, and a reader who took
-        // it as the live statement and deleted this guard as redundant would
-        // reintroduce the naive widening -- which is measured to redden three
-        // rows, not to be a no-op. Inside a truncation body this bar is the
-        // CLOSER, not an opener.
-        if matches!(self.peek(), Token::TruncBar) {
-            return self.truncation_depth == 0;
-        }
-        matches!(
-            self.peek(),
-            // ADMITTED HERE AND REFUSED BY `ProofSelector`, deliberately.
-            // Leaving it out would refuse it too -- by ABSENCE -- and the
-            // exclusion would then be INERT: neutering it would change
-            // nothing, and a member that cannot fail is documentation, not
-            // mechanism. Measured: with `KwProof` omitted here, neutering
-            // `ProofSelector` reddened not one row. Admitting it makes the
-            // CLASSIFICATION the authority for the refusal, which is what
-            // AC-1's closure property asks for, and makes the member
-            // mutation-provable.
-            Token::KwProof
-                | Token::LBrace
-                | Token::Ident(_)
-                | Token::ConId(_)
-                | Token::KwType
-                | Token::LParen
-                | Token::KwOld
-                | Token::Nat(_)
-                | Token::IntLit(_)
-                | Token::FloatLit(_)
-                | Token::DecimalLit(_, _)
-                | Token::Float32Lit(_)
-                | Token::Str(_)
-                | Token::CharLit(_)
-                | Token::ByteStr(_)
-        )
+        F::at(self).is_some()
+    }
+
+    /// AC-1: DERIVED from [`ExprAtomForm`], not a hand-written `matches!`
+    /// beside `parse_atom_expr_base`'s arms.
+    ///
+    /// **The admitted set is the FORM set minus the Expression-position
+    /// [`StartExclusion`] members**, which is why `KwIf`, `KwProof` and the
+    /// operator tokens are all forms and none of them is admitted here.
+    /// Omitting them from the form set instead would refuse them by ABSENCE,
+    /// and each exclusion would then be INERT: neutering it would change
+    /// nothing, and a member that cannot fail is documentation, not mechanism.
+    /// Measured at 7cb535be5 for `KwIf` -- with the form absent, neutering
+    /// `IfExpression::holds_at` left
+    /// `all_three_atom_entry_points_refuse_every_exclusion_trigger` GREEN; with
+    /// it present, the same mutation REDS that row.
+    fn can_start_atom_expr(&self) -> bool {
+        self.can_start_atom::<ExprAtomForm>()
     }
 
     fn parse_if_expr(&mut self) -> Result<Expr, ElabError> {
@@ -3757,11 +4645,11 @@ impl Parser {
         PatternAtomForm::at(self).is_some()
     }
 
+    /// **NOT a third roster** -- it is `can_start_pattern` plus the
+    /// Pattern-position exclusions, which is exactly what
+    /// [`Parser::can_start_atom`] computes.
     fn can_start_atom_pat(&self) -> bool {
-        if self.atom_start_exclusion(AtomPosition::Pattern).is_some() {
-            return false;
-        }
-        self.can_start_pattern()
+        self.can_start_atom::<PatternAtomForm>()
     }
 
     fn parse_literal_pattern(&mut self) -> Result<Pattern, ElabError> {
@@ -3881,11 +4769,18 @@ impl Parser {
     /// catching a hand-maintained correspondence drifting must not itself
     /// carry one: with a string, a copied `else` branch names the wrong form
     /// and the diagnostic lies about which pairing broke.
-    fn atom_form_drift(&self, form: PatternAtomForm) -> ElabError {
+    fn atom_form_drift<F: AtomFormRoster>(&self, form: F) -> ElabError {
+        // The roster's name is taken from the COMPILER rather than written
+        // here. A per-roster string literal would be a second hand-maintained
+        // correspondence inside the helper whose whole job is catching one.
+        let roster = std::any::type_name::<F>()
+            .rsplit("::")
+            .next()
+            .unwrap_or("AtomForm");
         ElabError::ParseError {
             msg: format!(
-                "internal: PatternAtomForm::{form:?} admitted a token its parse \
-                 arm cannot destructure -- admits() and the arm have drifted"
+                "internal: {roster}::{form:?} admitted a token its parse arm \
+                 cannot destructure -- admits() and the arm have drifted"
             ),
             span: self.peek_span().clone(),
         }
@@ -3984,100 +4879,101 @@ impl Parser {
         Ok(e)
     }
 
+    /// The eight literal tokens, in one arm, exactly as
+    /// `parse_literal_pattern` is for [`PatternAtomForm::Literal`].
+    ///
+    /// **This is where [`ExprAtomForm`]'s disclosed residual actually lives**:
+    /// `Literal::admits` hand-lists eight tokens and so does this match, two
+    /// hand-maintained lists agreeing by discipline. The `_ =>` arm below is
+    /// the runtime witness for that pairing drifting; a ninth literal added to
+    /// only one of them is not a compile error in either direction.
+    fn parse_literal_expr(&mut self) -> Result<Expr, ElabError> {
+        let span = self.peek_span().clone();
+        let expr = match self.peek().clone() {
+            Token::Nat(n) => Expr::ENumLit(NumLit::Int(num_bigint::BigInt::from(n)), span.clone()),
+            Token::IntLit(n) => Expr::ENumLit(NumLit::Int(n), span.clone()),
+            Token::FloatLit(f) => Expr::ENumLit(NumLit::Float(f), span.clone()),
+            Token::DecimalLit(c, e) => Expr::ENumLit(NumLit::Decimal(c, e), span.clone()),
+            Token::Float32Lit(f) => Expr::ENumLit(NumLit::Float32(f), span.clone()),
+            Token::Str(s) => Expr::EStr(s, span.clone()),
+            Token::CharLit(c) => Expr::ECharLit(c, span.clone()),
+            Token::ByteStr(bytes) => Expr::EByteStr(bytes, span.clone()),
+            _ => return Err(self.atom_form_drift(ExprAtomForm::Literal)),
+        };
+        self.advance();
+        Ok(expr)
+    }
+
+    /// `recursive result for x` and `induction hypothesis for x` (`32 §3:406`).
+    ///
+    /// **Takes the FORM, not a word, because the form is what decided which
+    /// four-word sequence is ahead.** Re-deriving the selector from `peek()`
+    /// here would be a second recognizer beside
+    /// [`ExprAtomForm::admits`] -- the exact duplication this node exists to
+    /// end -- and the two could then disagree about which selector a given
+    /// four words are.
+    fn parse_recursive_result_selector(&mut self, form: ExprAtomForm) -> Result<Expr, ElabError> {
+        let span = self.peek_span().clone();
+        let (second_word, selector) = match form {
+            ExprAtomForm::RecursiveResult => (
+                "result",
+                crate::ast::RecursiveResultSelector::RecursiveResult,
+            ),
+            ExprAtomForm::InductionHypothesis => (
+                "hypothesis",
+                crate::ast::RecursiveResultSelector::InductionHypothesis,
+            ),
+            _ => return Err(self.atom_form_drift(form)),
+        };
+        self.advance();
+        self.expect_contextual_ident(second_word)?;
+        self.expect_contextual_ident("for")?;
+        let (operand, operand_span) = self.expect_ident()?;
+        Ok(Expr::ERecursiveResult {
+            selector,
+            operand,
+            span: Span::new(span.start, operand_span.end),
+            operand_span,
+        })
+    }
+
     fn parse_atom_expr_base(&mut self) -> Result<Expr, ElabError> {
         let start = self.peek_span().start;
-        match self.peek().clone() {
-            Token::LBrace => self.parse_record_expr(),
-            Token::KwIf => self.parse_if_expr(),
-            Token::Nat(n) => {
+        // AC-1: the ONLY way into an arm below, over BOTH kinds of atom form.
+        // Three of the fourteen are recognized by a four-token lookahead and by
+        // no token at all -- a `Token`-keyed dispatch cannot express them, and
+        // that is exactly where this node's first proposed repair failed.
+        //
+        // The exclusions are NOT consulted here: this is the atom HEAD, and
+        // `can_start_atom_expr` is what governs whether a CONTINUATION may
+        // begin one. `if`, `proof` and an operator name are all live forms here
+        // and all three are refused as arguments.
+        let Some(form) = ExprAtomForm::at(self) else {
+            return Err(ElabError::ParseError {
+                msg: format!("expected an expression, found {:?}", self.peek()),
+                span: self.peek_span().clone(),
+            });
+        };
+        match form {
+            ExprAtomForm::Record => self.parse_record_expr(),
+            ExprAtomForm::If => self.parse_if_expr(),
+            ExprAtomForm::Literal => self.parse_literal_expr(),
+            ExprAtomForm::RetiredNestedResult => {
                 let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::ENumLit(
-                    NumLit::Int(num_bigint::BigInt::from(n)),
-                    span,
-                ))
+                Err(ElabError::ParseError {
+                    msg: "retired nested-result selector; use the sort-selected spelling"
+                        .to_string(),
+                    span: Span::new(span.start, self.tokens[self.pos + 3].1.end),
+                })
             }
-            Token::IntLit(n) => {
-                let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::ENumLit(NumLit::Int(n), span))
+            ExprAtomForm::RecursiveResult | ExprAtomForm::InductionHypothesis => {
+                self.parse_recursive_result_selector(form)
             }
-            Token::FloatLit(f) => {
-                let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::ENumLit(NumLit::Float(f), span))
-            }
-            Token::Str(s) => {
-                let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::EStr(s, span))
-            }
-            Token::CharLit(c) => {
-                let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::ECharLit(c, span))
-            }
-            Token::ByteStr(bytes) => {
-                let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::EByteStr(bytes, span))
-            }
-            Token::DecimalLit(c, e) => {
-                let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::ENumLit(NumLit::Decimal(c, e), span))
-            }
-            Token::Float32Lit(f) => {
-                let span = self.peek_span().clone();
-                self.advance();
-                Ok(Expr::ENumLit(NumLit::Float32(f), span))
-            }
-            Token::Ident(s) => {
-                let span = self.peek_span().clone();
-                if s == "structural"
-                    && matches!(self.lookahead(1), Token::Ident(word) if word == "result")
-                    && matches!(self.lookahead(2), Token::Ident(word) if word == "of")
-                    && matches!(self.lookahead(3), Token::Ident(_))
-                {
-                    return Err(ElabError::ParseError {
-                        msg: "retired nested-result selector; use the sort-selected spelling"
-                            .to_string(),
-                        span: Span::new(span.start, self.tokens[self.pos + 3].1.end),
-                    });
-                }
-                let selector = if s == "recursive"
-                    && matches!(self.lookahead(1), Token::Ident(word) if word == "result")
-                    && matches!(self.lookahead(2), Token::Ident(word) if word == "for")
-                    && matches!(self.lookahead(3), Token::Ident(_))
-                {
-                    Some((
-                        "result",
-                        crate::ast::RecursiveResultSelector::RecursiveResult,
-                    ))
-                } else if s == "induction"
-                    && matches!(self.lookahead(1), Token::Ident(word) if word == "hypothesis")
-                    && matches!(self.lookahead(2), Token::Ident(word) if word == "for")
-                    && matches!(self.lookahead(3), Token::Ident(_))
-                {
-                    Some((
-                        "hypothesis",
-                        crate::ast::RecursiveResultSelector::InductionHypothesis,
-                    ))
-                } else {
-                    None
+            ExprAtomForm::Var => {
+                let Token::Ident(s) = self.peek().clone() else {
+                    return Err(self.atom_form_drift(form));
                 };
-                if let Some((second_word, selector)) = selector {
-                    self.advance();
-                    self.expect_contextual_ident(second_word)?;
-                    self.expect_contextual_ident("for")?;
-                    let (operand, operand_span) = self.expect_ident()?;
-                    return Ok(Expr::ERecursiveResult {
-                        selector,
-                        operand,
-                        span: Span::new(span.start, operand_span.end),
-                        operand_span,
-                    });
-                }
+                let span = self.peek_span().clone();
                 self.advance();
                 if matches!(self.peek(), Token::DoubleColon) {
                     self.advance();
@@ -4091,7 +4987,7 @@ impl Parser {
                     Ok(Expr::EVar(s, span))
                 }
             }
-            operator if canonical_operator_name(&operator).is_some() => {
+            ExprAtomForm::OperatorName => {
                 // `32 Section 3`: an ungrouped `operator_name` is admitted only
                 // as an `operator_prefix` head with at least one following
                 // atom. With zero following atoms it rejects AT ITS LEADING
@@ -4115,6 +5011,17 @@ impl Parser {
                 // today, and nothing about widening the roster would consult
                 // this comment.
                 //
+                // AND DERIVING THE ROSTER FROM THE FORM SET WOULD HAVE BROKEN
+                // IT AS A SIDE EFFECT. This arm exists, so `ExprAtomForm`
+                // carries `OperatorName` and `at` claims every operator token
+                // -- a roster that was simply `at(..).is_some()` would admit
+                // them and the argument loop would take an operator as an
+                // argument. The refusal is therefore STATED, as
+                // `StartExclusion::OperatorName`, and the premise now holds for
+                // a reason rather than by omission. `32 Section 3` is
+                // position-keyed in exactly those terms: an ungrouped
+                // `operator_name` is an `operator_prefix` HEAD and nothing else.
+                //
                 // So the dependency is pinned rather than asserted, in
                 // `mod atom_start_premise` beside `canonical_operator_name`:
                 // every operator token is positioned in a `Parser` and
@@ -4133,9 +5040,9 @@ impl Parser {
                 // the roster would leave the premise pin green and the claim
                 // false.
                 let span = self.peek_span().clone();
-                let name = canonical_operator_name(&operator)
-                    .expect("guarded by operator-name recognition")
-                    .to_owned();
+                let Some(name) = canonical_operator_name(self.peek()).map(str::to_owned) else {
+                    return Err(self.atom_form_drift(form));
+                };
                 self.advance();
                 if !self.can_start_atom_expr() {
                     return Err(ElabError::ParseError {
@@ -4149,7 +5056,10 @@ impl Parser {
                 }
                 Ok(Expr::EVar(name, span))
             }
-            Token::ConId(s) => {
+            ExprAtomForm::Ctor => {
+                let Token::ConId(s) = self.peek().clone() else {
+                    return Err(self.atom_form_drift(form));
+                };
                 let span = self.peek_span().clone();
                 self.advance();
                 let (name, span) = self.parse_dotted(s, span);
@@ -4165,7 +5075,7 @@ impl Parser {
                     Ok(Expr::ECon(name, span))
                 }
             }
-            Token::KwType => {
+            ExprAtomForm::Universe => {
                 self.advance();
                 let level = if let Token::Nat(n) = self.peek().clone() {
                     self.advance();
@@ -4177,13 +5087,13 @@ impl Parser {
                 Ok(Expr::EUniv(level, Span::new(start, end)))
             }
             // `old e` — pre-state reference (`21 §6.4`)
-            Token::KwOld => {
+            ExprAtomForm::Old => {
                 self.advance(); // consume 'old'
                 let arg = self.parse_atom_expr()?;
                 let end = arg.span().end;
                 Ok(Expr::EOld(Box::new(arg), Span::new(start, end)))
             }
-            Token::KwProof => {
+            ExprAtomForm::ProofSelector => {
                 self.advance();
                 let (proof_name, _) = self.expect_ident()?;
                 self.expect_contextual_ident("for")?;
@@ -4195,7 +5105,7 @@ impl Parser {
                     span: Span::new(start, end),
                 })
             }
-            Token::LParen => {
+            ExprAtomForm::Paren => {
                 self.advance();
                 // DO NOT DELETE THIS AS REDUNDANT WITH THE `operator_name`
                 // ARM BELOW. It is not a convenience: that arm now REJECTS an
@@ -4336,7 +5246,7 @@ impl Parser {
             // LANG-TRUNCATION-SURFACE-SYNTAX D1). Same token both sides, so
             // parsing is symmetric with `(e)`: consume the opener, parse a
             // full expression, require the matching closer.
-            Token::TruncBar => {
+            ExprAtomForm::Truncation => {
                 self.advance();
                 self.truncation_depth += 1;
                 let inner = self.parse_expr();
@@ -4346,10 +5256,6 @@ impl Parser {
                 let end = self.tokens[self.pos - 1].1.end;
                 Ok(Expr::ETrunc(Box::new(inner), Span::new(start, end)))
             }
-            other => Err(ElabError::ParseError {
-                msg: format!("expected an expression, found {:?}", other),
-                span: self.peek_span().clone(),
-            }),
         }
     }
 
