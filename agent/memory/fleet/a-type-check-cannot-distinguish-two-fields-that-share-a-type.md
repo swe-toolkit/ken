@@ -96,6 +96,23 @@ opens the file. Had they agreed, the wrong coordinate would have landed.
 
 ## Related
 
-- `[[an-existence-check-is-the-one-that-feels-like-a-content-check]]`
-- `[[read-the-producer-before-writing-a-predicate-over-its-value]]`
+- `[[grep-the-producer-not-the-cited-proxy]]` — the same rule for greps: the
+  producer is the object, the citation is not.
+- `[[an-oracle-that-greps-a-name-fires-on-prose-that-denies-it]]` — a grep hit
+  is a mention, which is how the sibling instance above happened.
+- `[[a-capped-list-is-a-sound-presence-oracle-and-a-broken-absence-oracle]]` —
+  the presence/absence asymmetry a compatibility check shares.
 - `[[before-running-an-instrument-write-down-the-observation-that-would-end-it]]`
+
+> **This section shipped with two dead links and it is worth saying why**, since
+> the mechanism is the lesson's own. The first draft linked
+> `an-existence-check-is-the-one-that-feels-like-a-content-check` and
+> `read-the-producer-before-writing-a-predicate-over-its-value`. **Neither slug
+> exists anywhere in `agent/memory/` — both are from the author's PRIVATE memory
+> store**, and the two stores use identical `[[slug]]` syntax.
+>
+> **So a link written from the wrong store is syntactically perfect and resolves
+> to nothing**, and nothing in the authoring path says so: the file renders, the
+> commit passes, and the reader finds an empty result. **A `[[...]]` here is a
+> claim that a file exists in THIS corpus — check it the way you would any other
+> existence claim, which is by looking, not by recognising the name.**
