@@ -183,4 +183,49 @@ be startable while the publisher queue drains.
 
 ## 9. Measured outcome
 
-To be written by the implementing ring.
+**`D0` and `D1` ANSWERED, 2026-09-18, runtime-implementer. The frame's own
+dichotomy is refuted and `D3`'s pricing changes. The authoritative record is in
+the node** (`issues/RT-CONTEXT-FRAME-LABEL-CORRECTION.md`, the `ANSWERED`
+section); this is the frame-level consequence only.
+
+Measured at `7cb535be5`; `git diff 7cb535be5 origin/main -- crates/` is empty,
+so the numbers carry to `9dfa6978e`. All probes env-gated and reverted;
+`grep -c RTPROBE` = 0.
+
+### What the frame got wrong
+
+    frame reading (2)        REFUTED in all four rows
+    frame reading (1)        true of exactly ONE row (px7m:206)
+    frame's population split REFUTED -- it is not px7m versus px7l
+
+The mechanism is neither branch: **the comparison tests node identity where the
+property it needs is body equality.** The four rows are one population by shape,
+split 3-1 by where the resolved unit sits relative to the arms' divergence, and
+the odd row is inside `px7m`.
+
+### The re-pricing, which governs `D2`/`D3`
+
+> **No repair at `core.rs:1230` makes any row pass.** All four stop immediately
+> behind it at `RT-CONTSRC-PRODUCER-LOCAL` `D3b` (`core.rs:9558`), same
+> construct and same text.
+
+**`D3` remains worth doing and must NOT be reported as progress against the
+ignored rows.** A check testing the wrong relation is a real defect; closing it
+readmits three rows past `1230` and changes nothing observable about any of the
+four.
+
+### The limit that binds any successor
+
+Two forcings revealed two layers. **The stack behind `L2` is NOT bounded** --
+forcing past a refusal shows the next stop, never an inventory. Do not frame a
+successor as "the last blocker for these rows."
+
+### Two method notes worth carrying, both the implementer's
+
+- The second forcing's free parameter came out **invariant**, and the control
+  was shown **not vacuous**: the chosen unit is consumed and changes control flow
+  (the disagreement is reached 1 versus 2 times by direction). An invariant
+  result from a parameter nothing reads is not a finding.
+- The enclosing closures' capture lists are equal in every row and **nothing
+  rests on that** -- equal index lists resolved in different environments are not
+  equal values.
