@@ -487,6 +487,55 @@ colliding constructors* — the node table's actual column — which would have
 left that column grep-derived, which is what `AC-0` forbids. The run was
 stopped mid-build and re-cut; the cost was build time and no measurement.
 
+### 8.5a The 29 keys, and the namespace question the Architect raised
+
+**Asked during review and answered from the existing census output — a read,
+no rebuild.** The concern: `host_response_routes` inserts under
+`case.constructor`, a **match-arm** constructor (`responses.rs:1254`), and
+`selected_host_response_route` looks up under the constructor of the
+**operation value** being performed (`:1297`-`:1298`). Those are the same
+symbol only when the scanned `Match` is matching on the host operation itself,
+and nothing in the insert guards requires that.
+
+Every one of the 29 keys, in each of the three programs:
+
+    ClockOp      3    MonotonicNow, SleepUntil, WallNow
+    ConsoleOp    4    Flush, IsTerminal, Read, Write
+    EntropyOp    1    RandomBytes
+    FSOp        21    10 named, 11 anonymous (ctor_541 .. ctor_551)
+    ---------------
+                29
+
+**No data constructor appears as a key in any of the three plans**, and the
+three key sets are **identical modulo the program-name prefix** — `diff` over
+the stripped symbol lists is empty for `px7n` against each `rt_escape`
+program.
+
+**Why they coincide, from a measurement already on record rather than a new
+one:** `EntropyOp::RandomBytes` is a key in all three plans, and the
+de-duplication fold records that these programs perform `RandomBytes` **zero**
+times and that neither test file mentions entropy. A key therefore exists for
+an operation the program never performs ⇒ **the scanned `Match` is not program
+code, it is the prelude's operation dispatcher, and that dispatcher matches on
+the operation coproduct.** The divergence the concern requires is absent, for
+a reason and not by coincidence.
+
+**What is NOT measured, stated as the gap:** the per-route identity — for each
+key, whether that route's own `operation` is the operation the key names — is
+**not** in the census. The instrument printed the key and the agree-on-
+`operation` comparison *between the two colliding routes*; it never printed
+`operation` beside the key. Establishing it is one field and a rebuild, and it
+was deliberately not queued behind `AC-3`.
+
+**One of the 29 is settled already, from the predecessor:** `rt_escape:653`
+selects `FSOp::ctor_543`, and that constructor is one of that plan's 29
+counted collisions — so for that key the insert key and the lookup key are the
+same symbol. One of twenty-nine, and an anonymous one.
+
+⇒ The namespace conflation is **refuted at the level of which namespace the
+keys inhabit** and **unmeasured at the level of per-key identity**. It is
+narrowed, not open, and not closed.
+
 ### 8.6 `AC-2` — `S6` does not acquire a collision, and the control got sharper
 
 `S6` reports `overwrites=0 colliding_constructors=0 distinct_deltas=[]
