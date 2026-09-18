@@ -294,3 +294,42 @@ roster" and §4c corrected it 190 lines later; two readers (Steward,
 language-implementer) made the identical error independently inside one hour
 before reaching the correction. The disclaimer now sits at `:33`, at the point
 of introduction.
+
+## TRACKED OBLIGATION ON INCREMENT B2 — `atom_form_drift`, from B1's Finding 3
+
+**Recorded by the Steward 2026-09-18, on language-leader's request
+(`evt_46yeeq7cqzdge`, `evt_69dp5gfxkrv9d`), at B1's routing. This is a WRITE,
+not a promise in a channel. Every symbol below was re-measured at the routed
+candidate `a85c35b67c60a0ee49fb9e45d9a8907d0d19952d` before recording.**
+
+**The obligation.** `atom_form_drift`'s signature and **both** its call sites
+need the same *"leaves production byte-identical"* carry-property treatment as
+the rest of `B1`. Measured at the candidate:
+
+    crates/ken-elaborator/src/parser.rs
+      :3801   fn atom_form_drift(&self, form: &str) -> ElabError
+      :3730   return Err(self.atom_form_drift("Var"));
+      :3743   return Err(self.atom_form_drift("Ctor"));
+
+**Two call sites, and the count is measured rather than inherited from the
+phrase "both call sites."**
+
+**It was correctly left OUT of `B1`, and the reason is the part worth
+keeping.** The Architect's carry was bounded by a **property**, not by a list.
+A list appended to it would have **widened past the property** — an
+admitting-direction failure, and the Architect confirmed it was the same
+failure they had just flagged, occurring inside their own text. ⇒ **Do not
+"complete" a property-bounded carry by enumerating members. The enumeration is
+what breaks it.**
+
+**A bound `B2` should know in advance, from the leader:**
+`no_two_forms_admit_the_same_token` only sees overlaps on tokens already in
+`historical_roster()` (both in the `#[cfg(test)]` module — `historical_roster`
+at `:513`, the test at `:616`). On the **expression** side that is exactly
+where it needs to fire, because `Token::Ident(_)` is in the roster and the real
+collision risk is ordinary variables against `Ident`-headed contextual
+selectors. **So there is no gap in practice — but the scope is a property of
+the roster, not of the test, and a later roster change moves it silently.**
+
+**This obligation rides `B2`. It is not a node** — it closes when `B2` closes,
+and `B2` states which arm it took.
