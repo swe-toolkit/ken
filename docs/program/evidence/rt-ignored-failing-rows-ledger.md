@@ -111,7 +111,7 @@ replaced a hardcoded `BoundaryTag::ImmediateBool` expectation with one read
 from the plan's ruled allocation lane. That distinction is the whole point of
 the exercise and is the thing to check on every subsequent closure.
 
-### The population is MEASURED at 14, not 15 minus one
+### The population RECONCILES to 14, not 15 minus one
 
 Measured at `a503a5a971f8d673248317f1ab8023ee924b055c`. Two instruments:
 
@@ -121,6 +121,68 @@ Measured at `a503a5a971f8d673248317f1ab8023ee924b055c`. Two instruments:
       exemptions.toml
                                     22 - 8 = 14, reconciling exactly as
                                     23 - 8 = 15 did at the original base
+
+> ### BOTH INSTRUMENTS ABOVE READ SOURCE TEXT. NEITHER IS THE POPULATION ORACLE.
+>
+> **An earlier wording of this heading said the population was *"MEASURED"* at
+> 14. It is not; it is RECONCILED to 14, and the difference is the instrument.**
+>
+>     grep ^\s*#\[ignore    CHANGE DETECTOR. Names the FILE that moved.
+>                           BLIND to macro-generated rows, which have no
+>                           attribute in source at all.
+>     registry join         MEMBERSHIP. Says which rows are exempt BY NAME.
+>     harness listing       THE POPULATION ORACLE -- the CI ignored-row sweep's
+>                           "N selected", or a targeted --ignored --list.
+>                           NOT RUN HERE: no credential on this box reads CI,
+>                           and COORDINATION §12 forbids the workspace run that
+>                           would produce it locally. The lieutenant polls it;
+>                           ask at M7.
+>
+> **14 is well corroborated** — the per-file delta isolates one file, the
+> registry matched 8 of 8 by name, and the Architect's independent partition
+> (22 = 8 exempt + 14 failing, all 14 in `ken-cli`) agrees. **It is not
+> oracle-confirmed, and a number carried forward as "measured" stops being
+> re-checked.** Say reconciled until a harness listing says otherwise.
+>
+> ### THIS FILE ALREADY SAID ALL OF THAT. ITS OWN CLOSURE RECORD BROKE THE RULE.
+>
+> **"How the population was established" opens by excluding the exact
+> instrument the closure record then used** — *"`AC-1` requires the failing set
+> as measured at the implementation base, not §2's listing and __not a source
+> grep__"* — and establishes 15 from three oracle readings: a per-crate
+> `--ignored --list`, CI sweep run `35265440149` reporting *"15 selected"*, and
+> that run's per-binary FAIL breakdown.
+>
+> **"Why sixteen became fifteen" states the blind spot outright**, forty lines
+> above: a macro-generated row *"appears only under `docs/`"*, so *"a source
+> grep can neither confirm nor deny it… __Only the harness listing answers.__"*
+>
+> ⇒ **The rule was written down, correctly, at the top of the file, and the
+> first closure recorded underneath it used the excluded instrument anyway.**
+> Nothing was forgotten and nothing decayed — the closure was a NEW measurement,
+> and a new measurement does not inherit the standard the file set for the old
+> one unless someone re-reads the standard. **A rule stated in a document's
+> preamble is not enforced on the sections added to it later.** When you append
+> a measurement to an evidence file, re-read how that file says its numbers must
+> be taken, before choosing your instrument rather than after.
+>
+> ### `N - 8` IS SWAP-INVARIANT, SO THE COUNT CANNOT SAY WHICH ROW LEFT
+>
+> **A closure changes a count by one; so does a closure plus an addition
+> elsewhere, and so does an exempt row closing while a non-exempt row is
+> added.** `22 - 8 = 14` holds under every one of those, with completely
+> different membership. **The arithmetic is consistent with the answer being
+> wrong about which fourteen.** Pair it, in two distinct roles:
+>
+>     CLOSURE-TIME    which row LEFT -- read the SURVIVOR's exemption status
+>                     AT THE ATTRIBUTE, not from the count
+>     ASSERTION-TIME  which rows REMAIN -- match all 8 registry entries to rows
+>                     PRESENT in the listing, BY NAME
+>
+> **AN UNMATCHED REGISTRY ENTRY IS A FINDING, NOT A SMALLER SUBTRAHEND.** The
+> tempting repair — drop it from the subtraction and carry on — silently
+> redefines the population mid-measurement. Stop and say which entry, and
+> whether the row was renamed, deleted, or never existed.
 
 > ### COUNT THE ATTRIBUTE, NOT THE TEXT. THE WRONG PATTERN RETURNED THE INVERSE.
 >
