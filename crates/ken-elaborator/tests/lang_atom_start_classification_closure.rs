@@ -66,3 +66,57 @@ fn ac9_positive_control_the_excluded_tokens_still_start_atoms_elsewhere() {
         "`visits` not followed by `[` is an ordinary type argument"
     );
 }
+
+// ---------------------------------------------------------------------------
+// AC-6 — the contextual-form derivation, and the POSITION axis it produced.
+//
+// The derivation found a third negative start condition, on the pattern side:
+// `can_start_atom_pat` excluded `as` inline. The frame's "the pattern rosters
+// are clean" is true of `can_start_pattern` -- a flat `matches!`, no guards --
+// and `can_start_atom_pat` is a different function that carried one.
+//
+// That is what makes `applies_in` a MEASURED discriminator rather than
+// scaffolding: until now every exclusion governed the one position, so
+// `applies_in` was indistinguishable from `|_| true`.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ac6_the_as_alias_exclusion_governs_the_pattern_position() {
+    // PARSE SUCCESS CANNOT SEE THIS DEFECT, and my first version of this case
+    // was vacuous for exactly that reason: with the exclusion removed,
+    // `C x as w` still parses -- as `C` applied to THREE patterns (`x`, a
+    // variable named `as`, and `w`) instead of an as-pattern over `C x`. Both
+    // readings parse; only one has the right shape.
+    //
+    // ARITY is the behavioural discriminator. `C` takes one argument, so the
+    // broken reading is an elaboration error and the correct one is not.
+    let mut env = ken_elaborator::ElabEnv::new().expect("base environment");
+    env.elaborate_file(
+        "data T = C Bool \
+         fn f (v : T) : Bool = match v { C x as w ↦ x }",
+    )
+    .expect("an as-pattern over a one-argument constructor must elaborate");
+}
+
+#[test]
+fn ac6_and_it_does_not_govern_the_type_position() {
+    // THE OTHER HALF OF THE PAIR. `as` is an ordinary identifier in a type
+    // argument, so the exclusion must NOT fire here. A single-position test
+    // could not tell `applies_in` apart from `|_| true`; this pair can.
+    assert!(
+        parses("fn f (x : T as) : Bool = y"),
+        "`as` is a valid type argument -- the pattern exclusion must not reach here"
+    );
+}
+
+#[test]
+fn ac6_a_constructor_pattern_still_takes_several_arguments() {
+    // Positive control for the pattern side: the exclusion is CONTEXTUAL, so
+    // ordinary pattern arguments must keep being admitted. Without this, an
+    // exclusion that refused every pattern argument would pass both cases
+    // above for the wrong reason.
+    assert!(
+        parses("fn f (v : T) : Bool = match v { C x y ↦ x }"),
+        "a constructor pattern must still take several arguments"
+    );
+}
