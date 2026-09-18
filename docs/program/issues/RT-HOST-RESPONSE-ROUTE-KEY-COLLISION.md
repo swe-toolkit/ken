@@ -1,7 +1,7 @@
 ---
 id: RT-HOST-RESPONSE-ROUTE-KEY-COLLISION
 title: "Decide whether the static-transition planner's `two host response cases claim one operation constructor` invariant is too strong: its route map is keyed on `case.constructor` ALONE while the value it stores carries `operation` as a field, so two cases sharing a constructor across different operations collide. Four ignored rows fail with this one byte-identical message under TWO different labels claiming two different mechanisms -- the runtime says one defect, the labels say two."
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -11,6 +11,32 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-17, second repair node sized from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger (488acf24e) on operator directive 2026-09-15 'The other tests should be fixed.' S2 is the cluster where the ledger's central finding is sharpest: four rows, one byte-identical planner message, two mutually inconsistent labels, and the labels disagree with each other exactly where the runtime agrees. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED at `ef11485dd` (2026-09-18). STATUS FLIP WAS M7 DEBT, carried a day.
+>
+> **This node was DIAGNOSIS-ONLY and it succeeded.** AC-1's four dispositions are
+> answered in the frame's §9 and all four read **STAYS IGNORED**. A node whose
+> finding is *"these rows do not clear here"* has delivered its deliverable; the
+> rows remaining `#[ignore]`d is its RESULT, not its shortfall.
+>
+> **`ef11485dd` landed ZERO `src/` files** — two test-annotation files (4 + 4
+> lines) and 242 lines of its own frame. The discriminator, worth keeping:
+>
+>     git diff --name-only <sha>^ <sha> | grep src/
+>
+> **"The node landed" and "the defect is gone" are different claims**, and this
+> node is exactly where they come apart.
+>
+> **THE REPAIR HAS NO NODE AND THAT IS STEWARD FRAMING DEBT.** The live labels'
+> readmission condition — *"readmits when the duplicate prelude block is resolved
+> AND the frame-marker single-consumption holds"* — is unframed work. The 4 rows
+> do not move until it is cut.
+>
+> **Cost of the stale field:** the Steward released this node as undone work on
+> 2026-09-18 (`evt_37y46cqjz1yy9`), reading `status: ready` without checking
+> whether it had landed. Runtime QA stopped before starting and the implementer
+> measured the premise; nothing was built. Ruling `evt_7ze5v62g5v66t`.
+
 
 # The defect, and the hypothesis that is NOT yet a diagnosis
 
