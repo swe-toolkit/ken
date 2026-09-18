@@ -115,28 +115,68 @@ direction**, and the corpus did not carry that half until it happened while this
 very file was under review.
 
 An Architect set out to report that this lesson's `PredeclaredFunctionId` line
-coordinates were wrong. **Every one of them was correct.** The scan was
-
-    grep -E '^\s+[a-z_]+:\s*PredeclaredFunctionId'
-
-which requires the field name to start the line. **Declarations carrying
-`pub(super)` or `pub(in crate::cranelift_backend)` are invisible to it** — a
-clean false negative on exactly the set in dispute. A `sed` that would have
-stripped those prefixes existed and ran *after* the grep, so it did nothing.
+coordinates were wrong. **Every one of them was correct.** The scan that said
+otherwise was a grep anchoring the field name to the start of the line, so
+declarations carrying a visibility prefix were invisible to it.
 
 What stopped the report was opening the cited lines and reading them, rather
 than trusting the pattern's silence.
 
-> **The count in that report does not reconcile, and the number here is the
-> measured one.** The report said *"nine of your fourteen."* Re-measured in
-> `continuations.rs` with a pattern admitting an optional visibility prefix:
-> **23 lines declare that type, 13 are visible to the cited grep, and 10 carry
-> a `pub` prefix and are not.** Population stated because the totals depend on
-> whether function parameters and constructions are counted as declarations;
-> the **10 invisible** is the number the mechanism turns on, and it is what
-> makes the false negative a certainty rather than a possibility. **A count
-> handed to you inside a correction borrows the correction's authority; its
-> method borrows none.**
+### The measured split, and the two patterns it is measured against
+
+Population in `continuations.rs`, one pattern per row:
+
+    23   declarations of  name: PredeclaredFunctionId
+    13   bare, no visibility prefix
+     9   pub(super)
+     1   pub(in crate::cranelift_backend)
+
+Of this lesson's nine cited coordinates, **six are `pub(super)`** — `:224`,
+`:511`, `:512`, `:1070`, `:1073`, `:1136`. That is what made the false negative
+land on the dispute rather than at random.
+
+> **The pattern as PUBLISHED and the pattern as RUN are different patterns, and
+> they give different splits.** Both of the following are correct measurements:
+>
+>     published twice, bare-only:
+>       ^\s+[a-z_]+:\s*PredeclaredFunctionId                    13 seen, 10 blind
+>     actually run, one prefix admitted:
+>       ^\s+(pub\(in crate::cranelift_backend\) )?[a-z_]+:...   14 seen,  9 blind
+>
+> ⇒ **A quoted instrument is a claim about the run, not the run.** Re-measuring
+> against the quote checks the quote. Ask for the command that produced the
+> number, and treat a discrepancy between it and the prose as a finding about
+> the instrument rather than as arithmetic to reconcile.
+>
+> **The first attempt at this paragraph got the split wrong in the other
+> direction** — it reported `13 / 10` as *the* split, having modelled the
+> Architect's grep from their prose instead of from the pattern they ran. And
+> the report it was correcting was worse than wrong: *"nine of the fourteen
+> carry `pub(super)` or `pub(in crate::…)` first, so my pattern could not see
+> them"* — **the fourteen are precisely the ones it did see.** Hidden and seen
+> are disjoint sets there, so no reading of that sentence is true.
+>
+> **This is the roster error above, recurring inside the commit that fixed it.**
+> 13, 10 and 23 are all real numbers about this file and 13 + 10 = 23 balances,
+> which is exactly why the wrong one survived inspection. **The addition was
+> never the defect; the assignment was.**
+>
+> **A count handed to you inside a correction borrows the correction's
+> authority. Its method borrows none.**
+
+### The sharper mechanism: an enumerated roster inside a matcher fails open
+
+The pattern did not omit visibility handling. **It ENUMERATED the visibility
+forms, and the file uses two** — `pub(in crate::cranelift_backend)` was admitted
+as an optional group and `pub(super)` was not.
+
+⇒ **An enumerated roster inside a matcher fails open on the member it does not
+name, and it fails open SILENTLY: a non-match is indistinguishable from an
+absence.** The repair is not a longer list. It is `(pub(\([^)]*\))?\s+)?` —
+**hand the matcher a predicate, not a roster.**
+
+This is why the miss was not random. The disputed lines were the `pub(super)`
+ones, and `pub(super)` was the form the roster did not carry.
 
 **A false negative arrives with the same authority as a finding, and more
 momentum — because catching someone else's error feels like diligence.** A
