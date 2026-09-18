@@ -91,6 +91,83 @@ seated lieutenant takes over), M4-M5 publish, M6-M9 run after it lands.**
 Whether a thing *should* land, and where the cut goes, is `merge-policy.md`.
 This file assumes that decision is made.
 
+## M0 — HAS IT ALREADY LANDED? BLOB IDENTITY, BEFORE ANY OTHER CHECK
+
+**Run this first, on every candidate, including one a seat is actively asking
+you to route.** It costs one loop and it is the only check that can tell you
+the rest of the procedure is unnecessary.
+
+```sh
+C=<candidate SHA>; TIP=$(git rev-parse origin/main)
+for f in $(git diff --name-only $(git merge-base $C $TIP) $C); do
+  a=$(git rev-parse $C:$f 2>/dev/null); b=$(git rev-parse $TIP:$f 2>/dev/null)
+  [ "$a" = "$b" ] && echo "IDENTICAL $f" || echo "DIFFERS   $f"
+done
+```
+
+**All IDENTICAL means the content is on `main` and there is nothing to route.**
+
+> ### WHY THE OBVIOUS CHECKS ALL SAY "NOT LANDED" HERE
+>
+> A squash rewrites the subject and breaks ancestry, so on a merged candidate:
+>
+>     git merge-base --is-ancestor <cand> origin/main    NO
+>     git log --grep '<subject>' origin/main             no hit
+>     git cat-file -e <cand>                             succeeds, proves nothing
+>
+> **Three confident negatives on work that is fully merged**, and none of them
+> errors. `agent/memory/fleet/` states this in three separate files, one of them
+> verbatim: *"Never test 'did WP land?' with `is-ancestor` on the branch SHA."*
+> It is at the broadest scope, every seat loads it at startup, and on
+> 2026-09-18 it was missed **three times in one hour** by three different seats.
+> **The corpus is not the gap; the moment of use is.** That is the whole reason
+> this is a numbered step and not a lesson.
+>
+> **Measured, 2026-09-18.** `KERNEL-CONV-CONGRUENCE-CLOSURE` candidate
+> `742d1628` — all five paths blob-identical to `origin/main`, landed as
+> `0c68628f5` on **2026-09-10**. Three kernel seats were each holding a status
+> naming a *different* unfinished stage of it (`awaiting QA verdict`,
+> `leader owes a Decision`, `awaiting Steward M3-M4`), all internally
+> consistent, all eight days stale. **A hold is measured once and never again:
+> the seat that set it is the only one who would re-check, and having set it is
+> exactly why they stop looking.** Do not adjudicate between stale statuses --
+> measure the tree, which settles all of them at once.
+
+### M0a — A `DIFFERS` IS NOT A "NOT LANDED". THE LOOP IS ONE-DIRECTIONAL.
+
+**All-IDENTICAL is a sound "landed" verdict. A single `DIFFERS` is not a sound
+"unlanded" one** — and the difference bit me inside ten minutes of writing the
+step above.
+
+**Measured, 2026-09-18.** `CAT-PRIORITY-QUEUE-LAWS` candidate `a7fd5c51`: eight
+of nine paths IDENTICAL, `spec/SPEC-PROGRESS.md` **DIFFERS**. The candidate was
+**fully landed.** Its own one-line edit to that file sits verbatim on `main`;
+the file differs because main separately gained four *unrelated* lines (a
+reserved-infix contract pin) in the same table.
+
+⇒ **Any busy shared file — `SPEC-PROGRESS.md`, a tracker, a status backbone —
+will report `DIFFERS` forever, on every candidate, landed or not.** Those are
+exactly the files most candidates touch, so this false negative is the common
+case rather than the corner one.
+
+**On any `DIFFERS`, ask the second question: is the candidate's OWN added text
+on `main`?** Not "do the files match" — they never will.
+
+```sh
+git diff $(git merge-base $C $TIP) $C -- <the differing path>   # what IT added
+git cat-file -p $TIP:<the differing path> | grep -F '<a line it added>'
+```
+
+    its added text IS on main          -> LANDED. Main simply moved on too.
+    its added text is NOT on main,     -> genuinely unlanded, continue to M1
+      and main lacks it entirely
+    main has content it lacks, and it  -> main is AHEAD. SUPERSEDED, not owed.
+      adds nothing main does not have     Say so and close it; do not route it.
+
+**And a not-found proves nothing until you have shown the query could hit** —
+grep a line you know is there first, or the `grep -F` above is just a
+differently-spelled false negative.
+
 ## M1 — Verify the Decision is `resolved`, read fresh from the object
 
 ```sh
@@ -668,6 +745,23 @@ done
 > against the ring's declared scope.** If the loop prints fewer paths than the
 > handoff named, the instrument is wrong, not the handoff.
 
+> ### A `DIFFER` HERE HAS TWO READINGS TOO. See **M0a**.
+>
+> This loop and M0's are the same instrument pointed in opposite directions,
+> and they share the same one-directional limit: **`MATCH` is conclusive,
+> `DIFFER` is not.**
+>
+> Another publish landing between this one and your check moves `origin/main`
+> under you. On a shared status file — `spec/SPEC-PROGRESS.md`, a tracker, any
+> whole-corpus generated file — that prints `DIFFER` on a path that merged
+> perfectly. **Here the false reading points at "the publish dropped my
+> content", which is the alarming direction**, so it costs a re-publish or a
+> ring escalation rather than a quiet miss.
+>
+> Resolve it the way M0a does: stop asking whether the files match, and ask
+> whether **this candidate's own added text** is on `main`. If it is, the path
+> landed and main simply moved on.
+
 The publisher squashes. `git reset --hard origin/main` afterwards —
 `steward/work` is stale the instant any publish lands.
 
@@ -1018,20 +1112,44 @@ Your operational docs — the progress tracker, `agent/` playbook and
    `git branch -f wp/steward-<slug> origin/main`; `git switch
    wp/steward-<slug>`; apply or cherry-pick the intended change. The branch
    starts as `origin/main` plus the routed change only, never a stale base.
-3. **Append the tracker-sync commit before publication.** Pull the current
-   progress file from `steward/work`, commit it if it differs, and treat the
-   resulting branch tip as the PR SHA:
+3. **Let the hook REGENERATE the tracker. Never copy it from another branch.**
 
    ```sh
-   git checkout steward/work -- docs/program/IMPLEMENTATION-PROGRESS.md
-   git add docs/program/IMPLEMENTATION-PROGRESS.md
-   git diff --cached --quiet || git commit -m "tracker: sync implementation progress"
+   # .githooks/pre-commit regenerates docs/program/IMPLEMENTATION-PROGRESS.md
+   # and stages it. Confirm the header agrees with the tree it was cut from:
+   git show HEAD:docs/program/IMPLEMENTATION-PROGRESS.md | grep -m1 'issue file'
+   git ls-tree -r --name-only HEAD docs/program/issues/ | grep -c '\.md$'
    ```
 
-   The `git diff --cached --quiet ||` guard is required: without it the commit
-   fails when the tracker already matches. **This is the only copy of this
-   procedure** — it also applies to every ring candidate you publish, so
-   `origin/main` preserves the current progress file durably.
+   **The two numbers must match.** That is exactly what `ci.yml:562` re-derives.
+
+   > #### THIS STEP USED TO SAY `git checkout steward/work -- <the tracker>`.
+   > #### IT INSTRUCTED THE STEWARD TO DO THE THING THE STEWARD BLOCKS OTHERS FOR.
+   >
+   > **Measured 2026-09-18, while routing this very edit.** On the same night I
+   > blocked candidate `5e05cdc93` for carrying a dashboard generated at 677
+   > issue files against a `main` at 678, the live numbers were:
+   >
+   >     steward/work    from 678 issue file(s)
+   >     origin/main     from 679 issue file(s)
+   >
+   > A branch cut from `origin/main` starts at **679**. Copying the file from
+   > `steward/work` **overwrites it with 678 and commits that** — the count goes
+   > backwards, the committed file disagrees with the generator's own output,
+   > and `ci.yml:562` reds. The old step was not merely permissive about
+   > staleness; it *manufactured* it, from a branch that is stale by
+   > construction because every publish leaves it behind.
+   >
+   > **A generated whole-corpus file has exactly one correct resolver: its
+   > generator.** Any instruction to copy, hand-merge, or conflict-resolve one
+   > is wrong however careful the copying is, because the output must be a
+   > function of the tree it sits in and no other branch's tree is that tree.
+   > The 2026-09-18 candidate reached the same failure by accident; this step
+   > reached it by instruction, which is the more durable of the two.
+
+   Publishing off a branch cut from current `origin/main` is what keeps the
+   progress file current on `main`. **This is the only copy of this
+   procedure** — it also applies to every ring candidate you publish.
 
    > **`git checkout <ref> -- <path>` HERE IS SAFE ONLY BECAUSE YOU HAVE NOT
    > EDITED THE TRACKER ON THIS BRANCH. Do not generalize the idiom.**
