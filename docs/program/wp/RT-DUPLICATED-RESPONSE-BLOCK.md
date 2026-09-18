@@ -18,16 +18,30 @@ priority until it is done."* Third repair node from the
 
 ## 1. Objective
 
-Decide **where the duplicated host-response block enters the plan**, and on
-that answer either repair it or establish that the construction-time collision
-check is asserting a property the plan was never required to have.
-
-**Both outcomes close this node.** A duplication that turns out to be
-legitimate, with the check retired or moved as a result, is as good a result as
-a planner defect found and fixed, and it is reported the same way. What does
-not close this node is a repair that relaxes the collision check without
-deciding which of the two readings holds — that is the move
+Decide **where the duplicated host-response block enters the plan**, and report
+it. What does not close this node is a repair that relaxes the collision check
+without deciding where the second presentation comes from — that is the move
 `RT-HOST-RESPONSE-ROUTE-KEY-COLLISION` already built, measured, and reverted.
+
+> ### THIS OBJECTIVE OFFERED "RETIRE THE CHECK" AS A CLOSING OUTCOME. IT IS NOT ONE.
+>
+> **It read:** *"either repair it or establish that the construction-time
+> collision check is asserting a property the plan was never required to have,"*
+> with *"a duplication that turns out to be legitimate, with the check retired
+> or moved as a result, is as good a result."*
+>
+> **`evt_4eghtvj2fhpz0` rules the opposite** (§3a below): the invariant is
+> CORRECT, and `responses.rs:1279` is the only thing standing between the
+> consumer at `:1298` and a silent wrong-continuation route. **A close that
+> retires the check is a rejected outcome, not an acceptable one.**
+>
+> **Found by the Steward 2026-09-18 by sweeping the LICENCE WORDING, not the
+> node name.** The Architect raised this defect against
+> `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` (`evt_5m7k7k4vrg5ay`); a grep for *"a
+> property the plan was never required to have"* found it a second time **here,
+> in this frame's first paragraph** — the first thing an implementer reads, and
+> a section the ruling correction at §3a did not touch. **A correction applied
+> at the site where a finding was reported does not sweep the phrasing.**
 
 **Out of scope, explicitly.** `[[RT-FRAME-MARKER-ONCE]]` is the second refusal
 underneath the two `px7n` rows. It is a separate node at `draft`. Do not
