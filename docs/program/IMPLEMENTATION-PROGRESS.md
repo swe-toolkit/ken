@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-18 11:45:13Z — from 664 issue file(s) in `docs/program/issues/`.
+2026-09-18 11:49:22Z — from 665 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -273,6 +273,7 @@ the committed file matches the generator's output.
 | `LANG-MODULE-IMPORT-SYSTEM` | Module/import capability campaign — declaration visibility (public export), a selective-import surface, and cross-package plus prelude symbol resolution, sufficient for catalog packages to reuse canonical modules instead of reimplementing them | draft | language | XL | none | — |
 | `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` | `ken-cli` native production runs `px4b_native_production` at effectively zero stack margin -- base passes with a few hundred bytes to spare, so any candidate adding a few hundred bytes aborts it, and `98e6ac51` is the trigger that exposed this rather than its cause | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
+| `LANG-OLD-OPERAND-START-ADMISSION` | `old`'s operand is parsed by a direct `parse_atom_expr()` call that consults no atom-start roster and no exclusion, so forms refused in ordinary argument position -- `old if a then b else c`, `old proof p for s` -- are admitted after `old`. A live over-admission on main. The repair direction needs a design ruling first: whether `old`'s operand is an application_atom position at all (`21 §6.4`, `32 §3`). | draft | language | S | none | — |
 | `LANG-POW10-CASCADE-LITERAL-CLAUSE` | The pow10 generator's own doc comment says every branch is a concrete literal, which its own recursion refutes in the same way the elab.rs copy did -- but its conclusion rests on a DIFFERENT and TRUE property (no saturating/min/clamp anywhere in the generated cascade), so this is a wording repair on a sound argument, not a second false justification | merged | language | XS | none | — |
 | `LANG-PRELUDE-COLLECTIONS` | `37 §9` requires the List combinators delivered in the prelude and they are declared inside a test file instead -- `prelude.rs` supplies `data List` and no operation over it, so a program that imports the prelude has a list type and no way to map over it; and `filter` was deferred on the ground that `Bool` is an opaque non-matchable primitive, which is no longer true, with the promised follow-on never filed | merged | language | S-M | none | 2144 |
 | `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` | `AC-6`'s doc says a live differential is impossible because `ElabEnv::new()` has no 'before' env -- true of an ENV-level bracket and false of a BLOCK-level one, which is the established idiom four sites away in the same crate, so the instrument the comment says does not exist is writable, id-keyed, and fails in production | merged | language | S | none | 2189 |
