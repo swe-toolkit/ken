@@ -242,11 +242,20 @@ fn invariant_1_no_depth_zero_comma_precedes_the_first_arrow_in_an_arm_block() {
 
 #[test]
 fn invariant_2_an_empty_brace_is_not_a_legal_record_literal() {
-    // A GENUINE DETECTOR, unlike invariant 1's tripwire. `{}` becoming a legal
-    // record literal makes it the FIRST atom of this const's body, so the
-    // argument loop's exclusion never gates it, `parse_record_expr` accepts,
-    // and `parses(..)` flips TRUE -- so the assertion reds AT THE MOMENT OF
-    // BREAKAGE rather than at its repair.
+    // A GENUINE DETECTOR, unlike invariant 1's tripwire -- and MEASURED, not
+    // reasoned. The Architect derived this and language-qa declined to test it
+    // ("would require changing `parse_record_expr`, out of scope for a QA
+    // probe"), so it was the last claim here standing on argument alone.
+    //
+    // Run: `parse_record_expr` mutated to accept `{}` as an empty record
+    // literal. Result -- this test's PIN ROW reds, "an empty record literal
+    // must stay illegal", and the other NINE cases stay green. One test, its
+    // pin, nothing else. That is the detector firing at the moment of
+    // breakage, which is exactly what invariant 1's tripwire cannot do.
+    //
+    // The mechanism is as derived: `{}` becoming legal makes it the FIRST atom
+    // of this const's body, so the argument loop's exclusion never gates it,
+    // `parse_record_expr` accepts, and `parses(..)` flips TRUE.
     //
     // `RBrace if offset == 1 => return true` classifies `{}` as an arm block,
     // and that is safe ONLY because `{}` is not a record literal:
