@@ -31,6 +31,41 @@ origin: "Steward, 2026-09-18, third repair node from the RT-IGNORED-FAILING-ROWS
 > `RT-CLOSURE-BOUNDARY-LANE` undetermined state, the readmission-condition debt
 > the four labels name, and the deliverable shape. **The premise interrogation
 > is the one that changes what an implementer may size** — read it before `D2`.
+>
+> ### THE FIRST FOLD MOVED MATERIAL AND LEFT THE AUTHORITY BEHIND
+>
+> **The fold above was incomplete when it landed, and the missing piece was the
+> one the fold was for.** All four items moved into this NODE. What did not
+> move was in the closed node's **FRAME**: a design-fork section and an `AC`
+> reserving the *"is the invariant too strong"* question to the Architect,
+> with *"an edit that lands without that citation is out of scope by
+> construction."*
+>
+> Meanwhile this node's frame had `D1'` + `AC-4` — **the implementer justifying
+> the relaxation and proceeding.** So node and frame contradicted each other on
+> the one question the fold was about, and the scope moved with it: Arm B's
+> repair, which the closed frame scoped out to a successor, became executable
+> inside this node. **Restored in the frame's §3a, `Dr` and `AC-6`.**
+> Architect, `evt_261zdt47mgr9p`; independently reached by the implementer.
+>
+> **The general shape, and it is the more expensive half of the duplicate
+> story:** *a fold moves material and does not move authority.* **Material is
+> what a document SAYS and you can diff it. A gate is what a document FORBIDS,
+> and it appears in neither document's diff** — the closed frame still contains
+> its `AC` intact, and the surviving frame never lacked anything it once had.
+> **The loss is between the two files, so no diff of either one shows it.**
+>
+> ⇒ **Folding is not "is the unique material preserved."** It is **"for every
+> obligation the closed artifact imposed, which artifact imposes it now"** —
+> enumerated over the closed FRAME's deliverables and ACs **by position, not by
+> recall.** The search-key rule applies to the folder: this fold was checked
+> against what the node said, and the binding text was in the frame.
+>
+> **And an assignment does not travel either.** The Architect's standing note
+> read *"the `RT-HOST-RESPONSE-DUPLICATE-PRELUDE-BLOCK` fork is mine when
+> released."* That node is now void and this node's frame did not name them, so
+> **the assignment would have evaporated silently.** They re-attached it by
+> hand. Enumerate assignments alongside obligations.
 
 # The refusal, and what the predecessor already settled
 

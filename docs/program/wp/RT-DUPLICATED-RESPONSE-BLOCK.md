@@ -108,6 +108,15 @@ decision between exactly these, and both are terminating:
   that legitimately share constructors. ⇒ The duplication is not a defect, and
   the construction-time uniqueness assertion is the wrong instrument.
 
+> **BOTH OUTCOME SENTENCES ARE WEAK INSTRUMENTS AND THE FRAME SAYS SO.**
+> *"Every `static_origin` is visited exactly once"* is close to unfailable as
+> written, and (1) as written cannot distinguish a genuine second visit from
+> two origins that merely look alike. **What carried `D0` in practice was the
+> `S6` control, not either sentence.** `D0` is behind this node now, so this
+> costs the current run nothing — but **do not let outcome (2) be reached by
+> the weak reading and then treated as a licence for `D1'`.** `D1'` is gated
+> in §3a below regardless of how (2) was arrived at.
+
 **A third layer is an ANSWER, not a rung.** If the census shows something
 neither (1) nor (2) describes, that is the deliverable — report it and stop.
 Do not invent a third reading mid-turn and follow it; bring it back.
@@ -117,20 +126,70 @@ counting deltas, not from reading the producer. D0 exists precisely because
 "duplicated block" is the phrasing the symptom suggested, and nobody has yet
 read the code path that would make it true.
 
+> **EXPLAIN THE CONSTANT, NOT JUST THE DUPLICATE. Restored in the fold.** A
+> cause that predicts a duplicate but not a *uniform offset* has not explained
+> what was measured.
+>
+> **And the delta differs BETWEEN programs (`365` vs `317`) while being
+> constant WITHIN each.** That is a live constraint on the cause: whatever
+> duplicates the block does so at a point whose origin-id distance is
+> **program-relative**. ⇒ **A cause that predicts a fixed constant across
+> programs is refuted by this before you write it down.**
+
+## 3a. THE DESIGN FORK — A CITED RULING SETTLES IT, YOU DO NOT
+
+> **RESTORED 2026-09-18. This section and `AC-6` were lost in the fold and are
+> the reason the fold was not complete.** They stood in the frame of the
+> duplicate node that was closed into this one. The duplicate's *node* text
+> moved; **its frame's gate did not**, and a gate is what a frame is for. See
+> the banner in §0 of the issue node. Architect, `evt_261zdt47mgr9p`.
+
+**Is the invariant `one host-operation constructor ⇒ one response-handling
+site in the whole program` too strong?**
+
+- **Arm A — NO, the invariant is right.** Every second entry is a
+  materialization artefact; no admissible Ken program has two distinct
+  response-handling sites for one constructor. Then the repair is the
+  de-duplication found in `D0`, the invariant is untouched, and **this node
+  closes here.**
+- **Arm B — YES, it is too strong.** Some admissible program legitimately has N
+  handling sites. Then the repair is to make routing occurrence-aware — pairing
+  N `Vis` sites to N handlers — **which is planner work and is a SUCCESSOR
+  NODE, not this one.** This node closes by delivering the ruling and the `D0`,
+  and the Steward cuts the successor.
+
+**Do not pick an arm to get started.** The two have disjoint deliverables. The
+predecessor diagnosis's surviving *"too strong"* verdict **is not a ruling** —
+its only supporting case was measured false and no replacement was offered.
+See the node's *"THE CONCLUSION THAT OUTLIVED ITS PREMISE"*.
+
+**This matches what the issue node already says and the frame previously did
+not:** *"This node does not pick. The fork is a design question about
+admissible Ken programs and it routes to the Architect with a measurement in
+hand."*
+
 ## 4. Deliverables
 
 - **D0** — the census above, its instrument, and a verdict of (1), (2), or a
   named third answer. Lands as evidence; no production change.
 - **D1** — on (1): the repair at the site D0 names, with the four rows
   re-measured individually and each given a named disposition.
-- **D1'** — on (2): the check retired or relocated to the point of use, with
-  AC-4 below discharged — the thing the predecessor could not reach.
+- **Dr — THE RULING ON §3a's FORK, cited by `evt_`/`dec_` id, with the arm
+  recorded.** This is a deliverable, not a courtesy. It is required before any
+  edit to `host_response_routes`' key or loop shape, and before any retirement
+  or relocation of the uniqueness assertion.
+- **D1'** — on (2): **GATED BEHIND `Dr`, and only if the ruling returns Arm
+  A.** If the ruling returns Arm B, the repair is a successor node and **this
+  node closes on `Dr` + `D0` without touching the check.** The relaxation is
+  not this node's to perform on its own judgment.
 - **D2** — the four `#[ignore]` labels rewritten to whatever D0/D1 establish,
   including for any row that stays ignored. A row that stays ignored gets its
   reason restated in current terms, not left carrying a prediction this node
   has since tested.
 - **D3** — the three-program census table in the issue node re-measured at
   this base and corrected in place if it has moved.
+- **D4 — a registry row in `.github/ignored-test-exemptions.toml`** for any row
+  readmitted with an accepted red. **Also lost in the fold; restored.**
 
 ## 5. Acceptance criteria, each with its control
 
@@ -157,9 +216,55 @@ read the code path that would make it true.
   either survives at the point of use or was never real. This is the AC the
   predecessor recorded as "not reached"; reaching it is what makes outcome (2)
   a result rather than a gate being switched off.
+  **This AC is INPUT TO `Dr`, not a substitute for it.** Discharging it is what
+  gives the Architect a measurement to rule on; it does not authorize the
+  relaxation by itself. An implementer who satisfies `AC-4` and proceeds has
+  taken the decision §3a reserves.
+- **AC-6. THE FORK IS ANSWERED BY A CITED RULING BEFORE ANY PLANNER EDIT.**
+  Record the `evt_`/`dec_` id and the arm.
+  **Control, and it is mechanical:** an edit to `host_response_routes`' key or
+  loop shape, or a retirement or relocation of the uniqueness assertion, that
+  lands without that citation is **out of scope by construction** — not a
+  judgment call, not a close one. Check the diff for those three shapes before
+  handing off.
 - **AC-5. `[[RT-FRAME-MARKER-ONCE]]` is untouched and still `draft`**, and the
   two `px7n` rows' continued failure on it after a successful D1 is reported as
   the expected outcome rather than as this node's failure.
+
+> ### AC-7 THROUGH AC-10 ALSO FAILED TO TRAVEL IN THE FOLD. RESTORED 2026-09-18.
+>
+> **The Architect found the fork gate. Enumerating the closed frame's
+> obligations BY POSITION found four more** — which is the rule earning its
+> keep in the same hour it was written: checking by recall found one, checking
+> by position found five. **Two of these are the controls that catch a guard
+> which has been deleted rather than satisfied.**
+
+- **AC-7 (control, REQUIRED). The repair is shown to be REACHING THE SITE.**
+  Revert the `D0`/`D1` repair and confirm the rows you readmitted go RED again
+  with the collision message.
+  **If they stay green without your change, the rows were not gated on what you
+  fixed** — and that is a finding to report, not a quiet pass.
+- **AC-8 (control, REQUIRED). The invariant STILL REFUSES SOMETHING.** If the
+  repair removes the duplication, the uniqueness guard now fires on nothing in
+  these programs. **Name one case it must still refuse and show that it still
+  refuses** — a construction, a targeted unit test, or a stated argument from
+  the plan shape.
+  **A check that refuses nothing has been deleted rather than satisfied**, and
+  a silent deletion is exactly how this cluster's labels went wrong the first
+  time.
+- **AC-9. The crate set is DERIVED, not named.** Compute the reverse-dependency
+  closure over your touched set to a fixpoint and test that set. **Never
+  `--workspace`** (`COORDINATION §12`) — the workspace build and the
+  conformance suite run in CI. **State your target selection beside the
+  claim:** `cargo check` does not compile `#[cfg(test)]`, so a green `check` is
+  **not** evidence that any test built.
+- **AC-10. The second blockers are checked and NOT pulled in.** For each row
+  that does not readmit, say which blocker it now stops at, **measured**.
+  Specifically: does the `px7n` pair reach `[[RT-FRAME-MARKER-ONCE]]`'s
+  frame-marker message, and does anything under the `rt_escape` pair confirm or
+  refute `[[RT-CLOSURE-BOUNDARY-LANE]]`? **Both answers are findings for the
+  Steward to re-cut on. Do not absorb either into this node, and do not record
+  "undetermined" as "ruled out".**
 
 ## 6. Contention
 
