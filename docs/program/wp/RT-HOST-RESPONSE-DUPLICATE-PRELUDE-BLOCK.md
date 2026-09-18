@@ -1,5 +1,19 @@
 # WP frame — `RT-HOST-RESPONSE-DUPLICATE-PRELUDE-BLOCK`
 
+> # VOID — THIS FRAME'S NODE IS SUPERSEDED. DO NOT RELEASE, DO NOT KICK.
+>
+> **Steward, 2026-09-18.** The node this frames is a duplicate filing of
+> `[[RT-DUPLICATED-RESPONSE-BLOCK]]` — same defect, same four rows, same
+> census, filed ten minutes apart by the same author, and **both were framed.**
+> The surviving id is `RT-DUPLICATED-RESPONSE-BLOCK`, which is in flight.
+>
+> **The live frame is `docs/program/wp/RT-DUPLICATED-RESPONSE-BLOCK.md`.**
+> Release that one. The node's tombstone explains the fold and what moved.
+>
+> This file is kept, not deleted, so existing citations resolve to an
+> explanation rather than to a 404 — **and because a deleted frame cannot tell
+> you it was ever a duplicate.**
+
     owner    runtime
     size     M
     tier     T1   (a design fork routes out of this node; the D0 is a hunt,

@@ -12,6 +12,26 @@ github: null
 origin: "Steward, 2026-09-18, third repair node from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger on operator directive 2026-09-15 'The other tests should be fixed.' RT-HOST-RESPONSE-ROUTE-KEY-COLLISION (landed ef11485dd, annotation-only) ruled BOTH of its own section-3 branches out and closed with AC-4 unreached, stating in its own words: 'the right repair addresses the duplication, not the key -- so relaxing the key is the wrong unit.' It named the duplication and did not own it. Measured by the Steward at origin/main 60df2cfd2: zero occurrences of that duplication as a subject in any docs/program/issues or docs/program/wp file. This node is that owner. Steward-filed per COORDINATION section 2."
 ---
 
+> # THIS NODE ABSORBED A DUPLICATE OF ITSELF. THE MATERIAL BELOW CAME IN WITH IT.
+>
+> **Steward, 2026-09-18: I filed this work twice, frame and all.**
+> `RT-HOST-RESPONSE-DUPLICATE-PRELUDE-BLOCK` was filed at 16:17:02Z — ten
+> minutes after this node at 16:07:25Z — against the same four rows, the same
+> producer, the same census numbers (29 / all agree / one delta: 365, 317, 317),
+> and the same merged predecessor. It is **the same defect, not a neighbour.**
+>
+> **This id survives because it is the one in flight** and the one the ring's
+> posts, branch and D3 census cite. An id is a citation key; renaming mid-turn
+> to the tidier name would break every reference for a cosmetic gain. The
+> duplicate is `superseded` and points here.
+>
+> **The later filing was the RICHER document**, which is why this is a fold and
+> not a delete. Four things it carried that this node did not are folded in
+> below under their own headings: the refuted-premise interrogation, the
+> `RT-CLOSURE-BOUNDARY-LANE` undetermined state, the readmission-condition debt
+> the four labels name, and the deliverable shape. **The premise interrogation
+> is the one that changes what an implementer may size** — read it before `D2`.
+
 # The refusal, and what the predecessor already settled
 
 Four of the fourteen failing-ignored rows on `main` stop at one byte-identical
@@ -118,3 +138,71 @@ census of deltas rather than from reading the producer — so it is a
 description of the symptom, not yet a diagnosis of the cause. Establishing
 which reading holds is deliverable D0, and it is the whole of the node's first
 turn.
+
+# THE CONCLUSION THAT OUTLIVED ITS PREMISE — interrogate before sizing `D2`
+
+**Folded in from the duplicate filing. This is the half that bears on what you
+are allowed to size.**
+
+The predecessor diagnosis's own amendment carries:
+
+> *"The conclusion stands; the reason does not."*
+
+The refuted reason was *"a program that performs `RandomBytes` at two sites
+with two response handlers is valid Ken"* — **measured false, because these
+programs perform `RandomBytes` zero times.** `EntropyOp` is a prelude
+declaration and neither test file mentions entropy. The surviving conclusion is
+*"the invariant is too strong; pairing N `Vis` sites to N handlers is planner
+work."*
+
+**Ask what that conclusion LICENSES.** It licenses the expensive arm — planner
+work to make routing occurrence-aware — and **the only case ever offered for it
+was the one measured false. No replacement case is on the record.** If every
+actual second entry is a materialization artefact, then the invariant is not
+too strong; it is correctly refusing a plan that should never have contained
+the block twice, and the repair is upstream of the planner entirely.
+
+⇒ **This maps onto the fork above:** inheriting *"the invariant is too strong"*
+as settled is choosing reading (2) without measuring it, and sizing planner
+work off it. **This node does not pick.** The fork is a design question about
+admissible Ken programs and it routes to the Architect with a measurement in
+hand. What is forbidden is treating it as already decided.
+
+**Two repairs already ruled out — do not re-propose them:**
+
+- **Widening the key to `(constructor, operation)` changes nothing.** Both
+  entries already carry `EntropyRandomBytes`. Measured.
+- **Deferring the refusal to point of use is a measured NON-FIX for half the
+  rows.** See the split above.
+
+# THE SECOND BLOCKERS' STATUS, AND ONE OF THEM IS UNDETERMINED NOT CLEARED
+
+- **`[[RT-FRAME-MARKER-ONCE]]` — `status: draft`, and ZERO rows in the tree
+  cite it today** (the diagnosis relabelled the two that used to). A `draft`
+  node with no citing rows is not a released repair, so **do not size this node
+  as though the `px7n` pair readmits at its end.**
+- **`[[RT-CLOSURE-BOUNDARY-LANE]]` — `status: merged`**, one citing row
+  remaining elsewhere. Whether it is *also* a real blocker under the
+  `rt_escape` pair is **UNDETERMINED**: nothing has ever seen past the collision
+  on those rows, so the durable-lane claim is neither confirmed nor refuted.
+  **Undetermined is the honest state — do not record it as ruled out.**
+
+# WHAT THE FOUR LABELS PROMISE, WHICH IS WHY THE ROWS CANNOT MOVE
+
+All four rows' `#[ignore]` strings state a readmission condition —
+*"readmits when the duplicate prelude block is resolved"* — **which named work
+no node covered until this one.** That is the debt this node discharges, and it
+is the reason the rows are parked rather than merely failing.
+
+# THE DELIVERABLE SHAPE — NOT A PROMISE OF FOUR READMISSIONS
+
+The deliverable is **four rows re-dispositioned by file and line, each either
+readmitted or carrying a MEASURED next blocker.** The ledger's central finding —
+12 of 27 stated reasons already false — is why a stated blocker is never
+accepted in place of a measured one.
+
+This node is **not** a rewrite of the static-transition planner (if the
+Architect rules the occurrence-pairing arm, that is a successor node with its
+own frame, cut by the Steward), **not** the other eleven selected rows, and
+**not** `RT-FRAME-MARKER-ONCE` or `RT-CLOSURE-BOUNDARY-LANE` — it measures
+whether they are reached and repairs neither.
