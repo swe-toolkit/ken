@@ -313,6 +313,8 @@ expr ::=
   | "if" expr "then" expr "else" expr  -- = match on Bool
   | match_expr  -- pattern match (34); single-scrutinee eqn: modifier (34 §3.6)
   | "temporal" "{" expr "}"  -- temporal obligation → Temporal data (72) [OQ-syntax]
+  | proof_ref ("." ident | ".1" | ".2")*  -- attached-proof selector, with its
+      -- projection chain; NOT a `primary`, so never a bare argument (§3)
   | application_atom
 operator_prefix ::= operator_name application_atom+
 binop ::= operator_name | fixed_binop
@@ -321,7 +323,6 @@ application_atom ::= primary ("." ident | ".1" | ".2")*  -- postfix projection c
 primary ::=
     literal | ident | ConId | qualified_global_ref
   | path "::" ident  -- canonical attached-proof path
-  | proof_ref  -- attached-proof selector atom
   | recursive_result  -- Type-classified nested method result (34 §3.1.1)
   | induction_hypothesis  -- Omega-classified nested method result (34 §3.1.1)
   | "(" operator_name ")"  -- grouped operator value
@@ -396,14 +397,42 @@ loosest, application sits between them.**
 > It is not the case that the two entered together and were considered jointly,
 > and an amendment reasoning from that would be repairing a decision nobody made.
 
-`proof_ref` is a primary expression atom and therefore binds more tightly than
-application or any infix operator. Its subject is exactly one `path`; subsequent
-expressions are arguments to the selector result. Thus `proof p for s a b`
-parses as `((proof p for s) a) b`, and `f proof p for s` parses as
-`f (proof p for s)`. The bare atom and its grouped form `(proof p for s)`
-produce the identical `Expr::EAttachedProofRef { subject, proof_name }` and
-desugar to the same `subject::ident` global, where `ident` is stored as
-`proof_name`; parentheses are optional grouping.
+`proof_ref` is its **own `expr` alternative, not a `primary`** — the same
+structural position `lambda`, `let`, `if`, `match` and `temporal` occupy, and
+for the same reason. Its subject is exactly one `path`; subsequent expressions
+are arguments to the selector result, so at the head of an application it binds
+more tightly than application or any infix operator. Thus `proof p for s a b`
+parses as `((proof p for s) a) b`, and `proof p for s.1` keeps its projection
+chain there.
+
+**As a bare argument the atom must be grouped. This is a rule about the
+grammar, not a report about the current parser.** `proof_ref` is not a
+`primary` and therefore not an `application_atom`, so `§3`'s general
+requirement reaches it unchanged: an expression not admitted by
+`application_atom` must be grouped before it is used as an application
+argument. It is an instance of that rule, carried by the production rather
+than by this prose.
+
+Two bare positions, each requiring the grouping, and each carried by the
+`application_atom` restriction rather than by this prose:
+
+    application argument   f (proof p for s)       not  f proof p for s
+    prefix application     <= (proof p for s) b    not  <= proof p for s
+
+Infix operands are **not** among them: `binop`'s operands are `expr`, which no
+production restricts to atoms, so a bare selector is derivable there.
+
+The requirement is **unconditional and is not keyed on bracket depth**:
+`match v { _ ↦ f proof p for s }` does not parse either. **No rule in this
+chapter is keyed on bracket depth**, and a form that parsed bare inside
+brackets but not outside them would be the grammar's only depth-sensitive
+construct — a distinction a reader cannot see locally and an implementation
+must maintain state to honour.
+
+Where both forms parse, the bare atom and its grouped form produce the
+identical `Expr::EAttachedProofRef { subject, proof_name }` and desugar to the
+same `subject::ident` global, where `ident` is stored as `proof_name`; the
+parentheses are grouping and carry no meaning of their own.
 
 `recursive_result` and `induction_hypothesis` are likewise primary expression
 atoms. Each operand is exactly one surface `ident`, not a path or an arbitrary
