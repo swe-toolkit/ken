@@ -116,11 +116,37 @@ by grep:
 | `rt_escape_escape_file_then_readat` | 29 | 29 of 29 | one distinct value, 317 |
 | `rt_escape_nat_fanout_escaped` | 29 | 29 of 29 | one distinct value, 317 |
 
+**Re-measured at `9dfa6978e` by this node's `D3`, with the same instrument:
+every cell above is unchanged.** The only crate that moved between the framing
+base `60df2cfd2` and `9dfa6978e` is `ken-elaborator/src/parser.rs`;
+`ken-runtime` and `ken-cli` are byte-identical across that range, so the parser
+was the single route by which a number could have moved, and it did not. The
+counts are **per invocation** of `host_response_routes`, which runs **twice**
+per compile on all three programs — a line count over the probe's output
+therefore reads 58 where the census reads 29, and the two numbers are correct
+about different quantities.
+
 **A constant offset across an entire set is a duplicated block, not 29
 competing claims.** Twenty-nine independent collisions would not produce one
-delta; they would produce a spread. The two `rt_escape` programs are DIFFERENT
-Ken programs measured separately, and they agree in shape without sharing a
-measurement — which is corroboration, not one number counted twice.
+delta; they would produce a spread.
+
+**CORRECTED at `9dfa6978e`: the cross-program agreement rests on TWO programs,
+not three.** The two `rt_escape` programs were censused separately and no
+census value transfers between them — but every proc of
+`rt_escape_escape_file_then_readat` also appears in
+`rt_escape_nat_fanout_escaped`, with `after_file_escape`, `handle_outer` and
+`main` byte-identical and `read_body` differing in four lines. Two agreeing
+censuses across those two rows are **one shape seen twice**, not two
+independent replications. The independent pair is `px7n` and one `rt_escape`
+program.
+
+**And the transfer behind that correction is UNTESTED.** The proc-level overlap
+was measured because the two programs produce the same `ComputationalMatch`
+scrutinee refusal — a different refusal, reached by a different probe, from the
+collision census this paragraph is about. Whether the **collision** replicates
+independently across the two plans has been measured by nobody. Restoring
+"three" requires that measurement; the overlap above does not license it, and
+neither does its absence license reading the two rows as independent.
 
 # Why deferral does not close the rows, and the split it produces
 
@@ -145,6 +171,16 @@ none.** This node owns the duplication. It does not own
 the same file as two of these rows, **gets PAST response-route construction**,
 and fails elsewhere — on source-specific inheritances disagreeing on their
 typed consumer projection. `S8` likewise emits no collision at all.
+
+**Measured against the instrumented build at `9dfa6978e`, which sharpens the
+control rather than merely confirming it:** `S6` reports
+`overwrites=0 colliding_constructors=0 distinct_deltas=[] routes_final=29`. It
+builds a route map of **the same size as the colliding programs' — 29 — with
+zero collisions in it.** So the control is not "a program that happens to be
+smaller"; it is a program that reaches the same map cardinality by a plan that
+presents each constructor once. It then refuses at `source-specific
+inheritances at one generated entry disagree on their typed consumer
+projection, including the fresh-result route`, exactly as recorded.
 
 **Co-location is not co-causation, and `S6` is the sharper control because it
 shares a file with the population and does not share the cause.** Any account
@@ -199,9 +235,36 @@ the block twice, and the repair is upstream of the planner entirely.
 
 ⇒ **This maps onto the fork above:** inheriting *"the invariant is too strong"*
 as settled is choosing reading (2) without measuring it, and sizing planner
-work off it. **This node does not pick.** The fork is a design question about
-admissible Ken programs and it routes to the Architect with a measurement in
-hand. What is forbidden is treating it as already decided.
+work off it. **This node did not pick.** The fork was a design question about
+admissible Ken programs and it routed to the Architect with a measurement in
+hand.
+
+**RULED, 2026-09-18, by the Architect. The sentence above is spent and is kept
+only as the record of why the question was asked.** The ruling is **neither
+arm**, and its full text is section 8.9a of this node's work package:
+
+- **The uniqueness invariant is CORRECT.** It is decided on the **consumer**,
+  which neither arm mentioned: `selected_host_response_route` looks up by
+  constructor alone, and its uniqueness check is *within one Vis subtree*, so
+  it guarantees a Vis selects at most one route and says nothing about whether
+  it selected the **right** one. The two colliding copies agree on `operation`
+  and differ on all three origins — the fields naming which producer and which
+  continuation the response reaches — so they are **not interchangeable**, and
+  `responses.rs:1279` is the guard against a **silent wrong-continuation
+  route**.
+- **Neither "de-duplicate" nor "relax the key" survives.** Per-arm inlining of
+  a shared callee is legitimate, and the invariant is a claim about the source
+  dispatcher while `plan.source_occurrences` is post-inlining — the subject is
+  wrong, not the claim. Re-keying the **producer alone** leaves the consumer
+  selecting by constructor, so the collision disappears and the mis-route does
+  not.
+- **The repair is a third thing: producer and consumer move together, or
+  neither moves.** `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` is **one part** of it
+  and is not sufficient alone.
+
+**What is forbidden is no longer "treating it as already decided" — it is
+treating it as still open, or treating the occurrence key as the whole
+repair.**
 
 **Two repairs already ruled out — do not re-propose them:**
 

@@ -341,25 +341,34 @@ its own refusal.
 
 ### 9.6 AC-1 — four rows, four named dispositions
 
+**Coordinate convention, corrected by `[[RT-DUPLICATED-RESPONSE-BLOCK]]` D2.**
+The four numbers below were the `fn` lines. Both successor frames anchor a row
+on its `#[ignore]` **attribute** line, one above —
+`[[RT-DUPLICATED-RESPONSE-BLOCK]]` section 2 lists `:149 :170 :653 :713`, and
+`[[RT-CONTEXT-FRAME-LABEL-CORRECTION]]` states the convention in its own text.
+They are restated here on that convention so one row is not two coordinates.
+(`docs/program/evidence/rt-ignored-failing-rows-ledger.md` keys its rows by
+test name and carries no line number, so it is unaffected either way.)
+
 **All four STAY IGNORED.** No row is readmitted and none is retired: the tests
 assert native/interpreter agreement on valid Ken programs, and 9.2 shows they do
 not even mention the construct that collides.
 
-    rt_escape:654  STAYS IGNORED. Program rt_escape_escape_file_then_readat.
+    rt_escape:653  STAYS IGNORED. Program rt_escape_escape_file_then_readat.
                    Refuses at the collision; selects
                    rt_escape_escape_file_then_readat::FSOp::ctor_543, itself
                    one of that plan's 29 collisions. Whether
                    RT-CLOSURE-BOUNDARY-LANE is also a real blocker underneath
                    is UNDETERMINED -- nothing has seen past the collision.
-    rt_escape:714  STAYS IGNORED. A DIFFERENT program,
+    rt_escape:713  STAYS IGNORED. A DIFFERENT program,
                    rt_escape_nat_fanout_escaped, measured separately. Same
                    shape and the same UNDETERMINED, and the selected
                    constructor is ctor_543 of ITS OWN program -- the two rows
                    agree in shape, not by sharing a measurement.
-    px7n:150       STAYS IGNORED. Collision is a false alarm here; the real
+    px7n:149       STAYS IGNORED. Collision is a false alarm here; the real
                    blocker underneath is the labelled frame-marker mechanism,
                    confirmed by running with the collision deferred.
-    px7n:171       STAYS IGNORED. Same.
+    px7n:170       STAYS IGNORED. Same.
 
 ### 9.7 Deliverable 5 — the labels, corrected and CLASSIFIED
 
