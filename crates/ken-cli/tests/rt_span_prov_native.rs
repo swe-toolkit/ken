@@ -308,9 +308,38 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
 #[cfg(target_os = "linux")]
 // Ignored pending RT-COMPMATCH-TREE-SCRUTINEE.
 //
-// Observed signature, exactly:
-//   ComputationalMatch: tree-producing match scrutinee is not Bool or a
-//     constructor
+// Observed signature, exactly, measured at 742bf929a with this candidate's
+// pair_detached_required_consumer worker_return descent in place:
+//   unsupported runtime-IR lowering: StaticResponseDeferred: a deferred host
+//     response is compiler control and can only enter its exact response owner
+//
+// WHERE THAT WAS CAPTURED FROM: the helper thread 'sp-a-freeze', not the test
+// thread. The test thread reports only the wrapper
+//   called `Result::unwrap()` on an `Err` value: Any { .. }
+// which carries no signature of its own and is compatible with every refusal
+// in the planner. A run that reports the wrapper has measured nothing.
+//
+// SUPERSEDED SIGNATURES -- both measured, neither is what this row now
+// produces. Kept for provenance so a later reader can tell drift from
+// disagreement.
+//
+//   (1) At 742bf929a WITHOUT this candidate's descent, the first refusal was
+//       the planner invariant
+//         an exact detached required consumer has no computational occurrence
+//       raised by pair_detached_required_consumer. Superseded because that
+//       function now finds the consumer it was failing to see: for this row
+//       the outer projection carries zero steps and an empty caller_suffix,
+//       and the ComputationalMatchCase sits one level down behind
+//       worker_return.caller_context().
+//
+//   (2) Earlier still, this block recorded
+//         ComputationalMatch: tree-producing match scrutinee is not Bool or a
+//           constructor
+//       measured at base 21fd46dc. RT-COMPMATCH-TREE-SCRUTINEE D0 forced past
+//       (1) at 742bf929a and the next observation was the CURRENT signature,
+//       not this one. So (2) is not the layer behind (1). Whether it lies
+//       deeper than the current refusal is UNMEASURED -- D0 is one forcing
+//       step and forbids forcing again.
 //
 // Owner node: RT-COMPMATCH-TREE-SCRUTINEE.
 // Pre-existing base debt, NOT a bind-order regression: this row fails at
@@ -320,14 +349,9 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
 // binding order is observable in it.
 // A refusal class of its own, and the only failing row in this file --
 // its five siblings pass. It fits none of the effect-seat owners.
-// The refusal surfaces on the helper thread 'sp-a-freeze'; this
-// test thread then fails only with the wrapper
-//   called `Result::unwrap()` on an `Err` value: Any { .. }
-// which carries no signature of its own. The signature above is the
-// real cause.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE: a tree-producing match scrutinee is neither Bool nor a constructor; fails at base 21fd46dc"]
+#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE: a deferred host response can only enter its exact response owner (StaticResponseDeferred, runtime-IR lowering); measured at 742bf929a"]
 fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
     in_large_stack_thread("sp-a-freeze", || {
         let diff = differential("sp-a-freeze", SP_A_FREEZE);
