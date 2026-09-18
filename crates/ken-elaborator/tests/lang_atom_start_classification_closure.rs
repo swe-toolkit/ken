@@ -282,3 +282,105 @@ fn invariant_2_an_empty_brace_is_not_a_legal_record_literal() {
         "an empty arm block must parse -- the `offset == 1` arm"
     );
 }
+
+// ---------------------------------------------------------------------------
+// AC-0/AC-2 — the TRUNCATION half of the widening.
+//
+// `TruncBar` is admitted as an atom start in BOTH positions, gated on
+// truncation depth. AC-2 asks for a control on what the loop now CONSUMES,
+// because widening is the fail-open direction, and the row that matters is
+// `f ‖x‖ y`: the truncation must CLOSE and the loop must then CONTINUE.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ac0_a_bare_truncation_is_an_argument_in_both_positions() {
+    assert!(
+        parses("fn g (x : Bool) : Bool = f ‖x‖"),
+        "AC-0: a bare truncation must be admitted as an expression argument"
+    );
+    assert!(
+        parses("fn f (x : G ‖Bool‖) : Bool = y"),
+        "AC-0: and as a TYPE argument -- `TruncBar` is position-polymorphic, \
+         with arms in both parse_atom_type and parse_atom_expr_base"
+    );
+}
+
+#[test]
+fn ac2_the_truncation_closes_and_the_loop_continues() {
+    // THE REQUIRED CASE. Measured on what it now CONSUMES rather than on a
+    // rejection going away: `y` must survive as a second argument of `f`.
+    assert!(
+        parses("fn g (x : Bool) (y : Bool) : Bool = f ‖x‖ y"),
+        "AC-2: the truncation must close and the argument loop must continue"
+    );
+}
+
+#[test]
+fn ac2_the_enclosed_form_is_withheld_and_at_two_arguments_it_RE_ASSOCIATES() {
+    // THE FAIL-OPEN ROW, and my own fixture set could not see it.
+    //
+    // `ac2_..._nests_and_groups` below pins HEAD-position nesting -- and the
+    // `Token::TruncBar` arm in `parse_atom_expr_base` fires directly on the
+    // token, never consulting the roster. So head nesting is exactly the
+    // position the depth gate does NOT govern. The set varied the axis I could
+    // see and held the governed axis constant; these are the governed rows.
+    //
+    // Measured, base ab228f1bd vs this candidate:
+    //
+    //   ‖f (‖x‖)‖      grouped        PARSED -> PARSED    the escape hatch
+    //   ‖f ‖x‖‖        ONE argument   ERR    -> ERR
+    //   ‖f ‖x‖ ‖y‖‖    TWO arguments  ERR    -> PARSED    NEW ACCEPT
+    //
+    // and the two-argument tree is
+    //     EApp(EApp(ETrunc(f), x), ETrunc(ETrunc(y)))  ==  (‖f‖ x) ‖‖y‖‖
+    // The author wrote a truncation of `f ‖x‖ ‖y‖`. No diagnostic. A clean
+    // rejection at the base became a silent misparse here.
+    //
+    // NOT a defect to fix: a self-delimiting delimiter is genuinely ambiguous
+    // and the parser must pick a policy. Pinned so the policy is a decision on
+    // the record rather than an emergent behaviour, and so a change to it is
+    // visible. The policy itself is on `truncation_depth`'s doc comment.
+    assert!(
+        parses("fn g (x : Bool) : Bool = ‖f (‖x‖)‖"),
+        "grouping is the escape hatch and must keep working"
+    );
+    assert!(
+        !parses("fn g (x : Bool) : Bool = ‖f ‖x‖‖"),
+        "one enclosed argument stays refused"
+    );
+    // AND THE ONE THAT MAKES THE REFUSAL ARITY-DEPENDENT. A reader who probes
+    // only the one-argument row concludes the enclosed form is closed. It is
+    // not: one more argument and it parses, differently.
+    assert!(
+        parses("fn g (x : Bool) (y : Bool) : Bool = ‖f ‖x‖ ‖y‖‖"),
+        "two enclosed arguments PARSE, re-associated -- if this ever reds, the \
+         policy on `truncation_depth` changed and the doc comment is stale"
+    );
+}
+
+#[test]
+fn ac2_the_self_delimiting_bar_still_nests_and_groups() {
+    // `‖` opens and closes with the SAME token, so admitting it to the roster
+    // makes the closer look like an opener to the body's own application loop.
+    // Without the depth gate these three stop parsing -- the widening is a
+    // REGRESSION, not a partial improvement. Measured: all three PARSE at the
+    // base, and all three REJECT with the naive widening.
+    assert!(parses("fn g (x : Bool) : Bool = ‖x‖"), "head position");
+    assert!(parses("fn g (x : Bool) : Bool = f (‖x‖)"), "grouped argument");
+    assert!(parses("fn g (x : Bool) : Bool = ‖‖x‖‖"), "nested truncation");
+}
+
+#[test]
+fn ac3_if_is_still_refused_as_an_argument_and_still_admitted_as_a_head() {
+    // The negative control the frame forbids closing. `primary`'s arms carry
+    // no conditional, so this is the classification's distinction, not a
+    // hand-written case -- and the widening must not lose it.
+    assert!(
+        !parses("fn g (a : Bool) : Bool = f if a then b else c"),
+        "AC-3: `if` must stay refused as a bare argument"
+    );
+    assert!(
+        parses("fn g (a : Bool) : Bool = if a then b else c"),
+        "and still admitted as a head -- the position axis, not a token ban"
+    );
+}

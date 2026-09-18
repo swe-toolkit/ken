@@ -420,6 +420,43 @@ pub struct Parser {
     /// Set while parsing a declaration-dependent user-operator spine. Pure
     /// fixed arithmetic stays on the merge-base `EBinOp` path.
     contains_infix_spine: bool,
+    /// How many truncation bodies enclose the cursor.
+    ///
+    /// `‖` is SELF-DELIMITING -- one token opens and closes a truncation --
+    /// so admitting it to an atom-start roster makes the closer look like an
+    /// opener to the body's own application loop. This counter is what tells
+    /// the two apart, and without it the widening is not a partial
+    /// improvement but a REGRESSION: `‖x‖`, `f (‖x‖)` and `‖‖x‖‖` all stop
+    /// parsing. Measured, not reasoned.
+    ///
+    /// **THE POLICY, because the counter does more than disambiguate.** It
+    /// also WITHHOLDS argument-position truncation inside any truncation body,
+    /// so a truncation can never contain a bare truncated argument. That is a
+    /// deliberate choice -- a self-delimiting delimiter is genuinely ambiguous
+    /// here and the parser must pick one -- and the escape hatch is grouping,
+    /// this file's sanctioned spelling for an ambiguous bare token (see the
+    /// `( operator_name )` production and its DO-NOT-DELETE comment).
+    ///
+    /// **The withholding is not uniformly a refusal, and that is the part to
+    /// know.** Measured:
+    ///
+    /// ```text
+    /// ‖f (‖x‖)‖      grouped        PARSES   -- the escape hatch
+    /// ‖f ‖x‖‖        ONE argument   refused
+    /// ‖f ‖x‖ ‖y‖‖    TWO arguments  PARSES, as (‖f‖ x) ‖‖y‖‖
+    /// ```
+    ///
+    /// At two arguments the withholding SILENTLY RE-ASSOCIATES instead of
+    /// refusing: the author wrote a truncation of `f ‖x‖ ‖y‖` and got an
+    /// application of `‖f‖` to two arguments, with no diagnostic. The base
+    /// rejected that source, so this is a clean rejection converted into a
+    /// misparse -- the fail-open direction, admitted here rather than
+    /// discovered later.
+    ///
+    /// **A refusal that depends on arity reads as categorical at the arity
+    /// anyone tries first.** Probing the one-argument case suggests the
+    /// enclosed form is closed; it is not.
+    truncation_depth: usize,
 }
 
 impl Parser {
@@ -433,6 +470,7 @@ impl Parser {
             src,
             contains_user_operator,
             contains_infix_spine: false,
+            truncation_depth: 0,
         }
     }
 
@@ -2367,9 +2405,18 @@ impl Parser {
         if self.atom_start_exclusion(AtomPosition::Type).is_some() {
             return false;
         }
+        // Conditional membership; the sole statement of it. See the same
+        // guard in `can_start_atom_expr` for why the token must not also
+        // appear in the `matches!` below.
+        if matches!(self.peek(), Token::TruncBar) {
+            return self.truncation_depth == 0;
+        }
         matches!(
             self.peek(),
-            Token::ConId(_) | Token::Ident(_) | Token::KwType | Token::LParen
+            Token::ConId(_)
+                | Token::Ident(_)
+                | Token::KwType
+                | Token::LParen
         )
     }
 
@@ -2560,7 +2607,10 @@ impl Parser {
             // expression-position `Expr::ETrunc` production.
             Token::TruncBar => {
                 self.advance();
-                let inner = self.parse_type()?;
+                self.truncation_depth += 1;
+                let inner = self.parse_type();
+                self.truncation_depth -= 1;
+                let inner = inner?;
                 self.expect(&Token::TruncBar)?;
                 let end = self.tokens[self.pos - 1].1.end;
                 Ok(Type::TTrunc(Box::new(inner), Span::new(start, end)))
@@ -2851,6 +2901,16 @@ impl Parser {
     }
 
     fn can_start_atom_expr(&self) -> bool {
+        // `TruncBar`'s membership is CONDITIONAL, and this guard is the only
+        // statement of it. Do NOT also list the token in the `matches!` below
+        // "for symmetry": that arm would be unreachable, and a reader who took
+        // it as the live statement and deleted this guard as redundant would
+        // reintroduce the naive widening -- which is measured to redden three
+        // rows, not to be a no-op. Inside a truncation body this bar is the
+        // CLOSER, not an opener.
+        if matches!(self.peek(), Token::TruncBar) {
+            return self.truncation_depth == 0;
+        }
         matches!(
             self.peek(),
             Token::LBrace
@@ -3720,7 +3780,10 @@ impl Parser {
             // full expression, require the matching closer.
             Token::TruncBar => {
                 self.advance();
-                let inner = self.parse_expr()?;
+                self.truncation_depth += 1;
+                let inner = self.parse_expr();
+                self.truncation_depth -= 1;
+                let inner = inner?;
                 self.expect(&Token::TruncBar)?;
                 let end = self.tokens[self.pos - 1].1.end;
                 Ok(Expr::ETrunc(Box::new(inner), Span::new(start, end)))
