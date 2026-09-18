@@ -58,6 +58,12 @@ answers.**
 Signature is the observed failure text, read from a run. Label is the current
 `#[ignore]` text at this base.
 
+> **THE TABLE BELOW IS A RECORD OF `04d4dd38a` AND IS NOT EDITED WHEN A ROW
+> CLOSES.** Rewriting a cell to say "cleared" would destroy the measurement this
+> file exists to hold. Closures are appended to **"Rows cleared since this
+> base"** after the table, each with its own base. **Read both.** Row 15 has
+> closed; every other row's disposition here still stands.
+
 | # | identity | observed signature (measured) | label agrees? | owning node | status | framed? |
 |---|---|---|---|---|---|---|
 | 1 | `ken-cli::px7f_resource_native linked_public_right_denial_preserves_exact_masks` | `UnclassifiedRuntimeTrap { terminal_value: -1 }` | **NO** — label predicts the BoundaryCarrier arity refusal | `RT-SITEOP-CARRIED-WITNESS` | **merged** | yes |
@@ -84,6 +90,70 @@ symptom only — the observed text is what the label predicts, while the label's
 `fb414cb78de6cc82cdf247be85270a2da0e47f3e`. **This column therefore has a known
 expiry with a named cause**, and the quotations above remain a correct record of
 `04d4dd38a` rather than of `main`.
+
+## Rows cleared since this base — APPEND ONLY
+
+    row 15   ken-runtime ... constructors::c2_ac4_runtime_host_result_selects_
+             a_separately_generated_nested_payload
+             cleared by  RT-CARRIER-PRODUCER-OCCURRENCE D4
+             squash      9c3a5f588d7b58152c1c2c38e6e4f999f056ba8a  (PR #3937)
+             POPULATION  15 -> 14
+
+**The first of the fifteen to close.** The `#[ignore]` is gone from
+`crates/ken-runtime/src/cranelift_backend/lowering/core/tests/constructors.rs`
+— the file now carries none — and the row is live at `:3316`. **It passes on
+CI's green at D4's landing gate, not on a local run**; per `COORDINATION §12`
+this box does not run the workspace, and no credential here reads CI logs, so
+"passes" here means "the gate that merged it was green."
+
+**The row closed by measuring its property again, not by relabelling.** D4
+replaced a hardcoded `BoundaryTag::ImmediateBool` expectation with one read
+from the plan's ruled allocation lane. That distinction is the whole point of
+the exercise and is the thing to check on every subsequent closure.
+
+### The population is MEASURED at 14, not 15 minus one
+
+Measured at `a503a5a971f8d673248317f1ab8023ee924b055c`. Two instruments:
+
+    attribute-only #[ignore] sites in crates/     23 at 04d4dd38a -> 22 now
+      the ONLY per-file delta is constructors.rs   1 -> 0
+    exemption registry .github/ignored-test-       8 entries, unchanged
+      exemptions.toml
+                                    22 - 8 = 14, reconciling exactly as
+                                    23 - 8 = 15 did at the original base
+
+> ### COUNT THE ATTRIBUTE, NOT THE TEXT. THE WRONG PATTERN RETURNED THE INVERSE.
+>
+> A first pass counted `#[ignore` as a **substring** across `crates/` and got
+> **28 at both bases** — which reads as *"the population did not move."*
+>
+> **Five of those 28 are prose:** comments that mention `#[ignore]` while
+> discussing a row. `4eb3dc4c6` added one such comment to
+> `px8ta_oriented_subcontinuation.rs` in the same window, so the text count
+> showed that file **gaining** a row it did not gain — exactly cancelling the
+> row that did close.
+>
+> ⇒ **The wrong instrument did not blur the answer. It produced the INVERSE
+> one, and the inverse was plausible**: a new fixture landing beside a closure
+> is an ordinary thing to see, and "one cleared, one added" is a story that
+> explains itself. **Anchor the pattern at line start — `^\s*#\[ignore` — so it
+> matches the attribute and not the discussion of it.**
+>
+> **What caught it was the PER-FILE delta, not the total.** A total can only be
+> believed or disbelieved; a delta names a file you can open. **Never take a
+> population count as a bare number when the per-item delta costs one more
+> flag.**
+
+### What this closure settles about row 15's second refusal
+
+`RT-HOST-RESULT-ARM-SHAPE-DISAGREEMENT`'s frame asserted that row 15 carries
+**two independent refusals**, that its own was downstream of the carrier one,
+and that the `#[ignore]` must therefore stay after D4 because the row still
+could not run. **D4 removed it and the gate was green.** ⇒ Only one of the two
+claimed refusals actually blocked this row. The arm-shape question survives on
+its own merits — the Architect ruled it NARROWED, and the borrow it names is a
+measured coverage gap — but **not as a blocker on this row**, and that node is
+`draft` pending its re-cut.
 
 ## `AC-3` — the clustering question, MEASURED AT SIGNATURE DEPTH
 
