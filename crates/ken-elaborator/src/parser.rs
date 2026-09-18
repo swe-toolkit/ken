@@ -141,6 +141,22 @@ enum StartExclusion {
     /// `eqn :` -- a contextual modifier of the enclosing `match`, not an
     /// application argument to its scrutinee.
     MatchEquationBinder,
+    /// `{` opening a `match`'s ARM BLOCK, not a record-literal argument.
+    ///
+    /// Filed as an exclusion on the mechanism's own two-layer terms:
+    /// `Token::LBrace` is in `can_start_atom_expr`'s admitted set and this
+    /// subtracts occurrences of it, structurally identical to `BinderName`
+    /// subtracting `Ident`. The tempting reading -- that the other members are
+    /// vetoes while this one disambiguates two forms -- does not separate it:
+    /// every member here disambiguates occurrences of a token that can start
+    /// an atom.
+    ///
+    /// **What DOES distinguish it is reach, and reach is not a filing
+    /// criterion.** The others decide at the boundary, `peek()` plus
+    /// `lookahead(1)`. This one reads INSIDE the candidate atom, unbounded,
+    /// carrying its own depth model. A SECOND member needing an unbounded scan
+    /// is the signal that this two-layer design is wrong; one is not.
+    BraceOpensMatchArms,
     /// `as` -- an AS-PATTERN ALIAS keyword, not a pattern argument.
     ///
     /// Found by AC-6's derivation, and it is why "the pattern rosters are
@@ -160,12 +176,13 @@ enum StartExclusion {
 impl StartExclusion {
     /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
     /// length is checked against it rather than maintained independently.
-    const COUNT: usize = 4;
+    const COUNT: usize = 5;
 
     /// The iteration source `atom_start_exclusion` consults.
     const ALL: [Self; Self::COUNT] = [
         Self::EffectRowAnnotation,
         Self::MatchEquationBinder,
+        Self::BraceOpensMatchArms,
         Self::AsAlias,
         Self::BinderName,
     ];
@@ -176,8 +193,9 @@ impl StartExclusion {
         match self {
             Self::EffectRowAnnotation => 0,
             Self::MatchEquationBinder => 1,
-            Self::AsAlias => 2,
-            Self::BinderName => 3,
+            Self::BraceOpensMatchArms => 2,
+            Self::AsAlias => 3,
+            Self::BinderName => 4,
         }
     }
 
@@ -196,7 +214,9 @@ impl StartExclusion {
             }
             Self::BinderName => matches!(position, AtomPosition::Type),
             Self::AsAlias => matches!(position, AtomPosition::Pattern),
-            Self::MatchEquationBinder => matches!(position, AtomPosition::Expression),
+            Self::MatchEquationBinder | Self::BraceOpensMatchArms => {
+                matches!(position, AtomPosition::Expression)
+            }
         }
     }
 
@@ -212,6 +232,7 @@ impl StartExclusion {
                 parser.is_contextual_ident("eqn")
                     && matches!(parser.lookahead(1), Token::Colon)
             }
+            Self::BraceOpensMatchArms => parser.brace_starts_match_arms(),
             Self::BinderName => {
                 matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
                     && matches!(parser.lookahead(1), Token::Colon)
@@ -228,6 +249,7 @@ impl StartExclusion {
             Self::EffectRowAnnotation => "an effect-row annotation",
             Self::AsAlias => "an as-pattern alias",
             Self::MatchEquationBinder => "a match equation binder",
+            Self::BraceOpensMatchArms => "a match arm block",
             Self::BinderName => "a binder name",
         }
     }
@@ -2743,13 +2765,6 @@ impl Parser {
                     if self.atom_start_exclusion(AtomPosition::Expression).is_some() {
                         break;
                     }
-                    // The brace after a `match` scrutinee opens its arm block,
-                    // while a record-literal argument opens with the same token.
-                    // Classify from the first record-field/arm delimiter without
-                    // consuming either form.
-                    if self.brace_starts_match_arms() {
-                        break;
-                    }
                     if !self.can_start_atom_expr() {
                         // `32 §3`: an ungrouped leading form is not an
                         // `application_atom` and must reject AT its leading
@@ -2779,6 +2794,32 @@ impl Parser {
         }
     }
 
+    /// Does this `{` open a `match`'s arm block rather than a record literal?
+    ///
+    /// **Its correctness rests on two invariants that nothing states and
+    /// nothing checks**, so they are stated here and pinned in
+    /// `lang_atom_start_classification_closure.rs`:
+    ///
+    /// 1. **No depth-0 `Eq` / `Comma` / `RBrace` precedes the first `MapsTo`
+    ///    in an arm block.** Every pattern form that can carry a comma --
+    ///    tuple, record -- carries it inside parens or braces, so the scan is
+    ///    at depth > 0 when it passes one. Control:
+    ///    `match v { a, b ↦ x }` must stay REJECTED; today it is refused as a
+    ///    malformed RECORD LITERAL, which is the misclassification itself.
+    /// 2. **A record literal always reaches a depth-0 `Eq`, `Comma` or
+    ///    `RBrace` before any `MapsTo`.** Control: `{}` must stay an illegal
+    ///    record literal. `parse_record_expr` calls `expect_ident()` straight
+    ///    after `{`, so an empty brace is a parse error there -- which is the
+    ///    only reason `RBrace if offset == 1 => true` is safe. If `{}` ever
+    ///    becomes legal, `f {}` silently misclassifies.
+    ///
+    /// **A known hole, real in shape and empty in population:** the scan
+    /// tracks paren and brace depth but NOT brackets, so a bracketed form
+    /// containing a comma would sit at depth 0 and return `false` inside a
+    /// real arm block. It is not reachable today -- `can_start_atom_expr`
+    /// admits no `LBracket` and there is no list literal; every `LBracket`
+    /// site in this file is an effect row or the `visits` exclusion. Recorded
+    /// because a list literal would open it, and nothing here would say so.
     fn brace_starts_match_arms(&self) -> bool {
         if !matches!(self.peek(), Token::LBrace) {
             return false;
