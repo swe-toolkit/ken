@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-18 20:25:15Z — from 675 issue file(s) in `docs/program/issues/`.
+2026-09-18 20:28:47Z — from 676 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -463,6 +463,7 @@ the committed file matches the generator's output.
 | `RT-DEAD-ARM-JOIN-DISPOSITION` | The merged RT-DEAD-ARM-EFFECT-LOWERING trap short-circuits a provably-dead arm's lowering but leaves that arm's planned source-join origins neither emitted nor dispositioned, so finalize_join_disposition (joins.rs:1675) fires 'neither emitted nor statically unselected' once a downstream fix clears the effect-seat layer in front of it (19/19 unconsumed origins measured inside provably-dead arms, StaticOriginId(20)); complete the trap by dispositioning a PROVED-dead arm's joins as statically unselected (add to dispositioned_join_origins), reusing the RT-LEXICAL-RECURSOR-CONSUMERS D2b abandoned-region mechanism -- a latent completeness gap SURFACED (not caused) by RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL clearing the projection layer, co-landing with it as one candidate | closed | runtime | M | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
 | `RT-DEPTH2-VAR-PARENT-DERIVATION` | Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one | closed | runtime | S | none | — |
+| `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED` | At depth 3 of the oriented-subcontinuation bracket row, object emission refuses with ContinuationSpecialization `the claimed continuation target was not declared into this function` (core.rs:11268) -- the claim's identity is absent from `function_local.continuation_calls`. This is the SECOND blocker on ledger row 9, invisible until now because depth 2 panics first, so no measurement of that row had ever executed depth 3. | draft | runtime | M | none | — |
 | `RT-DESCENT-LANE-COMPLETENESS` | Is the functionized lane a complete replacement for RecursiveDescent, or has it been carrying only the ported subset? D2c refused NINE programs the retiring lane compiles, across FOUR independent constructs -- a pattern, not a missing case, so this is a lane-completeness question and not a port | closed | runtime | M | none | — |
 | `RT-DESCENT-RETIRE-PRIOR-ART` | Prior art admits the shape and carries no second descent lane -- retirement is supported and never by source unreachability -- this node's proposed pre-classifier IR invariant was DECLINED by the Architect in favour of uniform lowering, so the retirement is NOT gated on it and this row is not an unmet bar | merged | research | M | none | — |
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | merged | runtime | M | none | — |
