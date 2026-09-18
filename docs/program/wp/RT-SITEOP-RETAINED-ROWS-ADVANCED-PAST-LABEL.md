@@ -39,16 +39,44 @@ merge commit) as the set carrying one byte-identical `#[ignore]` string:
     rt_parity_native.rs                     5
                                            16    matches the closeout's count
 
+**Recovered with this exact command, and RE-RUN THIS ONE, not a command you
+compose from the node name:**
+
+    git grep -c 'RT-SITEOP-CARRIED-WITNESS D2' a388dc06
+
 **The three rows still carry that label on `main` today, byte-identical.**
+
+> ### THE OBVIOUS INSTRUMENT RETURNS 36 AND READS LIKE A FINE ANSWER
+>
+>     grep -c on the NODE NAME      36 matching lines across 9 files
+>     grep -c on the ATTRIBUTE      16 rows across 7 files
+>
+> The node name appears about **twice per row** — once in a comment above the
+> attribute — **and in two files that carry no such label at all**
+> (`px4b_native_production.rs`, `px7p_constructor_field_composition.rs`). So a
+> name-keyed count is larger, spans more files, and looks correct. **The
+> attribute is the key; the name is a mention.**
+>
+> **Second trap, the path:** these rows are in `crates/ken-cli/tests/`, **not**
+> `crates/ken-runtime/tests/`. A wrong-path run returns zero — and an empty
+> result on a population you know is non-empty is the cheapest false-negative
+> tell there is. Independently reproduced by the Architect, `evt_4j7ygjy4jyaxx`.
 
 > **The membership test and the claim under test are the same string.** That
 > string both marks a row retained and asserts the eliminated-not-callable
 > refusal, so on its own it cannot separate *"retained, claim false"* from
-> *"never retained, mislabelled."* **What breaks the tie is the count** —
-> sixteen label-carriers against a closeout that independently says sixteen.
+> *"never retained, mislabelled."*
+>
+> **The count CORROBORATES; it does not decide.** Two compensating errors
+> preserve a total — one row mislabelled in and one genuinely-retained row
+> missing nets to sixteen and reproduces the observation exactly. **What carries
+> `D0` is the per-line verification of rows 1, 2 and 10**, each at its own
+> coordinate. Do not read "sixteen" as a proof and skip that.
+>
 > **This is a stated limit on the instrument, not a caveat to skip.** If your
 > re-measurement returns anything but 16, `D0` is NOT answered and this frame's
-> §1 is void: stop and route it back.
+> §1 is void: stop and route it back. **That direction is sound — a mismatch
+> really does refute. Only the converse fails to carry.**
 
 ## 3. Deliverables
 
