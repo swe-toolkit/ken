@@ -35,13 +35,28 @@ without deciding where the second presentation comes from — that is the move
 > consumer at `:1298` and a silent wrong-continuation route. **A close that
 > retires the check is a rejected outcome, not an acceptable one.**
 >
-> **Found by the Steward 2026-09-18 by sweeping the LICENCE WORDING, not the
-> node name.** The Architect raised this defect against
-> `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` (`evt_5m7k7k4vrg5ay`); a grep for *"a
-> property the plan was never required to have"* found it a second time **here,
-> in this frame's first paragraph** — the first thing an implementer reads, and
-> a section the ruling correction at §3a did not touch. **A correction applied
-> at the site where a finding was reported does not sweep the phrasing.**
+> **Found 2026-09-18 by sweeping the LICENCE WORDING, not the node name.** The
+> Architect raised this defect against `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]`
+> (`evt_5m7k7k4vrg5ay`); a grep for *"a property the plan was never required to
+> have"* found it a second time **here, in this frame's first paragraph** — the
+> first thing an implementer reads, and a section the ruling correction at §3a
+> did not touch.
+>
+> **Three people passed over it and the record should say so.** The Steward
+> wrote this Objective. The runtime-implementer then swept these two files
+> **after** the ruling, specifically to record the ruling, and stopped at the
+> sentences the change request had named — leaving this paragraph forty lines
+> from the correction they were making (`evt_2b3kc6dv3r7qp`, their own
+> account). **That is the sharper instance**: not a sweep nobody ran, but a
+> sweep that ran, keyed to the instances it was shown.
+>
+> ⇒ **A change request names instances; the defect is a string. Sweep the
+> PHRASE, not the site you were pointed at.**
+>
+> **The licence was already on `main` at `831e521e5`**, before
+> `RT-DUPLICATED-RESPONSE-BLOCK`'s own candidate — measured by the
+> runtime-implementer, `evt_fy4afrj7wt73`. It is pre-existing text, not
+> something a recent candidate introduced.
 
 **Out of scope, explicitly.** `[[RT-FRAME-MARKER-ONCE]]` is the second refusal
 underneath the two `px7n` rows. It is a separate node at `draft`. Do not

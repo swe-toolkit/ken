@@ -88,11 +88,40 @@ occurrence -- a question posed against a code path `RT-DUPLICATED-RESPONSE-BLOCK
 is about to change. **Measuring it before that lands measures the wrong tree.**
 
 **The flip is the Steward's and its trigger is precise:** when
-`RT-DUPLICATED-RESPONSE-BLOCK`'s `D2`/`D3` land on `main`, re-read this node's
-fixed inputs against that `main`, correct any coordinate that moved, **run the
-citation re-read below**, and flip to `ready`. **Flipping on the node's status
-alone is not sufficient** -- that is the condition that already holds and is why
-this says `draft`.
+`RT-DUPLICATED-RESPONSE-BLOCK`'s `D2`/`D3` land on `main` **AND the gate
+corrections in this change land**, re-read this node's fixed inputs against
+that `main`, correct any coordinate that moved, **run the citation re-read
+below**, and flip to `ready`. **Flipping on the node's status alone is not
+sufficient** -- that is the condition that already holds and is why this says
+`draft`.
+
+> ### THE TRIGGER USED TO FIRE ONE LANDING TOO EARLY, AND THE GAP WAS NOT EMPTY
+>
+> **Architect, `evt_kk4kh7d1znhs`, 2026-09-18.** The precondition was `D2`/`D3`
+> alone. `D2`/`D3` landed in `RT-DUPLICATED-RESPONSE-BLOCK`'s `e080a6966`
+> (squash `5899268451d42e7c1337929a996921d6483b6541`), so the trigger fired
+> **before** the corrections on this page existed on `main`.
+>
+> **In that window `main` held, simultaneously:** this node eligible to flip;
+> the OLD trigger, scoped to *"coordinates that moved"*; and the predecessor's
+> §1 Objective offering retirement of the check as *"as good a result"*, with
+> its *"# The open question"* section presenting both readings as live.
+> **A coordinate-keyed re-read comes back clean on all three** — which is the
+> finding this page already carries, arriving in the one window where it bites.
+>
+> ⇒ **A correction that lands after the event it governs does not govern it.**
+> The re-read is supposed to check this node's `:39-44` as a fixed input, and
+> until this change lands that input is still wrong on `main`. Flipping first
+> certifies text that is about to be corrected — the weakest moment to run it.
+>
+> **The conjunction has an equivalent single form: flip when THIS change
+> lands.** It is a descendant of `e080a6966`, so it implies `D2`/`D3` and needs
+> no second clause.
+>
+> **The licence was NOT introduced by `e080a6966`** — runtime-implementer,
+> `evt_fy4afrj7wt73`, measured it live on `main` at `831e521e5`, before that
+> candidate. **The exposure started earlier than the flip window; the remedy is
+> unchanged.**
 
 > ### A RE-READ KEYED ON MOVED COORDINATES COMES BACK CLEAN ON WHAT ACTUALLY BROKE
 >
