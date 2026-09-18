@@ -39,7 +39,14 @@ and the repair is to hand-build it carrying the same four fields.
       :3444   fn synthesized_fixed_identity      the identity the row needs
       :3459   fn synthesized_constructor         the borrow being removed
       :3613   fn reconcile_declared_children     where the row actually refuses
-      :3881   `_ => false`                       the disjoint-forms catch-all
+      :3882   `_ => false`                       the disjoint-forms catch-all,
+                                                 the one under the "THE FORMS
+                                                 ARE DISJOINT" comment
+
+> **`:3882`, not `:3881` — and the enclosing function does not disambiguate
+> it.** There are two `_ => false` arms in `reconcile_declared_children`,
+> at `:3774` and `:3882`. **The comment is the discriminator**, not the line
+> number and not the function.
 
 **The row:**
 
@@ -50,17 +57,31 @@ and the repair is to hand-build it carrying the same four fields.
       :3578   let error = compiler.synthesized_constructor(
       :3580     &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk)
 
-> **THE ISSUE NODE'S TEST-FILE COORDINATES ARE STALE. ITS PRODUCTION
-> COORDINATES ARE NOT.** The node was measured at `973997af8` and cites the
-> error slot at `:3467` and the `ok` arm at `:3449`; at this base those lines
-> hold unrelated content and the error slot is at `:3578`. The four production
-> coordinates above were re-verified here and hold exactly, including the
-> `_ => false` catch-all and its *"THE FORMS ARE DISJOINT"* comment.
+> **THE ISSUE NODE'S TEST-FILE COORDINATES ARE WRONG, AND NOT BECAUSE ANYTHING
+> MOVED.** The node cites the error slot at `:3467` and the `ok` arm at `:3449`;
+> at this base the error slot is at `:3578` and those lines hold unrelated
+> content. **Nothing drifted:**
 >
-> ⇒ **The test file has moved under the node and the production file has not.**
-> Re-locate anything in `constructors.rs` **by content**, never by the node's
-> line number. This is not a caution in general terms: it is a measured
-> divergence in this specific pair of files.
+>     constructors.rs   973997af8 and 823c4a67c   51ae9f6d48...  IDENTICAL
+>     aggregates.rs     973997af8 and 823c4a67c   8d117792ed...  IDENTICAL
+>
+> **The whole of `crates/ken-runtime/` is byte-identical between the node's base
+> and this one.** `:3467` did not become wrong; it was wrong when it was
+> written, against the very tree its author was reading.
+>
+> ⇒ **Re-locate anything in `constructors.rs` by content** — but for this
+> reason, not for a drift that did not happen. **A wrong citation and a drifted
+> one look identical at the far end**, and they have opposite implications: a
+> drifted coordinate says re-measure at your base, a wrong one says the author's
+> own base does not support it either, so nothing downstream of it is safe on
+> its say-so.
+>
+> **An earlier revision of this frame asserted the drift reading and presented
+> it as the one thing worth reading here.** The instrument that produced it read
+> the right file at the right base and showed unrelated content; a cause was
+> inferred from that without checking the cause's own precondition. **Two
+> `git rev-parse` calls refute it**, and they were not run. Architect,
+> `evt_3r5pbrvm9pdg2`.
 
 ## 3. Deliverables
 
