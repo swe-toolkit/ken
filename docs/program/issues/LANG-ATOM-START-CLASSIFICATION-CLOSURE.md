@@ -258,3 +258,39 @@ release, not the remaining work.
 it** — three stacking instances on 2026-09-18 each cost a re-review, because an
 approval names an exact SHA and does not travel across a re-cut. The rule now
 sits in the release playbook at RELEASE (`e09558f53`).
+
+## TRACKED OBLIGATION ON THE NEXT INCREMENT — a noun correction that rides, not a node
+
+**Recorded by the Steward 2026-09-18 when ruling NOT to withdraw `92a0339fb`
+(`evt_5q7fwct1ktqhf`).** The candidate lands carrying a test name that
+overclaims, and this block exists so the correction is a tracked obligation
+rather than an intention. It does NOT get its own node; it rides the next
+increment.
+
+    RENAME     all_three_rosters_refuse_every_exclusion_trigger
+            -> all_three_atom_entry_points_refuse_every_exclusion_trigger
+    DOCSTRING  "roster functions" -> "ATOM ENTRY POINTS"
+    ADD        can_start_pattern is the third ROSTER and is deliberately
+               unguarded, because can_start_atom_pat wraps it -- guarding both
+               duplicates the check and re-creates the asymmetry the KwProof
+               hardening removed
+
+**Nothing behavioural is wrong with the landed commit.** The assertions are
+correct and the Pattern arm is mutation-proven (guard removed + branch = RED
+naming `AsAlias`; guard removed - branch = GREEN). The defect is a name and one
+docstring noun: the test asserts over the three atom ENTRY POINTS
+(`can_start_atom_expr`, `can_start_atom_type`, `can_start_atom_pat`) and calls
+them rosters. By the frame's own vocabulary the three ROSTERS are expr, type,
+and `can_start_pattern`.
+
+**Why it was worth tracking rather than leaving to the next reader.** The error
+runs toward guarding `can_start_pattern` — a duplicate of `can_start_atom_pat`'s
+guard. It manufactures a bad commit rather than a re-measurement, so the cheap
+window to fix it is before someone acts on it.
+
+**The generator is the frame, not the test, and it is repaired.** Frame `:33`
+introduced the pair `can_start_pattern` / `can_start_atom_pat` as "a third
+roster" and §4c corrected it 190 lines later; two readers (Steward,
+language-implementer) made the identical error independently inside one hour
+before reaching the correction. The disclaimer now sits at `:33`, at the point
+of introduction.
