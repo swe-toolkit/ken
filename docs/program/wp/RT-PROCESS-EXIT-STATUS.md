@@ -22,8 +22,25 @@ wrong and this frame corrects with a measurement.**
 
 ## 2. Fixed inputs, measured at `831e521e5`
 
-> **RE-VERIFIED AT `origin/main` `742bf929a` BEFORE RELEASE (Steward,
-> 2026-09-18). Every coordinate below still resolves. Do not re-derive this.**
+> **RE-VERIFIED AT `origin/main` `742bf929a` BEFORE RELEASE, AND AGAIN AT
+> `70fe4beb5` AFTER (Steward, 2026-09-18).**
+>
+> **THE FIRST PASS'S CLAIM — *"every coordinate below still resolves"* — WAS
+> FALSE, and the way it was false is the lesson.** `boundary.rs`'s two
+> coordinates did not resolve, and had never resolved. The second pass caught
+> it because it checked every coordinate BY TOKEN instead of stopping at the
+> blob.
+>
+>     rt_escape   blob CHANGED  => forced me to look   => coordinates CORRECT
+>     boundary    blob IDENTICAL => I stopped there    => coordinates WRONG
+>     surface     blob IDENTICAL => I stopped there    => coordinates correct
+>
+> ⇒ **Blob identity proves the FILE did not change. It says nothing about
+> whether my coordinates were ever right.** The file that changed got a token
+> check and came out clean; the files that looked safe kept their errors,
+> because "unchanged" was read as "verified". **A staleness instrument cannot
+> answer a correctness question, and the files it clears are the ones nobody
+> re-reads.**
 >
 > The frame sat unlanded while `main` advanced, so its inputs were re-measured
 > rather than assumed:
@@ -50,10 +67,29 @@ wrong and this frame corrects with a measurement.**
 
     crates/ken-runtime/src/cranelift_backend/lowering/boundary.rs
       :1031   fn boundary_transfer_admissibility      encloses the FIRST site
-      :1058   Lowered::StaticResponseDeferred         => Err(unsupported(
+      :1056   Lowered::StaticResponseDeferred         => Err(unsupported(
                                                            "StaticResponseDeferred", why))
       :1124   fn boundary_disposition                 encloses the SECOND site
-      :1292   LoweredVariant::StaticResponseDeferred  => FailClosedForbidden { why }
+      :1291   LoweredVariant::StaticResponseDeferred  => FailClosedForbidden { why }
+
+> **`:1056` and `:1291` were CORRECTED 2026-09-18 from `:1058` and `:1292`.
+> Nothing drifted — the blob is `da6211689` at `831e521e5` and at `main` alike,
+> and the old numbers do not resolve at the frame's OWN base either.** They
+> labelled each arm with a line inside it rather than the line it starts on.
+>
+> **The two wrong coordinates were exactly the two §3's argument rests on**,
+> and everything else in this section — `:1031`, `:1124`, `surface.rs:485`,
+> `surface.rs:253`, `rt_escape:755`, `:764`, `:776`, `:777` — verified exact at
+> `main`. A frame's load-bearing citations are not the ones most likely to be
+> right; they are the ones most often re-typed from prose while the incidental
+> ones get pasted from a tool.
+>
+> ⇒ **Resolve these by the token, as this section already instructs.** The
+> distinction matters beyond the typo: a DRIFTED coordinate says re-measure at
+> your base, a WRONG one says the author's own base never supported it, so
+> nothing resting on it is safe on its say-so. Here the CONTENT claim holds —
+> the arm really is `Err(unsupported("StaticResponseDeferred", why))` — so §3
+> survives intact and only the numbers were off.
 
     crates/ken-runtime/src/cranelift_backend/surface.rs
       :485    fn unsupported(construct, reason)       builds UnsupportedLowering
@@ -78,18 +114,18 @@ stated reason:**
 **Both do carry the same `why`. Only one PREPENDS A CONSTRUCT TAG, and the
 ledger's recorded signature has the tag.**
 
-    :1058   Err(unsupported("StaticResponseDeferred", why))
+    :1056   Err(unsupported("StaticResponseDeferred", why))
             => UnsupportedLowering { construct, reason }
             => Display renders  "{construct}: {reason}"
             => "StaticResponseDeferred: a deferred host response is compiler
                 control and can only enter its exact response owner"
 
-    :1292   FailClosedForbidden { why }
+    :1291   FailClosedForbidden { why }
             => a BoundaryDisposition variant, destructured `{ .. }` at its use
                sites. NO construct tag, so it cannot render that prefix.
 
 **The ledger's row-13 signature is that string, tag included.** ⇒ **The refusal
-came from `:1058`, the `Lowered::StaticResponseDeferred` arm of
+came from `:1056`, the `Lowered::StaticResponseDeferred` arm of
 `boundary_transfer_admissibility`.** The admissibility walk fired; the
 disposition arm did not.
 
