@@ -749,8 +749,21 @@ the flip must either clear those rows or name a successor owner — in the row's
 own attribute, not only in a convo post.**
 
 ```sh
-grep -rn '#\[ignore' crates/*/tests/ | grep '"<ID>'
+grep -rn '#\[ignore' crates/ | grep '"<ID>'
 ```
+
+**Scan all of `crates/`, not `crates/*/tests/`.** Ignored rows live under `src/`
+too — `ken-elaborator/src/compiler_driver.rs` and `ken-runtime/src/` both carry
+them, and so does a nested `src/.../core/tests/`. A `crates/*/tests/` glob misses
+every one of those directories.
+
+That is not hypothetical, and it is the reason this paragraph exists. **The step
+shipped with that glob, and the case it was written for sits in the gap it
+leaves.** Measured at `34e1426c7`: the corrected command returns
+`compiler_driver.rs:5404`, the founding case; the original returns zero for it.
+Both return the same three `RT-SITEOP-CARRIED-WITNESS` rows, so the widening
+loses nothing. A rule's founding case is the one it is never run against — run
+this one against yours before you trust it.
 
 Match on the node named at the **START** of the `#[ignore]` string. A node the
 label merely *mentions* — to supersede, to inherit from, to cite — does not own
@@ -785,6 +798,27 @@ have is the node that just closed.
 it:** `owner terminal (merged)` and `owner not releasable today (merged +
 draft)` are different populations, and a node that is itself `draft` discharges
 nothing.
+
+#### What this step does NOT cover
+
+This step reaches **node-owned rows** — rows whose label names the merging node
+at its start. It does not reach the rows the CI sweep holds exempt in
+`.github/ignored-test-exemptions.toml`, which are keyed by test path and carry a
+`class` and a `readmission` condition rather than an owning node.
+
+Those have the same defect one layer over: `verify_blocked_upstream_relations`
+in `scripts/ci-ignored-sweep.py` checks that a row's readmission symbol *occurs
+in its own `#[ignore]` reason*, never that the named relation is still absent.
+`RT-CLOSURE-BOUNDARY-LANE` is `merged`, its exemption stands, and CI is green.
+**Do not read M7a as covering the ignored-row population.** It covers the rows a
+merge can orphan; the registry's rows expire on a condition no instrument
+watches, and closing that is a `CI-IGNORED-SWEEP` successor, not this step.
+
+Nor is the sweep's own selection label-keyed, so do not reason about it from
+this step's grep: selection is **registry subtraction** — the nextest ignored
+population minus the exemption registry (`expected_count`). `verify_lists`
+reconstructs the nextest total from selected plus registry and raises, so an
+ignored row that is neither selected nor registered is a red, not a silent drop.
 
 ## M8 — Compact the Adversary, then notify it, if the merge carries code
 
