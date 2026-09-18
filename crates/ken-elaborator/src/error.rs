@@ -296,6 +296,40 @@ pub enum ElabError {
         ty: String,
         span: Span,
     },
+
+    /// A standard-operator role (`33 §6.1`) is not published by the
+    /// standard-operator home's export table.
+    ///
+    /// Layer 3 of the standard-identity design. This is the ABSENT arm, and it
+    /// is deliberately distinct from [`Self::StandardOperatorRoleWrongShape`]:
+    /// the two differ in what would change them. An unfilled role is closed by
+    /// publishing the binding; a wrong-shaped one is closed by fixing the
+    /// binding that is already published.
+    StandardOperatorRoleUnfilled {
+        /// The role's glyph, so the diagnostic names what a reader wrote.
+        role: String,
+        /// The standard-operator home consulted.
+        home: String,
+        span: Span,
+    },
+
+    /// A standard-operator role is published, but the binding behind it does
+    /// not have the shape `33 §6.1` fixes for that role.
+    ///
+    /// The arm a presence-only check cannot produce. A binding that moved, was
+    /// re-pointed, or drifted in arity stays PRESENT in the export table, so
+    /// only a shape contract over the elaborated telescope distinguishes it
+    /// from a correct one.
+    StandardOperatorRoleWrongShape {
+        role: String,
+        /// The canonical binding the home published for this role.
+        binding: String,
+        /// What `33 §6.1` fixes for the role.
+        expected: String,
+        /// What the published binding actually is.
+        found: String,
+        span: Span,
+    },
     /// The `sct_check` on the reified dictionary group rejected the resolution
     /// chain — i.e. search would not terminate (`39 §6.4`, `17 §4.2`).
     /// Detected at admission time; never a search-time hang.
@@ -695,6 +729,25 @@ impl fmt::Display for ElabError {
                 f,
                 "no instance at {}-{}: no instance of '{}' found for '{}'",
                 span.start, span.end, class, ty,
+            ),
+            ElabError::StandardOperatorRoleUnfilled { role, home, span } => write!(
+                f,
+                "standard operator '{}' has no meaning at {}-{}: the standard-operator \
+                 home '{}' does not publish it (`33 §6.1`); export the binding for '{}' \
+                 from that module",
+                role, span.start, span.end, home, role,
+            ),
+            ElabError::StandardOperatorRoleWrongShape {
+                role,
+                binding,
+                expected,
+                found,
+                span,
+            } => write!(
+                f,
+                "standard operator '{}' is published at {}-{} but '{}' does not have the \
+                 shape `33 §6.1` fixes for it: expected {}, found {}",
+                role, span.start, span.end, binding, expected, found,
             ),
             ElabError::NonTerminatingInstances { span } => write!(
                 f,

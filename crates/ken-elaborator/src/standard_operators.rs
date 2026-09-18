@@ -12,7 +12,28 @@
 //! `GlobalId` to key on and would falsify the precondition the whole completion
 //! policy is built on."* A role is the most the compiler may know.
 
+use std::collections::HashMap;
+
+use ken_kernel::env::GlobalEnv;
+use ken_kernel::{GlobalId, Term};
+
 use crate::ast::{Fixity, FixityAssoc};
+use crate::error::{ElabError, Span};
+
+/// The standard-operator home's module path — **the one string this crate
+/// holds about the catalog**, and a deliberate residual rather than an
+/// oversight.
+///
+/// Acquisition itself reads the catalog: this module's own `export` line is
+/// the glyph-to-identity declaration, so nothing here names `ord_leq_at` or
+/// any other meaning. What remains is the path at which to look, and it
+/// **fails closed and loud** — if the home moves or is absent, every
+/// binding-backed role is unfilled and a standard-operator occurrence is
+/// refused naming the role, rather than silently completing to nothing.
+///
+/// A fully self-declaring home would remove even this; that is recorded as a
+/// deferred, non-blocking improvement and is deliberately not built here.
+pub(crate) const STANDARD_OPERATOR_HOME: &str = "Core.Operators.Standard";
 
 /// The standard operator roles of `33 §6.1`'s fixity table.
 ///
@@ -67,6 +88,23 @@ impl StandardOperatorRole {
     pub(crate) const ALL: [Self; 5] =
         [Self::And, Self::Or, Self::Leq, Self::Geq, Self::Neq];
 
+    /// The roles whose meaning is ONE binding published by the
+    /// standard-operator home, and which the required-roles check therefore
+    /// certifies against that home's export table.
+    ///
+    /// **`≠` is absent, and it is absent for a different reason than `∈` is
+    /// absent from [`Self::ALL`].** `§6.1`'s table names a binding for four
+    /// roles and *describes* the fifth: `≠` is "the negation of the comparator
+    /// the `==` path selects", a carrier-directed selection over the registry
+    /// `§6.2` closes by construction. It has no single identity for a home to
+    /// publish, so an export-table check has nothing to look up for it — and
+    /// requiring it there would hard-error on a correct tree.
+    ///
+    /// **So the vocabulary and the certified set genuinely differ TODAY**, at
+    /// five against four, rather than only once the membership track lands.
+    pub(crate) const BINDING_BACKED: [Self; 4] =
+        [Self::And, Self::Or, Self::Leq, Self::Geq];
+
     /// The roles a program must actually supply.
     ///
     /// **Today this is the whole vocabulary, so the separation is not
@@ -115,5 +153,182 @@ impl StandardOperatorRole {
                 precedence: 4,
             },
         }
+    }
+}
+
+/// What `33 §6.1` fixes for a binding-backed role, as a description a
+/// diagnostic can print.
+///
+/// Stated over the ELABORATED TELESCOPE rather than as a surface signature
+/// template, and that is forced by the five rather than granted to a later
+/// role. `ord_leq_at`'s own type is
+///
+/// ```text
+/// Π Type 0. (Π (Ord @0). (Π @1. (Π @2. Bool)))
+/// ```
+///
+/// — three of four domains are de Bruijn back-references to earlier binders.
+/// A flat signature match was never sufficient for `≤` itself, so there is no
+/// non-dependent version of this contract anyone could have built. A domain
+/// that is a PROJECTION from an earlier binder (`d.Query`, `§6.3`) is the same
+/// kind of back-reference as one that is an APPLICATION to it, which is why
+/// this shape extends to the membership role without widening.
+fn expected_shape(role: StandardOperatorRole) -> &'static str {
+    match role {
+        StandardOperatorRole::And | StandardOperatorRole::Or => {
+            "(a : Bool) (b : Bool) : Bool"
+        }
+        StandardOperatorRole::Leq | StandardOperatorRole::Geq => {
+            "(a : Type) (d : <class> a) (x : a) (y : a) : Bool"
+        }
+        // Not binding-backed; never certified against an export table.
+        StandardOperatorRole::Neq => "a comparator selection (`33 §6.2`)",
+    }
+}
+
+/// Peel a Π-telescope into its domains and its final codomain.
+fn telescope(ty: &Term) -> (Vec<&Term>, &Term) {
+    let mut domains = Vec::new();
+    let mut cur = ty;
+    while let Term::Pi(domain, codomain) = cur {
+        domains.push(domain.as_ref());
+        cur = codomain.as_ref();
+    }
+    (domains, cur)
+}
+
+fn is_bool(term: &Term, bool_id: GlobalId) -> bool {
+    matches!(
+        term,
+        Term::IndFormer { id, .. } | Term::Const { id, .. } if *id == bool_id
+    )
+}
+
+/// Describe a telescope compactly enough for a diagnostic to be actionable.
+fn describe(ty: &Term, bool_id: GlobalId) -> String {
+    let (domains, codomain) = telescope(ty);
+    let arity = domains.len();
+    let result = if is_bool(codomain, bool_id) {
+        "Bool".to_string()
+    } else {
+        format!("{codomain:?}")
+    };
+    format!("arity {arity} returning {result}")
+}
+
+/// Does the published binding have the shape `§6.1` fixes for this role?
+///
+/// Returns `Ok(())`, or a description of what was found for the diagnostic.
+fn shape_matches(role: StandardOperatorRole, ty: &Term, bool_id: GlobalId) -> bool {
+    let (domains, codomain) = telescope(ty);
+    if !is_bool(codomain, bool_id) {
+        return false;
+    }
+    match role {
+        // `(a : Bool) (b : Bool) : Bool` — non-dependent, both operands Bool.
+        StandardOperatorRole::And | StandardOperatorRole::Or => {
+            domains.len() == 2 && domains.iter().all(|d| is_bool(d, bool_id))
+        }
+        // `(a : Type) (d : <class> a) (x : a) (y : a) : Bool`.
+        //
+        // The dictionary's own identity is deliberately NOT pinned: the
+        // compiler owns roles, never meanings, so requiring the class to be
+        // named `Ord` would put a catalog identity back into this crate. What
+        // IS pinned is the dependency structure, which is what a moved or
+        // re-pointed binding loses: a carrier universe, a dictionary APPLIED
+        // to that carrier, and two operands that are the carrier itself.
+        StandardOperatorRole::Leq | StandardOperatorRole::Geq => {
+            if domains.len() != 4 {
+                return false;
+            }
+            let carrier_is_universe = matches!(domains[0], Term::Type(_));
+            let dictionary_depends_on_carrier = matches!(
+                domains[1],
+                Term::App(_, ref argument) if matches!(argument.as_ref(), Term::Var(0))
+            );
+            let operands_are_the_carrier =
+                matches!(domains[2], Term::Var(1)) && matches!(domains[3], Term::Var(2));
+            carrier_is_universe && dictionary_depends_on_carrier && operands_are_the_carrier
+        }
+        StandardOperatorRole::Neq => false,
+    }
+}
+
+/// Layer 3 — certify every binding-backed role against the standard-operator
+/// home's own export table, and return the identities completion binds to.
+///
+/// **Acquisition is layer 2 and it reads the catalog rather than this crate.**
+/// The home's `export … (bool_and as ∧, ord_leq_at as ≤, …)` line IS the
+/// glyph-to-identity declaration (`33 §4.3` republishes, never mints), so the
+/// only thing this compiler holds is the home's module path.
+///
+/// **Two distinct refusals, and they are not one refusal with two messages.**
+/// A role absent from the table is closed by publishing a binding; a role
+/// present with the wrong shape is closed by fixing the one already published.
+/// `§6.2` makes exactly this distinction for `≠`'s two refusals and calls an
+/// implementation that collapses them non-conforming; the same reasoning
+/// applies here, so the arms are separate variants rather than one.
+pub(crate) fn certify_roles(
+    env: &GlobalEnv,
+    exports: &HashMap<String, HashMap<String, String>>,
+    globals: &HashMap<String, GlobalId>,
+    home: &str,
+    bool_id: GlobalId,
+    span: &Span,
+) -> Result<HashMap<StandardOperatorRole, GlobalId>, ElabError> {
+    let Some(published) = exports.get(home) else {
+        // The home is not in this program at all. Completion then fails at the
+        // occurrence instead, naming the role -- see the completion adapter.
+        return Ok(HashMap::new());
+    };
+
+    let mut certified = HashMap::new();
+    for role in StandardOperatorRole::BINDING_BACKED {
+        let glyph = role.glyph();
+        let canonical =
+            published
+                .get(glyph)
+                .ok_or_else(|| ElabError::StandardOperatorRoleUnfilled {
+                    role: glyph.to_string(),
+                    home: home.to_string(),
+                    span: span.clone(),
+                })?;
+        let id = globals.get(canonical).copied().ok_or_else(|| {
+            ElabError::StandardOperatorRoleUnfilled {
+                role: glyph.to_string(),
+                home: home.to_string(),
+                span: span.clone(),
+            }
+        })?;
+        let ty = env
+            .lookup(id)
+            .and_then(declared_type)
+            .ok_or_else(|| ElabError::StandardOperatorRoleWrongShape {
+                role: glyph.to_string(),
+                binding: canonical.clone(),
+                expected: expected_shape(role).to_string(),
+                found: "a declaration with no type".to_string(),
+                span: span.clone(),
+            })?;
+        if !shape_matches(role, &ty, bool_id) {
+            return Err(ElabError::StandardOperatorRoleWrongShape {
+                role: glyph.to_string(),
+                binding: canonical.clone(),
+                expected: expected_shape(role).to_string(),
+                found: describe(&ty, bool_id),
+                span: span.clone(),
+            });
+        }
+        certified.insert(role, id);
+    }
+    Ok(certified)
+}
+
+fn declared_type(decl: &ken_kernel::Decl) -> Option<Term> {
+    match decl {
+        ken_kernel::Decl::Transparent { ty, .. } | ken_kernel::Decl::Opaque { ty, .. } => {
+            Some(ty.clone())
+        }
+        _ => None,
     }
 }
