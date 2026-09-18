@@ -30,6 +30,7 @@ use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, Ins
 use crate::data;
 use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
+use crate::standard_operators::StandardOperatorRole;
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInfixOperator, RInstanceConstraint, RMatchArm, RPatKind,
     RPattern, RPropIntro, RRecordField, RRecordPatField, RSpaceDecl, RType, SUGAR_ABSURD,
@@ -335,6 +336,11 @@ struct ElabCtx<'e> {
     /// so a `where C a`-constrained body can project its resolved
     /// dictionary's fields.
     class_env: Option<&'e ClassEnv>,
+    /// The standard-operator identities certified by the required-roles check
+    /// (`33 §6.1`). `None` on paths that elaborate no user expression body; a
+    /// standard-operator occurrence reached with this unset is REFUSED naming
+    /// the role rather than silently left under-applied.
+    standard_operators: Option<&'e HashMap<StandardOperatorRole, GlobalId>>,
     /// Fully applied dictionaries introduced by a declaration's `where`
     /// clause.  They are elaborator-local terms, never synthetic globals.
     local_dicts: HashMap<String, (Term, Term, usize)>,
@@ -428,6 +434,7 @@ impl<'e> ElabCtx<'e> {
             obligations: Vec::new(),
             obl_counter: 0,
             class_env: None,
+            standard_operators: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
             active_index_refinements: Vec::new(),
@@ -486,8 +493,20 @@ impl<'e> ElabCtx<'e> {
         None
     }
 
-    fn with_classes(mut self, class_env: &'e ClassEnv) -> Self {
+    /// Wire the class registry AND the certified standard-operator identities
+    /// together. **One call on purpose**: completing a standard operator needs
+    /// the identity to recognise the occurrence and the class registry to
+    /// resolve its dictionary, so threading them apart is how one of them ends
+    /// up missing on a path nobody enumerated. Taking both makes every call
+    /// site a compile error until it supplies both -- the audit is bounded by
+    /// the compiler, not by a grep.
+    fn with_classes(
+        mut self,
+        class_env: &'e ClassEnv,
+        standard_operators: &'e HashMap<StandardOperatorRole, GlobalId>,
+    ) -> Self {
         self.class_env = Some(class_env);
+        self.standard_operators = Some(standard_operators);
         self
     }
 
@@ -9493,7 +9512,20 @@ pub fn elaborate_rdecl(
         });
     }
     let mut sentinel = ClassEnv::sentinel();
-    let result = elaborate_rdecl_v1(env, globals, num_values, numeric_env, &mut sentinel, rdecl)?;
+    // A sentinel class environment marks a path that elaborates no user
+    // expression body, so it certifies no standard operators either. Empty is
+    // the fail-closed value: an occurrence reaching here is refused naming the
+    // role rather than silently left under-applied.
+    let no_standard_operators = HashMap::new();
+    let result = elaborate_rdecl_v1(
+        env,
+        globals,
+        num_values,
+        numeric_env,
+        &mut sentinel,
+        &no_standard_operators,
+        rdecl,
+    )?;
     Ok(result.def_id)
 }
 
@@ -10970,12 +11002,13 @@ mod fixity_reassociation_skip_tests {
 }
 
 /// V1 elaboration: returns the definition id plus any emitted obligation holes.
-pub fn elaborate_rdecl_v1(
+pub(crate) fn elaborate_rdecl_v1(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     let mut fixities = HashMap::new();
@@ -10990,6 +11023,7 @@ pub fn elaborate_rdecl_v1(
         num_values,
         numeric_env,
         class_env,
+        standard_operators,
         &HashMap::new(),
         &mut fixities,
         &mut fixity_spans,
@@ -11008,6 +11042,7 @@ fn declaration_param_context(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
 ) -> Result<Context, ElabError> {
     // This walks the declaration's OWN parameter telescope, so it is the FIRST
@@ -11016,7 +11051,7 @@ fn declaration_param_context(
     // the class env for the same reason they do: the name-to-index lookup
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-        .with_classes(class_env);
+        .with_classes(class_env, standard_operators);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
         let domain_core = elab_type(&mut cx, domain)?;
@@ -11026,12 +11061,13 @@ fn declaration_param_context(
     Ok(cx.ctx)
 }
 
-pub fn elaborate_rdecl_v1_with_effect_rows(
+pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
@@ -11049,6 +11085,7 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             effect_rows,
             fixities,
             fixity_spans,
@@ -11065,6 +11102,7 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
         num_values,
         numeric_env,
         class_env,
+        standard_operators,
         effect_rows,
         fixities,
         fixity_spans,
@@ -11081,6 +11119,7 @@ fn elaborate_associated_rdecl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
@@ -11105,7 +11144,7 @@ fn elaborate_associated_rdecl(
             // name-to-index lookup has no field list and a well-formed binding
             // is refused by a sort pre-check.
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(&*class_env);
+                .with_classes(&*class_env, standard_operators);
             let ty = elab_type(&mut cx, ty)?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
@@ -11115,7 +11154,7 @@ fn elaborate_associated_rdecl(
         RDeclKind::View { constraints, .. } => {
             let effect_row_type = check_view_visits_row(rdecl)?;
             let dictionary_ctx =
-                declaration_param_context(env, globals, num_values, numeric_env, class_env, rdecl)?;
+                declaration_param_context(env, globals, num_values, numeric_env, class_env, standard_operators, rdecl)?;
             // Resolve each constraint into its fully applied dictionary term.
             // A generic instance is not a bare global: its type arguments and
             // recursively-required dictionaries must be applied at this use
@@ -11153,6 +11192,7 @@ fn elaborate_associated_rdecl(
                 num_values,
                 numeric_env,
                 class_env,
+                standard_operators,
                 rdecl,
                 &local_dicts,
                 fixities,
@@ -11170,6 +11210,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             rdecl,
             &HashMap::new(),
             fixities,
@@ -11178,7 +11219,7 @@ fn elaborate_associated_rdecl(
         ),
         RDeclKind::Prove => elaborate_prove(env, globals, num_values, numeric_env, rdecl),
         RDeclKind::Prop { intros } => {
-            elaborate_prop_decl(env, globals, num_values, numeric_env, class_env, rdecl, intros)
+            elaborate_prop_decl(env, globals, num_values, numeric_env, class_env, standard_operators, rdecl, intros)
         }
         RDeclKind::Theorem => elaborate_checked_theorem(
             env,
@@ -11186,6 +11227,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             rdecl,
             None,
         ),
@@ -11195,6 +11237,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             rdecl,
             Some(subject),
         ),
@@ -11334,6 +11377,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             rdecl,
             effect_rows,
             &rdecl.name.clone(),
@@ -11767,6 +11811,7 @@ fn elab_instance_decl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     class_name: &str,
@@ -11930,7 +11975,7 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env);
+            .with_classes(&*class_env, standard_operators);
             push_type0_params(&mut cx, head_params.len());
             for (index, constraint_ty) in constraint_core_types.iter().enumerate() {
                 cx.ctx.push(weaken(constraint_ty, index as i64));
@@ -11970,7 +12015,7 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env);
+            .with_classes(&*class_env, standard_operators);
             push_type0_params(&mut cx, head_params.len());
             compute_ordered_field_values(
                 &mut cx,
@@ -12215,6 +12260,7 @@ fn elaborate_view_or_let(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     fixities: &mut HashMap<GlobalId, Fixity>,
@@ -12235,6 +12281,7 @@ fn elaborate_view_or_let(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             rdecl,
             local_dicts,
             fixities,
@@ -12249,6 +12296,7 @@ fn elaborate_view_or_let(
         num_values,
         numeric_env,
         class_env,
+        standard_operators,
         rdecl,
         local_dicts,
     )
@@ -12465,7 +12513,7 @@ pub(crate) fn elaborate_space_decl(
             &elab.numeric_env,
             qualified_name.clone(),
         )
-        .with_classes(&elab.class_env);
+        .with_classes(&elab.class_env, &elab.standard_operators);
         let mut parameter_domains = Vec::with_capacity(operation.params.len());
         for (_, parameter_type) in &operation.params {
             let domain = elab_type(&mut cx, parameter_type)?;
@@ -12703,6 +12751,7 @@ fn elaborate_v0(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     fixities: &mut HashMap<GlobalId, Fixity>,
@@ -12720,6 +12769,7 @@ fn elaborate_v0(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             fixities,
             fixity_spans,
             declared_fixity,
@@ -12728,7 +12778,7 @@ fn elaborate_v0(
     }
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env)
+            .with_classes(class_env, standard_operators)
             .with_local_dicts(local_dicts);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
@@ -12811,6 +12861,7 @@ fn elaborate_recursive_view(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -12862,7 +12913,7 @@ fn elaborate_recursive_view(
     let associated = associated.as_deref().unwrap_or(rdecl);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env);
+            .with_classes(class_env, standard_operators);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
@@ -12935,12 +12986,13 @@ fn elaborate_recursive_view(
 /// Each member requires an explicit type annotation (mirrors the existing
 /// singleton recursive-const rule — a mutual group's forward references need
 /// every member's *type* resolvable before any body is elaborated).
-pub fn elaborate_mutual_group(
+pub(crate) fn elaborate_mutual_group(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixities: &[Option<(Fixity, Span)>],
@@ -13099,7 +13151,7 @@ pub fn elaborate_mutual_group(
     let elab_err = (|| -> Result<(), ElabError> {
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env)
+                .with_classes(class_env, standard_operators)
                 .with_recursive_group(&recursive_group);
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
@@ -13304,6 +13356,7 @@ fn elaborate_view_with_spec(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
 ) -> Result<ElabResult, ElabError> {
@@ -13321,7 +13374,7 @@ fn elaborate_view_with_spec(
         // Recursive: elab the carrier type, pre-admit, then elab the body.
         let carrier_ty = {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env)
+                .with_classes(class_env, standard_operators)
                 .with_local_dicts(local_dicts);
             let ty = rdecl.ty.as_ref().ok_or_else(|| {
                 ElabError::Internal(
@@ -13341,7 +13394,7 @@ fn elaborate_view_with_spec(
         globals.insert(rdecl.name.clone(), id);
         let body = {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env)
+                .with_classes(class_env, standard_operators)
                 .with_local_dicts(local_dicts);
             let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
             cx.metas.zonk_term(&body_c)
@@ -13350,7 +13403,7 @@ fn elaborate_view_with_spec(
     } else {
         // Non-recursive: original one-context flow.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env)
+            .with_classes(class_env, standard_operators)
             .with_local_dicts(local_dicts);
         if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
@@ -13379,6 +13432,7 @@ fn elaborate_view_with_spec(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             local_dicts,
             &param_ctx,
             req,
@@ -13414,6 +13468,7 @@ fn elaborate_view_with_spec(
             num_values,
             numeric_env,
             class_env,
+            standard_operators,
             local_dicts,
             &ens_ctx,
             ens,
@@ -13561,6 +13616,7 @@ fn elaborate_prop_decl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     intros: &[RPropIntro],
 ) -> Result<ElabResult, ElabError> {
@@ -13577,7 +13633,7 @@ fn elaborate_prop_decl(
         // does: a `prop`'s telescope may be typed by a projection, and the
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env);
+            .with_classes(class_env, standard_operators);
         let ty = elab_type(&mut cx, prop_ty)?;
         let ty = cx.metas.zonk_term(&ty);
         let body = top_body_for_prop_type(env, &ty, &rdecl.span)?;
@@ -13620,6 +13676,8 @@ fn elaborate_prop_decl(
             num_values,
             numeric_env,
             &ClassEnv::sentinel(),
+            // Sentinel path -- see `elaborate_rdecl_v1`'s call above.
+            &HashMap::new(),
             &helper_rdecl,
             None,
         )?;
@@ -13636,6 +13694,7 @@ fn elaborate_checked_theorem(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     attached_subject: Option<&str>,
 ) -> Result<ElabResult, ElabError> {
@@ -13648,7 +13707,7 @@ fn elaborate_checked_theorem(
 
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env);
+            .with_classes(class_env, standard_operators);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
         })?;
@@ -14035,6 +14094,7 @@ fn elab_in_ctx_at_omega(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     ctx: &Context,
     expr: &RExpr,
@@ -14049,7 +14109,7 @@ fn elab_in_ctx_at_omega(
         numeric_env,
         owner_label.to_string(),
     )
-    .with_classes(class_env)
+    .with_classes(class_env, standard_operators)
     .with_local_dicts(local_dicts);
     // Populate cx.ctx from the snapshot
     for ty in &ctx.types {
