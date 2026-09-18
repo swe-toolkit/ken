@@ -144,12 +144,92 @@ The candidate SHA is recorded only to say *which* candidate this squash
 carries. It is **not** an ancestor of `main` and never will be — cite
 `20ddc558f`.
 
-### AC-0 IS HALF CLOSED, AND THE LEDGER SAYS SO EXPLICITLY
+### THE AC-0 LEDGER — CORRECTED, AND THE FIRST VERSION WAS WRONG
 
-    CLOSED    f ‖x‖                  expression position, by 20ddc558f
-    CLOSED    fn f (x : G ‖Bool‖)    type position,       by 20ddc558f
-    OPEN      f proof p for s        KwProof — UNBUILT
-    control   f if a then b else c   negative, unaffected
+    PARSED    f ‖x‖                  closed by 20ddc558f, EXPRESSION position
+    PARSED    fn f (x : G ‖Bool‖)    closed by 20ddc558f, TYPE position
+    REJECTED  f proof p for s        UNCHANGED — and it MUST stay rejected
+    FIRES     f if a then b else c   negative control, unaffected
+
+**The third row is a negative control, not an open obligation.** The first
+version of this ledger, published at `096f2f0dd`, scored it
+`OPEN … KwProof — UNBUILT`. That is wrong and it is forbidden in terms by this
+node's own frame:
+
+> `expression, app argument, bracket depth 0` — **STAYS REFUSED, structurally.**
+> Ken has no declaration terminator, so the roster's complement IS the
+> declaration separator; admitting `proof` at depth 0 makes a declaration body
+> swallow the next declaration. That holds for any parser of this grammar.
+> ⇒ **Do not score the depth-0 row as an unmet AC.**
+
+**RULED 2026-09-18: OPTION A — UNCONDITIONAL EXCLUSION AT EVERY DEPTH.**
+Spec-leader's design call (`evt_17x6mx5bg96bv`), routed to Spec by the
+Architect, who argued for it **against their own depth-keyed ruling of two
+hours earlier** (`evt_5vr1ecznne66j`). Language-leader has released the build
+(`evt_617jawg1bv5te`).
+
+    RULED  (A)  KwProof is ONE unconditional, peek-only StartExclusion member
+                in argument position. No bracket-depth counter, no
+                bookkeeping, no fail-open direction -- there is no counter to
+                miss an increment of. Refused at EVERY depth.
+
+    DEAD   (B)  the depth-keyed exclusion. It bought exactly one thing, the
+                bare form inside brackets, and paid with a counter whose
+                MISSED INCREMENT admits `proof` at true depth 0 and silently
+                swallows a declaration -- this node's own opening hazard,
+                reintroduced through the counter instead of the roster.
+
+**The deciding argument is spec-author's, not the cost one:** a bare form
+legal inside brackets would make `proof_ref` **the grammar's only
+depth-sensitive construct — a distinction a reader cannot see locally.** Zero
+rules in `32-grammar.md` are keyed on bracket depth; that was measured, not
+asserted.
+
+### THE THIRD LEDGER VALUE (language-leader's framing, kept verbatim)
+
+The `f proof p for s` row is **not** "OPEN, KwProof will close it", and **not**
+"closes at depth > 0". It is **CLOSED BY EXPLICIT CLASSIFICATION AS REFUSED —
+a third ledger value, classified-and-deliberately-refused, never an
+obligation** — closed by exclusion rather than by admission. **It still
+discharges AC-1's closure property: an exclusion is inside the encoding
+exactly as an admission is.**
+
+That third value is what both wrong versions of this ledger lacked. With only
+OPEN and CLOSED available, a deliberately-refused row has nowhere to sit and
+gets recorded as an obligation.
+
+**The refusal is UNCONDITIONAL at every bracket depth**, per the resolved
+`32 §3` erratum. **How it is encoded is the build's to settle and its AC's to
+pin** — whether `KwProof` is absent from the roster or admitted and refused by
+a stated exclusion is a mechanism question with a live measurement attached to
+it, and this frame does not decide it. The sanctioned spelling is
+`f (proof p for s)`, which parses today through the grouped arm at
+`parser.rs:3672`, pinned at `096f2f0dd` because this file moves under its line
+numbers constantly.
+
+**The Architect's `:3547` prediction was conditional on (B) and was not
+labelled so.** Measure it fresh under this design; do not carry it.
+
+### WHY THE WRONG VERSION WAS WRITABLE AT ALL
+
+The bracket-depth coordinate is the one the 2026-09-18 frame amendment
+**added**, hours before this ledger was written from the table it amended — and
+the ledger dropped it. The frame predicted exactly this:
+
+> A position axis sharpened once is sharp to the resolution of the defect that
+> prompted it, and no further. **Expect the next repair on this node to find a
+> coordinate this table still lacks.**
+
+⇒ **A COORDINATE ADDED TO A TAXONOMY DOES NOT PROPAGATE TO THE ARTIFACTS
+WRITTEN FROM IT.** A ledger is a projection of the table onto a few rows, and a
+projection silently drops the axis most recently added, because the rows it
+summarises were phrased before that axis existed. The Steward added the
+coordinate and the Steward dropped it, inside the hour, in the next artifact.
+
+**AC-0 is a per-cut baseline gate, not a criterion that closes incrementally.**
+It is re-run at every increment's base; the `UNLESS` clause is what carries the
+rows a landed increment has since made parse, and it now has two entries, both
+from `20ddc558f`.
 
 **`TruncBar` is position-polymorphic, so admitting it closed TWO rows, not
 one.** That is why AC-0 is scored by row and not by token: a single symbol
