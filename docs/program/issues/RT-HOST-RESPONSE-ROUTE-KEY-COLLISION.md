@@ -32,6 +32,15 @@ origin: "Steward, 2026-09-17, second repair node sized from the RT-IGNORED-FAILI
 > AND the frame-marker single-consumption holds"* — is unframed work. The 4 rows
 > do not move until it is cut.
 >
+> **DEBT CLEARED 2026-09-18: the repair node is
+> `RT-HOST-RESPONSE-DUPLICATE-PRELUDE-BLOCK`** (`ready`, runtime, M/T1), which
+> owns the *"duplicate prelude block is resolved"* half and re-dispositions all
+> four rows. It does NOT own the frame-marker half — that is
+> `RT-FRAME-MARKER-ONCE`, still `draft`, so **the `px7n` pair does not readmit at
+> the end of the new node** and must not be sized as though it does. The
+> occurrence-pairing arm, if the Architect rules it, is a SUCCESSOR node and not
+> that one.
+>
 > **Cost of the stale field:** the Steward released this node as undone work on
 > 2026-09-18 (`evt_37y46cqjz1yy9`), reading `status: ready` without checking
 > whether it had landed. Runtime QA stopped before starting and the implementer
