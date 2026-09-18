@@ -229,3 +229,133 @@ successor as "the last blocker for these rows."
 - The enclosing closures' capture lists are equal in every row and **nothing
   rests on that** -- equal index lists resolved in different environments are not
   equal values.
+
+### `D2` — the four labels, rewritten. `AC-0` and `AC-1`
+
+**Readmission half rewritten on all four; attribution halves untouched**, as
+section 4 requires. Each label now carries, for its own row: the measured next
+stop with its own operands, the layer count and the explicit statement that
+the stack behind `L2` is **not** bounded, the non-vacuity of the two-direction
+control with that row's own 1-versus-2 counts, and what the two origins denote
+measured by referent.
+
+    px7m:163   owner 5, binding 395, env 391. Bodies BYTE-IDENTICAL, 558 B.
+    px7m:206   owner 5, binding 409, env 405. Bodies DIFFER, 1164 vs 1168 B,
+               in one leaf. THE REFUSAL IS CORRECT ON THIS ROW.
+    px7l:163   owner 3, binding 358, env 356. Bodies BYTE-IDENTICAL, 152 B.
+    px7l:241   owner 3, binding 377, env 375. Bodies BYTE-IDENTICAL,  92 B.
+
+**`AC-0` is satisfied and was satisfied before this WP touched anything**: all
+four labels already named `RT-CONTEXT-FRAME-LABEL-CORRECTION`, and the node now
+exists on `main`. The routing defect closed when the node was filed; what `D2`
+adds is that the label's content is no longer a prediction the node has since
+tested.
+
+### The acceptance criteria, enumerated BY POSITION
+
+**Corrected: an earlier revision of this section discharged "`AC-1`: no row
+readmits".** That is `[[RT-DUPLICATED-RESPONSE-BLOCK]]`'s `AC-1`, not this
+frame's. Reading them off section 5 in order instead:
+
+**`AC-0` — SATISFIED.** Above.
+
+**`AC-1` — D0 answered PER ROW, measured rather than carried, with the bound
+stated. SATISFIED.** Each of the four labels carries its own next-stop
+operands (`owner`/`binding`/`environment`, all four triples distinct), its own
+1-versus-2 non-vacuity counts, and the explicit sentence that the stack behind
+`L2` was not forced and is **not bounded**. Nothing in the rewritten half is
+carried from `b0421afd0`; the carried attribution halves are untouched and are
+marked as carried.
+
+**`AC-2` — D1 answered with its DECIDING EVIDENCE named. SATISFIED.** The
+deciding evidence is the rendered body at each origin, compared byte for byte,
+and it is named as that in every label. "The origins differ" is recorded as
+the premise, not the answer. The one row where the bodies differ has the
+differing leaf quoted.
+
+**`AC-3` — the admission gate is UNTOUCHED.** `grep -c RTPROBE` over
+`cranelift_backend/lowering/core.rs` is zero and the file is not in this
+candidate's diff. No argument against the both-ends-red measurement or the
+`:13572` comment is offered, because none is needed.
+
+**`AC-4` — the `BoundaryCarrier` arity refusal is NOT relaxed.** Untouched.
+`D3` lands zero production change, so no row is made to pass by moving it.
+
+**`AC-5` — no regression.** Workspace-green is CI's, per `COORDINATION`
+section 12. The local targeted check is stated with the run beside it in the
+`AC-5` note at the end of this section.
+
+### `D3` — the repair is OUT OF SCOPE, and the reason is not cost
+
+`D1` selects the unit: the comparison at `core.rs:1230` tests **node identity**
+where the property it needs is **body equality**. The obvious repair is to
+compare bodies. **I am not landing it, and the reason is not that it is big —
+it is small.**
+
+**The returned unit is not a boolean. It is an occurrence coordinate that is
+carried onward.** Read at `9dfa6978e`:
+
+    core.rs:13490   recursive_position_unit_body -> Option<StaticOriginId>
+    core.rs:14411   passed as the last argument of make_computational_recursor
+    mod.rs:12398    recursive_unit_body: Option<StaticOriginId>
+
+So "the bodies are equal, therefore either origin will do" **does not follow**.
+Equality of the body is not equality of the occurrence, and what `1230` returns
+names an occurrence that the induction hypothesis then carries.
+
+**And my own `D0` data says the choice is not inert.** The two forcing
+directions reach the disagreement a different number of times — 1 versus 2,
+inverted between `px7m` and `px7l` according to which unit the constructed
+frame is keyed to. **If the two origins were interchangeable the choice would
+be inert. It is not.** That is measurement, not analogy.
+
+**The analogy, stated separately because it is an argument and not a
+measurement.** `[[RT-DUPLICATED-RESPONSE-BLOCK]]` `8.9a` carries an Architect
+ruling of exactly this shape, on a sibling map: two entries agreed on their
+operation and differed on their origins, and **relaxing the producer's key
+alone — while the consumer still selects by the coarse key — converts a loud
+refusal into a silent mis-route.** Here the coarse relation is body equality
+and the fine one is occurrence identity, and nothing downstream of `1230`
+re-checks which occurrence was chosen. **A repair that accepts either equal
+body is the same move.**
+
+**Third, and independently sufficient: it buys nothing observable.** All four
+rows stop at `RT-CONTSRC-PRODUCER-LOCAL` `D3b` immediately behind `1230`.
+
+⇒ **`D3` is a written scope statement.** The defect is real and should be
+repaired; the repair must give the consumer of `recursive_unit_body` a reason
+to accept one of two equal bodies, or make the two indistinguishable to it.
+**That is producer-and-consumer work, not a predicate swap at `1230`.**
+
+**Successor: no node owns this, and I am not filing one** — node filing is the
+Steward's under `COORDINATION` section 2. What it would have to establish:
+
+    1. what make_computational_recursor's recursive_unit_body coordinate is
+       USED FOR downstream, and whether two structurally equal bodies at
+       different occurrences are distinguishable to any of those uses
+    2. if they are NOT, relaxing 1230 to body equality is sound and small
+    3. if they ARE, the repair is to carry the discriminating coordinate, and
+       the sibling ruling's clause-3 shape applies verbatim
+
+`[[RT-POST-L2-RESIDUE-DEPTH-READ]]` is **not** that node — it owns the layer
+BEHIND `1230`, not `1230`'s relation.
+
+### `AC-5` — the local check, with its target selection stated
+
+This candidate's whole `crates/` footprint is **four `#[ignore]` attribute
+lines**, which are string literals inside test files. So the check that
+matters is one that **builds and runs the test binaries**:
+
+    ken-cargo test -p ken-cli --test px7m_hostresult_computational_match \
+                              --test px7l_checked_host_recursive_bind -- --list
+
+**`cargo check` would not have been evidence** — it does not compile
+`#[cfg(test)]`, so a green `check` says nothing about whether a test built.
+The touched set is two `crates/ken-cli/tests/` files and `ken-cli` is a leaf
+here, so the reverse-dependency closure is those two targets and nothing else.
+Workspace-green is CI's, per `COORDINATION` section 12.
+
+**Result: `exit=0`, 5 tests listed** — 2 from
+`px7m_hostresult_computational_match` and 3 from
+`px7l_checked_host_recursive_bind`. Both binaries built and ran. The escaped-
+literal risk in `D2`'s rewritten labels is closed.
