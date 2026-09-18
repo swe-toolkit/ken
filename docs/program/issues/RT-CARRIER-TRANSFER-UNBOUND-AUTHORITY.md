@@ -93,7 +93,19 @@ The Architect's key, and the direction reversal is the point:
 
 **The absorbing set is the `AmbientBodyAuthority` bind spans** — the Architect
 measured **nine** and built that half themselves. **Re-derive the count; do not
-inherit it.** It is cited here as their measurement, not as a fixed input.
+inherit it.** It is cited here as their measurement, not as a fixed input. Their
+key, handed over on request (`evt_4xarw5w7crtd5`) so the nine are re-derivable
+rather than quoted:
+
+    KEY: lines matching `AmbientBodyAuthority::bind` or `.release(` in
+         production `.rs` under `lowering/`, excluding lines whose content
+         starts with `//`. Swept to closure; exactly 9 pairs, one release
+         each, no orphans.
+
+> **A DIFFERENT COUNT UNDER A DIFFERENT KEY IS A DIFFERENT KEY, NOT A CHANGED
+> TREE.** The Architect names this as their own error — going 31 to 35 on one
+> span and reading it as movement. If your number is not nine, print your key
+> beside it and diff the keys before you touch the tree.
 
 > **WHY THE DIRECTION REVERSES, AND IT IS STRUCTURAL RATHER THAN BAD LUCK.** A
 > call site names its callee **literally on its own line**. Finding *callers*
@@ -109,19 +121,58 @@ inherit it.** It is cited here as their measurement, not as a fixed input.
 deliberately did not split it: *"a number I have not run to closure is the thing
 I promised to stop handing over."* Same discipline applies to whoever runs it.
 
-# Outcomes
+# Outcomes — THREE, AND ONLY THE THIRD ESCALATES
 
-    (i)  every production transfer site sits inside a bind span
-         => the refusal is a correct fail-closed guard over a pairing
-            production never produces. That is a REAL RESULT and closes this
-            node green. Record it as a positive property, not as "nothing found".
-    (ii) at least one production site is NOT inside a bind span
-         => the refusal is protecting a real hole, the row was evidence rather
-            than debt, and this becomes a soundness question. STOP and escalate;
-            do not size a repair here.
+> **THIS SECTION WAS FILED WRONG AND IS CORRECTED HERE.** The first version had
+> two outcomes and read *"at least one production site is NOT inside a bind span
+> => ... STOP and escalate"*. **That converts an INCONCLUSIVE lexical result
+> into a soundness escalation — the exact failure of the withdrawn instrument
+> this node was written to avoid repeating.** Caught by the Architect
+> (`evt_4xarw5w7crtd5`). The defect is mine.
 
-**The RULING between them is the Architect's**, per the RT-CARRIER frame's own
-text (*"it is a mechanism question and returns to the Architect"*). The
+**The asymmetry the lexical pass actually has, and which the two-outcome table
+silently denied:**
+
+    DISCHARGED (inside a span)   SOUND. Between bind and release the field is
+                                 Some.
+    OPEN (not inside a span)     INCONCLUSIVE. An ancestor may have bound it,
+                                 and a LEAK may leave Some past its own span.
+
+⇒ **"Not lexically covered" is not "reaches unbound."** One direction of this
+test concludes; the other only fails to conclude.
+
+    (i)   every production transfer site lexically inside a bind span
+          => SOUND. Closes green as a positive property, not as "nothing found".
+    (ii)  some site not lexically covered, but each such site's enclosing
+          function is called only from within a bind span
+          => STILL (i), by absorption. NOT an escalation.
+    (iii) a site whose enclosing function has a call path reaching an entry
+          point with NO bind anywhere above it
+          => THE counterexample. Escalate.
+
+**The residue is the DELIVERABLE of the lexical pass, not its failure.** Work
+(iii) per-function, by hand, over whatever residue (ii) leaves. Do not build a
+general closure to do it — see the reconciliation under *What must not happen*.
+
+## Before (iii) is trusted — a precondition, not a formality
+
+**(iii) is sound here only because a carrier transfer is an in-body operation.**
+If any `transfer_into_carrier` site legitimately runs at top level and correctly
+refuses, then reaching *that* site unbound is correct code again, and **(iii)
+inherits the original defect verbatim** — a counterexample condition satisfied
+by correct code. Establish that no such site exists before escalating on (iii).
+The Architect's instruction, kept in their words: *"do not assume it because I
+said so."*
+
+## The leak makes outcome (i) STRONGER than it looks
+
+A leak leaves `Some` past its own span, so **real boundness is WIDER than the
+lexical spans**. Lexical discharge therefore UNDER-counts: an outcome-(i) result
+is a conservative floor, and every site it covers is covered under a test
+stricter than the property being claimed.
+
+**The RULING between the three is the Architect's**, per the RT-CARRIER frame's
+own text (*"it is a mechanism question and returns to the Architect"*). The
 measurement is runtime's.
 
 # What must not happen
@@ -137,6 +188,33 @@ measurement is runtime's.
   independent fault in its caller pattern. **Neither fault was visible from its
   output** — a broken traversal chasing a false negative produces the same shape
   as a working one.
+
+> ### RECONCILING THAT BAN WITH OUTCOME (iii)
+>
+> Read this before concluding the node forbids its own third outcome.
+>
+> **Outcomes (ii) and (iii) both ask a caller question, and the bullet above
+> bans a caller instrument. These do not conflict, and the difference is not
+> a matter of degree.**
+>
+>     BANNED     a GENERAL closure over the call graph, run to termination,
+>                whose stopping condition is "an entry point with no bind
+>                above it". Production satisfies that on every compile, so it
+>                cannot terminate in the negative -- only a residue or a false
+>                alarm is reachable. It answers about the WHOLE PROGRAM.
+>     REQUIRED   a PER-FUNCTION, BY-HAND argument over the named residue that
+>                (ii) leaves -- a finite, enumerated list of specific
+>                functions, each asked "who calls this one?" and answered by
+>                reading. It answers about THOSE FUNCTIONS.
+>
+> **The ban is on the instrument's form and its termination condition, never on
+> looking at callers.** What made the withdrawn instrument unusable was that it
+> was general and its negative was unreachable; a hand check over a bounded
+> residue has a reachable negative — you run out of functions.
+>
+> ⇒ **If the residue from (ii) is large enough that working it by hand feels
+> unreasonable, that is a finding to report, not a licence to rebuild the
+> closure.** Say how large it is and stop.
 
 # Related
 
