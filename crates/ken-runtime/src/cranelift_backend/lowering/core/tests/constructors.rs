@@ -3414,6 +3414,34 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     let match_origin = plan
         .child_static_origin(root, 1)
         .expect("the shared Result consumer occurrence exists");
+    let nested_read_some_origin = plan
+        .child_static_origin(ordinary_producer_origin, 0)
+        .expect("the ordinary Result producer's nested ReadSome occurrence exists");
+    // `D3` move 1 — `ac_c7_lowered_ctor`'s shape. The occurrence is resolved
+    // from the plan at the aggregate's OWN origin and passed in, never minted
+    // here and never inherited from whatever coordinate the transfer uses.
+    let nested_read_some_occurrence = plan
+        .source_aggregate_occurrence(nested_read_some_origin, PlannedAggregateShape::Constructor)
+        .expect("a planned `Construct` has an ownership record at its own origin");
+    // `D3` move 2 — same shape, at the ordinary producer's own origin.
+    let ordinary_result_occurrence = plan
+        .source_aggregate_occurrence(ordinary_producer_origin, PlannedAggregateShape::Constructor)
+        .expect("a planned `Construct` has an ownership record at its own origin");
+    // `D3` move 4 — stop 1. The edge emits ONE body and production binds both
+    // ambient facts for that body's lifetime (`AmbientBodyAuthority::bind`,
+    // `core.rs`). This rig never bound them, so the field was `None` and
+    // `synthesized_constructor` took its no-emission-owner early return,
+    // handing back a template with `occurrence: None` before it ever consulted
+    // the plan. The owner is derived from the unit whose body IS this
+    // fixture's root occurrence, not minted.
+    let root_unit = plan
+        .emittable_units()
+        .expect("the C2 fixture exposes emittable units")
+        .into_iter()
+        .find(|unit| unit.body_occurrence() == root)
+        .expect("the fixture's root occurrence is an emittable unit body");
+    let producer_defining_unit = root_unit.function();
+    let producer_emission_owner = ContinuationEmissionOwner::Predeclared(producer_defining_unit);
     let read_some = plan
         .synthesized_constructor_identity(SynthesizedConstructorRole::Fixed(
             SynthesizedFixedConstructorRole::ReadSome,
@@ -3452,18 +3480,31 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
                     tag: 0,
                     constructor: producer_symbols.read_some.clone(),
                     identity: ok_identity,
-                    occurrence: None,
+                    occurrence: Some(nested_read_some_occurrence),
                     fields: vec![Lowered::Bool {
                         value: true_word,
                         known: Some(true),
                     }],
                 }],
             });
+            compiler.defining_emission_owner = Some(producer_emission_owner);
+            compiler.defining_unit = Some(producer_defining_unit);
             // `D7` — this fixture has no `Effect` occurrence, so `match_origin`
             // is not a producer seat and carries no per-use record. That is
-            // correct and leaves the row's existing refusal unchanged: the
-            // template gets no occurrence and refuses at the allocation, which
-            // is where it already fails.
+            // correct, and the refusal it earns is correct.
+            //
+            // `D5` — what this note used to say next was that the template
+            // therefore gets no occurrence and refuses at the allocation. That
+            // named the SECOND refusal as the cause of the FIRST. Measured on
+            // this row: with `defining_emission_owner` unbound, as this rig
+            // left it until `D3`, `synthesized_constructor` takes its
+            // no-emission-owner early return and hands back `occurrence: None`
+            // BEFORE it ever consults the plan -- so the row died on the
+            // carrier's source-aggregate refusal, and the missing per-use
+            // record played no part in it. With the owner bound just above,
+            // the per-use record's absence does become operative, and it
+            // refuses at the `?` lookup INSIDE `synthesized_constructor`,
+            // still before any allocation.
             let error = compiler.synthesized_constructor(
                 match_origin,
                 &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk),
@@ -3512,11 +3553,11 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
             let ordinary_result = Lowered::Constructor {
                 constructor: ordinary_symbols.result_ok.clone(),
                 synthesized_identity: None,
-                occurrence: None,
+                occurrence: Some(ordinary_result_occurrence),
                 args: vec![ConstructorField::specialized(Lowered::Constructor {
                     constructor: ordinary_symbols.read_some.clone(),
                     synthesized_identity: None,
-                    occurrence: None,
+                    occurrence: Some(nested_read_some_occurrence),
                     args: vec![ConstructorField::specialized(Lowered::Bool {
                         value: true_word,
                         known: Some(true),
