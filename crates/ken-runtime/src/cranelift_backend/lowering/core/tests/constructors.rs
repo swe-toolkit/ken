@@ -3379,19 +3379,39 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
             args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
         }],
     };
+    // `D3` move 5 -- a real `FsWriteAt` seat, because a
+    // synthesized per-use record exists only at an `Effect` source occurrence.
+    // Placed as the OUTER binding so the match's `Var(0)` still names the
+    // producer's result and the consumer is untouched.
+    let write_effect = RuntimeExpr::Effect {
+        family: "FS".to_string(),
+        operation: ken_host::HostOpV1::FsWriteAt,
+        capability: None,
+        args: vec![
+            RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((4).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((0).into())),
+        ],
+    };
     let planned_fixture = RuntimeExpr::Let {
-        // The separate producer is a declared unit, so its result reaches the
-        // consumer through the carrier ABI. Keep that source fact in the plan
-        // instead of relying on the test rig's later manual carrier injection.
-        value: Box::new(RuntimeExpr::Call {
-            callee: Box::new(RuntimeExpr::LexicalClosure {
-                captures: Vec::new(),
-                params: Vec::new(),
-                body: Box::new(ordinary_producer_expr),
+        value: Box::new(write_effect),
+        body: Box::new(RuntimeExpr::Let {
+            // The separate producer is a declared unit, so its result reaches the
+            // consumer through the carrier ABI. Keep that source fact in the plan
+            // instead of relying on the test rig's later manual carrier injection.
+            value: Box::new(RuntimeExpr::Call {
+                callee: Box::new(RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: Vec::new(),
+                    body: Box::new(ordinary_producer_expr),
+                }),
+                args: Vec::new(),
             }),
-            args: Vec::new(),
+            body: Box::new(match_expr.clone()),
         }),
-        body: Box::new(match_expr.clone()),
     };
     let plan = plan_static_transition_graph_with_symbols(
         &planned_fixture,
@@ -3402,8 +3422,11 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     )
     .expect("the C2 producer/consumer fixture plans");
     let root = plan.root_static_origin().expect("root occurrence exists");
+    let producer_let_origin = plan
+        .child_static_origin(root, 1)
+        .expect("the producer/consumer binding is the effect binding's body");
     let producer_call_origin = plan
-        .child_static_origin(root, 0)
+        .child_static_origin(producer_let_origin, 0)
         .expect("the ordinary Result producer call exists");
     let producer_closure_origin = plan
         .child_static_origin(producer_call_origin, 0)
@@ -3412,8 +3435,83 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
         .child_static_origin(producer_closure_origin, 0)
         .expect("the ordinary Result producer body exists");
     let match_origin = plan
-        .child_static_origin(root, 1)
+        .child_static_origin(producer_let_origin, 1)
         .expect("the shared Result consumer occurrence exists");
+    // Found by PROPERTY, not by position: the seat is whichever occurrence is
+    // the fixture's `Effect`.
+    let effect_seat = first_effect_seat(&plan).expect("the fixture has an effect seat");
+    // `first_effect_seat` picks ONE member of a population, and so does the
+    // owner search below. Assert each population is a singleton rather than
+    // relying on it -- a later fixture edit adding a second `Effect`, or a
+    // second holding unit, would otherwise silently re-aim both selectors with
+    // no test going red.
+    let effect_seats = {
+        let mut found = Vec::new();
+        let mut stack = vec![root];
+        while let Some(origin) = stack.pop() {
+            if matches!(plan.source_occurrence(origin), Ok(RuntimeExpr::Effect { .. })) {
+                found.push(origin);
+            }
+            let mut position = 0;
+            while let Ok(child) = plan.child_static_origin(origin, position) {
+                stack.push(child);
+                position += 1;
+            }
+        }
+        found
+    };
+    assert_eq!(
+        effect_seats,
+        vec![effect_seat],
+        "this rig places exactly one `Effect` and `first_effect_seat` must be it"
+    );
+    let nested_read_some_origin = plan
+        .child_static_origin(ordinary_producer_origin, 0)
+        .expect("the ordinary Result producer's nested ReadSome occurrence exists");
+    // `D3` move 1 — `ac_c7_lowered_ctor`'s shape. The occurrence is resolved
+    // from the plan at the aggregate's OWN origin and passed in, never minted
+    // here and never inherited from whatever coordinate the transfer uses.
+    let nested_read_some_occurrence = plan
+        .source_aggregate_occurrence(nested_read_some_origin, PlannedAggregateShape::Constructor)
+        .expect("a planned `Construct` has an ownership record at its own origin");
+    // `D3` move 2 — same shape, at the ordinary producer's own origin.
+    let ordinary_result_occurrence = plan
+        .source_aggregate_occurrence(ordinary_producer_origin, PlannedAggregateShape::Constructor)
+        .expect("a planned `Construct` has an ownership record at its own origin");
+    // `D3` move 4 — stop 1. The edge emits ONE body and production binds both
+    // ambient facts for that body's lifetime (`AmbientBodyAuthority::bind`,
+    // `core.rs`). This rig never bound them, so the field was `None` and
+    // `synthesized_constructor` took its no-emission-owner early return,
+    // handing back a template with `occurrence: None` before it ever consulted
+    // the plan. The owner is derived from the unit whose body IS this
+    // fixture's root occurrence, not minted.
+    //
+    // The owner is found by ASKING which enumerated unit actually holds this
+    // seat's synthesized records, never assumed from a position.
+    let holding_units = plan
+        .emittable_units()
+        .expect("the C2 fixture exposes emittable units")
+        .into_iter()
+        .map(|unit| unit.function())
+        .filter(|unit| {
+            plan.synthesized_aggregate_occurrence(
+                ContinuationEmissionOwner::Predeclared(*unit),
+                effect_seat,
+                &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk),
+                SynthesizedConstructorRole::Fixed(SynthesizedFixedConstructorRole::Wrote),
+            )
+            .is_ok()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        holding_units.len(),
+        1,
+        "exactly one enumerated unit must hold the effect seat's `Wrote` record, \
+         or the selection below is a choice and not a derivation; got \
+         {holding_units:?}"
+    );
+    let producer_defining_unit = holding_units[0];
+    let producer_emission_owner = ContinuationEmissionOwner::Predeclared(producer_defining_unit);
     let read_some = plan
         .synthesized_constructor_identity(SynthesizedConstructorRole::Fixed(
             SynthesizedFixedConstructorRole::ReadSome,
@@ -3452,20 +3550,33 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
                     tag: 0,
                     constructor: producer_symbols.read_some.clone(),
                     identity: ok_identity,
-                    occurrence: None,
+                    occurrence: Some(nested_read_some_occurrence),
                     fields: vec![Lowered::Bool {
                         value: true_word,
                         known: Some(true),
                     }],
                 }],
             });
+            compiler.defining_emission_owner = Some(producer_emission_owner);
+            compiler.defining_unit = Some(producer_defining_unit);
             // `D7` — this fixture has no `Effect` occurrence, so `match_origin`
             // is not a producer seat and carries no per-use record. That is
-            // correct and leaves the row's existing refusal unchanged: the
-            // template gets no occurrence and refuses at the allocation, which
-            // is where it already fails.
+            // correct, and the refusal it earns is correct.
+            //
+            // `D5` — what this note used to say next was that the template
+            // therefore gets no occurrence and refuses at the allocation. That
+            // named the SECOND refusal as the cause of the FIRST. Measured on
+            // this row: with `defining_emission_owner` unbound, as this rig
+            // left it until `D3`, `synthesized_constructor` takes its
+            // no-emission-owner early return and hands back `occurrence: None`
+            // BEFORE it ever consults the plan -- so the row died on the
+            // carrier's source-aggregate refusal, and the missing per-use
+            // record played no part in it. With the owner bound just above,
+            // the per-use record's absence does become operative, and it
+            // refuses at the `?` lookup INSIDE `synthesized_constructor`,
+            // still before any allocation.
             let error = compiler.synthesized_constructor(
-                match_origin,
+                effect_seat,
                 &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk),
                 SynthesizedFixedConstructorRole::Wrote,
                 producer_symbols.wrote.clone(),
@@ -3512,11 +3623,11 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
             let ordinary_result = Lowered::Constructor {
                 constructor: ordinary_symbols.result_ok.clone(),
                 synthesized_identity: None,
-                occurrence: None,
+                occurrence: Some(ordinary_result_occurrence),
                 args: vec![ConstructorField::specialized(Lowered::Constructor {
                     constructor: ordinary_symbols.read_some.clone(),
                     synthesized_identity: None,
-                    occurrence: None,
+                    occurrence: Some(nested_read_some_occurrence),
                     args: vec![ConstructorField::specialized(Lowered::Bool {
                         value: true_word,
                         known: Some(true),

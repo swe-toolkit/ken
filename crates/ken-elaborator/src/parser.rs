@@ -195,6 +195,26 @@ enum StartExclusion {
     /// pattern roster -- carried this exclusion inline at its own definition.
     /// Same shape as the type side's two, in a third function.
     AsAlias,
+    /// `if` opening an IF-EXPRESSION, not an application argument.
+    ///
+    /// **AC-3: refused BY THE CLASSIFICATION, not by a hand-written case.**
+    /// Before this, `if` was refused by ABSENCE from `can_start_atom_expr`'s
+    /// `matches!` plus one hand-written `if matches!(peek(), KwIf)` in the
+    /// argument loop that supplied the diagnostic. The refusal was correct and
+    /// its REASON lived nowhere the classification could state it.
+    ///
+    /// The same argument [`Self::ProofSelector`] makes applies here and that
+    /// member's doc names this one in terms: absence is an omission and
+    /// omissions drift. A member says the refusal is INTENDED and carries its
+    /// reason, so a future widening is a deliberate act.
+    ///
+    /// **`if` REMAINS AN ATOM IN HEAD POSITION** -- `const k = if c then a
+    /// else b` parses, and `parse_atom_expr_base` keeps its `KwIf` arm. That
+    /// is why this is an EXCLUSION and not a removed roster entry: the
+    /// exclusion layer is position-keyed ([`Self::applies_in`]) and the head
+    /// call site does not consult the roster at all. Refusing the token
+    /// outright would break a live form.
+    IfExpression,
     /// `x :` -- a BINDER NAME, not a type argument.
     ///
     /// The load-bearing one. `can_start_atom_type` feeds two `while` loops
@@ -206,7 +226,7 @@ enum StartExclusion {
 impl StartExclusion {
     /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
     /// length is checked against it rather than maintained independently.
-    const COUNT: usize = 6;
+    const COUNT: usize = 7;
 
     /// The iteration source `atom_start_exclusion` consults.
     const ALL: [Self; Self::COUNT] = [
@@ -215,6 +235,7 @@ impl StartExclusion {
         Self::ProofSelector,
         Self::BraceOpensMatchArms,
         Self::AsAlias,
+        Self::IfExpression,
         Self::BinderName,
     ];
 
@@ -227,7 +248,8 @@ impl StartExclusion {
             Self::ProofSelector => 2,
             Self::BraceOpensMatchArms => 3,
             Self::AsAlias => 4,
-            Self::BinderName => 5,
+            Self::IfExpression => 5,
+            Self::BinderName => 6,
         }
     }
 
@@ -248,7 +270,8 @@ impl StartExclusion {
             Self::AsAlias => matches!(position, AtomPosition::Pattern),
             Self::MatchEquationBinder
             | Self::ProofSelector
-            | Self::BraceOpensMatchArms => matches!(position, AtomPosition::Expression),
+            | Self::BraceOpensMatchArms
+            | Self::IfExpression => matches!(position, AtomPosition::Expression),
         }
     }
 
@@ -265,6 +288,7 @@ impl StartExclusion {
                     && matches!(parser.lookahead(1), Token::Colon)
             }
             Self::ProofSelector => matches!(parser.peek(), Token::KwProof),
+            Self::IfExpression => matches!(parser.peek(), Token::KwIf),
             Self::BraceOpensMatchArms => parser.brace_starts_match_arms(),
             Self::BinderName => {
                 matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
@@ -298,6 +322,7 @@ impl StartExclusion {
                 Token::RBrace,
             ],
             Self::AsAlias => vec![Token::Ident("as".to_string())],
+            Self::IfExpression => vec![Token::KwIf],
             Self::BinderName => {
                 vec![Token::Ident("x".to_string()), Token::Colon]
             }
@@ -307,7 +332,13 @@ impl StartExclusion {
     /// The construct this exclusion keeps out of an argument position, named so
     /// a control can state which refusal it is exercising rather than only
     /// that something was refused.
-    #[cfg(test)]
+    ///
+    /// **No longer `#[cfg(test)]`.** AC-3 needs the refusal's REASON to reach a
+    /// production diagnostic, and a test-gated method cannot supply one. Note
+    /// what that does to the dead-code census: this method had zero callers and
+    /// the warning it carried disappears here because it acquired one, which is
+    /// CLOSED. Had it disappeared because the item became externally reachable,
+    /// that would be EXEMPT and would mean nothing.
     fn refuses(self) -> &'static str {
         match self {
             Self::EffectRowAnnotation => "an effect-row annotation",
@@ -315,7 +346,41 @@ impl StartExclusion {
             Self::MatchEquationBinder => "a match equation binder",
             Self::ProofSelector => "an attached-proof declaration",
             Self::BraceOpensMatchArms => "a match arm block",
+            Self::IfExpression => "an `if` expression",
             Self::BinderName => "a binder name",
+        }
+    }
+
+    /// The diagnostic to raise AFFIRMATIVELY when this exclusion stops the
+    /// application-argument loop, or `None` to stop QUIETLY.
+    ///
+    /// **The two are not interchangeable and the choice is per-member.** Ken
+    /// has no declaration terminator, so this roster's complement IS the
+    /// declaration separator: for most members the token legitimately begins
+    /// the NEXT DECLARATION, and the loop must yield so the declaration parser
+    /// can speak. Raising there would turn a correct declaration boundary into
+    /// a parse error.
+    ///
+    /// [`Self::IfExpression`] is the one that must speak. `if` never starts a
+    /// declaration, so a bare `break` leaves its token to be reported as a
+    /// stray by whatever production runs next -- at the SAME COORDINATE, which
+    /// is why a span assertion cannot tell the two apart and
+    /// `lang_application_atom_if_rejection.rs` asserts the PRODUCER instead.
+    ///
+    /// Exhaustive, no `_ =>`: a new exclusion must decide which it is.
+    fn argument_diagnostic(self) -> Option<String> {
+        match self {
+            Self::IfExpression => Some(format!(
+                "{} is not an application_atom: group it as \
+                 `(if ... then ... else ...)` to pass it as an argument",
+                self.refuses()
+            )),
+            Self::EffectRowAnnotation
+            | Self::MatchEquationBinder
+            | Self::ProofSelector
+            | Self::BraceOpensMatchArms
+            | Self::AsAlias
+            | Self::BinderName => None,
         }
     }
 }
@@ -330,6 +395,304 @@ fn canonical_operator_name(token: &Token) -> Option<&str> {
         Token::Or => Some("∨"),
         Token::Member => Some("∈"),
         _ => None,
+    }
+}
+
+/// The atom forms of PATTERN position, as ONE classification.
+///
+/// **AC-1: adding an atom form must be impossible without its start test and
+/// its parse moving together.** Before this, the pairing was two
+/// hand-maintained lists -- `can_start_pattern`'s twelve tokens and
+/// `parse_atom_pattern`'s twelve arms -- that AGREED BY DISCIPLINE. A census
+/// read `12 vs 12, none, both directions`, which records that a human copied
+/// carefully once; nothing made them move together.
+///
+/// **The count collapses to FIVE, not twelve**: the eight literal tokens
+/// already shared one roster group AND one parse arm, so the apparent
+/// twelve-way pairing was five forms all along.
+///
+/// **THE TWO FAILURE DIRECTIONS ARE ASYMMETRIC, and only one of them is
+/// silent.** That is what this closes:
+///
+/// ```text
+/// roster admits, parser lacks an arm
+///   -> a misattributed parse error               LOUD, someone sees it
+/// parser has an arm, roster refuses
+///   -> an UNREACHABLE arm, nothing reds          SILENT, until someone
+///                                                happens to test it
+/// ```
+///
+/// Dispatch over this enum closes the silent direction **by construction**:
+/// reaching an arm REQUIRES [`Self::admits`] to have said yes, because
+/// [`Self::at`] is the only way in. That is the acceptance property -- not
+/// arm-count matching, which is the instrument that recorded `12 vs 12` while
+/// enforcing nothing.
+///
+/// **[`Self::admits`] takes the PARSER, not a `&Token`, and that is
+/// load-bearing rather than uniform.** A token-keyed predicate cannot express
+/// a member whose admission is conditional on parser state --
+/// `can_start_atom_expr` has exactly one such member today (`TruncBar`,
+/// admitted only at `truncation_depth == 0`). Patterns have none, and the
+/// signature still takes the parser so the expression-side extension is not a
+/// signature change. [`StartExclusion::holds_at`] is the precedent.
+///
+/// **WHAT THIS DOES NOT CATCH.** The exhaustive `match` in [`Self::admits`]
+/// ties an arm to every variant -- and [`Self::ALL`] is a hand-written
+/// iteration source that the compiler does NOT tie to the variant set. The two
+/// claims are different and only the first is enforced by matching:
+///
+/// ```text
+/// add Sixth, add its arms, leave COUNT and ALL alone
+///   -> COMPILES. Sixth is never consulted.       NOT caught -- the residual
+/// bump COUNT without extending ALL, or the reverse
+///   -> array-length compile error                caught
+/// ```
+///
+/// [`Self::COUNT`] closes the common half of that: bumping the variant set
+/// without extending `ALL` is an array-length error, and `COUNT` sits beside
+/// `ALL` so extending one prompts the other. **The residual is named rather
+/// than papered over: a variant added with an [`Self::admits`] arm but no
+/// `COUNT` bump still slips, and only a derive macro closes that.** Stated
+/// because an overclaiming comment is exactly what stops the next reader
+/// checking -- a new form never reaching [`Self::at`] is an unreachable parse
+/// arm, which is the silent direction this enum exists to close.
+///
+/// **AND THE LARGER RESIDUAL: THE CLOSURE IS OVER FORMS, NOT OVER TOKENS.**
+/// [`Self::Literal`] hand-lists eight tokens, and `parse_literal_pattern`
+/// hand-lists the same eight with its own `other =>`. **Two hand-maintained
+/// lists, agreeing by discipline, with nothing forcing them together** -- which
+/// is verbatim the defect this enum exists to close, surviving at eight of the
+/// twelve tokens, one function below the dispatch:
+///
+/// ```text
+/// add a ninth literal to `admits` only
+///   -> `at` returns Literal, parse_literal_pattern takes `other =>`:
+///      "expected a literal pattern".  LOUD and MISATTRIBUTED, no compile error
+/// add it to parse_literal_pattern only
+///   -> an unreachable arm.            SILENT, no compile error
+/// ```
+///
+/// **That is the LIKELY edit, not an exotic one**: a language gains literal
+/// kinds far more often than it gains atom shapes, so the unguarded axis is
+/// the one that will actually move. The residual here is strictly smaller than
+/// the twelve-vs-twelve it replaced -- five forms are closed where twelve
+/// tokens were not -- but it is NOT zero, and a bound that names only the
+/// `COUNT`/`ALL` residual fails in the ADMITTING direction: a reader who
+/// checks it finds one named gap and infers the rest is closed.
+///
+/// Pushing the closure down -- having `Literal` carry the token-to-`LiteralPat`
+/// mapping so `admits` and the construction derive from ONE list -- would make
+/// this block's residual genuinely just `COUNT`/`ALL`. Deliberately not done
+/// here: it is larger than this candidate's scope, and disclosure is the
+/// honest alternative to doing it silently.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PatternAtomForm {
+    /// The eight literal tokens. One roster group, one parse arm, already.
+    Literal,
+    /// `Token::Ident` -- a binder, or `_` for the wildcard.
+    Var,
+    /// `Token::ConId` -- a nullary constructor at atom level.
+    Ctor,
+    /// `Token::LParen` -- grouping, and tuples.
+    Paren,
+    /// `Token::LBrace` -- a record pattern.
+    Record,
+}
+
+impl PatternAtomForm {
+    const COUNT: usize = 5;
+
+    const ALL: [Self; Self::COUNT] = [
+        Self::Literal,
+        Self::Var,
+        Self::Ctor,
+        Self::Paren,
+        Self::Record,
+    ];
+
+    /// Does this form's start condition hold at the cursor?
+    ///
+    /// Position is NOT a parameter here: it is carried by the exclusion layer
+    /// (`atom_start_exclusion`), exactly as it is for [`StartExclusion`],
+    /// whose [`StartExclusion::holds_at`] is likewise position-agnostic.
+    fn admits(self, parser: &Parser) -> bool {
+        match self {
+            Self::Literal => matches!(
+                parser.peek(),
+                Token::Nat(_)
+                    | Token::IntLit(_)
+                    | Token::FloatLit(_)
+                    | Token::DecimalLit(_, _)
+                    | Token::Float32Lit(_)
+                    | Token::Str(_)
+                    | Token::CharLit(_)
+                    | Token::ByteStr(_)
+            ),
+            Self::Var => matches!(parser.peek(), Token::Ident(_)),
+            Self::Ctor => matches!(parser.peek(), Token::ConId(_)),
+            Self::Paren => matches!(parser.peek(), Token::LParen),
+            Self::Record => matches!(parser.peek(), Token::LBrace),
+        }
+    }
+
+    /// The form admitted at the cursor, if any. **The only way into a parse
+    /// arm**, which is what makes the pairing structural.
+    fn at(parser: &Parser) -> Option<Self> {
+        Self::ALL.into_iter().find(|form| form.admits(parser))
+    }
+}
+
+#[cfg(test)]
+mod atom_form_closure {
+    //! AC-1 -- the closure property for the PATTERN position's token-keyed
+    //! forms.
+    //!
+    //! **The load-bearing evidence for this AC is NOT in this file.** It is
+    //! three compile-time results, because the property is structural:
+    //!
+    //! ```text
+    //! a parse arm whose form has no `admits` arm   -> E0004, COMPILE ERROR
+    //! an `admits` entry with no parse arm          -> E0004, COMPILE ERROR
+    //! both arms, COUNT and ALL left alone          -> COMPILES, unconsulted
+    //! ```
+    //!
+    //! The third is the residual [`PatternAtomForm`] discloses, measured
+    //! rather than asserted. The rows below cover what a compile error cannot:
+    //! that the derivation is FAITHFUL to the roster it replaced, and that no
+    //! variant is dead.
+    use super::*;
+
+    fn parser_at(tokens: Vec<Token>) -> Parser {
+        let mut spanned: Vec<(Token, Span)> = tokens
+            .into_iter()
+            .enumerate()
+            .map(|(i, t)| (t, Span::new(i, i + 1)))
+            .collect();
+        spanned.push((Token::Eof, Span::new(99, 99)));
+        Parser::new(spanned, String::new())
+    }
+
+    /// The twelve tokens `can_start_pattern` admitted before the derivation.
+    /// Changing this list is changing the pattern surface, which is a language
+    /// decision -- not a refactor's to make silently.
+    fn historical_roster() -> Vec<Token> {
+        vec![
+            Token::Ident(String::new()),
+            Token::ConId(String::new()),
+            Token::Nat(0),
+            Token::IntLit(0.into()),
+            Token::FloatLit(0.0),
+            Token::DecimalLit(0.into(), 0),
+            Token::Float32Lit(0.0),
+            Token::Str(String::new()),
+            Token::CharLit('x'),
+            Token::ByteStr(Vec::new()),
+            Token::LParen,
+            Token::LBrace,
+        ]
+    }
+
+    /// AC-1 -- the derivation is FAITHFUL. `can_start_pattern` is now computed
+    /// from `PatternAtomForm`, and it must admit exactly what the
+    /// hand-maintained list admitted. A refactor that quietly narrowed or
+    /// widened the pattern surface would pass every other test in this crate
+    /// that does not happen to use the dropped form.
+    #[test]
+    fn the_derived_roster_admits_exactly_the_historical_twelve() {
+        for token in historical_roster() {
+            let parser = parser_at(vec![token.clone()]);
+            assert!(
+                parser.can_start_pattern(),
+                "{token:?} started a pattern before the derivation and must \
+                 still -- the derived roster has NARROWED the pattern surface"
+            );
+            assert!(
+                PatternAtomForm::at(&parser).is_some(),
+                "{token:?} is admitted by the roster but no form claims it, so \
+                 `parse_atom_pattern` would take the fallthrough"
+            );
+        }
+    }
+
+    /// The other direction: a token no form claims must not be admitted. Pairs
+    /// with the row above, which alone would pass on a roster that admits
+    /// everything.
+    #[test]
+    fn the_derived_roster_refuses_what_no_form_claims() {
+        for token in [Token::KwIf, Token::KwProof, Token::TruncBar, Token::Arrow] {
+            let parser = parser_at(vec![token.clone()]);
+            assert!(
+                !parser.can_start_pattern(),
+                "{token:?} is not a pattern atom start and must stay refused"
+            );
+        }
+    }
+
+    /// No DEAD variant. A form whose `admits` can never fire is an unreachable
+    /// parse arm wearing a live-looking name -- the neighbour of the residual
+    /// `PatternAtomForm` discloses, and the one a compile error cannot catch.
+    #[test]
+    fn every_form_is_reachable_by_some_token() {
+        for form in PatternAtomForm::ALL {
+            let roster = historical_roster();
+            let witness = roster
+                .iter()
+                .find(|token| form.admits(&parser_at(vec![(*token).clone()])));
+            assert!(
+                witness.is_some(),
+                "{form:?} is admitted by no token in the roster, so its parse \
+                 arm is unreachable and nothing else would report it"
+            );
+        }
+    }
+
+    /// `ALL` is the iteration source and `COUNT` ties its length. This pins
+    /// the half the array length does NOT: that `ALL` lists each variant once.
+    ///
+    /// **This does NOT cover the shadowing hazard, and an earlier version of
+    /// this test said it did.** Its message named `at`'s first-match behaviour
+    /// while the assertion compared VARIANTS -- a claim about the array against
+    /// evidence about its elements. The hazard that can actually occur is two
+    /// DISTINCT forms whose `admits` predicates overlap, and it is invisible
+    /// here; [`no_two_forms_admit_the_same_token`] is where it lives.
+    #[test]
+    fn all_lists_each_variant_once() {
+        for (i, a) in PatternAtomForm::ALL.iter().enumerate() {
+            for b in PatternAtomForm::ALL.iter().skip(i + 1) {
+                assert_ne!(a, b, "`ALL` lists {a:?} twice");
+            }
+        }
+    }
+
+    /// `at` is `ALL.into_iter().find(..)`, so it returns the FIRST form whose
+    /// `admits` holds -- **`ALL`'s ORDER is load-bearing the moment two forms
+    /// can admit one token**, and the later one is then silently unreachable.
+    ///
+    /// **Installed while it is GREEN, which is the only time it is cheap.**
+    /// Today the five pattern forms are pairwise disjoint, so this costs one
+    /// test and asserts a real property. It will not stay free: on the
+    /// expression side `Token::Ident(_)` is admitted for ordinary variables
+    /// AND heads the contextual multi-word selectors (`recursive result for`,
+    /// `induction hypothesis for`), so the moment both are forms this is the
+    /// control that reports the overlap. Writing it then would mean authoring
+    /// it against a mechanism still being shaped, at the moment it is already
+    /// failing.
+    #[test]
+    fn no_two_forms_admit_the_same_token() {
+        for token in historical_roster() {
+            let parser = parser_at(vec![token.clone()]);
+            let claimants: Vec<PatternAtomForm> = PatternAtomForm::ALL
+                .into_iter()
+                .filter(|form| form.admits(&parser))
+                .collect();
+            assert!(
+                claimants.len() <= 1,
+                "{token:?} is admitted by {claimants:?}. `at` returns the \
+                 FIRST, so every form after it is unreachable for this token \
+                 and nothing else reports it -- if the overlap is intended, \
+                 `at`'s order is now a correctness property and must say so"
+            );
+        }
     }
 }
 
@@ -458,8 +821,16 @@ mod atom_start_premise {
         }
     }
 
-    /// ALL THREE roster functions consult the exclusions INTERNALLY, for
+    /// ALL THREE ATOM ENTRY POINTS consult the exclusions INTERNALLY, for
     /// EVERY member, at every position that member governs.
+    ///
+    /// **`can_start_pattern` is the third ROSTER and is deliberately
+    /// unguarded, because `can_start_atom_pat` wraps it.** The three that
+    /// self-guard are the atom ENTRY POINTS; the roster list and the
+    /// entry-point list are different sets of three, overlapping in two
+    /// members. Guarding the base predicate as well would duplicate
+    /// `can_start_atom_pat`'s check and re-create the asymmetry the KwProof
+    /// hardening removed.
     ///
     /// The Pattern arm is not decoration: [`StartExclusion::AsAlias`] governs
     /// Pattern and NOTHING ELSE, so before it existed this loop iterated that
@@ -479,7 +850,7 @@ mod atom_start_premise {
     /// version of this test hand-enumerated two of six members and was named
     /// for a closure it did not have -- which is read as discharging it.
     #[test]
-    fn all_three_rosters_refuse_every_exclusion_trigger() {
+    fn all_three_atom_entry_points_refuse_every_exclusion_trigger() {
         for exclusion in StartExclusion::ALL {
             let mut tokens: Vec<(Token, Span)> = exclusion
                 .fixture()
@@ -2947,27 +3318,40 @@ impl Parser {
                     // `visits [` is an effect-row annotation. They are now
                     // stated once, in the classification, rather than twice in
                     // two loops that could drift apart.
-                    if self.atom_start_exclusion(AtomPosition::Expression).is_some() {
-                        break;
-                    }
-                    if !self.can_start_atom_expr() {
-                        // `32 §3`: an ungrouped leading form is not an
-                        // `application_atom` and must reject AT its leading
-                        // token. A bare `break` cannot do that -- a
-                        // continuation predicate can only stop, and the
-                        // leftover token is then reported as a stray by
-                        // whatever production runs next, at the same
-                        // coordinate. So the rejection has to be raised HERE,
-                        // affirmatively, before the loop yields the token.
-                        if matches!(self.peek(), Token::KwIf) {
+                    // AC-3: the exclusion layer decides SPEAK-or-YIELD, in
+                    // ONE place.
+                    //
+                    // **This guard used to `break` on ANY exclusion, and that
+                    // is why it had to move.** `32 §3` says an ungrouped
+                    // leading form must reject AT its leading token, and a
+                    // bare `break` cannot: a continuation predicate can only
+                    // stop, and the leftover token is then reported as a stray
+                    // by whatever production runs next, at the same
+                    // coordinate. So `if` needed an affirmative raise -- which
+                    // it had, as a hand-written `matches!(peek(), KwIf)` below
+                    // this guard, carrying its own message.
+                    //
+                    // Moving that message into the classification made the
+                    // hand-written case unreachable: `IfExpression` is an
+                    // exclusion, so THIS guard matched it and broke first. A
+                    // layer in front of the law must not pre-empt the law's own
+                    // refusals -- it derives from them, it does not speak for
+                    // them. Measured: the contract test went red naming the
+                    // DECLARATION PARSER as the producer, which is exactly the
+                    // defect `lang_application_atom_if_rejection.rs` exists to
+                    // catch.
+                    if let Some(exclusion) =
+                        self.atom_start_exclusion(AtomPosition::Expression)
+                    {
+                        if let Some(diagnostic) = exclusion.argument_diagnostic() {
                             return Err(ElabError::ParseError {
-                                msg: "`if` is not an application_atom: group it \
-                                      as `(if ... then ... else ...)` to pass it \
-                                      as an argument"
-                                    .to_owned(),
+                                msg: diagnostic,
                                 span: self.peek_span().clone(),
                             });
                         }
+                        break;
+                    }
+                    if !self.can_start_atom_expr() {
                         break;
                     }
                     let arg = self.parse_atom_expr()?;
@@ -3366,22 +3750,11 @@ impl Parser {
         }
     }
 
+    /// AC-1: DERIVED from [`PatternAtomForm`], not a second hand-maintained
+    /// list beside `parse_atom_pattern`'s arms. The twelve tokens are now the
+    /// union of five forms' `admits`, computed rather than restated.
     fn can_start_pattern(&self) -> bool {
-        matches!(
-            self.peek(),
-            Token::Ident(_)
-                | Token::ConId(_)
-                | Token::Nat(_)
-                | Token::IntLit(_)
-                | Token::FloatLit(_)
-                | Token::DecimalLit(_, _)
-                | Token::Float32Lit(_)
-                | Token::Str(_)
-                | Token::CharLit(_)
-                | Token::ByteStr(_)
-                | Token::LParen
-                | Token::LBrace
-        )
+        PatternAtomForm::at(self).is_some()
     }
 
     fn can_start_atom_pat(&self) -> bool {
@@ -3420,16 +3793,20 @@ impl Parser {
 
     fn parse_atom_pattern(&mut self) -> Result<Pattern, ElabError> {
         let start = self.peek_span().start;
-        match self.peek().clone() {
-            Token::Nat(_)
-            | Token::IntLit(_)
-            | Token::FloatLit(_)
-            | Token::DecimalLit(_, _)
-            | Token::Float32Lit(_)
-            | Token::Str(_)
-            | Token::CharLit(_)
-            | Token::ByteStr(_) => self.parse_literal_pattern(),
-            Token::Ident(name) => {
+        // AC-1: the ONLY way into an arm below. A parse arm is reachable iff
+        // `admits` said yes, so the start test and the parse cannot drift.
+        let Some(form) = PatternAtomForm::at(self) else {
+            return Err(ElabError::ParseError {
+                msg: format!("expected an atom pattern, found {:?}", self.peek()),
+                span: self.peek_span().clone(),
+            });
+        };
+        match form {
+            PatternAtomForm::Literal => self.parse_literal_pattern(),
+            PatternAtomForm::Var => {
+                let Token::Ident(name) = self.peek().clone() else {
+                    return Err(self.atom_form_drift(PatternAtomForm::Var));
+                };
                 let span = self.peek_span().clone();
                 self.advance();
                 let kind = if name == "_" {
@@ -3439,7 +3816,10 @@ impl Parser {
                 };
                 Ok(Pattern { kind, span })
             }
-            Token::ConId(name) => {
+            PatternAtomForm::Ctor => {
+                let Token::ConId(name) = self.peek().clone() else {
+                    return Err(self.atom_form_drift(PatternAtomForm::Ctor));
+                };
                 // Atom constructor (no sub-patterns at this level without parens)
                 let span = self.peek_span().clone();
                 self.advance();
@@ -3449,7 +3829,7 @@ impl Parser {
                     span,
                 })
             }
-            Token::LParen => {
+            PatternAtomForm::Paren => {
                 self.advance();
                 if matches!(self.peek(), Token::RParen) {
                     return Err(ElabError::ParseError {
@@ -3487,11 +3867,27 @@ impl Parser {
                     span: Span::new(start, end),
                 })
             }
-            Token::LBrace => self.parse_record_pattern(),
-            other => Err(ElabError::ParseError {
-                msg: format!("expected an atom pattern, found {:?}", other),
-                span: self.peek_span().clone(),
-            }),
+            PatternAtomForm::Record => self.parse_record_pattern(),
+        }
+    }
+
+    /// Fail CLOSED when `admits` and its parse arm have drifted.
+    ///
+    /// Unreachable while they agree -- which is the point: it is a runtime
+    /// witness for the one pairing the type system cannot state, rather than a
+    /// `panic!` asserting the pairing holds.
+    ///
+    /// **Takes the FORM, not a `&str`.** A helper whose whole purpose is
+    /// catching a hand-maintained correspondence drifting must not itself
+    /// carry one: with a string, a copied `else` branch names the wrong form
+    /// and the diagnostic lies about which pairing broke.
+    fn atom_form_drift(&self, form: PatternAtomForm) -> ElabError {
+        ElabError::ParseError {
+            msg: format!(
+                "internal: PatternAtomForm::{form:?} admitted a token its parse \
+                 arm cannot destructure -- admits() and the arm have drifted"
+            ),
+            span: self.peek_span().clone(),
         }
     }
 
