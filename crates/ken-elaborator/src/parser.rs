@@ -479,7 +479,7 @@ mod atom_start_premise {
     /// version of this test hand-enumerated two of six members and was named
     /// for a closure it did not have -- which is read as discharging it.
     #[test]
-    fn both_rosters_refuse_every_exclusion_trigger() {
+    fn all_three_rosters_refuse_every_exclusion_trigger() {
         for exclusion in StartExclusion::ALL {
             let mut tokens: Vec<(Token, Span)> = exclusion
                 .fixture()
