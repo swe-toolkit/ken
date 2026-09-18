@@ -129,3 +129,70 @@ written, not about this node.
    `<symbol> :: <property>` with `file:line` marked as a hint. The Architect's
    §1a hard-stop counter does not advance for this one — the ruling was the
    Steward's, not theirs.
+
+2. **A peeling/forcing ladder measures a program Ken never runs, keyed on
+   DEPTH.** 2026-09-18, hard stop 2. Values behind a deferred guard are the
+   values the guard exists to reject, so each run buys one layer with no bound
+   on layers remaining and no guarantee the next is even a new predicate.
+   Architect withdrew the ladder and specified a caller closure in its place.
+   **That replacement was itself defective — see entry 3.**
+
+3. **An instrument whose COUNTEREXAMPLE CONDITION IS SATISFIED BY CORRECT CODE,
+   keyed on CALL-GRAPH POSITION.** 2026-09-18, hard stop 3. Architect specified
+   *"a branch reaches an entry point with no bind anywhere above it"*.
+   Production reaches that state on EVERY compile, by design
+   (`core.rs:1758-1760`), so the search could not terminate in the negative:
+   only a residue or a false alarm was reachable. It produced 13 apparent
+   counterexamples, none real. A second independent fault in its caller pattern
+   changed only WHICH correct paths were listed. **Neither fault was visible
+   from the output.** The instrument was the Architect's and was withdrawn
+   rather than debugged; `D2` then settled from the write side, and the answer
+   proved to be in a comment block directly above the declining read
+   (`aggregates.rs:3468-3476`).
+
+   Both entries 2 and 3 are the Architect's and both advance their `§1a`
+   counter: **`(RT-CARRIER-PRODUCER-OCCURRENCE, D2) = 2`, next research pull at
+   3.**
+
+### The three entries share ONE predicate, and it is the finding
+
+The list was seeded on the premise that a second entry of the same kind is a
+finding about how frames are written. **Three entries arrived and the Architect
+named what they share** (`evt_4xarw5w7crtd5`):
+
+    1  frame anchors de-aimed by a behaviour-preserving file split
+         keyed on SOURCE COORDINATES                          (Steward's)
+    2  the deferral/peeling ladder: force a guard, observe the next layer
+         keyed on DEPTH -- what is behind layer N             (Architect's)
+    3  the caller closure: "a branch reaches an entry with no bind above it"
+         keyed on CALL-GRAPH POSITION                         (Architect's)
+
+> **EACH WAS ANCHORED ON A POSITION WHERE THE QUESTION WAS ABOUT A PROPERTY.**
+
+**The failure mode is uniform and quiet: a position-anchored instrument does not
+error, it RESOLVES ONTO SOMETHING.** The re-aimed ban resolved onto real
+unrelated code and the natural check returned yes. The ladder returned a layer.
+The closure returned 13 roots. **Three confident, well-formed, wrong answers,
+and not one of them looked like a malfunction.**
+
+Two further instances, neither an inventory entry, both from this node: the
+frame's `D5` cites `:2677-2681` for a note the tree has since moved, and an
+*"is an inventory armed for this WP"* check was run as a search of
+`docs/program/wp/` — a LOCATION — when the section sits in
+`docs/program/issues/`. **Five instances, one predicate.**
+
+**The remedy already adopted for `§4` bans — anchor on `<symbol> :: <property>`,
+`file:line` as a hint — generalizes to three more artifact kinds:**
+
+    instrument termination conditions   state the PROPERTY that ends the
+                                        search, never the POSITION reached
+    currency citations                  cite by CONTENT; coordinates are hints
+    cross-artifact searches             search by the property's NAME across
+                                        the tree, not by the path you expect
+
+**No recut follows from this.** Each of the three entries' repairs was
+individually correct and is already made — the ban form was fixed, the ladder
+was withdrawn, the closure was withdrawn. The predicate buys the rule
+extension, not a rescope of this node; the Architect declined to manufacture
+work to make the trigger look productive, and that judgment is recorded here
+rather than quietly dropped.
