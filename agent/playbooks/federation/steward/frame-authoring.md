@@ -473,6 +473,44 @@ premise was established by careful measurement the night before. Having spent
 the effort establishing that the defect is real, *"what if it isn't"* is the
 question you are least able to ask.
 
+## A COMMISSIONED MEASUREMENT CARRIES ITS TERMINATING OBSERVATION, IN THE FRAME
+
+**Any deliverable or AC that commissions a measurement whose outcome you do not
+already know must state, beside the method, what observation ends it — and what
+the other outcome looks like.** Not in the kickoff, not in a memory lesson: in
+the frame. The rule binds at specification time, and the frame — rather than a
+lesson whoever writes the frame may happen to recall — is where specifications
+get written.
+
+**Two clauses, and the second is the one that gets skipped:**
+
+1. The observation is written **before** the measurement runs.
+2. **It must be able to come out either way.** An observation that cannot fail,
+   or that fires on the correct case as readily as the defective one, is not a
+   terminating observation — it is a checkable sentence.
+
+**The tell that you have written clause 1 without clause 2:** you can state the
+observation without knowing which way it will go, *and you already know*. If you
+can predict the result from the frame alone, it discriminates nothing.
+**Checkability is not discrimination.**
+
+> **Measured on `RT-DUPLICATED-RESPONSE-BLOCK`, 2026-09-18, both branches of one
+> D0.** Outcome (2) opened *"every `static_origin` is visited exactly once"* —
+> true by construction, since the table is a `Vec` indexed by origin with a
+> single writer that refuses a second entry. Outcome (1) required *"two distinct
+> `static_origin` values carry byte-identical case rosters at a constant
+> offset"* — which is what a correct compiler emits whenever it inlines two call
+> sites of one proc. **One could not fail; the other could not distinguish.**
+> The decision was carried entirely by a control the frame had listed as an AC,
+> and that control separated one-copy from two-copy, never legitimate from
+> defective. The frame demanded a terminating observation and supplied two
+> non-instances of one.
+
+**Where this does not apply:** an AC whose outcome is known and whose job is to
+detect drift — no-regression, baseline match, a scope or contention check. Those
+need a control, not a terminating observation. Reserve this for the steps that
+exist to find something out.
+
 ## Authoring acceptance criteria
 
 Load `pin-a-property` (`agent/playbooks/tools/pin-a-property.md`) before

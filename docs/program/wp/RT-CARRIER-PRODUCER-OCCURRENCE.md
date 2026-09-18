@@ -5,13 +5,16 @@ Depends on: `RT-SRCBODY-BIND-ORDER` (merged, `acfcc915`).
 Origin record:
 [`RT-CARRIER-PRODUCER-OCCURRENCE`](../issues/RT-CARRIER-PRODUCER-OCCURRENCE.md)
 
-Ground: `origin/main` **`d18da5c6`**. Every line number below was read at that
-ref.
+Ground: `origin/main` **`d18da5c6`** as originally written; **every source
+coordinate was RE-GROUND to `origin/main`
+`e75f1fe2768f1996c582bad6c6832e1e1716fc24` on 2026-09-18** — see the amendment
+at the head of §1. Line numbers are hints, not anchors.
 
 ## 0. Posture
 
 `c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload`
-(`constructors.rs:2549`) is `#[ignore]`d. It dies at
+(`constructors.rs:3334`, `#[ignore]` at `:3333` -- hint, re-measured
+2026-09-18) is `#[ignore]`d. It dies at
 `.expect("the C2 carrier edge emits")` before its property is evaluated, so the
 row currently measures nothing.
 
@@ -21,10 +24,150 @@ around it.** In particular §1f is a derivation I did not execute; §2 `D0` exis
 to kill it cheaply if it is wrong.
 
 **The refusal is a guard doing its job, and this node's default posture is that
-the fixture is wrong, not the guard.** Read §4 before proposing any change under
-`lowering/mod.rs`.
+the fixture is wrong, not the guard.** Read §4 before proposing any change to
+PRODUCTION under `lowering/` outside `core/tests/`. **(This sentence used to say
+`lowering/mod.rs`. The guard moved to `aggregates.rs`, which made it name the
+one file the repair will never need — the same vacuity the amendment fixes in
+§5's third hard-stop condition.)**
 
 ## 1. Fixed inputs
+
+> # AMENDMENT 2026-09-18 (Steward) — EVERY SOURCE COORDINATE BELOW IS RE-ANCHORED
+>
+> **This frame was written at `368ff87e8` (2026-08-07). `c7f071bcb`
+> (`RT-EMITTER-AGGREGATES-SPLIT D1`, a behaviour-preserving move to
+> `lowering/aggregates.rs`) relocated every production site it names.** Nothing
+> in the code is broken. Only the frame's aim was.
+>
+> Escalated by runtime-implementer (`evt_2n3wx07120cq6`) under §0's perishable-
+> anchor rule, held by runtime-leader, independently confirmed by the Architect
+> (`evt_24jpn6zngv87y`). **Every coordinate in this amendment was then
+> re-measured by the Steward against `origin/main e75f1fe27`** — not taken from
+> either report.
+>
+> **The implementer was right to stop.** Re-pointing a prohibition is a frame
+> amendment and the frame is the Steward's. They located every site correctly
+> and did not build around a fixed input they had measured false.
+>
+> ## WHY A DE-AIMED BAN IS WORSE THAN A DANGLING ONE
+>
+> **A line-anchored prohibition in a moving file does not fail by dangling. It
+> fails by RE-AIMING onto a same-shaped neighbour, and the natural check returns
+> YES.** Ban 1 read *"do not relax the refusal at `mod.rs:4994-5001`."*
+> Measured at `e75f1fe27`, `mod.rs:4994-5001` **is a refusal** — a
+> `StaticWorkerBinding` provenance/transition refusal. A reviewer asking *"is
+> the refusal still there?"* gets **yes**. The ban verifies as satisfied while
+> protecting nothing it was written to protect, and `mod.rs` contains **zero**
+> occurrences of `source_aggregate_producer` or `reconcile_source_aggregate`.
+>
+> **The re-aim is structural, not bad luck.** A file is dense in the construct
+> its bans are about; refusals cluster with refusals. A de-aimed refusal-ban
+> lands on another refusal with near-certainty, so the new target is
+> systematically the most confusing one available.
+>
+> **A PARTIALLY drifted anchor set is more dangerous than a wholly drifted one:
+> the surviving anchor licenses the rest**, and the anchor a spot check picks is
+> the cheap one.
+>
+> ## THE BAN FORM THIS FRAME NOW USES (Architect ruling, adopted)
+>
+>     ANCHOR      <symbol> :: <the property being protected>
+>     file:line   a HINT, marked as one, never the anchor
+>
+> `AC-4` survived the split untouched because it is directory-scoped, and that
+> is the property to copy. A symbol that moved is still found by name; a symbol
+> deleted or renamed **errors**, which is correct for a prohibition whose
+> subject is gone. Neither re-aims. **Treat every `file:line` in this frame as a
+> hint that may already be stale, and resolve the symbol.**
+>
+> ## RE-ANCHOR TABLE — measured at `origin/main e75f1fe27`
+>
+> Paths are under `crates/ken-runtime/src/cranelift_backend/lowering/`.
+>
+> | frame says | symbol | actually, at `e75f1fe27` |
+> |---|---|---|
+> | `mod.rs:4994-5001` (§1a, ban 1) | `reconcile_source_aggregate`'s producer-occurrence refusal | `aggregates.rs:1198-1204`, in `reconcile_source_aggregate` (`:1191`) |
+> | `mod.rs:9571-9580` (§1b) | `source_aggregate_producer` | `boundary.rs:1020` |
+> | `mod.rs:4895-4980` (§1c) | `source_aggregate_preflight` | `aggregates.rs:831` |
+> | `mod.rs:4866` (§1c) | the preflight-then-emit ordering | `aggregates.rs:1157`+`:1158` and `:1182`+`:1183` — **two sites, both preflight then `emit_carrier_transfer`** |
+> | (`emit_carrier_transfer`) | `emit_carrier_transfer` | `aggregates.rs:1772` |
+> | `mod.rs:11046` (§1f) | `synthesized_constructor` | `aggregates.rs:3459` |
+> | `mod.rs:11064-11071` (§1f, ban 2) | its no-emission-owner early return | `aggregates.rs:3477-3488` — `let Some(owner) = self.defining_emission_owner else { return Ok(Lowered::Constructor { .. occurrence: None .. }) }` |
+> | `mod.rs:4882-4887` (ban 1's citation) | the *"missing producer is a REFUSAL, never a fallback"* doc | `aggregates.rs:818` |
+>
+> **Fixture coordinates in `core/tests/constructors.rs` drifted about +780:**
+>
+> | frame says | symbol | actually |
+> |---|---|---|
+> | `:2548` | the `#[ignore]` attribute | `:3333` |
+> | `:2549` | `c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload` | `:3334`, body ends `:3610` |
+> | `:2654` | edge 1 `c2_host_result_producer` | `:3440` |
+> | `:2721` | edge 2 `c2_ordinary_result_producer` | `:3507` |
+> | `:2752` | edge 3 `c2_host_result_consumer` | `:3538` |
+> | `:2626` | `ordinary_producer_origin` | `:3411` (used `:3494`, `:3529`) |
+> | `:2730`, `:2734` | edge 2's hand-written `occurrence: None` | `:3515`, `:3519` |
+> | `:2511` (ban 3) | `.expect("the C2 carrier edge emits")` | `:2564` — see the correction below |
+>
+> ## TWO CORRECTIONS TO THE ESCALATION REPORTS, both in the safe direction
+>
+> **1. Ban 3's subject is NOT lost, and `:2564` is not a coincidence.** The
+> report reads `:2564` as an unrelated expect that happens to resolve. Resolved
+> from the frame commit's own blob — `git show
+> 368ff87e8:.../core/tests/constructors.rs | sed -n '2511p'` — **line 2511 at
+> framing time WAS `.expect("the C2 carrier edge emits")`.** The same assertion
+> is at `:2564` today. The ban's coordinate de-aimed; **its subject is intact
+> and findable by text.** The warning still stands in full, because today's
+> `:2511` is `&native,` — not an expect at all — so a literal reader of ban 3
+> protects nothing.
+>
+> **Note for the repair: that assertion lives in the shared C2 rig near
+> `ac_c7_run` (`:2483`), NOT inside `c2_ac4`'s body** (`:3334-3610` contains no
+> such expect; `:3326` is a comment referring to it). Ban 3 protects a shared
+> rig assertion, which is a stronger reason not to weaken it, not a weaker one.
+>
+> **2. The `occurrence: None` count is 11, not 14 and not 13.** The frame's 14
+> and the report's 13 are both `grep` hit counts, and **two of the 13 hits are
+> prose, not literals** (`:7848`, `:7948`). Literal count at `e75f1fe27`:
+> **11** — `:302`, `:309`, `:468`, `:521`, `:3455`, `:3515`, `:3519`, `:7730`,
+> `:7836`, `:7882`, `:7904`. A grep on text cannot tell a literal from a mention
+> of one; if you need this number, re-derive it excluding comment lines and say
+> how you excluded them.
+>
+> ## WHAT IS UNCHANGED
+>
+> **`AC-4` is untouched and still governs.** It is directory-scoped
+> (`lowering/` other than `core/tests/`, at `:237-241`), so it never de-aimed
+> and it fences the real guard at `aggregates.rs:1198-1204` today. **No
+> acceptance criterion is relaxed by this amendment** — only coordinates are
+> corrected and `§4` is re-anchored.
+>
+> ## CORRECTION TO THIS AMENDMENT — §5's THIRD CONDITION WAS NOT UNAFFECTED
+>
+> **I first wrote here that §5's third hard-stop condition was "likewise
+> directory-scoped and stands as written." That was wrong,** and the Architect
+> caught it (`evt_6m8xfrbddq0kn`). Only its EXCLUSION (`core/tests/`) is a
+> directory. **Its SUBJECT was `lowering/mod.rs` — one file.** After the split
+> the repair lands in `aggregates.rs`, so the repair *can* be written without
+> touching `mod.rs`, so the condition **could not fire — not for this repair,
+> not for any repair, ever again.** It is re-anchored in §5.
+>
+> **A DE-AIMED HARD STOP IS WORSE THAN A DE-AIMED BAN.** A de-aimed ban points
+> at a decoy — a reader protects the wrong lines, but there is something there
+> to look at. A de-aimed hard stop goes **vacuous**: the guard is not
+> misdirected, it is dead, **and a dead guard reports clear on every input**
+> while sitting in §5 reading as live protection.
+>
+> **And note how it survived the very pass that was auditing for this.** I
+> checked `AC-4` and §5 by reading them for directory-scoping. `AC-4` had it;
+> §5's third did not, **and it read as though it did because its exclusion
+> clause is a directory.** ⇒ **A PARTIALLY directory-scoped condition passes a
+> scan for directory-scoping** — the half that has the property vouches for the
+> half that does not. That is the partial-drift warning above, one level up,
+> and it defeated the audit rather than being caught by it. When you check a
+> guard for a property, check its SUBJECT, not whichever clause is nearest.
+>
+> **The node is still genuinely undone.** This amendment fixes the frame's aim,
+> not its verdict.
 
 ### 1a. The refusal site
 
@@ -277,18 +420,64 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
 
 ## 4. Banned scope
 
-- **Do not relax or delete the refusal at `mod.rs:4994-5001`, and do not add a
-  fallback owner.** The refusal text names precisely what a fallback would grant:
-  the authority of wherever the value happened to be transferred. `mod.rs:4882-
-  4887` states that a missing producer is a refusal and never a fallback.
+> **RE-ANCHORED 2026-09-18. Each ban below is anchored on a SYMBOL and the
+> PROPERTY it protects. The `hint:` coordinate is a convenience that may already
+> be stale — resolve the symbol, and if the symbol is gone, STOP and escalate
+> rather than finding the nearest thing that looks like it.** See the §1
+> amendment for why a line-anchored ban re-aims onto a same-shaped neighbour and
+> then verifies as satisfied.
+
+- **BAN 1 — `reconcile_source_aggregate` :: its producer-occurrence refusal must
+  not be relaxed or deleted, and no fallback owner may be added.**
+  *hint: `aggregates.rs:1198-1204`, fn at `:1191`.*
+  The refusal text names precisely what a fallback would grant: the authority of
+  wherever the value happened to be transferred. The doc at `aggregates.rs:818`
+  (*hint*) states that a missing producer is a REFUSAL, never a fallback.
   If the proposed repair is to make the emit succeed by accepting an aggregate
   with no ownership record, **that is a mechanism question and it returns to the
   Architect** — it does not land here.
-- **Do not change `synthesized_constructor`'s early-return branch
-  (`mod.rs:11064-11071`) without an Architect ruling.** §1f says that branch is
-  deliberate and `:2677-2681` says the resulting refusal is correct. Changing it
-  is a design change wearing a fixture repair's clothes.
-- **Do not weaken the `expect` at `:2511`** to make the row pass.
+  **This is the ban `AC-4` calls the only thing standing on that line**, and it
+  is the one that had de-aimed onto eight lines of `StaticWorkerBinding` code.
+- **BAN 2 — `synthesized_constructor` :: its no-emission-owner early-return
+  branch must not change without an Architect ruling.**
+  *hint: `aggregates.rs:3477-3488`, fn at `:3459`.* Identify it by
+  `let Some(owner) = self.defining_emission_owner else { .. occurrence: None .. }`,
+  not by line. §1f says that branch is deliberate and the fixture's own `D7`
+  note says the resulting refusal is correct. Changing it is a design change
+  wearing a fixture repair's clothes.
+- **BAN 4 (added 2026-09-18) — THE CLASS, not a list: no refusal whose reason
+  is a MISSING PLANNER-ISSUED OCCURRENCE may be relaxed anywhere under
+  `lowering/` outside `core/tests/`, whether or not this frame names its
+  symbol.** Added after runtime-implementer's `D1` found a third such refusal
+  in a symbol no ban reached (`evt_6ym3avaqwsb7r`).
+  Known members at `e75f1fe27`, **as hints and explicitly NOT as the
+  population**:
+
+      aggregates.rs:1201   reconcile_source_aggregate      (BAN 1's site)
+      aggregates.rs:1397   reconcile_source_aggregate      SECOND refusal in
+                                                           the same fn -- BAN 1
+                                                           reaches it ONLY
+                                                           because BAN 1 is
+                                                           symbol-anchored; its
+                                                           line-anchored
+                                                           predecessor did not
+      aggregates.rs:3169   emit_carrier_dynamic_constructor (fn at :3113)
+                           "the selected alternative ... carries no planned
+                            occurrence, so its allocation has no lifetime meet"
+
+  **This ban is deliberately written as a PROPERTY and must not be "completed"
+  by enumerating its members.** An enumeration widens past the property in the
+  admitting direction — the exact failure the language ring hit the same day —
+  and a fifth site would then sit outside a list that looks exhaustive. **If you
+  find a member not listed above, that is a finding to report, not a gap in the
+  ban.**
+  `AC-4` is what actually fences this today, and that is the second time in this
+  frame that the directory-scoped criterion caught what a named one missed.
+- **BAN 3 — the `.expect("the C2 carrier edge emits")` assertion :: must not be
+  weakened to make the row pass.** Identify it by that exact string.
+  *hint: `core/tests/constructors.rs:2564`.* It lives in the shared C2 rig near
+  `ac_c7_run` (`:2483`), **not** inside `c2_ac4`'s body — so weakening it
+  reaches rows beyond this node's.
 - **Do not re-baseline or re-scope the row's assertions** to fit whatever the
   repaired edge produces. If the row cannot assert its stated property after the
   repair, that is a finding to report, not an assertion to adjust.
@@ -303,9 +492,15 @@ Stop and report, rather than proceeding, if any of these holds:
 - `D2` rules *real* — a production path can reach the carrier with no producer
   occurrence. That is an Architect question and it is more important than this
   row.
-- The repair cannot be written without touching `lowering/mod.rs` outside
-  `core/tests/`. §1g says it can; if that turns out false, the constructibility
-  audit was wrong and the size is wrong with it.
+- **RE-ANCHORED 2026-09-18 — this condition had gone VACUOUS.** It read *"the
+  repair cannot be written without touching `lowering/mod.rs` outside
+  `core/tests/`."* Only its exclusion was directory-scoped; its SUBJECT was one
+  file. After `c7f071bcb` the repair lands in `aggregates.rs`, so the repair
+  **can** be written without touching `mod.rs`, so the condition could no longer
+  fire — for this repair or any other. It now reads:
+  **the repair cannot be written without touching PRODUCTION under `lowering/`
+  outside `core/tests/`.** §1g says it can; if that turns out false, the
+  constructibility audit was wrong and the size is wrong with it.
 - `D1`'s reaching set is materially larger than the four sites named — that is a
   re-sizing conversation with the Steward, not a longer turn.
 
@@ -318,8 +513,10 @@ Touches `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/
 constructors.rs`, which is also
 [[RT-WORKER-FIXTURE-DECODE]]'s file. **Both nodes are runtime-owned and the
 fleet is single-threaded, so they cannot run concurrently** — sequence them, do
-not parallelize. Their target rows are far apart — `c2_ac4...` at `:2549` here,
-`two_same_shape_workers_are_distinguished` at `:5816` there — and their
+not parallelize. Their target rows are far apart — `c2_ac4...` at `:3334`
+here (hint),
+`two_same_shape_workers_are_distinguished` at `:7404` there (hint,
+re-measured 2026-09-18) — and their
 deliverables are disjoint, so either order works.
 
 `RT-CARRIER-BYTESPAN-OBSERVE` is `active` on the same crate. This node is
