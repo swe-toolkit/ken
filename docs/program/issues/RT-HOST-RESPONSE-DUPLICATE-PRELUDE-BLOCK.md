@@ -1,7 +1,7 @@
 ---
 id: RT-HOST-RESPONSE-DUPLICATE-PRELUDE-BLOCK
-title: "The four RT-HOST-RESPONSE rows' readmission condition -- `readmits when the duplicate prelude block is resolved` -- has no node, so those rows cannot move. One prelude block is materialized twice in `plan.source_occurrences`, giving 29 constructors two route entries that AGREE on `operation` and differ by a single constant effect-origin offset. Find what materializes it twice, and settle whether the `one constructor => one handling site` invariant is too strong -- its `too strong` verdict currently rests on a premise the diagnosis itself measured false."
-status: ready
+title: "SUPERSEDED BY RT-DUPLICATED-RESPONSE-BLOCK -- a duplicate filing of the same defect by the same author ten minutes apart, not a neighbouring node. Same four rows, same producer, same census (29 / all agree / one delta). The surviving id is the one that was already in flight. This node's unique material -- the refuted-premise interrogation, the RT-CLOSURE-BOUNDARY-LANE undetermined state, the readmission-condition debt, and the deliverable shape -- was folded into the survivor, not discarded. Kept as a tombstone so existing citations resolve."
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,43 @@ blocks: []
 github: null
 origin: "Steward framing debt, cut 2026-09-18. RT-HOST-RESPONSE-ROUTE-KEY-COLLISION was DIAGNOSIS-ONLY and succeeded (merged ef11485dd; all four AC-1 dispositions read STAYS IGNORED). Its landed labels state a readmission condition that names work no node covers. Recorded as debt in that node's MERGED banner: 'THE REPAIR HAS NO NODE AND THAT IS STEWARD FRAMING DEBT. The 4 rows do not move until it is cut.' Third repair node sized from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger (488acf24e) under the operator's L1 priority (2026-09-17): L1 clears the ignored tests, and nothing in the lane outranks it until the 15 selected rows are cleared. Every load-bearing fact below re-measured by the Steward against origin/main e75f1fe27 before filing."
 ---
+
+> # TOMBSTONE — SUPERSEDED BY `[[RT-DUPLICATED-RESPONSE-BLOCK]]`
+>
+> **DO NOT WORK THIS NODE.**
+>
+> **Steward, 2026-09-18. This is a duplicate I filed of my own node, ten
+> minutes later.**
+>
+>     RT-DUPLICATED-RESPONSE-BLOCK              filed 16:07:25Z   IN FLIGHT
+>     RT-HOST-RESPONSE-DUPLICATE-PRELUDE-BLOCK  filed 16:17:02Z   this file
+>
+> Same four rows (`px7n:149`, `px7n:170`, `rt_escape:653`, `rt_escape:713`),
+> same producer (`host_response_routes` in `static_transition/responses.rs`),
+> same census numbers (29 colliding constructors, all agreeing on `operation`,
+> one delta per program: 365, 317, 317), same merged predecessor. **It is the
+> same defect, and both were given a WP frame.**
+>
+> **The survivor is the earlier id because it is the one in flight** — the
+> ring's branch, posts and running `D3` census all cite it, and an id is a
+> citation key. Renaming mid-turn for the better name would break every
+> reference for a cosmetic gain.
+>
+> **Nothing here was lost.** This was the richer of the two documents, and the
+> four things it carried that the survivor did not were folded into the survivor
+> under their own headings — the refuted-premise interrogation, the
+> `RT-CLOSURE-BOUNDARY-LANE` undetermined state, the readmission-condition debt
+> the four labels name, and the deliverable shape. **Read them there.** The text
+> below is left intact as the record of what was filed, not as live direction.
+>
+> **How this happened, since the mechanism is reusable:** the two filings came
+> from opposite ends of the same chain. This one was cut from the *readmission
+> condition* the four `#[ignore]` labels state; the survivor was cut from the
+> *refusal message* the four rows produce. **The same defect names itself
+> differently at its cause and at its symptom**, so neither filing's search
+> terms could find the other — a grep keyed on either name misses the node
+> keyed on the other. What would have caught it is neither name: it is the row
+> set. **Before filing, search for the ROWS, not for the mechanism.**
 
 # Why this node exists at all
 
