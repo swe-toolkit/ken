@@ -458,8 +458,13 @@ mod atom_start_premise {
         }
     }
 
-    /// BOTH roster functions consult the exclusions INTERNALLY, for EVERY
-    /// member, at every position that member governs.
+    /// ALL THREE roster functions consult the exclusions INTERNALLY, for
+    /// EVERY member, at every position that member governs.
+    ///
+    /// The Pattern arm is not decoration: [`StartExclusion::AsAlias`] governs
+    /// Pattern and NOTHING ELSE, so before it existed this loop iterated that
+    /// member and asserted nothing about it -- inside a test named for every
+    /// exclusion trigger.
     ///
     /// **This is the closure over CONSUMERS, a different property from AC-1's
     /// closure over TOKENS.** A test that a new token cannot be silently
@@ -474,7 +479,7 @@ mod atom_start_premise {
     /// version of this test hand-enumerated two of six members and was named
     /// for a closure it did not have -- which is read as discharging it.
     #[test]
-    fn both_rosters_refuse_every_exclusion_trigger() {
+    fn all_three_rosters_refuse_every_exclusion_trigger() {
         for exclusion in StartExclusion::ALL {
             let mut tokens: Vec<(Token, Span)> = exclusion
                 .fixture()
@@ -500,10 +505,17 @@ mod atom_start_premise {
                      its trigger"
                 );
             }
+            if exclusion.applies_in(AtomPosition::Pattern) {
+                assert!(
+                    !parser.can_start_atom_pat(),
+                    "{exclusion:?} governs Pattern but the pattern roster \
+                     admits its trigger"
+                );
+            }
         }
 
-        // Positive control: an ordinary ident is admitted by both rosters, so
-        // the guards are not refusing everything.
+        // Positive control: an ordinary ident is admitted by all three
+        // rosters, so the guards are not refusing everything.
         let parser = Parser::new(
             vec![
                 (Token::Ident("x".to_string()), Span::new(0, 1)),
@@ -513,6 +525,7 @@ mod atom_start_premise {
         );
         assert!(parser.can_start_atom_expr());
         assert!(parser.can_start_atom_type());
+        assert!(parser.can_start_atom_pat());
     }
 
     /// AC-4's premise: no operator token is admitted as an atom start.
