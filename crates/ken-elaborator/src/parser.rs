@@ -2806,6 +2806,9 @@ impl Parser {
     ///    at depth > 0 when it passes one. Control:
     ///    `match v { a, b ↦ x }` must stay REJECTED; today it is refused as a
     ///    malformed RECORD LITERAL, which is the misclassification itself.
+    ///    **That control is a TRIPWIRE, not a detector** -- see its own
+    ///    comment. The warning that reaches the author who breaks this is the
+    ///    note on `parse_pattern`.
     /// 2. **A record literal always reaches a depth-0 `Eq`, `Comma` or
     ///    `RBrace` before any `MapsTo`.** Control: `{}` must stay an illegal
     ///    record literal. `parse_record_expr` calls `expect_ident()` straight
@@ -3017,6 +3020,22 @@ impl Parser {
     /// binds tighter than non-associative `as`, which binds tighter than `|`.
     /// A disjunction is retained as one flat alternative list; parentheses do
     /// not introduce a semantic grouping inside that list.
+    /// **ADDING A PATTERN FORM? A depth-0 comma breaks
+    /// `brace_starts_match_arms`'s invariant 1.**
+    ///
+    /// That scan decides whether a `{` opens a match's arm block or a record
+    /// literal, and it concludes RECORD as soon as it sees a `Comma` at depth
+    /// 0. Every pattern form today carries its commas inside parens or braces,
+    /// so the scan passes them at depth > 0. A form that puts one at depth 0 --
+    /// multi-pattern arms, a bracketed form -- silently misclassifies every arm
+    /// block containing it.
+    ///
+    /// **The control for this lives in
+    /// `tests/lang_atom_start_classification_closure.rs`, and it will NOT warn
+    /// you.** It is a tripwire that fires when someone repairs the scan, not a
+    /// detector that fires when the invariant breaks: with the invariant broken
+    /// the arm still fails to parse, so an assertion of failure still passes.
+    /// This pointer is the warning; the test is the receipt.
     fn parse_pattern(&mut self) -> Result<Pattern, ElabError> {
         let start = self.peek_span().start;
         let first = self.parse_as_pattern()?;
