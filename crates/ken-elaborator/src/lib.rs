@@ -154,6 +154,17 @@ pub struct ElabEnv {
     pub ctor_decl_spans: HashMap<String, Span>,
     /// The numeric tower (registered op ids, dispatch tables).
     pub numeric_env: NumericEnv,
+
+    /// The standard-operator identities layer 3 certified against the
+    /// standard-operator home's export table (`33 §6.1`, `39 §6.9`).
+    ///
+    /// Empty when the program does not provide the home, in which case a
+    /// standard-operator occurrence is refused at the occurrence naming the
+    /// role. **Not `pub`**: the role type is crate-internal by contract, and
+    /// `#![deny(private_interfaces)]` above is what holds that rather than
+    /// this comment.
+    pub(crate) standard_operators:
+        HashMap<standard_operators::StandardOperatorRole, GlobalId>,
     /// The Bytes layer (L6): type ids, I/O effect row registry (`38 §1`, `41`).
     pub bytes_env: BytesEnv,
     /// The foreign FFI layer (L7): binding registry (`38 §2–§4`).
@@ -228,6 +239,7 @@ impl ElabEnv {
             fixity_spans: HashMap::new(),
             ctor_decl_spans,
             numeric_env,
+            standard_operators: HashMap::new(),
             bytes_env,
             foreign_env: foreign::ForeignEnv::empty(),
             effect_rows,

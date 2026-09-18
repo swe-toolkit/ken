@@ -471,6 +471,40 @@ fn apply_import(
     Ok(())
 }
 
+/// Layer 3 — certify the standard-operator home the moment its own export
+/// table is complete (`33 §6.1`, `39 §6.9`).
+///
+/// **Called from BOTH module-elaboration paths on purpose.** A module reaches
+/// its export table by two routes — a loaded source unit and an inline
+/// `module M { … }` — and they insert into `module_state.exports` at two
+/// different sites. Hooking only the first is the defect this function exists
+/// to prevent: an inline home would elaborate entirely uncertified, and every
+/// negative case would pass while proving nothing. That is not hypothetical;
+/// it is what the AC-9 cases caught on the first run.
+fn certify_standard_operator_home(
+    elab: &mut ElabEnv,
+    module: &str,
+    at: Option<&Span>,
+) -> Result<(), ElabError> {
+    if module != crate::standard_operators::STANDARD_OPERATOR_HOME {
+        return Ok(());
+    }
+    // An inline `module M { … }` knows its own span; a loaded source unit is
+    // the whole file and has none to offer. Carry the real one where it
+    // exists rather than synthesising a coordinate that points nowhere.
+    let span = at.cloned().unwrap_or_else(|| Span::new(0, 0));
+    let bool_id = elab.numeric_env.bool_id;
+    elab.standard_operators = crate::standard_operators::certify_roles(
+        &elab.env,
+        &elab.module_state.exports,
+        &elab.globals,
+        crate::standard_operators::STANDARD_OPERATOR_HOME,
+        bool_id,
+        &span,
+    )?;
+    Ok(())
+}
+
 fn publish_identity(
     exports_here: &mut HashMap<String, String>,
     surface_name: &str,
@@ -843,6 +877,8 @@ fn load_unit(
         elab.module_state
             .exports
             .insert(module.to_string(), exports);
+
+        certify_standard_operator_home(elab, module, None)?;
         elab.module_state
             .loaded_unit_scopes
             .insert(module.to_string(), scope);
@@ -2537,7 +2573,7 @@ fn expand_scope(
             Decl::ModuleDecl {
                 name,
                 decls: inner,
-                span: _,
+                span: module_span,
             } => {
                 let child_prefix = qualify(prefix, name);
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
@@ -2552,7 +2588,8 @@ fn expand_scope(
                 ids.extend(child_ids);
                 elab.module_state
                     .exports
-                    .insert(child_prefix, child_exports);
+                    .insert(child_prefix.clone(), child_exports);
+                certify_standard_operator_home(elab, &child_prefix, Some(module_span))?;
                 i += 1;
             }
             Decl::SpaceDecl {
