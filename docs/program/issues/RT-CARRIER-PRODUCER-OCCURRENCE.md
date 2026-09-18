@@ -109,3 +109,23 @@ production, or whether a real path can reach the carrier in that state.
 - **Check whether the same refusal reaches other rows.** This is one observed
   occurrence; the enumeration that found it was scoped to the failing set, not
   to this signature. Name the population before sizing the repair.
+
+## Symptom inventory
+
+Hard stops taken on this node, and what each one was actually a symptom of.
+Seeded on the Architect's suggestion (`evt_24jpn6zngv87y`); the point of the
+list is that a second entry of the same kind is a finding about how frames are
+written, not about this node.
+
+1. **Frame anchors de-aimed by a behaviour-preserving file split, keyed on
+   source coordinates.** 2026-09-18, hard stop 1. Raised by runtime-implementer
+   (`evt_2n3wx07120cq6`), confirmed by the Architect, re-measured and amended by
+   the Steward. `c7f071bcb` moved every production site the frame named from
+   `lowering/mod.rs` into `lowering/aggregates.rs` and `boundary.rs`; the three
+   `§4` bans then resolved to real, unrelated code rather than erroring. **The
+   general lesson, now written into the frame: a line-anchored prohibition in a
+   moving file fails by RE-AIMING onto a same-shaped neighbour, and the natural
+   check returns yes.** The remedy adopted frame-wide is to anchor bans on
+   `<symbol> :: <property>` with `file:line` marked as a hint. The Architect's
+   §1a hard-stop counter does not advance for this one — the ruling was the
+   Steward's, not theirs.
