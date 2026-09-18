@@ -1,7 +1,7 @@
 ---
 id: RT-PROCESS-EXIT-STATUS
-title: "rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds refuses at the boundary-transfer admissibility walk with StaticResponseDeferred -- a deferred host response reaches a cross-owner transfer. The id names a ProcessExitStatus/Persistent-over-NoReferent refusal the row no longer produces; the id is a citation key and is NOT renamed, the title is. Decide whether the Deferred is a correct fail-closed or a classify leak, and repair whichever it is."
-status: ready
+title: "rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds refuses with StaticResponseDeferred -- a deferred host response reaches a cross-owner transfer. WHICH of the two sites refuses is UNDECIDED: the frame's section 3 argument that the construct tag identifies the admissibility walk is REFUTED (Architect, evt_398hkbskdt1mx) and the enumeration it discharged is owed again. The id names a ProcessExitStatus/Persistent-over-NoReferent refusal the row no longer produces; the id is a citation key and is NOT renamed, the title is. Decide whether the Deferred is a correct fail-closed or a classify leak, and repair whichever it is."
+status: draft
 owner: runtime
 size: S
 gate: none
@@ -11,6 +11,53 @@ blocks: []
 github: null
 origin: "Measured by the RT-SRCBODY-BIND-ORDER D12 complete no-fail-fast enumeration (evt_2n9wq8xyj0aa1); re-measured by RT-IGNORED-FAILING-ROWS-INVENTORY's ledger (docs/program/evidence/rt-ignored-failing-rows-ledger.md) row 13, which records a DIFFERENT refusal from the one this node is named for and label agrees? NO. Fails at frozen base 21fd46dc as well as at the candidate, so it is pre-existing base debt and not a regression. Framed by the Steward 2026-09-18 under the operator L1 directive 2026-09-17 ('Is L1 still working on clearing the ignored tests? That is the top priority until it is done.'). depends_on was [RT-SRCBODY-BIND-ORDER]; that node is merged and the edge was a READ, not a dependency -- the provenance is recorded here instead. Steward-filed per COORDINATION section 2."
 ---
+
+> # HELD `draft`, NOT `ready`. DO NOT PICK THIS UP AND DO NOT KICK IT.
+>
+> **Flipped `ready` -> `draft` by the Steward, 2026-09-18, on the Architect's
+> refutation (`evt_398hkbskdt1mx`).** The WP frame's `§3` argues that the
+> construct tag in the observed signature identifies which of two sites
+> refused, and concludes *"`D1` step 1 is DISCHARGED BY CITATION."* **That
+> argument is false and the enumeration it discharged is owed again.**
+>
+>     frame §3 claims   :1291 FailClosedForbidden { why } carries NO construct
+>                       tag, so it cannot render the observed prefix
+>     MEASURED          the tag is NOT attached at the disposition site. It is
+>                       attached by the CONSUMER, and all four consumers do it
+>                       identically:
+>                         aggregates.rs:1533, :2240, :2275, :2312
+>                           BoundaryDisposition::FailClosedForbidden { why }
+>                             => Err(unsupported(lowered_value_kind(v), why))
+>     ⇒                 the :1291 path renders BYTE-IDENTICALLY to the :1056
+>                       path. Same wrapper, same tag, same `why` literal.
+>                       NOTHING in the rendered message separates them.
+>
+> **`runtime-IR lowering` is the enclosing WRAPPER, not a site** —
+> `surface.rs:219` renders `"unsupported runtime-IR lowering: {err}"` around
+> every `Unsupported`. I had read it as a possible third surface name; it is
+> not. Verified independently at `ea6cae0cd`.
+>
+> **THE QUESTION IS REOPENED, NOT ANSWERED THE OTHER WAY.** The Architect
+> showed the `:1291` path CAN render identically. Nobody has shown this row
+> went through it. **Reading this as "the site is the disposition table" is the
+> same unsupported move in the opposite direction.**
+>
+> **What it costs:** this node's own title asserted the admissibility walk
+> fired. That assertion rested on the refuted discriminator and has been struck
+> from the title. `D1` step 1 is LIVE work again, not a citation.
+>
+> **The instrument that terminates** (Architect's, ending stated before the
+> run): add a one-word marker to the `why` literal at `boundary.rs:1058` ONLY,
+> leave `:1292` untouched, re-run, and read the signature **captured from the
+> helper thread** — the test thread's wrapper carries no signature of its own
+> and measures nothing. Marker present ⇒ `:1056`, the admissibility walk, and
+> the site is SHARED with ledger row 14. Marker absent ⇒ `:1291`, the
+> disposition table, and row 14 needs its own successor. **A throwaway probe;
+> revert it. It must not ride in a candidate.**
+>
+> **Steward owes the `§3` replacement in the WP frame.** A coordinate
+> correction to that frame is already routed and pending as `9d481836d`; this
+> node edit is deliberately disjoint from it so the two cannot conflict.
 
 > # TREAT EVERY ANCHOR IN THIS FRAME AS PERISHABLE
 >
