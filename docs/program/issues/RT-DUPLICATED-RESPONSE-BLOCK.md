@@ -187,7 +187,20 @@ shares a file with the population and does not share the cause.** Any account
 of the duplication that would also predict a collision in `S6` is refuted on
 arrival.
 
-# The open question
+# The open question — CLOSED. READ THE RULING BELOW BEFORE THIS SECTION.
+
+> **This heading and the two readings under it are the RECORD OF WHAT WAS
+> ASKED. Both were REJECTED by the Architect, `evt_4eghtvj2fhpz0`,
+> 2026-09-18** — the ruling is in the next section and in section 8.9a of this
+> node's work package. **Neither reading is the answer, and reading (2) below,
+> left standing alone, authorises deleting `responses.rs:1279`, which the
+> ruling states is the only guard against a silent wrong-continuation route.**
+>
+> Steward, 2026-09-18: the ruling was recorded downstream of here and this
+> section was not marked, so **a reader who stops at the section titled "the
+> open question" gets the pre-ruling answer from the node that owns the
+> ruling.** Related: `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` inherited exactly
+> reading (2)'s sentence as a live claim (Architect, `evt_5m7k7k4vrg5ay`).
 
 Two readings survive the evidence, and this node exists to decide between them
 rather than to assume one:

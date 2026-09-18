@@ -1,7 +1,7 @@
 ---
 id: RT-HOST-RESULT-ARM-SHAPE-DISAGREEMENT
 title: "The C2 nested-payload row's ERROR arm is recipe-derived from FsWriteAt and asserts a BoundaryTag::ImmediateBool result the recipe yields under neither root -- HostResultOk is Fixed{Wrote,[PrivateTransferCount,[nat,nat]]} and HostResultError is a twelve-alternative Dynamic set. (The success arm is hand-built with a bool field and is fine.) This is not a fixture supplying a wrong value; it is the row's assertion and the operation's recipe disagreeing, so no fixture edit reconciles it. The question is whether the row's property is expressible against FsWriteAt at all, or whether it needs an operation whose error arm is genuinely an immediate bool."
-status: ready
+status: draft
 owner: runtime
 size: S
 gate: none
@@ -11,6 +11,54 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-18. Architect ruling in evt_760sbdhcgwx80, which took the arm question OUT of RT-CARRIER-PRODUCER-OCCURRENCE's D3 and out of fixture repair entirely: 'The row asserts a shape this operation's recipe never yields, under either root. No fixture edit reconciles that... It is a new node, and the design question there is mine -- I will take it when it is filed.' Surfaced by runtime-implementer during D3 (the OK-rooted template sitting in the error slot), whose observation the Architect confirmed and then widened by measuring the recipe tree. Second node produced by the RT-CARRIER chain. Steward-filed per COORDINATION section 2."
 ---
+
+> # RE-CUT IN FLIGHT — `draft`, NOT `ready`. DO NOT PICK THIS UP.
+>
+> **Flipped `ready` -> `draft` by the Steward, 2026-09-18, on the Architect's
+> NARROWED ruling (`evt_3a8xxpwmcy5xz`).** `RT-CARRIER-PRODUCER-OCCURRENCE`
+> `D3`/`D4` refuted several of this node's fixed inputs while it sat `ready`.
+> Corrections are inline below and are the Architect's, not paraphrases.
+>
+> **What died:** the STRENGTHENING section (struck), the stated reason for
+> rejecting `(a)` (refuted, conclusion kept), the published `args` block (will
+> not compile -- `false_word` was deleted), and *"both `ImmediateBool`
+> assertions survive"* (there is one).
+>
+> **What survives, and it is the core: `(c)` — THE ERROR ARM SHOULD NEVER HAVE
+> BEEN RECIPE-DERIVED.** The one measurement that decides it: the borrow `(c)`
+> names is **byte-unchanged** across `2d440e394..a9fb242f0` — no `+`/`-` line
+> touches it. `D3`/`D4` changed what the arm is **fed** and what the row
+> **asserts**; neither changed how the arm is **built**, and `(c)` is about the
+> build. **The borrow count went UP** — `D3` added a second one — and the
+> redundancy `(c)` rests on is intact: the row still derives its identities
+> independently and then borrows the recipe anyway, now twice.
+>
+> ## THE MOTIVATION IS NOW STRONGER THAN WHEN THIS WAS FILED, AND THE RE-CUT LEADS WITH IT
+>
+> Filed as an argument about a redundant borrow. It is now **the repair for a
+> coverage gap measured independently.**
+>
+> In reviewing `D4` the Architect noted, and explicitly declined to block on,
+> that both sides of the retargeted error assertion read `aggregate_allocation_at`
+> on the same plan — **so a planner-side defect moves both sides together and
+> the row stays green.**
+>
+>     WHY both sides read the plan      the fixture's error-arm input is
+>                                       RECIPE-DERIVED, so the plan sits on the
+>                                       INPUT end as well as the EXPECTED end
+>     WHAT REMOVING THE BORROW DOES     the input stops being plan-derived, so
+>                                       expected and actual stop sharing a source
+>
+> ⇒ **`(c)` and the `D4` should-fix are one defect seen from two ends.**
+>
+> **The question this node now asks is NOT "is the assertion satisfiable"** —
+> that is answered, it is. It is: **does the fixture's error-arm input come from
+> the plan, and should it?**
+>
+> **Coordinates cited from `a9fb242f0` are measured at that CANDIDATE, not at
+> `main`** — it was in the publisher queue when this was written. Re-verify at
+> the squash before building. The frame (`../wp/`) is stale in `§2`, `§3 D2` and
+> `§5` and is being re-cut with this node; **do not work from it yet.**
 
 > # THIS IS NOT A FIXTURE REPAIR, AND THE CHEAPEST WRONG MOVE IS A ONE-LINE EDIT
 >
@@ -174,34 +222,46 @@ only the identity.**
 - The `ok` arm is the existence proof **inside this same row**: hand-built,
   carrying `identity` from `synthesized_fixed_identity(ReadSome)`.
 
-### THE STRENGTHENING: THE ROW FAILS EARLIER THAN THIS NODE RECORDED
+### ~~THE STRENGTHENING: THE ROW FAILS EARLIER THAN THIS NODE RECORDED~~ — STRUCK 2026-09-18
 
-This node says the `ImmediateBool` assertion is unsatisfiable. **True, and the
-row never reaches it.** `reconcile_declared_children` (`:3613`) refuses at the
-**input**:
+> **STRUCK, NOT SOFTENED. `D3` made this false and it is the most dangerous
+> paragraph in the file, because it tells an implementer the row cannot reach
+> its assertions and the row now reaches all of them.** Architect
+> `evt_3a8xxpwmcy5xz`.
+>
+> It was true against `Scalar(Bool)` versus a declared
+> `Fixed{PrivateTransferCount,[nat,nat]}`. **`D3` made the emitted children
+> match the declaration, so `reconcile_declared_children` no longer refuses.**
+> The row is un-ignored and green: `1036 passed / 0 failed / 1 ignored`.
+>
+> The original text is preserved in git history. It is removed rather than
+> annotated in place because a struck claim beside a live one still gets read
+> as an input.
 
-    declared (WROTE)  [ Fixed{PrivateTransferCount, [nat, nat]} ]
-    emitted           [ SynthesizedArgument::Scalar(Lowered::Bool{false}) ]
+### THIS KILLS `(a)` OUTRIGHT — THE CONCLUSION STANDS, ITS STATED REASON IS REFUTED
 
-Arity matches, so it zips and reaches the form match. `(Fixed{..}, Scalar(..))`
-matches no arm; the catch-all at `:3881` is `_ => false` -- *the forms are
-disjoint, a mismatched pair is a refusal, not a fallthrough to a weaker check* --
-and it returns `Err(unsupported("Constructor", ...))`.
+**Assertion-only rewriting is insufficient, and that half is unchanged.**
 
-⇒ **The call refuses before it returns a value. The unsatisfiable assertion is a
-second, downstream fact about a value that is never produced.** The author passed
-a bool into a slot the recipe declares as a two-nat aggregate. That is the
-cleanest possible statement that the recipe was never load-bearing.
+> **THE REASON BELOW WAS WRONG AND THE ARCHITECT WITHDREW IT**
+> (`evt_3a8xxpwmcy5xz`, self-refuted). It read: *"you must also replace the
+> `Scalar(Bool)` with a `Nested` two-nat aggregate, at which point the row
+> carries no bool and 'selects a separately generated nested payload' is being
+> checked against a different value than the row was written about."*
+>
+> **`D3` performed exactly that replacement, and the consequence did not
+> follow.** The row's name is *selects a separately generated nested payload*,
+> and the recipe declares `Fixed{PrivateTransferCount,[nat,nat]}`. **The nested
+> aggregate is what the row was always about. The bool was the anomaly.**
+>
+> ⇒ **The error has a shape worth keeping: the artifact's current contents were
+> read as the artifact's subject.** A value that is sitting in a slot is
+> evidence about the defect, not a statement of what the slot is for. Same
+> family as treating a premise as something to reason from rather than
+> something to check.
 
-### THIS KILLS `(a)` OUTRIGHT, AND NOT FOR THE REASON GIVEN BELOW
-
-The `(a)` entry below warns it is the smallest diff addressing the wrong thing.
-**It is worse than that: `(a)` is not a repair at all.** Rewriting the assertion
-leaves the input refusal untouched -- you must *also* replace the `Scalar(Bool)`
-with a `Nested` two-nat aggregate, at which point the row carries no bool and
-*"selects a separately generated nested payload"* is being checked against a
-different value than the row was written about. **`(a)` changes what the row
-tests.** The framing below understates it; read this paragraph as governing.
+`(a)` remains rejected. **The live reason is `(c)` itself** — the borrow is the
+defect, so rewriting the assertion leaves the defect in place whatever the
+assertion then says.
 
 The ban on switching the root stands and **gets stronger**: under `(c)` the
 borrow *is* the defect, so any root is a deeper borrow.
@@ -218,17 +278,32 @@ stated over it.
             compiler.synthesized_fixed_identity(
                 SynthesizedFixedConstructorRole::Wrote)?),
         occurrence: <SEE RESIDUAL>,
-        args: vec![ConstructorField::specialized(Lowered::Bool {
-            value: false_word,
-            known: Some(false),
-        })],
+        args: vec![ /* SEE THE AMENDMENT BELOW -- NOT a bool */ ],
     };
+
+> **AMENDMENT 2026-09-18 — THE PUBLISHED `args` BLOCK WILL NOT COMPILE.**
+> Architect `evt_3a8xxpwmcy5xz`, self-reported.
+>
+> It read `args: vec![ConstructorField::specialized(Lowered::Bool { value:
+> false_word, known: Some(false) })]`. **`D4` DELETED `false_word`**, so the
+> block as published references a binding that no longer exists — and the bool
+> was the anomaly in any case.
+>
+> **Carry the nested two-nat aggregate `D3` introduced.** The hand-built form
+> must feed the same value the `transferred` construction builds, so that
+> removing the borrow changes **provenance only** and not the row's subject.
+> That is the whole point of `(c)`: if the repair also changes what the row
+> tests, it is not `(c)`.
 
 **`args` is spelled to match what `synthesized_constructor` itself produces at
 `:3480-3484`, NOT the `ok` arm's `fields:`** -- those are different types and the
 alternative's spelling does not transfer.
 
-The `ImmediateBool` assertions on **both** arms then survive untouched. Whether
+> **DELETED: *"the `ImmediateBool` assertions on both arms then survive
+> untouched."*** There is **one** `ImmediateBool` assertion now; the other seat
+> is `expected_error_tag`, the plan query `D4` installed.
+
+Whether
 `defining_emission_owner` / `defining_unit` / the `holding_units` singleton
 search come out is the implementer's call -- they are live assertions about the
 plan and may be worth keeping as independent checks.

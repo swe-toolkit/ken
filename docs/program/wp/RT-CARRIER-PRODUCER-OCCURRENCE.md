@@ -1,6 +1,21 @@
 # `RT-CARRIER-PRODUCER-OCCURRENCE` — frame
 
-Owner: **runtime**. Size: **M**. Gate: none.
+Owner: **runtime**. Size: **M**. Estimated capability tier: **T1**. Gate: none.
+
+> **The tier field was MISSING from this frame and from its node until
+> 2026-09-18, and `§4h` requires it on every frame.** That is a Steward defect,
+> not an omission the ring should have flagged. It is recorded here as **T1**,
+> and the record is **retroactive** — the WP ran without it, so it never fed the
+> kick-time seat check it exists to feed.
+>
+> **T1 is not a guess; the WP demonstrated it.** Every one of `D2`, `D3` and
+> `D4` turned on an argument rather than on an edit: `D2` was ruled a rig defect
+> only by measuring which state production can actually reach; `D3` hid a third
+> defect behind the first, which no green could report; and `D4` could not be
+> finished by supplying a value at all — it required deriving the expected tag
+> from a plan query, because the literal it replaced was the defect's own
+> fingerprint. A mechanical-tier seat would have produced a green row here by
+> re-baselining, which is exactly what `§4` below bans.
 Depends on: `RT-SRCBODY-BIND-ORDER` (merged, `acfcc915`).
 Origin record:
 [`RT-CARRIER-PRODUCER-OCCURRENCE`](../issues/RT-CARRIER-PRODUCER-OCCURRENCE.md)
@@ -356,10 +371,33 @@ an occurrence the planner issued for that node — not one borrowed from a
 sibling, and not a value minted to satisfy the check.
 
 **`D4` — un-ignore the row and prove it measures its property.**
-Remove the `#[ignore]` at `:2548` and the annotation block at `:2530-2546`.
-Note `:2530-2546` is a `//` block immediately above the attribute; check whether
-a separate leading doc comment exists above it and update that too rather than
-stranding it.
+Remove the `#[ignore]` and the annotation block immediately above it.
+**Re-measured on `origin/main` at `5899268451`** — the whole group sits about
+785 lines below where this deliverable used to place it:
+
+    :3315-3331   the `//` annotation block          (was written here as :2530-2546)
+    :3332        #[test]
+    :3333        #[ignore = "RT-CARRIER-PRODUCER-OCCURRENCE: ..."]   (was :2548)
+    :3334        fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload
+
+There is no separate leading doc comment above the block; `:3314` is blank and
+`:3313` closes the preceding test. **Line numbers are hints** per §0 — anchor on
+the attribute string and the function name, and if the group is not where this
+says, that is a finding to report, not a discrepancy to reconcile silently.
+
+> **`:3328-3330` of that block is the sentence `D5` should have caught.** It
+> reads *"Un-ignoring the row is therefore NOT the repair and would only restore
+> a refusal."* **That is true at this base and false the moment `D3` lands**, and
+> it is a second instance of exactly what `D5` is for. `D4` deletes the block, so
+> it is discharged either way — but if `D4` is ever split from `D3`, this
+> sentence has to go with `D3`, not stay behind asserting a refusal that no
+> longer happens.
+
+**This deliverable is why this node is the lane's next kick.** It is the only
+released runtime node whose completion removes an `#[ignore]` from the selected
+population. `D4` is not optional trailing cleanup and does not defer to a
+successor: **a `D3` that lands without `D4` leaves the count unmoved**, which is
+the whole failure this lane has been reproducing.
 
 **`D5` — currency.**
 If `D2` rules *rig*, the `D7` note at `:2677-2681` says the refusal is correct
@@ -481,6 +519,116 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
 - **Do not re-baseline or re-scope the row's assertions** to fit whatever the
   repaired edge produces. If the row cannot assert its stated property after the
   repair, that is a finding to report, not an assertion to adjust.
+  **Replacing an assertion is TWO acts needing TWO authorizations, on different
+  evidence — see the carve-out below. Removing the old value and installing a
+  new one are never authorized together.**
+
+  > **CARVE-OUT, 2026-09-18 (Steward). This ban as first written stopped `D4`
+  > one line from green, and the ring was right to stop.**
+  >
+  > **CORRECTION, same day, Architect at `evt_7sz14dsfcz0a3`. The first version
+  > of this carve-out — landed in `daa4c010c` and replaced here — asked WHERE
+  > THE EXPECTED VALUE CAME FROM. That test fails on the very case it was
+  > written for**, because replacing an assertion involves *two* values that can
+  > point opposite ways: `D4` removes `ImmediateBool`, which came from the
+  > defect, and installs `PersistentGround`, which was read off the repaired
+  > run's own output. One edit, both cells, nothing discriminated. **Provenance
+  > is also a claim about history made by the party it relieves, and it is not
+  > checkable from the file.**
+  >
+  > **THE TEST:**
+  >
+  > > **Does the artifact state a derivation that would have PREDICTED this
+  > > value BEFORE the run?**
+  >
+  >     the row can only say WHAT THE RUN EMITTED   -> re-baselining, whatever
+  >                                                    the history was. BANNED.
+  >     the row can say WHY THAT VALUE AND NOT       -> a repair, whatever the
+  >       ANOTHER, independently of any run             history was. Permitted.
+  >
+  > **A reader holding the file and nothing else can apply this.** That is the
+  > whole reason it replaces the provenance test.
+  >
+  > **THE TWO AUTHORIZATIONS, resting on different evidence:**
+  >
+  >     REMOVING the old expected value   authorized by the OLD value's
+  >                                       provenance -- it is the defect's own
+  >                                       fingerprint sitting in the oracle
+  >     INSTALLING a new one              authorized ONLY by a derivation stated
+  >                                       independently of any run, IN THIS FILE
+  >                                       -- never in a thread, a post, or a
+  >                                       commit message
+  >
+  > Written as one rule they collapse, and the installation borrows evidence
+  > that reaches only the removal.
+  >
+  > **Measured instance, `D4`:** the error-path equality compared a projected
+  > boundary tag against `ImmediateBool` — **the value the pre-`D3` rig itself
+  > chose for `Wrote`.** The assertion compared the fixture's own input against
+  > itself, so the defect's fingerprint sat inside the oracle. Leaving it there
+  > is not rigour; it preserves the bug in the thing meant to catch the bug.
+  >
+  > **The premise does not reach the wider conclusion.** *"It was never an
+  > independent oracle"* licenses **repairing** the oracle. It does not license
+  > **retiring** the check — it says nothing about whether the property is worth
+  > asserting. Both readings follow from the same true sentence and only the
+  > weaker one is entailed; prefer it.
+  >
+  > **OBLIGATIONS ON ANY INSTALLATION, all three:**
+  >
+  > 1. **A derived property, never an observed literal.** `517` pins an arena
+  >    index: sound as a measurement, unsound as a criterion.
+  > 2. **The derivation is written INTO THIS ROW with its citations**, and every
+  >    link is grounded in a producer rather than in a name that looks right. If
+  >    a link cannot be grounded it goes to the Architect — an ungrounded
+  >    replacement is wrong in exactly the way the original was.
+  > 3. **The repaired assertion reddens under a mutation ON THE PATH IT
+  >    GUARDS**, not merely on some other path the row also covers.
+  >
+  > **If no mutation on that path can redden it, retiring it is then honest —
+  > but the row must SAY it does not cover that path.** An assertion that cannot
+  > fail quietly retired, and one loudly retired, are the same coverage and very
+  > different artifacts.
+  >
+  > **OBLIGATION 2 PRODUCES A HAZARD OF ITS OWN: the citations a reader finds
+  > are WIDER than the claim that executes.** Recorded 2026-09-18 from the
+  > Architect's review of `a9fb242f0`, verified at producers, and kept here at
+  > the runtime-leader's request rather than respun into the row.
+  >
+  > `D4` discharged obligation 1 the strongest available way — it removed the
+  > constant rather than justifying it, so the expected tag is a plan query
+  > (`aggregate_allocation_at`, through the same closed two-arm mapping
+  > production uses at `lowering/aggregates.rs:2499-2508`) and no observed value
+  > appears in the assertion at all. Obligation 2 then put the meet-rule chain
+  > beside it: `boundary_value.rs:129-140`, `:216-218`, `:211-212`.
+  >
+  >     what the comment DERIVES     the lane for this aggregate is
+  >                                    PersistentGround  (the meet rule)
+  >     what the assertion PINS      lowering emits THE LANE THE PLAN RULED
+  >
+  > **Only the second executes.** Both sides of the comparison read the same
+  > plan, so if the planner ever ruled `InvocationAggregate` here, expected and
+  > actual would move together and the row would stay green while the meet-rule
+  > chain was violated. The implementer's own mutation shows the direction: it
+  > reddens `left 9 right 5` because the divergence it injects is on the
+  > *lowering* side.
+  >
+  > **This is the right property and it must not be traded back for a pinned
+  > constant** — guarding lowering-honours-plan is exactly the defect class the
+  > original row had, where the tag came from somewhere other than the ruled
+  > lane. The hazard is only in what a later reader takes three
+  > `boundary_value.rs` citations to mean: they explain WHY the plan rules that
+  > lane; they are not what the row guards. **A derivation written in to satisfy
+  > obligation 2 states more than the assertion tests, and the row should say
+  > which half is load-bearing.**
+  >
+  > **Why obligation 2 says IN THIS FILE.** Measured on candidate `d20afe1be` by
+  > a grep of the whole file rather than the diff: the only derivation present
+  > was *"517 is tag 5 = `PersistentGround`"*, with the reasoning that justifies
+  > it living solely in a convo post. **A later reader opening the file finds a
+  > value read off the fixed run, sitting beneath the rule forbidding exactly
+  > that, and nothing to tell it apart from re-baselining.** A justification that
+  > is not in the artifact does not travel with it.
 - **Do not repair the other census row.** `two_same_shape_workers_are_distinguished`
   is `RT-WORKER-FIXTURE-DECODE`'s, and it is `ready`.
 
