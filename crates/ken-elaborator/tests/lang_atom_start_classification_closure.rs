@@ -316,7 +316,7 @@ fn ac2_the_truncation_closes_and_the_loop_continues() {
 }
 
 #[test]
-fn ac2_the_enclosed_form_is_withheld_and_at_two_arguments_it_RE_ASSOCIATES() {
+fn ac2_the_enclosed_form_is_withheld_and_at_two_arguments_it_re_associates() {
     // THE FAIL-OPEN ROW, and my own fixture set could not see it.
     //
     // `ac2_..._nests_and_groups` below pins HEAD-position nesting -- and the
@@ -382,5 +382,123 @@ fn ac3_if_is_still_refused_as_an_argument_and_still_admitted_as_a_head() {
     assert!(
         parses("fn g (a : Bool) : Bool = if a then b else c"),
         "and still admitted as a head -- the position axis, not a token ban"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// AC-0/AC-2 — the PROOF-SELECTOR half, and it closes by explicit REFUSAL.
+//
+// `32 §3`'s erratum settles the contract flatly, with no depth qualifier:
+// "as an argument the atom must be grouped; `f proof p for s` does not parse;
+// write `f (proof p for s)`."
+//
+// So this half of AC-0 is discharged by the refusal being STATED in the
+// classification rather than by admitting anything. Absence is an omission and
+// omissions drift -- which is the defect this node exists to close.
+//
+// LEDGER, per AC-0's amended clause. Rows parsing at this base, each named to
+// the landed increment of THIS node that closed it (squash `20ddc558f`,
+// verified by blob on `main`, not by ancestry):
+//
+//     f ‖x‖                REJ -> PARSED   expression argument loop
+//     fn f (x : G ‖Bool‖)  REJ -> PARSED   the two type-app loops
+//     <+> ‖x‖              REJ -> PARSED   operator-prefix tail
+//     ≤   ‖x‖              REJ -> PARSED   same gate, glyph operator
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ac0_the_bare_proof_selector_is_refused_as_an_argument_at_every_depth() {
+    // UNCONDITIONAL. An earlier ruling admitted it at bracket depth > 0; the
+    // erratum superseded that, and unconditional is strictly better -- there
+    // is no depth counter to miss an increment of, so the fail-open direction
+    // does not exist.
+    assert!(!parses("fn g (s : Bool) : Bool = f proof p for s"), "depth 0");
+    assert!(!parses("fn g (s : Bool) : Bool = h (f proof p for s)"), "depth > 0");
+    assert!(
+        !parses("fn g (s : Bool) : Bool = h (<+> proof p for s)"),
+        "and through the operator-prefix tail, which under the superseded \
+         depth-keyed ruling would have widened here"
+    );
+}
+
+#[test]
+fn ac0_the_grouped_spelling_is_the_sanctioned_one_and_parses() {
+    // The other half of the pair: the refusal above is a CONTRACT, not a gap,
+    // because the sanctioned spelling already works and needs no code.
+    assert!(parses("fn g (s : Bool) : Bool = f (proof p for s)"), "depth 0");
+    assert!(parses("fn g (s : Bool) : Bool = h (f (proof p for s))"), "depth > 0");
+}
+
+#[test]
+fn ac0_a_proof_selector_head_is_still_admitted() {
+    // The position axis, same shape as `if`: refused as a bare ARGUMENT,
+    // admitted as a HEAD. A token ban would lose this.
+    assert!(parses("fn g (s : Bool) : Bool = proof p for s"));
+}
+
+#[test]
+fn the_declaration_sequence_survives_and_this_is_the_row_that_caught_it() {
+    // THE OBSERVABLE MUST BE THE DECLARATION COUNT, not parse success. When
+    // `proof` was admitted unconditionally, this source still PARSED -- as ONE
+    // declaration, the `fn` body having swallowed the attached-proof
+    // declaration. `bare_proof_selector_atom.rs` caught that; a `parses(..)`
+    // assertion could not have.
+    let decls = parse_decls(
+        "fn s (x : Int) : Int = x\nproof p for s (y : Int) : T = Refl",
+    )
+    .expect("a proof declaration after another declaration must parse");
+    assert_eq!(
+        decls.len(),
+        2,
+        "the `fn` body must not swallow the following proof DECLARATION"
+    );
+}
+
+#[test]
+fn a_bare_operator_name_is_never_a_declaration_body() {
+    // THE BLOCKED DEFECT, pinned. Admitting `KwProof` to the roster made this
+    // source parse as TWO declarations with body `EVar("≤")` -- a bare,
+    // ungrouped operator name as a function body, with the attached-proof
+    // declaration silently split off. The base rejected it and so must this.
+    //
+    // The observable is again the DECLARATION COUNT plus which guard refused:
+    // `<= proof p for s` rejects either way at expression level, so an
+    // expression-level probe cannot see this. A MEASUREMENT OF THE OUTCOME IS
+    // NOT A MEASUREMENT OF THE GATE.
+    let source = "fn f (x : Int) : Int = <=\nproof p for f (y : Int) : T = Refl";
+    let error = parse_decls(source).expect_err(
+        "a bare operator name must not be a legal function body, whatever \
+         follows it",
+    );
+    let rendered = format!("{error:?}");
+    assert!(
+        rendered.contains("operator name"),
+        "and it must be the OPERATOR GATE that refuses -- a refusal from some \
+         later stray-token error would mean the gate widened and something \
+         downstream happened to catch it: {rendered}"
+    );
+}
+
+#[test]
+fn self_guarding_changed_one_thing_and_this_is_it() {
+    // Making `can_start_atom_expr` self-guard exposes the other exclusions to
+    // the operator-prefix gate, which is a real behaviour change and is
+    // recorded rather than discovered.
+    //
+    //   `<= { x = a }`   base OK, fix OK           unchanged: a record
+    //                                              literal is not an arm block
+    //   `<= eqn : x`     base ERR stray-token,
+    //                    fix  ERR operator-gate    CHANGED -- same outcome,
+    //                                              different guard, better
+    //                                              message
+    assert!(
+        parses("fn g (a : Bool) : Bool = <= { x = a }"),
+        "a record literal is still a valid operator argument"
+    );
+    let error = parse_decls("fn g (a : Bool) : Bool = <= eqn : x")
+        .expect_err("`eqn :` is not an operator argument");
+    assert!(
+        format!("{error:?}").contains("operator name"),
+        "it now refuses at the operator gate rather than as a stray token"
     );
 }

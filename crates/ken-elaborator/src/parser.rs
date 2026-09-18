@@ -141,6 +141,36 @@ enum StartExclusion {
     /// `eqn :` -- a contextual modifier of the enclosing `match`, not an
     /// application argument to its scrutinee.
     MatchEquationBinder,
+    /// `proof` opening an ATTACHED-PROOF DECLARATION, not an argument.
+    ///
+    /// **Unconditional, and peek-only.** `proof` is both a declaration keyword
+    /// and an atom starter, and Ken has NO DECLARATION TERMINATOR: a
+    /// declaration's extent ends exactly where its body expression stops, so
+    /// this roster's COMPLEMENT is the declaration separator. Admitting
+    /// `proof` in argument position therefore makes the preceding
+    /// declaration's body swallow the next declaration -- measured, and
+    /// silent.
+    ///
+    /// `32 §3`'s erratum settles the contract flatly, with no depth
+    /// qualifier: *"as an argument the atom must be grouped; `f proof p for s`
+    /// does not parse; write `f (proof p for s)`."* The grouped spelling
+    /// already parses through the grouping arm and needs no code.
+    ///
+    /// **Why this is a stated EXCLUSION and not merely an absent roster
+    /// entry.** Absence is an omission and omissions drift -- that is the
+    /// defect this whole node exists to close, measured four times over in
+    /// `§1a`. A member here says the refusal is INTENDED, carries its reason,
+    /// and makes a future widening a deliberate act rather than an accident.
+    /// Same discipline `KwIf` needs under AC-3: refused by the classification,
+    /// not by a hand-written case.
+    ///
+    /// **An earlier ruling admitted `proof` at bracket depth > 0** and I built
+    /// it: a precomputed depth vector, chosen over a maintained counter
+    /// because that would have to be right at 29 openers and 30 closers and
+    /// desyncs at this parser's one backtrack site. The erratum superseded it,
+    /// and unconditional is strictly better -- there is no counter to miss an
+    /// increment of, so the fail-open direction does not exist.
+    ProofSelector,
     /// `{` opening a `match`'s ARM BLOCK, not a record-literal argument.
     ///
     /// Filed as an exclusion on the mechanism's own two-layer terms:
@@ -176,12 +206,13 @@ enum StartExclusion {
 impl StartExclusion {
     /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
     /// length is checked against it rather than maintained independently.
-    const COUNT: usize = 5;
+    const COUNT: usize = 6;
 
     /// The iteration source `atom_start_exclusion` consults.
     const ALL: [Self; Self::COUNT] = [
         Self::EffectRowAnnotation,
         Self::MatchEquationBinder,
+        Self::ProofSelector,
         Self::BraceOpensMatchArms,
         Self::AsAlias,
         Self::BinderName,
@@ -193,9 +224,10 @@ impl StartExclusion {
         match self {
             Self::EffectRowAnnotation => 0,
             Self::MatchEquationBinder => 1,
-            Self::BraceOpensMatchArms => 2,
-            Self::AsAlias => 3,
-            Self::BinderName => 4,
+            Self::ProofSelector => 2,
+            Self::BraceOpensMatchArms => 3,
+            Self::AsAlias => 4,
+            Self::BinderName => 5,
         }
     }
 
@@ -214,9 +246,9 @@ impl StartExclusion {
             }
             Self::BinderName => matches!(position, AtomPosition::Type),
             Self::AsAlias => matches!(position, AtomPosition::Pattern),
-            Self::MatchEquationBinder | Self::BraceOpensMatchArms => {
-                matches!(position, AtomPosition::Expression)
-            }
+            Self::MatchEquationBinder
+            | Self::ProofSelector
+            | Self::BraceOpensMatchArms => matches!(position, AtomPosition::Expression),
         }
     }
 
@@ -232,10 +264,42 @@ impl StartExclusion {
                 parser.is_contextual_ident("eqn")
                     && matches!(parser.lookahead(1), Token::Colon)
             }
+            Self::ProofSelector => matches!(parser.peek(), Token::KwProof),
             Self::BraceOpensMatchArms => parser.brace_starts_match_arms(),
             Self::BinderName => {
                 matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
                     && matches!(parser.lookahead(1), Token::Colon)
+            }
+        }
+    }
+
+    /// A token sequence that triggers this exclusion.
+    ///
+    /// **Exhaustive, no `_ =>`, so a NEW MEMBER IS A COMPILE ERROR HERE** --
+    /// the same device the operator-premise roster uses over `Token`, applied
+    /// to the member set. Without it the closure test hand-enumerates members
+    /// and a member added tomorrow gets no coverage while the test's name says
+    /// otherwise.
+    #[cfg(test)]
+    fn fixture(self) -> Vec<Token> {
+        match self {
+            Self::EffectRowAnnotation => {
+                vec![Token::Ident("visits".to_string()), Token::LBracket]
+            }
+            Self::MatchEquationBinder => {
+                vec![Token::Ident("eqn".to_string()), Token::Colon]
+            }
+            Self::ProofSelector => vec![Token::KwProof],
+            Self::BraceOpensMatchArms => vec![
+                Token::LBrace,
+                Token::Ident("x".to_string()),
+                Token::MapsTo,
+                Token::Ident("y".to_string()),
+                Token::RBrace,
+            ],
+            Self::AsAlias => vec![Token::Ident("as".to_string())],
+            Self::BinderName => {
+                vec![Token::Ident("x".to_string()), Token::Colon]
             }
         }
     }
@@ -249,6 +313,7 @@ impl StartExclusion {
             Self::EffectRowAnnotation => "an effect-row annotation",
             Self::AsAlias => "an as-pattern alias",
             Self::MatchEquationBinder => "a match equation binder",
+            Self::ProofSelector => "an attached-proof declaration",
             Self::BraceOpensMatchArms => "a match arm block",
             Self::BinderName => "a binder name",
         }
@@ -391,6 +456,63 @@ mod atom_start_premise {
             assert!(!is_operator_token(&token));
             assert!(canonical_operator_name(&token).is_none());
         }
+    }
+
+    /// BOTH roster functions consult the exclusions INTERNALLY, for EVERY
+    /// member, at every position that member governs.
+    ///
+    /// **This is the closure over CONSUMERS, a different property from AC-1's
+    /// closure over TOKENS.** A test that a new token cannot be silently
+    /// admitted does not stop a new CALLER from silently skipping the
+    /// exclusions -- which is what happened: while `can_start_atom_expr` was a
+    /// pure token predicate, applying them was a per-caller obligation, the
+    /// bare-operator-name gate did not discharge it, and admitting one token
+    /// made `fn f (x : Int) : Int = <=` a legal declaration.
+    ///
+    /// Driven by `ALL` and by an exhaustive [`StartExclusion::fixture`], so a
+    /// new member is a compile error rather than an uncovered row. An earlier
+    /// version of this test hand-enumerated two of six members and was named
+    /// for a closure it did not have -- which is read as discharging it.
+    #[test]
+    fn both_rosters_refuse_every_exclusion_trigger() {
+        for exclusion in StartExclusion::ALL {
+            let mut tokens: Vec<(Token, Span)> = exclusion
+                .fixture()
+                .into_iter()
+                .enumerate()
+                .map(|(i, t)| (t, Span::new(i, i + 1)))
+                .collect();
+            tokens.push((Token::Eof, Span::new(99, 99)));
+            let parser = Parser::new(tokens, String::new());
+
+            if exclusion.applies_in(AtomPosition::Expression) {
+                assert!(
+                    !parser.can_start_atom_expr(),
+                    "{exclusion:?} governs Expression but the roster admits \
+                     its trigger -- the refusal would depend on each caller \
+                     remembering to ask"
+                );
+            }
+            if exclusion.applies_in(AtomPosition::Type) {
+                assert!(
+                    !parser.can_start_atom_type(),
+                    "{exclusion:?} governs Type but the type roster admits \
+                     its trigger"
+                );
+            }
+        }
+
+        // Positive control: an ordinary ident is admitted by both rosters, so
+        // the guards are not refusing everything.
+        let parser = Parser::new(
+            vec![
+                (Token::Ident("x".to_string()), Span::new(0, 1)),
+                (Token::Eof, Span::new(1, 1)),
+            ],
+            String::new(),
+        );
+        assert!(parser.can_start_atom_expr());
+        assert!(parser.can_start_atom_type());
     }
 
     /// AC-4's premise: no operator token is admitted as an atom start.
@@ -2901,6 +3023,23 @@ impl Parser {
     }
 
     fn can_start_atom_expr(&self) -> bool {
+        // SELF-GUARDING, exactly as `can_start_atom_type` is. The asymmetry
+        // between the two was a defect GENERATOR, not a style difference:
+        // while this one was a pure token predicate, applying the exclusions
+        // was a per-CALLER obligation, and a per-caller obligation is
+        // discharged by whoever remembers. The bare-operator-name gate did
+        // not, so admitting `KwProof` to the roster below made
+        // `fn f (x : Int) : Int = <=` a legal declaration whenever the next
+        // token was `proof` -- a bare operator name as a function body, with
+        // the following declaration silently split off. Measured against the
+        // base, which rejected both.
+        //
+        // Guarding here covers every consumer by construction, including the
+        // ones nobody has written yet. AC-1's closure property is stated over
+        // TOKENS; this is the same closure over CONSUMERS.
+        if self.atom_start_exclusion(AtomPosition::Expression).is_some() {
+            return false;
+        }
         // `TruncBar`'s membership is CONDITIONAL, and this guard is the only
         // statement of it. Do NOT also list the token in the `matches!` below
         // "for symmetry": that arm would be unreachable, and a reader who took
@@ -2913,7 +3052,17 @@ impl Parser {
         }
         matches!(
             self.peek(),
-            Token::LBrace
+            // ADMITTED HERE AND REFUSED BY `ProofSelector`, deliberately.
+            // Leaving it out would refuse it too -- by ABSENCE -- and the
+            // exclusion would then be INERT: neutering it would change
+            // nothing, and a member that cannot fail is documentation, not
+            // mechanism. Measured: with `KwProof` omitted here, neutering
+            // `ProofSelector` reddened not one row. Admitting it makes the
+            // CLASSIFICATION the authority for the refusal, which is what
+            // AC-1's closure property asks for, and makes the member
+            // mutation-provable.
+            Token::KwProof
+                | Token::LBrace
                 | Token::Ident(_)
                 | Token::ConId(_)
                 | Token::KwType
