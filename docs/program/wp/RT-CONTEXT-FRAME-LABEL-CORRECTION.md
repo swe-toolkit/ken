@@ -251,9 +251,39 @@ exists on `main`. The routing defect closed when the node was filed; what `D2`
 adds is that the label's content is no longer a prediction the node has since
 tested.
 
-**`AC-1`: no row readmits.** Three of the four now record that their arms
-declare equal bodies and the refusal tests the wrong relation; the fourth
-records that its arms declare different bodies and the refusal is right.
+### The acceptance criteria, enumerated BY POSITION
+
+**Corrected: an earlier revision of this section discharged "`AC-1`: no row
+readmits".** That is `[[RT-DUPLICATED-RESPONSE-BLOCK]]`'s `AC-1`, not this
+frame's. Reading them off section 5 in order instead:
+
+**`AC-0` — SATISFIED.** Above.
+
+**`AC-1` — D0 answered PER ROW, measured rather than carried, with the bound
+stated. SATISFIED.** Each of the four labels carries its own next-stop
+operands (`owner`/`binding`/`environment`, all four triples distinct), its own
+1-versus-2 non-vacuity counts, and the explicit sentence that the stack behind
+`L2` was not forced and is **not bounded**. Nothing in the rewritten half is
+carried from `b0421afd0`; the carried attribution halves are untouched and are
+marked as carried.
+
+**`AC-2` — D1 answered with its DECIDING EVIDENCE named. SATISFIED.** The
+deciding evidence is the rendered body at each origin, compared byte for byte,
+and it is named as that in every label. "The origins differ" is recorded as
+the premise, not the answer. The one row where the bodies differ has the
+differing leaf quoted.
+
+**`AC-3` — the admission gate is UNTOUCHED.** `grep -c RTPROBE` over
+`cranelift_backend/lowering/core.rs` is zero and the file is not in this
+candidate's diff. No argument against the both-ends-red measurement or the
+`:13572` comment is offered, because none is needed.
+
+**`AC-4` — the `BoundaryCarrier` arity refusal is NOT relaxed.** Untouched.
+`D3` lands zero production change, so no row is made to pass by moving it.
+
+**`AC-5` — no regression.** Workspace-green is CI's, per `COORDINATION`
+section 12. The local targeted check is stated with the run beside it in the
+`AC-5` note at the end of this section.
 
 ### `D3` — the repair is OUT OF SCOPE, and the reason is not cost
 
@@ -310,14 +340,22 @@ Steward's under `COORDINATION` section 2. What it would have to establish:
 `[[RT-POST-L2-RESIDUE-DEPTH-READ]]` is **not** that node — it owns the layer
 BEHIND `1230`, not `1230`'s relation.
 
-### `AC-3` and `AC-4` — both untouched, verified
+### `AC-5` — the local check, with its target selection stated
 
-**`AC-3`: the admission gate is untouched.** Every probe was environment-gated
-and reverted; `grep -c RTPROBE` over
-`cranelift_backend/lowering/core.rs` returns zero, and the only files this WP
-changes are the two test files and this frame. No argument against the
-both-ends-red measurement or the `:13572` comment is offered, because none is
-needed.
+This candidate's whole `crates/` footprint is **four `#[ignore]` attribute
+lines**, which are string literals inside test files. So the check that
+matters is one that **builds and runs the test binaries**:
 
-**`AC-4`: the `BoundaryCarrier` arity refusal is not relaxed.** Untouched, and
-`D3` lands no production change at all, so no row is made to pass by moving it.
+    ken-cargo test -p ken-cli --test px7m_hostresult_computational_match \
+                              --test px7l_checked_host_recursive_bind -- --list
+
+**`cargo check` would not have been evidence** — it does not compile
+`#[cfg(test)]`, so a green `check` says nothing about whether a test built.
+The touched set is two `crates/ken-cli/tests/` files and `ken-cli` is a leaf
+here, so the reverse-dependency closure is those two targets and nothing else.
+Workspace-green is CI's, per `COORDINATION` section 12.
+
+**Result: `exit=0`, 5 tests listed** — 2 from
+`px7m_hostresult_computational_match` and 3 from
+`px7l_checked_host_recursive_bind`. Both binaries built and ran. The escaped-
+literal risk in `D2`'s rewritten labels is closed.
