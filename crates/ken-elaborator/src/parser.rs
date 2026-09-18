@@ -246,6 +246,135 @@ fn canonical_operator_name(token: &Token) -> Option<&str> {
     }
 }
 
+#[cfg(test)]
+mod atom_start_premise {
+    //! AC-4 — the premise the operator arm's comment depends on.
+    //!
+    //! **THIS PINS THE MECHANISM, NOT THE CLAIM, and the difference matters.**
+    //! The comment claims *"the infix path never routes an operator through
+    //! this arm."* That holds today **because** the argument loop consults
+    //! `can_start_atom_expr`. A second route into the arm that did not consult
+    //! it would leave every row below green and the claim false.
+    //!
+    //! So: `ac_infix_path_untouched` (in `tests/`) holds the CLAIM — an
+    //! operator between atoms becomes a spine, never an operand. This module
+    //! holds the PREMISE that claim currently rests on. Reading either as the
+    //! other is the mistake AC-4 exists to fix, in the two directions.
+
+    use super::*;
+
+    /// Is this token an operator token?
+    ///
+    /// **Exhaustive over `Token` with no `_ =>`**, which is the whole point: a
+    /// new variant is a compile error HERE, so the token set cannot grow
+    /// without someone classifying the newcomer.
+    ///
+    /// It does not restate which tokens are operators — it is checked against
+    /// `canonical_operator_name`, which stays authoritative. Production
+    /// already uses that direction: `Parser::new` derives
+    /// `contains_user_operator` from the same function rather than repeating
+    /// its token set.
+    ///
+    /// **Residual, and it is the floor `StartExclusion::ALL` already sits on
+    /// rather than a new one:** the roster below is hand-written, so a variant
+    /// classified with an arm but left out of `EVERY_OPERATOR_TOKEN` still
+    /// slips. You cannot close over a Rust enum's inhabitants without a
+    /// hand-written roster; only a derive macro would.
+    fn is_operator_token(token: &Token) -> bool {
+        match token {
+            Token::Operator(_)
+            | Token::Le
+            | Token::Ge
+            | Token::Ne
+            | Token::And
+            | Token::Or
+            | Token::Member => true,
+
+            Token::KwConst | Token::KwFn | Token::KwProc | Token::KwLet | Token::KwIn
+            | Token::KwIf | Token::KwThen | Token::KwElse | Token::KwType | Token::KwInfixl
+            | Token::KwInfixr | Token::KwInfix | Token::KwRequires | Token::KwEnsures
+            | Token::KwProve | Token::KwLaw | Token::KwOld | Token::KwSpace | Token::KwMut
+            | Token::KwBecomes | Token::KwData | Token::KwMatch | Token::KwDef
+            | Token::KwTypeReserved | Token::KwForeign | Token::KwRecord | Token::KwClass
+            | Token::KwInstance | Token::KwDerive | Token::KwWhere | Token::KwTemporal
+            | Token::KwModule | Token::KwImport | Token::KwExport | Token::KwUseReserved
+            | Token::KwPub | Token::KwProgram | Token::KwPackage | Token::KwAdmits
+            | Token::KwCapabilities | Token::KwProp | Token::KwTheorem | Token::KwAxiom
+            | Token::KwProof | Token::LParen | Token::RParen | Token::Colon
+            | Token::DoubleColon | Token::Eq | Token::Dot | Token::Arrow | Token::Lambda
+            | Token::Semicolon | Token::LBrace | Token::RBrace | Token::Pipe
+            | Token::LBracket | Token::RBracket | Token::Comma | Token::Str(_)
+            | Token::CharLit(_) | Token::ByteStr(_) | Token::Plus | Token::PlusPercent
+            | Token::Minus | Token::Star | Token::EqEq | Token::PropEq | Token::FlowsTo
+            | Token::Join | Token::Meet | Token::Times | Token::MapsTo | Token::TruncBar
+            | Token::IntLit(_) | Token::FloatLit(_) | Token::DecimalLit(_, _)
+            | Token::Float32Lit(_) | Token::Ident(_) | Token::ConId(_) | Token::Nat(_)
+            | Token::Eof => false,
+        }
+    }
+
+    /// One inhabitant of every operator token kind.
+    ///
+    /// `Token` values, not spellings: `Parser::new` takes the token vector
+    /// directly, so the premise is asserted without going through the lexer at
+    /// all. The spelling-to-token mapping is a DIFFERENT property and is not
+    /// AC-4's — `lang_reserved_infix_names.rs` drives all six glyphs and their
+    /// five ASCII aliases through the lexer in declaration, prefix, infix and
+    /// chain position.
+    fn every_operator_token() -> Vec<Token> {
+        vec![
+            Token::Operator("<+>".to_string()),
+            Token::Le,
+            Token::Ge,
+            Token::Ne,
+            Token::And,
+            Token::Or,
+            Token::Member,
+        ]
+    }
+
+    fn parser_at(token: Token) -> Parser {
+        Parser::new(
+            vec![(token, Span::new(0, 1)), (Token::Eof, Span::new(1, 1))],
+            String::new(),
+        )
+    }
+
+    /// The roster agrees with the authoritative function, in both directions.
+    #[test]
+    fn the_operator_roster_matches_canonical_operator_name() {
+        for token in every_operator_token() {
+            assert!(
+                is_operator_token(&token),
+                "{token:?} is in the roster but the exhaustive classifier says otherwise"
+            );
+            assert!(
+                canonical_operator_name(&token).is_some(),
+                "{token:?} is in the roster but `canonical_operator_name` does not \
+                 recognise it -- the roster has drifted from the authority"
+            );
+        }
+        for token in [Token::Ident("x".to_string()), Token::LParen, Token::Nat(1)] {
+            assert!(!is_operator_token(&token));
+            assert!(canonical_operator_name(&token).is_none());
+        }
+    }
+
+    /// AC-4's premise: no operator token is admitted as an atom start.
+    #[test]
+    fn no_operator_token_is_admitted_as_an_atom_start() {
+        for token in every_operator_token() {
+            let parser = parser_at(token.clone());
+            assert!(
+                !parser.can_start_atom_expr(),
+                "`can_start_atom_expr` admits {token:?}, so the operator arm's \
+                 comment -- which reasons FROM this predicate being narrow -- is \
+                 false, and the argument loop will take an operator as an argument"
+            );
+        }
+    }
+}
+
 pub struct Parser {
     tokens: Vec<(Token, Span)>,
     pos: usize,
@@ -3290,6 +3419,30 @@ impl Parser {
                 // this arm, because `can_start_atom_expr` does not admit an
                 // operator token, so an operator is only ever seen here when an
                 // expression STARTS with it.
+                //
+                // THAT SENTENCE DEPENDS ON A PREDICATE 600 LINES AWAY, and it
+                // is the kind that goes false without anyone editing it. The
+                // roster's admitted set and the operator-token set are disjoint
+                // today, and nothing about widening the roster would consult
+                // this comment.
+                //
+                // So the dependency is pinned rather than asserted, in
+                // `mod atom_start_premise` beside `canonical_operator_name`:
+                // every operator token is positioned in a `Parser` and
+                // `can_start_atom_expr` must refuse it. Admitting any operator
+                // token into the roster reds that test; the classifier it
+                // enumerates from is an exhaustive `match` over `Token`, so a
+                // new token kind is a compile error rather than a silent
+                // omission.
+                //
+                // MECHANISM VERSUS CLAIM, because reading one as the other is
+                // this comment's own failure mode: that test pins the MECHANISM
+                // -- the argument loop consults `can_start_atom_expr`. The
+                // CLAIM above is broader, and `ac_infix_path_untouched` holds
+                // it: an operator between atoms becomes a spine, never an
+                // operand. A second route into this arm that did not consult
+                // the roster would leave the premise pin green and the claim
+                // false.
                 let span = self.peek_span().clone();
                 let name = canonical_operator_name(&operator)
                     .expect("guarded by operator-name recognition")
