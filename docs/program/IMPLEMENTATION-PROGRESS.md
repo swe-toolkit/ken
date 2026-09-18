@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-18 16:29:11Z — from 675 issue file(s) in `docs/program/issues/`.
+2026-09-18 16:54:00Z — from 675 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -610,7 +610,7 @@ the committed file matches the generator's output.
 | `RT-SECOND-RECOGNITION-ERASURE` | Determine whether the depth-2/3 static-worker rebind is a succession of one obligation or two distinct ones, and select the disposition on that fact -- erasure is REFUTED and is no longer this node's deliverable | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2377 |
 | `RT-SEED-CALL-PORT` | Seed-closure call port — a Call whose callee is the retained non-lexical closure form routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-SITEOP-CARRIED-WITNESS` | Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried | merged | runtime | M | none | — |
-| `RT-SITEOP-RETAINED-ROWS-ADVANCED-PAST-LABEL` | RT-SITEOP-CARRIED-WITNESS merged claiming its 16 retained rows all stop at the LATER eliminated-not-callable refusal -- an advancing refusal, not two causes. Three of those rows were then measured stopping somewhere else entirely: rows 1 and 2 at UnclassifiedRuntimeTrap{terminal_value:-1}, row 10 at a typed-consumer-projection disagreement. The closeout's universal claim over the retained set is refuted on these three, which is why they read as owned and cannot be routed. Establish what actually owns them. | ready | runtime | S | none | — |
+| `RT-SITEOP-RETAINED-ROWS-ADVANCED-PAST-LABEL` | RT-SITEOP-CARRIED-WITNESS merged claiming its 16 retained rows all stop at the LATER eliminated-not-callable refusal -- an advancing refusal, not two causes. Three of those rows were then measured stopping somewhere else entirely: rows 1 and 2 at UnclassifiedRuntimeTrap{terminal_value:-1}, row 10 at a typed-consumer-projection disagreement. The closeout's universal claim over the retained set is refuted on these three, which is why they read as owned and cannot be routed. Establish what actually owns them. | ready | runtime | M | none | — |
 | `RT-SOURCE-MACHINE-TYPES-SPLIT` | Relocate the existing source-machine types and control into their own child -- relocation ONLY, and explicitly not the transition IR, which is deferred to its own semantic node after this phase closes | merged | runtime | M | none | — |
 | `RT-SPECIALIZED-ACTIVE-RESUME` | A live specialized value with an Active frame is refused by a constructor-only destructure — Active resume does not require constructor shape | merged | runtime | S | none | — |
 | `RT-SPECIALIZED-MATCH-ATTRIBUTION` | A Match scrutinee arriving as a Specialized operand falls to the remainder arm, and neither the stage nor the seat says which Lowered class | merged | runtime | S | none | — |

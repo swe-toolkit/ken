@@ -3,7 +3,7 @@ id: RT-SITEOP-RETAINED-ROWS-ADVANCED-PAST-LABEL
 title: "RT-SITEOP-CARRIED-WITNESS merged claiming its 16 retained rows all stop at the LATER eliminated-not-callable refusal -- an advancing refusal, not two causes. Three of those rows were then measured stopping somewhere else entirely: rows 1 and 2 at UnclassifiedRuntimeTrap{terminal_value:-1}, row 10 at a typed-consumer-projection disagreement. The closeout's universal claim over the retained set is refuted on these three, which is why they read as owned and cannot be routed. Establish what actually owns them."
 status: ready
 owner: runtime
-size: S
+size: M
 gate: none
 tier: T1
 depends_on: []
@@ -111,6 +111,71 @@ stopped matching reality, and filed it as a non-blocking documentation nit —
 > carried an `#[ignore]` then, and which of those this node's `D1a`/`D2`
 > re-credited. **Recover it from the tree or declare it unrecoverable; do not
 > infer it from the label, which is the thing under suspicion.**
+
+## `D0` IS ANSWERED. IT RETURNS `(ii)`. RECOVERED FROM THE TREE, 2026-09-18.
+
+**The artifacts do not name the 16; the tree does.** Steward, measured at
+`a388dc06` itself:
+
+    git grep -c 'RT-SITEOP-CARRIED-WITNESS D2' a388dc06
+
+    px7f_resource_native.rs               2      <- rows 1 and 2
+    px7l_checked_host_recursive_bind.rs   2
+    px7m_hostresult_computational_match.rs 2
+    px8ta_oriented_subcontinuation.rs     2
+    px8x_single_schema_observation.rs     1
+    rt_escape_second_resource_native.rs   2      <- row 10 among these
+    rt_parity_native.rs                   5
+    ------------------------------------------
+                                         16
+
+**Sixteen, exactly — and the closeout says sixteen.** The label is one
+byte-identical string on all of them:
+
+    #[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port
+     succeeds; this row next refuses because a carried recursive hypothesis is
+     an eliminated value, not a callable, but the call provides 1"]
+
+⇒ **The retained 16 is recoverable as the set carrying that string**, the count
+matches the closeout independently of the string, and **rows 1, 2 and 10 are
+inside it.** They were never mis-attributed.
+
+**Each of the three verified at its own line, not inferred from a per-file
+count.** The count says `px7f` holds two label-carriers; it does not say *which*
+two, and `px7f` holds a third `#[ignore]` under a different node
+(`RT-CARRIED-RESOURCE-SCALAR`, `:268`) that a count cannot exclude:
+
+    a388dc06 px7f_resource_native.rs:311            -> row 1, fn at :312
+    a388dc06 px7f_resource_native.rs:345            -> row 2, fn at :346
+    a388dc06 rt_escape_second_resource_native.rs    -> row 10, fn at :663
+
+`rt_escape`'s other label-carrier is `escape_resource_plus_plain_matches_
+interpreter` (fn at `:591`), which is **not** in the current ignored set — one
+of the six retained rows that have since left it.
+
+> **The per-file count was the instrument in this section's first revision, and
+> it could not have decided this.** *Two label-carriers in `px7f`* is consistent
+> with row 2 being the row under a different label. **A count establishes how
+> many, never which** — and the file's third `#[ignore]` is exactly the case
+> that makes the difference observable.
+
+> **THE MEMBERSHIP TEST AND THE CLAIM UNDER TEST ARE THE SAME STRING, AND THAT
+> IS THE ONE WEAKNESS HERE.** The label both marks a row retained *and* asserts
+> the eliminated-not-callable refusal. So this measurement cannot distinguish
+> *"retained, and the claim about it is false"* from *"never retained, and
+> mislabelled."* **What breaks the tie is the count**: sixteen label-carriers
+> against a closeout that independently says sixteen. Had the count come back
+> 14 or 19, this would not have settled `D0` and the honest report would have
+> been that it remains open.
+
+⇒ `(ii)` HOLDS: **the closeout's universal claim over the retained 16 is
+refuted**, the retained set did split, and `§9`'s hard stop did not fire when
+it should have. Per this node's own `D0` text, *"that is a finding about the
+merged node, not about these rows"* — and **the other 13 retained rows inherit
+the doubt**, which is the consequence `D0` was ordered first to expose.
+
+**The labels are still on `main` today, byte-identical**, on rows the ledger
+measured stopping somewhere else entirely.
 
 > **WHY THIS ORDER.** Under (i) nothing is wrong with the merged node and the
 > repair is bookkeeping. Under (ii) a merged node's central claim is false and
