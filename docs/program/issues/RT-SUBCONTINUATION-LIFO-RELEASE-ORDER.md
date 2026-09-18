@@ -1,7 +1,7 @@
 ---
 id: RT-SUBCONTINUATION-LIFO-RELEASE-ORDER
 title: "px8ta public_two_three_level_brackets_finish_and_release_lifo is the ONLY row in the failing-fifteen that executes and returns a WRONG ANSWER rather than refusing to build -- depth-2 releases come back [Id(1), Id(2)], which is ACQUISITION order, where strict LIFO requires the reverse [Id(2), Id(1)]. Its in-tree annotation still says it refuses at object emission so the program never executes and no binding order is observable, which is the exact opposite of what was measured. Establish whether the ordering is a real defect and what owns it."
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -11,6 +11,38 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-18, from RT-IGNORED-FAILING-ROWS-INVENTORY's ledger (docs/program/evidence/rt-ignored-failing-rows-ledger.md), row 9 and AC-5: the row's owning node RT-CLOSURE-BOUNDARY-LANE is merged, carries no frame, and the ledger records label agrees? NO -- 'label predicts a closure-lane refusal; this is an ordering assertion inside one engine'. Last of the six unroutable rows to get a node. Operator directive 2026-09-15: 'The other tests should be fixed.' Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED 2026-09-18 — AND THE ROW IS STILL `#[ignore]`d. THAT IS THE CORRECT OUTCOME.
+>
+> Closed at squash **`4eb3dc4c61f556c6426016c4dc9ff9a018e83550`** (PR #3930),
+> which landed the whole of this node: `§5` frames exactly two deliverables and
+> both are discharged.
+>
+>     D0   fork resolved to arm (i) -- a STABLE PRODUCT DEFECT in release
+>          ordering, escalated rather than repaired, exactly as the frame
+>          required. Adversary corroborated the defect at the squash SHA.
+>     D1   annotation re-measured at main and corrected in the same change.
+>
+> **Do not read this closure as the row clearing.** Arm (i) is the branch where
+> finishing the node and clearing the row are *different events*, and this node
+> only ever owned the first. The row is one of the failing fifteen and it stays
+> in the count.
+>
+> **It is held by TWO blockers under one `#[ignore]`, and either fix alone
+> leaves it red** — the annotation says so in the file:
+>
+>     the ordering product defect    RT-BRACKET-RELEASE-ORDER-PARITY
+>     the depth-3 refusal at object  RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED
+>       emission, a SEPARATE finding   (reported with it, never owned by this node)
+>
+> **Neither successor had landed when this closed**, so the sequencing lives
+> here rather than in either of them. A reader who finds this node `merged` and
+> the row still ignored is looking at the intended state, not at dropped work.
+>
+> ⇒ **The general shape, which is the reusable part:** a node that escalates
+> rather than repairs completes by *filing* the defect, so its closure moves the
+> node count and not the objective count. Anything measuring the fifteen must
+> count the row, not the node.
 
 > # THIS ROW IS NOT LIKE THE OTHER FOURTEEN, AND THAT IS THE REASON TO READ IT FIRST
 >
