@@ -391,6 +391,10 @@ The node says this fork "routes to the Architect with a measurement in hand"
 and that this node does not pick it. **It does not pick it here.** The
 measurement in hand is 8.2 and 8.3.
 
+**RULED, and neither arm survived — see 8.9a.** Both arms above are stated
+over the **producer**; the Architect decided it on the **consumer**, which
+neither arm mentions.
+
 ### 8.3 `AC-4` — deleting the check is not the repair, measured
 
 `AC-4` is written for outcome `(2)`. The outcome is the third answer, so it is
@@ -583,6 +587,28 @@ node succeeding**, not evidence of it failing. Nothing in this node's repair
 path touches it, and nothing here should be read as bounding what lies behind
 it.
 
+### 8.8a `AC-3` — no regression, measured
+
+    scripts/ken-cargo test -p ken-runtime --lib
+    test result: ok. 1035 passed; 0 failed; 2 ignored; 0 measured
+
+**1035 / 0 / 2, which is the predecessor's baseline exactly**, so section 2's
+"re-measure at THIS base rather than carrying the number forward" comes back
+with no difference to report. Workspace-green is CI's, per `COORDINATION`
+section 12; this run is the targeted one the frame asks for.
+
+**It took three attempts and the first two are not results.** Both earlier
+runs returned `ken-cargo: timed out waiting for the build lock` after the full
+1800-second wait and produced no measurement. A lock timeout is a failed
+capture, not a clean run, and the two commits taken before this one say in
+their own messages that nothing rested on it.
+
+**Companion check, also green:** the two edited test targets compile and
+enumerate — `--list` over `px7n_nested_computational_eliminator` and
+`rt_escape_second_resource_native` exits 0 with 8 tests listed. That closes
+the real risk in `D2`, which is that the rewritten labels are
+`#[ignore = "..."]` string literals carrying an escaped backslash.
+
 ### 8.9 What this node does NOT deliver, and who owns the rest
 
 Section 4's `D1` (repair on outcome 1) and `D1'` (retirement on outcome 2) are
@@ -603,9 +629,77 @@ survive the change rather than be relaxed by it.**
 
 **This node's outcome is therefore: the duplication is LOCATED, the check is
 EXONERATED, `AC-4` is DISCHARGED, the fork is stated with its measurement
-attached and routed rather than picked, and no row is readmitted.** Section 1
-says both outcomes close the node; this is the second, reached with `AC-4`
-answered — the thing the predecessor could not reach.
+attached and routed rather than picked — and then RULED, on the consumer, in
+8.9a — and no row is readmitted.** Section 1 says both outcomes close the
+node; this is the second, reached with `AC-4` answered, which is the thing the
+predecessor could not reach.
+
+### 8.9a The ruling — neither arm, decided on the consumer
+
+**The Architect's, recorded here because a ruling delivered in thread is not
+a deliverable.** I did not reach it and am not restating it as mine.
+
+Both arms in 8.2 are about the **producer**: is the second entry legitimate.
+The consumer is where it is settled, and nobody had quoted it:
+
+    :1289  fn selected_host_response_route(plan, operation_origin, routes)
+    :1298      if let Some(route) = routes.get(constructor).copied()
+    :1301          "one Vis operation subtree selects more than one host
+                    response producer"
+
+**The consumer looks up by constructor alone**, and its uniqueness check is
+*within one Vis subtree* — it guarantees a Vis selects at most one route, and
+says nothing about whether it selected the **right** one.
+
+Against what the two colliding entries are: `HostResponseRoute { operation,
+effect_origin, producer_call_origin, response_origin }`. Measured in 8.5 and
+the node's table — the copies **agree on `operation`** and **differ on the
+three origins** by a constant delta. **Three of four fields differ, and they
+are exactly the fields naming which producer and which continuation the
+response goes to.**
+
+⇒ **The two copies are not interchangeable**, the correct route for a Vis site
+is the copy belonging to *that* call site, the key cannot distinguish them, and
+the consumer cannot ask. So `responses.rs:1279` is not a tidiness assertion; it
+is **the guard between here and a silent wrong-continuation route**, and 8.3
+measured exactly what is behind it.
+
+**Both arms rejected as framed:**
+
+- **Arm A** — verdict right, repair wrong. The invariant is correct, but there
+  is nothing to de-duplicate: per-arm inlining of a shared callee is a
+  legitimate transformation. The invariant is a claim about the **source**
+  dispatcher and `plan.source_occurrences` is **post-inlining**. The subject is
+  wrong, not the claim.
+- **Arm B** — diagnosis half right, direction dangerous. Re-keying the
+  **producer alone** makes the map unambiguous per occurrence while the
+  consumer still looks up by constructor, so the collision disappears and the
+  mis-route does not. That converts a loud refusal into a silent miscompile.
+
+**The third answer: producer and consumer move together, or neither moves.**
+The route map is keyed on a coordinate that does not identify the Vis site;
+any repair must give the consumer the same key the producer inserted under and
+make it select with it. `operation_origin` is a `StaticOriginId`, so the
+occurrence is derivable in principle, and threading it is the scope.
+
+**The acceptance bar gains a third clause**, which is the whole ruling:
+
+    1. MUST STILL REFUSE  two response-handling sites within one occurrence
+                          claiming one operation constructor.
+    2. MUST NOT REFUSE    N occurrences that are inlined copies of ONE source
+                          dispatcher arm.
+    3. MUST ROUTE EACH VIS SITE TO ITS OWN COPY -- the consumer selects by the
+       same key the producer inserted under, and a Vis site whose copy is
+       absent REFUSES rather than falling back to another copy.
+
+Clause 3's control is **not a green test**: revert clause 3 alone, keep 1 and
+2, and exhibit a Vis site routing to the other copy's `producer_call_origin`.
+If that control cannot be built, that is itself a finding about whether the
+repair is observable, and it is worth more than a green run.
+
+**What this changes in the sections above: nothing measured.** 8.1 through 8.6
+stand as taken. What it replaces is 8.9's "no repair unit is selected here" —
+one is now selected, it is neither arm, and it is larger than either.
 
 ### 8.10 Attribution
 
