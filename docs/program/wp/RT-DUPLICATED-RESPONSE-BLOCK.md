@@ -304,3 +304,231 @@ on justifying a fail-closed gate against its purpose — a diff whose review
 turns on an argument, not on byte-faithfulness. The predecessor reached a
 correct answer by building a repair and then declining to land it, which is the
 judgment this tier buys.
+
+## 8. Measured outcome
+
+**Everything below was measured at `origin/main`
+`9dfa6978ebf6c86e5d4ebafe8f2ecf6a565a1158`** unless a sentence names another
+revision. `D0`, `D1` and the `AC-4` measurement were first taken at the framing
+base `60df2cfd2`; between that base and `9dfa6978e` the only crate file that
+moved is `ken-elaborator/src/parser.rs` (+108/-25), and `ken-runtime` and
+`ken-cli` are byte-identical across the range. The parser was therefore the
+single route by which a census number could have moved, and `D3` measured that
+it did not. Every probe used here was environment-gated, is reverted, and
+`grep -c RTPROBE` over the touched files returns zero.
+
+### 8.1 `D0` — the census, and why NEITHER section-3 branch could decide it
+
+**The observable signature of `(1)` holds: the block is presented twice.** The
+census, counted by the instrument, is in section 8.5.
+
+**But the diagnosis attached to `(1)` does not follow, and `(2)`'s
+discriminating clause could not have come out false.** That is the finding of
+`D0`, and it is the "named third answer" section 3 asks for rather than either
+listed branch:
+
+- `(2)` says *every `static_origin` is visited exactly once*. That is
+  **guaranteed by construction**, not measured: `plan.source_occurrences` is
+  dense by origin ordinal, a node's origin **is** its index in it, and
+  `record_source_occurrence` refuses a second write at one origin as a
+  `PlannerInvariant`. A clause that cannot be false cannot discriminate.
+- `(1)` says two distinct origins carry byte-identical case rosters at a
+  constant offset. That is **exactly what correct code produces** whenever two
+  call sites of one proc are inlined. Observing it does not distinguish a
+  planner defect from a planner working correctly.
+
+⇒ **Both branches were written over the same observation and neither
+separates the readings it was supposed to separate.** The census is sound; the
+dichotomy it was commissioned to settle was not a dichotomy.
+
+### 8.2 `D1` — where the second presentation enters, measured
+
+`px7n-nested-computational-eliminator`, `const PROGRAM`, proc `main`:
+
+    Cons _ tail |-> match tail {
+      Nil      |-> wrap_again (\_. wrap_result True);
+      Cons _ _ |-> wrap_again (\_. wrap_result False)
+    }
+
+Both arms call `wrap_again`, so inlining instantiates the
+`wrap_again -> relay -> wrap_result` chain **once per arm** and presents one
+program's response cases to `host_response_routes` twice.
+
+**The discriminating run: a single-arm fixture, with the production check
+LIVE.** Collapsing the inner `match tail` to one arm removes the collision
+entirely, and the row then advances to
+`OrientedSubcontinuationPlanV1: checked Runtime frame marker was consumed more
+than once` — `[[RT-FRAME-MARKER-ONCE]]`, which this node does not own. The
+fixture was reverted.
+
+⇒ **The check is FAITHFUL** — it reports a real second presentation — **and
+the plan is CORRECT** — that presentation is what inlining two call sites of
+one proc looks like. The defect is in neither: it is that the route map's key
+is `case.constructor` alone, and the thing that distinguishes the two
+presentations is the **occurrence**.
+
+### 8.3 `AC-4` — deleting the check is not the repair, measured
+
+`AC-4` is written for outcome `(2)`. The outcome is the third answer, so it is
+discharged here in the form that actually bears: **what the uniqueness
+assertion protects, and what is lost if it is simply removed.**
+
+With the refusal suppressed and nothing else changed — the exact behaviour of
+deleting `responses.rs:1281` — each invocation of `host_response_routes`
+performs **29 silent overwrites, dropping 29 constructors' wiring
+coordinates** (`effect_origin`, `producer_call_origin`, `response_origin`), and
+**nothing refuses**: not at construction, and not at the point of use, where
+`selected_host_response_route`'s own *one Vis operation subtree selects more
+than one host response producer* does **not** fire. The last-written route is
+simply used.
+
+⇒ **The assertion is protecting route wiring, and the protection is real.**
+Removing it does not relax a gate; it silently mis-wires. The key must gain the
+occurrence, not lose the check.
+
+### 8.4 `D2` and `AC-1` — four rows, four named dispositions, none readmitted
+
+**All four STAY IGNORED.** No row is dispositioned by inheriting its
+file-mate's result, and the two `rt_escape` rows are measured separately as
+`AC-1`'s control requires.
+
+    px7n:149   STAYS IGNORED. Collision is the first stop; with it suppressed
+               the row reaches RT-FRAME-MARKER-ONCE. Label rewritten.
+    px7n:170   STAYS IGNORED. Same program, measured in the same run; the
+               census covers both rows because they build one program.
+    esc:653    STAYS IGNORED. Program rt_escape_escape_file_then_readat,
+               censused on its own. With the collision suppressed it reaches
+               ComputationalMatch: tree-producing match scrutinee is not Bool
+               or a constructor -- a SECOND blocker, newly seen.
+    esc:713    STAYS IGNORED. Program rt_escape_nat_fanout_escaped, censused
+               on its own, same second blocker.
+
+**The `RT-CLOSURE-BOUNDARY-LANE` question on the two `esc` rows stays
+UNDETERMINED.** Something has now been seen past the collision, but what it
+reached is a different mechanism, and nothing has seen past **that**.
+
+**Coordinate convention.** Row coordinates are the `#[ignore]` **attribute**
+line. The predecessor frame's section 9.6 carried the `fn` lines
+(`654 714 150 171`) and is corrected to `653 713 149 170` in the same commit,
+with a note recording why. That file is not in this node's section 6 path list;
+it is one docs file, coordinates only, no claim altered.
+
+**Owner.** Each label's owning ID moves from `RT-HOST-RESPONSE-ROUTE-KEY-
+COLLISION`, which is landed and cannot close these rows, to
+`[[RT-DUPLICATED-RESPONSE-BLOCK]]`. The successor that owns the key change is
+framed and **not on main at the time of writing**, so it is deliberately **not
+named in any label** — a row pointing at an ID with no node is the routing
+defect `[[RT-CONTEXT-FRAME-LABEL-CORRECTION]]` exists to fix, and this node
+will not create a fifth instance of it. The labels state the readmission
+condition without minting the pointer.
+
+**And the obligation that creates is recorded rather than left implicit:**
+this node closes, so once it does, the four rows name a closed owner — the
+same shape as the `RT-HOST-RESPONSE-ROUTE-KEY-COLLISION` pointer being
+corrected here. **The successor's landing must re-point all four labels**, and
+that is a deliverable of the successor, not a residue of this one. Until the
+successor is on main, a live node the rows can be routed through is the
+correct owner and a non-existent ID is not.
+
+### 8.5 `D3` and `AC-0` — the table re-measured, two numbers for one word
+
+| program | overwrites | colliding constructors | agree on operation | deltas |
+|---|---|---|---|---|
+| `px7n-nested-computational-eliminator` | 29 | 29 | 29 of 29 | `[365]` |
+| `rt_escape_escape_file_then_readat` | 29 | 29 | 29 of 29 | `[317]` |
+| `rt_escape_nat_fanout_escaped` | 29 | 29 | 29 of 29 | `[317]` |
+| `S6` (control) | 0 | 0 | 0 | `[]` |
+
+**Every cell of the node's three-program table is unchanged at this base**, so
+`D3` corrects nothing and records the re-measurement instead.
+
+**`AC-0`'s control disagreed with the instrument, and the disagreement is the
+finding, not an error.** The instrument reports **29**; a grep-derived line
+count over the same probe output reports **58**. `host_response_routes` runs
+**twice** per compile on all three colliding programs, the instrument's
+counters are per invocation, and the grep spans both. Both numbers are correct
+about different quantities, and the earlier "58 silent overwrites" figure is
+the grep quantity. Stated here so one word does not carry two values.
+
+**A first version of the instrument was discarded before it measured
+anything.** It counted overwrites, agreement and deltas but not *distinct
+colliding constructors* — the node table's actual column — which would have
+left that column grep-derived, which is what `AC-0` forbids. The run was
+stopped mid-build and re-cut; the cost was build time and no measurement.
+
+### 8.6 `AC-2` — `S6` does not acquire a collision, and the control got sharper
+
+`S6` reports `overwrites=0 colliding_constructors=0 distinct_deltas=[]
+routes_final=29`. **It builds a route map of the same cardinality as the
+colliding programs — 29 — with zero collisions in it**, so the control is not
+"a smaller program"; it reaches the same map size by a plan that presents each
+constructor once. It then refuses where it always did, on `source-specific
+inheritances at one generated entry disagree on their typed consumer
+projection, including the fresh-result route`.
+
+The account in 8.2 predicts no collision in `S6`, and none is observed.
+
+**One asymmetry, reported and deliberately not over-read:** the three colliding
+programs emit two `host_response_routes` totals lines and `S6` emits one. `S6`
+refuses on a planner invariant that may well abort before a second invocation,
+so this is not read as a structural difference; it is unmeasured.
+
+### 8.7 The correction this node owes, and its untested transfer
+
+**The node's cross-program agreement rests on TWO programs, not three**, and
+that correction is recorded in the node itself. Every proc of
+`rt_escape_escape_file_then_readat` also appears in
+`rt_escape_nat_fanout_escaped` — `after_file_escape`, `handle_outer` and `main`
+byte-identical, `read_body` differing in four lines. Two agreeing censuses
+across those rows are one shape seen twice.
+
+**The transfer behind the correction is UNTESTED and is marked as such.** The
+proc-level overlap was measured because the two programs produce the same
+`ComputationalMatch` scrutinee refusal — a different refusal, reached by a
+different probe, from the collision census the corrected sentence is about.
+Whether the **collision** replicates independently across the two plans has
+been measured by nobody. Restoring "three" needs that measurement; the overlap
+does not license it, and its absence does not license the opposite either.
+
+**The node's `title` is not corrected.** It says the colliding constructors
+agree on their operation *across three programs*, and that is true as measured
+— three programs were censused and all three agree. The correction is about
+**independence**, which the title does not claim.
+
+### 8.8 `AC-5` — `[[RT-FRAME-MARKER-ONCE]]` untouched
+
+Not absorbed, not repaired, not edited; still `draft`. The two `px7n` rows
+reaching it once the collision is suppressed is **the expected outcome of this
+node succeeding**, not evidence of it failing. Nothing in this node's repair
+path touches it, and nothing here should be read as bounding what lies behind
+it.
+
+### 8.9 What this node does NOT deliver, and who owns the rest
+
+Section 4's `D1` (repair on outcome 1) and `D1'` (retirement on outcome 2) are
+both written against branches that 8.1 shows did not decide anything. **The
+repair is the occurrence-keyed route map, and it is out of this node's scope**
+— it changes a production key on a path all four rows traverse, and 8.3 shows
+the fail-closed check must survive that change rather than be relaxed by it.
+It is owned by the framed successor, which lands before any label is re-pointed
+at it.
+
+**This node's outcome is therefore: the duplication is located, the check is
+exonerated, the plan is exonerated, the repair unit is named, and no row is
+readmitted.** Section 1 says both outcomes close the node; this is the second
+one, reached with `AC-4` discharged — the thing the predecessor could not
+reach.
+
+### 8.10 Attribution
+
+- The **key-adequacy** statement — that there is no key too narrow to
+  distinguish cases that never differ — is the Architect's, from the
+  predecessor's review.
+- The distinction between **a refuted repair and an adequate key** — that
+  `RT-HOST-RESPONSE-ROUTE-KEY-COLLISION` refuting *its* key change does not
+  establish that the constructor key is adequate — is mine.
+- The **plan-versus-instrument split** in 8.1 and 8.2 — that a correct plan and
+  a faithful check can both be right while their meeting point is wrong — is
+  mine, and it is the sentence the rest of section 8 rests on.
+- The four labels' **attribution halves** are the predecessor ring's, carried
+  and re-measured, not rewritten.
