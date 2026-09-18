@@ -9,7 +9,7 @@ tier: T1
 depends_on: [RT-DUPLICATED-RESPONSE-BLOCK]
 blocks: []
 github: null
-origin: "Steward, 2026-09-18, fourth repair node from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger on operator directive 2026-09-15 'The other tests should be fixed.' The occurrence-keying insight is the Steward's own section 3a amendment to RT-HOST-RESPONSE-ROUTE-KEY-COLLISION, written 2026-09-17: 'What the key actually omits is the OCCURRENCE.' It was routed to that node's AC-4 and AC-4 closed 'not reached', so the assignment has sat undischarged since. RT-DUPLICATED-RESPONSE-BLOCK then established the reading that licenses it -- the two copies are legitimate instantiations, not a duplicate awaiting resolution -- which makes the construction-time uniqueness assertion the wrong instrument rather than a faithful report of a planner defect. Architect ruled the repair LIVE 2026-09-18 and set its acceptance bar. Steward-filed per COORDINATION section 2."
+origin: "Steward, 2026-09-18, fourth repair node from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger on operator directive 2026-09-15 'The other tests should be fixed.' The occurrence-keying insight is the Steward's own section 3a amendment to RT-HOST-RESPONSE-ROUTE-KEY-COLLISION, written 2026-09-17: 'What the key actually omits is the OCCURRENCE.' It was routed to that node's AC-4 and AC-4 closed 'not reached', so the assignment has sat undischarged since. RT-DUPLICATED-RESPONSE-BLOCK then located WHERE the second presentation comes from -- per-arm inlining of a shared callee -- which makes the construction-time uniqueness assertion wrong in its SUBJECT, stated over post-inlining occurrences rather than over the source dispatcher, and NOT unnecessary. Corrected 2026-09-18 on Architect evt_5m7k7k4vrg5ay: this line previously said that node 'established the reading that licenses it', which overstates in the same direction the body did -- that node measured the origin and explicitly did NOT measure whether producing the second presentation is correct (its 8.2). The Architect ruled the repair LIVE 2026-09-18 and rejected both design arms (evt_4eghtvj2fhpz0); separately, the Architect set this node's acceptance bar and has since REPLACED it with the three-clause bar below. The liveness ruling and the bar are two acts and this line used to fuse them. Steward-filed per COORDINATION section 2."
 ---
 
 # The refusal, and why the key is now the right unit when it was not before
@@ -36,12 +36,44 @@ errors on any second insert at that key. The invariant it encodes is:
 > one host-operation constructor ⇒ one response-handling site in the whole
 > program
 
-**That invariant is too strong, and saying so is now licensed evidence rather
-than a proposal.** `[[RT-DUPLICATED-RESPONSE-BLOCK]]` measured that the two
-colliding copies track two semantically different match arms — legitimate
-instantiations, not one block awaiting de-duplication. A construction-time
-uniqueness assertion over `case.constructor` is therefore not a property the
-plan was ever required to have.
+**That invariant is stated over the wrong UNIT, which is a narrower claim than
+"too strong".** `[[RT-DUPLICATED-RESPONSE-BLOCK]]` located WHERE the second
+presentation comes from — per-arm inlining of a shared callee — so
+`plan.source_occurrences` is **post-inlining** while the invariant is a claim
+about the **source dispatcher**. Re-keying on the occurrence fixes the unit.
+**It does not retire the assertion, and this node may not be read as saying it
+does.**
+
+> ### THIS PARAGRAPH SAID "MEASURED", AND IT LICENSED DELETING `:1279`
+>
+> **Architect, `evt_5m7k7k4vrg5ay`, 2026-09-18. Two defects, and they failed in
+> the same direction: toward a larger permission than the evidence grants.**
+>
+> **The verb.** It read *"`[[RT-DUPLICATED-RESPONSE-BLOCK]]` **measured** that
+> the two colliding copies track two semantically different match arms."* The
+> cited node's own 8.2 strikes exactly that step:
+>
+> > *"I measured WHERE the second presentation comes from. **I did not measure
+> > whether producing it is correct** ... an earlier revision went one step
+> > further and said 'and the plan is CORRECT'. It should not have. That is an
+> > inference, not a measurement."*
+>
+> ⇒ **This node attributed as MEASURED the one step its source went back and
+> marked as not-measured.** A word promising an instrument nobody ran.
+>
+> **The licence.** *"A construction-time uniqueness assertion over
+> `case.constructor` is therefore not a property the plan was ever required to
+> have"* **authorises deleting `responses.rs:1279`.** Under `evt_4eghtvj2fhpz0`
+> it must not be: the consumer at `:1298` looks up by constructor alone, the two
+> colliding copies agree on `operation` and differ on all three origins, so
+> **`:1279` is the guard between here and a silent wrong-continuation route.**
+>
+> **Both design arms were REJECTED.** *"Per-arm inlining is legitimate"*
+> survives inside Arm A's rejection, as the reason the assertion's SUBJECT is
+> wrong. **It does not survive as a reason the assertion should not exist.** The
+> old paragraph took Arm A's surviving premise and drew Arm B's rejected
+> conclusion — a bar read as a licence, one level up from where that already
+> happened once in this chain.
 
 # WHY THIS IS `draft` AND WHAT FLIPS IT
 
@@ -56,10 +88,58 @@ occurrence -- a question posed against a code path `RT-DUPLICATED-RESPONSE-BLOCK
 is about to change. **Measuring it before that lands measures the wrong tree.**
 
 **The flip is the Steward's and its trigger is precise:** when
-`RT-DUPLICATED-RESPONSE-BLOCK`'s `D2`/`D3` land on `main`, re-read this node's
-fixed inputs against that `main`, correct any coordinate that moved, and flip to
-`ready`. **Flipping on the node's status alone is not sufficient** -- that is the
-condition that already holds and is why this says `draft`.
+`RT-DUPLICATED-RESPONSE-BLOCK`'s `D2`/`D3` land on `main` **AND the gate
+corrections in this change land**, re-read this node's fixed inputs against
+that `main`, correct any coordinate that moved, **run the citation re-read
+below**, and flip to `ready`. **Flipping on the node's status alone is not
+sufficient** -- that is the condition that already holds and is why this says
+`draft`.
+
+> ### THE TRIGGER USED TO FIRE ONE LANDING TOO EARLY, AND THE GAP WAS NOT EMPTY
+>
+> **Architect, `evt_kk4kh7d1znhs`, 2026-09-18.** The precondition was `D2`/`D3`
+> alone. `D2`/`D3` landed in `RT-DUPLICATED-RESPONSE-BLOCK`'s `e080a6966`
+> (squash `5899268451d42e7c1337929a996921d6483b6541`), so the trigger fired
+> **before** the corrections on this page existed on `main`.
+>
+> **In that window `main` held, simultaneously:** this node eligible to flip;
+> the OLD trigger, scoped to *"coordinates that moved"*; and the predecessor's
+> §1 Objective offering retirement of the check as *"as good a result"*, with
+> its *"# The open question"* section presenting both readings as live.
+> **A coordinate-keyed re-read comes back clean on all three** — which is the
+> finding this page already carries, arriving in the one window where it bites.
+>
+> ⇒ **A correction that lands after the event it governs does not govern it.**
+> The re-read is supposed to check this node's `:39-44` as a fixed input, and
+> until this change lands that input is still wrong on `main`. Flipping first
+> certifies text that is about to be corrected — the weakest moment to run it.
+>
+> **The conjunction has an equivalent single form: flip when THIS change
+> lands.** It is a descendant of `e080a6966`, so it implies `D2`/`D3` and needs
+> no second clause.
+>
+> **The licence was NOT introduced by `e080a6966`** — runtime-implementer,
+> `evt_fy4afrj7wt73`, measured it live on `main` at `831e521e5`, before that
+> candidate. **The exposure started earlier than the flip window; the remedy is
+> unchanged.**
+
+> ### A RE-READ KEYED ON MOVED COORDINATES COMES BACK CLEAN ON WHAT ACTUALLY BROKE
+>
+> **Architect, `evt_5m7k7k4vrg5ay`.** This trigger used to say only *"correct
+> any coordinate that moved."* The defect corrected above is **not a coordinate
+> that moved.** It is a claim whose **WARRANT** moved — and it moved by the
+> cited node retracting a verb and by the Architect rejecting the arm. **A
+> coordinate-keyed re-read returns nothing on it, and the node flips carrying
+> the licence.**
+>
+> ⇒ **The question the re-read must ask instead:**
+>
+>     for every claim in this node that CITES the predecessor,
+>     does the predecessor still say that -- and with WHICH VERB
+>
+> **There are exactly two, both corrected 2026-09-18, both to be re-asked at the
+> flip:** the paragraph above, and the `origin:` line. Neither is reachable by
+> asking whether a line number moved.
 
 # THIS IS AN UNDISCHARGED ASSIGNMENT. IT IS NOT A DISCOVERY.
 
@@ -101,16 +181,39 @@ arrival.
 
 # THE ACCEPTANCE BAR, SET BY THE ARCHITECT
 
-Both halves are required and the second is the one a tuple-widening satisfies
-by accident:
+> ### THIS BAR WAS TWO CLAUSES AND IS NOW THREE. THE THIRD REPLACES, NOT EXTENDS.
+>
+> **Architect, `evt_4eghtvj2fhpz0`, 2026-09-18.** The two-clause bar below was
+> published here as *"THE ACCEPTANCE BAR"* and **was insufficient on its own**
+> — both its clauses are producer-side, and **every producer-side control
+> passes on a repair that mis-routes.**
+>
+> **Say "replaces", not "gains".** A reader arriving at a bar that looks
+> complete will not go looking for a third clause, which is the whole failure
+> mode: the two clauses below are individually correct and jointly **not a
+> bar.** Architect, `evt_7ct1bwa50pne7`; Steward sweep.
+>
+> **And this node is ONE PART of the repair, not the whole of it.** The ruling
+> is that producer and consumer move together. Re-keying alone does not clear
+> the rows.
+
+All three are required. Clause 2 is the one a tuple-widening satisfies by
+accident; **clause 3 is the one nothing else in this chain checks.**
 
     MUST STILL REFUSE   two response-handling sites within ONE occurrence
                         claiming one operation constructor
     MUST NOT REFUSE     N legitimate instantiations each contributing one
                         response handler
+    MUST NOT MIS-ROUTE  the consumer selects by the key the producer inserted
+                        under, and a Vis site whose route copy is ABSENT
+                        REFUSES rather than falling back to the last-written
+                        route
 
 **A repair that cannot still refuse the first has relaxed the invariant, not
-re-keyed it.**
+re-keyed it.** **A repair that satisfies the first two and fails the third has
+kept the guard green while routing every `Vis` site to the wrong copy** — which
+is a silent wrong-continuation route, and is what `responses.rs:1279` is
+currently the only barrier against.
 
 # THE POPULATION IS ALL FOUR ROWS
 

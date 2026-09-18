@@ -163,10 +163,56 @@ of the six retained rows that have since left it.
 > IS THE ONE WEAKNESS HERE.** The label both marks a row retained *and* asserts
 > the eliminated-not-callable refusal. So this measurement cannot distinguish
 > *"retained, and the claim about it is false"* from *"never retained, and
-> mislabelled."* **What breaks the tie is the count**: sixteen label-carriers
-> against a closeout that independently says sixteen. Had the count come back
-> 14 or 19, this would not have settled `D0` and the honest report would have
-> been that it remains open.
+> mislabelled."* **What raises the odds sharply is the count**: sixteen
+> label-carriers against a closeout that independently says sixteen. Had the
+> count come back 14 or 19, this would not have settled `D0` and the honest
+> report would have been that it remains open.
+>
+> ### THE COUNT CORROBORATES. IT DOES NOT DECIDE. (Architect, `evt_4j7ygjy4jyaxx`)
+>
+> An earlier revision of this section said *"what breaks the tie is the count."*
+> **It does not break the tie.** A matching total is evidence, not a
+> discriminator: **two compensating errors preserve a total.** One row
+> mislabelled into the set and one genuinely-retained row missing from it nets
+> to sixteen and reproduces this observation exactly.
+>
+> **The worked example is in this same day's record.** `13 + 10 = 23` balanced
+> while the assignment was wrong, and **the balance is precisely what let it
+> survive inspection** — see the fleet lesson on a count handed to you inside a
+> correction.
+>
+> ⇒ **What carries `D0` is the per-line verification of rows 1, 2 and 10**, each
+> at its own coordinate. The count corroborates that; it is not a substitute for
+> it. **A successor must not read "sixteen" as a proof and skip the per-line
+> work.**
+>
+> **The voiding condition is unaffected and stays exactly as written: any count
+> other than sixteen voids the answer and stops the WP.** That direction is
+> sound — a mismatch really does refute. Only the converse fails to carry.
+
+> ### THE TRAP FOR WHOEVER RE-MEASURES: THE OBVIOUS INSTRUMENT RETURNS 36
+>
+> **Re-run the command above, not a command you compose from the node name.**
+> Measured independently by the Architect at `a388dc06`:
+>
+>     grep -c on the NODE NAME       36 matching lines across 9 files
+>     grep -c on the ATTRIBUTE       16 rows across 7 files
+>
+> The node name appears roughly **twice per row** — once in a comment above the
+> attribute — **and it also appears in `px4b_native_production.rs` and
+> `px7p_constructor_field_composition.rs`, which carry no such label at all.**
+> So the name-keyed count returns a larger number over a wider file set and
+> reads as a perfectly fine answer.
+>
+> ⇒ **Anyone re-checking with the obvious instrument gets 36 and will conclude
+> the sixteen is a miscount.** The attribute is the key; the name is a mention.
+>
+> **And the path is the second trap.** These rows live in
+> `crates/ken-cli/tests/`, **not** `crates/ken-runtime/tests/`. The Architect's
+> first attempt returned zero for that reason — *"the empty result is the only
+> reason I checked the path."* **An empty result on a population you know is
+> non-empty is the cheapest false-negative tell available**, and it is the one
+> that did the work here.
 
 ⇒ `(ii)` HOLDS: **the closeout's universal claim over the retained 16 is
 refuted**, the retained set did split, and `§9`'s hard stop did not fire when

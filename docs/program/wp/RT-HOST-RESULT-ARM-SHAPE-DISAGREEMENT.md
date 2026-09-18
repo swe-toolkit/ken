@@ -1,5 +1,39 @@
 # RT-HOST-RESULT-ARM-SHAPE-DISAGREEMENT — work package
 
+> # DO NOT WORK FROM THIS FRAME. IT IS BEING RE-CUT.
+>
+> **The node is `draft`, not `ready` (Steward, 2026-09-18). Read the node's
+> head banner first.** `RT-CARRIER-PRODUCER-OCCURRENCE` `D3`/`D4` refuted parts
+> of this frame while it sat `ready`, and the refuted parts are not coordinates
+> — **they are an acceptance criterion and a fixed input.**
+>
+>     §3 D2 point 2   "whether BOTH ImmediateBool assertions survive untouched,
+>                      as the ruling predicts"
+>                     REFUTED. One of the two was deleted by D4 and replaced
+>                     with `expected_error_tag`, a plan query. An implementer
+>                     would measure this first, find it false, and be RIGHT to
+>                     stop.
+>     §3 D2 point 1   "does reconcile_declared_children still refuse at its
+>                      input"  -- ANSWERED, NO. Row green, 1036/0/1.
+>     §2 fixed input  the row's `#[ignore]` at :3333 -- GONE. The row is
+>                     un-ignored.
+>     §5 title        "THIS NODE DOES NOT CLOSE ITS ROW, AND THE #[ignore]
+>                      STAYS" -- false. There is no #[ignore] on that row.
+>
+> **`(c)` SURVIVES** — the Architect ruled NARROWED, not SUPERSEDED
+> (`evt_3a8xxpwmcy5xz`). The borrow is byte-unchanged across
+> `2d440e394..a9fb242f0`; `D3`/`D4` changed what the arm is fed and what the row
+> asserts, never how it is built. The re-cut is the Steward's and it leads with
+> the strengthened motivation recorded on the node: removing the borrow closes a
+> coverage gap the Architect measured independently while reviewing `D4`.
+>
+> **The lesson for frame authors, and it is why this banner is this loud:** a
+> stale **coordinate** is defended by the perishable-anchor rule every frame
+> here carries, and a reader re-measures it. **A stale ACCEPTANCE CRITERION has
+> no such defence** — an AC encoding a prediction about a file another node is
+> actively rewriting reads, once refuted, as a finding about the implementer's
+> own work rather than as frame rot.
+
 **Owner: Team Runtime. Size S. Tier T1. Gate: none.**
 **Implementation base: `origin/main` at
 `823c4a67cbfe8ef3e8fccf06acd1fa4c4a13af97`.**

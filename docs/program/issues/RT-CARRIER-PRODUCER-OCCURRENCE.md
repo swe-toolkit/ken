@@ -5,6 +5,7 @@ status: ready
 owner: runtime
 size: M
 gate: none
+tier: T1
 depends_on: [RT-SRCBODY-BIND-ORDER]
 blocks: []
 github: null
