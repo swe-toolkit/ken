@@ -259,6 +259,50 @@ as though it were.** `§3` escaped the trap only because it worked
 > positional noun phrase is not.** Treat the former as an oracle; treat the
 > latter as a claim needing a position before it can be checked.
 
+> ### AMENDED 2026-09-18 (Steward): THE TABLE ABOVE NEEDS A BRACKET-DEPTH COORDINATE
+>
+> **`expression, app argument` is not one cell.** Under the Architect's `KwProof`
+> ruling (`evt_75pnw3svb4z4b`) it splits, and the frame's axis cannot express the
+> split:
+>
+>     position                                      proof_ref
+>     expression, app argument, bracket depth > 0    CLOSES under the ruling
+>     expression, app argument, bracket depth 0      STAYS REFUSED, structurally
+>
+> **The depth-0 row is not an implementation shortfall.** Ken has no declaration
+> terminator, so the atom-start roster's complement *is* the declaration
+> separator; admitting `proof` at depth 0 makes a declaration body swallow the
+> next declaration. **That holds for any parser of this grammar, not just ours.**
+> The sanctioned spelling at depth 0 is `f (proof p for s)`, which works today
+> through the grouped arm (`parser.rs:3637`) and needs no code.
+>
+> ⇒ **The objective's omission-closure clause narrows accordingly.** `proof`
+> closes as a consequence of the unification **wherever a declaration cannot
+> begin**. Do not score the depth-0 row as an unmet AC.
+>
+> **This is §5's own lesson recurring against §5.** The section exists because
+> *"expression position is not one position"* — and the refined taxonomy it
+> built is itself too coarse, by exactly one coordinate, discovered the same way
+> the first coarseness was. **A position axis sharpened once is sharp to the
+> resolution of the defect that prompted it, and no further.** Expect the next
+> repair on this node to find a coordinate this table still lacks; that is the
+> normal behaviour of a taxonomy, not a defect in this amendment.
+>
+> **That prediction is NOT standing permission to miss a row** (Architect,
+> `evt_3r6xjnk510pmb`). As written the table is **scoring-complete for the rows
+> AC-0 enumerates.** A new coordinate is a **frame amendment** — authored,
+> stated, reviewed — never a silent re-score of a row already being counted.
+>
+> **No AC changes.** AC-0 is a baseline measurement — it is satisfied by the bare
+> cases being REJECTED, so it never required the depth-0 form and is not
+> unsatisfiable. AC-1 is a property of the encoding, which a depth-keyed
+> `StartExclusion` member satisfies the same way the existing three do.
+>
+> **The residual contradicts `spec/30-surface/32-grammar.md:399-406`**, which
+> asserts ungrouped `f proof p for s` parses. Routed to the Spec enclave as a
+> behavioural-contract question; it does **not** gate this node. If Spec adds a
+> declaration terminator, the depth exclusion is one enum member to delete.
+
 **Do not retire the argument position into `LANG-TRUNC-INTRO-DIAGNOSTIC-
 REMEDIES` D1** — the Architect nearly reported the opposite and flagged the
 move explicitly.
@@ -310,8 +354,73 @@ at `6acd40705` — and paste the output:
     REJECTED  fn f (x : G ‖Bool‖)...   PARSED  fn f (x : G (‖Bool‖))...
     FIRES     f if a then b else c     -- the negative control
 
-**If any bare case PARSES at your base, STOP and return to the Steward.** The
-node's premise has changed, and that makes its scope WRONG, not merely smaller.
+**If any bare case PARSES at your base, STOP and return to the Steward —
+UNLESS a landed increment of THIS node closed it. Name that increment and the
+row it closed.** If no increment of this node accounts for the row, the node's
+premise has changed, and that makes its scope WRONG, not merely smaller.
+
+**Name the increment as recorded in the issue file's LANDED INCREMENTS table —
+the SQUASH.** Every landing is a squash, so a candidate SHA is **not an ancestor
+of `main`** and never becomes one: the KwProof increment cutting after
+`9c4dda0b2` lands will find that SHA absent from `main`'s history. **If you cite
+a candidate SHA, establish landedness by CONTENT — blob identity — never by
+ancestry**, or a reader checking your ledger by ancestry gets a false negative on
+a true entry. (Architect, `evt_3r6xjnk510pmb`.)
+
+> ### AMENDED 2026-09-18 (Steward). THE UNLESS CLAUSE IS NOT A SOFTENING.
+>
+> **Without it this AC reports the node's own success as a premise failure, and
+> it does so on the very next cut.** The TruncBar increment
+> (`9c4dda0b226e11edaf29c7b087a86ca584cfed01`) makes **two** bare rows PARSE —
+> that *is* the repair — so the KwProof increment would cut from a `main` where
+> bare rows parse and be instructed to stop and declare the scope wrong. Raised
+> unprompted by the Architect (`evt_exrk02z1p7gg`), one cut before it would have
+> fired.
+>
+> **The ledger as of that increment, MEASURED by the implementer at
+> `9c4dda0b2` (`evt_5tcc70s0t90st`) — it is TWO rows, not one:**
+>
+>     PARSED    f ‖x‖                  closed by 9c4dda0b2, EXPRESSION position
+>     PARSED    fn f (x : G ‖Bool‖)    closed by 9c4dda0b2, TYPE position
+>     REJECTED  f proof p for s        unchanged
+>     FIRES     f if a then b else c   negative control, unaffected
+>
+> `TruncBar` is **position-polymorphic** — it has arms in both `parse_atom_type`
+> and `parse_atom_expr_base` — so one increment closes a row on each side.
+>
+> ⇒ **Do not read this worked example as the inventory.** The clause says *"name
+> the row it closed"* and accommodates any number; a reader who takes a singular
+> example as the list leaves the type row with no accounting increment, and it
+> trips the stop. **A count stated in prose beside a clause that does not carry
+> the count is where this AC will be misread next.** The singular example was the
+> Steward's, caught by the implementer before publication.
+>
+> **The discrimination the AC exists for is preserved exactly.** Its hazard is a
+> SIBLING (`LANG-STANDARD-INFIX-CALL-COMPLETION`, live in the same file) silently
+> closing the defect, so you build a repair for something already fixed. The
+> observable is identical in both cases and the old predicate saw only the
+> observable:
+>
+>     a bare row parses because a SIBLING closed it   -> STOP, correct
+>     a bare row parses because THIS NODE closed it   -> proceed
+>
+> Naming the accounting increment is what separates them, and it makes the node
+> accumulate a ledger of which rows it has closed — which AC-0's *"paste the
+> output"* already half-produces. The `FIRES` negative control is unaffected.
+>
+> **Root cause: a once-per-NODE baseline written as a once-per-INCREMENT gate.**
+> AC-0 was authored when this was one increment; it is now six.
+>
+> ⇒ **A GATE THAT HAS ONLY EVER TAKEN ITS PASSING BRANCH IS UNMEASURED.** The
+> first five increments kept every bare row rejected, so AC-0 passed on every run
+> and **its stop branch has never once executed** — unmeasured five times while
+> reading as a discharged AC each time. A criterion whose own repair invalidates
+> it is unsatisfiable, and the tell is available before the failure: ask which
+> branch has ever run.
+>
+> **Whoever writes an increment-gated AC on a multi-increment node owes this
+> check at every recut**, not just here: does the node's own progress move the
+> gate's input? If it does, the gate needs a clause naming the node's own work.
 
 > ### WHY THIS AC EXISTS, AND WHY IT IS AC-0 RATHER THAN AC-11
 >

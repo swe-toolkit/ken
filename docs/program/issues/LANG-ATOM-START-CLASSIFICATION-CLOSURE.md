@@ -56,3 +56,86 @@ origin: "Raised by the Architect from their own carry list (evt_a1t4jpv9tvc0); t
 > their instruments named** — not as assumptions, and not as open work.
 >
 > Reviewers: language QA + Architect. Then Steward M1-M3a, lieutenant M4-M9.
+
+## SYMPTOM INVENTORY (§1b-i)
+
+**Seeded by the Steward 2026-09-18 at the Architect's request. Both entries are
+transcribed from the Architect's ruling `evt_75pnw3svb4z4b` and are theirs, not
+mine. @architect appends here; the inventory lives in this tracked file because
+it is the only place it survives a compaction.**
+
+    1. admitting `‖`      the truncation body loses its terminator
+                          -- keyed on the roster's COMPLEMENT
+    2. admitting `proof`  the declaration sequence loses its separator
+                          -- keyed on the roster's COMPLEMENT
+
+### The shared predicate (Architect, answered at entry 2)
+
+**The atom-start roster is doing double duty. It is an ADMISSION set, and by
+complement it is the TERMINATOR set for every site that consults it.**
+
+CORRECTED 2026-09-18 by the Architect against its own first statement, which
+said *"three unbounded loops"* and then named four things. **State the
+membership; the sum is what drifts** — the count moved in both directions within
+twenty minutes of being handed over. Exact, MEASURED — every consumer of either
+roster function in `parser.rs`:
+
+    2056   while self.can_start_atom_type()     type-application loop
+    2362   while self.can_start_atom_type()     type-application loop
+    2788   if !self.can_start_atom_expr()       expression argument loop
+    3547   if !self.can_start_atom_expr()       operator-prefix tail gate
+
+**Four consulting sites, and `:3547` is not a loop** — it is the gate behind
+*"apply it to at least one argument"*, which is why it fell out of a sentence
+about loop termination. It is a live roster consumer all the same: with
+`TruncBar` admitted, `<+> ‖x‖` now passes that gate where it previously errored.
+Direction is correct and no defect is measured, so this is a **carry for the
+KwProof increment**, not a hold on anything landed.
+
+⇒ **Every token added to the roster changes behaviour at all four consulting
+sites at once, silently — and at `:592`, which consults it zero times.** Three
+of the four are terminators, which an admission disarms; `:3547` is an admission
+gate, which an admission merely widens. That is the defect. Neither `‖` nor
+`proof` is; each is an instance.
+
+### AND THE DECLARATION SEQUENCE CONSULTS THE ROSTER ZERO TIMES
+
+It is absent from all four lines above. `parse_decls:592` is affected
+**transitively**, through the extent of a declaration body, with no reference
+anywhere to grep.
+
+⇒ **A complete census of the roster's consumers is complete and still cannot
+find the thing that broke.** That is why this hazard is invisible, and it is
+worth more here than any count.
+
+Ken has no declaration terminator — no semicolon, no layout rule, nothing in the
+loop at `:592`. A declaration's extent ends exactly where its body expression
+stops, and the body expression stops because the next token is not admitted as an
+atom start. **The roster's complement IS the declaration separator.**
+
+The Architect answered at the 2nd entry rather than §1b-ii's 3rd because both
+entries arrived in a single stop and the predicate was already visible.
+
+### Corollary, MEASURED (Architect)
+
+The intersection of `parse_decl`'s dispatch set with `can_start_atom_expr`'s
+roster is currently **EMPTY**. `KwProof` would be the first token that is both a
+declaration keyword and an expression atom start. (`KwType` in the roster is not
+the declaration `type`; that is `KwTypeReserved`, a distinct token `parse_decl`
+rejects outright.) **This is not an instance of a known class — it is the first
+one, which is why nothing in the design anticipated it.**
+
+## LANDED INCREMENTS (Steward, blob-verified at each merge)
+
+    AC-9 + AC-6   6285aa1d80ca808dc2ec679a2d3aabfc6d0967a5
+    AC-4          aa89de8ff18a813c5fae077f1d712df4d89925b1   PR #3890
+    brace/§4      ab228f1bdef2d2bb8301d250802fbc310cfe4e27   PR #3892
+
+**The node stays `active`.** Owed: AC-0, AC-1, AC-2, AC-3, AC-5, AC-7, AC-8,
+AC-10. The release-time increment list above (AC-9, AC-6, AC-4) is discharged;
+it was the plan at release, not the remaining work.
+
+**Each increment is cut fresh from `origin/main`, never stacked on the one below
+it** — three stacking instances on 2026-09-18 each cost a re-review, because an
+approval names an exact SHA and does not travel across a re-cut. The rule now
+sits in the release playbook at RELEASE (`e09558f53`).
