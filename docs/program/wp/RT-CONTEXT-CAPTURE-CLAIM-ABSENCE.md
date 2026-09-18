@@ -36,14 +36,41 @@ and attributing a printed line to the header above it is not a measurement.
     L3  resolve_context_capture_claim                         core.rs:9551
         the absence arm, `let Some(claim) = ... else`         core.rs:9557
 
-**The six `context_capture:` producer arms in `planning/`, ALL occurrences:**
+> **`L1` AND `L3` ARE THE SAME PRESENCE PREDICATE ON THE SAME FIELD** — §1a.A.
+> Read "depth 3" as **two distinct predicates plus a convergence result**, not
+> as three independent layers. **Convergence is the measured claim and the one
+> this node rests on; finiteness is NOT.**
 
-    continuations.rs:4625    Some(claim)
-    continuations.rs:10491   Some(declared)
-    continuations.rs:10541   Some(ContinuationEnvironmentDraft::EntryFrame { .. })
-    continuations.rs:10280   None
-    continuations.rs:10403   None
-    continuations.rs:10423   None
+**The `context_capture` writers in `planning/`, ALL occurrences, with the
+production/test split — CORRECTED 2026-09-18, see the amendment at §1a:**
+
+    continuations.rs:830     draft.context_capture.map(..).transpose()?  PROD  pass-through
+    continuations.rs:1001    the field declaration                       PROD
+    continuations.rs:4560    context_capture: capture,                   PROD  a variable
+    continuations.rs:4625    context_capture: Some(claim),               PROD  only literal Some
+    continuations.rs:10280   context_capture: None,                      TEST
+    continuations.rs:10403   context_capture: None,                      TEST
+    continuations.rs:10423   context_capture: None,                      TEST
+    continuations.rs:10491   context_capture: Some(declared),            TEST
+    continuations.rs:10541   context_capture: Some(EntryFrame { .. }),   TEST
+
+`#[cfg(test)] pub(in crate::cranelift_backend) mod tests` spans `8324`-`11079`
+(brace-depth and column-0 scans agree). **There is NOT ONE production
+`context_capture: None` literal in `planning/`.** Closure on the population:
+**zero** assignment-form writes (`.context_capture =`) anywhere in
+`crates/ken-runtime/src/`, so the struct-literal census is the complete set of
+writers.
+
+**Production `None` is decided ONE HOP ABOVE the arm.** `:4560`'s `capture` is a
+forward, not a decision:
+
+    let capture = predeclared_entry_frame_slot(plan, *emission_owner, input.coordinate)?
+        .map(|declared_slot| ContinuationEnvironmentDraft::EntryFrame { .. });
+
+Production `None` arises exactly when `predeclared_entry_frame_slot` returns
+`Ok(None)`. Its own comment (`continuations.rs:4546-4548`): *"`None` when the
+frame declares no member: fails closed. Nothing invents a position, and no
+fallback reads the direct-emission index as a frame slot."*
 
 **The four rows** — file and line, function name confirmed:
 
@@ -64,21 +91,116 @@ also record a structural difference — `px7l` issues TWO admission queries (one
 admitted, one falling through), `px7m` a SOLE query that falls through. The
 rows converge at `L3` regardless; they are not identical upstream of it.
 
+## §1a. AMENDMENT 2026-09-18 (Steward) — four Architect findings, all verified
+
+Raised by the Architect at `evt_4hzm4praxvdrq` against this frame while it was
+`ready` and unreleased. **Every claim below re-measured by the Steward at
+`e75f1fe27` before folding.** The census's own base `0298c51eb` is an ancestor
+of main, 23 commits behind, with `continuations.rs` and `core.rs` UNCHANGED
+since — **its coordinates are live and need no re-derivation.**
+
+**A. `L1` AND `L3` READ THE SAME FIELD, AND `L1`'S DOC SAYS SO.** `core.rs:13594`
+is `Ok(claims.iter().all(|claim| claim.availability.context_capture.is_some()))`
+— the same presence test `L3` unwraps at `core.rs:9557`. `L1`'s doc comment,
+`core.rs:13527-13531`, verbatim:
+
+> *"`context_capture` is the field `resolve_context_capture_claim` consumes; a
+> `None` there is precisely the refusal this gate must respect rather than route
+> around."*
+
+**The census forced `L1` to an unconditional `Ok(true)` — the "route around"
+that comment names — and reported meeting `L3` as a discovery about the
+program.** ⇒ **DEPTH 3 OVER-COUNTS: two distinct predicates were traversed, not
+three.** Not a claim of set identity: `L1` quantifies over the context's
+`Capture` run, `L3` resolves one coordinate's views, and whether the second is a
+member of the first is a further measurement.
+
+**B. FINITENESS DOES NOT SURVIVE; CONVERGENCE DOES.** The census's verdict says
+*"FINITE at depth 3"* while its own limits section says *"not proof that nothing
+lies behind `L3`... a repair there may expose an `L4`."* Both cannot hold.
+**Under `B` finite-at-3 is right; under `A` a repair issues a real claim, `L3`
+passes for real, and what is behind it is UNMEASURED.** ⇒ **`A`'s correct label
+is "repairable, depth beyond `L3` UNKNOWN".** A single document at a single base
+disagreeing with itself, and the half that reached this frame is the half
+phrased as a result — **a limits section is written in the register of caveats,
+so it reads as hedging rather than as a finding and does not get relayed.**
+
+**"One disposition serves all four" rests on CONVERGENCE, not on finiteness**,
+and convergence is measured and solid. Ground it there.
+
+**C. THE PRODUCTION POPULATION IS NOT SIX ARMS.** §1 as first written named six
+literal arms; **five are `#[cfg(test)]` fixtures.** The Steward's error was
+treating a PATH (`planning/`) as a production filter — `continuations.rs`
+carries an inline `#[cfg(test)] mod tests`. ⇒ **`D0` as first written was
+unanswerable: no production compile reaches `:10280`.** The direction was right
+— the census's single-arm evidence base was a real defect, and banning *"the
+producer"* as singular stands. It is the replacement population that needed
+deriving.
+
+**D. A HAZARD CLOSED RATHER THAN HANDED ON.** A claim cannot be produced and
+lost in transit (which would make the consumer's `None` underdetermine the
+producer — the `occurrence: None` shape from RT-CARRIER). `:830` is
+`draft.context_capture.map(finalize).transpose()?`: `None` in gives `None` out,
+`Some` in gives `Some` out or a propagated `Err`. **No `Some`-to-`None` collapse.
+The transport is FAITHFUL, so `D0` may reason from producer to consumer.** One
+fewer thing for the ring to establish.
+
+**E. THREE READERS, AND ONE SELECTS RATHER THAN REFUSES.** Every read in
+`crates/ken-runtime/src/`:
+
+    core.rs:13594   .all(.. .is_some())    L1, ADMISSION
+    core.rs:9557    let Some(claim) ..     L3, REFUSAL
+    calls.rs:982    .any(.. .is_none())    gather_cannot_serve, ROUTE SELECTION
+
+**`calls.rs:982` does not refuse, it SELECTS.** Issuing a claim where there was
+none flips `gather_cannot_serve` and changes which route `calls.rs` takes —
+**silently, and outside the four rows this node fences.** ⇒ **Outcome `A` is not
+a local repair**, and if `A` is taken `calls.rs:982` needs a named disposition
+in the same node. This is the measured reason behind §0's *"do not arrive at `A`
+because `A` produces code."*
+
+> **THE METHOD FINDING, worth more than any single correction above.** Forcing a
+> guard demands surgical precision about WHERE it is and zero understanding of
+> WHY it exists: you must locate the exact arm to replace, and nothing in that
+> operation makes you read the paragraph above it. **A forcing census
+> systematically under-reads the guards it is most intimately engaged with.**
+> Here the doc comment that answered the census's own open question sat four
+> lines above the line it edited. **Whenever you force an arm, read its
+> enclosing doc comment first and quote it beside the result.**
+
+**What the Architect explicitly did NOT rule: `A` versus `B`.** `A.` and the
+`predeclared_entry_frame_slot` comment are two statements of design **intent**,
+at the gate and at the producer, both pointing at `B`. **Comments are evidence
+about intent, never proof of correctness.** They do not rule `B`; they make the
+question cheaper and better posed.
+
 ## §2. Deliverables
 
-- **`D0` — WHICH ARM.** For each of the four rows, determine which of the six
-  `context_capture:` arms the row's coordinate takes, or that it takes none.
-  Report per row, never summed.
-- **`D1` — WHY THAT ARM.** Read the taken arm's guarding condition. State
-  whether the declination is **deliberate with a stated reason** or a
-  **fallthrough with none**, quoting the condition.
+- **`D0` — DOES THE PREDECLARED ENTRY FRAME DECLARE A MEMBER?** RE-AIMED by
+  §1a.C/F3; the original *"which of the six arms"* was unanswerable because five
+  are test fixtures. Production `None` has exactly one source: for each of the
+  four rows' coordinates, does `predeclared_entry_frame_slot` return `Ok(None)`,
+  and on which condition? **Report per row, never summed.** §1a.D licenses
+  reasoning from producer to consumer — the transport is faithful.
+- **`D1` — IS THE DECLINATION DELIBERATE?** Read the condition `D0` lands on.
+  State whether it is **deliberate with a stated reason** or a **fallthrough
+  with none**, quoting the condition from the tree. **Read the enclosing doc
+  comment and quote it too** — §1a's method finding is that a forcing pass
+  under-reads exactly these paragraphs.
 - **`D2` — RULE `A` OR `B`.** With `D0`+`D1` in hand. If the ruling turns on
   what the planner *ought* to do rather than what it does, that is a mechanism
   question and it goes to the **Architect**, not to this seat.
 - **`D3` — DISPOSITION, which follows from `D2` and not before it.**
   - Under `B`: an exemption row plus the `D4` label rewrite. **No repair.**
   - Under `A`: size the repair as a **SUCCESSOR node** and hand it back to the
-    Steward. Do not build it here.
+    Steward. Do not build it here. **`A`'s disposition is NOT "repair, relabel,
+    un-ignore."** Two things follow from §1a and a ring will otherwise infer
+    neither: (1) **a repair RE-OPENS the census** — `A` means "repairable, depth
+    beyond `L3` UNKNOWN", so the successor must re-walk, and a row that reaches
+    `L3` legitimately may meet an `L4` nobody has seen; (2) **`calls.rs:982`
+    needs a named disposition in that same successor** — it SELECTS on this
+    field rather than refusing, so issuing a claim changes a route silently,
+    outside the four rows this node fences.
 - **`D4` — REWRITE THE FOUR `#[ignore]` LABELS.** Required under BOTH outcomes.
   The live labels still say *"READMISSION CONDITION UNKNOWN: ... whether
   `core.rs:1230` is the last layer or the next in a queue is NOT established"*.
@@ -88,16 +210,22 @@ rows converge at `L3` regardless; they are not identical upstream of it.
 
 ## §3. The third possibility `A`/`B` does not cover — name it before you measure
 
-`D0` has three outcomes, not two:
+`D0` has three outcomes, not two. **Re-based by §1a onto
+`predeclared_entry_frame_slot` rather than onto the arm list:**
 
-    (i)   the coordinate reaches a `None` arm         -> D1 reads its condition
-    (ii)  the coordinate reaches a `Some` arm and the
-          claim is lost or overwritten downstream     -> a DIFFERENT defect
-    (iii) the coordinate reaches NO arm at all        -> the producer never ran
-                                                         for this coordinate
+    (i)   it returns Ok(None) on a stated condition  -> D1 reads that condition
+    (ii)  it returns Ok(Some(..)) and the row still
+          meets L3 with None                         -> CLOSED, see below
+    (iii) it is never called for this coordinate     -> the producer never ran
+
+**(ii) IS ALREADY CLOSED — do not spend a measurement on it.** §1a.D establishes
+the transport is faithful (`:830` is `map(..).transpose()?`, no `Some`-to-`None`
+collapse) and there are zero assignment-form writes to the field. If `D0`
+somehow observes (ii) anyway, that refutes §1a.D and is a finding about this
+frame, not a branch to explore.
 
 **(iii) is neither `A` nor `B` as the census framed them.** "The planner did not
-issue a claim" would then be true for a reason no arm describes, and the
+issue a claim" would then be true for a reason no condition describes, and the
 question moves upstream again — to what decides whether the producer runs.
 **If `D0` reports (iii), STOP and hand back.** Do not convert it into `A` on the
 grounds that a claim is missing; that is the same substitution that put three
