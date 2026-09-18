@@ -164,6 +164,32 @@ land on the dispute rather than at random.
 > **A count handed to you inside a correction borrows the correction's
 > authority. Its method borrows none.**
 
+### The check that was never run, and it was the cheapest one available
+
+**A published command and a published count are two claims about one run, so
+they constrain each other.** Check the pair against itself before checking
+either against the world. A mismatch localises the defect for free — either the
+number is wrong, or **the command is not the one that produced it**, and the
+second is the one nobody looks for.
+
+Here the pair was incoherent on its face:
+
+    published:  ^\s+[a-z_]+:\s*PredeclaredFunctionId      -- excludes prefixed lines
+    published:  "nine of the FOURTEEN carry pub(super) or pub(in crate::...)
+                 first, so my pattern could not see them"
+
+**The fourteen are the ones the pattern DID see, so they cannot be the ones
+carrying a prefix it cannot see.** Seen and hidden are disjoint. That needs no
+repository, no second measurement, and no second reader — and three rounds of
+file access went by before anyone read the post against itself.
+
+> **Scope this check honestly, because its neighbour is not free.** *The
+> published pattern returns 13, not 14* looks like the same observation and is
+> not: computing 13 requires the file. **What the post alone refutes is the
+> sentence's internal structure, not its arithmetic.** The distinction matters
+> because a rule advertised as needing no access, and then demonstrated on a
+> case that needs access, will be reached for where it does not apply.
+
 ### The sharper mechanism: an enumerated roster inside a matcher fails open
 
 The pattern did not omit visibility handling. **It ENUMERATED the visibility
