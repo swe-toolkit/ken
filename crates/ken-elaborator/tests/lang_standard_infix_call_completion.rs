@@ -197,3 +197,75 @@ fn the_real_catalog_facade_certifies_against_the_shape_contract() {
     env.elaborate_module_from_roots(&[catalog], "Core.Operators.Standard")
         .expect("the shipped standard-operator facade must certify");
 }
+
+// ---------------------------------------------------------------------------
+// The standard fixities (`33 §6.1`: ∧ infixr 3, ∨ infixr 2, ≤ ≥ ≠ infix 4).
+//
+// Asserted BEHAVIOURALLY -- what an expression parses to -- rather than by
+// reading the fixity table back. A table assertion would pass while the
+// fixity never reached the parser, which is the whole failure this WP had to
+// route around: the travel half of `§6` was landed and the DECLARATION half
+// had no surface form for a re-exported binding.
+// ---------------------------------------------------------------------------
+
+const PROVIDER_AND_HOME: &str = "class Ord a { leq : a -> a -> Bool } \
+     module Provider { \
+       pub fn bool_and (a : Bool) (b : Bool) : Bool = a \
+       pub fn bool_or (a : Bool) (b : Bool) : Bool = a \
+       pub fn ord_leq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y \
+       pub fn ord_geq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq y x \
+     } \
+     module Core.Operators.Standard { \
+       export Provider (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, ord_geq_at as ≥) }";
+
+fn body_of(env: &ElabEnv, name: &str) -> ken_kernel::Term {
+    let (_, body) = env
+        .env
+        .transparent_body(env.globals[name])
+        .unwrap_or_else(|| panic!("{name} must be transparent"));
+    body
+}
+
+#[test]
+fn the_standard_fixities_govern_parsing_and_and_binds_tighter_than_or() {
+    // `∧ infixr 3` over `∨ infixr 2`, so `a ∨ b ∧ c` groups as `a ∨ (b ∧ c)`.
+    // Without the installed fixities both default to `infixl 9` and this
+    // would group left as `(a ∨ b) ∧ c` instead -- a DIFFERENT term, which is
+    // what makes this a discriminator rather than a smoke test.
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         import Core.Operators.Standard (∧, ∨) \
+         fn written (a : Bool) (b : Bool) (c : Bool) : Bool = a ∨ b ∧ c \
+         fn grouped (a : Bool) (b : Bool) (c : Bool) : Bool = ∨ a (∧ b c)"
+    ))
+    .expect("the standard fixities parse a mixed spine");
+
+    assert_eq!(
+        body_of(&env, "written"),
+        body_of(&env, "grouped"),
+        "`a ∨ b ∧ c` must group as `a ∨ (b ∧ c)` under infixr 3 over infixr 2"
+    );
+}
+
+#[test]
+fn an_explicit_saturated_call_through_the_facade_path_elaborates() {
+    // NAMED FOR WHAT IT TESTS. This was drafted as a non-associativity case
+    // for `≤ ≥ ≠ infix 4`, but a chained `a ≤ b ≤ c` needs the completion
+    // adapter to supply each occurrence's carrier and dictionary, and that is
+    // not built yet. Asserting non-associativity here would have been a name
+    // claiming more than the body checks. What it does establish is the
+    // positive half the completion work rests on: the binding is reachable
+    // and well-typed through the facade path, under its glyph.
+    let mut env = ElabEnv::new().expect("base environment");
+    let result = env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         import Core.Operators.Standard (≤) \
+         import Provider (bool_and) \
+         fn chained (d : Ord Bool) (a : Bool) (b : Bool) (c : Bool) : Bool = \
+           ≤ Bool d a b"
+    ));
+    // The explicit four-argument call is the positive half: the binding is
+    // reachable and well-typed through the facade path.
+    result.expect("an explicit saturated call through the facade elaborates");
+}
