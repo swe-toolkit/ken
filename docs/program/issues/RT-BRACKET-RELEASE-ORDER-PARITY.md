@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-RELEASE-ORDER-PARITY
-title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics (settlement follows the body's returned value or error; the inner bracket's completion is an event in the outer's body). Both engines violate it, on different nests: interp releases outer-then-inner on the composed-return fixtures, where native is CORRECT; native releases outer-then-inner on px8ta row `public_two_three_level_brackets_finish_and_release_lifo`, one of the fifteen selected ignored rows. Native being right on one nest and wrong on another is the lead, and six properties co-vary across that pair."
+title: "Bracket teardown order. There is ONE shape, not two: Ken's surface cannot express two resources in one scope, so every measured case is a NEST of single-resource brackets, and inner-before-outer is FORCED by bracket semantics (settlement follows the body's returned value or error; the inner bracket's completion is an event in the outer's body). Both engines violate it, on different nests -- BUT THAT PAIR IS CARRIED FROM 2026-09-03 AND NEITHER HALF HAS BEEN RE-RUN: interp releases outer-then-inner on the composed-return fixtures, where native is CORRECT; native releases outer-then-inner on px8ta row `public_two_three_level_brackets_finish_and_release_lifo`, one of the fifteen originally selected ignored rows (population now 14; row 15 closed at 9c3a5f588). Native being right on one nest and wrong on another is the lead, and six properties co-vary across that pair -- so if the native half no longer holds there is no contrast left to explain, which is why AC-4 re-measures it BEFORE the repair rather than after."
 status: ready
 owner: runtime
 size: M
@@ -186,8 +186,11 @@ cheap fixture.
 > ## THIS NODE IS A BLOCKER ON A COUNTED ROW
 >
 > `public_two_three_level_brackets_finish_and_release_lifo` is one of the
-> **fifteen selected** ignored rows (`RT-IGNORED-FAILING-ROWS-INVENTORY`), the
-> operator's top-priority population. **`D1a` is what moves it.**
+> **fifteen originally selected** ignored rows
+> (`RT-IGNORED-FAILING-ROWS-INVENTORY`), the operator's top-priority
+> population. **The cohort was selected as fifteen; the population now stands
+> at fourteen** — row 15 closed at `9c3a5f588` — and this is ledger **row 9**.
+> **`D1a` is what moves it.**
 >
 > **It does not clear the row.** That row carries a SECOND blocker at depth 3 —
 > an object-emission refusal owned by
