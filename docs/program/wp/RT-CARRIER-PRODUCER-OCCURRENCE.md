@@ -5,13 +5,16 @@ Depends on: `RT-SRCBODY-BIND-ORDER` (merged, `acfcc915`).
 Origin record:
 [`RT-CARRIER-PRODUCER-OCCURRENCE`](../issues/RT-CARRIER-PRODUCER-OCCURRENCE.md)
 
-Ground: `origin/main` **`d18da5c6`**. Every line number below was read at that
-ref.
+Ground: `origin/main` **`d18da5c6`** as originally written; **every source
+coordinate was RE-GROUND to `origin/main`
+`e75f1fe2768f1996c582bad6c6832e1e1716fc24` on 2026-09-18** — see the amendment
+at the head of §1. Line numbers are hints, not anchors.
 
 ## 0. Posture
 
 `c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload`
-(`constructors.rs:2549`) is `#[ignore]`d. It dies at
+(`constructors.rs:3334`, `#[ignore]` at `:3333` -- hint, re-measured
+2026-09-18) is `#[ignore]`d. It dies at
 `.expect("the C2 carrier edge emits")` before its property is evaluated, so the
 row currently measures nothing.
 
@@ -21,8 +24,11 @@ around it.** In particular §1f is a derivation I did not execute; §2 `D0` exis
 to kill it cheaply if it is wrong.
 
 **The refusal is a guard doing its job, and this node's default posture is that
-the fixture is wrong, not the guard.** Read §4 before proposing any change under
-`lowering/mod.rs`.
+the fixture is wrong, not the guard.** Read §4 before proposing any change to
+PRODUCTION under `lowering/` outside `core/tests/`. **(This sentence used to say
+`lowering/mod.rs`. The guard moved to `aggregates.rs`, which made it name the
+one file the repair will never need — the same vacuity the amendment fixes in
+§5's third hard-stop condition.)**
 
 ## 1. Fixed inputs
 
@@ -130,11 +136,35 @@ the fixture is wrong, not the guard.** Read §4 before proposing any change unde
 > ## WHAT IS UNCHANGED
 >
 > **`AC-4` is untouched and still governs.** It is directory-scoped
-> (`lowering/` other than `core/tests/`), so it never de-aimed and it fences the
-> real guard at `aggregates.rs:1198-1204` today. §5's third hard-stop condition
-> is likewise directory-scoped and stands as written. **No acceptance criterion
-> is relaxed by this amendment** — only coordinates are corrected and §4 is
-> re-anchored.
+> (`lowering/` other than `core/tests/`, at `:237-241`), so it never de-aimed
+> and it fences the real guard at `aggregates.rs:1198-1204` today. **No
+> acceptance criterion is relaxed by this amendment** — only coordinates are
+> corrected and `§4` is re-anchored.
+>
+> ## CORRECTION TO THIS AMENDMENT — §5's THIRD CONDITION WAS NOT UNAFFECTED
+>
+> **I first wrote here that §5's third hard-stop condition was "likewise
+> directory-scoped and stands as written." That was wrong,** and the Architect
+> caught it (`evt_6m8xfrbddq0kn`). Only its EXCLUSION (`core/tests/`) is a
+> directory. **Its SUBJECT was `lowering/mod.rs` — one file.** After the split
+> the repair lands in `aggregates.rs`, so the repair *can* be written without
+> touching `mod.rs`, so the condition **could not fire — not for this repair,
+> not for any repair, ever again.** It is re-anchored in §5.
+>
+> **A DE-AIMED HARD STOP IS WORSE THAN A DE-AIMED BAN.** A de-aimed ban points
+> at a decoy — a reader protects the wrong lines, but there is something there
+> to look at. A de-aimed hard stop goes **vacuous**: the guard is not
+> misdirected, it is dead, **and a dead guard reports clear on every input**
+> while sitting in §5 reading as live protection.
+>
+> **And note how it survived the very pass that was auditing for this.** I
+> checked `AC-4` and §5 by reading them for directory-scoping. `AC-4` had it;
+> §5's third did not, **and it read as though it did because its exclusion
+> clause is a directory.** ⇒ **A PARTIALLY directory-scoped condition passes a
+> scan for directory-scoping** — the half that has the property vouches for the
+> half that does not. That is the partial-drift warning above, one level up,
+> and it defeated the audit rather than being caught by it. When you check a
+> guard for a property, check its SUBJECT, not whichever clause is nearest.
 >
 > **The node is still genuinely undone.** This amendment fixes the frame's aim,
 > not its verdict.
@@ -408,9 +438,15 @@ Stop and report, rather than proceeding, if any of these holds:
 - `D2` rules *real* — a production path can reach the carrier with no producer
   occurrence. That is an Architect question and it is more important than this
   row.
-- The repair cannot be written without touching `lowering/mod.rs` outside
-  `core/tests/`. §1g says it can; if that turns out false, the constructibility
-  audit was wrong and the size is wrong with it.
+- **RE-ANCHORED 2026-09-18 — this condition had gone VACUOUS.** It read *"the
+  repair cannot be written without touching `lowering/mod.rs` outside
+  `core/tests/`."* Only its exclusion was directory-scoped; its SUBJECT was one
+  file. After `c7f071bcb` the repair lands in `aggregates.rs`, so the repair
+  **can** be written without touching `mod.rs`, so the condition could no longer
+  fire — for this repair or any other. It now reads:
+  **the repair cannot be written without touching PRODUCTION under `lowering/`
+  outside `core/tests/`.** §1g says it can; if that turns out false, the
+  constructibility audit was wrong and the size is wrong with it.
 - `D1`'s reaching set is materially larger than the four sites named — that is a
   re-sizing conversation with the Steward, not a longer turn.
 
@@ -423,8 +459,10 @@ Touches `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/
 constructors.rs`, which is also
 [[RT-WORKER-FIXTURE-DECODE]]'s file. **Both nodes are runtime-owned and the
 fleet is single-threaded, so they cannot run concurrently** — sequence them, do
-not parallelize. Their target rows are far apart — `c2_ac4...` at `:2549` here,
-`two_same_shape_workers_are_distinguished` at `:5816` there — and their
+not parallelize. Their target rows are far apart — `c2_ac4...` at `:3334`
+here (hint),
+`two_same_shape_workers_are_distinguished` at `:7404` there (hint,
+re-measured 2026-09-18) — and their
 deliverables are disjoint, so either order works.
 
 `RT-CARRIER-BYTESPAN-OBSERVE` is `active` on the same crate. This node is
