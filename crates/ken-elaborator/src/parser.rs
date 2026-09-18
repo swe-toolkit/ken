@@ -195,6 +195,26 @@ enum StartExclusion {
     /// pattern roster -- carried this exclusion inline at its own definition.
     /// Same shape as the type side's two, in a third function.
     AsAlias,
+    /// `if` opening an IF-EXPRESSION, not an application argument.
+    ///
+    /// **AC-3: refused BY THE CLASSIFICATION, not by a hand-written case.**
+    /// Before this, `if` was refused by ABSENCE from `can_start_atom_expr`'s
+    /// `matches!` plus one hand-written `if matches!(peek(), KwIf)` in the
+    /// argument loop that supplied the diagnostic. The refusal was correct and
+    /// its REASON lived nowhere the classification could state it.
+    ///
+    /// The same argument [`Self::ProofSelector`] makes applies here and that
+    /// member's doc names this one in terms: absence is an omission and
+    /// omissions drift. A member says the refusal is INTENDED and carries its
+    /// reason, so a future widening is a deliberate act.
+    ///
+    /// **`if` REMAINS AN ATOM IN HEAD POSITION** -- `const k = if c then a
+    /// else b` parses, and `parse_atom_expr_base` keeps its `KwIf` arm. That
+    /// is why this is an EXCLUSION and not a removed roster entry: the
+    /// exclusion layer is position-keyed ([`Self::applies_in`]) and the head
+    /// call site does not consult the roster at all. Refusing the token
+    /// outright would break a live form.
+    IfExpression,
     /// `x :` -- a BINDER NAME, not a type argument.
     ///
     /// The load-bearing one. `can_start_atom_type` feeds two `while` loops
@@ -206,7 +226,7 @@ enum StartExclusion {
 impl StartExclusion {
     /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
     /// length is checked against it rather than maintained independently.
-    const COUNT: usize = 6;
+    const COUNT: usize = 7;
 
     /// The iteration source `atom_start_exclusion` consults.
     const ALL: [Self; Self::COUNT] = [
@@ -215,6 +235,7 @@ impl StartExclusion {
         Self::ProofSelector,
         Self::BraceOpensMatchArms,
         Self::AsAlias,
+        Self::IfExpression,
         Self::BinderName,
     ];
 
@@ -227,7 +248,8 @@ impl StartExclusion {
             Self::ProofSelector => 2,
             Self::BraceOpensMatchArms => 3,
             Self::AsAlias => 4,
-            Self::BinderName => 5,
+            Self::IfExpression => 5,
+            Self::BinderName => 6,
         }
     }
 
@@ -248,7 +270,8 @@ impl StartExclusion {
             Self::AsAlias => matches!(position, AtomPosition::Pattern),
             Self::MatchEquationBinder
             | Self::ProofSelector
-            | Self::BraceOpensMatchArms => matches!(position, AtomPosition::Expression),
+            | Self::BraceOpensMatchArms
+            | Self::IfExpression => matches!(position, AtomPosition::Expression),
         }
     }
 
@@ -265,6 +288,7 @@ impl StartExclusion {
                     && matches!(parser.lookahead(1), Token::Colon)
             }
             Self::ProofSelector => matches!(parser.peek(), Token::KwProof),
+            Self::IfExpression => matches!(parser.peek(), Token::KwIf),
             Self::BraceOpensMatchArms => parser.brace_starts_match_arms(),
             Self::BinderName => {
                 matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
@@ -298,6 +322,7 @@ impl StartExclusion {
                 Token::RBrace,
             ],
             Self::AsAlias => vec![Token::Ident("as".to_string())],
+            Self::IfExpression => vec![Token::KwIf],
             Self::BinderName => {
                 vec![Token::Ident("x".to_string()), Token::Colon]
             }
@@ -307,7 +332,13 @@ impl StartExclusion {
     /// The construct this exclusion keeps out of an argument position, named so
     /// a control can state which refusal it is exercising rather than only
     /// that something was refused.
-    #[cfg(test)]
+    ///
+    /// **No longer `#[cfg(test)]`.** AC-3 needs the refusal's REASON to reach a
+    /// production diagnostic, and a test-gated method cannot supply one. Note
+    /// what that does to the dead-code census: this method had zero callers and
+    /// the warning it carried disappears here because it acquired one, which is
+    /// CLOSED. Had it disappeared because the item became externally reachable,
+    /// that would be EXEMPT and would mean nothing.
     fn refuses(self) -> &'static str {
         match self {
             Self::EffectRowAnnotation => "an effect-row annotation",
@@ -315,7 +346,41 @@ impl StartExclusion {
             Self::MatchEquationBinder => "a match equation binder",
             Self::ProofSelector => "an attached-proof declaration",
             Self::BraceOpensMatchArms => "a match arm block",
+            Self::IfExpression => "an `if` expression",
             Self::BinderName => "a binder name",
+        }
+    }
+
+    /// The diagnostic to raise AFFIRMATIVELY when this exclusion stops the
+    /// application-argument loop, or `None` to stop QUIETLY.
+    ///
+    /// **The two are not interchangeable and the choice is per-member.** Ken
+    /// has no declaration terminator, so this roster's complement IS the
+    /// declaration separator: for most members the token legitimately begins
+    /// the NEXT DECLARATION, and the loop must yield so the declaration parser
+    /// can speak. Raising there would turn a correct declaration boundary into
+    /// a parse error.
+    ///
+    /// [`Self::IfExpression`] is the one that must speak. `if` never starts a
+    /// declaration, so a bare `break` leaves its token to be reported as a
+    /// stray by whatever production runs next -- at the SAME COORDINATE, which
+    /// is why a span assertion cannot tell the two apart and
+    /// `lang_application_atom_if_rejection.rs` asserts the PRODUCER instead.
+    ///
+    /// Exhaustive, no `_ =>`: a new exclusion must decide which it is.
+    fn argument_diagnostic(self) -> Option<String> {
+        match self {
+            Self::IfExpression => Some(format!(
+                "{} is not an application_atom: group it as \
+                 `(if ... then ... else ...)` to pass it as an argument",
+                self.refuses()
+            )),
+            Self::EffectRowAnnotation
+            | Self::MatchEquationBinder
+            | Self::ProofSelector
+            | Self::BraceOpensMatchArms
+            | Self::AsAlias
+            | Self::BinderName => None,
         }
     }
 }
@@ -3253,27 +3318,40 @@ impl Parser {
                     // `visits [` is an effect-row annotation. They are now
                     // stated once, in the classification, rather than twice in
                     // two loops that could drift apart.
-                    if self.atom_start_exclusion(AtomPosition::Expression).is_some() {
-                        break;
-                    }
-                    if !self.can_start_atom_expr() {
-                        // `32 §3`: an ungrouped leading form is not an
-                        // `application_atom` and must reject AT its leading
-                        // token. A bare `break` cannot do that -- a
-                        // continuation predicate can only stop, and the
-                        // leftover token is then reported as a stray by
-                        // whatever production runs next, at the same
-                        // coordinate. So the rejection has to be raised HERE,
-                        // affirmatively, before the loop yields the token.
-                        if matches!(self.peek(), Token::KwIf) {
+                    // AC-3: the exclusion layer decides SPEAK-or-YIELD, in
+                    // ONE place.
+                    //
+                    // **This guard used to `break` on ANY exclusion, and that
+                    // is why it had to move.** `32 §3` says an ungrouped
+                    // leading form must reject AT its leading token, and a
+                    // bare `break` cannot: a continuation predicate can only
+                    // stop, and the leftover token is then reported as a stray
+                    // by whatever production runs next, at the same
+                    // coordinate. So `if` needed an affirmative raise -- which
+                    // it had, as a hand-written `matches!(peek(), KwIf)` below
+                    // this guard, carrying its own message.
+                    //
+                    // Moving that message into the classification made the
+                    // hand-written case unreachable: `IfExpression` is an
+                    // exclusion, so THIS guard matched it and broke first. A
+                    // layer in front of the law must not pre-empt the law's own
+                    // refusals -- it derives from them, it does not speak for
+                    // them. Measured: the contract test went red naming the
+                    // DECLARATION PARSER as the producer, which is exactly the
+                    // defect `lang_application_atom_if_rejection.rs` exists to
+                    // catch.
+                    if let Some(exclusion) =
+                        self.atom_start_exclusion(AtomPosition::Expression)
+                    {
+                        if let Some(diagnostic) = exclusion.argument_diagnostic() {
                             return Err(ElabError::ParseError {
-                                msg: "`if` is not an application_atom: group it \
-                                      as `(if ... then ... else ...)` to pass it \
-                                      as an argument"
-                                    .to_owned(),
+                                msg: diagnostic,
                                 span: self.peek_span().clone(),
                             });
                         }
+                        break;
+                    }
+                    if !self.can_start_atom_expr() {
                         break;
                     }
                     let arg = self.parse_atom_expr()?;
@@ -3727,7 +3805,7 @@ impl Parser {
             PatternAtomForm::Literal => self.parse_literal_pattern(),
             PatternAtomForm::Var => {
                 let Token::Ident(name) = self.peek().clone() else {
-                    return Err(self.atom_form_drift("Var"));
+                    return Err(self.atom_form_drift(PatternAtomForm::Var));
                 };
                 let span = self.peek_span().clone();
                 self.advance();
@@ -3740,7 +3818,7 @@ impl Parser {
             }
             PatternAtomForm::Ctor => {
                 let Token::ConId(name) = self.peek().clone() else {
-                    return Err(self.atom_form_drift("Ctor"));
+                    return Err(self.atom_form_drift(PatternAtomForm::Ctor));
                 };
                 // Atom constructor (no sub-patterns at this level without parens)
                 let span = self.peek_span().clone();
@@ -3798,10 +3876,15 @@ impl Parser {
     /// Unreachable while they agree -- which is the point: it is a runtime
     /// witness for the one pairing the type system cannot state, rather than a
     /// `panic!` asserting the pairing holds.
-    fn atom_form_drift(&self, form: &str) -> ElabError {
+    ///
+    /// **Takes the FORM, not a `&str`.** A helper whose whole purpose is
+    /// catching a hand-maintained correspondence drifting must not itself
+    /// carry one: with a string, a copied `else` branch names the wrong form
+    /// and the diagnostic lies about which pairing broke.
+    fn atom_form_drift(&self, form: PatternAtomForm) -> ElabError {
         ElabError::ParseError {
             msg: format!(
-                "internal: PatternAtomForm::{form} admitted a token its parse \
+                "internal: PatternAtomForm::{form:?} admitted a token its parse \
                  arm cannot destructure -- admits() and the arm have drifted"
             ),
             span: self.peek_span().clone(),
