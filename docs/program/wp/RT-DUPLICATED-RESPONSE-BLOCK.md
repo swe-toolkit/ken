@@ -361,11 +361,35 @@ entirely, and the row then advances to
 than once` — `[[RT-FRAME-MARKER-ONCE]]`, which this node does not own. The
 fixture was reverted.
 
-⇒ **The check is FAITHFUL** — it reports a real second presentation — **and
-the plan is CORRECT** — that presentation is what inlining two call sites of
-one proc looks like. The defect is in neither: it is that the route map's key
-is `case.constructor` alone, and the thing that distinguishes the two
-presentations is the **occurrence**.
+⇒ **The check is FAITHFUL: it reports a real second presentation, and the
+presentation is what inlining two call sites of one proc produces.** That much
+is measured.
+
+**CORRECTED — an earlier revision of this section went one step further and
+said "and the plan is CORRECT". It should not have.** That is an inference, not
+a measurement, and it is exactly the step the node's own folded
+premise-interrogation forbids taking without measuring. Two readings survive
+the fixture result and nothing here separates them:
+
+    the second instantiation is LEGITIMATE   -> the invariant is too strong
+      -- per-arm inlining of a shared             and the route map must be
+      callee is what the backend is                keyed on the OCCURRENCE
+      supposed to do
+
+    the second instantiation is ITSELF       -> the invariant is CORRECTLY
+      the artefact -- the shared chain             refusing a plan that should
+      should have been materialized once           never have held the block
+      and reused                                   twice, and the repair is
+                                                   upstream of the route map
+
+**I measured WHERE the second presentation comes from. I did not measure
+whether producing it is correct**, and the fixture cannot tell: collapsing the
+match to one arm removes the second call site, which removes the collision
+under **either** reading.
+
+The node says this fork "routes to the Architect with a measurement in hand"
+and that this node does not pick it. **It does not pick it here.** The
+measurement in hand is 8.2 and 8.3.
 
 ### 8.3 `AC-4` — deleting the check is not the repair, measured
 
@@ -422,13 +446,20 @@ defect `[[RT-CONTEXT-FRAME-LABEL-CORRECTION]]` exists to fix, and this node
 will not create a fifth instance of it. The labels state the readmission
 condition without minting the pointer.
 
-**And the obligation that creates is recorded rather than left implicit:**
-this node closes, so once it does, the four rows name a closed owner — the
-same shape as the `RT-HOST-RESPONSE-ROUTE-KEY-COLLISION` pointer being
-corrected here. **The successor's landing must re-point all four labels**, and
-that is a deliverable of the successor, not a residue of this one. Until the
-successor is on main, a live node the rows can be routed through is the
-correct owner and a non-existent ID is not.
+**The premise under that paragraph changed mid-turn and the labels were
+rewritten again.** `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` landed on main at
+`4a6c091e3` while this section was being written, so "framed but not on main"
+stopped being true. The labels now **name it**, as the owner of one arm of
+8.2's fork, alongside the statement that the fork is unruled and that the other
+arm has no node. Naming a `draft` node is not the
+`[[RT-CONTEXT-FRAME-LABEL-CORRECTION]]` defect — that defect is naming an ID
+with **no file**, and `RT-FRAME-MARKER-ONCE` is named by these same labels on
+exactly that basis.
+
+**The obligation that survives:** this node closes, so the four rows' owner
+must move again when the fork is ruled. The labels say which node owns which
+arm, so that move is a re-point with a stated destination rather than a
+search.
 
 ### 8.5 `D3` and `AC-0` — the table re-measured, two numbers for one word
 
@@ -506,18 +537,26 @@ it.
 ### 8.9 What this node does NOT deliver, and who owns the rest
 
 Section 4's `D1` (repair on outcome 1) and `D1'` (retirement on outcome 2) are
-both written against branches that 8.1 shows did not decide anything. **The
-repair is the occurrence-keyed route map, and it is out of this node's scope**
-— it changes a production key on a path all four rows traverse, and 8.3 shows
-the fail-closed check must survive that change rather than be relaxed by it.
-It is owned by the framed successor, which lands before any label is re-pointed
-at it.
+both written against branches that 8.1 shows did not decide anything, so
+neither is delivered as written. **No repair is delivered, and no repair unit
+is selected here** — 8.2's fork is unruled, and picking the occurrence-keyed
+route map would be sizing the expensive arm off a premise nobody has measured.
 
-**This node's outcome is therefore: the duplication is located, the check is
-exonerated, the plan is exonerated, the repair unit is named, and no row is
-readmitted.** Section 1 says both outcomes close the node; this is the second
-one, reached with `AC-4` discharged — the thing the predecessor could not
-reach.
+**Both arms have a shape and only one has a node.**
+`[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` (on main, `draft`, `depends_on` this
+node) carries the occurrence-keyed arm. The other arm — the shared chain
+materialized once rather than per call site — has **no node and no owner**, and
+its absence should not be read as evidence against it; it is what happens when
+one arm was assumed.
+
+Whichever arm is taken, 8.3 is a constraint on it: **the fail-closed check must
+survive the change rather than be relaxed by it.**
+
+**This node's outcome is therefore: the duplication is LOCATED, the check is
+EXONERATED, `AC-4` is DISCHARGED, the fork is stated with its measurement
+attached and routed rather than picked, and no row is readmitted.** Section 1
+says both outcomes close the node; this is the second, reached with `AC-4`
+answered — the thing the predecessor could not reach.
 
 ### 8.10 Attribution
 
