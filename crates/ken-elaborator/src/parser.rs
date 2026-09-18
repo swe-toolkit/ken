@@ -101,6 +101,8 @@ enum AtomPosition {
     Type,
     /// Pattern-application argument position (`can_start_atom_pat`).
     Pattern,
+    /// Expression-application argument position (`parse_app_expr`'s loop).
+    Expression,
 }
 
 /// A NEGATIVE start condition: a context in which a token that would otherwise
@@ -136,6 +138,9 @@ enum AtomPosition {
 enum StartExclusion {
     /// `visits [E]` -- an effect-row annotation, not a type argument.
     EffectRowAnnotation,
+    /// `eqn :` -- a contextual modifier of the enclosing `match`, not an
+    /// application argument to its scrutinee.
+    MatchEquationBinder,
     /// `as` -- an AS-PATTERN ALIAS keyword, not a pattern argument.
     ///
     /// Found by AC-6's derivation, and it is why "the pattern rosters are
@@ -155,29 +160,43 @@ enum StartExclusion {
 impl StartExclusion {
     /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
     /// length is checked against it rather than maintained independently.
-    const COUNT: usize = 3;
+    const COUNT: usize = 4;
 
     /// The iteration source `atom_start_exclusion` consults.
-    const ALL: [Self; Self::COUNT] =
-        [Self::EffectRowAnnotation, Self::AsAlias, Self::BinderName];
+    const ALL: [Self; Self::COUNT] = [
+        Self::EffectRowAnnotation,
+        Self::MatchEquationBinder,
+        Self::AsAlias,
+        Self::BinderName,
+    ];
 
     /// Exhaustive, no `_ =>`: a new variant forces an arm here, and the arm
     /// sits next to [`Self::COUNT`] so extending one prompts the other.
     const fn index(self) -> usize {
         match self {
             Self::EffectRowAnnotation => 0,
-            Self::AsAlias => 1,
-            Self::BinderName => 2,
+            Self::MatchEquationBinder => 1,
+            Self::AsAlias => 2,
+            Self::BinderName => 3,
         }
     }
 
     /// Positions this exclusion governs.
     fn applies_in(self, position: AtomPosition) -> bool {
         match self {
-            Self::EffectRowAnnotation | Self::BinderName => {
-                matches!(position, AtomPosition::Type)
+            // Governs two positions. The TYPE membership is measured; the
+            // EXPRESSION one is NOT -- restricting this to `Type` alone reds
+            // nothing in any suite, and I could not construct a fixture that
+            // reaches `parse_app_expr`'s loop with `visits [` ahead of it. It
+            // stays because the inline break it replaced lived in that loop,
+            // so removing it would change behaviour on an input I cannot
+            // exhibit. Flagged rather than left to read as reviewed.
+            Self::EffectRowAnnotation => {
+                matches!(position, AtomPosition::Type | AtomPosition::Expression)
             }
+            Self::BinderName => matches!(position, AtomPosition::Type),
             Self::AsAlias => matches!(position, AtomPosition::Pattern),
+            Self::MatchEquationBinder => matches!(position, AtomPosition::Expression),
         }
     }
 
@@ -189,6 +208,10 @@ impl StartExclusion {
                     && matches!(parser.lookahead(1), Token::LBracket)
             }
             Self::AsAlias => parser.is_contextual_ident("as"),
+            Self::MatchEquationBinder => {
+                parser.is_contextual_ident("eqn")
+                    && matches!(parser.lookahead(1), Token::Colon)
+            }
             Self::BinderName => {
                 matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
                     && matches!(parser.lookahead(1), Token::Colon)
@@ -204,6 +227,7 @@ impl StartExclusion {
         match self {
             Self::EffectRowAnnotation => "an effect-row annotation",
             Self::AsAlias => "an as-pattern alias",
+            Self::MatchEquationBinder => "a match equation binder",
             Self::BinderName => "a binder name",
         }
     }
@@ -219,6 +243,146 @@ fn canonical_operator_name(token: &Token) -> Option<&str> {
         Token::Or => Some("∨"),
         Token::Member => Some("∈"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod atom_start_premise {
+    //! AC-4 — the premise the operator arm's comment depends on.
+    //!
+    //! **THIS PINS THE MECHANISM, NOT THE CLAIM, and the difference matters.**
+    //! The comment claims *"the infix path never routes an operator through
+    //! this arm."* That holds today **because** the argument loop consults
+    //! `can_start_atom_expr`. A second route into the arm that did not consult
+    //! it would leave every row below green and the claim false.
+    //!
+    //! So: `ac_infix_path_untouched` (in `tests/`) holds the CLAIM — an
+    //! operator between atoms becomes a spine, never an operand. This module
+    //! holds the PREMISE that claim currently rests on. Reading either as the
+    //! other is the mistake AC-4 exists to fix, in the two directions.
+
+    use super::*;
+
+    /// Is this token an operator token?
+    ///
+    /// **Exhaustive over `Token` with no `_ =>`**, which is the whole point: a
+    /// new variant is a compile error HERE, so the token set cannot grow
+    /// without someone classifying the newcomer.
+    ///
+    /// **IT DOES RESTATE THEM, and calling that a derivation would be false.**
+    /// The `true` arm below lists the same seven tokens `canonical_operator_name`
+    /// recognises — a DUPLICATE, not a tie. What the roster test checks is
+    /// AGREEMENT on those seven plus three negative samples, which is a sample
+    /// and not a structural link. And the exhaustive match forces a new variant
+    /// to be CLASSIFIED; nothing downstream consumes the classification except
+    /// that sample, so the compile error is a routing device that lands the next
+    /// author in this file, not a closure over coverage.
+    ///
+    /// That is said flatly because the softer version contradicted the residual
+    /// below it, and a crisp claim beside an accurate paragraph is the one that
+    /// gets read. `canonical_operator_name` remains the authority — production
+    /// derives `contains_user_operator` from it rather than repeating its token
+    /// set — but this module mirrors it rather than deriving from it.
+    ///
+    /// **Residual, and it is the floor `StartExclusion::ALL` already sits on
+    /// rather than a new one:** the roster below is hand-written, so a variant
+    /// classified with an arm but left out of `every_operator_token` still
+    /// slips — which is exactly the classifier/authority divergence the
+    /// paragraph above no longer claims to prevent. You cannot close over a
+    /// Rust enum's inhabitants without a hand-written roster; only a derive
+    /// macro would.
+    fn is_operator_token(token: &Token) -> bool {
+        match token {
+            Token::Operator(_)
+            | Token::Le
+            | Token::Ge
+            | Token::Ne
+            | Token::And
+            | Token::Or
+            | Token::Member => true,
+
+            Token::KwConst | Token::KwFn | Token::KwProc | Token::KwLet | Token::KwIn
+            | Token::KwIf | Token::KwThen | Token::KwElse | Token::KwType | Token::KwInfixl
+            | Token::KwInfixr | Token::KwInfix | Token::KwRequires | Token::KwEnsures
+            | Token::KwProve | Token::KwLaw | Token::KwOld | Token::KwSpace | Token::KwMut
+            | Token::KwBecomes | Token::KwData | Token::KwMatch | Token::KwDef
+            | Token::KwTypeReserved | Token::KwForeign | Token::KwRecord | Token::KwClass
+            | Token::KwInstance | Token::KwDerive | Token::KwWhere | Token::KwTemporal
+            | Token::KwModule | Token::KwImport | Token::KwExport | Token::KwUseReserved
+            | Token::KwPub | Token::KwProgram | Token::KwPackage | Token::KwAdmits
+            | Token::KwCapabilities | Token::KwProp | Token::KwTheorem | Token::KwAxiom
+            | Token::KwProof | Token::LParen | Token::RParen | Token::Colon
+            | Token::DoubleColon | Token::Eq | Token::Dot | Token::Arrow | Token::Lambda
+            | Token::Semicolon | Token::LBrace | Token::RBrace | Token::Pipe
+            | Token::LBracket | Token::RBracket | Token::Comma | Token::Str(_)
+            | Token::CharLit(_) | Token::ByteStr(_) | Token::Plus | Token::PlusPercent
+            | Token::Minus | Token::Star | Token::EqEq | Token::PropEq | Token::FlowsTo
+            | Token::Join | Token::Meet | Token::Times | Token::MapsTo | Token::TruncBar
+            | Token::IntLit(_) | Token::FloatLit(_) | Token::DecimalLit(_, _)
+            | Token::Float32Lit(_) | Token::Ident(_) | Token::ConId(_) | Token::Nat(_)
+            | Token::Eof => false,
+        }
+    }
+
+    /// One inhabitant of every operator token kind.
+    ///
+    /// `Token` values, not spellings: `Parser::new` takes the token vector
+    /// directly, so the premise is asserted without going through the lexer at
+    /// all. The spelling-to-token mapping is a DIFFERENT property and is not
+    /// AC-4's — `lang_reserved_infix_names.rs` drives all six glyphs and their
+    /// five ASCII aliases through the lexer in declaration, prefix, infix and
+    /// chain position.
+    fn every_operator_token() -> Vec<Token> {
+        vec![
+            Token::Operator("<+>".to_string()),
+            Token::Le,
+            Token::Ge,
+            Token::Ne,
+            Token::And,
+            Token::Or,
+            Token::Member,
+        ]
+    }
+
+    fn parser_at(token: Token) -> Parser {
+        Parser::new(
+            vec![(token, Span::new(0, 1)), (Token::Eof, Span::new(1, 1))],
+            String::new(),
+        )
+    }
+
+    /// The roster agrees with the authoritative function, in both directions.
+    #[test]
+    fn the_operator_roster_matches_canonical_operator_name() {
+        for token in every_operator_token() {
+            assert!(
+                is_operator_token(&token),
+                "{token:?} is in the roster but the exhaustive classifier says otherwise"
+            );
+            assert!(
+                canonical_operator_name(&token).is_some(),
+                "{token:?} is in the roster but `canonical_operator_name` does not \
+                 recognise it -- the roster has drifted from the authority"
+            );
+        }
+        for token in [Token::Ident("x".to_string()), Token::LParen, Token::Nat(1)] {
+            assert!(!is_operator_token(&token));
+            assert!(canonical_operator_name(&token).is_none());
+        }
+    }
+
+    /// AC-4's premise: no operator token is admitted as an atom start.
+    #[test]
+    fn no_operator_token_is_admitted_as_an_atom_start() {
+        for token in every_operator_token() {
+            let parser = parser_at(token.clone());
+            assert!(
+                !parser.can_start_atom_expr(),
+                "`can_start_atom_expr` admits {token:?}, so the operator arm's \
+                 comment -- which reasons FROM this predicate being narrow -- is \
+                 false, and the argument loop will take an operator as an argument"
+            );
+        }
     }
 }
 
@@ -2570,15 +2734,13 @@ impl Parser {
             _ => {
                 let mut f = self.parse_atom_expr()?;
                 loop {
-                    // `eqn:` is a contextual modifier of the surrounding
-                    // `match`, not an application argument to its scrutinee.
-                    if self.is_contextual_ident("eqn") && matches!(self.lookahead(1), Token::Colon)
-                    {
-                        break;
-                    }
-                    if self.is_contextual_ident("visits")
-                        && matches!(self.lookahead(1), Token::LBracket)
-                    {
+                    // Both of the inline breaks that used to sit here are
+                    // negative start conditions, identical in shape to the
+                    // type side's: `eqn :` modifies the enclosing `match`, and
+                    // `visits [` is an effect-row annotation. They are now
+                    // stated once, in the classification, rather than twice in
+                    // two loops that could drift apart.
+                    if self.atom_start_exclusion(AtomPosition::Expression).is_some() {
                         break;
                     }
                     // The brace after a `match` scrutinee opens its arm block,
@@ -3268,6 +3430,30 @@ impl Parser {
                 // this arm, because `can_start_atom_expr` does not admit an
                 // operator token, so an operator is only ever seen here when an
                 // expression STARTS with it.
+                //
+                // THAT SENTENCE DEPENDS ON A PREDICATE 600 LINES AWAY, and it
+                // is the kind that goes false without anyone editing it. The
+                // roster's admitted set and the operator-token set are disjoint
+                // today, and nothing about widening the roster would consult
+                // this comment.
+                //
+                // So the dependency is pinned rather than asserted, in
+                // `mod atom_start_premise` beside `canonical_operator_name`:
+                // every operator token is positioned in a `Parser` and
+                // `can_start_atom_expr` must refuse it. Admitting any operator
+                // token into the roster reds that test; the classifier it
+                // enumerates from is an exhaustive `match` over `Token`, so a
+                // new token kind is a compile error rather than a silent
+                // omission.
+                //
+                // MECHANISM VERSUS CLAIM, because reading one as the other is
+                // this comment's own failure mode: that test pins the MECHANISM
+                // -- the argument loop consults `can_start_atom_expr`. The
+                // CLAIM above is broader, and `ac_infix_path_untouched` holds
+                // it: an operator between atoms becomes a spine, never an
+                // operand. A second route into this arm that did not consult
+                // the roster would leave the premise pin green and the claim
+                // false.
                 let span = self.peek_span().clone();
                 let name = canonical_operator_name(&operator)
                     .expect("guarded by operator-name recognition")
