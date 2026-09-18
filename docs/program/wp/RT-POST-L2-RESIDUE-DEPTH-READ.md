@@ -179,6 +179,35 @@ that owner can close these rows.**
 Any branch not followed is recorded as **unread**, never as empty. A site whose
 reachability the operands do not decide is listed, not dropped.
 
+**D5 must state both of these explicitly. They are not caveats; they bound what
+the residue number means:**
+
+    verify_entry_frame is a SHARED CALLEE with TWO callers --
+      core.rs:9538  inside resolve_direct_emission_claim   (fn starts :9408)
+      core.rs:9581  inside resolve_context_capture_claim   (fn starts :9551)
+    The residue is counted along the :9581 path ONLY.
+
+    D0's defining_owner is measured FOR THE :9581 CALLER. It does NOT
+    transfer to :9538 -- a different function, its own parameter, its own
+    value. Pruning the direct-emission path requires its OWN measurement.
+
+> **WHY THIS IS NOT INCIDENTAL.** `:9558`'s own refusal text says it *"refuses
+> rather than reading **the direct-emission claim**, whose index counts binders
+> in a lexical environment this consumer does not hold."* **The thing `L2`
+> declines to read is exactly what the function at `:9408` handles.** The two
+> paths are not parallel strangers — the refusal is *about* the relationship
+> between them. A residue count that omits this reads as "the work behind `L2`"
+> when it is "the work behind `L2` along one of two consumer paths into a shared
+> callee."
+>
+> **And reusing `D0`'s variant to prune the `:9538` path would be this WP's own
+> named error, one level out:** a value measured at one call site applied to a
+> different call site of the same callee, the two indistinguishable because the
+> parameter has the same name and the same type at both. `:9578` was a grep hit
+> read as a definition; `PredeclaredFunctionId` was a type read as a value;
+> **this would be a call site read as a callee.** It is the only one of the
+> three that has not happened yet.
+
 **D6 — the measured-outcome section** in this frame, including the
 forcing-versus-reading ratio from §2 and the escape-hatch disposition from §5.
 
