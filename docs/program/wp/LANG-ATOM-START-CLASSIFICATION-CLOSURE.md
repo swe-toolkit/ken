@@ -269,6 +269,34 @@ as though it were.** `§3` escaped the trap only because it worked
 >     expression, app argument, bracket depth > 0    CLOSES under the ruling
 >     expression, app argument, bracket depth 0      STAYS REFUSED, structurally
 >
+> > #### SUPERSEDED 2026-09-18T09:38Z — THE DEPTH COORDINATE IS RETIRED.
+> >
+> > **The `depth > 0` row above is WRONG and the split it introduces does not
+> > exist.** Spec ruled (`evt_17x6mx5bg96bv`) that `proof_ref` as an argument
+> > must be grouped **at every depth**; the Architect argued for that against
+> > their own depth-keyed ruling (`evt_5vr1ecznne66j`), and language-leader
+> > released the build on it (`evt_617jawg1bv5te`).
+> >
+> >     position                                    proof_ref
+> >     expression, app argument, ANY bracket depth  REFUSED, unconditionally
+> >
+> > **The whole bracket-depth coordinate is retired**, not re-valued: no
+> > counter, no bookkeeping, no depth-keyed `StartExclusion` member. The
+> > deciding argument was that a bare form legal inside brackets would make
+> > `proof_ref` **the grammar's only depth-sensitive construct, a distinction a
+> > reader cannot see locally** — and that zero rules in `32-grammar.md` are
+> > keyed on bracket depth, measured rather than asserted.
+> >
+> > **This amendment's own prediction came true against itself, one level
+> > deeper than predicted.** It said to expect the next repair to find a
+> > coordinate this table still lacks. Instead the next repair found that the
+> > coordinate this amendment *added* should not exist at all. ⇒ **A taxonomy
+> > can be wrong by having too many axes as well as too few, and the axis you
+> > just added is the one you will defend rather than re-examine.**
+> >
+> > Nothing else in this section changes: the depth-0 structural argument is
+> > intact and is now simply the argument for the whole row.
+>
 > **The depth-0 row is not an implementation shortfall.** Ken has no declaration
 > terminator, so the atom-start roster's complement *is* the declaration
 > separator; admitting `proof` at depth 0 makes a declaration body swallow the
