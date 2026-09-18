@@ -726,10 +726,25 @@ them in the first place.
 **`D1` — DOES NOT FIRE.** It is written for outcome `(1)`; `D0` returned the
 third answer (8.1).
 
-**`D1'` — DOES NOT FIRE, and this is the gate working.** It is gated behind
-`Dr` and fires only on Arm A. The ruling returned neither arm, so **this node
-closes on `Dr` + `D0` without touching the check**, which is exactly what
-section 4 prescribes. No relaxation was performed on implementer judgment.
+**`D1'` — DOES NOT FIRE, because the ruling returned NEITHER ARM.** That is
+the whole reason, and this node closes on `Dr` + `D0` without touching the
+check. No relaxation was performed on implementer judgment.
+
+**CORRECTED: an earlier revision of this line read "and this is the gate
+working". It is not, and the Architect caught it.** `D1'` is *the check
+retired or relocated*, and section 4 gates it on **"only if the ruling returns
+Arm A"** — where Arm A is *"NO, the invariant is right."* **As written the
+clause licenses the relaxation on the arm that says the relaxation is
+unwarranted.** It stayed shut here because the ruling returned neither arm,
+not because it discriminates. **A guard that gives the right answer on one
+input is not thereby validated**, and calling it working is the sentence that
+would stop anyone looking at it again — which is the same reading error, one
+level up, that this whole node has spent the day on.
+
+The inverted clause is the Architect's finding, not mine, and it is **live on
+`main`** at this frame's `:181` after a race between their review and the
+Steward's commit. Its repair is the Steward's follow-up, not this candidate's:
+nothing here edits section 4.
 
 **`D4` — VACUOUS, and said so rather than skipped.** It asks for a registry
 row in `.github/ignored-test-exemptions.toml` **for any row readmitted with an
