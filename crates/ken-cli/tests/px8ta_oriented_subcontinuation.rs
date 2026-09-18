@@ -261,28 +261,69 @@ fn public_one_level_bracket_finishes_and_releases() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CLOSURE-BOUNDARY-LANE.
+// Re-measured under RT-SUBCONTINUATION-LIFO-RELEASE-ORDER (failing-rows
+// ledger row 9) at main 5899268451d42e7c1337929a996921d6483b6541. The layers
+// below are STRUCK together rather than appended to, as the depth-1 row above
+// already does.
 //
-// Observed signature, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and
-//     live-domain only, and it has no durable lane
+//   1. "Ignored pending RT-CLOSURE-BOUNDARY-LANE ... a closure cannot cross
+//      the boundary: it is runtime-local and live-domain only, and it has no
+//      durable lane" -- does not reproduce. The closure-lane signature
+//      appears at NEITHER depth.
+//   2. "It refuses at object emission, so the program never executes and no
+//      binding order is observable in it." -- half true, which is what made
+//      it misleading rather than merely stale. FALSE of depth 2, TRUE of
+//      depth 3. Which program it was written about is not recorded and is
+//      not established here: it is struck on the measurement, not on a
+//      reading of its author's intent.
+//   3. "depth 2 reaches the closure lane first" -- depth 2 reaches no refusal
+//      at all. It builds, links, executes and exits 0.
 //
-// Owner node: RT-CLOSURE-BOUNDARY-LANE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// The depth-1 bracket in this file refuses on the BYTE-SPAN seat under
-// a different owner; depth 2 reaches the closure lane first.
-// The refusal surfaces on the helper thread 'px8ta-nested-brackets'; this
-// test thread then fails only with the wrapper
+// WHAT THIS ROW DOES, MEASURED. The body runs `for depth in 2..=3`, so it is
+// two programs. Depth 2 panics, which is why the second has never been
+// observed by any measurement of this row, the ledger's included:
+//
+//   depth 2  EXECUTES. Exit 0, no terminal error, every bracket continuation
+//            retained. The strict-LIFO assertion below then fails:
+//              left  [ResourceTraceIdentityV1(1), ResourceTraceIdentityV1(2)]
+//              right [ResourceTraceIdentityV1(2), ResourceTraceIdentityV1(1)]
+//            LEFT is observed, RIGHT is expected -- read the assert_eq!, not
+//            the panic message. Releases come back in ACQUISITION order: the
+//            outer bracket's resource is released before the inner one's.
+//            Deterministic across 20 fresh processes, 20 identical results.
+//            That excludes instability at or above rate 0.15 at >= 96%; it is
+//            a bound, NOT a demonstration of stability, which repetition
+//            cannot return.
+//   depth 3  REFUSES at object emission, and not with the struck label's
+//            signature:
+//              unsupported runtime-IR lowering: ContinuationSpecialization:
+//              the claimed continuation target was not declared into this
+//              function
+//            Measured by running both depths under catch_unwind, and again
+//            with depth 3 first. The two programs use separate output
+//            directories and separate build_native_program calls, so the
+//            result is order-independent.
+//
+// SO THIS ROW IS TWO BLOCKERS UNDER ONE #[ignore] AND EITHER FIX ALONE LEAVES
+// IT RED. The ordering defect is a PRODUCT defect: it is escalated under
+// RT-SUBCONTINUATION-LIFO-RELEASE-ORDER D0 arm (i) rather than repaired here,
+// because the expectation is correct and editing it to match the observation
+// would encode the defect in the fixture. The depth-3 refusal is a separate
+// finding, reported with it and not owned by that node.
+//
+// RT-CLOSURE-BOUNDARY-LANE is cited for provenance only -- merged, no frame,
+// never names this row, and the ledger records its label as not agreeing with
+// what the row does.
+//
+// Both the panic and the refusal surface on the helper thread
+// 'px8ta-nested-brackets'; this test thread then fails only with the wrapper
 //   nested-bracket control thread: Any { .. }
-// which carries no signature of its own. The signature above is the
-// real cause.
+// which carries no signature of its own. The signatures above are the real
+// causes.
+//
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]
+#[ignore = "RT-SUBCONTINUATION-LIFO-RELEASE-ORDER: depth 2 executes and releases in acquisition order rather than strict LIFO (product defect, escalated); depth 3 separately refuses at object emission on ContinuationSpecialization"]
 fn public_two_three_level_brackets_finish_and_release_lifo() {
     // Lowering nested checked brackets is stack-hungry, and libtest hands a
     // test a 2 MiB (2048 KiB) worker thread. Bisected minimum passing stack
