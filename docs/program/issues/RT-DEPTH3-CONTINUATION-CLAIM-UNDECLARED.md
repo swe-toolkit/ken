@@ -15,10 +15,12 @@ origin: "Measured by runtime-implementer under RT-SUBCONTINUATION-LIFO-RELEASE-O
 > ## THE ROW THIS BLOCKS IS ALREADY COUNTED, AND THIS NODE IS WHY IT CANNOT CLOSE
 >
 > The `px8ta_oriented_subcontinuation.rs` row
-> `public_two_three_level_brackets_finish_and_release_lifo` is one of the
-> **fifteen selected** ignored rows, the operator's top-priority population.
-> **Repairing the release-order defect does not clear it.** The row is two
-> blockers under one `#[ignore]`, and this node owns the second.
+> `public_two_three_level_brackets_finish_and_release_lifo` is one of the rows
+> the CI sweep **selects and runs** — the operator's top-priority work. (It
+> carries no registry exemption; see the count note at the foot of this node,
+> and quote the predicate with any figure.) **Repairing the release-order defect
+> does not clear it.** The row is two blockers under one `#[ignore]`, and this
+> node owns the second.
 >
 > **Do not treat this as a reason to defer the ordering repair.** Both are
 > owed; neither subsumes the other. The ordering defect is
@@ -182,14 +184,85 @@ of them is the answer.**
   mechanism, different layer, different owner. One `#[ignore]` covering two
   defects is what hid this one for as long as it was hidden.
 
+## MEASURED FROM OUTSIDE THIS NODE'S FIXTURE: THE SUBJECT IS WIDER THAN "FILE NESTS"
+
+**Added 2026-09-18 from `RT-BRACKET-RELEASE-ORDER-PARITY`'s D0c probe series
+(thread `thr_3s7btdee77g0n`), which was not investigating this node.** This is
+the first measurement of this refusal taken from a program other than the px8ta
+row, and it arrived before anyone framed the node — which is the good order.
+
+Probe **(H)** — a three-deep nest with **no further effect below the innermost
+bracket** — refuses at object emission with **this node's signature**:
+`ContinuationSpecialization`, *"the claimed continuation target was not declared
+into this function"*. It is not a file nest and shares no fixture with px8ta.
+
+The contrast is the part that makes it a finding rather than a repetition. Probe
+**fixG** is **also three deep** and **builds cleanly**:
+
+    fixG   Fs, Buf, ReadAt, Buf, Rel, Rel, Rel    three deep, host call
+           at depth, BUILDS
+    (H)    three deep, nothing below the innermost bracket   REFUSES
+
+⇒ **Depth 3 alone does not produce this refusal.** The subject widens from
+*"depth 3 of the oriented-subcontinuation bracket row"* to **"a depth-3
+continuation with no further effect below it"**, and `fixG` is the measured
+negative control for that statement. A repair keyed on nesting depth is keyed on
+the wrong variable.
+
+> ### THE CAUTION, AND IT IS NOT OPTIONAL
+>
+> **(H) and px8ta depth 3 share a SIGNATURE at one producer. Whether they share
+> a ROUTE is UNMEASURED.**
+>
+> The signature is specific — it names a condition (`the claimed continuation
+> target was not declared into this function`) that a differently-failing
+> program would not carry, and it is reached only after `defining_unit` and
+> `defining_emission_owner` have both bound. So it is real evidence, not a
+> catch-all. **But `core.rs:11268` is a single `ok_or_else` on an exact lookup,
+> and an empty `continuation_calls` for an identity can be arrived at from more
+> than one upstream path.** Two programs refusing there have the same *outcome*;
+> that is not yet the same *cause*.
+>
+> ⇒ **Do not merge (H) into this node's repair, and do not assume the repair
+> that clears px8ta clears (H).** What settles it is the check this node already
+> specifies under WHAT WOULD REFUTE THE GUESS — print the owner the claim was
+> issued under and the owner whose tokens the defining function declared — run
+> on **both** programs and compared. Until that is run, (H) is a second instance
+> of the signature and a candidate instance of the defect.
+
 ## The generalizable finding, which outlives this node
 
 **A test body that loops over cases fails at the first one and reports nothing
 about the rest.** This row looped `2..=3`, and every measurement ever taken of
-it — the ledger's included — saw only depth 2. **The population of fifteen
-counts `#[ignore]` attributes, not defects**, and the instrument that separates
-them (run past the first panic under `catch_unwind`) has not been applied to the
-other fourteen rows.
+it — the ledger's included — saw only depth 2. **A population of `#[ignore]`
+rows counts attributes, not defects**, and the instrument that separates them
+(run past the first panic under `catch_unwind`) has not been applied to the
+other rows.
 
 That measurement is not this node's work. It is recorded here because this node
 is the existence proof that it is worth doing.
+
+> ### THE COUNT THIS NODE QUOTED WAS A SELECTION, NOT A POPULATION
+>
+> Earlier revisions of this node called the px8ta row *"one of the fifteen
+> selected ignored rows, the operator's top-priority population."* **Selection
+> and population are two different numbers and this node used one word for
+> both.** Measured 2026-09-18 from the producer rather than from a count anyone
+> quoted:
+>
+>     22   ignored rows in the tree        nextest, CI ground truth
+>     14   rows the CI sweep runs          22 minus the exemption registry
+>      8   rows registry-exempt            .github/ignored-test-exemptions.toml
+>
+> Selection is **registry subtraction** (`scripts/ci-ignored-sweep.py`,
+> `expected_count`), not a label-keyed filter. The px8ta row
+> `public_two_three_level_brackets_finish_and_release_lifo` is **one of the 14**
+> — it carries no registry exemption. So this node's claim that the row it
+> blocks is inside the top-priority population still holds; the number attached
+> to that claim did not.
+>
+> **Quote the predicate with the count, or do not quote the count.** These
+> figures are also time-varying — the population moved twice while
+> `CI-IGNORED-SWEEP` sat `ready` — so a bare number in a node's banner is a
+> coordinate of the third kind this node already documents: right when written,
+> and scheduled to go wrong.
