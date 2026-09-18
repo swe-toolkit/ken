@@ -682,7 +682,13 @@ any repair must give the consumer the same key the producer inserted under and
 make it select with it. `operation_origin` is a `StaticOriginId`, so the
 occurrence is derivable in principle, and threading it is the scope.
 
-**The acceptance bar gains a third clause**, which is the whole ruling:
+**The acceptance bar is REPLACED, not extended.** The word matters: the
+two-clause bar is published on `main` right now, in
+`[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` at `:102-113`, under the heading "THE
+ACCEPTANCE BAR, SET BY THE ARCHITECT" — **and it is insufficient on its own**,
+because occurrence-keying satisfies both of its clauses and still mis-routes.
+Anyone reading that node today sees a bar that looks complete and is not.
+Three clauses replace two:
 
     1. MUST STILL REFUSE  two response-handling sites within one occurrence
                           claiming one operation constructor.

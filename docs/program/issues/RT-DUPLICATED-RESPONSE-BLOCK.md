@@ -235,9 +235,36 @@ the block twice, and the repair is upstream of the planner entirely.
 
 ⇒ **This maps onto the fork above:** inheriting *"the invariant is too strong"*
 as settled is choosing reading (2) without measuring it, and sizing planner
-work off it. **This node does not pick.** The fork is a design question about
-admissible Ken programs and it routes to the Architect with a measurement in
-hand. What is forbidden is treating it as already decided.
+work off it. **This node did not pick.** The fork was a design question about
+admissible Ken programs and it routed to the Architect with a measurement in
+hand.
+
+**RULED, 2026-09-18, by the Architect. The sentence above is spent and is kept
+only as the record of why the question was asked.** The ruling is **neither
+arm**, and its full text is section 8.9a of this node's work package:
+
+- **The uniqueness invariant is CORRECT.** It is decided on the **consumer**,
+  which neither arm mentioned: `selected_host_response_route` looks up by
+  constructor alone, and its uniqueness check is *within one Vis subtree*, so
+  it guarantees a Vis selects at most one route and says nothing about whether
+  it selected the **right** one. The two colliding copies agree on `operation`
+  and differ on all three origins — the fields naming which producer and which
+  continuation the response reaches — so they are **not interchangeable**, and
+  `responses.rs:1279` is the guard against a **silent wrong-continuation
+  route**.
+- **Neither "de-duplicate" nor "relax the key" survives.** Per-arm inlining of
+  a shared callee is legitimate, and the invariant is a claim about the source
+  dispatcher while `plan.source_occurrences` is post-inlining — the subject is
+  wrong, not the claim. Re-keying the **producer alone** leaves the consumer
+  selecting by constructor, so the collision disappears and the mis-route does
+  not.
+- **The repair is a third thing: producer and consumer move together, or
+  neither moves.** `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` is **one part** of it
+  and is not sufficient alone.
+
+**What is forbidden is no longer "treating it as already decided" — it is
+treating it as still open, or treating the occurrence key as the whole
+repair.**
 
 **Two repairs already ruled out — do not re-propose them:**
 
