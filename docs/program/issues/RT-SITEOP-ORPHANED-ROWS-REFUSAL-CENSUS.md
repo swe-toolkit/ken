@@ -9,7 +9,7 @@ tier: T1
 depends_on: []
 blocks: []
 github: null
-origin: "Steward, 2026-09-18, at origin/main c2b4854cb. SUPERSEDES the WITHDRAWN RT-SITEOP-RESIDUAL-ARITY-SECOND-STOP (candidate 023fc5e01cd3a04a8c0a491de60138f976148f52, never landed, withdrawn at evt_75tner07q0qxt). That node asserted all three rows stop next at the carried-residual arity refusal, sourced from three byte-identical #[ignore] labels. The ledger had measured all three and recorded `label agrees? NO` on each, and said so in prose naming these exact rows: 'what they now do is unrelated to what the label predicts. Rows 1 and 2 trap at runtime; row 10 refuses on typed consumer projection.' The withdrawn node also contained a section warning that identical refusal text cannot say which site fired -- the fence was written and then crossed one level up, treating identical LABEL as identical BEHAVIOUR. Architect evt_3fpkye1tsvbc4 supplied the four D0 requirements this node is built on (partition on phase first; capture each trap's SITE because the sentinel signature carries no mechanism; scope conditional; state the zero-decrement branch in the motivation) and evt_2tkfcc2hqm2xv supplied the producer reading that relocates row 10's candidate mechanism. The scope condition resolved to ALL THREE ROWS IN: runtime-implementer evt_45beq3x7ajkq8 characterized their own fixtures, not row 10, which the Steward confirmed by reading row 10's program at this base."
+origin: "Steward, 2026-09-18, authored at origin/main c2b4854cb -- WHICH WAS ALREADY SIX LANDINGS STALE WHEN QUOTED AS CURRENT. Rows and labels RE-MEASURED unchanged at origin/main 2dcc67b08944059b411858692618f86bee3de52b, and the three status claims re-verified there; see 'The three rows'. Both bases are recorded and neither is live -- re-derive before acting. SUPERSEDES the WITHDRAWN RT-SITEOP-RESIDUAL-ARITY-SECOND-STOP (candidate 023fc5e01cd3a04a8c0a491de60138f976148f52, never landed, withdrawn at evt_75tner07q0qxt). That node asserted all three rows stop next at the carried-residual arity refusal, sourced from three byte-identical #[ignore] labels. The ledger had measured all three and recorded `label agrees? NO` on each, and said so in prose naming these exact rows: 'what they now do is unrelated to what the label predicts. Rows 1 and 2 trap at runtime; row 10 refuses on typed consumer projection.' The withdrawn node also contained a section warning that identical refusal text cannot say which site fired -- the fence was written and then crossed one level up, treating identical LABEL as identical BEHAVIOUR. Architect evt_3fpkye1tsvbc4 supplied the four D0 requirements this node is built on (partition on phase first; capture each trap's SITE because the sentinel signature carries no mechanism; scope conditional; state the zero-decrement branch in the motivation) and evt_2tkfcc2hqm2xv supplied the producer reading that relocates row 10's candidate mechanism. The scope condition resolved to ALL THREE ROWS IN: runtime-implementer evt_45beq3x7ajkq8 characterized their own fixtures, not row 10, which the Steward confirmed by reading row 10's program at this base."
 ---
 
 > # OPERATIVE (Steward, 2026-09-18)
@@ -27,7 +27,9 @@ origin: "Steward, 2026-09-18, at origin/main c2b4854cb. SUPERSEDES the WITHDRAWN
 
 ## The three rows
 
-Measured by the Steward at `origin/main c2b4854cb`:
+First measured by the Steward at `origin/main c2b4854cb`; **RE-MEASURED and
+unchanged at `origin/main 2dcc67b08944059b411858692618f86bee3de52b`** (2026-09-18,
+six landings later):
 
     crates/ken-cli/tests/px7f_resource_native.rs
       :315  fn linked_public_right_denial_preserves_exact_masks
@@ -37,7 +39,43 @@ Measured by the Steward at `origin/main c2b4854cb`:
       :685  fn escaped_buffer_used_by_fanning_host_op_matches_interpreter
 
 All three `#[ignore]` strings are byte-identical, md5 `e123c024` on each
-individually.
+individually. Same line numbers, same strings, at both bases.
+
+**Why the second base is stated rather than the first being edited away.**
+`c2b4854cb` was already six commits behind `origin/main` when this node was
+authored — the Steward quoted it as current and it was not. The measurement
+survived, so the node's substance is unaffected; what was wrong is the claim
+about *when* it was true. A fixed input is a claim about a tree at a moment, and
+re-anchoring it silently would destroy the only evidence that the original
+anchor was stale. Both bases stay.
+
+⇒ **Re-derive against current `origin/main` before acting on any row here, and
+do not treat either SHA as live.** This paragraph is not a licence to trust
+`2dcc67b0…` either; it will go stale the same way.
+
+### The status claims, re-verified at the same base
+
+    RT-SITEOP-CARRIED-WITNESS     status: merged     (named by all three labels)
+    RT-CARRIER-BYTESPAN-OBSERVE   status: merged     (named by comment block 1)
+    RT-SITEOP-RESIDUAL-ARITY-...  absent             (withdrawn, never landed)
+
+None of the three rows appears in `.github/ignored-test-exemptions.toml`, so all
+three sit in the **swept** population, not the registry-exempt one. That matters
+for the ignored-test objective: these rows are counted as live sweep members
+today.
+
+### This node is the founding case for `merge-procedure.md` M7a
+
+M7a — the merge step that catches ignored rows whose label names the node being
+merged — landed after this node was authored. **These three rows are exactly what
+it now catches:** their label names `RT-SITEOP-CARRIED-WITNESS`, and that node's
+merge is what orphaned them. Had M7a existed at that merge, this census would not
+have been needed.
+
+That does not retire this node — the rows are already orphaned and still need
+measuring. It bounds it: **this is cleanup of a class that should not recur**,
+not the first of a series. Cf. `CI-IGNORED-SWEEP-EXEMPTION-LIVENESS`, which
+covers the complementary set (the registry) and explicitly does not cover these.
 
 ## FOUR ACCOUNTS OF THESE ROWS, AND NO TWO AGREE
 
