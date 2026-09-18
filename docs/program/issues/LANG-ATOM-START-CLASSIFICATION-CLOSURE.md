@@ -130,10 +130,37 @@ one, which is why nothing in the design anticipated it.**
     AC-9 + AC-6   6285aa1d80ca808dc2ec679a2d3aabfc6d0967a5
     AC-4          aa89de8ff18a813c5fae077f1d712df4d89925b1   PR #3890
     brace/§4      ab228f1bdef2d2bb8301d250802fbc310cfe4e27   PR #3892
+    AC-0 TruncBar 20ddc558f6657c5bdb1ae07878fb5f1755b77ee9   candidate 9c4dda0b2
 
-**The node stays `active`.** Owed: AC-0, AC-1, AC-2, AC-3, AC-5, AC-7, AC-8,
-AC-10. The release-time increment list above (AC-9, AC-6, AC-4) is discharged;
-it was the plan at release, not the remaining work.
+**`20ddc558f` is the SQUASH and is what AC-0's ledger clause means by "the
+increment".** Blob-verified by the Steward at merge, both files, against
+candidate `9c4dda0b226e11edaf29c7b087a86ca584cfed01`:
+
+    crates/ken-elaborator/src/parser.rs                      a9aafad7a…  MATCH
+    crates/ken-elaborator/tests/…closure.rs                  a131c2580…  MATCH
+    2 files, +168/-3.  truncation_depth in parser.rs: 0 before, 8 after.
+
+The candidate SHA is recorded only to say *which* candidate this squash
+carries. It is **not** an ancestor of `main` and never will be — cite
+`20ddc558f`.
+
+### AC-0 IS HALF CLOSED, AND THE LEDGER SAYS SO EXPLICITLY
+
+    CLOSED    f ‖x‖                  expression position, by 20ddc558f
+    CLOSED    fn f (x : G ‖Bool‖)    type position,       by 20ddc558f
+    OPEN      f proof p for s        KwProof — UNBUILT
+    control   f if a then b else c   negative, unaffected
+
+**`TruncBar` is position-polymorphic, so admitting it closed TWO rows, not
+one.** That is why AC-0 is scored by row and not by token: a single symbol
+crossing a single roster moved two independently-measured positions, and a
+ledger keyed on symbols would have recorded one.
+
+**The node stays `active`. AC-0 REMAINS OWED** — a half-closed criterion is an
+open criterion, and no M7 flip is authorized on this merge. Owed: AC-0
+(KwProof half), AC-1, AC-2, AC-3, AC-5, AC-7, AC-8, AC-10. The release-time
+increment list above (AC-9, AC-6, AC-4) is discharged; it was the plan at
+release, not the remaining work.
 
 **Each increment is cut fresh from `origin/main`, never stacked on the one below
 it** — three stacking instances on 2026-09-18 each cost a re-review, because an
