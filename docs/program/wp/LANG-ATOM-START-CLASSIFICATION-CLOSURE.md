@@ -259,7 +259,9 @@ as though it were.** `§3` escaped the trap only because it worked
 > positional noun phrase is not.** Treat the former as an oracle; treat the
 > latter as a claim needing a position before it can be checked.
 
-> ### AMENDED 2026-09-18 (Steward): THE TABLE ABOVE NEEDS A BRACKET-DEPTH COORDINATE
+> ### AMENDED 2026-09-18 (Steward), THEN SUPERSEDED THE SAME DAY — the
+> ### bracket-depth coordinate this heading asks for DOES NOT EXIST. Read to
+> ### the sub-block below before acting on anything in this amendment.
 >
 > **`expression, app argument` is not one cell.** Under the Architect's `KwProof`
 > ruling (`evt_75pnw3svb4z4b`) it splits, and the frame's axis cannot express the
@@ -297,16 +299,54 @@ as though it were.** `§3` escaped the trap only because it worked
 > > Nothing else in this section changes: the depth-0 structural argument is
 > > intact and is now simply the argument for the whole row.
 >
-> **The depth-0 row is not an implementation shortfall.** Ken has no declaration
+> **The refusal is not an implementation shortfall.** Ken has no declaration
 > terminator, so the atom-start roster's complement *is* the declaration
-> separator; admitting `proof` at depth 0 makes a declaration body swallow the
+> separator; admitting `proof` bare makes a declaration body swallow the
 > next declaration. **That holds for any parser of this grammar, not just ours.**
-> The sanctioned spelling at depth 0 is `f (proof p for s)`, which works today
-> through the grouped arm (`parser.rs:3637`) and needs no code.
+> The sanctioned spelling is `f (proof p for s)`, which works today
+> through the grouped arm — `parser.rs:3672`, pinned at `5107f4adc`, because
+> this file moves under its line numbers constantly.
 >
-> ⇒ **The objective's omission-closure clause narrows accordingly.** `proof`
-> closes as a consequence of the unification **wherever a declaration cannot
-> begin**. Do not score the depth-0 row as an unmet AC.
+> ⇒ **The objective's omission-closure clause does not reach `proof` at all.**
+> The bare form is refused in argument position unconditionally, so there is no
+> position where it closes *as a consequence of the unification*. The row is
+> discharged by the third ledger value — **CLOSED BY EXPLICIT CLASSIFICATION AS
+> REFUSED** — not by the unification and not by an increment. Do not score the
+> refused row as an unmet AC, and do not score it as closed by unification
+> either.
+>
+> > #### THE THREE SENTENCES ABOVE WERE CORRECTED 2026-09-18T10:14Z, and the
+> > #### reason is worth more than the correction.
+> >
+> > They sat **after** the SUPERSEDED sub-block that retires the bracket-depth
+> > coordinate, and they went on using it — *"the depth-0 row"*, *"at depth 0"*,
+> > *"wherever a declaration cannot begin"*, the last of which is a depth-keyed
+> > quantifier wearing prose clothes. The retraction landed on the **table** and
+> > left the **paragraph that reads from it** untouched, so a reader who got
+> > past the marker was handed the retired coordinate as live text.
+> >
+> > **Deleting that quantifier is where this correction nearly went wrong, and
+> > the near-miss is the more useful half.** The first draft struck *"wherever a
+> > declaration cannot begin"* and stopped, leaving *"`proof` closes as a
+> > consequence of the unification"* — which, with the qualifier gone, asserts
+> > closure **everywhere**, the exact opposite of the unconditional refusal that
+> > was just ruled. ⇒ **REMOVING A RETIRED QUALIFIER STRENGTHENS THE CLAIM IT
+> > QUALIFIED.** A retired coordinate cannot simply be struck out; the sentence
+> > has to be re-derived from the new ruling, because the qualifier was the only
+> > thing holding the claim down to a range that no longer exists.
+> >
+> > ⇒ **A SUPERSESSION MARKER BOUNDS A REGION, AND THE PROSE THAT DEPENDS ON
+> > THAT REGION IS NOT INSIDE IT.** Marking the table cost one edit and felt
+> > complete; the sentences downstream of it are where the retired idea
+> > actually survives, because they restate it in words rather than reproduce
+> > it in a row.
+> >
+> > The citation was wrong in the same place and for a different reason:
+> > `parser.rs:3637` is inside the **bare** arm the erratum forbids, cited as
+> > the arm that sanctions the grouped spelling. Corrected to `:3672` and
+> > pinned. This was the second site of that citation; the first was repaired
+> > when it landed, which is how a corrected fact ends up disagreeing with
+> > itself across two files.
 >
 > **This is §5's own lesson recurring against §5.** The section exists because
 > *"expression position is not one position"* — and the refined taxonomy it
@@ -322,14 +362,58 @@ as though it were.** `§3` escaped the trap only because it worked
 > stated, reviewed — never a silent re-score of a row already being counted.
 >
 > **No AC changes.** AC-0 is a baseline measurement — it is satisfied by the bare
-> cases being REJECTED, so it never required the depth-0 form and is not
-> unsatisfiable. AC-1 is a property of the encoding, which a depth-keyed
-> `StartExclusion` member satisfies the same way the existing three do.
+> cases being REJECTED, so it never required the bare form and is not
+> unsatisfiable. AC-1 is a property of the encoding, which `ProofSelector`
+> satisfies the same way the existing three **Expression-position** members do
+> (`EffectRowAnnotation`, `MatchEquationBinder`, `BraceOpensMatchArms`).
 >
-> **The residual contradicts `spec/30-surface/32-grammar.md:399-406`**, which
-> asserts ungrouped `f proof p for s` parses. Routed to the Spec enclave as a
-> behavioural-contract question; it does **not** gate this node. If Spec adds a
-> declaration terminator, the depth exclusion is one enum member to delete.
+> **The residual is RESOLVED, not outstanding.** It was routed to the Spec
+> enclave as a behavioural-contract question and SPEC-32-PROOF-REF-ARGUMENT-
+> ERRATA has since landed (`5107f4adc`), correcting the grammar's worked
+> example: a bare `proof_ref` argument must be grouped, and `proof_ref` is not
+> an `application_atom`. The grammar and this node now agree. Nothing here
+> waits on a declaration terminator.
+>
+> > #### CORRECTED 2026-09-18T10:19Z — THREE MORE SENTENCES, SAME MARKER.
+> >
+> > The Architect blocked the first pass of this correction for stopping at one
+> > paragraph (`evt_k202bnbe4was`). Three further sentences at this same `>`
+> > level still asserted the retired coordinate: a *depth-keyed* exclusion
+> > member, a contradiction with the grammar, and a depth exclusion to delete
+> > if a terminator arrived. **The middle one had gone FALSE forty minutes
+> > earlier**, when SPEC-32 landed and the grammar stopped asserting what the
+> > sentence said it asserted.
+> >
+> > ⇒ **MY RETRIEVAL SELECTED THEM OUT, AND I DESCRIBED THE RESULT AS THE
+> > WIDER SET.** I found the first paragraph by grepping a stale *citation*, so
+> > my working set was *sentences carrying a bad line number* — then I reported
+> > it as *the prose downstream of the marker*. These three carry no citation
+> > and the instrument could never have reached them. An enumeration inherits
+> > the selection of whatever produced it.
+> >
+> > **The count was never wrong, and my first attempt to fix it introduced the
+> > error.** The block reported *"six members, not three"*, read off
+> > `StartExclusion::COUNT`. That symbol counts the roster across **all three
+> > positions**; this sentence's referent is the **Expression** set, which is
+> > three before `ProofSelector` and four after. *"The existing three"* was
+> > correct when written and still is. The Architect caught their own number
+> > before I committed (`evt_53yrdrsyefhj2`); both of us verified from
+> > `applies_in` rather than from the enum.
+> >
+> > ⇒ **A COUNT IS ONLY CHECKABLE AGAINST ITS REFERENT, AND THE NEAREST SYMBOL
+> > IS NOT THE REFERENT.** `COUNT` sits beside the enum and answers a question
+> > nobody asked here.
+> >
+> > **And the repair I reached for first was worse than the count.** I replaced
+> > *"the existing three"* with *"every other `StartExclusion` member"* —
+> > applying the write-a-predicate-not-a-count rule. But the roster spans three
+> > positions and `AsAlias` and `BinderName` are not Expression members, so the
+> > quantifier ranges over a **different set than the count counted**.
+> > ⇒ **A QUANTIFIER IS NOT A SAFE SUBSTITUTE FOR A COUNT UNLESS IT RANGES OVER
+> > THE SET THE COUNT COUNTED.** Generalising looks like strengthening and is
+> > silently a re-scoping. The text now names the position *and* the three
+> > members, so the referent is on the page and the count is checkable against
+> > it.
 
 **Do not retire the argument position into `LANG-TRUNC-INTRO-DIAGNOSTIC-
 REMEDIES` D1** — the Architect nearly reported the opposite and flagged the
