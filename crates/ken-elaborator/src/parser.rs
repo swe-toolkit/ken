@@ -96,8 +96,26 @@ enum AtomPosition {
 /// are refusals, not omissions from the admitted set: the token genuinely can
 /// start an atom elsewhere, which is exactly why a roster cannot express them.
 ///
-/// Closed and exhaustively matched (no `_ =>`), so a new exclusion is a
-/// compile error at every consumer rather than a silent omission.
+/// **Exhaustively matched (no `_ =>`), so a new exclusion is a compile error
+/// in every classifier below — and [`Self::ALL`] is a hand-written iteration
+/// source that the compiler does NOT tie to the variant set.** The two claims
+/// are different and only the first is enforced by matching:
+///
+/// ```text
+/// add StartExclusion::Third
+///   -> applies_in / holds_at / index fail to compile   the mechanism works
+///   -> author adds an arm to each                      errors discharged
+///   -> ALL still has COUNT elements                    caught by array length
+/// ```
+///
+/// [`Self::COUNT`] closes the common half of that: bumping the variant set
+/// without extending `ALL` is an array-length error, and `COUNT` sits beside
+/// `ALL` so extending one prompts the other. **The residual is named rather
+/// than papered over: a variant added with an [`Self::index`] arm but no
+/// `COUNT` bump still slips, and only a derive macro closes that.** Stated
+/// because an overclaiming comment is exactly what stops the next reader
+/// checking — a new exclusion never reaching `atom_start_exclusion` is
+/// fail-open in type parsing, which is the defect this enum exists to close.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StartExclusion {
     /// `visits [E]` -- an effect-row annotation, not a type argument.
@@ -111,7 +129,21 @@ enum StartExclusion {
 }
 
 impl StartExclusion {
-    const ALL: [Self; 2] = [Self::EffectRowAnnotation, Self::BinderName];
+    /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
+    /// length is checked against it rather than maintained independently.
+    const COUNT: usize = 2;
+
+    /// The iteration source `atom_start_exclusion` consults.
+    const ALL: [Self; Self::COUNT] = [Self::EffectRowAnnotation, Self::BinderName];
+
+    /// Exhaustive, no `_ =>`: a new variant forces an arm here, and the arm
+    /// sits next to [`Self::COUNT`] so extending one prompts the other.
+    const fn index(self) -> usize {
+        match self {
+            Self::EffectRowAnnotation => 0,
+            Self::BinderName => 1,
+        }
+    }
 
     /// Positions this exclusion governs.
     fn applies_in(self, position: AtomPosition) -> bool {
