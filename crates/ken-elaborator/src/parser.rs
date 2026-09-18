@@ -500,6 +500,69 @@ impl StartExclusion {
     }
 }
 
+/// The eight literal tokens, enumerated ONCE, with the payload each carries.
+///
+/// **This closes the residual both form enums disclosed, and the fix is a
+/// shared LIST rather than a better gate because the disclosure was
+/// ONE-SIDED.** Before this the eight tokens were written out FOUR times --
+/// `ExprAtomForm::Literal::admits`, `PatternAtomForm::Literal::admits`,
+/// `parse_literal_expr` and `parse_literal_pattern` -- four hand-maintained
+/// lists agreeing by discipline, one function below the dispatch that exists to
+/// make exactly that impossible. Each parse had a fail-closed `_ =>` arm, and
+/// naming that arm as the safeguard was the mistake:
+///
+/// ```text
+/// admits gains a token the parse lacks   -> `_ =>` fires, NAMED     detected
+/// a parse gains a token admits lacks     -> the arm is UNREACHABLE  SILENT
+/// ```
+///
+/// The silent direction is the one the whole classification exists to close,
+/// and it survived here. Deriving all four sites from this map REMOVES the
+/// direction instead of detecting it: add a ninth token here and both rosters
+/// admit it and both parses build it; add it anywhere else and there is
+/// nowhere else.
+///
+/// **The payload type is [`LiteralPat`] and its name is now wrong.** It carries
+/// exactly the four surface-literal shapes and this function serves both
+/// positions, so expression code now names a type spelled `...Pat`. Renaming it
+/// is 26 occurrences across three modules and is not this candidate's; the
+/// mismatch is recorded here rather than hidden behind a type alias, because an
+/// alias would break `grep LiteralPat` for whoever does rename it.
+fn surface_literal_at(token: &Token) -> Option<LiteralPat> {
+    // MATCH ON THE REFERENCE, AND CLONE ONLY IN THE ARMS THAT NEED IT. This is
+    // not a style preference and `match token.clone()` is not an equivalent
+    // spelling of it.
+    //
+    // This function is now the `Literal` arm of BOTH rosters' `admits`, and
+    // `Literal` is first in `PatternAtomForm::ALL` -- so `at` calls it on every
+    // `can_start_pattern` and every `can_start_atom_pat`, including each
+    // iteration of the pattern-application loop. Discriminating on a clone
+    // would heap-allocate a full copy of the current token on the COMMON
+    // NON-LITERAL path -- `Ident` and `ConId` are the two commonest tokens
+    // reaching it and both carry a `String`, as does `Operator` -- which the
+    // `matches!` this replaced did for free. Matching the reference allocates
+    // nothing there, and on the literal path clones the payload once instead of
+    // the token and then the payload.
+    //
+    // **Nothing tests this and the comment is the only thing holding it.** It
+    // is an allocation property, not a behavioural one, so it survives every
+    // green suite in both spellings; the repo has no benchmark harness to pin
+    // it in. Stated plainly rather than left for a future reader to "simplify"
+    // back -- the shape reads as redundant precisely because the cost is
+    // invisible.
+    Some(match token {
+        Token::Nat(value) => LiteralPat::Numeric(NumLit::Int((*value).into())),
+        Token::IntLit(value) => LiteralPat::Numeric(NumLit::Int(value.clone())),
+        Token::FloatLit(value) => LiteralPat::Numeric(NumLit::Float(*value)),
+        Token::DecimalLit(coeff, exp) => LiteralPat::Numeric(NumLit::Decimal(coeff.clone(), *exp)),
+        Token::Float32Lit(value) => LiteralPat::Numeric(NumLit::Float32(*value)),
+        Token::Str(value) => LiteralPat::String(value.clone()),
+        Token::CharLit(value) => LiteralPat::Char(*value),
+        Token::ByteStr(value) => LiteralPat::Bytes(value.clone()),
+        _ => return None,
+    })
+}
+
 fn canonical_operator_name(token: &Token) -> Option<&str> {
     match token {
         Token::Operator(name) => Some(name.as_str()),
@@ -672,34 +735,25 @@ trait AtomFormRoster: Copy + PartialEq + std::fmt::Debug + Sized + 'static {
 /// checking -- a new form never reaching [`Self::at`] is an unreachable parse
 /// arm, which is the silent direction this enum exists to close.
 ///
-/// **AND THE LARGER RESIDUAL: THE CLOSURE IS OVER FORMS, NOT OVER TOKENS.**
-/// [`Self::Literal`] hand-lists eight tokens, and `parse_literal_pattern`
-/// hand-lists the same eight with its own `other =>`. **Two hand-maintained
-/// lists, agreeing by discipline, with nothing forcing them together** -- which
-/// is verbatim the defect this enum exists to close, surviving at eight of the
-/// twelve tokens, one function below the dispatch:
+/// **THE LARGER RESIDUAL THIS BLOCK USED TO DISCLOSE IS NOW CLOSED.** It read:
+/// [`Self::Literal`] hand-lists eight tokens and `parse_literal_pattern`
+/// hand-lists the same eight, two hand-maintained lists agreeing by discipline
+/// -- verbatim the defect this enum exists to close, surviving at eight of the
+/// twelve tokens, one function below the dispatch. **It was correct, and it
+/// named the likely edit**: a language gains literal kinds far more often than
+/// it gains atom shapes, so the unguarded axis was the one that would move.
 ///
-/// ```text
-/// add a ninth literal to `admits` only
-///   -> `at` returns Literal, parse_literal_pattern takes `other =>`:
-///      "expected a literal pattern".  LOUD and MISATTRIBUTED, no compile error
-/// add it to parse_literal_pattern only
-///   -> an unreachable arm.            SILENT, no compile error
-/// ```
+/// Both sides now derive from [`surface_literal_at`], and the expression side's
+/// four payload arms are exhaustive over [`LiteralPat`]. The eight tokens are
+/// enumerated once and the four payloads are tied by matching, so neither
+/// direction of that drift is representable.
 ///
-/// **That is the LIKELY edit, not an exotic one**: a language gains literal
-/// kinds far more often than it gains atom shapes, so the unguarded axis is
-/// the one that will actually move. The residual here is strictly smaller than
-/// the twelve-vs-twelve it replaced -- five forms are closed where twelve
-/// tokens were not -- but it is NOT zero, and a bound that names only the
-/// `COUNT`/`ALL` residual fails in the ADMITTING direction: a reader who
-/// checks it finds one named gap and infers the rest is closed.
-///
-/// Pushing the closure down -- having `Literal` carry the token-to-`LiteralPat`
-/// mapping so `admits` and the construction derive from ONE list -- would make
-/// this block's residual genuinely just `COUNT`/`ALL`. Deliberately not done
-/// here: it is larger than this candidate's scope, and disclosure is the
-/// honest alternative to doing it silently.
+/// **What is left is `COUNT`/`ALL`, above, and that is now the whole bound.**
+/// The old disclosure warned that naming only the `COUNT`/`ALL` residual would
+/// fail in the ADMITTING direction -- a reader finds one named gap and infers
+/// the rest is closed. That warning is retired on its own terms rather than by
+/// being deleted: the gap it pointed at was measured, closed, and the closure
+/// is named here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PatternAtomForm {
     /// The eight literal tokens. One roster group, one parse arm, already.
@@ -732,17 +786,7 @@ impl AtomFormRoster for PatternAtomForm {
 
     fn admits(self, parser: &Parser) -> bool {
         match self {
-            Self::Literal => matches!(
-                parser.peek(),
-                Token::Nat(_)
-                    | Token::IntLit(_)
-                    | Token::FloatLit(_)
-                    | Token::DecimalLit(_, _)
-                    | Token::Float32Lit(_)
-                    | Token::Str(_)
-                    | Token::CharLit(_)
-                    | Token::ByteStr(_)
-            ),
+            Self::Literal => surface_literal_at(parser.peek()).is_some(),
             Self::Var => matches!(parser.peek(), Token::Ident(_)),
             Self::Ctor => matches!(parser.peek(), Token::ConId(_)),
             Self::Paren => matches!(parser.peek(), Token::LParen),
@@ -921,17 +965,7 @@ impl AtomFormRoster for ExprAtomForm {
             Self::Var => matches!(parser.peek(), Token::Ident(_)),
             Self::Ctor => matches!(parser.peek(), Token::ConId(_)),
             Self::OperatorName => canonical_operator_name(parser.peek()).is_some(),
-            Self::Literal => matches!(
-                parser.peek(),
-                Token::Nat(_)
-                    | Token::IntLit(_)
-                    | Token::FloatLit(_)
-                    | Token::DecimalLit(_, _)
-                    | Token::Float32Lit(_)
-                    | Token::Str(_)
-                    | Token::CharLit(_)
-                    | Token::ByteStr(_)
-            ),
+            Self::Literal => surface_literal_at(parser.peek()).is_some(),
             Self::Record => matches!(parser.peek(), Token::LBrace),
             Self::If => matches!(parser.peek(), Token::KwIf),
             Self::Universe => matches!(parser.peek(), Token::KwType),
@@ -1575,6 +1609,151 @@ mod atom_form_closure {
                 expected.is_none(),
                 "{form:?}: the roster must be exactly the form set minus the \
                  exclusions"
+            );
+        }
+    }
+
+    /// The eight literal tokens PAIRED WITH THE PAYLOAD EACH MUST CARRY,
+    /// written out here independently of production.
+    ///
+    /// **A second hand-written list, in the test, ON PURPOSE.** The candidate's
+    /// whole point is that production enumerates these tokens once. An oracle
+    /// DERIVED from that single enumeration compares the code to itself: the
+    /// corruption reaches the expectation and both parses alike, so they agree
+    /// and the row passes.
+    ///
+    /// **MEASURED as a two-run control, because neither run alone says
+    /// anything.** Same corruption both times -- `Token::Nat` mapped to
+    /// `value + 1` -- varying ONLY where the expected payload comes from:
+    ///
+    /// ```text
+    /// expectation from THIS TABLE     61 reds, and this row is one of them
+    /// expectation from the MAP        60 reds, and this row is NOT
+    /// ```
+    ///
+    /// The other sixty are behavioural fallout from shifting every numeric
+    /// literal in the crate; they fire either way and prove nothing about this
+    /// row. **The single-member difference between the two sets is the whole
+    /// result**, and it is why the table is written out rather than computed.
+    ///
+    /// The first version of this comment asserted that outcome from reasoning,
+    /// before the control was run. It happened to be right, which is the worst
+    /// case: a claim that survives because it was lucky reads exactly like one
+    /// that survives because it was checked.
+    ///
+    /// Values are DISTINCT so a transposed arm is visible; equal placeholders
+    /// would make a swap indistinguishable from correctness.
+    ///
+    /// Promise class: NORMATIVE COMPATIBILITY VECTOR. `7` denoting `Int(7)` is
+    /// the contract, not an implementation detail. It stays green when the
+    /// language gains a ninth literal kind -- the loop ranges over this table,
+    /// not over production -- so it does NOT force the table to grow, and
+    /// `the_derived_roster_admits_exactly_the_historical_twelve` is what
+    /// notices a token appearing or vanishing.
+    fn literal_token_expectations() -> Vec<(Token, LiteralPat)> {
+        vec![
+            (Token::Nat(7), LiteralPat::Numeric(NumLit::Int(7.into()))),
+            (
+                Token::IntLit((-3).into()),
+                LiteralPat::Numeric(NumLit::Int((-3).into())),
+            ),
+            (
+                Token::FloatLit(1.5),
+                LiteralPat::Numeric(NumLit::Float(1.5)),
+            ),
+            (
+                Token::DecimalLit(25.into(), 1),
+                LiteralPat::Numeric(NumLit::Decimal(25.into(), 1)),
+            ),
+            (
+                Token::Float32Lit(2.5),
+                LiteralPat::Numeric(NumLit::Float32(2.5)),
+            ),
+            (
+                Token::Str("s".to_string()),
+                LiteralPat::String("s".to_string()),
+            ),
+            (Token::CharLit('c'), LiteralPat::Char('c')),
+            (Token::ByteStr(vec![1, 2]), LiteralPat::Bytes(vec![1, 2])),
+        ]
+    }
+
+    /// AC-1's literal axis: each literal token carries its declared payload
+    /// through BOTH positions, checked against the table above rather than
+    /// against the map under test.
+    ///
+    /// **This is what the consolidation could have broken and a compile error
+    /// could not catch.** Folding four hand-written token lists into one closes
+    /// the drift between them, and buys a new failure mode in exchange: a
+    /// mistranscribed arm is now wrong in both positions at once, silently and
+    /// consistently. Most such arms are type-enforced -- the four payload
+    /// shapes and the four expression constructors have pairwise distinct types
+    /// -- but the numeric ones are NOT: `Nat`, `IntLit`, `FloatLit`,
+    /// `DecimalLit` and `Float32Lit` all land in `NumLit`, and a wrong value or
+    /// a wrong `NumLit` variant compiles.
+    ///
+    /// **The inverse mapping below is hand-written for the same reason as the
+    /// table.** Reading the payload back out of an `Expr` is the test's own
+    /// oracle; it is four arms and exhaustive, so a fifth surface-literal shape
+    /// reds here too.
+    #[test]
+    fn every_literal_token_carries_its_declared_payload_in_both_positions() {
+        for (token, expected) in literal_token_expectations() {
+            assert_eq!(
+                surface_literal_at(&token).as_ref(),
+                Some(&expected),
+                "{token:?}: the shared map does not carry its contracted payload"
+            );
+
+            let pattern = parser_at(vec![token.clone()])
+                .parse_atom_pattern()
+                .unwrap_or_else(|e| panic!("{token:?} must parse as a pattern: {e:?}"));
+            let PatKind::Literal(from_pattern) = pattern.kind else {
+                panic!("{token:?} did not parse as a literal pattern")
+            };
+
+            let expr = parser_at(vec![token.clone()])
+                .parse_atom_expr_base()
+                .unwrap_or_else(|e| panic!("{token:?} must parse as an expression: {e:?}"));
+            let from_expr = match expr {
+                Expr::ENumLit(value, _) => LiteralPat::Numeric(value),
+                Expr::EStr(value, _) => LiteralPat::String(value),
+                Expr::ECharLit(value, _) => LiteralPat::Char(value),
+                Expr::EByteStr(value, _) => LiteralPat::Bytes(value),
+                other => panic!("{token:?} parsed as {other:?}, not a literal expression"),
+            };
+
+            assert_eq!(
+                from_pattern, expected,
+                "{token:?}: the PATTERN payload is not the contracted one"
+            );
+            assert_eq!(
+                from_expr, expected,
+                "{token:?}: the EXPRESSION payload is not the contracted one, so \
+                 the two positions no longer agree about what this token means"
+            );
+        }
+    }
+
+    /// The other direction, and the reason the row above is not vacuous: the
+    /// shared map must REFUSE everything else. Without this, a map returning
+    /// `Some` for any token would satisfy every assertion above.
+    #[test]
+    fn the_shared_literal_map_refuses_every_non_literal_token() {
+        for token in [
+            Token::Ident(String::new()),
+            Token::ConId(String::new()),
+            Token::KwIf,
+            Token::KwProof,
+            Token::LParen,
+            Token::LBrace,
+            Token::TruncBar,
+            Token::Arrow,
+        ] {
+            assert!(
+                surface_literal_at(&token).is_none(),
+                "{token:?} is not a literal and the shared map must not claim it \
+                 -- both rosters' `Literal` arms are derived from it"
             );
         }
     }
@@ -4652,25 +4831,19 @@ impl Parser {
         self.can_start_atom::<PatternAtomForm>()
     }
 
+    /// DERIVED from [`surface_literal_at`], which is now the sole enumeration
+    /// of the literal tokens.
+    ///
+    /// **The `else` branch changed from a user-facing diagnostic to the drift
+    /// witness, and that is a narrowing of nothing.** It read *"expected a
+    /// literal pattern"*, which could only be produced by calling this function
+    /// at a non-literal token -- and the single call site is
+    /// `parse_atom_pattern`'s `Literal` arm, reachable only when `admits` has
+    /// said yes. It was already unreachable; it now says so.
     fn parse_literal_pattern(&mut self) -> Result<Pattern, ElabError> {
         let span = self.peek_span().clone();
-        let literal = match self.peek().clone() {
-            Token::Nat(value) => LiteralPat::Numeric(NumLit::Int(value.into())),
-            Token::IntLit(value) => LiteralPat::Numeric(NumLit::Int(value)),
-            Token::FloatLit(value) => LiteralPat::Numeric(NumLit::Float(value)),
-            Token::DecimalLit(coeff, exp) => {
-                LiteralPat::Numeric(NumLit::Decimal(coeff, exp))
-            }
-            Token::Float32Lit(value) => LiteralPat::Numeric(NumLit::Float32(value)),
-            Token::Str(value) => LiteralPat::String(value),
-            Token::CharLit(value) => LiteralPat::Char(value),
-            Token::ByteStr(value) => LiteralPat::Bytes(value),
-            other => {
-                return Err(ElabError::ParseError {
-                    msg: format!("expected a literal pattern, found {:?}", other),
-                    span,
-                })
-            }
+        let Some(literal) = surface_literal_at(self.peek()) else {
+            return Err(self.atom_form_drift(PatternAtomForm::Literal));
         };
         self.advance();
         Ok(Pattern {
@@ -4880,28 +5053,24 @@ impl Parser {
     }
 
     /// The eight literal tokens, in one arm, exactly as
-    /// `parse_literal_pattern` is for [`PatternAtomForm::Literal`].
-    ///
-    /// **This is where [`ExprAtomForm`]'s disclosed residual actually lives**:
-    /// `Literal::admits` hand-lists eight tokens and so does this match, two
-    /// hand-maintained lists agreeing by discipline. The `_ =>` arm below is
-    /// the runtime witness for that pairing drifting; a ninth literal added to
-    /// only one of them is not a compile error in either direction.
+    /// `parse_literal_pattern` is for [`PatternAtomForm::Literal`] -- and both
+    /// now derive from [`surface_literal_at`] rather than restating it.
     fn parse_literal_expr(&mut self) -> Result<Expr, ElabError> {
         let span = self.peek_span().clone();
-        let expr = match self.peek().clone() {
-            Token::Nat(n) => Expr::ENumLit(NumLit::Int(num_bigint::BigInt::from(n)), span.clone()),
-            Token::IntLit(n) => Expr::ENumLit(NumLit::Int(n), span.clone()),
-            Token::FloatLit(f) => Expr::ENumLit(NumLit::Float(f), span.clone()),
-            Token::DecimalLit(c, e) => Expr::ENumLit(NumLit::Decimal(c, e), span.clone()),
-            Token::Float32Lit(f) => Expr::ENumLit(NumLit::Float32(f), span.clone()),
-            Token::Str(s) => Expr::EStr(s, span.clone()),
-            Token::CharLit(c) => Expr::ECharLit(c, span.clone()),
-            Token::ByteStr(bytes) => Expr::EByteStr(bytes, span.clone()),
-            _ => return Err(self.atom_form_drift(ExprAtomForm::Literal)),
+        let Some(literal) = surface_literal_at(self.peek()) else {
+            return Err(self.atom_form_drift(ExprAtomForm::Literal));
         };
         self.advance();
-        Ok(expr)
+        // Exhaustive over `LiteralPat`, no `_ =>`: this is the OTHER half of
+        // the closure. The shared list ties the eight TOKENS together; this
+        // ties the four PAYLOADS to expression nodes, and a fifth
+        // surface-literal shape is a compile error right here.
+        Ok(match literal {
+            LiteralPat::Numeric(value) => Expr::ENumLit(value, span),
+            LiteralPat::String(value) => Expr::EStr(value, span),
+            LiteralPat::Char(value) => Expr::ECharLit(value, span),
+            LiteralPat::Bytes(value) => Expr::EByteStr(value, span),
+        })
     }
 
     /// `recursive result for x` and `induction hypothesis for x` (`32 §3:406`).
