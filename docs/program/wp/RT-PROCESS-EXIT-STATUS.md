@@ -17,8 +17,9 @@ priority until it is done."* Covers ledger row **13**.
 `docs/program/issues/RT-PROCESS-EXIT-STATUS.md` carries the measurement, the
 superseded signature, the `D0`/`D1`/`D2` structure, the `D3` hard stop and the
 bans. **Read it first; this frame does not restate it.** Where they differ, the
-node governs — **except on the one point in §3 below, which the node gets
-wrong and this frame corrects with a measurement.**
+node governs — **with no exception. An earlier cut of this frame carved one out
+in §3, claiming the node was wrong about `D1` step 1. The node was right and
+this frame was wrong; see §3.**
 
 ## 2. Fixed inputs, measured at `831e521e5`
 
@@ -88,8 +89,16 @@ wrong and this frame corrects with a measurement.**
 > distinction matters beyond the typo: a DRIFTED coordinate says re-measure at
 > your base, a WRONG one says the author's own base never supported it, so
 > nothing resting on it is safe on its say-so. Here the CONTENT claim holds —
-> the arm really is `Err(unsupported("StaticResponseDeferred", why))` — so §3
-> survives intact and only the numbers were off.
+> the arm really is `Err(unsupported("StaticResponseDeferred", why))`.
+>
+> **THAT CLEARED THE COORDINATE AXIS ONLY, AND THE SENTENCE THAT USED TO SIT
+> HERE — *"so §3 survives intact and only the numbers were off"* — OVERSOLD
+> IT.** §3's argument was refuted hours later, on a different axis entirely:
+> the tag it turned on is attached by the CONSUMER, so both arms render the
+> same text (§3.1). **Both citations were right and the inference drawn from
+> them was wrong.** Checking that a claim's coordinates resolve is not checking
+> the claim; the clearance a re-measurement issues reaches exactly as far as
+> what it measured.
 
     crates/ken-runtime/src/cranelift_backend/surface.rs
       :485    fn unsupported(construct, reason)       builds UnsupportedLowering
@@ -103,44 +112,109 @@ wrong and this frame corrects with a measurement.**
       :776    #[ignore = "RT-PROCESS-EXIT-STATUS: ..."]  stale record #2
       :777    fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds
 
-## 3. `D1.1` IS ALREADY DECIDED, AND THE NODE SAYS IT IS NOT
+## 3. `D1.1` IS UNDECIDED. THIS FRAME PREVIOUSLY CLAIMED OTHERWISE AND WAS WRONG.
 
-**The node's `D1` step 1 is "establish which of the two sites fired", on this
-stated reason:**
+**The node's `D1` step 1 — "establish which of the two sites fired" — STANDS,
+and it is real work.** An earlier cut of this section claimed it was
+*"DISCHARGED BY CITATION"* on a construct-tag argument. **That argument is
+refuted** (Architect, `evt_398hkbskdt1mx`; independently verified by the
+Steward at the objects before it was acted on).
 
-> *"Both carry the same `why` text, so the ledger's signature alone does not
-> say which one fired."*
+### 3.1 Why the tag does not discriminate
 
-**Both do carry the same `why`. Only one PREPENDS A CONSTRUCT TAG, and the
-ledger's recorded signature has the tag.**
+The refuted rule was: `:1056` prepends a construct tag and `:1291`
+`FailClosedForbidden { why }` cannot, so a tagged signature means the
+admissibility walk fired. **The tag is not attached at the disposition site. It
+is attached by the CONSUMER, and every consumer attaches it:**
 
-    :1056   Err(unsupported("StaticResponseDeferred", why))
-            => UnsupportedLowering { construct, reason }
-            => Display renders  "{construct}: {reason}"
-            => "StaticResponseDeferred: a deferred host response is compiler
-                control and can only enter its exact response owner"
+    aggregates.rs:1533, :2240, :2275, :2312   all four, identically
+      BoundaryDisposition::FailClosedForbidden { why }
+        => Err(unsupported(lowered_value_kind(v), why))
 
-    :1291   FailClosedForbidden { why }
-            => a BoundaryDisposition variant, destructured `{ .. }` at its use
-               sites. NO construct tag, so it cannot render that prefix.
+    mod.rs:13509
+      Lowered::StaticResponseDeferred => "StaticResponseDeferred"
 
-**The ledger's row-13 signature is that string, tag included.** ⇒ **The refusal
-came from `:1056`, the `Lowered::StaticResponseDeferred` arm of
-`boundary_transfer_admissibility`.** The admissibility walk fired; the
-disposition arm did not.
+    surface.rs:219
+      CraneliftBackendError::Unsupported(err)
+        => write!(f, "unsupported runtime-IR lowering: {err}")
 
-> **Why the node concluded otherwise, because the shape recurs.** It compared
-> the two `why` strings, found them identical, and read that as the signature
-> being ambiguous. **The signature is not the `why`. It is `construct: why`,
-> and the `construct` half is exactly the discriminator.** A comparison on the
-> shared substring answered a question about the whole string — and came back
-> "indistinguishable", which reads as a finding rather than as a gap.
->
-> ⇒ **Confirm this at your base before relying on it** (re-read the `Display`
-> impl; a `{construct}` dropped from the format string retires the
-> discriminator silently). **If it holds, `D1` step 1 is DISCHARGED BY
-> CITATION** — record it and spend the turn on step 2, which is the real work.
-> **If it does not hold, that is a finding: say so and do the enumeration.**
+⇒ **The `:1291` path renders BYTE-IDENTICALLY to the `:1056` path** — same
+wrapper, same tag, same `why`. **Nothing in the rendered message separates the
+two sites.**
+
+Name the enclosing items rather than the line numbers, which drift:
+
+    :1056   boundary_transfer_admissibility   (:1031)   the admissibility walk
+    :1291   boundary_disposition              (:1124)   the disposition table
+
+> **`"runtime-IR lowering"` is NOT a third site.** It is the enclosing wrapper
+> on every `Unsupported` rendering in the tree, which is why other rows record
+> `BoundaryCarrier:`, `ContinuationSpecialization:`, `Closure:` and `Effect:`
+> in that same slot. A signature decomposes as **wrapper + construct tag +
+> `why`**. Reading the wrapper as a site name is the mistake that made this
+> look like a three-way question; it is two-way.
+
+### 3.2 THE QUESTION IS REOPENED, NOT ANSWERED THE OTHER WAY
+
+**What was shown is that `:1291` CAN render identically. Nobody has shown this
+row went through it.** Concluding "the disposition table" is the same
+unsupported inference running backwards, and it is the sentence a reader in a
+hurry will drop. **Neither site is established. Do not write either one into a
+deliverable, a commit message or a node title until the probe below has run.**
+
+### 3.3 THE INSTRUMENT: make the two paths differ in TEXT
+
+The paths differ in call stack, not in rendered text, so the probe makes them
+differ in text. **Its ending is stated before the run, and both endings are
+reachable:**
+
+    ACT       add a one-word marker to the `why` literal at boundary.rs:1058
+              ONLY. Leave :1292 untouched.
+    OBSERVE   re-run the row and read the signature CAPTURED FROM THE HELPER
+              THREAD. The test thread's `unwrap()` wrapper measures nothing --
+              the row's own comment says so.
+    ENDS      marker present  => :1056, the admissibility walk
+              marker absent   => :1291, the disposition table
+    THEN      REVERT the marker.
+
+**This is a throwaway probe. It must not ride in a candidate**, and the revert
+is part of the deliverable, not a tidy-up afterwards.
+
+### 3.4 The probe's two blindness hazards were checked BEFORE it runs
+
+Both come back clean, so the instrument is sound in **both** directions
+(Architect, `evt_35mdm2f7bmc02`):
+
+**A shared constant would have made "marker present" vacuous.** If both sites
+read one `const`, marking "the literal at `:1058`" marks both, the marker
+appears whichever path fired, and the probe reports "shared site"
+unconditionally — the always-green failure, invisible from the result. They are
+**two independently written literals**, byte-identical in text, at separate
+sites (`boundary.rs:1058` and `:1292`). Editing `:1058` does not touch `:1292`.
+**Marker present is a real positive, not a tautology.**
+
+**An open roster would have made "marker absent" ambiguous.** *Absent ⇒ `:1291`*
+holds only if `:1291` is the sole OTHER way that sentence can reach the
+signature; with a third emitter anywhere, absent would mean "not `:1056`" and
+nothing more — a roster read as closed while it is open, which is the direction
+that fails open. Census over the tree, keyed on the **sentence** rather than on
+either site's name:
+
+    grep -rn "can only enter its exact response owner" crates/ --include=*.rs
+    boundary.rs:1058
+    boundary.rs:1292
+    (no others)
+
+Population is exactly two. ⇒ **Absent ⇒ `:1291` is an ENTAILMENT, not an
+inference**, and a negative result licenses naming the disposition table rather
+than merely excluding the walk.
+
+> **The bound on that census, so it is not read wider than it is.** It
+> quantifies over **source text** in `crates/`, so it is blind to a sentence
+> assembled at runtime from fragments or produced by a macro body; neither was
+> looked for. It is a strong negative on the ordinary case and **not a proof of
+> absence** — the same standing as any grep. **The probe is the oracle; this is
+> only its precondition check.**
 
 ## 4. Deliverables
 
@@ -154,7 +228,10 @@ three outcomes `(a)`/`(b)`/`(c)` are unchanged and all three terminate.
 > pre-recut artefact. **But do not convert `(c)` into a hunt for a way to make
 > it fail.** Report it and propose un-ignoring.
 
-**`D1` — step 1 discharged per §3; do step 2.** Apply the landed
+**`D1` — step 1 is NOT discharged. RUN THE §3.3 PROBE, then do step 2.** An
+earlier cut of this frame discharged step 1 by citation; that argument is
+refuted (§3.1) and the site is undecided in both directions (§3.2). The probe
+is cheap and terminates. **Then** apply the landed
 caller-consumption discriminator to this row's response:
 
     Deferred = P1 UNION P2      P1  absent-residual
@@ -201,10 +278,20 @@ the handback, and the base SHA is stated. **A `(b)` or `(c)` outcome discharges
 this node's measurement obligation and STOPS the work — that is a pass, not a
 failure.**
 
-**AC-1 — the firing site is named with its evidence.** Either §3's tag argument
-is confirmed and cited, or it is refuted and the enumeration is done.
-**Control:** an answer resting on the `why` text alone fails this AC in either
-direction — the `why` is shared and cannot discriminate.
+**AC-1 — the firing site is named with the PROBE's evidence, or reported
+undecided.** Run §3.3 and report the signature **as captured from the helper
+thread**, plus which ending it hit. **Control: an answer resting on the
+rendered message alone fails this AC in either direction** — the two sites
+render byte-identically (§3.1), so any argument from the signature's text is
+refuted before it is made, including one that concludes `:1291`.
+
+**A reverted probe is a passing probe.** Verify the marker is gone: the diff
+handed back must contain no edit to `boundary.rs`.
+
+**If the probe cannot be run** — the row will not reach the refusal at your
+base, or the helper-thread signature cannot be captured — **that is a hard
+stop to report, not a licence to fall back on the text.** Say which of the two
+it was.
 
 **AC-2 — the caller-consumption verdict is stated with its evidence**, not its
 expectation.
