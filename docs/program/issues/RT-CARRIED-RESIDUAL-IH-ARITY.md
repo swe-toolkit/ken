@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-RESIDUAL-IH-ARITY
 title: "Close the BoundaryCarrier refusal that a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments -- the arity property `reject_carried_residual_arguments` decides against a carried residual before any invocation segment is installed. Four ignored rows carry this signature byte-identically and their labels already name it; the design question is whether the repair belongs at the shared refusal or at its five call sites."
-status: ready
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -11,6 +11,74 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-17, sizing the repair program from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger (488acf24e) on operator directive 2026-09-15 'The other tests should be fixed.' The ledger's S1 is the largest signature cluster whose label AGREES with the run -- four rows, one byte-identical message, one named mechanism. Steward-filed per COORDINATION section 2."
 ---
+
+> # CLOSED 2026-09-18 (Steward) — REFUTED PREMISE. It was still `ready`.
+>
+> **This node's founding claim is false against the landed tree, and it sat
+> `ready` — releasable to the runtime ring at any moment — while that was true.**
+> Found by the Steward on 2026-09-18 while re-measuring the ignored-row census;
+> nobody had pulled it.
+>
+> **What refutes it.** `RT-CONTEXT-FRAME-REFUSAL-DEPTH-CENSUS` (`merged`)
+> rewrote all four rows' `#[ignore]` labels at `b0421afd0816c44347bb3281a5062cc0ada00c8e`
+> — verified an ancestor of `origin/main` — and the new labels say:
+>
+> > *"the BoundaryCarrier arity text is a FALLBACK SYMPTOM, not the mechanism,
+> > and the arity refusal itself is correct and must not be relaxed."*
+>
+> ⇒ **This node's objective is "Close the BoundaryCarrier refusal." The
+> measurement says that refusal is CORRECT and must not be relaxed.** The
+> objective and the evidence point in opposite directions.
+>
+> **And the refutation is worse than a stale objective.** The census measured
+> the admission axis **red at BOTH ends**: admit fewer (today) yields `Ok(None)`
+> and control falls to the zero-argument route that reports the arity; admit
+> more — the frame arm forced to `Ok(true)`, strictly more permissive than any
+> key — still fails at `agreeing_recursive_body_unit`
+> (`lowering/core.rs:1230`) with *"plain Match branches declare different
+> recursive body units."* The resolved body origins come from the closure
+> structure rather than from the frame, **so no setting of this gate passes
+> these rows.** A repair sized here could not have worked.
+>
+> ## THE THREE WAYS IT WAS STALE, AND WHY THE USUAL CHECK MISSES ALL THREE
+>
+> 1. **Premise refuted** — above.
+> 2. **The labels it quotes as "byte-identical" NO LONGER EXIST.** It quotes
+>    `RT-SITEOP-CARRIED-WITNESS D2: ...`; the four rows now carry
+>    `RT-CONTEXT-FRAME-LABEL-CORRECTION`.
+> 3. **Its row coordinates moved.** It names `px7l:153`, `px7l:220`,
+>    `px7m:153`, `px7m:185` at `c041de7c3`. At `e75f1fe27` the same four
+>    functions are at `px7l:163`, `px7l:241`, `px7m:163`, `px7m:206`
+>    — **identity confirmed by function name, not by position.**
+>
+> **The node's own §"These rows are NOT stale" section is the trap.** It argues,
+> correctly for its time, that the labels agree with the run and the mechanism
+> is named — and that argument is the entire reason it was sized `S` instead of
+> being a diagnosis node. **A later measurement retired the premise and nothing
+> propagated back to the node's `status:`.** A status is last-set and never
+> self-correcting; the census that refuted this one had no obligation to flip it
+> and did not.
+>
+> ## WHAT SURVIVES, AND WHAT DOES NOT
+>
+> **Does NOT survive:** the objective, the `S` sizing, and the front-loaded
+> five-call-site fan-in question — that question asked which unit a repair to
+> `reject_carried_residual_arguments` belongs at, and no repair to it is wanted.
+> The fan-in reasoning is sound and currently **unmotivated**; it is not
+> answered, it is unasked.
+>
+> **DOES survive, and needs a node nobody has cut:** the census stopped at its
+> first forced layer and recorded **"READMISSION CONDITION UNKNOWN — whether
+> `core.rs:1230` is the last layer or the next in a queue is NOT established."**
+> That is the live question for these four rows. Cutting it is Steward framing
+> debt, tracked with the `RT-HOST-RESPONSE` cluster's.
+>
+> **Precedent followed:** `RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION` was
+> `closed` when refuted and its surviving section re-homed into
+> `RT-CONTEXT-FRAME-ADMISSION-EVIDENCE-KEY`. Same shape, same disposition.
+>
+> **Everything below this banner is preserved as written and is the refuted
+> text. Do not build from it.**
 
 # The defect, and it is already diagnosed in the tree
 
