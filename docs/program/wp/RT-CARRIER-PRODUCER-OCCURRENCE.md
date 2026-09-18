@@ -1,6 +1,21 @@
 # `RT-CARRIER-PRODUCER-OCCURRENCE` — frame
 
-Owner: **runtime**. Size: **M**. Gate: none.
+Owner: **runtime**. Size: **M**. Estimated capability tier: **T1**. Gate: none.
+
+> **The tier field was MISSING from this frame and from its node until
+> 2026-09-18, and `§4h` requires it on every frame.** That is a Steward defect,
+> not an omission the ring should have flagged. It is recorded here as **T1**,
+> and the record is **retroactive** — the WP ran without it, so it never fed the
+> kick-time seat check it exists to feed.
+>
+> **T1 is not a guess; the WP demonstrated it.** Every one of `D2`, `D3` and
+> `D4` turned on an argument rather than on an edit: `D2` was ruled a rig defect
+> only by measuring which state production can actually reach; `D3` hid a third
+> defect behind the first, which no green could report; and `D4` could not be
+> finished by supplying a value at all — it required deriving the expected tag
+> from a plan query, because the literal it replaced was the defect's own
+> fingerprint. A mechanical-tier seat would have produced a green row here by
+> re-baselining, which is exactly what `§4` below bans.
 Depends on: `RT-SRCBODY-BIND-ORDER` (merged, `acfcc915`).
 Origin record:
 [`RT-CARRIER-PRODUCER-OCCURRENCE`](../issues/RT-CARRIER-PRODUCER-OCCURRENCE.md)
@@ -574,6 +589,38 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
   > but the row must SAY it does not cover that path.** An assertion that cannot
   > fail quietly retired, and one loudly retired, are the same coverage and very
   > different artifacts.
+  >
+  > **OBLIGATION 2 PRODUCES A HAZARD OF ITS OWN: the citations a reader finds
+  > are WIDER than the claim that executes.** Recorded 2026-09-18 from the
+  > Architect's review of `a9fb242f0`, verified at producers, and kept here at
+  > the runtime-leader's request rather than respun into the row.
+  >
+  > `D4` discharged obligation 1 the strongest available way — it removed the
+  > constant rather than justifying it, so the expected tag is a plan query
+  > (`aggregate_allocation_at`, through the same closed two-arm mapping
+  > production uses at `lowering/aggregates.rs:2499-2508`) and no observed value
+  > appears in the assertion at all. Obligation 2 then put the meet-rule chain
+  > beside it: `boundary_value.rs:129-140`, `:216-218`, `:211-212`.
+  >
+  >     what the comment DERIVES     the lane for this aggregate is
+  >                                    PersistentGround  (the meet rule)
+  >     what the assertion PINS      lowering emits THE LANE THE PLAN RULED
+  >
+  > **Only the second executes.** Both sides of the comparison read the same
+  > plan, so if the planner ever ruled `InvocationAggregate` here, expected and
+  > actual would move together and the row would stay green while the meet-rule
+  > chain was violated. The implementer's own mutation shows the direction: it
+  > reddens `left 9 right 5` because the divergence it injects is on the
+  > *lowering* side.
+  >
+  > **This is the right property and it must not be traded back for a pinned
+  > constant** — guarding lowering-honours-plan is exactly the defect class the
+  > original row had, where the tag came from somewhere other than the ruled
+  > lane. The hazard is only in what a later reader takes three
+  > `boundary_value.rs` citations to mean: they explain WHY the plan rules that
+  > lane; they are not what the row guards. **A derivation written in to satisfy
+  > obligation 2 states more than the assertion tests, and the row should say
+  > which half is load-bearing.**
   >
   > **Why obligation 2 says IN THIS FILE.** Measured on candidate `d20afe1be` by
   > a grep of the whole file rather than the diff: the only derivation present
