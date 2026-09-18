@@ -86,10 +86,132 @@ from the closure structure rather than from the frame."** The resolver is
 `resolve_recursive_unit_body` at `core.rs:13597`, which walks `Match` cases and
 collects one declared unit per case.
 
-# The open question, and the one the labels flagged UNKNOWN
+# ANSWERED, 2026-09-18. BOTH READINGS BELOW ARE WRONG. DO NOT BUILD ON EITHER.
 
-Two readings survive, and this node exists to decide between them rather than
-to assume one:
+**`D0` and `D1` ran and the dichotomy this section poses is not the mechanism.**
+Measured by runtime-implementer at `7cb535be5`, carried to `9dfa6978e` (the
+`crates/` diff between them is empty). The two readings are kept below **only so
+nobody reconstructs them as open**; they are closed.
+
+    reading (1)   TRUE OF EXACTLY ONE ROW -- px7m:206
+    reading (2)   REFUTED IN ALL FOUR
+
+`(2)` said the branches denote one body and resolution produces two origins for
+it. `PlannedOccurrence` holds `expr: &'src RuntimeExpr`, so this is answerable
+by **referent**. In all four rows the two origins name **two genuinely distinct
+nodes at distinct addresses** -- no aliasing anywhere. **Resolution is faithful,
+and so is `agreeing_recursive_body_unit`: it reports what it was given.**
+
+The deciding evidence was the byte rendering of the body at each origin, not the
+origins themselves. Three rows: byte-identical bodies, and the check refuses
+anyway. `px7m:206`: bodies differ by exactly one leaf
+(`Value(String("not-found"))` versus `Value(String("unexpected-ok"))`), and the
+check is correct.
+
+## THE THIRD READING, WHICH IS THE ONE TO BUILD ON
+
+> **The comparison tests node identity where the property it needs is body
+> equality.**
+
+## AND THE POPULATION SPLIT NAMED IN THIS NODE IS ALSO WRONG
+
+This node framed the four rows as splitting `px7m` versus `px7l`. **They do
+not.** All four have the same shape -- a two-armed match whose arms differ. The
+split is **where the resolved unit sits relative to the arms' divergence**: in
+three rows it is the innermost continuation body, below the divergence, so it
+comes out equal; in `px7m:206` it sits above the divergence, so an inlined
+literal is inside it. **The odd row is inside `px7m`.** One population by shape,
+3-1, not along the axis this node named.
+
+# THE READMISSION CONDITION: ONE LAYER ANSWERED, THE STACK STILL UNBOUNDED
+
+The labels' `READMISSION CONDITION UNKNOWN` is answered for **exactly one more
+layer** and no further. Forced past `core.rs:1230`, all four rows reach the same
+next refusal, same construct, same text:
+
+    core.rs:9558, resolve_context_capture_claim, on views.context_capture == None
+    "RT-CONTSRC-PRODUCER-LOCAL D3b refuses rather than reading the direct-
+     emission claim, whose index counts binders in a lexical environment this
+     consumer does not hold"
+
+> **L2 IS NOT ESTABLISHED AS THE LAST LAYER AND MUST NOT BE WRITTEN AS ONE.**
+> Forcing past a refusal shows the **next** stop, never an inventory of what
+> remains behind it. Two forcings revealed two layers; there is no basis for
+> believing the second is terminal. **A node framed as "the last blocker for
+> these rows" would be a framing that cannot be wrong.**
+
+## AND `L2` IS DEMONSTRABLY NOT THE LAST -- TEN MORE SITES, READ NOT FORCED
+
+**Architect, `evt_1g71815y1kyya`, read at `9dfa6978e`.** Repair only the `None`
+case at `:9558` and control falls straight into these, all in the same function
+and its immediate callee:
+
+    9570   CurrentLexical claim presented to the entry-frame consumer
+    9608   entry-frame claim names a predeclared frame that is not the one held
+    9637   claim names a generated context of the wrong specialization
+    9661   named generated context frame the planner never interned
+    9688 9706 9716 9729 9735 9748    (verify_entry_frame, continued)
+
+plus a cross-module callee with its own refusals at
+`planning/static_transition/continuations.rs:4279`,
+`verify_predeclared_entry_frame_membership`, reached at `core.rs:9615`.
+
+**Two forcings revealed two layers. One read revealed ten more.**
+
+### THE DISTINCTION THAT MAKES THAT POSSIBLE, AND IT REFINES THE LIMIT ABOVE
+
+The implementer's limit is exactly right **and it is a limit on FORCING, not on
+KNOWING.** A forcing run is **existential**: one run, one witness, one next stop,
+and no number of them composes into the universal needed here. **But refusals are
+not runtime events catchable only in the act -- they are static code at named
+sites, so the inventory question is call-graph reachability and the instrument
+for it is READING.**
+
+    forcing            terminates when? No answer exists. Every run yields a
+                       layer, which is always available. It ends by BUDGET.
+    path enumeration   terminates when the PATH ends -- lowering returns Ok or
+                       reaches the row's terminal. The path is finite, so the
+                       observation that ends it is one the WORLD produces.
+
+### THE BOUND IN THE OTHER DIRECTION -- "ENUMERATE THE REFUSALS" IS ALSO WRONG
+
+A grep for `unsupported(` in `core.rs` alone returns **342** sites. That is a
+**presence oracle and nothing more** -- it does not say which are reachable on
+this path -- but it is enough to establish that a flat enumeration is not the
+instrument either. **The read must be PATH-SCOPED, and the scoping is the design
+work.**
+
+⇒ The measurement owed is **a bounded read along one path with a stated stopping
+point, not a ladder.** If the path-scoped residue comes back too large to work by
+hand, **that size is the finding: the pass reports it and stops.**
+
+## THE ROUTING FACT THIS EXPOSES
+
+    RT-CONTSRC-PRODUCER-LOCAL     status: merged
+
+**The refusal now blocking all four rows is owned by a node that cannot close
+them.** That is the same defect shape as `RT-SITEOP-CARRIED-WITNESS` for rows
+1/2/10 and `RT-CARRIED-RESIDUAL-IH-ARITY` for rows 3-6 -- **recurring one layer
+down.** Rows 3-6 therefore do NOT have an owner that can close them, and any
+claim that all fifteen ignored rows are live-owned is false as of this
+measurement.
+
+# D3 IS NOT ROW WORK. DO NOT PRICE IT AS PROGRESS ON THE IGNORED ROWS.
+
+> **No repair at `core.rs:1230` makes any row pass.**
+
+Relaxing identity to equality readmits three rows past `1230` and **changes
+nothing observable about any of the four** -- they stop immediately behind it.
+
+**Do the repair anyway: a check testing the wrong relation is a real defect and
+it stands on its own merits.** But report it as a correctness fix, never as a
+row closure. What rows 3-6 need first is a **bounded** answer to how deep the
+stack goes, which is a measurement and not a repair.
+
+# The superseded framing, retained for the record
+
+Two readings were posed here, and this node existed to decide between them
+rather than to assume one:
 
 1. **The refusal is correct.** These programs genuinely have Match branches
    declaring different recursive body units, that is a legitimate Ken shape,
@@ -100,19 +222,9 @@ to assume one:
    `resolve_recursive_unit_body`'s walk. The repair is upstream, in resolution,
    and `agreeing_recursive_body_unit` is reporting faithfully.
 
-**These are not ranked here.** The label's phrasing points at (2) and the label
-does not establish it.
-
-**And the labels record their own limit, which this node must respect:**
-
-> READMISSION CONDITION UNKNOWN: the stack behind this gate was measured only
-> in the forced configuration and only to its first stop, so whether
-> `core.rs:1230` is the last layer or the next in a queue is NOT established --
-> do not read either into this label.
-
-⇒ **Establishing that is the node's first deliverable.** A repair proposed
-before it is known whether `1230` is the last layer is a repair priced against
-an unknown remaining stack.
+**These were not ranked.** The label's phrasing pointed at (2) and did not
+establish it. **`D1` refuted (2) outright.** The instinct to leave them unranked
+was right; the error was that neither was the mechanism.
 
 # Related
 

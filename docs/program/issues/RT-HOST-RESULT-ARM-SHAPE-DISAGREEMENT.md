@@ -150,6 +150,125 @@ so **test it first.**
 > **Whoever takes this node checks that before building.** The lean tells you
 > where to look first; it does not licence skipping the check.
 
+## RULED, 2026-09-18. `(c)` CONFIRMED AND THE CHECK ABOVE WAS RUN.
+
+**Architect, `evt_6kw3gkpq810sq`, all coordinates read at `973997af8`. The
+discriminator comes back ONLY WELL-FORMED.** The paragraph above is discharged,
+not skipped: the Architect ran the downstream check it demanded.
+
+**Identity and aggregate are separable in the representation, and the row needs
+only the identity.**
+
+- `synthesized_constructor` (`lowering/aggregates.rs:3526-3534`) returns four
+  fields and nothing else: `constructor`, `synthesized_identity`, `occurrence`,
+  `args`.
+- `synthesized_fixed_identity` (`:3444`) is *exactly*
+  `static_transition_plan.synthesized_constructor_identity(Fixed(role))` -- **the
+  same call the row already makes at `:3515-3527`** to compute `wrote` for its
+  own `assert_ne!`. The row derives the identity its property needs without the
+  recipe, then borrows the recipe to obtain it a second time.
+- Downstream (`:1843-1855`) reads the **field**, never the provenance:
+  `match synthesized_identity { Some(identity) => *identity, None => ... }`.
+  **Nothing downstream can distinguish a hand-set `Some(x)` from a
+  synthesized-set `Some(x)`.**
+- The `ok` arm is the existence proof **inside this same row**: hand-built,
+  carrying `identity` from `synthesized_fixed_identity(ReadSome)`.
+
+### THE STRENGTHENING: THE ROW FAILS EARLIER THAN THIS NODE RECORDED
+
+This node says the `ImmediateBool` assertion is unsatisfiable. **True, and the
+row never reaches it.** `reconcile_declared_children` (`:3613`) refuses at the
+**input**:
+
+    declared (WROTE)  [ Fixed{PrivateTransferCount, [nat, nat]} ]
+    emitted           [ SynthesizedArgument::Scalar(Lowered::Bool{false}) ]
+
+Arity matches, so it zips and reaches the form match. `(Fixed{..}, Scalar(..))`
+matches no arm; the catch-all at `:3881` is `_ => false` -- *the forms are
+disjoint, a mismatched pair is a refusal, not a fallthrough to a weaker check* --
+and it returns `Err(unsupported("Constructor", ...))`.
+
+⇒ **The call refuses before it returns a value. The unsatisfiable assertion is a
+second, downstream fact about a value that is never produced.** The author passed
+a bool into a slot the recipe declares as a two-nat aggregate. That is the
+cleanest possible statement that the recipe was never load-bearing.
+
+### THIS KILLS `(a)` OUTRIGHT, AND NOT FOR THE REASON GIVEN BELOW
+
+The `(a)` entry below warns it is the smallest diff addressing the wrong thing.
+**It is worse than that: `(a)` is not a repair at all.** Rewriting the assertion
+leaves the input refusal untouched -- you must *also* replace the `Scalar(Bool)`
+with a `Nested` two-nat aggregate, at which point the row carries no bool and
+*"selects a separately generated nested payload"* is being checked against a
+different value than the row was written about. **`(a)` changes what the row
+tests.** The framing below understates it; read this paragraph as governing.
+
+The ban on switching the root stands and **gets stronger**: under `(c)` the
+borrow *is* the defect, so any root is a deeper borrow.
+
+### THE REPAIR, SELF-CONTAINED
+
+Replace the `synthesized_constructor` call with the hand-built form carrying the
+same four fields. **Keep `Wrote`** -- the row's `assert_ne!` selection check is
+stated over it.
+
+    let error = Lowered::Constructor {
+        constructor: producer_symbols.wrote.clone(),
+        synthesized_identity: Some(
+            compiler.synthesized_fixed_identity(
+                SynthesizedFixedConstructorRole::Wrote)?),
+        occurrence: <SEE RESIDUAL>,
+        args: vec![ConstructorField::specialized(Lowered::Bool {
+            value: false_word,
+            known: Some(false),
+        })],
+    };
+
+**`args` is spelled to match what `synthesized_constructor` itself produces at
+`:3480-3484`, NOT the `ok` arm's `fields:`** -- those are different types and the
+alternative's spelling does not transfer.
+
+The `ImmediateBool` assertions on **both** arms then survive untouched. Whether
+`defining_emission_owner` / `defining_unit` / the `holding_units` singleton
+search come out is the implementer's call -- they are live assertions about the
+plan and may be worth keeping as independent checks.
+
+### THE ONE RESIDUAL. IT IS GENUINELY OPEN AND THE ARCHITECT DID NOT GUESS IT.
+
+**What `occurrence` should the hand-built error arm carry?** The error arm is
+synthesized precisely *because* it has no source construct in the fixture's
+program, so the `ok` arm's `source_aggregate_occurrence(..)` move may have no
+counterpart.
+
+    occurrence: None       LEADING. synthesized_constructor's OWN
+                           no-emission-owner early return (:3475-3484) produces
+                           exactly this, so it is a lawful shape, not a
+                           degenerate one. Downstream identity consumption
+                           (:1843) does not read `occurrence` at all. But this
+                           node records a refusal "at the allocation" for
+                           occurrence-less templates -- CHECK THAT. One run.
+
+    occurrence: Some(..)   a plan-resolved coordinate, IF one exists for this
+                           aggregate. If obtaining it requires PLANNER WORK
+                           rather than a lookup, STOP AND ROUTE IT BACK -- that
+                           is not S and not fixture work.
+
+**Establish which first. It is cheap and it is the only thing between this
+ruling and a build.**
+
+### DISPOSITION
+
+    outcome   (c) CONFIRMED -- the error arm should not be recipe-derived
+    (a)       REFUTED as a repair, not merely deprioritized
+    (b)       unnecessary; the property IS expressible against FsWriteAt
+    size      S HOLDS if the residual resolves to `None` or a lookup.
+              If it needs planner work it is NOT S -- stop and re-route.
+    owner     runtime, now unblocked
+
+**The ban list and the `D4`/`AC-3` warnings below are unchanged and the Architect
+did not restate them -- they are correct as written and whoever takes this node
+reads them there.**
+
 ## The alternatives, if the discriminator comes back the other way
 
     (a) the ERROR ASSERTION is wrong for this operation
