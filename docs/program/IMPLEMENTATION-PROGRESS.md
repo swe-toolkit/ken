@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-18 04:36:34Z — from 663 issue file(s) in `docs/program/issues/`.
+2026-09-18 11:45:13Z — from 664 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -73,6 +73,7 @@ the committed file matches the generator's output.
 | `CAT-DERIVED-PUB-EXPORT` | Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3079 |
 | `CAT-DERIVED-REUSE-CONSUMERS` | Drain catalog-reuse census group 4 (derived-list computational reuse) — replace six reimplementations of list_append, reverse, concat_map, and length across five packages with selective imports from Data.Collections.Derived. The consumer half of CAT-DERIVED-PUB-EXPORT, shaped on the landed CAT-NAT-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | M | none | — |
 | `CAT-EXPORT-CENSUS-DERIVES-LOADER-PREDICATE` | Derive the export-census population from the loader's own publication predicate instead of a parallel hand-maintained Decl match, so the exactly-six equality control cannot silently narrow as new publishable declaration kinds are added. | closed | foundation | S | none | — |
+| `CAT-FMT-GATE-CORPUS-ENUMERATION` | The frozen-corpus formatter gate enumerates catalog by the `.ken.md` suffix plus one hand-named `.ken` path, and the catalog holds two `.ken` files -- so `FoKripke.ken` is outside the gate and nothing reds. Collect by a predicate over the suffix set instead, and assert the collected population EQUALS the matching file set rather than merely being non-empty. | draft | verify | S | none | — |
 | `CAT-GCD-REFACTOR` | Refactor Gcd.ken.md to the catalog implementation standard — import Nat add/mul from Data/Numeric/Nat/Arithmetic and leq_nat/sub from Data/Numeric/Nat/Order instead of reimplementing them, and arrange the module top-down (divides_gcd first, fundamentals last) | merged | foundation | S | none | — |
 | `CAT-GCD` | Euclidean gcd with divides laws — Algorithm/Numeric: gcd over Nat proved to be a greatest common divisor, target 4 of the Foundation expressibility trial and a deliberate termination-presentation probe | merged | foundation | M | none | — |
 | `CAT-LAWFULFUNCTORS-STANDALONE-IMPORT` | Migrate the three orphan list_append proofs (assoc/left_unit/right_unit) from Core/Classes/LawfulFunctors into Data/Collections/Derived, the module that defines list_append, per Architect ruling evt_7khknqydxxd93. An attached proof f::law is part of f's definitional surface and can be soundly owned only by f's module; proving it elsewhere is an orphan attachment that resolves under full-catalog load but goes UnboundName under selective/standalone import. LawfulFunctors keeps its co-located bool_and/list_map/option_map proofs and gains the real standalone imports it owes; EffectfulClasses's prose owner-attribution is re-pointed to Derived. Carries the campaign rule for every future orphan attached proof. | merged | foundation | M | none | — |
