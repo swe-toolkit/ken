@@ -33,6 +33,23 @@ way and both are on the record (§2). The node does not re-litigate them.
 > **A third roster pair, `can_start_pattern` / `can_start_atom_pat`, is
 > genuinely uncensused** and is AC-9.
 >
+> > **"PAIR" IS LOAD-BEARING AND THIS LINE IS WHERE READERS LOSE IT.** Only
+> > `can_start_pattern` is the third ROSTER. `can_start_atom_pat` is a derived
+> > wrapper —
+> > `can_start_pattern() && !is_contextual_ident("as")` — plus the exclusion
+> > guard; it is an atom ENTRY POINT, not a roster. §4c says so at length, but
+> > it says so ~190 lines below this sentence, and **two readers independently
+> > took the pair as one roster before reaching it** (Steward, a carried note
+> > saying "all three rosters self-guard"; language-implementer, a test renamed
+> > to `all_three_rosters_…` while asserting over the three entry points). Both
+> > errors ran the same way: toward guarding `can_start_pattern`, which
+> > duplicates `can_start_atom_pat`'s guard and re-creates the asymmetry the
+> > `KwProof` hardening removed. **Two independent instances inside one hour is
+> > a reading on this line, not on either reader.** Say "the three atom entry
+> > points" when you mean guard placement and "the three rosters" when you mean
+> > admitted-token content; they are different sets of three that overlap in two
+> > members.
+>
 > **A node scoped to `can_start_atom_expr` fixes two of three occurrences and
 > leaves an identical third behind a different function name.**
 >
