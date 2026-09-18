@@ -75,6 +75,140 @@ fn projection_field_token(token: &Token) -> Option<ProjectionFieldToken> {
     }
 }
 
+/// `ALL` is ordered by [`StartExclusion::index`], checked at compile time.
+///
+/// This is what keeps `index` load-bearing rather than dead: it exists to
+/// force a compile error when a variant is added, and a tripwire nothing
+/// consumes is just an unused function. Driven by `COUNT`, so it scales with
+/// the enum instead of pinning three slots.
+const _: () = {
+    let mut slot = 0;
+    while slot < StartExclusion::COUNT {
+        assert!(StartExclusion::ALL[slot].index() == slot);
+        slot += 1;
+    }
+};
+
+/// Where an atom-start roster is being consulted.
+///
+/// The positions do not admit the same forms and do not apply the same
+/// exclusions, so the classification is indexed by position rather than
+/// duplicated per roster.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AtomPosition {
+    /// Type-application argument position (`parse_ctor_decl`'s and
+    /// `parse_type_app`'s `while` loops).
+    Type,
+    /// Pattern-application argument position (`can_start_atom_pat`).
+    Pattern,
+}
+
+/// A NEGATIVE start condition: a context in which a token that would otherwise
+/// begin an atom is something else entirely.
+///
+/// **An atom-start test is not a function of `peek()`.** Both members below
+/// look one token ahead, and both exist to stop a type-application `while`
+/// loop from swallowing input that belongs to the enclosing construct. They
+/// are refusals, not omissions from the admitted set: the token genuinely can
+/// start an atom elsewhere, which is exactly why a roster cannot express them.
+///
+/// **Exhaustively matched (no `_ =>`), so a new exclusion is a compile error
+/// in every classifier below — and [`Self::ALL`] is a hand-written iteration
+/// source that the compiler does NOT tie to the variant set.** The two claims
+/// are different and only the first is enforced by matching:
+///
+/// ```text
+/// add Third, add its arms, leave COUNT and ALL alone
+///   -> COMPILES. Third is never consulted.       NOT caught -- the residual
+/// bump COUNT without extending ALL, or the reverse
+///   -> array-length compile error                caught
+/// ```
+///
+/// [`Self::COUNT`] closes the common half of that: bumping the variant set
+/// without extending `ALL` is an array-length error, and `COUNT` sits beside
+/// `ALL` so extending one prompts the other. **The residual is named rather
+/// than papered over: a variant added with an [`Self::index`] arm but no
+/// `COUNT` bump still slips, and only a derive macro closes that.** Stated
+/// because an overclaiming comment is exactly what stops the next reader
+/// checking — a new exclusion never reaching `atom_start_exclusion` is
+/// fail-open in type parsing, which is the defect this enum exists to close.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StartExclusion {
+    /// `visits [E]` -- an effect-row annotation, not a type argument.
+    EffectRowAnnotation,
+    /// `as` -- an AS-PATTERN ALIAS keyword, not a pattern argument.
+    ///
+    /// Found by AC-6's derivation, and it is why "the pattern rosters are
+    /// clean" needs a qualifier: `can_start_pattern` is indeed a flat
+    /// `matches!` with no guards, but `can_start_atom_pat` -- the OTHER
+    /// pattern roster -- carried this exclusion inline at its own definition.
+    /// Same shape as the type side's two, in a third function.
+    AsAlias,
+    /// `x :` -- a BINDER NAME, not a type argument.
+    ///
+    /// The load-bearing one. `can_start_atom_type` feeds two `while` loops
+    /// that collect type-application arguments; without this, `(x : T)` offers
+    /// `x` to the loop as another atom argument and the binder is consumed.
+    BinderName,
+}
+
+impl StartExclusion {
+    /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
+    /// length is checked against it rather than maintained independently.
+    const COUNT: usize = 3;
+
+    /// The iteration source `atom_start_exclusion` consults.
+    const ALL: [Self; Self::COUNT] =
+        [Self::EffectRowAnnotation, Self::AsAlias, Self::BinderName];
+
+    /// Exhaustive, no `_ =>`: a new variant forces an arm here, and the arm
+    /// sits next to [`Self::COUNT`] so extending one prompts the other.
+    const fn index(self) -> usize {
+        match self {
+            Self::EffectRowAnnotation => 0,
+            Self::AsAlias => 1,
+            Self::BinderName => 2,
+        }
+    }
+
+    /// Positions this exclusion governs.
+    fn applies_in(self, position: AtomPosition) -> bool {
+        match self {
+            Self::EffectRowAnnotation | Self::BinderName => {
+                matches!(position, AtomPosition::Type)
+            }
+            Self::AsAlias => matches!(position, AtomPosition::Pattern),
+        }
+    }
+
+    /// Does this exclusion hold at the cursor?
+    fn holds_at(self, parser: &Parser) -> bool {
+        match self {
+            Self::EffectRowAnnotation => {
+                matches!(parser.peek(), Token::Ident(name) if name == "visits")
+                    && matches!(parser.lookahead(1), Token::LBracket)
+            }
+            Self::AsAlias => parser.is_contextual_ident("as"),
+            Self::BinderName => {
+                matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
+                    && matches!(parser.lookahead(1), Token::Colon)
+            }
+        }
+    }
+
+    /// The construct this exclusion keeps out of an argument position, named so
+    /// a control can state which refusal it is exercising rather than only
+    /// that something was refused.
+    #[cfg(test)]
+    fn refuses(self) -> &'static str {
+        match self {
+            Self::EffectRowAnnotation => "an effect-row annotation",
+            Self::AsAlias => "an as-pattern alias",
+            Self::BinderName => "a binder name",
+        }
+    }
+}
+
 fn canonical_operator_name(token: &Token) -> Option<&str> {
     match token {
         Token::Operator(name) => Some(name.as_str()),
@@ -2044,20 +2178,28 @@ impl Parser {
     }
 
     fn can_start_atom_type(&self) -> bool {
-        if matches!(self.peek(), Token::Ident(s) if s == "visits")
-            && matches!(self.lookahead(1), Token::LBracket)
-        {
-            return false;
-        }
-        if matches!(self.peek(), Token::Ident(_) | Token::ConId(_))
-            && matches!(self.lookahead(1), Token::Colon)
-        {
+        if self.atom_start_exclusion(AtomPosition::Type).is_some() {
             return false;
         }
         matches!(
             self.peek(),
             Token::ConId(_) | Token::Ident(_) | Token::KwType | Token::LParen
         )
+    }
+
+    /// The first [`StartExclusion`] that vetoes an atom start here, if any.
+    ///
+    /// **Separated from the admitted set because the two do different jobs.**
+    /// An admitted set answers *"could this token begin an atom?"*; an
+    /// exclusion answers *"is this occurrence of that token something else?"*
+    /// Only the first looks like a roster, and a closure that models atom
+    /// starts as a predicate over `peek()` alone silently drops the second --
+    /// which is fail-open in type parsing, and invisible to any control that
+    /// only checks admissions.
+    fn atom_start_exclusion(&self, position: AtomPosition) -> Option<StartExclusion> {
+        StartExclusion::ALL
+            .into_iter()
+            .find(|exclusion| exclusion.applies_in(position) && exclusion.holds_at(self))
     }
 
     /// `{ x : A | φ }` — refinement type (`21 §6.1`).
@@ -2799,7 +2941,10 @@ impl Parser {
     }
 
     fn can_start_atom_pat(&self) -> bool {
-        self.can_start_pattern() && !self.is_contextual_ident("as")
+        if self.atom_start_exclusion(AtomPosition::Pattern).is_some() {
+            return false;
+        }
+        self.can_start_pattern()
     }
 
     fn parse_literal_pattern(&mut self) -> Result<Pattern, ElabError> {
