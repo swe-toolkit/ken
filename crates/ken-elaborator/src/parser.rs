@@ -269,17 +269,28 @@ mod atom_start_premise {
     /// new variant is a compile error HERE, so the token set cannot grow
     /// without someone classifying the newcomer.
     ///
-    /// It does not restate which tokens are operators — it is checked against
-    /// `canonical_operator_name`, which stays authoritative. Production
-    /// already uses that direction: `Parser::new` derives
-    /// `contains_user_operator` from the same function rather than repeating
-    /// its token set.
+    /// **IT DOES RESTATE THEM, and calling that a derivation would be false.**
+    /// The `true` arm below lists the same seven tokens `canonical_operator_name`
+    /// recognises — a DUPLICATE, not a tie. What the roster test checks is
+    /// AGREEMENT on those seven plus three negative samples, which is a sample
+    /// and not a structural link. And the exhaustive match forces a new variant
+    /// to be CLASSIFIED; nothing downstream consumes the classification except
+    /// that sample, so the compile error is a routing device that lands the next
+    /// author in this file, not a closure over coverage.
+    ///
+    /// That is said flatly because the softer version contradicted the residual
+    /// below it, and a crisp claim beside an accurate paragraph is the one that
+    /// gets read. `canonical_operator_name` remains the authority — production
+    /// derives `contains_user_operator` from it rather than repeating its token
+    /// set — but this module mirrors it rather than deriving from it.
     ///
     /// **Residual, and it is the floor `StartExclusion::ALL` already sits on
     /// rather than a new one:** the roster below is hand-written, so a variant
-    /// classified with an arm but left out of `EVERY_OPERATOR_TOKEN` still
-    /// slips. You cannot close over a Rust enum's inhabitants without a
-    /// hand-written roster; only a derive macro would.
+    /// classified with an arm but left out of `every_operator_token` still
+    /// slips — which is exactly the classifier/authority divergence the
+    /// paragraph above no longer claims to prevent. You cannot close over a
+    /// Rust enum's inhabitants without a hand-written roster; only a derive
+    /// macro would.
     fn is_operator_token(token: &Token) -> bool {
         match token {
             Token::Operator(_)

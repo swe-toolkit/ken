@@ -146,26 +146,33 @@ fn the_match_equation_binder_is_not_a_scrutinee_argument() {
 }
 
 #[test]
-fn the_effect_row_veto_is_reachable_in_the_type_position_only_so_far() {
-    // HONEST NAME. I first called this the two-position case and claimed it as
-    // the strongest evidence for `applies_in`'s axis. That was VACUOUS:
-    // restricting `EffectRowAnnotation` to `Type` alone reddens nothing, here
-    // or across seven other suites. The fixture below exercises the RETURN
-    // TYPE's application loop, not the expression loop.
+fn the_effect_row_veto_governs_the_expression_position_too() {
+    // THE ARM I SHIPPED AS UNMEASURED, now measured. The fixture is the
+    // Architect's (evt_c7ga5m781kgq); they proposed it without running it and
+    // flagged it might be void. It is not.
     //
-    // My earlier neuter-`holds_at` check did not catch it because `holds_at`
-    // is shared across positions: neutering the CONDITION also kills the
-    // type-side use, so it looks like evidence for the POSITION. The condition
-    // and the position are different axes and only a per-position mutation
-    // separates them.
+    // Why my earlier attempt could not see it: BOTH readings of `g visits [x]`
+    // fail, so success-versus-failure is blind. They fail at DIFFERENT
+    // COORDINATES, and that is the discriminator.
     //
-    // The `Expression` membership stays -- the inline break it replaced lived
-    // in `parse_app_expr`'s loop, so dropping it changes behaviour on an input
-    // I cannot exhibit -- and is labelled UNMEASURED rather than left to read
-    // as reviewed. `applies_in`'s axis is carried by `AsAlias`, where flipping
-    // the position reds both halves of the pair.
+    //   with the exclusion     loop stops at `visits`  -> error spans `visits`
+    //   without it             `visits` is taken as an argument, the loop
+    //                          stops at `[`            -> error spans `[`
+    //
+    // The mirror of this node's vacuous-control family: there both readings
+    // PARSED, here both readings FAIL. Either way the observable has to be
+    // finer than the outcome.
+    const SOURCE: &str = "const k : Nat = g visits [x]";
+    let visits_at = SOURCE.find("visits").expect("fixture contains `visits`");
+
+    let error = parse_decls(SOURCE).expect_err("`g visits [x]` is not a valid expression");
+    let rendered = format!("{error:?}");
+    let expected = format!("start: {visits_at}, end: {}", visits_at + "visits".len());
+
     assert!(
-        parses("proc p (a : Auth) : Unit visits [FS] = q"),
-        "a `visits` row must not be consumed by the return type's loop"
+        rendered.contains(&expected),
+        "the error must land on `visits` -- the expression loop stopping there is \
+         the exclusion firing. Landing on `[` means `visits` was consumed as an \
+         argument and the Expression membership is inert. got {rendered}"
     );
 }
