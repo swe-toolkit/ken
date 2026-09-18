@@ -67,6 +67,56 @@ is what review cannot catch.**
 disposition and nothing records it arriving, guess and attempt rather than wait.
 Review is the backstop.
 
+### THE SECTION ABOVE HAS NO DETECTOR, AND WITHOUT ONE IT DOES NOT FIRE.
+
+**Measured 2026-09-18, this seat, against the section above.** The operator set
+clearing the ignored rows as the top priority on 2026-09-17. Over the preceding
+five days the runtime lane landed **thirteen** distinct nodes — census,
+disposition, correction, re-attribution, coverage — and the selected population
+went **15 to 15**. Then the next six framed WPs were checked and **not one had
+the row going green as a deliverable**; four said so explicitly, in an `AC` or a
+dedicated section, each with a defensible local reason.
+
+**That is the 2026-08-15 failure at 2.6x, by the same seat, with this section
+already written and loaded at every session start.** Reading it does not fire
+it. Each frame's prohibition is argued on its own merits at authoring time, and
+the ratio is invisible from inside any one of them — which is exactly what the
+2026-08-15 note says and is still not enough to catch it.
+
+⇒ **The section describes how to author one frame. It needs a check that reads
+the population.** Run it at the watchdog tick, not at authoring time:
+
+    for the objective the operator named, name its POPULATION and its
+    CURRENT NUMBER. Then: of the frames released and queued against it,
+    HOW MANY HAVE MOVING THAT NUMBER AS A DELIVERABLE?
+
+**Zero is the alarm, and it is a reading on the frames, not on the teams.** A
+lane can be highly productive, land every node correctly, pass every review, and
+score zero here — that is the observed state, not a hypothetical. **Node
+throughput and objective throughput are two numbers, and only one of them is the
+priority.**
+
+**Two traps in running the check, both hit on 2026-09-18:**
+
+- **The number must come from the objective's own definition, not from a grep
+  that resembles it.** A raw `git grep -c '#\[ignore' -- crates/` returns 28; the
+  attribute count excluding `//` comment lines is 23; the sweep's selected
+  population is 15. Three numbers, one subject. **Read the producer** — the
+  ledger node states its selection rule and the cross-check that makes it
+  falsifiable.
+- **Two populations of equal size are not the same population.** The ken-cli
+  `#[ignore]` attributes number 15 and the sweep's selected rows number 15, and
+  they differ in membership at both ends: the selected set excludes a
+  deliberately parked row and includes one row in `ken-runtime`. **A count that
+  matches is not a set that matches**, and a headline built on the coincidence
+  names nobody.
+
+**When the check returns zero, the remedy is a kick, not a rule.** Find the
+released node whose completion moves the number and kick that one next. On
+2026-09-18 it existed, was `ready`, and was not what got kicked — the kick had
+been chosen for base-freshness, which is an instrument about staleness and says
+nothing about the objective.
+
 ## Before you pin a fixed input: five audits, every time
 
 A fixed input is only as good as the substrate it stands on, and **grounding

@@ -356,10 +356,33 @@ an occurrence the planner issued for that node — not one borrowed from a
 sibling, and not a value minted to satisfy the check.
 
 **`D4` — un-ignore the row and prove it measures its property.**
-Remove the `#[ignore]` at `:2548` and the annotation block at `:2530-2546`.
-Note `:2530-2546` is a `//` block immediately above the attribute; check whether
-a separate leading doc comment exists above it and update that too rather than
-stranding it.
+Remove the `#[ignore]` and the annotation block immediately above it.
+**Re-measured on `origin/main` at `5899268451`** — the whole group sits about
+785 lines below where this deliverable used to place it:
+
+    :3315-3331   the `//` annotation block          (was written here as :2530-2546)
+    :3332        #[test]
+    :3333        #[ignore = "RT-CARRIER-PRODUCER-OCCURRENCE: ..."]   (was :2548)
+    :3334        fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload
+
+There is no separate leading doc comment above the block; `:3314` is blank and
+`:3313` closes the preceding test. **Line numbers are hints** per §0 — anchor on
+the attribute string and the function name, and if the group is not where this
+says, that is a finding to report, not a discrepancy to reconcile silently.
+
+> **`:3328-3330` of that block is the sentence `D5` should have caught.** It
+> reads *"Un-ignoring the row is therefore NOT the repair and would only restore
+> a refusal."* **That is true at this base and false the moment `D3` lands**, and
+> it is a second instance of exactly what `D5` is for. `D4` deletes the block, so
+> it is discharged either way — but if `D4` is ever split from `D3`, this
+> sentence has to go with `D3`, not stay behind asserting a refusal that no
+> longer happens.
+
+**This deliverable is why this node is the lane's next kick.** It is the only
+released runtime node whose completion removes an `#[ignore]` from the selected
+population. `D4` is not optional trailing cleanup and does not defer to a
+successor: **a `D3` that lands without `D4` leaves the count unmoved**, which is
+the whole failure this lane has been reproducing.
 
 **`D5` — currency.**
 If `D2` rules *rig*, the `D7` note at `:2677-2681` says the refusal is correct
