@@ -494,7 +494,7 @@ fn certify_standard_operator_home(
     // exists rather than synthesising a coordinate that points nowhere.
     let span = at.cloned().unwrap_or_else(|| Span::new(0, 0));
     let bool_id = elab.numeric_env.bool_id;
-    elab.standard_operators = crate::standard_operators::certify_roles(
+    let certified = crate::standard_operators::certify_roles(
         &elab.env,
         &elab.module_state.exports,
         &elab.globals,
@@ -502,6 +502,27 @@ fn certify_standard_operator_home(
         bool_id,
         &span,
     )?;
+
+    // `33 §6.1`'s standard fixities, installed onto the identities just
+    // certified rather than declared in surface source.
+    //
+    // This is the only mechanism available, and the measurement is in the WP
+    // thread: a fixity target must be DEFINED in the declaring module
+    // (`scope.locals`), and a fixity target must be a SYMBOLIC operator, so
+    // `infix 4 ord_leq_at` at the defining module is unsayable and
+    // `infix 4 ≤` at the facade is refused as not-local. The only expressible
+    // declaration is one that also DEFINES the glyph -- which mints a second
+    // `GlobalId` and is exactly what `§6.9` forbids.
+    //
+    // Keying on the identity is what `§6` already requires: fixity is "a
+    // property of the operator's canonical identity, not of any surface path
+    // or alias that reaches it", so it travels with import and re-export for
+    // free. `fixities` is `GlobalId`-keyed, so nothing further is needed to
+    // make that travel happen.
+    for (role, id) in &certified {
+        elab.fixities.insert(*id, role.fixity());
+    }
+    elab.standard_operators = certified;
     Ok(())
 }
 
