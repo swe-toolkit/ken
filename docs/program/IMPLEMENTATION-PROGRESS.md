@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-18 21:15:54Z — from 676 issue file(s) in `docs/program/issues/`.
+2026-09-18 22:06:31Z — from 677 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -611,6 +611,7 @@ the committed file matches the generator's output.
 | `RT-SECOND-RECOGNITION-ERASURE` | Determine whether the depth-2/3 static-worker rebind is a succession of one obligation or two distinct ones, and select the disposition on that fact -- erasure is REFUTED and is no longer this node's deliverable | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2377 |
 | `RT-SEED-CALL-PORT` | Seed-closure call port — a Call whose callee is the retained non-lexical closure form routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-SITEOP-CARRIED-WITNESS` | Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried | merged | runtime | M | none | — |
+| `RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` | Three ignored rows name RT-SITEOP-CARRIED-WITNESS, which is merged, so no live node owns their next repair. Their annotations are the only account of what they do, and the annotations DISAGREE WITH EACH OTHER AND WITH THE LEDGER: each row carries a comment block naming RT-CARRIER-BYTESPAN-OBSERVE (also merged) with a BytesPointerLength/CarriedWord signature and the claim that the program never executes, a second comment naming RT-SITEOP-CARRIED-WITNESS D1a/D2, and an #[ignore] attribute predicting the BoundaryCarrier arity refusal -- while the ledger MEASURED all three as `label agrees? NO` with two different signatures again (rows 1 and 2 UnclassifiedRuntimeTrap terminal_value -1, row 10 the typed-consumer-projection planner refusal). FOUR ACCOUNTS, THREE OF THEM ANNOTATION, NONE MEASURED AT CURRENT MAIN. D0 measures the rows and censuses their annotations; it does not adjudicate between labels. THE NODE MAY DELIVER ZERO DECREMENTS: if the ledger's verdict still holds at current main the labels are simply stale and the first deliverable is a LABEL CORRECTION, which is re-labelling and not clearing. | draft | runtime | M | none | — |
 | `RT-SITEOP-RETAINED-ROWS-ADVANCED-PAST-LABEL` | RT-SITEOP-CARRIED-WITNESS merged claiming its 16 retained rows all stop at the LATER eliminated-not-callable refusal -- an advancing refusal, not two causes. Three of those rows were then measured stopping somewhere else entirely: rows 1 and 2 at UnclassifiedRuntimeTrap{terminal_value:-1}, row 10 at a typed-consumer-projection disagreement. The closeout's universal claim over the retained set is refuted on these three, which is why they read as owned and cannot be routed. Establish what actually owns them. | ready | runtime | M | none | — |
 | `RT-SOURCE-MACHINE-TYPES-SPLIT` | Relocate the existing source-machine types and control into their own child -- relocation ONLY, and explicitly not the transition IR, which is deferred to its own semantic node after this phase closes | merged | runtime | M | none | — |
 | `RT-SPECIALIZED-ACTIVE-RESUME` | A live specialized value with an Active frame is refused by a constructor-only destructure — Active resume does not require constructor shape | merged | runtime | S | none | — |
