@@ -742,6 +742,50 @@ scripts/gen-progress.sh
 
 Bundle both into your next publish.
 
+### M7a — A node that OWNS ignored rows may not reach `merged` unowned
+
+**Before flipping, ask whether this node owns any `#[ignore]`d row. If it does,
+the flip must either clear those rows or name a successor owner — in the row's
+own attribute, not only in a convo post.**
+
+```sh
+grep -rn '#\[ignore' crates/*/tests/ | grep '"<ID>'
+```
+
+Match on the node named at the **START** of the `#[ignore]` string. A node the
+label merely *mentions* — to supersede, to inherit from, to cite — does not own
+the row, and a substring join will hand you rows that belong to someone else.
+
+If the grep returns rows and you cannot clear them in this merge, **the
+successor owner goes into each row's attribute as part of this publish.** A
+row whose label names a `merged` node is unroutable: it looks owned to every
+census, and nothing will ever correct it, because the only thing that would
+have is the node that just closed.
+
+> **Why this step exists.** Measured 2026-09-18, against the operator's
+> top-priority objective (clearing the ignored tests). Of the fourteen blocker
+> rows in `crates/ken-cli/tests/`, **four named a `merged` owner** — three
+> `RT-SITEOP-CARRIED-WITNESS`, one `RT-SUBCONTINUATION-LIFO-RELEASE-ORDER`. None
+> was abandoned on purpose. Each was minted by an ordinary, correct merge that
+> had no step at which anyone asked this question.
+>
+> **The mechanism is still live and the next instance is already visible:**
+> `RT-COMPMATCH-TREE-SCRUTINEE` is `ready`, owns one row, and is in the queue.
+> When it lands it will orphan that row the same way, and nothing in the
+> federation will report it. **A census is a reading at a moment; this is the
+> missing enforcement edge** (Architect `evt_7881e7b6wvf87`).
+>
+> The worst of the four shows what the gap costs: `px8ta:326` carries a label
+> saying **"product defect, escalated"** and is two blockers under one
+> `#[ignore]`, the second of which its own comment says is *"not owned by that
+> node"*. An escalated product defect, an unowned second blocker, and a merged
+> owner — reached without any single step being wrong.
+
+**State the predicate when you report a count, because the cells move under
+it:** `owner terminal (merged)` and `owner not releasable today (merged +
+draft)` are different populations, and a node that is itself `draft` discharges
+nothing.
+
 ## M8 — Compact the Adversary, then notify it, if the merge carries code
 
 Two actions in that order, both required, both yours. A step, not a courtesy.
