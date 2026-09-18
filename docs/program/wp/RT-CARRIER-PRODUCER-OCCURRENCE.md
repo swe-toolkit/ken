@@ -504,6 +504,45 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
 - **Do not re-baseline or re-scope the row's assertions** to fit whatever the
   repaired edge produces. If the row cannot assert its stated property after the
   repair, that is a finding to report, not an assertion to adjust.
+  **EXCEPTION, and it is not optional — an expected value that came from THE
+  DEFECT ITSELF was never a criterion, and repairing it is MANDATORY.** That is
+  the opposite act from re-baselining, it is easy to mistake for it, and the
+  carve-out below states the test and the three obligations that come with it.
+
+  > **CARVE-OUT, added 2026-09-18 (Steward). This ban as first written stopped
+  > work it should not have, and the ring was right to stop.** It does not
+  > distinguish two opposite acts. **The question is WHERE THE EXPECTED VALUE
+  > CAME FROM:**
+  >
+  >     from THE RUN YOU JUST FIXED   -> re-baselining. BANNED, no exceptions.
+  >     from THE DEFECT ITSELF        -> it was never a criterion. Repairing it
+  >                                      is MANDATORY, not merely permitted.
+  >
+  > **Measured instance, `D4`:** the error-path equality compared a projected
+  > boundary tag against `ImmediateBool` — **the value the pre-`D3` rig itself
+  > chose for `Wrote`.** The assertion was comparing the fixture's own input
+  > against itself, so the defect's fingerprint was sitting inside the oracle.
+  > Leaving it there is not rigour; it preserves the bug in the thing that is
+  > supposed to catch the bug.
+  >
+  > **The premise does not reach the wider conclusion.** *"It was never an
+  > independent oracle"* licenses **repairing** the oracle. It does not license
+  > **retiring** the check — it says nothing about whether the property is worth
+  > asserting. Both readings follow from the same true sentence and only the
+  > weaker one is entailed; prefer it.
+  >
+  > **Repairing under this carve-out carries three obligations, all three:**
+  > assert a **derived property, never an observed literal** (an arena index is
+  > sound as a measurement and unsound as a criterion); **state the derivation
+  > with its citation**, and route it to the Architect if it cannot be grounded
+  > in the plan — an ungrounded replacement is wrong the same way the original
+  > was; and **show the repaired assertion reddens under a mutation on the path
+  > it guards**, not merely on some other path the row also covers.
+  >
+  > **If no mutation on that path can redden it, retiring it is then honest —
+  > but the row must SAY it does not cover that path.** An assertion that cannot
+  > fail quietly retired, and one loudly retired, are the same coverage and very
+  > different artifacts.
 - **Do not repair the other census row.** `two_same_shape_workers_are_distinguished`
   is `RT-WORKER-FIXTURE-DECODE`'s, and it is `ready`.
 
