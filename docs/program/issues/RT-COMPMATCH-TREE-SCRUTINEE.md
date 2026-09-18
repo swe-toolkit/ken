@@ -16,11 +16,54 @@ origin: Measured by the RT-SRCBODY-BIND-ORDER D12 complete no-fail-fast enumerat
 > It exists so a skipped CI row has an owner. **A skipped row measures nothing;
 > this node owns un-skipping it.** Size is `TBD` deliberately.
 
-## Exact signature
+## Exact signature — MEASURED, and the row now stops EARLIER
+
+> **The row no longer reaches the refusal this node is named for.** Read this
+> section, not the title.
+
+**Measured at `04d4dd38a9cfb40da9b5d68bfeb42aaddbb76661`** by
+`RT-IGNORED-FAILING-ROWS-INVENTORY` (row 14 of its ledger,
+`docs/program/evidence/rt-ignored-failing-rows-ledger.md`):
+
+```text
+an exact detached required consumer has no computational occurrence
+```
+
+The ledger records `label agrees? NO`, noting the label predicts **a
+tree-producing match scrutinee**. That is the refusal below, and it is not the
+one the row hits first.
+
+**Superseded as the FIRST refusal, not disproved as a property of the row:**
 
 ```text
 ComputationalMatch: tree-producing match scrutinee is not Bool or a constructor
 ```
+
+> ### THIS DOES NOT REFUTE THE WITNESS CLAIM BELOW. IT STOPS DEMONSTRATING IT.
+>
+> The section that follows makes this node **load-bearing for the descent
+> campaign** — *"the sole failure was this node"*, *"a real Ken program producing
+> a non-constructor `ComputationalMatch` scrutinee"*. **That argument requires
+> the row to actually reach the `ComputationalMatch` consumer.** It now stops at
+> an earlier, different refusal, so the row is no longer observed doing the
+> thing the claim rests on.
+>
+> **Refuted and no-longer-demonstrated are different, and the difference is the
+> whole point.** Signature depth is one layer: the ledger is explicit that a
+> first stop is not a root cause and that forcing past a first refusal on other
+> rows revealed a second behind it. The scrutinee-shape refusal may well still
+> be there, one layer down. **Nobody has looked.**
+>
+> ⇒ **`D0` for this node is: force past the detached-consumer refusal and record
+> whether the `ComputationalMatch` scrutinee refusal is still behind it.** Until
+> that is run, **the descent campaign's Trap 1 answer — "yes, real programs
+> exhibit this shape" — rests on a row that is no longer seen exhibiting it.**
+> Do not cite this node as that witness in the meantime, and do not delete the
+> claim either; it is unconfirmed, not wrong.
+>
+> **The reason this sat unnoticed is worth keeping:** the row kept failing the
+> whole time. **A load-bearing claim resting on a still-red row looks exactly
+> as healthy as one resting on a row that is red for the right reason.**
 
 ## IT IS THE DESCENT CAMPAIGN'S ONLY REAL-PROGRAM WITNESS FOR THIS CLASS
 
