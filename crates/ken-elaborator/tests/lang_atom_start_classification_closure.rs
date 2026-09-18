@@ -120,3 +120,52 @@ fn ac6_a_constructor_pattern_still_takes_several_arguments() {
         "a constructor pattern must still take several arguments"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The expression position's two vetoes, previously inline breaks in
+// `parse_app_expr`'s loop.
+//
+// Both discriminate through plain parse success, and I checked that by
+// neutering each rather than assuming it -- the as-pattern case above taught
+// me that a wrong parse is still a parse.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_match_equation_binder_is_not_a_scrutinee_argument() {
+    // Without the veto the application loop takes `eqn` as another argument of
+    // the scrutinee and the parse dies on the colon:
+    // "expected LBrace, found Colon".
+    assert!(
+        parses("fn f (v : T) : Bool = match v eqn: h { C ↦ z }"),
+        "`match v eqn: h` must parse"
+    );
+    assert!(
+        parses("fn f (v : T) : Bool = match v { C ↦ z }"),
+        "the form without the binder must keep parsing"
+    );
+}
+
+#[test]
+fn the_effect_row_veto_is_reachable_in_the_type_position_only_so_far() {
+    // HONEST NAME. I first called this the two-position case and claimed it as
+    // the strongest evidence for `applies_in`'s axis. That was VACUOUS:
+    // restricting `EffectRowAnnotation` to `Type` alone reddens nothing, here
+    // or across seven other suites. The fixture below exercises the RETURN
+    // TYPE's application loop, not the expression loop.
+    //
+    // My earlier neuter-`holds_at` check did not catch it because `holds_at`
+    // is shared across positions: neutering the CONDITION also kills the
+    // type-side use, so it looks like evidence for the POSITION. The condition
+    // and the position are different axes and only a per-position mutation
+    // separates them.
+    //
+    // The `Expression` membership stays -- the inline break it replaced lived
+    // in `parse_app_expr`'s loop, so dropping it changes behaviour on an input
+    // I cannot exhibit -- and is labelled UNMEASURED rather than left to read
+    // as reviewed. `applies_in`'s axis is carried by `AsAlias`, where flipping
+    // the position reds both halves of the pair.
+    assert!(
+        parses("proc p (a : Auth) : Unit visits [FS] = q"),
+        "a `visits` row must not be consumed by the return type's loop"
+    );
+}

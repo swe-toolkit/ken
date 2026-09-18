@@ -101,6 +101,8 @@ enum AtomPosition {
     Type,
     /// Pattern-application argument position (`can_start_atom_pat`).
     Pattern,
+    /// Expression-application argument position (`parse_app_expr`'s loop).
+    Expression,
 }
 
 /// A NEGATIVE start condition: a context in which a token that would otherwise
@@ -136,6 +138,9 @@ enum AtomPosition {
 enum StartExclusion {
     /// `visits [E]` -- an effect-row annotation, not a type argument.
     EffectRowAnnotation,
+    /// `eqn :` -- a contextual modifier of the enclosing `match`, not an
+    /// application argument to its scrutinee.
+    MatchEquationBinder,
     /// `as` -- an AS-PATTERN ALIAS keyword, not a pattern argument.
     ///
     /// Found by AC-6's derivation, and it is why "the pattern rosters are
@@ -155,29 +160,43 @@ enum StartExclusion {
 impl StartExclusion {
     /// The number of exclusions. Kept beside [`Self::ALL`] so the array's
     /// length is checked against it rather than maintained independently.
-    const COUNT: usize = 3;
+    const COUNT: usize = 4;
 
     /// The iteration source `atom_start_exclusion` consults.
-    const ALL: [Self; Self::COUNT] =
-        [Self::EffectRowAnnotation, Self::AsAlias, Self::BinderName];
+    const ALL: [Self; Self::COUNT] = [
+        Self::EffectRowAnnotation,
+        Self::MatchEquationBinder,
+        Self::AsAlias,
+        Self::BinderName,
+    ];
 
     /// Exhaustive, no `_ =>`: a new variant forces an arm here, and the arm
     /// sits next to [`Self::COUNT`] so extending one prompts the other.
     const fn index(self) -> usize {
         match self {
             Self::EffectRowAnnotation => 0,
-            Self::AsAlias => 1,
-            Self::BinderName => 2,
+            Self::MatchEquationBinder => 1,
+            Self::AsAlias => 2,
+            Self::BinderName => 3,
         }
     }
 
     /// Positions this exclusion governs.
     fn applies_in(self, position: AtomPosition) -> bool {
         match self {
-            Self::EffectRowAnnotation | Self::BinderName => {
-                matches!(position, AtomPosition::Type)
+            // Governs two positions. The TYPE membership is measured; the
+            // EXPRESSION one is NOT -- restricting this to `Type` alone reds
+            // nothing in any suite, and I could not construct a fixture that
+            // reaches `parse_app_expr`'s loop with `visits [` ahead of it. It
+            // stays because the inline break it replaced lived in that loop,
+            // so removing it would change behaviour on an input I cannot
+            // exhibit. Flagged rather than left to read as reviewed.
+            Self::EffectRowAnnotation => {
+                matches!(position, AtomPosition::Type | AtomPosition::Expression)
             }
+            Self::BinderName => matches!(position, AtomPosition::Type),
             Self::AsAlias => matches!(position, AtomPosition::Pattern),
+            Self::MatchEquationBinder => matches!(position, AtomPosition::Expression),
         }
     }
 
@@ -189,6 +208,10 @@ impl StartExclusion {
                     && matches!(parser.lookahead(1), Token::LBracket)
             }
             Self::AsAlias => parser.is_contextual_ident("as"),
+            Self::MatchEquationBinder => {
+                parser.is_contextual_ident("eqn")
+                    && matches!(parser.lookahead(1), Token::Colon)
+            }
             Self::BinderName => {
                 matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
                     && matches!(parser.lookahead(1), Token::Colon)
@@ -204,6 +227,7 @@ impl StartExclusion {
         match self {
             Self::EffectRowAnnotation => "an effect-row annotation",
             Self::AsAlias => "an as-pattern alias",
+            Self::MatchEquationBinder => "a match equation binder",
             Self::BinderName => "a binder name",
         }
     }
@@ -2570,15 +2594,13 @@ impl Parser {
             _ => {
                 let mut f = self.parse_atom_expr()?;
                 loop {
-                    // `eqn:` is a contextual modifier of the surrounding
-                    // `match`, not an application argument to its scrutinee.
-                    if self.is_contextual_ident("eqn") && matches!(self.lookahead(1), Token::Colon)
-                    {
-                        break;
-                    }
-                    if self.is_contextual_ident("visits")
-                        && matches!(self.lookahead(1), Token::LBracket)
-                    {
+                    // Both of the inline breaks that used to sit here are
+                    // negative start conditions, identical in shape to the
+                    // type side's: `eqn :` modifies the enclosing `match`, and
+                    // `visits [` is an effect-row annotation. They are now
+                    // stated once, in the classification, rather than twice in
+                    // two loops that could drift apart.
+                    if self.atom_start_exclusion(AtomPosition::Expression).is_some() {
                         break;
                     }
                     // The brace after a `match` scrutinee opens its arm block,
