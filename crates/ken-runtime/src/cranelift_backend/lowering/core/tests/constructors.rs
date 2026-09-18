@@ -3312,25 +3312,52 @@ fn generated_context_pairing_refuses_raw_owner_header_mismatch() {
     );
 }
 
-// Ignored pending RT-CARRIER-PRODUCER-OCCURRENCE.
+// Ignored pending RT-CARRIER-PRODUCER-OCCURRENCE `D4`. Re-measured at
+// origin/main 4d20a1cb5, with `D3` (60df2cfd2) landed and the child-shape
+// repair below applied.
 //
-// Observed signature, exactly:
-//   the C2 carrier edge emits: Unsupported(UnsupportedLowering { construct: "Constructor", reason: "a source aggregate reached the carrier with no planner-issued producer occurrence, so it would name no ownership record and could only be given the authority of wherever it happened to be transferred" })
+// THE CARRIER EDGE NOW EMITS. All three edges compile, the row runs, and it
+// evaluates the property it was written for -- which no run of it had ever
+// reached before. The signature this block used to quote,
 //
-// Owner node: RT-CARRIER-PRODUCER-OCCURRENCE.
-// Pre-existing base debt, NOT a bind-order regression: fails at base
-// 21fd46dc with this same signature, measured two-ended at both refs and
-// with the CI feature px8-ds-test-support both on and off.
+//   Unsupported(UnsupportedLowering { construct: "Constructor", reason: "a source aggregate reached the carrier with no planner-issued producer occurrence, so it would name no ownership record and could only be given the authority of wherever it happened to be transferred" })
 //
-// IT DIES AT ITS `expect` BEFORE THE PROPERTY IS EVALUATED. The panic is at
-// the `.expect("the C2 carrier edge emits")`, so the carrier edge refuses to
-// emit and the separately-generated nested payload selection this row names
-// is never evaluated at all. Un-ignoring the row is therefore NOT the repair
-// and would only restore a refusal; the repair is the owner node's, and it
-// has to make the carrier edge emit.
-// Annotation only -- test body, expect, and expectations are unchanged.
+// does not reproduce anywhere in this row any more.
+//
+// TWO SENTENCES THAT STOOD HERE ARE STRUCK, not softened:
+//
+//   1. "IT DIES AT ITS `expect` BEFORE THE PROPERTY IS EVALUATED." It reaches
+//      every assertion.
+//   2. "Un-ignoring the row is therefore NOT the repair and would only restore
+//      a refusal." The frame said in advance that this sentence would expire
+//      the moment `D3` landed. It has.
+//
+// WHY THE ROW IS STILL IGNORED, and it is ONE ASSERTION. Run un-ignored at
+// this tip:
+//
+//   success path                                 PASSES
+//   assert_ne!, the selection discriminator      PASSES
+//   ordinary source Result route                 PASSES
+//   error path                                   FAILS   left 517  right 0
+//
+// 517 is tag 5 = `PersistentGround`, payload index 2: the projected field is
+// the nested `PrivateTransferCount(nat, nat)` that the plan requires `Wrote`
+// to carry. `right` is `BoundaryTag::ImmediateBool`, which is the `Bool` this
+// rig used to hand `Wrote` before the child-shape repair below. The
+// expectation is a fossil of a payload the fixture is no longer free to
+// choose, so it compared the rig's own input against itself.
+//
+// IT IS REPORTED RATHER THAN ADJUSTED, because the frame bans adjusting it:
+// `§4`, do not re-baseline or re-scope the row's assertions to fit whatever
+// the repaired edge produces; a row that cannot assert its stated property
+// after the repair is a finding to report, not an assertion to adjust.
+//
+// THE ROW IS NOT VACUOUS WHILE IT WAITS. With that one assertion bypassed the
+// row passes, and the `AC-3` population-side mutation -- swapping the two arm
+// constructors in the consumer's match -- reddens it (the success-path
+// assertion goes 0 against 256). Both measured here, at this tip.
 #[test]
-#[ignore = "RT-CARRIER-PRODUCER-OCCURRENCE: the carrier edge refuses to emit for a source aggregate with no planner-issued producer occurrence; fails at base 21fd46dc"]
+#[ignore = "RT-CARRIER-PRODUCER-OCCURRENCE D4: the carrier edge now emits and the row reaches its property; its error-path assertion still expects the Bool payload the pre-D3 rig handed Wrote, and re-baselining that expectation is banned by frame section 4 -- reported, not adjusted"]
 fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let nested_default = || RuntimeTrap {
@@ -3540,7 +3567,6 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
         producer_plan,
         move |compiler, builder, success| {
             let true_word = builder.ins().iconst(types::I64, 1);
-            let false_word = builder.ins().iconst(types::I64, 0);
             let discriminator = builder.ins().iconst(types::I64, 0);
             let ok_identity = compiler
                 .synthesized_fixed_identity(SynthesizedFixedConstructorRole::ReadSome)?;
@@ -3559,31 +3585,66 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
             });
             compiler.defining_emission_owner = Some(producer_emission_owner);
             compiler.defining_unit = Some(producer_defining_unit);
-            // `D7` — this fixture has no `Effect` occurrence, so `match_origin`
-            // is not a producer seat and carries no per-use record. That is
-            // correct, and the refusal it earns is correct.
+            // `D5` CURRENCY, corrected at `D4`. Both halves of what stood
+            // here are now false, and the second was false the moment it was
+            // written.
             //
-            // `D5` — what this note used to say next was that the template
-            // therefore gets no occurrence and refuses at the allocation. That
-            // named the SECOND refusal as the cause of the FIRST. Measured on
-            // this row: with `defining_emission_owner` unbound, as this rig
-            // left it until `D3`, `synthesized_constructor` takes its
-            // no-emission-owner early return and hands back `occurrence: None`
-            // BEFORE it ever consults the plan -- so the row died on the
-            // carrier's source-aggregate refusal, and the missing per-use
-            // record played no part in it. With the owner bound just above,
-            // the per-use record's absence does become operative, and it
-            // refuses at the `?` lookup INSIDE `synthesized_constructor`,
-            // still before any allocation.
+            //   1. "this fixture has no `Effect` occurrence, so `match_origin`
+            //      is not a producer seat and carries no per-use record" --
+            //      `D3`'s own move 5 added the `FsWriteAt` seat above and
+            //      moved this call from `match_origin` to `effect_seat`. The
+            //      sentence was falsified by the same diff that carried it,
+            //      and the singleton assertion above measures the opposite:
+            //      this fixture has exactly one `Effect`.
+            //   2. "the per-use record's absence does become operative, and it
+            //      refuses at the `?` lookup INSIDE `synthesized_constructor`"
+            //      -- measured at `D4`: it does not. With the owner bound just
+            //      above and the call made at `effect_seat`, the record exists
+            //      and the lookup succeeds.
+            //
+            // What was still refusing after `D3` was neither of those. It was
+            // the child shape disagreement the next block repairs, which no
+            // run could observe until both occurrence defects were gone.
+            //
+            // `D3` move 6 -- `Wrote`'s payload is a nested
+            // `PrivateTransferCount(nat, nat)`, not a scalar, and this rig
+            // passed a `Bool`. That is a THIRD defect on this edge, of a third
+            // kind: not an absent occurrence but a shape disagreement between
+            // the child the plan describes and the child the emitter built.
+            // It was unobservable until the two occurrence defects above were
+            // repaired, exactly as `§0` says a first refusal bounds only what
+            // the reader can see.
+            //
+            // Production's `FsWriteAt` arm builds the count at
+            // `ok_root.field(0)` and passes it as `Nested` (`effects.rs`,
+            // `SynthesizedFixedConstructorRole::PrivateTransferCount` then
+            // `::Wrote`). This mirrors that: same path, same role, same two
+            // `BoundedNat` children in the same order. The values are the
+            // rig's own -- nothing here executes, and the row's property is
+            // which arm is selected, not what the count reads.
+            let transfer_predecessor = builder.ins().iconst(types::I64, 0);
+            let transfer_remaining = builder.ins().iconst(types::I64, 0);
+            let transferred = compiler.synthesized_constructor(
+                effect_seat,
+                &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk).field(0),
+                SynthesizedFixedConstructorRole::PrivateTransferCount,
+                producer_symbols.private_transfer_count.clone(),
+                vec![
+                    SynthesizedArgument::Scalar(Lowered::BoundedNat(
+                        BoundedNatV1::derived_from_validated(transfer_predecessor),
+                    )),
+                    SynthesizedArgument::Scalar(Lowered::BoundedNat(
+                        BoundedNatV1::derived_from_validated(transfer_remaining),
+                    )),
+                ],
+                &ClaimedEffectSeats::none(),
+            )?;
             let error = compiler.synthesized_constructor(
                 effect_seat,
                 &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk),
                 SynthesizedFixedConstructorRole::Wrote,
                 producer_symbols.wrote.clone(),
-                vec![SynthesizedArgument::Scalar(Lowered::Bool {
-                    value: false_word,
-                    known: Some(false),
-                })],
+                vec![SynthesizedArgument::Nested(transferred)],
                 &ClaimedEffectSeats::none(),
             )?;
             let host_result = Lowered::HostResult {
