@@ -75,6 +75,79 @@ fn projection_field_token(token: &Token) -> Option<ProjectionFieldToken> {
     }
 }
 
+/// Where an atom-start roster is being consulted.
+///
+/// The positions do not admit the same forms and do not apply the same
+/// exclusions, so the classification is indexed by position rather than
+/// duplicated per roster.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AtomPosition {
+    /// Type-application argument position (`parse_ctor_decl`'s and
+    /// `parse_type_app`'s `while` loops).
+    Type,
+}
+
+/// A NEGATIVE start condition: a context in which a token that would otherwise
+/// begin an atom is something else entirely.
+///
+/// **An atom-start test is not a function of `peek()`.** Both members below
+/// look one token ahead, and both exist to stop a type-application `while`
+/// loop from swallowing input that belongs to the enclosing construct. They
+/// are refusals, not omissions from the admitted set: the token genuinely can
+/// start an atom elsewhere, which is exactly why a roster cannot express them.
+///
+/// Closed and exhaustively matched (no `_ =>`), so a new exclusion is a
+/// compile error at every consumer rather than a silent omission.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StartExclusion {
+    /// `visits [E]` -- an effect-row annotation, not a type argument.
+    EffectRowAnnotation,
+    /// `x :` -- a BINDER NAME, not a type argument.
+    ///
+    /// The load-bearing one. `can_start_atom_type` feeds two `while` loops
+    /// that collect type-application arguments; without this, `(x : T)` offers
+    /// `x` to the loop as another atom argument and the binder is consumed.
+    BinderName,
+}
+
+impl StartExclusion {
+    const ALL: [Self; 2] = [Self::EffectRowAnnotation, Self::BinderName];
+
+    /// Positions this exclusion governs.
+    fn applies_in(self, position: AtomPosition) -> bool {
+        match self {
+            Self::EffectRowAnnotation | Self::BinderName => {
+                matches!(position, AtomPosition::Type)
+            }
+        }
+    }
+
+    /// Does this exclusion hold at the cursor?
+    fn holds_at(self, parser: &Parser) -> bool {
+        match self {
+            Self::EffectRowAnnotation => {
+                matches!(parser.peek(), Token::Ident(name) if name == "visits")
+                    && matches!(parser.lookahead(1), Token::LBracket)
+            }
+            Self::BinderName => {
+                matches!(parser.peek(), Token::Ident(_) | Token::ConId(_))
+                    && matches!(parser.lookahead(1), Token::Colon)
+            }
+        }
+    }
+
+    /// The construct this exclusion keeps out of an argument position, named so
+    /// a control can state which refusal it is exercising rather than only
+    /// that something was refused.
+    #[cfg(test)]
+    fn refuses(self) -> &'static str {
+        match self {
+            Self::EffectRowAnnotation => "an effect-row annotation",
+            Self::BinderName => "a binder name",
+        }
+    }
+}
+
 fn canonical_operator_name(token: &Token) -> Option<&str> {
     match token {
         Token::Operator(name) => Some(name.as_str()),
@@ -2044,20 +2117,28 @@ impl Parser {
     }
 
     fn can_start_atom_type(&self) -> bool {
-        if matches!(self.peek(), Token::Ident(s) if s == "visits")
-            && matches!(self.lookahead(1), Token::LBracket)
-        {
-            return false;
-        }
-        if matches!(self.peek(), Token::Ident(_) | Token::ConId(_))
-            && matches!(self.lookahead(1), Token::Colon)
-        {
+        if self.atom_start_exclusion(AtomPosition::Type).is_some() {
             return false;
         }
         matches!(
             self.peek(),
             Token::ConId(_) | Token::Ident(_) | Token::KwType | Token::LParen
         )
+    }
+
+    /// The first [`StartExclusion`] that vetoes an atom start here, if any.
+    ///
+    /// **Separated from the admitted set because the two do different jobs.**
+    /// An admitted set answers *"could this token begin an atom?"*; an
+    /// exclusion answers *"is this occurrence of that token something else?"*
+    /// Only the first looks like a roster, and a closure that models atom
+    /// starts as a predicate over `peek()` alone silently drops the second --
+    /// which is fail-open in type parsing, and invisible to any control that
+    /// only checks admissions.
+    fn atom_start_exclusion(&self, position: AtomPosition) -> Option<StartExclusion> {
+        StartExclusion::ALL
+            .into_iter()
+            .find(|exclusion| exclusion.applies_in(position) && exclusion.holds_at(self))
     }
 
     /// `{ x : A | φ }` — refinement type (`21 §6.1`).
