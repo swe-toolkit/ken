@@ -12,6 +12,31 @@ tier: T1
 origin: "Steward, 2026-09-17, ruled in evt_339x9h7ys4pe9 on closing RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION as REFUTED: no fourth repair node on these rows until the queue of refusals is measured as a queue. Under the operator's standing L1 direction (2026-09-15, 'The other tests should be fixed'). The probe is reproducible from main and its procedure is published at evt_41nd1exp7vbb0 -- five anchors that each resolve exactly once in core.rs, so it applies with no line numbers; --test-threads=1 is load-bearing because parallel cargo test interleaves stderr and attributing a printed line to the header above it is not a measurement. Predecessor lineage: RT-CARRIED-RESIDUAL-IH-ARITY established the arity refusal is correct at all four sites and is a fallback symptom; the label-correction node established the labels asserted a mechanism and a cardinality comparison the code does not make; RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION was refuted on its own premise (RTPROBE-WRITE = 1 on all four rows, and keying by worker_body_origin readmits nothing)."
 ---
 
+> # RESULT — DEPTH 3, ALL FOUR ROWS CONVERGE. READ THE EVIDENCE FILE.
+>
+> **`docs/program/evidence/rt-context-frame-refusal-depth-census.md`** is this
+> node's deliverable and the only surface carrying its finding. Landed
+> `9682927b7`; measured at `origin/main` `0298c51eb08df955c502a4fa2bfd17e315745e22`.
+>
+>     L1  recursive_position_captures_all_planner_recoverable   core.rs:13532
+>     L2  agreeing_recursive_body_unit                          core.rs:1230
+>     L3  resolve_context_capture_claim                         core.rs:9551
+>
+> **The stack is FINITE at depth 3.** `L1` and `L2` reject data that is PRESENT
+> and are both correct; `L3` is an ABSENCE, and the technique terminates there
+> on principle, not on budget. Verdict is `A` or `B` and **this node could not
+> discriminate**; the discriminator is a planner-side question, now owned by
+> **[[RT-CONTEXT-CAPTURE-CLAIM-ABSENCE]]**.
+>
+> > **THE `title:` AND `origin:` ABOVE DESCRIBE THIS NODE'S PREDECESSOR'S LIMIT,
+> > NOT THIS NODE'S RESULT.** They say the stack was *"measured to its FIRST STOP
+> > AND NO FURTHER"* — true of `RT-CONTEXT-FRAME-SLOT-HOLDS-ONE-PER-FUNCTION`,
+> > false of this node, which walked two stops further. **The four rows'
+> > `#[ignore]` labels carry the same stale "READMISSION CONDITION UNKNOWN"
+> > wording** and are rewritten by the successor node. The Steward cut a wrong
+> > node off these two surfaces on 2026-09-18 before reading the evidence file.
+> > **A framing text is written before the result and is never updated by it.**
+>
 > # RELEASED 2026-09-17 (Steward). L1 lane.
 >
 > Frame: `docs/program/wp/RT-CONTEXT-FRAME-REFUSAL-DEPTH-CENSUS.md`.
