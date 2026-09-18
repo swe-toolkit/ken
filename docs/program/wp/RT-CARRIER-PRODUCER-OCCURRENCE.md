@@ -419,6 +419,34 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
   not by line. §1f says that branch is deliberate and the fixture's own `D7`
   note says the resulting refusal is correct. Changing it is a design change
   wearing a fixture repair's clothes.
+- **BAN 4 (added 2026-09-18) — THE CLASS, not a list: no refusal whose reason
+  is a MISSING PLANNER-ISSUED OCCURRENCE may be relaxed anywhere under
+  `lowering/` outside `core/tests/`, whether or not this frame names its
+  symbol.** Added after runtime-implementer's `D1` found a third such refusal
+  in a symbol no ban reached (`evt_6ym3avaqwsb7r`).
+  Known members at `e75f1fe27`, **as hints and explicitly NOT as the
+  population**:
+
+      aggregates.rs:1201   reconcile_source_aggregate      (BAN 1's site)
+      aggregates.rs:1397   reconcile_source_aggregate      SECOND refusal in
+                                                           the same fn -- BAN 1
+                                                           reaches it ONLY
+                                                           because BAN 1 is
+                                                           symbol-anchored; its
+                                                           line-anchored
+                                                           predecessor did not
+      aggregates.rs:3169   emit_carrier_dynamic_constructor (fn at :3113)
+                           "the selected alternative ... carries no planned
+                            occurrence, so its allocation has no lifetime meet"
+
+  **This ban is deliberately written as a PROPERTY and must not be "completed"
+  by enumerating its members.** An enumeration widens past the property in the
+  admitting direction — the exact failure the language ring hit the same day —
+  and a fifth site would then sit outside a list that looks exhaustive. **If you
+  find a member not listed above, that is a finding to report, not a gap in the
+  ban.**
+  `AC-4` is what actually fences this today, and that is the second time in this
+  frame that the directory-scoped criterion caught what a named one missed.
 - **BAN 3 — the `.expect("the C2 carrier edge emits")` assertion :: must not be
   weakened to make the row pass.** Identify it by that exact string.
   *hint: `core/tests/constructors.rs:2564`.* It lives in the shared C2 rig near
