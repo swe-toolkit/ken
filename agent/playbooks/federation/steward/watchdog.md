@@ -38,20 +38,24 @@ opinion, and never introduce a new edge to fix one.
 
 ## Arming the tick
 
-Use the convo-channel `schedule_create` self-wake. **Never** the convo
+Use the convo-channel `set_interval` self-wake. **Never** the convo
 `schedule_call`, and never a hand-rolled bash loop or `Monitor`-tool poll
 (operator, 2026-07-20; this supersedes the earlier `CronCreate` guidance).
 
 ```
-schedule_create(interval_seconds=900, label="steward-watchdog",
-                prompt="[Steward watchdog tick] ...")
+set_interval(seconds=900,
+             prompt="[Steward watchdog tick] ...")
 ```
 
 It delivers a tick privately into your own session and posts nothing to the
 space. On each fire, run a private `get_recent_context` read plus the pane
 sweep below, and message the space **only** when there is a real stall to
-nudge. **Post nothing on a clear tick.** It returns a `schedule_id`;
-`schedule_delete(schedule_id)` disarms it.
+nudge. **Post nothing on a clear tick.** `clear_interval()`, which takes no
+arguments, disarms it.
+
+**There is one interval per agent and a second call replaces it.** No `label`,
+no `schedule_id`, no `target` — so you cannot hold two ticks at once and you
+cannot arm another seat's pane. `seconds` is rejected below 60.
 
 The convo `schedule_call` broadcasts its read into the space as a System event
 everyone sees — never use it for the watchdog. A bash `while true` loop, the
@@ -61,14 +65,17 @@ orphan. Do not resurrect a script.
 
 ## The reconnect regression: the one way this backstop silently dies
 
-`schedule_create` schedules live only for the convo-channel MCP process's
+`set_interval` intervals live only for the convo-channel MCP process's
 lifetime and **do not survive an MCP reconnect** — a package upgrade, a network
 blip, or a self-compaction that re-instantiates the client. Posting can stay up
 while they are gone, so you get no signal.
 
 **Re-arm on session start, after every compaction, and after any convo-MCP
-reconnect. Run `schedule_list` at the top of every tick** — an empty list while
-work is open means your backstop fell over.
+reconnect — unconditionally.** There is no way to read an interval back, so
+there is nothing to check first, and checking is not needed: **a re-arm replaces
+whatever is there**, so re-arming one you already hold costs nothing, while
+skipping one you needed leaves the backstop dead with no signal. The asymmetry
+is the whole argument — always re-arm.
 
 > **Re-arm from the stored file, never from memory.**
 > `agent/playbooks/federation/steward-watchdog-tick-prompt.txt` is the
@@ -81,7 +88,7 @@ work is open means your backstop fell over.
 > prompt, edit the file and publish it in the same act as the interval call.
 
 On this Claude-Code seat the host-level `CronCreate` does survive an MCP
-reconnect and is a valid durable fallback, but default to `schedule_create` for
+reconnect and is a valid durable fallback, but default to `set_interval` for
 fleet uniformity.
 
 ## The tick, in order

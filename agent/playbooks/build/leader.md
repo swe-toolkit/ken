@@ -123,27 +123,32 @@ seat working straight through instead of stalling every sub-step onto your (or
 the Steward's) watchdog. Mirror of the build-implementer "keep this turn active"
 discipline.
 
-**Your watchdog is the convo-channel `schedule_create` self-wake (operator,
-2026-07-20 — this replaces the old external wake SCRIPT).** `schedule_create` is
-the uniform convo-MCP watchdog command with `CronCreate`-parity that was in
-progress — it has **landed**, and it works on your terra/Codex seat, so you no
-longer need `local/steward-watchdog-wake.sh` or any managed tick script. Arm it at
-session start while your ring has open work:
-`schedule_create(interval_seconds=900, label="<team>-leader-watchdog",
-prompt="[watchdog tick] …")` ticks **your own** pane on a cadence and **posts
-nothing to the space** (it delivers via a guarded tmux `send-keys` on a terra
-seat, skipping a tick rather than overtyping partial input). `interval_seconds` is
-the recurring "set_interval"; it returns a `schedule_id`, and
-`schedule_delete(schedule_id)` disarms it when the WP is merged. Do **not** reach
+**Your watchdog is the convo-channel `set_interval` self-wake (operator,
+2026-07-20 — this replaces the old external wake SCRIPT).** `set_interval` is
+the uniform convo-MCP watchdog command, and it works on your terra/Codex seat, so
+you no longer need `local/steward-watchdog-wake.sh` or any managed tick script.
+Arm it at session start while your ring has open work:
+`set_interval(seconds=900, prompt="[watchdog tick] …")` ticks **your own** pane
+on a cadence and **posts nothing to the space** (it delivers via a guarded tmux
+`send-keys` on a terra seat, skipping a tick rather than overtyping partial
+input). `seconds` has a hard minimum of 60; `clear_interval()` disarms it when
+the WP is merged. Do **not** reach
 for the convo `schedule_call` (it broadcasts its read into the space as a System
 event everyone sees — noise + orphan risk), a hand-rolled bash `while`-loop, or the
 `Monitor` tool (git-refs only — they miss the pane-level stalls below).
-** Re-arm on reconnect:** `schedule_create` schedules do **not** survive a
+
+**You get ONE interval and it is your own.** A second `set_interval` silently
+replaces the first, and there is no `target` parameter — **you cannot arm a
+member's pane.** A leader that tries has destroyed its own watchdog and thinks
+it has two. Wake a stalled member with a mention, which is the only wake.
+
+** Re-arm on reconnect:** intervals do **not** survive a
 convo-MCP reconnect (a restart re-instantiates the client and silently drops
-them). Re-arm on session start, after any compaction, and after any reconnect;
-`schedule_list` at the top of each tick — an empty list while work is open means
-your watchdog fell over, so re-arm it. The tick discipline below is identical
-regardless of what fires it.
+them). Re-arm on session start, after any compaction, and after any reconnect —
+**unconditionally, without checking first.** You cannot list an interval back, and
+you do not need to: re-arming one you already hold is a no-op, while skipping one
+you needed leaves the backstop dead and silent. The tick discipline below is
+identical regardless of what fires it.
 
 ## The tick: stall recognition and recovery
 

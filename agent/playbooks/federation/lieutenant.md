@@ -216,7 +216,7 @@ of its skill."*
 **Arm it at session start, and again after every compaction,** while any
 candidate is routed and unpublished:
 
-    schedule_create(interval_seconds=900, label="lieutenant-monitor",
+    set_interval(seconds=900,
       prompt="[monitor tick] list routed-but-unpublished candidates; read
       origin/main's SHA; for each, is a PR open and what is its check state?
       Publish the next one in the Steward's order. Reap dead monitors. If the
@@ -225,9 +225,16 @@ candidate is routed and unpublished:
 It is the **same sanctioned, provider-agnostic mechanism the Steward uses**
 (`COORDINATION §13`) — it works identically on Claude-Code and terra/Codex
 seats. It **posts nothing to the space**: the prompt is delivered privately
-into your own session. `schedule_delete(schedule_id)` disarms it;
-`schedule_list` shows what you own. **Do NOT use convo `schedule_call`** — that
-executes on the backend and broadcasts a System event to every participant.
+into your own session. `clear_interval()` disarms it. **Do NOT use convo
+`schedule_call`** — that executes on the backend and broadcasts a System event
+to every participant.
+
+**You hold exactly one interval; a second `set_interval` replaces it silently.**
+So re-arming after a compaction is safe and is the correct move — there is no
+way to list an interval back, and a re-arm you did not need costs nothing while
+a re-arm you skipped leaves this backstop dead. **900s is an upper bound, not a
+prescription** — a shorter period is fine (the minimum is 60), and the lieutenant
+seat has run this at 600s.
 
 ### WHY THIS IS NOT "POLLING", WHICH §7 FORBIDS
 
