@@ -1886,12 +1886,14 @@ fn elaborate_checked_spine_free(
     rdecl: &crate::resolve::RDecl,
 ) -> Result<crate::elab::ElabResult, ElabError> {
     crate::elab::check_surface_purity(rdecl, &elab.effect_rows, &elab.globals, &elab.class_env)?;
+    let standard_operators_here = elab.standard_operators.clone();
     let result = crate::elab::elaborate_rdecl_v1_with_effect_rows(
         &mut elab.env,
         &mut elab.globals,
         &mut elab.num_values,
         &elab.numeric_env,
         &mut elab.class_env,
+        &standard_operators_here,
         &elab.effect_rows,
         &mut elab.fixities,
         &mut elab.fixity_spans,
@@ -1910,12 +1912,14 @@ fn elaborate_checked_with_fixity(
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
     crate::elab::check_surface_purity(rdecl, &elab.effect_rows, &elab.globals, &elab.class_env)?;
+    let standard_operators_here = elab.standard_operators.clone();
     let result = crate::elab::elaborate_rdecl_v1_with_effect_rows(
         &mut elab.env,
         &mut elab.globals,
         &mut elab.num_values,
         &elab.numeric_env,
         &mut elab.class_env,
+        &standard_operators_here,
         &elab.effect_rows,
         &mut elab.fixities,
         &mut elab.fixity_spans,
@@ -2538,12 +2542,16 @@ fn elaborate_mutual_group_with_fixities(
                 .map(|pending| (pending.fixity, pending.declaration_span.clone()))
         })
         .collect::<Vec<_>>();
+    // Snapshot: the call borrows `elab.env`/`elab.globals` mutably, so the
+    // certified map cannot be handed over as a live field borrow.
+    let standard_operators_for_group = elab.standard_operators.clone();
     crate::elab::elaborate_mutual_group(
         &mut elab.env,
         &mut elab.globals,
         &mut elab.num_values,
         &elab.numeric_env,
         &elab.class_env,
+        &standard_operators_for_group,
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &member_fixities,
