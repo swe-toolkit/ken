@@ -43,9 +43,22 @@ The Steward checked it and reported it **confirmed**, on this reasoning:
 `defining_owner` names who owns **the frame being defined**. **Two different
 facts sharing a newtype.**
 
-Had the value been the other variant, the pruning would have survived four arms
-that are unreachable and discarded the two that are — and the repair selected
-from it would have been measuring a branch the rows cannot enter.
+Had `defining_owner` been `Specialization(_)`, the pruning would have **kept two
+arms that are unreachable and discarded both of the two that are reachable** —
+so the repair selected from it would have been measuring a branch the rows
+cannot enter.
+
+    kept        9604, 9759    both unreachable
+    discarded   9629, 9747    both REACHABLE
+                9785, 9797    unreachable
+
+**The match is fully enumerated with no catch-all, so `defining_owner` alone
+prunes six arms to two: it keeps two and discards four.** An earlier draft of
+this line said the reverse — *"survived four arms that are unreachable and
+discarded the two that are."* Both numbers in it are real (four arms are
+unreachable, two are reachable), which is exactly why it read correctly and
+survived review. **Attach a count to the verb that governs it**; a sentence
+whose every number is true can still reconcile with nothing.
 
 ## The rule
 
@@ -93,6 +106,65 @@ a possibility. Neither is a value, and both look like one in a report.
 
 **What caught it was two sources disagreeing** — and that only pays if someone
 opens the file. Had they agreed, the wrong coordinate would have landed.
+
+## The reader's half — a check returning FALSE reads as a REFUTATION
+
+Everything above warns the AUTHOR: a cheap check that comes back TRUE reads as
+having decided. **The same instrument fails the READER in the opposite
+direction**, and the corpus did not carry that half until it happened while this
+very file was under review.
+
+An Architect set out to report that this lesson's `PredeclaredFunctionId` line
+coordinates were wrong. **Every one of them was correct.** The scan was
+
+    grep -E '^\s+[a-z_]+:\s*PredeclaredFunctionId'
+
+which requires the field name to start the line. **Declarations carrying
+`pub(super)` or `pub(in crate::cranelift_backend)` are invisible to it** — a
+clean false negative on exactly the set in dispute. A `sed` that would have
+stripped those prefixes existed and ran *after* the grep, so it did nothing.
+
+What stopped the report was opening the cited lines and reading them, rather
+than trusting the pattern's silence.
+
+> **The count in that report does not reconcile, and the number here is the
+> measured one.** The report said *"nine of your fourteen."* Re-measured in
+> `continuations.rs` with a pattern admitting an optional visibility prefix:
+> **23 lines declare that type, 13 are visible to the cited grep, and 10 carry
+> a `pub` prefix and are not.** Population stated because the totals depend on
+> whether function parameters and constructions are counted as declarations;
+> the **10 invisible** is the number the mechanism turns on, and it is what
+> makes the false negative a certainty rather than a possibility. **A count
+> handed to you inside a correction borrows the correction's authority; its
+> method borrows none.**
+
+**A false negative arrives with the same authority as a finding, and more
+momentum — because catching someone else's error feels like diligence.** A
+true-returning check gets reported as confirmation; a false-returning one gets
+reported as refutation. **Neither was entitled to the verb.**
+
+⇒ **Before reporting that a cited coordinate is wrong, open it.** The
+discriminator is identical in both directions, and it is not a better pattern:
+it is reading the thing that was cited.
+
+**A pattern's silence is evidence only once you have shown the pattern could
+speak.** Worked example from the same review: checking this file's `[[...]]`
+targets, two returned zero and one returned a hit — and **the hit is what
+licensed reading the zeroes as absences rather than as a broken extractor.**
+Carry a case you know is present, in every absence check.
+
+## And the reads that come back SHORT are the safe ones
+
+A fourth instance was available on this object within the hour and did not
+happen: reconstructing a colleague's finding from a **truncated** notification
+rather than asking them to restate it.
+
+**That one is the cheapest of the four, because the truncation is visible** —
+the absence announces itself, so the read cannot be mistaken for an answer. The
+other three all returned well-formed output.
+
+⇒ **The dangerous reads are not the ones that come back short. They are the ones
+that come back whole.**
 
 ## Related
 
