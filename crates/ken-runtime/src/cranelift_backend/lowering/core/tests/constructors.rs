@@ -3379,7 +3379,7 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
             args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
         }],
     };
-    // `D3` move 5 (EXPERIMENT) -- a real `FsWriteAt` seat, because a
+    // `D3` move 5 -- a real `FsWriteAt` seat, because a
     // synthesized per-use record exists only at an `Effect` source occurrence.
     // Placed as the OUTER binding so the match's `Var(0)` still names the
     // producer's result and the consumer is untouched.
@@ -3440,6 +3440,31 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     // Found by PROPERTY, not by position: the seat is whichever occurrence is
     // the fixture's `Effect`.
     let effect_seat = first_effect_seat(&plan).expect("the fixture has an effect seat");
+    // `first_effect_seat` picks ONE member of a population, and so does the
+    // owner search below. Assert each population is a singleton rather than
+    // relying on it -- a later fixture edit adding a second `Effect`, or a
+    // second holding unit, would otherwise silently re-aim both selectors with
+    // no test going red.
+    let effect_seats = {
+        let mut found = Vec::new();
+        let mut stack = vec![root];
+        while let Some(origin) = stack.pop() {
+            if matches!(plan.source_occurrence(origin), Ok(RuntimeExpr::Effect { .. })) {
+                found.push(origin);
+            }
+            let mut position = 0;
+            while let Ok(child) = plan.child_static_origin(origin, position) {
+                stack.push(child);
+                position += 1;
+            }
+        }
+        found
+    };
+    assert_eq!(
+        effect_seats,
+        vec![effect_seat],
+        "this rig places exactly one `Effect` and `first_effect_seat` must be it"
+    );
     let nested_read_some_origin = plan
         .child_static_origin(ordinary_producer_origin, 0)
         .expect("the ordinary Result producer's nested ReadSome occurrence exists");
@@ -3463,12 +3488,12 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     //
     // The owner is found by ASKING which enumerated unit actually holds this
     // seat's synthesized records, never assumed from a position.
-    let producer_defining_unit = plan
+    let holding_units = plan
         .emittable_units()
         .expect("the C2 fixture exposes emittable units")
         .into_iter()
         .map(|unit| unit.function())
-        .find(|unit| {
+        .filter(|unit| {
             plan.synthesized_aggregate_occurrence(
                 ContinuationEmissionOwner::Predeclared(*unit),
                 effect_seat,
@@ -3477,7 +3502,15 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
             )
             .is_ok()
         })
-        .expect("some enumerated unit holds the effect seat's `Wrote` record");
+        .collect::<Vec<_>>();
+    assert_eq!(
+        holding_units.len(),
+        1,
+        "exactly one enumerated unit must hold the effect seat's `Wrote` record, \
+         or the selection below is a choice and not a derivation; got \
+         {holding_units:?}"
+    );
+    let producer_defining_unit = holding_units[0];
     let producer_emission_owner = ContinuationEmissionOwner::Predeclared(producer_defining_unit);
     let read_some = plan
         .synthesized_constructor_identity(SynthesizedConstructorRole::Fixed(
