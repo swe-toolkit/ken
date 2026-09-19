@@ -163,6 +163,18 @@ asked not to look like one — **the same failure shape as the export it would b
 covering up**, and it would leave the measured defect in place while removing
 the evidence of it.
 
+# Contention: one file overlaps a sibling node
+
+`[[LANG-INSTANCE-REGISTRY-IDENTITY-KEY]]` re-keys the class-instance registry
+declared at `classes.rs:202` (`main` `b2d186ef7`). **This node narrows the
+visibility of `InstanceInfo` and `InstanceConstraintInfo` in that same file.**
+
+**Different axes — visibility here, key type there — and neither blocks the
+other.** They must NOT be folded: this one is `S`/`T2` and mechanical, that one
+is `M`/`T1` and gated on its own `D0`. **Whichever runs second re-grounds its
+coordinates in `classes.rs` before editing**, since the first will have moved
+them.
+
 # Why this is `draft`
 
 **`draft` here is a QUEUED marker, not an unframed one.** The frame is
