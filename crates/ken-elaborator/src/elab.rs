@@ -341,6 +341,15 @@ struct ElabCtx<'e> {
     /// standard-operator occurrence reached with this unset is REFUSED naming
     /// the role rather than silently left under-applied.
     standard_operators: Option<&'e HashMap<StandardOperatorRole, GlobalId>>,
+    /// The sink `§6.2` instance search appends its provenance to.
+    ///
+    /// **Carried beside `class_env`, not inside it.** The registry itself is
+    /// borrowed SHARED here -- expression elaboration must not be typed as
+    /// able to mutate it, because `§6.2` search is a lookup against a registry
+    /// fixed before any body elaborates. The one thing resolution writes is
+    /// this append-only log, so it travels as its own `&mut` and the registry
+    /// stays immutable.
+    provenance: Option<&'e mut Vec<crate::classes::InstanceResolution>>,
     /// Fully applied dictionaries introduced by a declaration's `where`
     /// clause.  They are elaborator-local terms, never synthetic globals.
     local_dicts: HashMap<String, (Term, Term, usize)>,
@@ -435,6 +444,7 @@ impl<'e> ElabCtx<'e> {
             obl_counter: 0,
             class_env: None,
             standard_operators: None,
+            provenance: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
             active_index_refinements: Vec::new(),
@@ -500,12 +510,20 @@ impl<'e> ElabCtx<'e> {
     /// up missing on a path nobody enumerated. Taking both makes every call
     /// site a compile error until it supplies both -- the audit is bounded by
     /// the compiler, not by a grep.
+    /// **All three together, on purpose.** Taking them in one call makes
+    /// every call site a compile error until it supplies all of them, so the
+    /// audit is bounded by the compiler rather than by a grep. The provenance
+    /// sink belongs in the bundle for the same reason the other two do:
+    /// completion needs the identity to recognise an occurrence, the registry
+    /// to resolve its dictionary, and the sink to record what it resolved.
     fn with_classes(
         mut self,
         class_env: &'e ClassEnv,
+        provenance: &'e mut Vec<crate::classes::InstanceResolution>,
         standard_operators: &'e HashMap<StandardOperatorRole, GlobalId>,
     ) -> Self {
         self.class_env = Some(class_env);
+        self.provenance = Some(provenance);
         self.standard_operators = Some(standard_operators);
         self
     }
@@ -9707,11 +9725,136 @@ fn resolve_instance_dictionary(
         provenance,
         ctx,
         class_name,
-        requested,
+        &rtype_head_name(requested),
+        Some(requested),
         span,
         owner_label,
         true,
     )
+}
+
+/// Resolve a dictionary when the caller holds the carrier's IDENTITY and no
+/// surface type -- the expression side of the seam.
+///
+/// **It finds the registry key without ever inverting `globals`.** The
+/// registry is keyed on a surface type name and `globals` maps name -> id,
+/// which nothing makes injective; running it backwards would pick among
+/// candidates, and a wrong pick keying a registry entry is not provably a
+/// miss. So this scans the registered names FORWARD -- `globals.get(name)`,
+/// the same direction `elab_type` itself uses -- and asks which resolve to the
+/// identity in hand. No injectivity is assumed anywhere.
+///
+/// Three outcomes, all decided:
+///
+/// ```text
+/// zero matches   NoInstance, fail closed, semantics unchanged
+/// one match      that is the key; delegate with no surface pattern
+/// two matches    REFUSE -- the name-keyed registry cannot express which
+///                instance was meant, and iteration order must not decide it
+/// ```
+#[allow(clippy::too_many_arguments)]
+fn resolve_instance_dictionary_by_head_id(
+    env: &mut GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    ctx: &Context,
+    class_name: &str,
+    head_id: GlobalId,
+    span: &Span,
+    owner_label: &str,
+) -> Result<(Term, Term), ElabError> {
+    let mut hit: Option<&str> = None;
+    for (registered_class, registered_head) in class_env.instances.keys() {
+        if registered_class != class_name {
+            continue;
+        }
+        if globals.get(registered_head).copied() != Some(head_id) {
+            continue;
+        }
+        if let Some(earlier) = hit.replace(registered_head.as_str()) {
+            let mut spellings = [earlier.to_string(), registered_head.clone()];
+            spellings.sort();
+            let [first, second] = spellings;
+            return Err(ElabError::InstanceHeadSpellingsShareAnIdentity {
+                class: class_name.to_string(),
+                spellings: (first, second),
+                span: span.clone(),
+            });
+        }
+    }
+    let Some(head_name) = hit.map(str::to_owned) else {
+        return Err(ElabError::NoInstance {
+            class: class_name.to_string(),
+            // No registered spelling resolves to this identity, so there is no
+            // name to report. The identity is what the occurrence knows.
+            ty: format!("{head_id:?}"),
+            span: span.clone(),
+        });
+    };
+
+    // STEP 2 -- the class must be CARRIER-PARAMETERISED, or there is nothing
+    // in its type to confirm the scan against and step 3 would be vacuous.
+    if !class_env
+        .class(class_name)
+        .map(|view| view.projection.head_param.is_some())
+        .unwrap_or(false)
+    {
+        return Err(ElabError::NoInstance {
+            class: class_name.to_string(),
+            ty: head_name,
+            span: span.clone(),
+        });
+    }
+
+    let resolved = resolve_instance_dictionary_inner(
+        env,
+        globals,
+        num_values,
+        numeric_env,
+        class_env,
+        provenance,
+        ctx,
+        class_name,
+        &head_name,
+        None,
+        span,
+        owner_label,
+        true,
+    )?;
+
+    // STEP 3 -- CONFIRM IN CORE, which is what demotes the name from a
+    // decision to a hint (Architect, amending their own ruling in
+    // `evt_zfwss6hz79ct`).
+    //
+    // The scan asks which registered spelling resolves to this identity TODAY.
+    // `globals` is a flat mutable name table holding at most one id per name,
+    // so a spelling that meant one type at registration can mean another now:
+    // two names to one id is an ambiguity the two-match arm above detects, but
+    // two ids to one NAME is a substitution it cannot see, because the map has
+    // already forgotten the other. That direction would hand one carrier's
+    // dictionary to a different carrier, silently.
+    //
+    // The kernel-inferred type of the candidate is `ClassType <carrier-core>`,
+    // and the carrier is there in CORE with no name anywhere. One comparison
+    // on a term that already exists closes the direction the scan cannot see.
+    let confirmed = match &resolved.1 {
+        Term::App(_, carrier) => match carrier.as_ref() {
+            Term::Const { id, .. } | Term::IndFormer { id, .. } => *id == head_id,
+            _ => false,
+        },
+        _ => false,
+    };
+    if !confirmed {
+        return Err(ElabError::InstanceCarrierIdentityMismatch {
+            class: class_name.to_string(),
+            spelling: head_name,
+            span: span.clone(),
+        });
+    }
+    Ok(resolved)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -9724,12 +9867,23 @@ fn resolve_instance_dictionary_inner(
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
-    requested: &RType,
+    // `head_name` is the registry KEY, supplied rather than derived: the
+    // registry is keyed on a surface type NAME (`classes.rs:202`) and an
+    // expression site does not hold one -- it holds the carrier's identity.
+    //
+    // `requested` is the surface carrier, when the caller has one. **`None`
+    // records a fact about the WORLD, not a wiring gap.** One caller holds
+    // surface syntax and one does not; that difference is real, and the
+    // refusal it forces below IS the V1 boundary. Contrast an `Option` that
+    // records that we might have forgotten to wire something, which should be
+    // made unrepresentable rather than detected.
+    head_name: &str,
+    requested: Option<&RType>,
     span: &Span,
     owner_label: &str,
     enforce_direct_use: bool,
 ) -> Result<(Term, Term), ElabError> {
-    let head_name = rtype_head_name(requested);
+    let head_name = head_name.to_string();
     let info = class_env
         .instances
         .get(&(class_name.to_string(), head_name.clone()))
@@ -9766,11 +9920,24 @@ fn resolve_instance_dictionary_inner(
     let type_args = if info.head_param_count == 0 {
         Vec::new()
     } else if let Some(pattern) = &info.head_type {
+        // A PARAMETERISED CARRIER NEEDS THE SURFACE PATTERN, and an
+        // identity-keyed caller has none. Refusing is the V1 boundary rather
+        // than a stopgap: widening it means matching instance heads against
+        // CORE terms, which is the identity-keyed-registry closure and a
+        // different node. If you are about to write a core-side
+        // `match_instance_head`, you have crossed into it.
+        let Some(requested) = requested else {
+            return Err(ElabError::NoInstance {
+                class: class_name.to_string(),
+                ty: head_name.clone(),
+                span: span.clone(),
+            });
+        };
         let mut matched = vec![None; info.head_param_count];
         if !match_instance_head(pattern, requested, info.head_param_count, &mut matched) {
             return Err(ElabError::NoInstance {
                 class: class_name.to_string(),
-                ty: rtype_head_name(requested),
+                ty: head_name.clone(),
                 span: span.clone(),
             });
         }
@@ -9779,13 +9946,13 @@ fn resolve_instance_dictionary_inner(
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| ElabError::NoInstance {
                 class: class_name.to_string(),
-                ty: rtype_head_name(requested),
+                ty: head_name.clone(),
                 span: span.clone(),
             })?
     } else {
         return Err(ElabError::NoInstance {
             class: class_name.to_string(),
-            ty: rtype_head_name(requested),
+            ty: head_name.clone(),
             span: span.clone(),
         });
     };
@@ -9815,7 +9982,8 @@ fn resolve_instance_dictionary_inner(
             provenance,
             ctx,
             &constraint.class_name,
-            &required_head,
+            &rtype_head_name(&required_head),
+            Some(&required_head),
             span,
             owner_label,
             false,
@@ -10601,15 +10769,95 @@ fn elab_standard_operator(
         // exactly such a fallback. The sound subset above ships; this one
         // fails closed and names why.
         StandardOperatorRole::Leq | StandardOperatorRole::Geq => {
-            Err(ElabError::Internal(format!(
-                "standard operator '{}' at {}-{} needs an `Ord` dictionary, and \
-                 dictionary resolution is not reachable from an expression site \
-                 yet: `resolve_instance_dictionary` requires `&mut ClassEnv` and \
-                 `ElabCtx` holds `Option<&ClassEnv>`",
-                role.glyph(),
-                span.start,
-                span.end
-            )))
+            // `§6.9`'s ORDER, exactly: infer the operand carrier, resolve the
+            // dictionary by the ordinary `§6.2` search, then check the
+            // saturated application.
+            let (lhs_core, lhs_ty) = infer(cx, lhs)?;
+            let carrier = whnf(cx.env, &cx.ctx, &lhs_ty);
+
+            // THE CARRIER'S HEAD IDENTITY. A carrier that is not a type
+            // constant has no registry key and no instance; refusing here is
+            // `§6.9`'s "carrier un-inferable" step failing at the occurrence.
+            let head_id = match &carrier {
+                Term::Const { id, .. } => *id,
+                Term::IndFormer { id, .. } => *id,
+                _ => {
+                    return Err(ElabError::NoInstance {
+                        class: "Ord".to_string(),
+                        ty: format!("{carrier:?}"),
+                        span: span.clone(),
+                    })
+                }
+            };
+
+            // The right operand is CHECKED at the carrier, which is what makes
+            // `x ≤ y` reject a mismatched pair at the occurrence rather than
+            // inside the binding.
+            let rhs_core = check(cx, rhs, &carrier, span)?;
+
+            let (dictionary, _) = {
+                // Destructured so the resolver's `&mut` arguments are disjoint
+                // FIELD borrows of `cx` rather than several borrows of `cx`
+                // itself.
+                let ElabCtx {
+                    env,
+                    globals,
+                    num_values,
+                    numeric_env,
+                    ctx,
+                    class_env,
+                    provenance,
+                    owner_label,
+                    ..
+                } = &mut *cx;
+                let class_env = class_env.ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "standard operator '{}' at {}-{} reached completion with \
+                         no class registry; `with_classes` was not applied on \
+                         this path",
+                        role.glyph(),
+                        span.start,
+                        span.end
+                    ))
+                })?;
+                let provenance = provenance.as_deref_mut().ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "standard operator '{}' at {}-{} reached completion with \
+                         no provenance sink; `with_classes` takes the registry \
+                         and the sink together so this cannot happen singly",
+                        role.glyph(),
+                        span.start,
+                        span.end
+                    ))
+                })?;
+                resolve_instance_dictionary_by_head_id(
+                    env,
+                    globals,
+                    num_values,
+                    numeric_env,
+                    class_env,
+                    provenance,
+                    ctx,
+                    "Ord",
+                    head_id,
+                    span,
+                    owner_label,
+                )?
+            };
+
+            // THE SATURATED APPLICATION, in source operand order for BOTH
+            // roles. `≥` does NOT reverse here: `ord_geq_at a d x y = d.leq y x`
+            // reverses inside the binding, on values call-by-value has already
+            // evaluated left to right. Reversing at the call site too would
+            // double-reverse, and AC-4's control is exactly that mutation.
+            let applied = Term::app(
+                Term::app(
+                    Term::app(Term::app(Term::const_(op, vec![]), carrier), dictionary),
+                    lhs_core,
+                ),
+                rhs_core,
+            );
+            Ok((applied, Term::indformer(cx.numeric_env.bool_id, vec![])))
         }
         // `≠` is authored rather than re-exported (D2), so the home does not
         // publish it and `certify_roles` never admits it -- this node is not
@@ -11234,6 +11482,7 @@ fn declaration_param_context(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
 ) -> Result<Context, ElabError> {
@@ -11243,7 +11492,7 @@ fn declaration_param_context(
     // the class env for the same reason they do: the name-to-index lookup
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-        .with_classes(class_env, standard_operators);
+        .with_classes(class_env, provenance, standard_operators);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
         let domain_core = elab_type(&mut cx, domain)?;
@@ -11340,7 +11589,7 @@ fn elaborate_associated_rdecl(
             // name-to-index lookup has no field list and a well-formed binding
             // is refused by a sort pre-check.
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(&*class_env, standard_operators);
+                .with_classes(&*class_env, provenance, standard_operators);
             let ty = elab_type(&mut cx, ty)?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
@@ -11349,8 +11598,16 @@ fn elaborate_associated_rdecl(
     match &rdecl.kind {
         RDeclKind::View { constraints, .. } => {
             let effect_row_type = check_view_visits_row(rdecl)?;
-            let dictionary_ctx =
-                declaration_param_context(env, globals, num_values, numeric_env, class_env, standard_operators, rdecl)?;
+            let dictionary_ctx = declaration_param_context(
+                env,
+                globals,
+                num_values,
+                numeric_env,
+                class_env,
+                provenance,
+                standard_operators,
+                rdecl,
+            )?;
             // Resolve each constraint into its fully applied dictionary term.
             // A generic instance is not a bare global: its type arguments and
             // recursively-required dictionaries must be applied at this use
@@ -11389,6 +11646,7 @@ fn elaborate_associated_rdecl(
                 num_values,
                 numeric_env,
                 class_env,
+                provenance,
                 standard_operators,
                 rdecl,
                 &local_dicts,
@@ -11407,6 +11665,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             rdecl,
             &HashMap::new(),
@@ -11415,15 +11674,24 @@ fn elaborate_associated_rdecl(
             declared_fixity.clone(),
         ),
         RDeclKind::Prove => elaborate_prove(env, globals, num_values, numeric_env, rdecl),
-        RDeclKind::Prop { intros } => {
-            elaborate_prop_decl(env, globals, num_values, numeric_env, class_env, standard_operators, rdecl, intros)
-        }
+        RDeclKind::Prop { intros } => elaborate_prop_decl(
+            env,
+            globals,
+            num_values,
+            numeric_env,
+            class_env,
+            provenance,
+            standard_operators,
+            rdecl,
+            intros,
+        ),
         RDeclKind::Theorem => elaborate_checked_theorem(
             env,
             globals,
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             rdecl,
             None,
@@ -11434,6 +11702,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             rdecl,
             Some(subject),
@@ -11574,6 +11843,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             rdecl,
             effect_rows,
@@ -12008,6 +12278,7 @@ fn elab_instance_decl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
@@ -12172,7 +12443,7 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env, standard_operators);
+            .with_classes(&*class_env, provenance, standard_operators);
             push_type0_params(&mut cx, head_params.len());
             for (index, constraint_ty) in constraint_core_types.iter().enumerate() {
                 cx.ctx.push(weaken(constraint_ty, index as i64));
@@ -12212,7 +12483,7 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env, standard_operators);
+            .with_classes(&*class_env, provenance, standard_operators);
             push_type0_params(&mut cx, head_params.len());
             compute_ordered_field_values(
                 &mut cx,
@@ -12457,6 +12728,7 @@ fn elaborate_view_or_let(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
@@ -12478,6 +12750,7 @@ fn elaborate_view_or_let(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             rdecl,
             local_dicts,
@@ -12493,6 +12766,7 @@ fn elaborate_view_or_let(
         num_values,
         numeric_env,
         class_env,
+        provenance,
         standard_operators,
         rdecl,
         local_dicts,
@@ -12710,7 +12984,11 @@ pub(crate) fn elaborate_space_decl(
             &elab.numeric_env,
             qualified_name.clone(),
         )
-        .with_classes(&elab.class_env, &elab.standard_operators);
+        .with_classes(
+            &elab.class_env,
+            &mut elab.resolution_provenance,
+            &elab.standard_operators,
+        );
         let mut parameter_domains = Vec::with_capacity(operation.params.len());
         for (_, parameter_type) in &operation.params {
             let domain = elab_type(&mut cx, parameter_type)?;
@@ -12948,6 +13226,7 @@ fn elaborate_v0(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
@@ -12966,6 +13245,7 @@ fn elaborate_v0(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             fixities,
             fixity_spans,
@@ -12975,7 +13255,7 @@ fn elaborate_v0(
     }
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, standard_operators)
+            .with_classes(class_env, provenance, standard_operators)
             .with_local_dicts(local_dicts);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
@@ -13058,6 +13338,7 @@ fn elaborate_recursive_view(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
@@ -13110,7 +13391,7 @@ fn elaborate_recursive_view(
     let associated = associated.as_deref().unwrap_or(rdecl);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, standard_operators);
+            .with_classes(class_env, provenance, standard_operators);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
@@ -13189,6 +13470,7 @@ pub(crate) fn elaborate_mutual_group(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
@@ -13348,7 +13630,7 @@ pub(crate) fn elaborate_mutual_group(
     let elab_err = (|| -> Result<(), ElabError> {
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env, standard_operators)
+                .with_classes(class_env, provenance, standard_operators)
                 .with_recursive_group(&recursive_group);
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
@@ -13556,6 +13838,7 @@ fn elaborate_view_with_spec(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
@@ -13574,7 +13857,7 @@ fn elaborate_view_with_spec(
         // Recursive: elab the carrier type, pre-admit, then elab the body.
         let carrier_ty = {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env, standard_operators)
+                .with_classes(class_env, provenance, standard_operators)
                 .with_local_dicts(local_dicts);
             let ty = rdecl.ty.as_ref().ok_or_else(|| {
                 ElabError::Internal(
@@ -13594,7 +13877,7 @@ fn elaborate_view_with_spec(
         globals.insert(rdecl.name.clone(), id);
         let body = {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env, standard_operators)
+                .with_classes(class_env, provenance, standard_operators)
                 .with_local_dicts(local_dicts);
             let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
             cx.metas.zonk_term(&body_c)
@@ -13603,7 +13886,7 @@ fn elaborate_view_with_spec(
     } else {
         // Non-recursive: original one-context flow.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, standard_operators)
+            .with_classes(class_env, provenance, standard_operators)
             .with_local_dicts(local_dicts);
         if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
@@ -13632,6 +13915,7 @@ fn elaborate_view_with_spec(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             local_dicts,
             &param_ctx,
@@ -13668,6 +13952,7 @@ fn elaborate_view_with_spec(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             local_dicts,
             &ens_ctx,
@@ -13816,6 +14101,7 @@ fn elaborate_prop_decl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     intros: &[RPropIntro],
@@ -13833,7 +14119,7 @@ fn elaborate_prop_decl(
         // does: a `prop`'s telescope may be typed by a projection, and the
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, standard_operators);
+            .with_classes(class_env, provenance, standard_operators);
         let ty = elab_type(&mut cx, prop_ty)?;
         let ty = cx.metas.zonk_term(&ty);
         let body = top_body_for_prop_type(env, &ty, &rdecl.span)?;
@@ -13876,6 +14162,10 @@ fn elaborate_prop_decl(
             num_values,
             numeric_env,
             &ClassEnv::sentinel(),
+            // A local sink on a sentinel path, for the same reason as
+            // `elaborate_rdecl`'s: provenance lived in the throwaway registry
+            // here and was dropped with it.
+            &mut Vec::new(),
             // Sentinel path -- see `elaborate_rdecl_v1`'s call above.
             &HashMap::new(),
             &helper_rdecl,
@@ -13894,6 +14184,7 @@ fn elaborate_checked_theorem(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     attached_subject: Option<&str>,
@@ -13907,7 +14198,7 @@ fn elaborate_checked_theorem(
 
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, standard_operators);
+            .with_classes(class_env, provenance, standard_operators);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
         })?;
@@ -14294,6 +14585,7 @@ fn elab_in_ctx_at_omega(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     ctx: &Context,
@@ -14309,7 +14601,7 @@ fn elab_in_ctx_at_omega(
         numeric_env,
         owner_label.to_string(),
     )
-    .with_classes(class_env, standard_operators)
+    .with_classes(class_env, provenance, standard_operators)
     .with_local_dicts(local_dicts);
     // Populate cx.ctx from the snapshot
     for ty in &ctx.types {

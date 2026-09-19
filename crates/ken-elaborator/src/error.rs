@@ -357,6 +357,50 @@ pub enum ElabError {
         home: String,
         span: Span,
     },
+    /// Two registered instance-head SPELLINGS resolve to one type identity.
+    ///
+    /// **A live detector for a registry hazard, sitting in the one place that
+    /// can observe it.** `ClassEnv::instances` is keyed on a surface type
+    /// NAME, so an expression site -- which holds the carrier's identity and
+    /// no name -- finds its key by scanning for the registered name that
+    /// resolves to that identity. When two do, the name-keyed registry cannot
+    /// express which instance was meant, and picking one would resolve a
+    /// coherence question by iteration order.
+    ///
+    /// Refusing makes the registry's own ambiguity visible. The structural
+    /// closure is an identity-keyed instance registry, which reaches
+    /// coherence, the orphan check, module re-export and `derive` -- a
+    /// separate node.
+    InstanceHeadSpellingsShareAnIdentity {
+        /// The class whose instance table was scanned.
+        class: String,
+        /// The two registered spellings, sorted so the message is stable.
+        spellings: (String, String),
+        span: Span,
+    },
+    /// The instance found by an identity-keyed scan is for a DIFFERENT carrier
+    /// than the occurrence's.
+    ///
+    /// **The confirmation that demotes the registry's NAME from a decision to
+    /// a hint.** The scan finds its candidate by asking which registered
+    /// spelling resolves to the carrier's identity TODAY -- and `globals` is a
+    /// flat, mutable name table holding at most one id per name, so a spelling
+    /// that meant one type at registration can mean another now. Two names to
+    /// one id is an ambiguity a scan can detect; two ids to one name is a
+    /// SUBSTITUTION it cannot, because the map has already forgotten the
+    /// other.
+    ///
+    /// So the scan's answer is confirmed against the kernel-inferred type of
+    /// the candidate dictionary, which carries the carrier in CORE with no
+    /// name anywhere. A wrong hint then fails closed here instead of handing
+    /// one carrier's dictionary to another.
+    InstanceCarrierIdentityMismatch {
+        /// The class being resolved.
+        class: String,
+        /// The registered spelling the scan matched.
+        spelling: String,
+        span: Span,
+    },
     /// The `sct_check` on the reified dictionary group rejected the resolution
     /// chain — i.e. search would not terminate (`39 §6.4`, `17 §4.2`).
     /// Detected at admission time; never a search-time hang.
@@ -788,6 +832,29 @@ impl fmt::Display for ElabError {
                  role (`33 §6.1`), because completion is keyed on the defining \
                  identity and cannot tell two roles apart when they share one",
                 roles.0, roles.1, binding, span.start, span.end, home,
+            ),
+            ElabError::InstanceHeadSpellingsShareAnIdentity {
+                class,
+                spellings,
+                span,
+            } => write!(
+                f,
+                "instance heads '{}' and '{}' name one type at {}-{}, so the \
+                 '{}' instance to use here cannot be determined: the instance \
+                 registry is keyed on the spelling, and this occurrence knows \
+                 only the type's identity",
+                spellings.0, spellings.1, span.start, span.end, class,
+            ),
+            ElabError::InstanceCarrierIdentityMismatch {
+                class,
+                spelling,
+                span,
+            } => write!(
+                f,
+                "the '{}' instance registered for '{}' is for a different type \
+                 than the one at {}-{}: the registry is keyed on the spelling \
+                 and that spelling no longer names this occurrence's type",
+                class, spelling, span.start, span.end,
             ),
             ElabError::NonTerminatingInstances { span } => write!(
                 f,
