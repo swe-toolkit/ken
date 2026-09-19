@@ -201,6 +201,18 @@ a definition:**
 > **The label edit lands in its OWN candidate, carrying no other AC's
 > deliverable. Every candidate before it is an investigation candidate.**
 
+**SCOPE — THIS RULE GOVERNS THIS NODE'S OWN CANDIDATES AND NOTHING ELSE.** It
+exists because `AC-7` and `AC-11` mandate opposite rosters and a reviewer must
+tell which of *those two* governs. A candidate belonging to a **different node**
+is not classified by it, whatever its roster contains:
+`RT-PX7F-LINKED-PUBLIC-ROWS`' closing candidate changes an `#[ignore]` attribute
+and is governed by its own `AC-2`, inheriting nothing from `AC-11` or `AC-12`.
+**A filter keyed on a roster SHAPE cannot see which NODE the roster belongs
+to** — the same axis as a filter keyed on a name being blind to the case that
+omits the name. (Steward ruling `evt_5892bm283mec2`, Architect concurring; the
+runtime-implementer produced the collision reading rather than a worry, for the
+second time on this rule.)
+
 A reviewer classifies from the roster and nothing else: a roster containing an
 `#[ignore]` attribute change is the closeout candidate and AC-11 governs it;
 any other roster is an investigation candidate and AC-7 governs it. **It also
@@ -356,12 +368,28 @@ instruction someone has to remember.
   its own `#[ignore]` string.** The successor is whatever this census's own
   measurement determined; if the answer is that no live node owns the row, the
   attribute says that in those words, naming this census as the node that
-  established it. *(Control: the closeout candidate's file roster **contains**
-  changes to `crates/ken-cli/tests/px7f_resource_native.rs` and
-  `crates/ken-cli/tests/rt_escape_second_resource_native.rs`. This is the exact
-  edit AC-7 bars on the investigation candidates and requires here — check the
-  roster, not the prose. Because it touches `crates/`, this candidate is
-  **`full` CI, never doc-only**.)*
+  established it. *(Control, keyed on the PROPERTY, not on a file list: **at the
+  candidate's base, every one of this node's three rows carries a compliant
+  label** — successor at the START, or the no-live-owner words. The file roster
+  is the MECHANISM for the rows this candidate must still fix, never the
+  criterion. A row already discharged by another node needs no edit here and its
+  file need not appear. Whatever rows this candidate does fix are `#[ignore]`
+  attribute changes under `crates/`, so it is **`full` CI, never doc-only**;
+  if every row was discharged elsewhere there is no closeout candidate to write
+  and the obligation is satisfied outright. This is the exact edit AC-7 bars on
+  the investigation candidates and requires here.)*
+
+  > **Amended 2026-09-19, because `RT-PX7F-LINKED-PUBLIC-ROWS` goes first.** The
+  > control previously demanded the roster contain changes to **both**
+  > `px7f_resource_native.rs` **and** `rt_escape_second_resource_native.rs`.
+  > `RT-PX7F` owns rows 1 and 2, both in `px7f`, so once it lands this
+  > candidate has nothing left to edit there: its roster is `rt_escape` only and
+  > a control demanding both files **fails on a node that did everything right**.
+  > The trap is the obvious escape — **a no-op edit to `px7f` manufactured to
+  > satisfy a roster**, leaving a spurious diff every later reader must have
+  > explained to them. **A control keyed on a file roster cannot see that a row
+  > was already fixed by someone else** (Architect `evt_31t76qzfdyjwg`); keying
+  > on the property makes the other node's work count, which is what it is.
 
   > **Added by Steward amendment 2026-09-19. This AC exists because the
   > federation's guard against exactly this failure returns ZERO here, and the
