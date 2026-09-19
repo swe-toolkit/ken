@@ -869,6 +869,39 @@ row whose label names a `merged` node is unroutable: it looks owned to every
 census, and nothing will ever correct it, because the only thing that would
 have is the node that just closed.
 
+#### THE THIRD DISPOSITION — a row can be genuinely terminal
+
+**CLEAR IT and NAME A SUCCESSOR are the two dispositions this step offers, and a
+seat holding a genuinely terminal row has neither.** No live node owns the next
+step, and there is no successor to name because there is no successor. What the
+step's silence buys is a seat that either waives it or **invents** an owner — a
+node id corresponding to no work, which is the unroutable row again with better
+paperwork.
+
+**NO LIVE OWNER** — the reason string states **in words** that no live node owns
+the next step, and names this node as having established that. It leaves a
+reader a record to go to instead of a dead end. The reviewer's check is that
+NAME A SUCCESSOR was **unavailable**, not a token resolution.
+
+**The three dispositions are NAMED, not numbered, and that is load-bearing**
+(Architect): a named disposition survives the insertion of a fourth, where a
+numbered one renumbers and silently falsifies every frame that cited the old
+number. Names also travel into a label's own prose, which is where these get
+used. Add a fourth by naming it; do not convert these to a list.
+
+**What a terminal row may NOT do is open with the merging node's ID and stop
+there.** At the flip that node is `merged`, so such a string mints precisely the
+row arm 1 is keyed on — **the defect this step exists to prevent, reached by
+following the step.** Measured 2026-09-19: that clause was written into three
+separate frames, each time to work around this gap, before anyone read it as a
+gap in the step rather than a phrasing to repeat.
+
+> **The detector, worth more than the instance** (Architect): *the second time
+> you write the same clause into a different frame, go read the procedure that
+> should have made it unnecessary.* Second, not Nth — by the third the clause
+> reads as house style rather than as a workaround, and a workaround that looks
+> like house style is not repaired by anyone.
+
 #### ARM 2 — A ZERO FROM THE GREP ABOVE IS NOT A PASS FOR AN ADOPTION NODE
 
 **The grep asks whether rows name the node that is MERGING. For a node created

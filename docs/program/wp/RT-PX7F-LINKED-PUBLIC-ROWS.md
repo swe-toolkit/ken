@@ -53,7 +53,12 @@ SHA and re-derive by symbol, not by line.
   instrument that cannot report the negative cannot report an answer.)*
 - **`AC-2` — THE ROWS MOVED.** Each row is either un-ignored and green in CI, or
   still `#[ignore]`d with a reason string that **opens with this node's ID**,
-  states which check fires, and says why it is terminal.
+  **states which check fires and why it is terminal**, and then **either names
+  the live successor that owns the next step, or states in those words that no
+  live node owns it and that this node established that**. A string that opens
+  with this node's ID and says only which check fires and why it is terminal
+  **does not satisfy this AC**: at the flip this node is `merged`, and `M7a` is
+  keyed on exactly that.
   *(Control: the candidate's roster **contains** a change to
   `crates/ken-cli/tests/px7f_resource_native.rs`. Because it touches `crates/`
   this is **`full` CI, never doc-only**.)*
