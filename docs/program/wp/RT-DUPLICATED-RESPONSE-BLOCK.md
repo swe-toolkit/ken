@@ -809,6 +809,10 @@ Three clauses replace two:
        same key the producer inserted under, and a Vis site whose copy is
        absent REFUSES rather than falling back to another copy.
 
+**CLAUSE 3 IS STRUCK (Architect, `evt_7sj5xmgcxwk5f`; see 8.11e).** Both its
+forms are non-actionable on the censused population. The bar for this node is
+clauses 1 and 2. Do not read clause 3 above as live.
+
 Clause 3's control is **not a green test**: revert clause 3 alone, keep 1 and
 2, and exhibit a Vis site routing to the other copy's `producer_call_origin`.
 If that control cannot be built, that is itself a finding about whether the
@@ -1068,16 +1072,31 @@ whole censused population:
 `AC-11`, which is clause 3's acceptance criterion in this frame, is
 **discharged by the strike** rather than by an exhibit.
 
-**AN OBLIGATION THIS CANDIDATE DOES NOT DISCHARGE, NAMED WITH ITS OWNER.** The
-**three**-clause bar is published on `main` right now in
-`[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` at `:196-215`, under *"THE ACCEPTANCE
-BAR, SET BY THE ARCHITECT"*, and clause 3 is now struck. **Anyone reading that
-node today sees a bar with a clause that no longer stands** — which is the
-exact shape 8.9a recorded when it replaced the two-clause bar, one turn
-earlier, in the same file. This candidate does not edit that node: it is
-outside §6's path list, the bar is the Architect's and the node is the
-Steward's. **Recorded here so the correction is in the tree rather than only
-in a thread, and flagged in the handback.**
+**AN OBLIGATION THIS CANDIDATE DOES NOT DISCHARGE, NAMED WITH ITS OWNER. THERE
+ARE TWO COPIES AND THE SECOND IS THE DANGEROUS ONE.**
+
+    issues/RT-HOST-RESPONSE-OCCURRENCE-KEY.md:196-215
+        THREE clauses, "THE ACCEPTANCE BAR, SET BY THE ARCHITECT".
+        Now carries a struck clause. Reads as WRONG, so it will get fixed.
+
+    wp/RT-HOST-RESPONSE-OCCURRENCE-KEY.md:130
+        section 3b, "THE ACCEPTANCE BAR (Architect, 2026-09-18)".
+        TWO clauses, no marker. After the strike it is content-correct BY
+        COINCIDENCE. Reads as RIGHT, so it will NOT get fixed.
+
+**The second copy is the one that loses the record.** Anyone later reconciling
+the two finds them agreeing at two clauses and concludes the bar was always two
+— which erases that clause 3 was set, tested against a four-row census, and
+struck on evidence. **A copy that is accidentally correct needs the marker more
+than the copy that is visibly wrong**, because nothing will ever send a reader
+back to it. Second copy identified by the Architect, `evt_76jqgvmhdtnpq`.
+
+**Anyone reading the three-clause copy today sees a clause that no longer
+stands** — the exact shape 8.9a recorded when it replaced the two-clause bar,
+one turn earlier, in that same file. This candidate does not edit either: both
+are outside §6's path list, the bar is the Architect's and the nodes are the
+Steward's. **Recorded here so the correction is in the tree rather than only in
+a thread, and flagged in the handback.**
 
 #### 8.11f The symmetric point, and what it does to both repairs
 
@@ -1148,6 +1167,25 @@ of its 13 sites is a declaration, an accessor, a field propagation, or
 test-support. Its only reader outside `responses.rs` is
 `static_transition.rs:1106`, inside a `px8-ds-test-support` observation struct.
 **No production code branches, keys, groups or compares on it.**
+
+**AND IT IS WRITTEN WHERE IT IS NOT READ -- BUT NOT BY THE MECHANISM THE
+REVIEW NAMED.** Handed over non-blocking by the Architect
+(`evt_76jqgvmhdtnpq`) as *"written at `:2389`, `:2400-2401`, `:2413` by a
+normalization pass"*. **Checked at the coordinates rather than carried: all
+three sites are `StaticResponseContextDemandMutation::Substitute*` arms inside
+the `#[cfg(feature = "px8-ds-test-support")]` block opened at `:2299`.** There
+is no normalization pass. The corrected shape is sharper:
+
+    SET      once, in host_response_routes' HostResponseRoute (:1276 region)
+    CARRIED  into the demand (:2263) and the continuation (:2689)
+    WRITTEN  only by three test-support mutation arms, which exist precisely
+             to perturb it
+    READ     only by static_transition.rs:1106, itself test-support
+
+⇒ **The field's whole lifecycle outside propagation is test-support on both
+ends.** Its correctness is exercised by no production behaviour, so a mutation
+of it is observable only in the observation struct. Recorded beside the
+positional-id residual as the review asked, with the mechanism corrected.
 
 ⇒ **This narrows 8.9a.** That section reads *"the copies differ on all three
 origins, which are exactly the fields naming WHICH producer and WHICH
