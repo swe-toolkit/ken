@@ -1,7 +1,7 @@
 ---
 id: RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS
 title: "Three ignored rows name RT-SITEOP-CARRIED-WITNESS, which is merged, so no live node owns their next repair. Their annotations are the only account of what they do, and the annotations DISAGREE WITH EACH OTHER AND WITH THE LEDGER: each row carries a comment block naming RT-CARRIER-BYTESPAN-OBSERVE (also merged) with a BytesPointerLength/CarriedWord signature and the claim that the program never executes, a second comment naming RT-SITEOP-CARRIED-WITNESS D1a/D2, and an #[ignore] attribute predicting the BoundaryCarrier arity refusal -- while the ledger MEASURED all three as `label agrees? NO` with two different signatures again (rows 1 and 2 UnclassifiedRuntimeTrap terminal_value -1, row 10 the typed-consumer-projection planner refusal). FOUR ACCOUNTS, THREE OF THEM ANNOTATION, NONE MEASURED AT CURRENT MAIN. D0 measures the rows and censuses their annotations; it does not adjudicate between labels. THE NODE MAY DELIVER ZERO DECREMENTS: if the ledger's verdict still holds at current main the labels are simply stale and the first deliverable is a LABEL CORRECTION, which is re-labelling and not clearing."
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,6 +11,23 @@ blocks: []
 github: null
 origin: "Steward, 2026-09-18, authored at origin/main c2b4854cb -- WHICH WAS ALREADY SIX LANDINGS STALE WHEN QUOTED AS CURRENT. Rows and labels RE-MEASURED unchanged at origin/main 2dcc67b08944059b411858692618f86bee3de52b, and the three status claims re-verified there; see 'The three rows'. Both bases are recorded and neither is live -- re-derive before acting. SUPERSEDES the WITHDRAWN RT-SITEOP-RESIDUAL-ARITY-SECOND-STOP (candidate 023fc5e01cd3a04a8c0a491de60138f976148f52, never landed, withdrawn at evt_75tner07q0qxt). That node asserted all three rows stop next at the carried-residual arity refusal, sourced from three byte-identical #[ignore] labels. The ledger had measured all three and recorded `label agrees? NO` on each, and said so in prose naming these exact rows: 'what they now do is unrelated to what the label predicts. Rows 1 and 2 trap at runtime; row 10 refuses on typed consumer projection.' The withdrawn node also contained a section warning that identical refusal text cannot say which site fired -- the fence was written and then crossed one level up, treating identical LABEL as identical BEHAVIOUR. Architect evt_3fpkye1tsvbc4 supplied the four D0 requirements this node is built on (partition on phase first; capture each trap's SITE because the sentinel signature carries no mechanism; scope conditional; state the zero-decrement branch in the motivation) and evt_2tkfcc2hqm2xv supplied the producer reading that relocates row 10's candidate mechanism. The scope condition resolved to ALL THREE ROWS IN: runtime-implementer evt_45beq3x7ajkq8 characterized their own fixtures, not row 10, which the Steward confirmed by reading row 10's program at this base."
 ---
+
+> ## FRAMED 2026-09-19 — `ready`, size M, tier T1
+>
+> Frame: [`wp/RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS.md`](../wp/RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS.md)
+>
+> **The frame governs; this file is the origin record and the provenance.**
+> Where the two differ, the frame is later. It carries three inputs that
+> postdate this node:
+>
+> - the `-1` provenance chain (Architect, `evt_7v4gb9y06ft6t`) — `-1` is a
+>   value the child WROTE after a clean hash-validated handshake, so the
+>   producer set is exactly `ken_nc23_entrypoint`'s return;
+> - `RT-BORROWED-INPUT-CARRIER-DURABILITY` **CLOSED REFUTED** (`4d0958988`),
+>   which **weakens but does not eliminate** the borrowed-ingress candidate for
+>   rows 1 and 2;
+> - the live crux, unanswered: rows 1 and 2 declare `proc main (_input :
+>   ProcessInput)` — **unused** — and it decides the routing either way.
 
 > # OPERATIVE (Steward, 2026-09-18)
 > #
