@@ -2782,6 +2782,25 @@ impl<'a> Lowering<'a> {
         static_origin: StaticOriginId,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let release_claim = if operation == ken_host::HostOpV1::ResourceRelease {
+            self.function_local.active_release_emission_claim.or_else(|| {
+                let mut matching = self
+                    .function_local
+                    .release_emission_claims
+                    .values()
+                    .copied()
+                    .filter(|claim| claim.effect_origin() == static_origin);
+                let first = matching.next();
+                first.filter(|_| matching.next().is_none())
+            })
+        } else {
+            None
+        };
+        if release_claim.is_some_and(|claim| claim.dispatch_claimant().is_none()) {
+            return Ok(LoweringOperand::Specialized(
+                Lowered::StaticResponseDeferred,
+            ));
+        }
         // Recut §7 total match (AC-2) over the response classify verdict. No
         // catch-all: adding a ResponseDisposition variant reddens the build here.
         use crate::cranelift_backend::planning::ResponseDisposition;
@@ -2826,6 +2845,25 @@ impl<'a> Lowering<'a> {
             // A Specialized effect inside its owner and a non-response effect
             // lower normally.
             Some(ResponseDisposition::Specialized) | None => {}
+        }
+        if operation == ken_host::HostOpV1::ResourceRelease {
+            let claim = release_claim.ok_or_else(|| {
+                unsupported(
+                    "ReleaseObligation",
+                    format!(
+                        "a ResourceRelease dispatch claim carries no obligation id (effect {static_origin:?}, response owner {:?}, emission owner {:?}, claims {:?})",
+                        self.function_local.static_response_owner,
+                        self.defining_emission_owner,
+                        self.function_local.release_emission_claims,
+                    ),
+                )
+            })?;
+            if claim.effect_origin() != static_origin {
+                return Err(unsupported(
+                    "ReleaseObligation",
+                    "a ResourceRelease dispatch claim names a different effect origin",
+                ));
+            }
         }
         if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation) {
             // `RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the SECOND refusal site, and

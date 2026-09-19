@@ -618,6 +618,8 @@ pub(in crate::cranelift_backend) struct ResolvedUnitTarget {
 #[derive(Clone)]
 pub(in crate::cranelift_backend) struct DeclaredUnitCall {
     pub(in crate::cranelift_backend) function: FuncRef,
+    /// Present only when this target is a planner-issued generated context.
+    pub(in crate::cranelift_backend) context: Option<ContinuationContextId>,
     /// The callee's scheduling entry -- `RT-CONTSPEC-ACTIVATE` `D1b` keeps
     /// this as the target origin.
     pub(in crate::cranelift_backend) origin: StaticOriginId,
@@ -649,6 +651,7 @@ impl CallEdgeTargets {
         for target in self.targets_in(caller) {
             let call = DeclaredUnitCall {
                 function: module.declare_func_in_func(target.function, func),
+                context: None,
                 origin: target.origin,
                 call_site_origin: target.call_site_origin,
                 header: target.header,
@@ -851,6 +854,7 @@ impl CallEdgeTargets {
                 body,
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target.function, func),
+                    context: None,
                     origin: target.origin,
                     call_site_origin: target.call_site_origin,
                     header: target.header,
@@ -972,6 +976,7 @@ impl WorkerTargets {
                     *origin,
                     DeclaredUnitCall {
                         function: module.declare_func_in_func(target.function, func),
+                        context: None,
                         origin: target.origin,
                         call_site_origin: target.call_site_origin,
                         header: target.header,
@@ -2972,6 +2977,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     })?;
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target, &mut func),
+                    context: None,
                     origin: emission.row.k_body_origin(),
                     call_site_origin: emission.row.k_body_origin(),
                     header: emission.owner.header(),
@@ -3082,6 +3088,14 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             }
             function_local.defining_abi_operands = descriptor_inputs;
             function_local.static_response_owner = Some(emission.owner.id());
+            if let Some(claim) = compiler
+                .static_transition_plan
+                .release_emission_claim_for_static_response(emission.owner.id())?
+            {
+                function_local
+                    .release_emission_claims
+                    .insert(claim.member().vis_origin(), claim);
+            }
             compiler.function_local = function_local;
 
             let frame_operand = |binding: &StaticResponseEnvironmentBinding| {
@@ -3904,6 +3918,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
                 unit.worker_body_origin,
                 DeclaredUnitCall {
                     function: module.declare_func_in_func(target, &mut func),
+                    context: Some(context.id()),
                     // The context EXECUTES that body, so the origin it answers
                     // for is unchanged. ⛔ Read from the CONTEXT, not from the
                     // asking unit: taking it from `unit` is what made
@@ -4002,6 +4017,21 @@ pub(super) fn define_continuation_bodies<M: Module>(
                     backend_module("continuation trap slot offset exceeds range".to_string())
                 })?,
             )?;
+            for claim in compiler
+                .static_transition_plan
+                .release_emission_claims_for_continuation(unit.id)
+            {
+                if function_local
+                    .release_emission_claims
+                    .insert(claim.member().vis_origin(), claim)
+                    .is_some()
+                {
+                    return Err(backend_module(
+                        "one continuation carries two release claims for one Vis member"
+                            .to_string(),
+                    ));
+                }
+            }
             compiler.function_local = function_local;
 
             // Descriptor-only loads. Each operand is read from the slot the
@@ -4387,6 +4417,14 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             .ok_or_else(|| {
                 backend_module("generated context frame declares no trap slot".to_string())
             })?;
+        let control_offset = slots
+            .iter()
+            .zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Control)
+            .map(|(_, offset)| *offset)
+            .ok_or_else(|| {
+                backend_module("generated context frame declares no control slot".to_string())
+            })?;
 
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(3, id.as_u32()), sig);
@@ -4488,6 +4526,14 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             function_local.native_int_arena = Some(native_int_arena);
             function_local.boundary_arena = Some(boundary_arena);
             function_local.services_pointer = Some(services);
+            function_local.release_dispatch_control = Some(builder.ins().load(
+                types::I64,
+                MemFlags::trusted(),
+                frame,
+                i32::try_from(control_offset).map_err(|_| {
+                    backend_module("generated context control slot offset exceeds range".to_string())
+                })?,
+            ));
             function_local.bind_unit_trap_frame(
                 frame,
                 i32::try_from(trap_offset).map_err(|_| {
@@ -4507,6 +4553,20 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             }
             function_local.checked_ih_generated_entry_access =
                 context.checked_ih_generated_entry_access.clone();
+            for claim in compiler
+                .static_transition_plan
+                .release_emission_claims_for_context(context.id)
+            {
+                if function_local
+                    .release_emission_claims
+                    .insert(claim.member().vis_origin(), claim)
+                    .is_some()
+                {
+                    return Err(backend_module(
+                        "one context carries two release claims for one Vis member".to_string(),
+                    ));
+                }
+            }
             #[cfg(feature = "px8-ds-test-support")]
             if let Some(access) = &function_local.checked_ih_generated_entry_access {
                 record_checked_ih_generated_entry_installed(access);
@@ -5083,6 +5143,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             fusion_self_edge_identities(fusion.producer_body, fusion.consuming_call);
         let self_edge = DeclaredUnitCall {
             function: module.declare_func_in_func(id, &mut func),
+            context: None,
             origin: self_edge_body,
             call_site_origin: self_edge_call_site,
             header: fusion.header,
@@ -5568,6 +5629,7 @@ fn redirect_fused_producer_invocations<M: Module>(
     for (fusion, seat, callee_origin, target, header, slots, offsets) in redirects {
         let call = DeclaredUnitCall {
             function: module.declare_func_in_func(target, func),
+            context: None,
             origin: callee_origin,
             call_site_origin: seat,
             header,
@@ -5643,6 +5705,7 @@ pub(super) fn define_root_adapter<M: Module>(
         root_origin,
         DeclaredUnitCall {
             function: module.declare_func_in_func(root_id, &mut func),
+            context: None,
             origin: root_origin,
             // The body occurrence, NOT the scheduling entry. They coincide
             // for an ordinary root and deliberately do not when the root body
@@ -6427,6 +6490,7 @@ impl ContinuationClaimLedger {
                     identity.clone(),
                     DeclaredUnitCall {
                         function: module.declare_func_in_func(*target, func),
+                        context: None,
                         origin: unit.continuation_origin(),
                         call_site_origin: unit.continuation_origin(),
                         header: unit.header(),
@@ -7409,6 +7473,7 @@ fn declare_response_context_call_in_func<M: Module>(
     let (offsets, _frame_bytes) = context.slot_offsets()?;
     Ok(DeclaredUnitCall {
         function: module.declare_func_in_func(target, func),
+        context: Some(context.id()),
         origin: context.worker_body_origin(),
         call_site_origin: context.worker_body_origin(),
         header: context.header(),
@@ -7435,6 +7500,7 @@ pub(in crate::cranelift_backend) fn declare_context_calls_in_func<M: Module>(
             context.id(),
             DeclaredUnitCall {
                 function: module.declare_func_in_func(target, func),
+                context: Some(context.id()),
                 // The context EXECUTES this body, so the origin it answers for
                 // is unchanged and the source edge it serves is untouched.
                 origin: context.worker_body_origin(),

@@ -154,7 +154,9 @@ pub(super) use static_transition::{
     ContinuationSourceCoordinate,
     ContinuationSourceSlotAuthority,
     ContinuationSpecializationId, DeferredResponseRow, DeferredResponseSubCase,
-    ResponseDisposition, StaticResponseContinuation, StaticResponseEffectInput,
+    ReleaseDispatchClaimant, ReleaseEmissionClaim, ReleaseEmissionSite,
+    ReleaseObligationId, ReleaseObligationMember, ResponseDisposition,
+    StaticResponseContinuation, StaticResponseEffectInput,
     StaticResponseEnvironmentBinding, StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization,
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches

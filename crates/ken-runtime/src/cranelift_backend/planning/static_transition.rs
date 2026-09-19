@@ -97,7 +97,9 @@ pub(in crate::cranelift_backend) use occurrences::StaticOriginId;
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use responses::{
     CheckedIhPostCallConsumer,
-    DeferredResponseRow, DeferredResponseSubCase, ResponseDisposition, SsaInfeasible,
+    DeferredResponseRow, DeferredResponseSubCase, ReleaseDispatchClaimant,
+    ReleaseEmissionClaim, ReleaseEmissionSite, ReleaseObligationId,
+    ReleaseObligationMember, ReleaseObligationPlan, ResponseDisposition, SsaInfeasible,
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
@@ -616,6 +618,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// enclosing specialized owner; every other row falls through to ordinary
     /// lowering.
     static_response_deferred: Vec<DeferredResponseRow>,
+    /// One cross-family release-obligation table. Installed only after response
+    /// phase B fixes every row's generated-family placement.
+    release_obligations: ReleaseObligationPlan,
     /// Phase-A carry of the two-phase response context install (RECUT 2, HS5):
     /// the owner-less demand + P1 population minted at install
     /// (construction.rs:1213), consumed by

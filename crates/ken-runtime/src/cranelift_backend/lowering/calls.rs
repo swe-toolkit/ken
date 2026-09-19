@@ -1847,6 +1847,18 @@ impl<'a> Lowering<'a> {
                 target.header.frame_bytes,
                 3,
             ));
+            let release_dispatch_claim = target
+                .context
+                .map(|context| {
+                    self.static_transition_plan
+                        .release_dispatch_claim_for_context_call(
+                            context,
+                            self.function_local.static_response_owner,
+                            self.defining_emission_owner,
+                        )
+                })
+                .transpose()?
+                .flatten();
             let mut input = 0usize;
             let mut result_offset = None;
             let mut trap_offset = None;
@@ -1922,8 +1934,15 @@ impl<'a> Lowering<'a> {
                         input += 1;
                     }
                     AbiSlotKind::Control | AbiSlotKind::Store => {
-                        let zero = builder.ins().iconst(types::I64, 0);
-                        builder.ins().stack_store(zero, payload, offset);
+                        let value = if slot.kind == AbiSlotKind::Control {
+                            release_dispatch_claim
+                                .map(|claim| claim.member().claim_word())
+                                .unwrap_or(0)
+                        } else {
+                            0
+                        };
+                        let value = builder.ins().iconst(types::I64, value as i64);
+                        builder.ins().stack_store(value, payload, offset);
                     }
                     AbiSlotKind::Trap => {
                         #[cfg(any(test, feature = "px8-ds-test-support"))]

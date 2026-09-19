@@ -248,6 +248,9 @@ fn run_dynamic_constructor_dispatch_fixture(
             context_calls: BTreeMap::new(),
             static_response_owner: None,
             driven_deferred_response_effect: None,
+            release_dispatch_control: None,
+            release_emission_claims: BTreeMap::new(),
+            active_release_emission_claim: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
             constructed_context_frame: None,
@@ -1982,6 +1985,9 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             context_calls: BTreeMap::new(),
             static_response_owner: None,
             driven_deferred_response_effect: None,
+            release_dispatch_control: None,
+            release_emission_claims: BTreeMap::new(),
+            active_release_emission_claim: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
             constructed_context_frame: None,
@@ -6710,6 +6716,7 @@ fn worker_descriptor(
 fn worker_call_target(template: units::WorkerTemplate) -> units::DeclaredUnitCall {
     units::DeclaredUnitCall {
         function: cranelift_codegen::ir::FuncRef::from_u32(0),
+        context: None,
         origin: template.origin,
         call_site_origin: template.call_site_origin,
         header: template.header,

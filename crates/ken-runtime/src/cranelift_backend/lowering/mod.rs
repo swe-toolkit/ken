@@ -451,7 +451,9 @@ fn scale_b_record_unit_body(function: &Function) {
 // population is derived from it there. This is a namespace re-export so both
 // the emitter's admission check and the planner's population read the same
 // list; a local copy could disagree with it silently.
-use crate::cranelift_backend::planning::CRANELIFT_HOST_EFFECT_CONSUMERS_V1;
+use crate::cranelift_backend::planning::{
+    ReleaseEmissionClaim, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
+};
 
 
 
@@ -957,6 +959,9 @@ impl ArtifactHelpers<'_> {
             context_calls: BTreeMap::new(),
             static_response_owner: None,
             driven_deferred_response_effect: None,
+            release_dispatch_control: None,
+            release_emission_claims: BTreeMap::new(),
+            active_release_emission_claim: None,
             defining_abi_operands: Vec::new(),
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
@@ -1190,6 +1195,16 @@ struct FunctionLocalRefs {
     /// one host dispatch and restores afterwards; it never makes a sibling
     /// effect occurrence observable inside the owner.
     driven_deferred_response_effect: Option<StaticOriginId>,
+    /// Planner-selected release dispatch claim supplied by a generated
+    /// context caller. Zero means this call preserves the residual; a nonzero
+    /// word names the exact obligation member this invocation may dispatch.
+    release_dispatch_control: Option<cranelift_codegen::ir::Value>,
+    /// The logical release members whose emission sites occur in this
+    /// function, keyed by their source Vis provenance.
+    release_emission_claims: BTreeMap<StaticOriginId, ReleaseEmissionClaim>,
+    /// The exact member whose source Vis is being lowered. Scoped around that
+    /// Vis's operation and restored before any sibling descent.
+    active_release_emission_claim: Option<ReleaseEmissionClaim>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1b** -- this function's
     /// own ABI-slot operands, indexed by ABI position.
     ///

@@ -5787,6 +5787,18 @@ impl<'a> Lowering<'a> {
             .function_local
             .driven_deferred_response_effect
             .replace(effect.static_origin);
+        let claim = self
+            .function_local
+            .release_emission_claims
+            .get(&vis_origin)
+            .copied();
+        let prior_release_claim = match claim {
+            Some(claim) => self
+                .function_local
+                .active_release_emission_claim
+                .replace(claim),
+            None => self.function_local.active_release_emission_claim,
+        };
         let response = self.lower_process_host_effect(
             builder,
             family,
@@ -5797,6 +5809,7 @@ impl<'a> Lowering<'a> {
             &effect_env,
         );
         self.function_local.driven_deferred_response_effect = prior_driven_effect;
+        self.function_local.active_release_emission_claim = prior_release_claim;
         let response = response?;
         if !matches!(
             response,
@@ -15035,6 +15048,18 @@ impl<'a> Lowering<'a> {
                         )?,
                     ));
                 }
+                let release_claim = self
+                    .function_local
+                    .release_emission_claims
+                    .get(&static_origin)
+                    .copied();
+                let prior_release_claim = match release_claim {
+                    Some(claim) => self
+                        .function_local
+                        .active_release_emission_claim
+                        .replace(claim),
+                    None => self.function_local.active_release_emission_claim,
+                };
                 let lowered_args = args
                     .iter()
                     .enumerate()
@@ -15042,7 +15067,9 @@ impl<'a> Lowering<'a> {
                         let arg = self.child_occurrence(static_origin, position, arg)?;
                         self.lower_expr(builder, arg, env)
                     })
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .collect::<Result<Vec<_>, _>>();
+                self.function_local.active_release_emission_claim = prior_release_claim;
+                let lowered_args = lowered_args?;
                 if lowered_args
                     .iter()
                     .any(|arg| matches!(arg, LoweringOperand::Specialized(Lowered::RecursiveBackedge)))
@@ -15061,6 +15088,101 @@ impl<'a> Lowering<'a> {
                         if !handler_owned_deferred_response_mutation_applies(
                             HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
                         ) {
+                            if let Some(claim) = self
+                                .function_local
+                                .release_emission_claims
+                                .get(&static_origin)
+                                .copied()
+                            {
+                                if claim.member().vis_origin() != static_origin {
+                                    return Err(unsupported(
+                                        "ReleaseObligation",
+                                        "a release emission claim names a different Vis member",
+                                    ));
+                                }
+                                let control = self.function_local.release_dispatch_control.ok_or_else(|| {
+                                    unsupported(
+                                        "ReleaseObligation",
+                                        "a reconciled release context has no dispatch-claim control",
+                                    )
+                                })?;
+                                let expected = claim.member().claim_word() as i64;
+                                Self::require_one_of_i64(builder, control, &[0, expected]);
+                                let dispatches = builder.ins().icmp_imm(
+                                    cranelift_codegen::ir::condcodes::IntCC::Equal,
+                                    control,
+                                    expected,
+                                );
+                                let dispatch = builder.create_block();
+                                let preserve = builder.create_block();
+                                let merged = builder.create_block();
+                                builder.append_block_param(merged, types::I64);
+                                builder.ins().brif(dispatches, dispatch, &[], preserve, &[]);
+
+                                builder.switch_to_block(dispatch);
+                                let dispatched = self.drive_handler_owned_deferred_response(
+                                    builder,
+                                    static_origin,
+                                    &lowered_args,
+                                    &row,
+                                    None,
+                                )?;
+                                let dispatched = match dispatched {
+                                    LoweringOperand::Carried(word) => word,
+                                    LoweringOperand::Specialized(value) => self
+                                        .transfer_unit_result_into_carrier(
+                                            builder,
+                                            static_origin,
+                                            &value,
+                                        )?,
+                                };
+                                builder.ins().jump(merged, &[dispatched.word.into()]);
+
+                                builder.switch_to_block(preserve);
+                                let preserved = if lowered_args.iter().any(|argument| {
+                                    matches!(argument, LoweringOperand::Carried(_))
+                                }) {
+                                    LoweringOperand::Carried(self.transfer_constructor_operands(
+                                        builder,
+                                        static_origin,
+                                        constructor,
+                                        &lowered_args,
+                                    )?)
+                                } else {
+                                    LoweringOperand::Specialized(Lowered::Constructor {
+                                        constructor: constructor.clone(),
+                                        synthesized_identity: Some(
+                                            self.static_transition_plan
+                                                .constructor_symbol_identity(static_origin)?,
+                                        ),
+                                        occurrence: Some(
+                                            self.static_transition_plan.source_aggregate_occurrence(
+                                                static_origin,
+                                                PlannedAggregateShape::Constructor,
+                                            )?,
+                                        ),
+                                        args: specialized_constructor_fields_at(
+                                            &lowered_args,
+                                            "a constructor argument",
+                                        )?,
+                                    })
+                                };
+                                let preserved = match preserved {
+                                    LoweringOperand::Carried(word) => word,
+                                    LoweringOperand::Specialized(value) => self
+                                        .transfer_unit_result_into_carrier(
+                                            builder,
+                                            static_origin,
+                                            &value,
+                                        )?,
+                                };
+                                builder.ins().jump(merged, &[preserved.word.into()]);
+
+                                builder.switch_to_block(merged);
+                                return Ok(LoweringOperand::Carried(CarriedBoundaryWord {
+                                    word: builder.block_params(merged)[0],
+                                }));
+                            }
                             return self.drive_handler_owned_deferred_response(
                                 builder,
                                 static_origin,

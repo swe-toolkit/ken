@@ -114,6 +114,7 @@ use super::occurrences::{
 };
 use super::responses::{
     publish_checked_ih_post_call_consumers, validate_checked_ih_post_call_consumers,
+    ReleaseObligationPlan,
 };
 use super::semantic_ir::{
     build_bool_constructor_inventory, build_semantic_plane,
@@ -304,6 +305,7 @@ impl<'src> Planner<'src> {
                 static_response_plan_installed: false,
                 static_response_infeasible: None,
                 static_response_deferred: Vec::new(),
+                release_obligations: ReleaseObligationPlan::default(),
                 static_response_phase_a: None,
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
@@ -1463,6 +1465,7 @@ impl<'src> Planner<'src> {
         self.plan.immediate_bridge_realizations =
             publish_immediate_bridge_realization_plan(&self.plan)?;
         self.plan.install_static_response_context_plan_phase_b()?;
+        self.plan.release_obligations = self.plan.derive_release_obligation_plan()?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing

@@ -7244,6 +7244,11 @@ pub(super) fn validate_continuation_specialization_plan(
     }
     if plan.static_response_plan_installed {
         plan.validate_static_response_context_plan(&expected_contexts)?;
+        if plan.release_obligations != plan.derive_release_obligation_plan()? {
+            return Err(planner_error(
+                "release obligation table is not the exact closed derivation",
+            ));
+        }
     }
     Ok(())
 }

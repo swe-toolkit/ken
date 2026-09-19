@@ -120,6 +120,115 @@ pub(in crate::cranelift_backend) enum StaticResponseEffectInput {
     },
 }
 
+/// Planner-issued identity of one bracket resource's release obligation.
+///
+/// This identity is disjoint from source origins and every generated-function
+/// family. Its members retain source provenance beneath it; generated families
+/// only place claims and never become the obligation's owner.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct ReleaseObligationId(u32);
+
+impl ReleaseObligationId {
+    fn from_position(position: usize) -> Result<Self, CraneliftBackendError> {
+        Ok(Self(u32::try_from(position).map_err(|_| {
+            planner_capacity_error("release obligation identity exhausted")
+        })?))
+    }
+
+    pub(in crate::cranelift_backend) const fn ordinal(self) -> u32 {
+        self.0
+    }
+}
+
+/// One logical release demand belonging to a bracket obligation.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct ReleaseObligationMember {
+    obligation: ReleaseObligationId,
+    ordinal: u32,
+    vis_origin: StaticOriginId,
+    resource_operand_origin: StaticOriginId,
+}
+
+impl ReleaseObligationMember {
+    pub(in crate::cranelift_backend) const fn obligation(self) -> ReleaseObligationId {
+        self.obligation
+    }
+
+    pub(in crate::cranelift_backend) const fn vis_origin(self) -> StaticOriginId {
+        self.vis_origin
+    }
+
+    pub(in crate::cranelift_backend) const fn resource_operand_origin(self) -> StaticOriginId {
+        self.resource_operand_origin
+    }
+
+    pub(in crate::cranelift_backend) const fn claim_word(self) -> u64 {
+        ((self.obligation.0 as u64 + 1) << 32) | (self.ordinal as u64 + 1)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum ReleaseDispatchClaimant {
+    StaticResponse(StaticResponseOwnerId),
+    Continuation(ContinuationSpecializationId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum ReleaseEmissionSite {
+    StaticResponse(StaticResponseOwnerId),
+    ContinuationSpecialization(ContinuationSpecializationId),
+    ContinuationContext(ContinuationContextId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct ReleaseEmissionClaim {
+    member: ReleaseObligationMember,
+    effect_origin: StaticOriginId,
+    site: ReleaseEmissionSite,
+    dispatch_claimant: Option<ReleaseDispatchClaimant>,
+}
+
+impl ReleaseEmissionClaim {
+    pub(in crate::cranelift_backend) const fn member(self) -> ReleaseObligationMember {
+        self.member
+    }
+
+    pub(in crate::cranelift_backend) const fn effect_origin(self) -> StaticOriginId {
+        self.effect_origin
+    }
+
+    pub(in crate::cranelift_backend) const fn site(self) -> ReleaseEmissionSite {
+        self.site
+    }
+
+    pub(in crate::cranelift_backend) const fn dispatch_claimant(
+        self,
+    ) -> Option<ReleaseDispatchClaimant> {
+        self.dispatch_claimant
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ReleaseObligationMemberRecord {
+    member: ReleaseObligationMember,
+    effect_origin: StaticOriginId,
+    claims: Vec<ReleaseEmissionClaim>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ReleaseObligationRecord {
+    id: ReleaseObligationId,
+    producer_call_origin: StaticOriginId,
+    effect_origin: StaticOriginId,
+    resource_operand_origin: StaticOriginId,
+    members: Vec<ReleaseObligationMemberRecord>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct ReleaseObligationPlan {
+    obligations: Vec<ReleaseObligationRecord>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct StaticResponseContextDemand {
     id: StaticResponseContinuationId,
@@ -133,6 +242,7 @@ pub(in crate::cranelift_backend) struct StaticResponseContextDemand {
     effect_environment: Vec<StaticResponseEffectInput>,
     vis_origin: StaticOriginId,
     operation: HostOpV1,
+    release_member: Option<ReleaseObligationMember>,
     k_identity: ContinuationCallIdentity,
     k_specialization: ContinuationSpecializationId,
     k_closure_origin: StaticOriginId,
@@ -164,6 +274,12 @@ impl StaticResponseContextDemand {
 
     pub(in crate::cranelift_backend) fn effect_origin(&self) -> StaticOriginId {
         self.effect_origin
+    }
+
+    pub(in crate::cranelift_backend) fn release_member(
+        &self,
+    ) -> Option<ReleaseObligationMember> {
+        self.release_member
     }
 
     pub(in crate::cranelift_backend) fn effect_source_owner(
@@ -621,6 +737,7 @@ pub(in crate::cranelift_backend) struct StaticResponseContinuation {
     effect_environment: Vec<StaticResponseEffectInput>,
     vis_origin: StaticOriginId,
     operation: HostOpV1,
+    release_member: Option<ReleaseObligationMember>,
     k_identity: ContinuationCallIdentity,
     k_specialization: ContinuationSpecializationId,
     k_closure_origin: StaticOriginId,
@@ -651,6 +768,12 @@ impl StaticResponseContinuation {
 
     pub(in crate::cranelift_backend) fn effect_origin(&self) -> StaticOriginId {
         self.effect_origin
+    }
+
+    pub(in crate::cranelift_backend) fn release_member(
+        &self,
+    ) -> Option<ReleaseObligationMember> {
+        self.release_member
     }
 
     pub(in crate::cranelift_backend) fn effect_source_owner(
@@ -784,6 +907,7 @@ impl DeferredResponseOwnerPair {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct DeferredResponseRow {
     vis_origin: StaticOriginId,
+    release_member: Option<ReleaseObligationMember>,
     /// The producer call origin this Deferred residual belongs to (P1: the
     /// route's producer edge; P2: the demand's). Retained for the
     /// closed diagnostic relation and suppression control.
@@ -806,6 +930,12 @@ pub(in crate::cranelift_backend) struct DeferredResponseRow {
 impl DeferredResponseRow {
     pub(in crate::cranelift_backend) fn vis_origin(&self) -> StaticOriginId {
         self.vis_origin
+    }
+
+    pub(in crate::cranelift_backend) fn release_member(
+        &self,
+    ) -> Option<ReleaseObligationMember> {
+        self.release_member
     }
 
     pub(in crate::cranelift_backend) fn producer_call_origin(&self) -> StaticOriginId {
@@ -2481,6 +2611,40 @@ impl StaticTransitionPlan<'_> {
             },
         );
 
+        let mut obligation_ids = BTreeMap::new();
+        let mut member_counts = BTreeMap::new();
+        let mut release_members = BTreeMap::new();
+        for (vis_origin, _, _, route, _) in &response_vis {
+            if route.operation != HostOpV1::ResourceRelease {
+                continue;
+            }
+            let resource_operand_origin = self.semantic.child_origin(route.effect_origin, 0)?;
+            let key = (
+                route.producer_call_origin,
+                route.effect_origin,
+                resource_operand_origin,
+            );
+            let next_obligation = obligation_ids.len();
+            let obligation = *obligation_ids.entry(key).or_insert(
+                ReleaseObligationId::from_position(next_obligation)?,
+            );
+            let ordinal = member_counts.entry(obligation).or_insert(0u32);
+            let member = ReleaseObligationMember {
+                obligation,
+                ordinal: *ordinal,
+                vis_origin: *vis_origin,
+                resource_operand_origin,
+            };
+            *ordinal = ordinal.checked_add(1).ok_or_else(|| {
+                planner_capacity_error("release obligation member identity exhausted")
+            })?;
+            if release_members.insert(*vis_origin, member).is_some() {
+                return Err(planner_error(
+                    "one release Vis was entered twice in its bracket obligation",
+                ));
+            }
+        }
+
         let mut demands = Vec::new();
         // PHASE A (RECUT 2, HS5 two-phase, Architect evt_7eh84c8n6w08e). This
         // pass runs at install (construction.rs:1213), BEFORE aggregate_ownership
@@ -2504,6 +2668,7 @@ impl StaticTransitionPlan<'_> {
         for (vis_origin, operation_root_origin, selected_operation_origin, route, k_is_opaque) in
             response_vis
         {
+            let release_member = release_members.get(&vis_origin).copied();
             let matching = units
                 .iter()
                 .filter(|unit| unit.producer_construct_origin() == vis_origin)
@@ -2537,6 +2702,7 @@ impl StaticTransitionPlan<'_> {
                 // operation root / effect fall through to main's pre-WP lowering.
                 deferred.push(DeferredResponseRow {
                     vis_origin,
+                    release_member,
                     producer_call_origin: route.producer_call_origin,
                     operation_root_origin,
                     effect_origin: route.effect_origin,
@@ -2676,6 +2842,7 @@ impl StaticTransitionPlan<'_> {
                     effect_environment,
                     vis_origin,
                     operation: route.operation,
+                    release_member,
                     k_identity,
                     k_specialization: unit.id(),
                     k_closure_origin: unit.worker_closure_origin(),
@@ -3102,6 +3269,7 @@ impl StaticTransitionPlan<'_> {
                 effect_environment: demand.effect_environment,
                 vis_origin: demand.vis_origin,
                 operation: demand.operation,
+                release_member: demand.release_member,
                 k_identity: demand.k_identity,
                 k_specialization: demand.k_specialization,
                 k_closure_origin: demand.k_closure_origin,
@@ -3200,6 +3368,314 @@ impl StaticTransitionPlan<'_> {
         self.static_response_deferred = deferred;
         self.static_response_plan_installed = true;
         Ok(())
+    }
+
+    pub(super) fn derive_release_obligation_plan(
+        &self,
+    ) -> Result<ReleaseObligationPlan, CraneliftBackendError> {
+        let owners = self
+            .static_response_owner_specializations()?
+            .map_err(|infeasible| {
+                planner_error(format!(
+                    "release obligation planning reached an infeasible response at {:?}: {}",
+                    infeasible.vis_origin(),
+                    infeasible.reason(),
+                ))
+            })?;
+        let mut records = BTreeMap::<ReleaseObligationId, ReleaseObligationRecord>::new();
+        let mut insert = |
+            member: ReleaseObligationMember,
+            producer_call_origin: StaticOriginId,
+            effect_origin: StaticOriginId,
+            site: ReleaseEmissionSite,
+            dispatch_claimant: Option<ReleaseDispatchClaimant>,
+        | -> Result<(), CraneliftBackendError> {
+            let record = records.entry(member.obligation).or_insert(ReleaseObligationRecord {
+                id: member.obligation,
+                producer_call_origin,
+                effect_origin,
+                resource_operand_origin: member.resource_operand_origin,
+                members: Vec::new(),
+            });
+            if record.producer_call_origin != producer_call_origin
+                || record.effect_origin != effect_origin
+                || record.resource_operand_origin != member.resource_operand_origin
+            {
+                return Err(planner_error(
+                    "one release obligation identity carries disagreeing bracket provenance",
+                ));
+            }
+            let position = record
+                .members
+                .iter()
+                .position(|candidate| candidate.member == member);
+            let member_record = match position {
+                Some(position) => &mut record.members[position],
+                None => {
+                    record.members.push(ReleaseObligationMemberRecord {
+                        member,
+                        effect_origin,
+                        claims: Vec::new(),
+                    });
+                    record.members.last_mut().expect("the member was just pushed")
+                }
+            };
+            if member_record.effect_origin != effect_origin {
+                return Err(planner_error(
+                    "one release obligation member carries disagreeing effect provenance",
+                ));
+            }
+            let claim = ReleaseEmissionClaim {
+                member,
+                effect_origin,
+                site,
+                dispatch_claimant,
+            };
+            if member_record.claims.contains(&claim) {
+                return Err(planner_error(
+                    "one release obligation member repeats an identical emission claim",
+                ));
+            }
+            member_record.claims.push(claim);
+            Ok(())
+        };
+
+        for row in &self.static_response_continuations {
+            if row.operation() != HostOpV1::ResourceRelease {
+                if row.release_member().is_some() {
+                    return Err(planner_error(
+                        "a non-release response row carries a release obligation member",
+                    ));
+                }
+                continue;
+            }
+            let member = row.release_member().ok_or_else(|| {
+                planner_error("a static-response release claim carries no obligation id")
+            })?;
+            let matching = owners
+                .iter()
+                .filter(|owner| owner.response() == row.id())
+                .collect::<Vec<_>>();
+            let [owner] = matching.as_slice() else {
+                return Err(planner_error(
+                    "a static-response release member has no unique owner dispatch site",
+                ));
+            };
+            insert(
+                member,
+                row.producer_call_origin(),
+                row.effect_origin(),
+                ReleaseEmissionSite::StaticResponse(owner.id()),
+                Some(ReleaseDispatchClaimant::StaticResponse(owner.id())),
+            )?;
+        }
+
+        for row in &self.static_response_deferred {
+            if row.operation() != HostOpV1::ResourceRelease {
+                if row.release_member().is_some() {
+                    return Err(planner_error(
+                        "a non-release deferred row carries a release obligation member",
+                    ));
+                }
+                continue;
+            }
+            let member = row.release_member().ok_or_else(|| {
+                planner_error("a deferred release claim carries no obligation id")
+            })?;
+            let ContinuationEmissionOwner::Specialization(handler) = self
+                .deferred_response_handler_owner(row)?
+                .ok_or_else(|| {
+                    planner_error("a release obligation member has no dispatch site")
+                })?
+            else {
+                return Err(planner_error(
+                    "a deferred release obligation member has no continuation dispatch site",
+                ));
+            };
+            let matching = self
+                .continuation_contexts
+                .iter()
+                .filter(|context| context.enclosing_specialization == handler)
+                .collect::<Vec<_>>();
+            let [context] = matching.as_slice() else {
+                return Err(planner_error(
+                    "a release obligation member has no unique continuation dispatch site",
+                ));
+            };
+            let response_claimants = owners
+                .iter()
+                .filter(|owner| owner.k_context() == context.id)
+                .map(|owner| owner.id())
+                .collect::<Vec<_>>();
+            let claimant = match response_claimants.as_slice() {
+                [] => ReleaseDispatchClaimant::Continuation(handler),
+                [owner] => ReleaseDispatchClaimant::StaticResponse(*owner),
+                _ => {
+                    return Err(planner_error(
+                        "one release context is claimed by more than one response owner",
+                    ));
+                }
+            };
+            insert(
+                member,
+                row.producer_call_origin(),
+                row.effect_origin(),
+                ReleaseEmissionSite::ContinuationContext(context.id),
+                Some(claimant),
+            )?;
+
+            let pair = row.owner_pair().ok_or_else(|| {
+                planner_error("a deferred release obligation member has no owner pair")
+            })?;
+            let ContinuationEmissionOwner::Specialization(base) = pair.base_owner() else {
+                return Err(planner_error(
+                    "a deferred release obligation member has no specialization base owner",
+                ));
+            };
+            insert(
+                member,
+                row.producer_call_origin(),
+                row.effect_origin(),
+                ReleaseEmissionSite::ContinuationSpecialization(base),
+                None,
+            )?;
+        }
+
+        let mut obligations = records.into_values().collect::<Vec<_>>();
+        obligations.sort_by_key(|record| record.id);
+        for (position, record) in obligations.iter_mut().enumerate() {
+            if record.id != ReleaseObligationId::from_position(position)? {
+                return Err(planner_error(
+                    "release obligation identities are not dense in planner order",
+                ));
+            }
+            record.members.sort_by_key(|member| member.member.ordinal);
+            for (ordinal, member) in record.members.iter_mut().enumerate() {
+                if member.member.ordinal as usize != ordinal {
+                    return Err(planner_error(
+                        "release obligation member identities are not dense in source order",
+                    ));
+                }
+                member.claims.sort_by_key(|claim| claim.site);
+                let dispatch_sites = member
+                    .claims
+                    .iter()
+                    .filter(|claim| claim.dispatch_claimant.is_some())
+                    .count();
+                if member.claims.is_empty() {
+                    return Err(planner_error(
+                        "a release obligation member has no dispatch site",
+                    ));
+                }
+                if dispatch_sites != 1 {
+                    return Err(planner_error(
+                        "a release obligation member does not have exactly one consuming dispatch claim",
+                    ));
+                }
+            }
+        }
+        Ok(ReleaseObligationPlan { obligations })
+    }
+
+    pub(in crate::cranelift_backend) fn release_emission_claim_for_static_response(
+        &self,
+        owner: StaticResponseOwnerId,
+    ) -> Result<Option<ReleaseEmissionClaim>, CraneliftBackendError> {
+        let claims = self
+            .all_release_emission_claims()
+            .filter(|claim| claim.site() == ReleaseEmissionSite::StaticResponse(owner))
+            .collect::<Vec<_>>();
+        match claims.as_slice() {
+            [] => Ok(None),
+            [claim] => Ok(Some(*claim)),
+            _ => Err(planner_error(
+                "one response owner carries more than one release emission claim",
+            )),
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn release_emission_claims_for_continuation(
+        &self,
+        specialization: ContinuationSpecializationId,
+    ) -> Vec<ReleaseEmissionClaim> {
+        self.all_release_emission_claims()
+            .filter(|claim| {
+                claim.site()
+                    == ReleaseEmissionSite::ContinuationSpecialization(specialization)
+            })
+            .collect()
+    }
+
+    pub(in crate::cranelift_backend) fn release_emission_claims_for_context(
+        &self,
+        context: ContinuationContextId,
+    ) -> Vec<ReleaseEmissionClaim> {
+        self.all_release_emission_claims()
+            .filter(|claim| {
+                claim.site() == ReleaseEmissionSite::ContinuationContext(context)
+            })
+            .collect()
+    }
+
+    fn all_release_emission_claims(
+        &self,
+    ) -> impl Iterator<Item = ReleaseEmissionClaim> + '_ {
+        self.release_obligations
+            .obligations
+            .iter()
+            .flat_map(|record| record.members.iter())
+            .flat_map(|member| member.claims.iter().copied())
+    }
+
+    pub(in crate::cranelift_backend) fn release_dispatch_claim_for_context_call(
+        &self,
+        context: ContinuationContextId,
+        response_owner: Option<StaticResponseOwnerId>,
+        emission_owner: Option<ContinuationEmissionOwner>,
+    ) -> Result<Option<ReleaseEmissionClaim>, CraneliftBackendError> {
+        let claims = self
+            .release_emission_claims_for_context(context)
+            .into_iter()
+            .filter(|claim| match claim.dispatch_claimant() {
+                Some(ReleaseDispatchClaimant::StaticResponse(owner)) => {
+                    response_owner == Some(owner)
+                }
+                Some(ReleaseDispatchClaimant::Continuation(specialization)) => {
+                    emission_owner
+                        == Some(ContinuationEmissionOwner::Specialization(specialization))
+                }
+                None => false,
+            })
+            .collect::<Vec<_>>();
+        match claims.as_slice() {
+            [] => Ok(None),
+            [claim] => Ok(Some(*claim)),
+            _ => Err(planner_error(
+                "one context call carries more than one release dispatch claim",
+            )),
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn release_obligation_members(
+        &self,
+    ) -> BTreeSet<ReleaseObligationMember> {
+        self.release_obligations
+            .obligations
+            .iter()
+            .flat_map(|record| record.members.iter().map(|member| member.member))
+            .collect()
+    }
+
+    pub(in crate::cranelift_backend) fn release_context_members(
+        &self,
+    ) -> BTreeSet<ReleaseObligationMember> {
+        self.all_release_emission_claims()
+            .filter_map(|claim| {
+                (matches!(claim.site(), ReleaseEmissionSite::ContinuationContext(_))
+                    && claim.dispatch_claimant().is_some())
+                    .then_some(claim.member())
+            })
+            .collect()
     }
 
     /// Derive the aggregate-producer ownership relation for a locally driven
@@ -3379,6 +3855,7 @@ impl StaticTransitionPlan<'_> {
                 );
                 deferred.push(DeferredResponseRow {
                     vis_origin: demand.vis_origin,
+                    release_member: demand.release_member,
                     producer_call_origin: demand.producer_call_origin,
                     operation_root_origin: demand.operation_root_origin,
                     effect_origin: demand.effect_origin,
