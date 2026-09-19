@@ -60,6 +60,20 @@ formatter, not an editor.
 2. Scan for lines **>85** codepoints that are **not** exempt (not in a fence, not
    a table row, not front matter). Lines of 81–85 are within tolerance — skip
    them.
+
+   **Measure with Python, never `awk length`.** `mawk` — the default `awk`
+   here — is not UTF-8 aware and counts *bytes* whatever the locale, so every
+   `—`, `→` or `Ω` inflates the reading by 2. Compliant lines then read as
+   violations and get churned, and the count you report back is wrong.
+   Measured 2026-09-19: `printf 'a—b\n' | awk '{print length($0)}'` prints
+   **5** for a 3-codepoint line. `wc -m` is correct but counts the newline.
+
+   ```sh
+   python3 -c 'import sys
+   for i, l in enumerate(open(sys.argv[1]), 1):
+       n = len(l.rstrip("\n"))
+       if n > 85: print(i, n)' FILE.md
+   ```
 3. Reflow each offending paragraph/list-item minimally: rebalance line breaks so
    every line is ≤80 (the target), touching as few lines as possible.
 4. Re-scan. Every non-exempt line must be ≤85, or explicitly reported as an
