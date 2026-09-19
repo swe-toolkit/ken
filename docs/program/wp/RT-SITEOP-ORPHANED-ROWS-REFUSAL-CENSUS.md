@@ -257,3 +257,178 @@ No blocking dependencies. `RT-SITEOP-RETAINED-ROWS-ADVANCED-PAST-LABEL` is the
 sibling census and its `D1` supplies the "classify, don't repair" instruction
 this frame's `D1` carries. Read the ledger, not its commissioning node:
 `docs/program/evidence/rt-ignored-failing-rows-ledger.md`.
+
+## Measured outcome — increment 1 (AC-0, AC-1, AC-2, AC-5; AC-3 bounded)
+
+**Base: `5fe2b9bd4aef626cf1fabfe1b00dc8dca886e2fa`**, re-anchored so
+`merge-base == origin/main`. **No row un-ignored, no row re-labelled,
+`RT-SITEOP-CARRIED-WITNESS` neither reopened nor amended. Docs-only.**
+
+### `AC-0` — premise re-established at this base. Neither stop condition fired.
+
+Rows located by symbol, per `AC-10`; numbers are anchors to re-find, not values
+to check.
+
+    px7f_resource_native.rs
+      fn linked_public_right_denial_preserves_exact_masks              ~:315
+      fn linked_public_second_release_is_closed_and_the_handle_closes_once ~:349
+    rt_escape_second_resource_native.rs
+      fn escaped_buffer_used_by_fanning_host_op_matches_interpreter    ~:685
+
+All three still carry an `#[ignore]`, and the three strings are **one distinct
+value** (md5-equal). None appears in `.github/ignored-test-exemptions.toml`, so
+all three remain live members of the swept population. **No row passes** and
+**the ledger's verdict still holds**, so neither reportable stop condition is
+triggered.
+
+### `AC-1` — phase and stop site, partitioned on the instrument's own field
+
+    rows 1, 2   RUNTIME.  The artifact builds, links and runs.
+                "linked PX7-F child emits its canonical observation:
+                 UnclassifiedRuntimeTrap { terminal_value: -1 }"
+                scripts/ken-cargo test -p ken-cli --test px7f_resource_native
+                  --no-fail-fast -- --ignored --test-threads=1
+                -> 0 passed; 2 failed
+
+    row 10      COMPILE.  ObjectLinkerPackagingError
+                  { stage: ObjectEmission, field: "checked_process_object" }
+                reason: native static transition planner invariant failed;
+                  source-specific inheritances at one generated entry disagree
+                  on their typed consumer projection, including the
+                  fresh-result route
+                -> no artifact is produced and nothing runs
+
+**The partition is measured, not asserted:** the layer difference is carried by
+the packaging error's own `stage` field, not inferred from the signatures
+differing.
+
+### `AC-2` — rows 1 and 2 classified from the CRITERION, not the value
+
+The criterion is `decode_signed_root_trap`, which delegates membership to
+`root_trap_catalog_index`. A planned root trap is encoded
+`-((identity << 8) | 0xff)`, with the tag in the low byte and a 1-based
+identity above it. Evaluated on this row's value:
+
+    terminal_value -1  ->  magnitude 1
+      1 & 0xff == 0xff ?   FALSE   <- fails HERE, the tag clause
+      1 >> 8 != 0 ?        false   (would fail the identity clause too)
+    smallest legal token   -511
+
+⇒ **`-1` is not a malformed trap token. It is not a trap token at all.** The
+classifier is correct and its refusal is accurate, so `UnclassifiedRuntimeTrap`
+is neither a classifier failure nor a missing catalog entry — **and no
+trap-catalog node owns these rows.**
+
+**The stub cannot corroborate or refute this.** Its diagnostic is keyed on the
+value — the `value == -1` branch in the process starter's C stub — so the
+stderr line `ken native trap: malformed borrowed process input` is a lookup on
+an integer and carries no mechanism.
+
+### `AC-5` — search space re-derived, and the frame is right
+
+    git grep -l BorrowedOpaque -- 'crates/ken-runtime/src/*' | grep -v test
+    -> 8 files, 6 under cranelift_backend/lowering/
+
+**Confirmed at eight and six.** The frame's count stands.
+
+### `AC-3` — BOUNDED, NOT ANSWERED
+
+The question — does ingress validation run for a `proc main (_input :
+ProcessInput)` the program never consumes — is **not** answered by this
+increment. What is delivered is its boundary.
+
+    CLOSED  ken-runtime, non-test references to PROCESS_INPUT_CONSTRUCTOR:
+            the constant, one NativeProcessSymbols field, and
+            native_process_input_value -- which CONSTRUCTS the value.
+            Nothing builds a destructure.
+    CLOSED  the elaborator: eight non-test process_input_constructor sites,
+            all field plumbing or admission-time resolution
+            (program_admission's get("MkProcessInput")). None builds a Match.
+    CLOSED  the entry-wrapping route in lowering/core.rs -- EXAMINED in
+            increment 1a. All ten sites are the SAME value THREADED, not
+            consumed: `staged_process_input: Option<&RuntimeValue>` in four
+            signature positions and the matching forwarding arguments, ending
+            in compile_expr_into_module_with_root_projection, which forwards
+            it onward again. No Match, no destructure, no unwrap of the
+            Option anywhere in the file. core.rs carries the staged value; it
+            does not validate it.
+    LOCATED the forward target, in increment 1b: core.rs hands the value to
+            `super::units::define_unit_bodies`, in
+            cranelift_backend/lowering/units.rs -- a file named by NEITHER
+            enumeration (not in the eight BorrowedOpaque files, not in the
+            six entry-wrap files).
+    OPEN    whether units.rs CONSUMES or forwards again, plus artifact/api.rs,
+            artifact/mod.rs and platform_runtime_support.rs.
+
+> ### THE VALUE IS RENAMED AT THE CALL BOUNDARY, AND THAT IS WHY THE TRAIL
+> ### READS AS ENDING
+>
+>     core.rs    staged_process_input: Option<&RuntimeValue>
+>     units.rs   staged_root_value:    Option<&RuntimeValue>   <- same value
+>
+> `grep staged_process_input` over `units.rs` returns **zero**, and the file is
+> 8,445 lines, so the zero is entirely plausible and entirely wrong. It was
+> caught only because the call site provably passes the value, so the callee
+> must receive it under some name — implausibility, not a better key.
+>
+> ⇒ **Any enumeration of this value keyed on `staged_process_input` stops at
+> `core.rs` by construction.** Follow the parameter across each call boundary
+> and re-read the callee's signature for its local name; do not carry one name
+> across a hop. This is the same defect class as `AC-4`'s residual-versus-
+> emission guard, one layer along: there the value may never be written, here
+> it is written under a name the query does not contain.
+
+**The remaining routes are handed over as the predicate that generated them,
+not as a list**, so the next reader can re-run the enumeration and learn
+whether it is still the same size:
+
+    git grep -ln 'staged_process_input\|STARTER_ENTRY_SYMBOL' \
+      -- 'crates/*/src/*' | grep -v test
+        cranelift_backend/artifact/api.rs
+        cranelift_backend/artifact/mod.rs
+        cranelift_backend/lowering/core.rs        <- 10 sites, the entry wrap
+        native_process_entrypoint.rs
+        object_linker_packaging.rs
+        platform_runtime_support.rs
+
+    grep -c 'staged_process_input\|STARTER_ENTRY_SYMBOL' \
+      crates/ken-runtime/src/cranelift_backend/lowering/core.rs
+        -> 10
+
+### TWO INSTRUMENT FAILURES OF THIS INCREMENT, recorded beside the finding
+
+Both are recorded here rather than in a scratchpad because each fails toward
+*"nothing here"*, and a false zero that agrees with the reader is the one
+nobody re-runs.
+
+**1. A `#[cfg(test)]`-position filter returned a false zero over ten sites.**
+I filtered production as *"lines before the first `#[cfg(test)]`"*. That is
+sound for a file whose `mod tests` sits at the bottom. **In `core.rs` the first
+`#[cfg(test)]` is at line 26 and decorates a `use`** — a test-only import, not
+a module boundary — so the filter classified **16,461 of 16,487 lines as test**
+and returned an **empty set over a population of ten.** The zero was the
+instrument. ⇒ **Do not reuse that filter.** Resolve the enclosing item, or grep
+the whole file and classify each hit.
+
+**2. An ingress destructure read out of a test module.** The `Match` on the
+process-input constructor with `binders: 3` and a `PatternMatchFailure` default
+sits inside `native_process_entrypoint.rs`'s `mod tests`. Read as production it
+would have answered `AC-3` from a test harness's own entry construction.
+
+**And a limit on the counter-witness carried in from the sibling node.**
+`abi_s6_mapping_surface_native` declares `proc main (_input : ProcessInput)`,
+runs genuinely native and passes with no `-1`. That refutes *"proc plus an
+unused `_input` inevitably yields `-1`"* and is **silent on `AC-3`**: a pass is
+equally consistent with validation not running and with validation running and
+succeeding on a well-formed input. It also needs re-running — `abi_s6` is the
+one file that moved between the base it was measured at and this one.
+
+### `AC-9`
+
+**Rows 1 and 2 have a named candidate owner and not an owner.** `AC-2` is
+discharged and `AC-3` is not, so no owner is named here.
+
+### Not delivered
+
+`AC-4` is discharged only for the zeros this increment actually produced;
+`AC-6`'s fold-or-split argument, and any routing proposal, await `AC-3`.
