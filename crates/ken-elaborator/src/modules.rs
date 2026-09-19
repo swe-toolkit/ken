@@ -471,6 +471,61 @@ fn apply_import(
     Ok(())
 }
 
+/// Layer 3 — certify the standard-operator home the moment its own export
+/// table is complete (`33 §6.1`, `39 §6.9`).
+///
+/// **Called from BOTH module-elaboration paths on purpose.** A module reaches
+/// its export table by two routes — a loaded source unit and an inline
+/// `module M { … }` — and they insert into `module_state.exports` at two
+/// different sites. Hooking only the first is the defect this function exists
+/// to prevent: an inline home would elaborate entirely uncertified, and every
+/// negative case would pass while proving nothing. That is not hypothetical;
+/// it is what the AC-9 cases caught on the first run.
+fn certify_standard_operator_home(
+    elab: &mut ElabEnv,
+    module: &str,
+    at: Option<&Span>,
+) -> Result<(), ElabError> {
+    if module != crate::standard_operators::STANDARD_OPERATOR_HOME {
+        return Ok(());
+    }
+    // An inline `module M { … }` knows its own span; a loaded source unit is
+    // the whole file and has none to offer. Carry the real one where it
+    // exists rather than synthesising a coordinate that points nowhere.
+    let span = at.cloned().unwrap_or_else(|| Span::new(0, 0));
+    let bool_id = elab.numeric_env.bool_id;
+    let certified = crate::standard_operators::certify_roles(
+        &elab.env,
+        &elab.module_state.exports,
+        &elab.globals,
+        crate::standard_operators::STANDARD_OPERATOR_HOME,
+        bool_id,
+        &span,
+    )?;
+
+    // `33 §6.1`'s standard fixities, installed onto the identities just
+    // certified rather than declared in surface source.
+    //
+    // This is the only mechanism available, and the measurement is in the WP
+    // thread: a fixity target must be DEFINED in the declaring module
+    // (`scope.locals`), and a fixity target must be a SYMBOLIC operator, so
+    // `infix 4 ord_leq_at` at the defining module is unsayable and
+    // `infix 4 ≤` at the facade is refused as not-local. The only expressible
+    // declaration is one that also DEFINES the glyph -- which mints a second
+    // `GlobalId` and is exactly what `§6.9` forbids.
+    //
+    // Keying on the identity is what `§6` already requires: fixity is "a
+    // property of the operator's canonical identity, not of any surface path
+    // or alias that reaches it", so it travels with import and re-export for
+    // free. `fixities` is `GlobalId`-keyed, so nothing further is needed to
+    // make that travel happen.
+    for (role, id) in &certified {
+        elab.fixities.insert(*id, role.fixity());
+    }
+    elab.standard_operators = certified;
+    Ok(())
+}
+
 fn publish_identity(
     exports_here: &mut HashMap<String, String>,
     surface_name: &str,
@@ -843,6 +898,8 @@ fn load_unit(
         elab.module_state
             .exports
             .insert(module.to_string(), exports);
+
+        certify_standard_operator_home(elab, module, None)?;
         elab.module_state
             .loaded_unit_scopes
             .insert(module.to_string(), scope);
@@ -1294,6 +1351,31 @@ fn rewrite_rexpr_inner(
             Box::new(rewrite_rexpr(scope, exports, *r)?),
             s,
         ),
+        // THE CROSS-MODULE REMAP, and omitting it would have been INVISIBLE
+        // rather than a compile error (Architect, `evt_2y0a3j5yjznn2`). This
+        // function is a REWRITE over every node: a variant left out does not
+        // fail to compile, it silently stops having its operands remapped, and
+        // an operator crossing an import would then complete differently from
+        // the same operator in its home module -- which no single-module
+        // fixture can see.
+        //
+        // The IDENTITY is deliberately not remapped. A `GlobalId` is already
+        // canonical -- `33 §4.3` says an export republishes the existing one
+        // and never mints another -- so there is nothing here for a module
+        // boundary to rewrite. That is the whole reason this node carries the
+        // identity rather than the glyph: the glyph WOULD have needed
+        // remapping, and forgetting it is the invisible failure above.
+        RExpr::RStandardOp {
+            op,
+            lhs,
+            rhs,
+            span,
+        } => RExpr::RStandardOp {
+            op,
+            lhs: Box::new(rewrite_rexpr(scope, exports, *lhs)?),
+            rhs: Box::new(rewrite_rexpr(scope, exports, *rhs)?),
+            span,
+        },
         RExpr::RInfixSpine {
             operands,
             operators,
@@ -1774,12 +1856,15 @@ fn elaborate_checked_spine_free(
     rdecl: &crate::resolve::RDecl,
 ) -> Result<crate::elab::ElabResult, ElabError> {
     crate::elab::check_surface_purity(rdecl, &elab.effect_rows, &elab.globals, &elab.class_env)?;
+    let standard_operators_here = elab.standard_operators.clone();
     let result = crate::elab::elaborate_rdecl_v1_with_effect_rows(
         &mut elab.env,
         &mut elab.globals,
         &mut elab.num_values,
         &elab.numeric_env,
         &mut elab.class_env,
+        &mut elab.resolution_provenance,
+        &standard_operators_here,
         &elab.effect_rows,
         &mut elab.fixities,
         &mut elab.fixity_spans,
@@ -1798,12 +1883,15 @@ fn elaborate_checked_with_fixity(
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
     crate::elab::check_surface_purity(rdecl, &elab.effect_rows, &elab.globals, &elab.class_env)?;
+    let standard_operators_here = elab.standard_operators.clone();
     let result = crate::elab::elaborate_rdecl_v1_with_effect_rows(
         &mut elab.env,
         &mut elab.globals,
         &mut elab.num_values,
         &elab.numeric_env,
         &mut elab.class_env,
+        &mut elab.resolution_provenance,
+        &standard_operators_here,
         &elab.effect_rows,
         &mut elab.fixities,
         &mut elab.fixity_spans,
@@ -2408,8 +2496,16 @@ fn elaborate_resolved_space(
     elab: &mut ElabEnv,
     resolved: &crate::resolve::RSpaceDecl,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    let associated =
-        crate::elab::reassociate_space_decl(resolved, &elab.globals, &elab.fixities)?;
+    // Cloned rather than borrowed, following the same shape as the two
+    // `standard_operators_here` sites above: `elab` is `&mut` here and the
+    // reassociation pass needs an immutable view of the certified map.
+    let standard_operators_here = elab.standard_operators.clone();
+    let associated = crate::elab::reassociate_space_decl(
+        resolved,
+        &elab.globals,
+        &elab.fixities,
+        Some(&standard_operators_here),
+    )?;
     crate::elab::elaborate_space_decl(elab, associated.as_deref().unwrap_or(resolved))
 }
 
@@ -2426,12 +2522,17 @@ fn elaborate_mutual_group_with_fixities(
                 .map(|pending| (pending.fixity, pending.declaration_span.clone()))
         })
         .collect::<Vec<_>>();
+    // Snapshot: the call borrows `elab.env`/`elab.globals` mutably, so the
+    // certified map cannot be handed over as a live field borrow.
+    let standard_operators_for_group = elab.standard_operators.clone();
     crate::elab::elaborate_mutual_group(
         &mut elab.env,
         &mut elab.globals,
         &mut elab.num_values,
         &elab.numeric_env,
         &elab.class_env,
+        &mut elab.resolution_provenance,
+        &standard_operators_for_group,
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &member_fixities,
@@ -2537,7 +2638,7 @@ fn expand_scope(
             Decl::ModuleDecl {
                 name,
                 decls: inner,
-                span: _,
+                span: module_span,
             } => {
                 let child_prefix = qualify(prefix, name);
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
@@ -2552,7 +2653,8 @@ fn expand_scope(
                 ids.extend(child_ids);
                 elab.module_state
                     .exports
-                    .insert(child_prefix, child_exports);
+                    .insert(child_prefix.clone(), child_exports);
+                certify_standard_operator_home(elab, &child_prefix, Some(module_span))?;
                 i += 1;
             }
             Decl::SpaceDecl {

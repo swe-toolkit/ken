@@ -296,6 +296,111 @@ pub enum ElabError {
         ty: String,
         span: Span,
     },
+
+    /// A standard-operator role (`33 §6.1`) is not published by the
+    /// standard-operator home's export table.
+    ///
+    /// Layer 3 of the standard-identity design. This is the ABSENT arm, and it
+    /// is deliberately distinct from [`Self::StandardOperatorRoleWrongShape`]:
+    /// the two differ in what would change them. An unfilled role is closed by
+    /// publishing the binding; a wrong-shaped one is closed by fixing the
+    /// binding that is already published.
+    StandardOperatorRoleUnfilled {
+        /// The role's glyph, so the diagnostic names what a reader wrote.
+        role: String,
+        /// The standard-operator home consulted.
+        home: String,
+        span: Span,
+    },
+
+    /// A standard-operator role is published, but the binding behind it does
+    /// not have the shape `33 §6.1` fixes for that role.
+    ///
+    /// The arm a presence-only check cannot produce. A binding that moved, was
+    /// re-pointed, or drifted in arity stays PRESENT in the export table, so
+    /// only a shape contract over the elaborated telescope distinguishes it
+    /// from a correct one.
+    StandardOperatorRoleWrongShape {
+        role: String,
+        /// The canonical binding the home published for this role.
+        binding: String,
+        /// What `33 §6.1` fixes for the role.
+        expected: String,
+        /// What the published binding actually is.
+        found: String,
+        span: Span,
+    },
+    /// Two standard-operator roles resolve to ONE defining binding.
+    ///
+    /// **A THIRD malformation of the home, not a variant of the other two.**
+    /// `Unfilled` is closed by publishing a binding and `WrongShape` by fixing
+    /// one already published; this is closed by publishing a SECOND, distinct
+    /// binding, and collapsing it into either would tell the author to do the
+    /// wrong thing. `§6.2` makes exactly that distinction for `≠`'s two
+    /// refusals and calls an implementation that merges them non-conforming.
+    ///
+    /// **Why it must be refused rather than recorded.** `39 §6.9` keys
+    /// completion on the defining `GlobalId`, so the adapter recovers a role
+    /// by reverse lookup in the certified map -- and that is a FUNCTION only
+    /// if the map's values are distinct. `certify_roles` builds it
+    /// glyph -> canonical -> id with nothing that would stop
+    /// `export (bool_and as ∧, bool_and as ∨)`, and under such a map an
+    /// occurrence of one glyph could complete as the other role. The
+    /// injectivity is cheap to enforce at the single place the map is built,
+    /// so it is enforced there instead of being left as a stated invariant.
+    StandardOperatorRolesShareABinding {
+        /// The two role glyphs, in `ALL` order, so the message is stable.
+        roles: (String, String),
+        /// The canonical binding both resolved to.
+        binding: String,
+        /// The standard-operator home consulted.
+        home: String,
+        span: Span,
+    },
+    /// Two registered instance-head SPELLINGS resolve to one type identity.
+    ///
+    /// **A live detector for a registry hazard, sitting in the one place that
+    /// can observe it.** `ClassEnv::instances` is keyed on a surface type
+    /// NAME, so an expression site -- which holds the carrier's identity and
+    /// no name -- finds its key by scanning for the registered name that
+    /// resolves to that identity. When two do, the name-keyed registry cannot
+    /// express which instance was meant, and picking one would resolve a
+    /// coherence question by iteration order.
+    ///
+    /// Refusing makes the registry's own ambiguity visible. The structural
+    /// closure is an identity-keyed instance registry, which reaches
+    /// coherence, the orphan check, module re-export and `derive` -- a
+    /// separate node.
+    InstanceHeadSpellingsShareAnIdentity {
+        /// The class whose instance table was scanned.
+        class: String,
+        /// The two registered spellings, sorted so the message is stable.
+        spellings: (String, String),
+        span: Span,
+    },
+    /// The instance found by an identity-keyed scan is for a DIFFERENT carrier
+    /// than the occurrence's.
+    ///
+    /// **The confirmation that demotes the registry's NAME from a decision to
+    /// a hint.** The scan finds its candidate by asking which registered
+    /// spelling resolves to the carrier's identity TODAY -- and `globals` is a
+    /// flat, mutable name table holding at most one id per name, so a spelling
+    /// that meant one type at registration can mean another now. Two names to
+    /// one id is an ambiguity a scan can detect; two ids to one name is a
+    /// SUBSTITUTION it cannot, because the map has already forgotten the
+    /// other.
+    ///
+    /// So the scan's answer is confirmed against the kernel-inferred type of
+    /// the candidate dictionary, which carries the carrier in CORE with no
+    /// name anywhere. A wrong hint then fails closed here instead of handing
+    /// one carrier's dictionary to another.
+    InstanceCarrierIdentityMismatch {
+        /// The class being resolved.
+        class: String,
+        /// The registered spelling the scan matched.
+        spelling: String,
+        span: Span,
+    },
     /// The `sct_check` on the reified dictionary group rejected the resolution
     /// chain — i.e. search would not terminate (`39 §6.4`, `17 §4.2`).
     /// Detected at admission time; never a search-time hang.
@@ -695,6 +800,61 @@ impl fmt::Display for ElabError {
                 f,
                 "no instance at {}-{}: no instance of '{}' found for '{}'",
                 span.start, span.end, class, ty,
+            ),
+            ElabError::StandardOperatorRoleUnfilled { role, home, span } => write!(
+                f,
+                "standard operator '{}' has no meaning at {}-{}: the standard-operator \
+                 home '{}' does not publish it (`33 §6.1`); export the binding for '{}' \
+                 from that module",
+                role, span.start, span.end, home, role,
+            ),
+            ElabError::StandardOperatorRoleWrongShape {
+                role,
+                binding,
+                expected,
+                found,
+                span,
+            } => write!(
+                f,
+                "standard operator '{}' is published at {}-{} but '{}' does not have the \
+                 shape `33 §6.1` fixes for it: expected {}, found {}",
+                role, span.start, span.end, binding, expected, found,
+            ),
+            ElabError::StandardOperatorRolesShareABinding {
+                roles,
+                binding,
+                home,
+                span,
+            } => write!(
+                f,
+                "standard operators '{}' and '{}' both resolve to '{}' at {}-{}: the \
+                 standard-operator home '{}' must publish a DISTINCT binding for each \
+                 role (`33 §6.1`), because completion is keyed on the defining \
+                 identity and cannot tell two roles apart when they share one",
+                roles.0, roles.1, binding, span.start, span.end, home,
+            ),
+            ElabError::InstanceHeadSpellingsShareAnIdentity {
+                class,
+                spellings,
+                span,
+            } => write!(
+                f,
+                "instance heads '{}' and '{}' name one type at {}-{}, so the \
+                 '{}' instance to use here cannot be determined: the instance \
+                 registry is keyed on the spelling, and this occurrence knows \
+                 only the type's identity",
+                spellings.0, spellings.1, span.start, span.end, class,
+            ),
+            ElabError::InstanceCarrierIdentityMismatch {
+                class,
+                spelling,
+                span,
+            } => write!(
+                f,
+                "the '{}' instance registered for '{}' is for a different type \
+                 than the one at {}-{}: the registry is keyed on the spelling \
+                 and that spelling no longer names this occurrence's type",
+                class, spelling, span.start, span.end,
             ),
             ElabError::NonTerminatingInstances { span } => write!(
                 f,

@@ -30,6 +30,7 @@ use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, Ins
 use crate::data;
 use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
+use crate::standard_operators::StandardOperatorRole;
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInfixOperator, RInstanceConstraint, RMatchArm, RPatKind,
     RPattern, RPropIntro, RRecordField, RRecordPatField, RSpaceDecl, RType, SUGAR_ABSURD,
@@ -335,6 +336,26 @@ struct ElabCtx<'e> {
     /// so a `where C a`-constrained body can project its resolved
     /// dictionary's fields.
     class_env: Option<&'e ClassEnv>,
+    /// The standard-operator identities certified by the required-roles check
+    /// (`33 §6.1`). `None` on paths that elaborate no user expression body.
+    ///
+    /// **An occurrence reached with this unset is NOT refused naming the
+    /// role, and this comment used to say it was.** Nothing is certified, so
+    /// the occurrence takes the non-certified arm in `reduce_resolved_operator`
+    /// and is left as an ordinary UNDER-APPLIED application — precisely the
+    /// outcome the old sentence offered as the alternative it ruled out. It is
+    /// caught downstream by the kernel check. That arm's residual carries the
+    /// reachability argument.
+    standard_operators: Option<&'e HashMap<StandardOperatorRole, GlobalId>>,
+    /// The sink `§6.2` instance search appends its provenance to.
+    ///
+    /// **Carried beside `class_env`, not inside it.** The registry itself is
+    /// borrowed SHARED here -- expression elaboration must not be typed as
+    /// able to mutate it, because `§6.2` search is a lookup against a registry
+    /// fixed before any body elaborates. The one thing resolution writes is
+    /// this append-only log, so it travels as its own `&mut` and the registry
+    /// stays immutable.
+    provenance: Option<&'e mut Vec<crate::classes::InstanceResolution>>,
     /// Fully applied dictionaries introduced by a declaration's `where`
     /// clause.  They are elaborator-local terms, never synthetic globals.
     local_dicts: HashMap<String, (Term, Term, usize)>,
@@ -428,6 +449,8 @@ impl<'e> ElabCtx<'e> {
             obligations: Vec::new(),
             obl_counter: 0,
             class_env: None,
+            standard_operators: None,
+            provenance: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
             active_index_refinements: Vec::new(),
@@ -486,8 +509,28 @@ impl<'e> ElabCtx<'e> {
         None
     }
 
-    fn with_classes(mut self, class_env: &'e ClassEnv) -> Self {
+    /// Wire the class registry AND the certified standard-operator identities
+    /// together. **One call on purpose**: completing a standard operator needs
+    /// the identity to recognise the occurrence and the class registry to
+    /// resolve its dictionary, so threading them apart is how one of them ends
+    /// up missing on a path nobody enumerated. Taking both makes every call
+    /// site a compile error until it supplies both -- the audit is bounded by
+    /// the compiler, not by a grep.
+    /// **All three together, on purpose.** Taking them in one call makes
+    /// every call site a compile error until it supplies all of them, so the
+    /// audit is bounded by the compiler rather than by a grep. The provenance
+    /// sink belongs in the bundle for the same reason the other two do:
+    /// completion needs the identity to recognise an occurrence, the registry
+    /// to resolve its dictionary, and the sink to record what it resolved.
+    fn with_classes(
+        mut self,
+        class_env: &'e ClassEnv,
+        provenance: &'e mut Vec<crate::classes::InstanceResolution>,
+        standard_operators: &'e HashMap<StandardOperatorRole, GlobalId>,
+    ) -> Self {
         self.class_env = Some(class_env);
+        self.provenance = Some(provenance);
+        self.standard_operators = Some(standard_operators);
         self
     }
 
@@ -8546,6 +8589,12 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         RExpr::RByteStr(bytes, span) => elab_bytes_lit(cx, bytes, span),
 
         RExpr::RBinOp(op, lhs, rhs, span) => elab_binop(cx, op, lhs, rhs, span),
+        RExpr::RStandardOp {
+            op,
+            lhs,
+            rhs,
+            span,
+        } => elab_standard_operator(cx, *op, lhs, rhs, span),
 
         RExpr::RInfixSpine { span, .. } => unassociated_infix_error(span),
 
@@ -9493,7 +9542,33 @@ pub fn elaborate_rdecl(
         });
     }
     let mut sentinel = ClassEnv::sentinel();
-    let result = elaborate_rdecl_v1(env, globals, num_values, numeric_env, &mut sentinel, rdecl)?;
+    // A sentinel class environment marks a path that elaborates no user
+    // expression body, so it certifies no standard operators either.
+    //
+    // EMPTY IS NOT A FAIL-CLOSED VALUE, and this comment used to call it one.
+    // An empty map certifies nothing, so an occurrence reaching here is left
+    // as an ordinary under-applied application and caught downstream by the
+    // kernel check -- NOT refused naming the role. See the residual on
+    // `reduce_resolved_operator`'s non-certified arm.
+    let no_standard_operators = HashMap::new();
+    // A LOCAL SINK IS CORRECT HERE, AND IT IS THE ONLY PLACE THAT IS TRUE.
+    // Provenance used to live inside `ClassEnv`, so on this path it went into
+    // the throwaway `sentinel` above and was dropped with it. A local vector
+    // preserves that exactly. Contrast `elaborate_rdecl_v1`, where provenance
+    // accumulated into the CALLER's registry and a local would have silently
+    // discarded it -- same refactor, opposite right answer, decided by where
+    // the old field's owner outlived the call.
+    let mut discarded_provenance = Vec::new();
+    let result = elaborate_rdecl_v1(
+        env,
+        globals,
+        num_values,
+        numeric_env,
+        &mut sentinel,
+        &mut discarded_provenance,
+        &no_standard_operators,
+        rdecl,
+    )?;
     Ok(result.def_id)
 }
 
@@ -9631,12 +9706,20 @@ fn match_instance_head(
 /// Resolve an instance and recursively apply every prerequisite dictionary.
 /// The returned candidate is immediately kernel-inferred, so an elaborator
 /// wiring error fails closed before it can become a local dictionary binding.
+/// **Takes `&ClassEnv` and a separate `&mut` SINK.** The resolution decision is
+/// a pure function of the registry; the one thing this writes is an
+/// append-only provenance log that used to live inside `ClassEnv` and forced
+/// the whole registry to be borrowed mutably. Splitting the sink out is what
+/// puts dictionary resolution within reach of an expression site, where
+/// `ElabCtx` holds `Option<&ClassEnv>` and must not be granted an authority
+/// `33 §6.2` says it does not have.
 fn resolve_instance_dictionary(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
-    class_env: &mut ClassEnv,
+    class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
     requested: &RType,
@@ -9649,13 +9732,139 @@ fn resolve_instance_dictionary(
         num_values,
         numeric_env,
         class_env,
+        provenance,
         ctx,
         class_name,
-        requested,
+        &rtype_head_name(requested),
+        Some(requested),
         span,
         owner_label,
         true,
     )
+}
+
+/// Resolve a dictionary when the caller holds the carrier's IDENTITY and no
+/// surface type -- the expression side of the seam.
+///
+/// **It finds the registry key without ever inverting `globals`.** The
+/// registry is keyed on a surface type name and `globals` maps name -> id,
+/// which nothing makes injective; running it backwards would pick among
+/// candidates, and a wrong pick keying a registry entry is not provably a
+/// miss. So this scans the registered names FORWARD -- `globals.get(name)`,
+/// the same direction `elab_type` itself uses -- and asks which resolve to the
+/// identity in hand. No injectivity is assumed anywhere.
+///
+/// Three outcomes, all decided:
+///
+/// ```text
+/// zero matches   NoInstance, fail closed, semantics unchanged
+/// one match      that is the key; delegate with no surface pattern
+/// two matches    REFUSE -- the name-keyed registry cannot express which
+///                instance was meant, and iteration order must not decide it
+/// ```
+#[allow(clippy::too_many_arguments)]
+fn resolve_instance_dictionary_by_head_id(
+    env: &mut GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    ctx: &Context,
+    class_name: &str,
+    head_id: GlobalId,
+    span: &Span,
+    owner_label: &str,
+) -> Result<(Term, Term), ElabError> {
+    let mut hit: Option<&str> = None;
+    for (registered_class, registered_head) in class_env.instances.keys() {
+        if registered_class != class_name {
+            continue;
+        }
+        if globals.get(registered_head).copied() != Some(head_id) {
+            continue;
+        }
+        if let Some(earlier) = hit.replace(registered_head.as_str()) {
+            let mut spellings = [earlier.to_string(), registered_head.clone()];
+            spellings.sort();
+            let [first, second] = spellings;
+            return Err(ElabError::InstanceHeadSpellingsShareAnIdentity {
+                class: class_name.to_string(),
+                spellings: (first, second),
+                span: span.clone(),
+            });
+        }
+    }
+    let Some(head_name) = hit.map(str::to_owned) else {
+        return Err(ElabError::NoInstance {
+            class: class_name.to_string(),
+            // No registered spelling resolves to this identity, so there is no
+            // name to report. The identity is what the occurrence knows.
+            ty: format!("{head_id:?}"),
+            span: span.clone(),
+        });
+    };
+
+    // STEP 2 -- the class must be CARRIER-PARAMETERISED, or there is nothing
+    // in its type to confirm the scan against and step 3 would be vacuous.
+    if !class_env
+        .class(class_name)
+        .map(|view| view.projection.head_param.is_some())
+        .unwrap_or(false)
+    {
+        return Err(ElabError::NoInstance {
+            class: class_name.to_string(),
+            ty: head_name,
+            span: span.clone(),
+        });
+    }
+
+    let resolved = resolve_instance_dictionary_inner(
+        env,
+        globals,
+        num_values,
+        numeric_env,
+        class_env,
+        provenance,
+        ctx,
+        class_name,
+        &head_name,
+        None,
+        span,
+        owner_label,
+        true,
+    )?;
+
+    // STEP 3 -- CONFIRM IN CORE, which is what demotes the name from a
+    // decision to a hint (Architect, amending their own ruling in
+    // `evt_zfwss6hz79ct`).
+    //
+    // The scan asks which registered spelling resolves to this identity TODAY.
+    // `globals` is a flat mutable name table holding at most one id per name,
+    // so a spelling that meant one type at registration can mean another now:
+    // two names to one id is an ambiguity the two-match arm above detects, but
+    // two ids to one NAME is a substitution it cannot see, because the map has
+    // already forgotten the other. That direction would hand one carrier's
+    // dictionary to a different carrier, silently.
+    //
+    // The kernel-inferred type of the candidate is `ClassType <carrier-core>`,
+    // and the carrier is there in CORE with no name anywhere. One comparison
+    // on a term that already exists closes the direction the scan cannot see.
+    let confirmed = match &resolved.1 {
+        Term::App(_, carrier) => match carrier.as_ref() {
+            Term::Const { id, .. } | Term::IndFormer { id, .. } => *id == head_id,
+            _ => false,
+        },
+        _ => false,
+    };
+    if !confirmed {
+        return Err(ElabError::InstanceCarrierIdentityMismatch {
+            class: class_name.to_string(),
+            spelling: head_name,
+            span: span.clone(),
+        });
+    }
+    Ok(resolved)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -9664,15 +9873,27 @@ fn resolve_instance_dictionary_inner(
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
-    class_env: &mut ClassEnv,
+    class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
-    requested: &RType,
+    // `head_name` is the registry KEY, supplied rather than derived: the
+    // registry is keyed on a surface type NAME (`classes.rs:202`) and an
+    // expression site does not hold one -- it holds the carrier's identity.
+    //
+    // `requested` is the surface carrier, when the caller has one. **`None`
+    // records a fact about the WORLD, not a wiring gap.** One caller holds
+    // surface syntax and one does not; that difference is real, and the
+    // refusal it forces below IS the V1 boundary. Contrast an `Option` that
+    // records that we might have forgotten to wire something, which should be
+    // made unrepresentable rather than detected.
+    head_name: &str,
+    requested: Option<&RType>,
     span: &Span,
     owner_label: &str,
     enforce_direct_use: bool,
 ) -> Result<(Term, Term), ElabError> {
-    let head_name = rtype_head_name(requested);
+    let head_name = head_name.to_string();
     let info = class_env
         .instances
         .get(&(class_name.to_string(), head_name.clone()))
@@ -9709,11 +9930,24 @@ fn resolve_instance_dictionary_inner(
     let type_args = if info.head_param_count == 0 {
         Vec::new()
     } else if let Some(pattern) = &info.head_type {
+        // A PARAMETERISED CARRIER NEEDS THE SURFACE PATTERN, and an
+        // identity-keyed caller has none. Refusing is the V1 boundary rather
+        // than a stopgap: widening it means matching instance heads against
+        // CORE terms, which is the identity-keyed-registry closure and a
+        // different node. If you are about to write a core-side
+        // `match_instance_head`, you have crossed into it.
+        let Some(requested) = requested else {
+            return Err(ElabError::NoInstance {
+                class: class_name.to_string(),
+                ty: head_name.clone(),
+                span: span.clone(),
+            });
+        };
         let mut matched = vec![None; info.head_param_count];
         if !match_instance_head(pattern, requested, info.head_param_count, &mut matched) {
             return Err(ElabError::NoInstance {
                 class: class_name.to_string(),
-                ty: rtype_head_name(requested),
+                ty: head_name.clone(),
                 span: span.clone(),
             });
         }
@@ -9722,13 +9956,13 @@ fn resolve_instance_dictionary_inner(
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| ElabError::NoInstance {
                 class: class_name.to_string(),
-                ty: rtype_head_name(requested),
+                ty: head_name.clone(),
                 span: span.clone(),
             })?
     } else {
         return Err(ElabError::NoInstance {
             class: class_name.to_string(),
-            ty: rtype_head_name(requested),
+            ty: head_name.clone(),
             span: span.clone(),
         });
     };
@@ -9755,9 +9989,11 @@ fn resolve_instance_dictionary_inner(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             ctx,
             &constraint.class_name,
-            &required_head,
+            &rtype_head_name(&required_head),
+            Some(&required_head),
             span,
             owner_label,
             false,
@@ -9769,9 +10005,7 @@ fn resolve_instance_dictionary_inner(
         span: span.clone(),
     })?;
     if enforce_direct_use {
-        class_env
-            .resolution_provenance
-            .push(crate::classes::InstanceResolution {
+        provenance.push(crate::classes::InstanceResolution {
                 instance_id: info.instance_id,
                 class_name: class_name.to_string(),
                 head_type: head_name,
@@ -10260,6 +10494,13 @@ fn infer_expr_row_type(
         RExpr::RPosProj(e, _, _) => infer_expr_row_type(e, effect_rows, projection_ctx),
         RExpr::RProj(e, field, _) => infer_expr_row_type(e, effect_rows, projection_ctx)
             .join(projected_field_row_type(e, field, projection_ctx)),
+        // The operands' rows, joined -- identical to `RBinOp` below, because
+        // the operator itself is a global binding and contributes no row of
+        // its own at this stage.
+        RExpr::RStandardOp { lhs, rhs, .. } => {
+            let left = infer_expr_row_type(lhs, effect_rows, projection_ctx);
+            left.join(infer_expr_row_type(rhs, effect_rows, projection_ctx))
+        }
         RExpr::RBinOp(_, l, r, _) => infer_expr_row_type(l, effect_rows, projection_ctx)
             .join(infer_expr_row_type(r, effect_rows, projection_ctx)),
         RExpr::RInfixSpine {
@@ -10463,7 +10704,176 @@ fn resolved_operator_fixity(
     }
 }
 
-fn reduce_resolved_operator(values: &mut Vec<RExpr>, operator: RInfixOperator) {
+/// Reduce one operator against the two operands on top of the value stack.
+///
+/// **THIS IS THE ONLY PLACE OPERATOR POSITION IS STILL VISIBLE**, and the only
+/// place [`RExpr::RStandardOp`] is minted. Its two call sites are both inside
+/// `reassociate_rexpr`'s spine arm, so an explicit application never reaches
+/// it -- which is what makes AC-2(c) (`ord_leq_at Nat d` stays partial) a
+/// property of the tree rather than of a guard.
+/// `39 §6.9` standard-operator call completion, at the occurrence.
+///
+/// **The role is recovered from the IDENTITY, by reverse lookup in the
+/// certified map.** That is what makes `§6.9`'s *"binds to the defining
+/// `GlobalId`, never to the occurrence's glyph text"* true of the
+/// implementation and not just of the node: an alias reaching the same binding
+/// completes identically, and the lookup is a function because
+/// `certify_roles` refuses a home that binds two roles to one identity.
+fn elab_standard_operator(
+    cx: &mut ElabCtx,
+    op: GlobalId,
+    lhs: &RExpr,
+    rhs: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let role = cx
+        .standard_operators
+        .and_then(|roles| {
+            roles
+                .iter()
+                .find_map(|(&role, &id)| (id == op).then_some(role))
+        })
+        .ok_or_else(|| {
+            // Minting consulted the same map, so reaching here means the map
+            // changed between reduction and elaboration. Fail closed and say
+            // which invariant broke rather than guessing a role.
+            ElabError::Internal(format!(
+                "standard-operator occurrence at {}-{} carries identity {:?}, \
+                 which the certified map no longer contains",
+                span.start, span.end, op
+            ))
+        })?;
+
+    match role {
+        // `∧` and `∨` bind `bool_and` / `bool_or`, whose telescope is already
+        // `Bool -> Bool -> Bool`. THERE IS NO OMITTED PREFIX TO SUPPLY, so
+        // completion here is the saturated application itself.
+        //
+        // **Both operands are CHECKED, which is AC-7's no-short-circuit
+        // property holding by construction rather than by a guard.** Under
+        // call-by-value both are evaluated before the body runs; `bool_and`'s
+        // body matching on its first argument is about the body's ARMS, which
+        // `33 §6.1` names as the conflation to avoid.
+        StandardOperatorRole::And | StandardOperatorRole::Or => {
+            let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+            let lhs_core = check(cx, lhs, &bool_ty, span)?;
+            let rhs_core = check(cx, rhs, &bool_ty, span)?;
+            let applied = Term::app(Term::app(Term::const_(op, vec![]), lhs_core), rhs_core);
+            Ok((applied, bool_ty))
+        }
+        // `≤` and `≥` bind `ord_leq_at` / `ord_geq_at`, whose telescope is
+        // `(a : Type) -> Ord a -> a -> a -> Bool`. Completion must infer the
+        // carrier and resolve the `Ord` dictionary by `§6.2`'s ordinary
+        // instance search before the saturated application exists.
+        StandardOperatorRole::Leq | StandardOperatorRole::Geq => {
+            // `§6.9`'s ORDER, exactly: infer the operand carrier, resolve the
+            // dictionary by the ordinary `§6.2` search, then check the
+            // saturated application.
+            let (lhs_core, lhs_ty) = infer(cx, lhs)?;
+            let carrier = whnf(cx.env, &cx.ctx, &lhs_ty);
+
+            // THE CARRIER'S HEAD IDENTITY. A carrier that is not a type
+            // constant has no registry key and no instance; refusing here is
+            // `§6.9`'s "carrier un-inferable" step failing at the occurrence.
+            let head_id = match &carrier {
+                Term::Const { id, .. } => *id,
+                Term::IndFormer { id, .. } => *id,
+                _ => {
+                    return Err(ElabError::NoInstance {
+                        class: "Ord".to_string(),
+                        ty: format!("{carrier:?}"),
+                        span: span.clone(),
+                    })
+                }
+            };
+
+            // The right operand is CHECKED at the carrier, which is what makes
+            // `x ≤ y` reject a mismatched pair at the occurrence rather than
+            // inside the binding.
+            let rhs_core = check(cx, rhs, &carrier, span)?;
+
+            let (dictionary, _) = {
+                // Destructured so the resolver's `&mut` arguments are disjoint
+                // FIELD borrows of `cx` rather than several borrows of `cx`
+                // itself.
+                let ElabCtx {
+                    env,
+                    globals,
+                    num_values,
+                    numeric_env,
+                    ctx,
+                    class_env,
+                    provenance,
+                    owner_label,
+                    ..
+                } = &mut *cx;
+                let class_env = class_env.ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "standard operator '{}' at {}-{} reached completion with \
+                         no class registry; `with_classes` was not applied on \
+                         this path",
+                        role.glyph(),
+                        span.start,
+                        span.end
+                    ))
+                })?;
+                let provenance = provenance.as_deref_mut().ok_or_else(|| {
+                    ElabError::Internal(format!(
+                        "standard operator '{}' at {}-{} reached completion with \
+                         no provenance sink; `with_classes` takes the registry \
+                         and the sink together so this cannot happen singly",
+                        role.glyph(),
+                        span.start,
+                        span.end
+                    ))
+                })?;
+                resolve_instance_dictionary_by_head_id(
+                    env,
+                    globals,
+                    num_values,
+                    numeric_env,
+                    class_env,
+                    provenance,
+                    ctx,
+                    "Ord",
+                    head_id,
+                    span,
+                    owner_label,
+                )?
+            };
+
+            // THE SATURATED APPLICATION, in source operand order for BOTH
+            // roles. `≥` does NOT reverse here: `ord_geq_at a d x y = d.leq y x`
+            // reverses inside the binding, on values call-by-value has already
+            // evaluated left to right. Reversing at the call site too would
+            // double-reverse, and AC-4's control is exactly that mutation.
+            let applied = Term::app(
+                Term::app(
+                    Term::app(Term::app(Term::const_(op, vec![]), carrier), dictionary),
+                    lhs_core,
+                ),
+                rhs_core,
+            );
+            Ok((applied, Term::indformer(cx.numeric_env.bool_id, vec![])))
+        }
+        // `≠` is authored rather than re-exported (D2), so the home does not
+        // publish it and `certify_roles` never admits it -- this node is not
+        // minted for it. Unreachable via the certified map, and it fails
+        // closed rather than pretending otherwise.
+        StandardOperatorRole::Neq => Err(ElabError::Internal(format!(
+            "standard operator '≠' at {}-{} reached completion, but it is not a \
+             binding-backed role and the home cannot certify it",
+            span.start, span.end
+        ))),
+    }
+}
+
+fn reduce_resolved_operator(
+    values: &mut Vec<RExpr>,
+    operator: RInfixOperator,
+    globals: &HashMap<String, GlobalId>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) {
     let rhs = values.pop().expect("an infix operator has a right operand");
     let lhs = values.pop().expect("an infix operator has a left operand");
     let span = Span::merge(lhs.span(), rhs.span());
@@ -10472,10 +10882,58 @@ fn reduce_resolved_operator(values: &mut Vec<RExpr>, operator: RInfixOperator) {
             RExpr::RBinOp(operator, Box::new(lhs), Box::new(rhs), span)
         }
         RInfixOperator::User(name, operator_span) => {
-            let head = RExpr::RCon(name, operator_span.clone());
-            let first_span = Span::merge(head.span(), lhs.span());
-            let applied = RExpr::RApp(Box::new(head), Box::new(lhs), first_span);
-            RExpr::RApp(Box::new(applied), Box::new(rhs), span)
+            // KEYED ON THE RESOLVED IDENTITY, NOT ON `name`. `39 §6.9` binds
+            // completion to the defining `GlobalId` "never to the occurrence's
+            // glyph text", so this resolves the surface name first and then
+            // asks whether that identity is one the home certified. An alias
+            // reaching the same binding under a different spelling mints the
+            // same node; an unrelated local `≤` resolves elsewhere and does
+            // not (AC-2(b)).
+            let certified = standard_operators.and_then(|roles| {
+                let id = *globals.get(&name)?;
+                roles.values().any(|&certified| certified == id).then_some(id)
+            });
+            match certified {
+                Some(op) => RExpr::RStandardOp {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                    span,
+                },
+                // The ordinary user-operator spine, unchanged.
+                //
+                // **RESIDUAL: REACHABLE, UNFIXTURED.** A standard occurrence
+                // taking this arm is left as a two-argument application of a
+                // four-argument binding, caught downstream by the kernel check
+                // rather than named as a role. Deciding it here without the
+                // map would mean keying on the glyph, which is the thing
+                // `§6.9` forbids.
+                //
+                // AN EARLIER VERSION OF THIS COMMENT CALLED THE CASE
+                // UNCONSTRUCTIBLE, and the reason it gave covered only half of
+                // it. It reasoned about `standard_operators == None` -- the
+                // paths that elaborate no user body -- and concluded the map is
+                // absent exactly where no user body elaborates. But an ABSENT
+                // HOME yields `Some(empty)`, not `None`: `certify_roles`
+                // returns an empty map rather than declining, and an empty map
+                // certifies nothing, so this arm is reached WITH a user body.
+                //
+                // The shape that reaches it: import `ord_leq_at as ≤` directly
+                // while `Core.Operators.Standard` is absent from the program.
+                // `≤` then resolves to the four-argument binding, nothing is
+                // certified, and the occurrence lands here.
+                //
+                // That construction is stated and NOT BUILT. A named, unbuilt
+                // construction is a better thing to hand an attacker than a
+                // claim of non-constructibility, which is what this said
+                // before and what the paragraph above refutes.
+                None => {
+                    let head = RExpr::RCon(name, operator_span.clone());
+                    let first_span = Span::merge(head.span(), lhs.span());
+                    let applied = RExpr::RApp(Box::new(head), Box::new(lhs), first_span);
+                    RExpr::RApp(Box::new(applied), Box::new(rhs), span)
+                }
+            }
         }
     };
     values.push(combined);
@@ -10523,45 +10981,46 @@ fn reassociate_rexpr(
     expr: RExpr,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<RExpr, ElabError> {
     Ok(match expr {
         RExpr::RApp(function, argument, span) => RExpr::RApp(
-            Box::new(reassociate_rexpr(*function, globals, fixities)?),
-            Box::new(reassociate_rexpr(*argument, globals, fixities)?),
+            Box::new(reassociate_rexpr(*function, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*argument, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RLam(name, body, span) => RExpr::RLam(
             name,
-            Box::new(reassociate_rexpr(*body, globals, fixities)?),
+            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RLet(name, ty, value, body, span) => RExpr::RLet(
             name,
-            ty.map(|ty| reassociate_rtype(ty, globals, fixities))
+            ty.map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                 .transpose()?,
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
-            Box::new(reassociate_rexpr(*body, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RAsc(value, ty, span) => RExpr::RAsc(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
-            Box::new(reassociate_rtype(*ty, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*ty, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::ROld(value, span) => RExpr::ROld(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RBecomes(index, name, value, span) => RExpr::RBecomes(
             index,
             name,
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RBinOp(operator, lhs, rhs, span) => RExpr::RBinOp(
             operator,
-            Box::new(reassociate_rexpr(*lhs, globals, fixities)?),
-            Box::new(reassociate_rexpr(*rhs, globals, fixities)?),
+            Box::new(reassociate_rexpr(*lhs, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*rhs, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RInfixSpine {
@@ -10571,7 +11030,7 @@ fn reassociate_rexpr(
         } => {
             let mut operands = operands
                 .into_iter()
-                .map(|operand| reassociate_rexpr(operand, globals, fixities));
+                .map(|operand| reassociate_rexpr(operand, globals, fixities, standard_operators));
             let mut values = vec![operands
                 .next()
                 .expect("a parsed spine has one more operand")?];
@@ -10584,13 +11043,15 @@ fn reassociate_rexpr(
                     reduce_resolved_operator(
                         &mut values,
                         pending.pop().expect("pending operator exists"),
+                        globals,
+                        standard_operators,
                     );
                 }
                 pending.push(operator);
                 values.push(rhs?);
             }
             while let Some(operator) = pending.pop() {
-                reduce_resolved_operator(&mut values, operator);
+                reduce_resolved_operator(&mut values, operator, globals, standard_operators);
             }
             values.pop().expect("reassociation produces one expression")
         }
@@ -10600,7 +11061,7 @@ fn reassociate_rexpr(
             arms,
             span,
         } => RExpr::RMatch {
-            scrut: Box::new(reassociate_rexpr(*scrut, globals, fixities)?),
+            scrut: Box::new(reassociate_rexpr(*scrut, globals, fixities, standard_operators)?),
             equation,
             arms: arms
                 .into_iter()
@@ -10609,9 +11070,9 @@ fn reassociate_rexpr(
                         pat: arm.pat,
                         guard: arm
                             .guard
-                            .map(|guard| reassociate_rexpr(guard, globals, fixities))
+                            .map(|guard| reassociate_rexpr(guard, globals, fixities, standard_operators))
                             .transpose()?,
-                        body: reassociate_rexpr(arm.body, globals, fixities)?,
+                        body: reassociate_rexpr(arm.body, globals, fixities, standard_operators)?,
                         span: arm.span,
                     })
                 })
@@ -10624,28 +11085,28 @@ fn reassociate_rexpr(
             else_branch,
             span,
         } => RExpr::RIf {
-            condition: Box::new(reassociate_rexpr(*condition, globals, fixities)?),
-            then_branch: Box::new(reassociate_rexpr(*then_branch, globals, fixities)?),
-            else_branch: Box::new(reassociate_rexpr(*else_branch, globals, fixities)?),
+            condition: Box::new(reassociate_rexpr(*condition, globals, fixities, standard_operators)?),
+            then_branch: Box::new(reassociate_rexpr(*then_branch, globals, fixities, standard_operators)?),
+            else_branch: Box::new(reassociate_rexpr(*else_branch, globals, fixities, standard_operators)?),
             span,
         },
         RExpr::RPair(components, span) => RExpr::RPair(
             components
                 .into_iter()
-                .map(|component| reassociate_rexpr(component, globals, fixities))
+                .map(|component| reassociate_rexpr(component, globals, fixities, standard_operators))
                 .collect::<Result<Vec<_>, _>>()?,
             span,
         ),
         RExpr::RRecord { base, fields, span } => RExpr::RRecord {
             base: base
-                .map(|base| reassociate_rexpr(*base, globals, fixities).map(Box::new))
+                .map(|base| reassociate_rexpr(*base, globals, fixities, standard_operators).map(Box::new))
                 .transpose()?,
             fields: fields
                 .into_iter()
                 .map(|(name, value, name_span)| {
                     Ok((
                         name,
-                        reassociate_rexpr(value, globals, fixities)?,
+                        reassociate_rexpr(value, globals, fixities, standard_operators)?,
                         name_span,
                     ))
                 })
@@ -10653,30 +11114,42 @@ fn reassociate_rexpr(
             span,
         },
         RExpr::RProj(value, field, span) => RExpr::RProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             field,
             span,
         ),
         RExpr::RPosProj(value, index, span) => RExpr::RPosProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             index,
             span,
         ),
         RExpr::RPi(name, domain, codomain, span) => RExpr::RPi(
             name,
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RArrow(domain, codomain, span) => RExpr::RArrow(
-            Box::new(reassociate_rexpr(*domain, globals, fixities)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities)?),
+            Box::new(reassociate_rexpr(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RTrunc(inner, span) => RExpr::RTrunc(
-            Box::new(reassociate_rexpr(*inner, globals, fixities)?),
+            Box::new(reassociate_rexpr(*inner, globals, fixities, standard_operators)?),
             span,
         ),
+        // A LEAF HERE, AND THE ARGUMENT IS WHY -- stated because
+        // `leaf => leaf` below would have swallowed this variant with no
+        // compile error, the same invisible shape as the `modules.rs` remap.
+        //
+        // This node is MINTED BY THIS PASS, in `reduce_resolved_operator`,
+        // from operands the spine arm has already reassociated. So it can only
+        // be encountered on a SECOND traversal of an already-reassociated
+        // tree, where descending would be a no-op. Leafing is correct and
+        // descending would also be correct; what is not correct is leaving
+        // which one it is to a catch-all, since the reachability argument is
+        // the part that rots when the minting site moves.
+        leaf @ RExpr::RStandardOp { .. } => leaf,
         leaf => leaf,
     })
 }
@@ -10685,40 +11158,41 @@ fn reassociate_rtype(
     ty: RType,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<RType, ElabError> {
     Ok(match ty {
         RType::RPi(name, domain, codomain, span) => RType::RPi(
             name,
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RSigma(name, domain, codomain, span) => RType::RSigma(
             name,
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RArr(domain, codomain, span) => RType::RArr(
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::REffectArr(domain, row, codomain, span) => RType::REffectArr(
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
             row,
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RRefine(name, carrier, predicate, span) => RType::RRefine(
             name,
-            Box::new(reassociate_rtype(*carrier, globals, fixities)?),
-            Box::new(reassociate_rexpr(*predicate, globals, fixities)?),
+            Box::new(reassociate_rtype(*carrier, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*predicate, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RApp(function, argument, span) => RType::RApp(
-            Box::new(reassociate_rtype(*function, globals, fixities)?),
-            Box::new(reassociate_rtype(*argument, globals, fixities)?),
+            Box::new(reassociate_rtype(*function, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*argument, globals, fixities, standard_operators)?),
             span,
         ),
         // `‖A‖` — descend into the truncated type. This is REACHING, not
@@ -10734,7 +11208,7 @@ fn reassociate_rtype(
         // a chain) that a correct descent REJECTS. Mutation-proven by
         // `d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation`.
         RType::RTrunc(inner, span) => {
-            RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities)?), span)
+            RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities, standard_operators)?), span)
         }
         // `d.Query` — descend into the base through the EXPRESSION half, the
         // same split `RRefine` above makes for its predicate.
@@ -10749,7 +11223,7 @@ fn reassociate_rtype(
         // change, and the unreachability argument is the part that rots when
         // the base's shape widens. Three lines cost less than the argument.
         RType::RProj(base, field, span) => RType::RProj(
-            Box::new(reassociate_rexpr(*base, globals, fixities)?),
+            Box::new(reassociate_rexpr(*base, globals, fixities, standard_operators)?),
             field,
             span,
         ),
@@ -10788,33 +11262,34 @@ pub(crate) fn reassociate_space_decl(
     space: &RSpaceDecl,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<Option<Box<RSpaceDecl>>, ElabError> {
     if !space.contains_infix_spine {
         return Ok(None);
     }
     let mut associated = space.clone();
     for cell in &mut associated.cells {
-        cell.ty = reassociate_rtype(cell.ty.clone(), globals, fixities)?;
-        cell.init = reassociate_rexpr(cell.init.clone(), globals, fixities)?;
+        cell.ty = reassociate_rtype(cell.ty.clone(), globals, fixities, standard_operators)?;
+        cell.init = reassociate_rexpr(cell.init.clone(), globals, fixities, standard_operators)?;
     }
     for operation in &mut associated.operations {
         for (_, parameter_type) in &mut operation.params {
-            *parameter_type = reassociate_rtype(parameter_type.clone(), globals, fixities)?;
+            *parameter_type = reassociate_rtype(parameter_type.clone(), globals, fixities, standard_operators)?;
         }
-        operation.ret_ty = reassociate_rtype(operation.ret_ty.clone(), globals, fixities)?;
+        operation.ret_ty = reassociate_rtype(operation.ret_ty.clone(), globals, fixities, standard_operators)?;
         operation.requires = operation
             .requires
             .clone()
             .into_iter()
-            .map(|expr| reassociate_rexpr(expr, globals, fixities))
+            .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
             .collect::<Result<Vec<_>, _>>()?;
         operation.ensures = operation
             .ensures
             .clone()
             .into_iter()
-            .map(|expr| reassociate_rexpr(expr, globals, fixities))
+            .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
             .collect::<Result<Vec<_>, _>>()?;
-        operation.body = reassociate_rexpr(operation.body.clone(), globals, fixities)?;
+        operation.body = reassociate_rexpr(operation.body.clone(), globals, fixities, standard_operators)?;
     }
     Ok(Some(Box::new(associated)))
 }
@@ -10823,6 +11298,7 @@ fn reassociate_rdecl(
     rdecl: &RDecl,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<Option<Box<RDecl>>, ElabError> {
     if !rdecl.contains_infix_spine {
         return Ok(None);
@@ -10830,34 +11306,34 @@ fn reassociate_rdecl(
     let mut associated = rdecl.clone();
     associated.ty = associated
         .ty
-        .map(|ty| reassociate_rtype(ty, globals, fixities))
+        .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
         .transpose()?;
-    associated.body = reassociate_rexpr(associated.body, globals, fixities)?;
+    associated.body = reassociate_rexpr(associated.body, globals, fixities, standard_operators)?;
     associated.requires = associated
         .requires
         .into_iter()
-        .map(|expr| reassociate_rexpr(expr, globals, fixities))
+        .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
         .collect::<Result<Vec<_>, _>>()?;
     associated.ensures = associated
         .ensures
         .into_iter()
-        .map(|expr| reassociate_rexpr(expr, globals, fixities))
+        .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
         .collect::<Result<Vec<_>, _>>()?;
     match &mut associated.kind {
         RDeclKind::View { constraints, .. } => {
             for constraint in constraints {
                 constraint.head_type =
-                    reassociate_rtype(constraint.head_type.clone(), globals, fixities)?;
+                    reassociate_rtype(constraint.head_type.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::Prop { intros } => {
             for intro in intros {
-                intro.ty = reassociate_rtype(intro.ty.clone(), globals, fixities)?;
+                intro.ty = reassociate_rtype(intro.ty.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::Law { fields, .. } => {
             for (_, field) in fields {
-                *field = reassociate_rexpr(field.clone(), globals, fixities)?;
+                *field = reassociate_rexpr(field.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::DataDecl { ctors, .. } => {
@@ -10866,7 +11342,7 @@ fn reassociate_rdecl(
                     .args
                     .clone()
                     .into_iter()
-                    .map(|ty| reassociate_rtype(ty, globals, fixities))
+                    .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                     .collect::<Result<Vec<_>, _>>()?;
             }
         }
@@ -10877,25 +11353,25 @@ fn reassociate_rdecl(
             ..
         } => {
             for entry in params.iter_mut().chain(indices.iter_mut()) {
-                entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities)?;
+                entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities, standard_operators)?;
             }
             for ctor in ctors {
                 for entry in &mut ctor.args {
-                    entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities)?;
+                    entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities, standard_operators)?;
                 }
                 ctor.result = ctor
                     .result
                     .clone()
-                    .map(|ty| reassociate_rtype(ty, globals, fixities))
+                    .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                     .transpose()?;
             }
         }
         RDeclKind::TypeAlias { ty } => {
-            *ty = reassociate_rtype(ty.clone(), globals, fixities)?;
+            *ty = reassociate_rtype(ty.clone(), globals, fixities, standard_operators)?;
         }
         RDeclKind::RecordDecl { fields } => {
             for field in fields {
-                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities)?;
+                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::ClassDecl {
@@ -10903,10 +11379,10 @@ fn reassociate_rdecl(
         } => {
             *param_kind = param_kind
                 .clone()
-                .map(|ty| reassociate_rtype(ty, globals, fixities))
+                .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                 .transpose()?;
             for field in fields {
-                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities)?;
+                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::InstanceDecl {
@@ -10915,13 +11391,13 @@ fn reassociate_rdecl(
             fields,
             ..
         } => {
-            *head_type = reassociate_rtype(head_type.clone(), globals, fixities)?;
+            *head_type = reassociate_rtype(head_type.clone(), globals, fixities, standard_operators)?;
             for constraint in constraints {
                 constraint.head_type =
-                    reassociate_rtype(constraint.head_type.clone(), globals, fixities)?;
+                    reassociate_rtype(constraint.head_type.clone(), globals, fixities, standard_operators)?;
             }
             for (_, field) in fields {
-                *field = reassociate_rexpr(field.clone(), globals, fixities)?;
+                *field = reassociate_rexpr(field.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::Let
@@ -10961,7 +11437,7 @@ mod fixity_reassociation_skip_tests {
             kind: RDeclKind::Let,
         };
         assert!(
-            reassociate_rdecl(&declaration, &HashMap::new(), &HashMap::new())
+            reassociate_rdecl(&declaration, &HashMap::new(), &HashMap::new(), None)
                 .expect("spine-free reassociation cannot fail")
                 .is_none(),
             "a spine-free declaration must not allocate or traverse an associated clone"
@@ -10970,12 +11446,19 @@ mod fixity_reassociation_skip_tests {
 }
 
 /// V1 elaboration: returns the definition id plus any emitted obligation holes.
-pub fn elaborate_rdecl_v1(
+pub(crate) fn elaborate_rdecl_v1(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    // Threaded rather than made local. `fixities`, `fixity_spans` and
+    // `ctor_decl_spans` below ARE locals on this standalone path because they
+    // are scoped to one declaration -- provenance is not. It accumulated into
+    // the caller's registry before this change, so making it local here would
+    // silently drop it on this path.
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     let mut fixities = HashMap::new();
@@ -10990,6 +11473,8 @@ pub fn elaborate_rdecl_v1(
         num_values,
         numeric_env,
         class_env,
+        provenance,
+        standard_operators,
         &HashMap::new(),
         &mut fixities,
         &mut fixity_spans,
@@ -11008,6 +11493,8 @@ fn declaration_param_context(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
 ) -> Result<Context, ElabError> {
     // This walks the declaration's OWN parameter telescope, so it is the FIRST
@@ -11016,7 +11503,7 @@ fn declaration_param_context(
     // the class env for the same reason they do: the name-to-index lookup
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-        .with_classes(class_env);
+        .with_classes(class_env, provenance, standard_operators);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
         let domain_core = elab_type(&mut cx, domain)?;
@@ -11026,12 +11513,14 @@ fn declaration_param_context(
     Ok(cx.ctx)
 }
 
-pub fn elaborate_rdecl_v1_with_effect_rows(
+pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
@@ -11049,6 +11538,8 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             effect_rows,
             fixities,
             fixity_spans,
@@ -11057,7 +11548,7 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
             rdecl,
         );
     }
-    let associated = reassociate_rdecl(rdecl, globals, fixities)?
+    let associated = reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators))?
         .expect("a declaration marked with an infix spine must be reassociated");
     elaborate_associated_rdecl(
         env,
@@ -11065,6 +11556,8 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
         num_values,
         numeric_env,
         class_env,
+        provenance,
+        standard_operators,
         effect_rows,
         fixities,
         fixity_spans,
@@ -11081,6 +11574,8 @@ fn elaborate_associated_rdecl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
@@ -11105,7 +11600,7 @@ fn elaborate_associated_rdecl(
             // name-to-index lookup has no field list and a well-formed binding
             // is refused by a sort pre-check.
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(&*class_env);
+                .with_classes(&*class_env, provenance, standard_operators);
             let ty = elab_type(&mut cx, ty)?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
@@ -11114,8 +11609,16 @@ fn elaborate_associated_rdecl(
     match &rdecl.kind {
         RDeclKind::View { constraints, .. } => {
             let effect_row_type = check_view_visits_row(rdecl)?;
-            let dictionary_ctx =
-                declaration_param_context(env, globals, num_values, numeric_env, class_env, rdecl)?;
+            let dictionary_ctx = declaration_param_context(
+                env,
+                globals,
+                num_values,
+                numeric_env,
+                class_env,
+                provenance,
+                standard_operators,
+                rdecl,
+            )?;
             // Resolve each constraint into its fully applied dictionary term.
             // A generic instance is not a bare global: its type arguments and
             // recursively-required dictionaries must be applied at this use
@@ -11128,6 +11631,7 @@ fn elaborate_associated_rdecl(
                     num_values,
                     numeric_env,
                     class_env,
+                    provenance,
                     &dictionary_ctx,
                     &constraint.class_name,
                     &constraint.head_type,
@@ -11153,6 +11657,8 @@ fn elaborate_associated_rdecl(
                 num_values,
                 numeric_env,
                 class_env,
+                provenance,
+                standard_operators,
                 rdecl,
                 &local_dicts,
                 fixities,
@@ -11170,6 +11676,8 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             rdecl,
             &HashMap::new(),
             fixities,
@@ -11177,15 +11685,25 @@ fn elaborate_associated_rdecl(
             declared_fixity.clone(),
         ),
         RDeclKind::Prove => elaborate_prove(env, globals, num_values, numeric_env, rdecl),
-        RDeclKind::Prop { intros } => {
-            elaborate_prop_decl(env, globals, num_values, numeric_env, class_env, rdecl, intros)
-        }
+        RDeclKind::Prop { intros } => elaborate_prop_decl(
+            env,
+            globals,
+            num_values,
+            numeric_env,
+            class_env,
+            provenance,
+            standard_operators,
+            rdecl,
+            intros,
+        ),
         RDeclKind::Theorem => elaborate_checked_theorem(
             env,
             globals,
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             rdecl,
             None,
         ),
@@ -11195,6 +11713,8 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             rdecl,
             Some(subject),
         ),
@@ -11334,6 +11854,8 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             rdecl,
             effect_rows,
             &rdecl.name.clone(),
@@ -11767,6 +12289,8 @@ fn elab_instance_decl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     class_name: &str,
@@ -11930,7 +12454,7 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env);
+            .with_classes(&*class_env, provenance, standard_operators);
             push_type0_params(&mut cx, head_params.len());
             for (index, constraint_ty) in constraint_core_types.iter().enumerate() {
                 cx.ctx.push(weaken(constraint_ty, index as i64));
@@ -11970,7 +12494,7 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env);
+            .with_classes(&*class_env, provenance, standard_operators);
             push_type0_params(&mut cx, head_params.len());
             compute_ordered_field_values(
                 &mut cx,
@@ -12215,6 +12739,8 @@ fn elaborate_view_or_let(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     fixities: &mut HashMap<GlobalId, Fixity>,
@@ -12235,6 +12761,8 @@ fn elaborate_view_or_let(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             rdecl,
             local_dicts,
             fixities,
@@ -12249,6 +12777,8 @@ fn elaborate_view_or_let(
         num_values,
         numeric_env,
         class_env,
+        provenance,
+        standard_operators,
         rdecl,
         local_dicts,
     )
@@ -12465,7 +12995,11 @@ pub(crate) fn elaborate_space_decl(
             &elab.numeric_env,
             qualified_name.clone(),
         )
-        .with_classes(&elab.class_env);
+        .with_classes(
+            &elab.class_env,
+            &mut elab.resolution_provenance,
+            &elab.standard_operators,
+        );
         let mut parameter_domains = Vec::with_capacity(operation.params.len());
         for (_, parameter_type) in &operation.params {
             let domain = elab_type(&mut cx, parameter_type)?;
@@ -12703,6 +13237,8 @@ fn elaborate_v0(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     fixities: &mut HashMap<GlobalId, Fixity>,
@@ -12720,6 +13256,8 @@ fn elaborate_v0(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             fixities,
             fixity_spans,
             declared_fixity,
@@ -12728,7 +13266,7 @@ fn elaborate_v0(
     }
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env)
+            .with_classes(class_env, provenance, standard_operators)
             .with_local_dicts(local_dicts);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
@@ -12811,6 +13349,8 @@ fn elaborate_recursive_view(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -12847,7 +13387,7 @@ fn elaborate_recursive_view(
 
     // 3. Reassociate once, after predeclaration and before type-directed body
     // elaboration. The existing checker sees ordinary RApp/RBinOp only.
-    let associated = match reassociate_rdecl(rdecl, globals, fixities) {
+    let associated = match reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators)) {
         Ok(associated) => associated,
         Err(error) => {
             env.remove_last();
@@ -12862,7 +13402,7 @@ fn elaborate_recursive_view(
     let associated = associated.as_deref().unwrap_or(rdecl);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env);
+            .with_classes(class_env, provenance, standard_operators);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
@@ -12935,12 +13475,14 @@ fn elaborate_recursive_view(
 /// Each member requires an explicit type annotation (mirrors the existing
 /// singleton recursive-const rule — a mutual group's forward references need
 /// every member's *type* resolvable before any body is elaborated).
-pub fn elaborate_mutual_group(
+pub(crate) fn elaborate_mutual_group(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixities: &[Option<(Fixity, Span)>],
@@ -13016,7 +13558,7 @@ pub fn elaborate_mutual_group(
     }
     let associated_members = match members
         .iter()
-        .map(|member| reassociate_rdecl(member, globals, fixities))
+        .map(|member| reassociate_rdecl(member, globals, fixities, Some(standard_operators)))
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(members) => members,
@@ -13099,7 +13641,7 @@ pub fn elaborate_mutual_group(
     let elab_err = (|| -> Result<(), ElabError> {
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env)
+                .with_classes(class_env, provenance, standard_operators)
                 .with_recursive_group(&recursive_group);
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
@@ -13215,6 +13757,9 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RAsc(e, _, _) => rexpr_mentions_name(e, name),
         RExpr::ROld(e, _) => rexpr_mentions_name(e, name),
         RExpr::RBecomes(_, _, e, _) => rexpr_mentions_name(e, name),
+        RExpr::RStandardOp { lhs, rhs, .. } => {
+            rexpr_mentions_name(lhs, name) || rexpr_mentions_name(rhs, name)
+        }
         RExpr::RBinOp(_, l, r, _) => rexpr_mentions_name(l, name) || rexpr_mentions_name(r, name),
         RExpr::RInfixSpine {
             operands,
@@ -13304,6 +13849,8 @@ fn elaborate_view_with_spec(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
 ) -> Result<ElabResult, ElabError> {
@@ -13321,7 +13868,7 @@ fn elaborate_view_with_spec(
         // Recursive: elab the carrier type, pre-admit, then elab the body.
         let carrier_ty = {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env)
+                .with_classes(class_env, provenance, standard_operators)
                 .with_local_dicts(local_dicts);
             let ty = rdecl.ty.as_ref().ok_or_else(|| {
                 ElabError::Internal(
@@ -13341,7 +13888,7 @@ fn elaborate_view_with_spec(
         globals.insert(rdecl.name.clone(), id);
         let body = {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(class_env)
+                .with_classes(class_env, provenance, standard_operators)
                 .with_local_dicts(local_dicts);
             let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
             cx.metas.zonk_term(&body_c)
@@ -13350,7 +13897,7 @@ fn elaborate_view_with_spec(
     } else {
         // Non-recursive: original one-context flow.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env)
+            .with_classes(class_env, provenance, standard_operators)
             .with_local_dicts(local_dicts);
         if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
@@ -13379,6 +13926,8 @@ fn elaborate_view_with_spec(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             local_dicts,
             &param_ctx,
             req,
@@ -13414,6 +13963,8 @@ fn elaborate_view_with_spec(
             num_values,
             numeric_env,
             class_env,
+            provenance,
+            standard_operators,
             local_dicts,
             &ens_ctx,
             ens,
@@ -13561,6 +14112,8 @@ fn elaborate_prop_decl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     intros: &[RPropIntro],
 ) -> Result<ElabResult, ElabError> {
@@ -13577,7 +14130,7 @@ fn elaborate_prop_decl(
         // does: a `prop`'s telescope may be typed by a projection, and the
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env);
+            .with_classes(class_env, provenance, standard_operators);
         let ty = elab_type(&mut cx, prop_ty)?;
         let ty = cx.metas.zonk_term(&ty);
         let body = top_body_for_prop_type(env, &ty, &rdecl.span)?;
@@ -13620,6 +14173,12 @@ fn elaborate_prop_decl(
             num_values,
             numeric_env,
             &ClassEnv::sentinel(),
+            // A local sink on a sentinel path, for the same reason as
+            // `elaborate_rdecl`'s: provenance lived in the throwaway registry
+            // here and was dropped with it.
+            &mut Vec::new(),
+            // Sentinel path -- see `elaborate_rdecl_v1`'s call above.
+            &HashMap::new(),
             &helper_rdecl,
             None,
         )?;
@@ -13636,6 +14195,8 @@ fn elaborate_checked_theorem(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     attached_subject: Option<&str>,
 ) -> Result<ElabResult, ElabError> {
@@ -13648,7 +14209,7 @@ fn elaborate_checked_theorem(
 
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env);
+            .with_classes(class_env, provenance, standard_operators);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
         })?;
@@ -14035,6 +14596,8 @@ fn elab_in_ctx_at_omega(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     ctx: &Context,
     expr: &RExpr,
@@ -14049,7 +14612,7 @@ fn elab_in_ctx_at_omega(
         numeric_env,
         owner_label.to_string(),
     )
-    .with_classes(class_env)
+    .with_classes(class_env, provenance, standard_operators)
     .with_local_dicts(local_dicts);
     // Populate cx.ctx from the snapshot
     for ty in &ctx.types {
@@ -19482,6 +20045,112 @@ mod missing_pattern_witness_diagnostic_strictness_tests {
             "B's declared arity is still correctly derived from the kernel \
              lookup even though the name lookup missed -- the two lookups \
              are independent, not coupled"
+        );
+    }
+}
+
+#[cfg(test)]
+mod surf1_visits_row_production_path {
+    //! SURF-1 D1's two production-path rows, RELOCATED FROM
+    //! `tests/effects.rs` rather than rewritten (language-leader,
+    //! `evt_66h8wqeaffnfg`).
+    //!
+    //! **They pin the `elaborate_rdecl_v1` hook deliberately** -- their own
+    //! doc said "if the hook is removed, this fails with `None`" -- so the
+    //! cheaper rewrite through a public `elaborate_file` path was refused: it
+    //! would keep the assertion and drop the thing being asserted.
+    //!
+    //! They live here because that function is `pub(crate)`, and it is
+    //! `pub(crate)` because its signature names `StandardOperatorRole`, which
+    //! `lib.rs`'s `deny(private_interfaces)` keeps off the public surface for
+    //! the membership track. An integration test cannot reach it. **In-crate
+    //! they are compiled by `--lib`**, which runs every increment -- the
+    //! version in `tests/` was not compiled by any targeted selection and sat
+    //! broken, undelivered, for the branch's whole length.
+    use super::*;
+    use crate::effects::RowType;
+    use crate::parser::parse_decls;
+    use crate::resolve::resolve_decl;
+
+    /// The certified standard operators these fixtures need: NONE -- CHOSEN
+    /// AND STATED, not defaulted.
+    ///
+    /// **And the choice self-checks.** "These fixtures contain no comparison
+    /// operator" is a property of the fixtures, not a fact about the world, so
+    /// it is asserted rather than assumed: a fixture that later grows a `≤`
+    /// reds here instead of being silently refused by an empty map.
+    fn no_standard_operators(src: &str) -> HashMap<StandardOperatorRole, GlobalId> {
+        for role in StandardOperatorRole::ALL {
+            assert!(
+                !src.contains(role.glyph()),
+                "this fixture now contains `{}`, so an EMPTY certified map is \
+                 no longer the right choice for it -- supply the role or split \
+                 the fixture",
+                role.glyph()
+            );
+        }
+        HashMap::new()
+    }
+
+    /// SURF-1 D1 production path: real `RDeclKind::View` elaboration consumes
+    /// the parsed concrete `visits` row and records the checked `RowType`. If
+    /// the `elaborate_rdecl_v1` hook is removed, this fails with `None`.
+    #[test]
+    fn surf1_view_elaboration_consumes_visits_row() {
+        let src = "proc surf1_visits (x : Nat) : Nat visits [Console] = x";
+        let decls = parse_decls(src).expect("const with concrete visits row must parse");
+        let rdecl = resolve_decl(&decls[0]).expect("const with concrete visits row must resolve");
+        let mut env = crate::ElabEnv::new().expect("base env");
+        let standard_operators = no_standard_operators(src);
+
+        let result = elaborate_rdecl_v1(
+            &mut env.env,
+            &mut env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            &mut env.class_env,
+            &mut env.resolution_provenance,
+            &standard_operators,
+            &rdecl,
+        )
+        .expect("const with concrete D1 visits row must elaborate");
+
+        let row = result
+            .effect_row_type
+            .expect("production const elaboration must expose checked visits row");
+        assert_eq!(
+            row,
+            RowType::singleton("Console"),
+            "written [Console] must reach production checking as a RowType"
+        );
+    }
+
+    /// SURF-1 D1 production path: row variables fail closed unless the same
+    /// variable was allocated from a HOF latent-row binding in the declaration
+    /// type. A plain first-order const must not synthesize `e` from `visits`.
+    #[test]
+    fn surf1_view_elaboration_rejects_unbound_visits_row_var() {
+        let src = "proc surf1_bad_visits (x : Nat) : Nat visits [Console | e] = x";
+        let decls = parse_decls(src).expect("const with open visits row must parse");
+        let rdecl = resolve_decl(&decls[0]).expect("const with open visits row must resolve");
+        let mut env = crate::ElabEnv::new().expect("base env");
+        let standard_operators = no_standard_operators(src);
+
+        let err = elaborate_rdecl_v1(
+            &mut env.env,
+            &mut env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            &mut env.class_env,
+            &mut env.resolution_provenance,
+            &standard_operators,
+            &rdecl,
+        )
+        .expect_err("unbound visits row variable must reject fail-closed");
+
+        assert!(
+            format!("{err:?}").contains("unknown row variable `e` in visits row"),
+            "unexpected error for unbound row variable: {err:?}"
         );
     }
 }

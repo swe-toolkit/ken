@@ -223,8 +223,6 @@ pub struct ClassEnv {
     pub implicit_single_provider: bool,
     /// Distinct source packages which registered instances in this closure.
     pub source_instance_packages: std::collections::HashSet<String>,
-    /// Successful implicit-resolution provenance in source order.
-    pub resolution_provenance: Vec<InstanceResolution>,
 }
 
 impl ClassEnv {
@@ -297,7 +295,6 @@ impl ClassEnv {
             direct_use_instances: std::collections::HashSet::new(),
             implicit_single_provider: false,
             source_instance_packages: std::collections::HashSet::new(),
-            resolution_provenance: Vec::new(),
         }
     }
     /// Create a sentinel `ClassEnv` for non-class elaboration paths. Its
@@ -318,7 +315,6 @@ impl ClassEnv {
             direct_use_instances: std::collections::HashSet::new(),
             implicit_single_provider: false,
             source_instance_packages: std::collections::HashSet::new(),
-            resolution_provenance: Vec::new(),
         }
     }
 

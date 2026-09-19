@@ -7,6 +7,15 @@
 //! L1 extensions: numeric tower, literal defaulting, overflow obligations.
 //! Clean-room: built from `/spec` and `/conformance` only.
 
+// `standard_operators::StandardOperatorRole` is crate-internal BY CONTRACT,
+// not by convention: the membership track widens it, and that widening is an
+// ordinary internal edit only for as long as the type never reaches this
+// crate's public surface. `private_interfaces` is the compiler check that
+// says so -- a `pub fn` taking or returning the role type, or a `pub` field
+// holding one, becomes a BUILD ERROR here rather than a silent escape that
+// the widening seat discovers later.
+#![deny(private_interfaces)]
+
 mod ast;
 pub mod bytes;
 pub mod capabilities;
@@ -39,6 +48,7 @@ pub mod program_admission;
 pub mod protocol;
 pub mod prover;
 pub mod resolve;
+mod standard_operators;
 pub mod strings;
 pub mod temporal;
 pub mod trace;
@@ -144,6 +154,22 @@ pub struct ElabEnv {
     pub ctor_decl_spans: HashMap<String, Span>,
     /// The numeric tower (registered op ids, dispatch tables).
     pub numeric_env: NumericEnv,
+
+    /// The standard-operator identities layer 3 certified against the
+    /// standard-operator home's export table (`33 §6.1`, `39 §6.9`).
+    ///
+    /// Empty when the program does not provide the home. **An occurrence is
+    /// then NOT refused naming the role, and this comment used to say it
+    /// was.** An empty map certifies nothing, so each occurrence is left as an
+    /// ordinary under-applied application and caught downstream by the kernel
+    /// check; the residual on `reduce_resolved_operator`'s non-certified arm
+    /// carries the detail.
+    ///
+    /// **Not `pub`**: the role type is crate-internal by contract, and
+    /// `#![deny(private_interfaces)]` above is what holds that rather than
+    /// this comment.
+    pub(crate) standard_operators:
+        HashMap<standard_operators::StandardOperatorRole, GlobalId>,
     /// The Bytes layer (L6): type ids, I/O effect row registry (`38 §1`, `41`).
     pub bytes_env: BytesEnv,
     /// The foreign FFI layer (L7): binding registry (`38 §2–§4`).
@@ -162,6 +188,26 @@ pub struct ElabEnv {
     /// The Lc typeclass environment: class/instance registry + structural
     /// postulates (`RecordNil`, `record_nil_val`). Initialized in `empty()`.
     pub class_env: ClassEnv,
+    /// Successful implicit-resolution provenance, in source order.
+    ///
+    /// **A SIBLING OF `class_env`, not a field of it, and the split is the
+    /// point.** `33 §6.2` instance search is a lookup against a registry fixed
+    /// before any body elaborates, so the resolution DECISION is a pure
+    /// function of `&ClassEnv`. This is the one thing the resolver writes --
+    /// an append-only OUTPUT with zero production readers -- and while it
+    /// lived inside `ClassEnv` the whole registry had to be borrowed mutably
+    /// to record it, which put dictionary resolution out of reach of an
+    /// expression site.
+    ///
+    /// Keeping it inside and borrowing the field alone does not work: `&*env`
+    /// and `&mut env.field` overlap as places. Two fields of `ElabEnv` are
+    /// disjoint by direct projection, which is why the SINK moves rather than
+    /// the borrow (Architect, `evt_qgdv6h7s3fyn`).
+    ///
+    /// **ONE OWNER, APPENDED IN ELABORATION ORDER.** `classes.rs` documented
+    /// "in source order" and tests index `resolutions[0]`/`[1]`, so this must
+    /// not become per-declaration.
+    pub resolution_provenance: Vec<classes::InstanceResolution>,
     /// Module/import/visibility bookkeeping (`33 §3-4`, ES3-build) —
     /// persists the file-level (root) import scope and every elaborated
     /// module's `pub` export table across separate `elaborate_*` calls.
@@ -218,6 +264,7 @@ impl ElabEnv {
             fixity_spans: HashMap::new(),
             ctor_decl_spans,
             numeric_env,
+            standard_operators: HashMap::new(),
             bytes_env,
             foreign_env: foreign::ForeignEnv::empty(),
             effect_rows,
@@ -226,6 +273,7 @@ impl ElabEnv {
             prelude_env: prelude::empty_prelude_env(),
             // placeholder; replaced after prelude registration below.
             class_env: classes::ClassEnv::sentinel(),
+            resolution_provenance: Vec::new(),
             module_state: modules::ModuleState::default(),
         };
         // L3 prelude: Peano `Nat` (replaces the placeholder postulate) + the
