@@ -311,3 +311,46 @@ in one run.
 ⇒ Disposition is **undetermined**. It may still be `AC-2`'s second branch, but
 that cannot be asserted until the site is known, and the previous text
 asserting it is withdrawn.
+
+## `D1` increment — the site now has an IDENTITY, not an inferred location
+
+Two localizations have now failed, both keyed on **a property of the program**
+(span length; outer-continuation shape). A third property-keyed guess is the
+error to avoid, so this measures the site's own identity instead.
+
+    row              effect_origin        expected_word
+    double-release   StaticOriginId(190)  13975823581216
+    right-denial     StaticOriginId(198)  14272176324638
+
+Paired by `expected_word`, which the `D0` decode already tied to each row.
+Both rows fire the same `require_i64(ret_tag, expected_ret)` call.
+
+### The coordinate that moved under the instrument, caught
+
+The probe reported the firing site as `units.rs:3437`. **That is not a
+coordinate in the tree** — it is `:3430` displaced by the seven lines the
+probe itself inserted above the call. Verified by reading both:
+
+    instrumented tree :3437   Lowering::require_i64(&mut builder, ret_tag, expected_ret);
+    HEAD              :3430   Lowering::require_i64(&mut builder, ret_tag, expected_ret);
+
+Same statement. Had this been published as `:3437` it would have resolved, in
+a clean tree, to a neighbouring line — the failure mode where a wrong citation
+is believed because it does not error.
+
+### On the per-build positive control
+
+@architect's rule is that the control belongs to every build the probe is
+rebuilt for, because a re-anchored probe is a new instrument. **This reading
+is positive — a tag fired and the `kret` lines printed — and a fired tag is
+self-evidencing: it excludes both "nothing was instrumented" and "no
+instrumented site fired" at once.** The forcing control is what a *negative*
+reading needs, and that is the case that bit earlier. Recording the
+distinction rather than running the control as ritual or skipping it silently.
+
+### Still open
+
+Mapping `StaticOriginId(190)` and `(198)` to their source terms. Until that
+lands, the `withResource`-plus-`bind` hypothesis is untested and **no label
+can be written** — the branch is undetermined and `D1` has not established
+whether a live successor exists.
