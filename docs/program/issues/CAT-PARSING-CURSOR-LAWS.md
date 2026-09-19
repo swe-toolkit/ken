@@ -116,6 +116,15 @@ must not become a third predecessor.
 `sub` from `Data.Numeric.Nat.Order`, and `Order.ken.md:39` re-exports `leq_nat`
 and `IsTrue`. Widen the existing import list.
 
+> **CORRECTED 2026-09-19: WIDEN TO `(leq_nat, sub)` ONLY. DO NOT IMPORT
+> `IsTrue`.** Foundation measured that importing it makes the consumer-view
+> loader harness fail `AmbiguousReference`, because base already supplies
+> `IsTrue`. The sentence above is right that `Order` re-exports it and wrong to
+> read that as licence to name it here — a name available by two routes is
+> ambiguous, not redundant. **The narrowed import preserves package check and
+> fmt**, and the bridge still closes because `IsTrue` remains in scope from
+> base.
+
 **4. The `Bytes` view closes by unfolding, not by a new fact.**
 `bytes_nat_length bs` is *defined* as `length UInt8 (bytes_to_list bs)`
 (`Data/Collections/Derived.ken.md:928`), and `arg_length` is `bytes_nat_length`
@@ -193,10 +202,39 @@ compare them programmatically, not by eye.
 
 **`AC-3` — no new trust, and the diff goes exactly one place.** *Control:* the
 added lines contain no `Axiom`, postulate, primitive, `Omega` carrier, or
-kernel/TCB surface; **and** the diff touches exactly
-`catalog/packages/Capability/Parsing/Cursor.ken.md` and, under `crates/`,
-nothing at all. Any other path — test or not — means this frame did not
-anticipate something: that is a hard stop and a report, not a scope extension.
+kernel/TCB surface; **and** the diff touches
+`catalog/packages/Capability/Parsing/Cursor.ken.md` plus, under `crates/`,
+**only test harnesses that mechanically reconstruct a consumer's view of a
+catalog package.** Any path under `crates/**/src/**`, or any other non-test
+path, is a hard stop and a report, not a scope extension.
+
+> **AMENDED 2026-09-19 ON A HARD STOP THAT THIS `AC` PRODUCED CORRECTLY.**
+> Foundation stopped at `be70f1f84` rather than edit a harness, which is the
+> behaviour the clause was written to get. **The clause was wrong, not the
+> stop.** `crates/ken-elaborator/tests/cat_tier_d_cursor_import.rs` holds
+> `parsing_cursor_loader_visible_inventory_is_exact`, which asserts
+> `published_module_surfaces(...)` equals a 17-name literal set. **A new `pub`
+> export necessarily changes that set**, so the harness edit is mechanical and
+> forced — refusing it would mean this package can never gain a public export
+> without a separate node.
+>
+> **This `AC` shape has now been wrong three times, all three mine, and this
+> time in the OPPOSITE direction from the first two.** On
+> `CAT-COLLECTIONS-NTH-LAWS` it was twice too narrow — a path list that had
+> only sampled its population — and I reshaped it into exactly the predicate
+> above. **One commit later I wrote `crates/`: nothing at all into the
+> successor node**, discarding the predicate I had just derived, on a node whose
+> whole deliverable is a new `pub` export. Over-tight and under-tight are the
+> same defect: an `AC` asserting a population I had not measured.
+
+**`AC-3a` — the harness edit is mechanical, and it is bounded.** *Control, all
+three required:* the only change to
+`cat_tier_d_cursor_import.rs` is adding the new exported name to the literal
+set and updating the "seventeen" prose to match; the assertion stays an
+**equality**, never a subset or a `contains`; **and** deleting the added name
+makes the harness go RED, restored byte-exact afterwards. **If closing this
+needs any harness change beyond those, that is a fresh hard stop** — the
+authorisation is for the name, not for the file.
 
 ## Design note, not a criterion
 
