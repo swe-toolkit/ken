@@ -315,3 +315,44 @@ The node's list stands. Three more, all from this frame's measurements:
   for a different purpose; this function needs one consumer origin and pairs it
   with `checked_frame_for_consumer`. It is a comparator for **where to look**,
   not a body to clone.
+
+## WRITE-BACK — `D0`, `D1`, `D2` landed 2026-09-18 and were never recorded here
+
+**Written back at `c67a33fda46f93e7bfb89e2fc3d9a3d127679dbd`.** This frame's
+deliverables above were discharged in `crates/` by `03976d2ac` (verified an
+ancestor of `origin/main`), which touched
+`crates/ken-cli/tests/rt_span_prov_native.rs` and
+`.../static_transition/aggregates.rs` and **did not touch this frame or the
+node.** Read the node's write-back section for the full record; the operative
+facts for anyone picking this frame up:
+
+- **`D0` returned outcome (a).** The first refusal cleared and a **third
+  layer, `StaticResponseDeferred`, was found behind it.**
+- **`D1`/`D2` are discharged** by that same commit, which found the consumer
+  behind `worker_return` and corrected the annotation.
+- **Re-verified at current `main`:** row 14 is still `#[ignore]`d and its
+  label has been retitled to name the third layer.
+- **`D3`: witness RETIRED — RELAYED, NOT RE-DERIVED.** A claim from the
+  campaign thread, recorded because `D3` asks for it, marked because I did
+  not verify it against an artifact.
+
+**THIS FRAME'S FORCING STEP HAS ALREADY FIRED.** Its `D0` is described as *"a
+single forcing step with a named target and a binary outcome, NOT a peeling
+ladder"* — that is a true description of work **already done**, not of work
+available. Anyone selecting this node for that property is selecting a
+property that was consumed on 2026-09-18.
+
+**No row is cleared.** Row 14 remains ignored, now stopping at the third
+layer. **The third layer is neither investigated nor sized here** — sizing it
+against the superseded analysis would size the wrong thing.
+
+### The predicate this node is a worked example of
+
+    Before starting any `ready` node:
+        git log --oneline origin/main --grep=<NODE-ID>
+    Commits the node file does not record ⇒ the node is stale and the
+    write-back precedes the work.
+
+**`status: ready` is a claim about a node, not evidence about the tree.** Here
+the tree had moved three deliverables ahead of the file, and every reader
+since would have re-derived landed work.
