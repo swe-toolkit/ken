@@ -967,6 +967,25 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // The operator facade this WP adds. It declares the standard
+            // operator bindings and inherits its ambient set from the
+            // conjunction vocabulary those bindings are checked against.
+            "Core.Operators.Standard".to_string(),
+            [
+                "And",
+                "Bottom",
+                "Equal",
+                "Prop",
+                "Proved",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // The historical package now imports the canonical class owner and
             // declares no local instance. Its remaining convenience set is
             // inherited from that provider's checked proof vocabulary.
