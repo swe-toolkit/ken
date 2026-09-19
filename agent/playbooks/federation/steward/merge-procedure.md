@@ -869,6 +869,55 @@ row whose label names a `merged` node is unroutable: it looks owned to every
 census, and nothing will ever correct it, because the only thing that would
 have is the node that just closed.
 
+#### ARM 2 — A ZERO FROM THE GREP ABOVE IS NOT A PASS FOR AN ADOPTION NODE
+
+**The grep asks whether rows name the node that is MERGING. For a node created
+to ADOPT rows another node orphaned, that is zero BY CONSTRUCTION** — the rows
+carry the predecessor's ID at their start, which is the entire reason the
+adoption node exists. **Arm 1 is vacuous exactly where the orphan problem is
+already real**, so its zero carries no information there and must not be read as
+a discharge.
+
+Measured 2026-09-19 by the runtime-implementer, at the close of
+`RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` — **the node this step's own
+"why this step exists" box cites as its founding case**:
+
+    grep -rn '#\[ignore' crates/ | grep '"RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS'
+      -> 0                                     the closing node
+    positive control  '"RT-SITEOP-CARRIED-WITNESS'  -> 3   instrument CAN hit
+    negative control  '"RT-NOT-A-REAL-NODE'         -> 0
+
+The three rows begin `#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: …`. **They name
+the node that merged, not the one that is merging.** Run as written, M7a
+discharges green at that close and all three rows stay exactly as orphaned as
+they were. This section already said *"a rule's founding case is the one it is
+never run against — run this one against yours before you trust it."* It was
+run, and it returned zero.
+
+⇒ **Before flipping ANY node to `merged`, run BOTH arms:**
+
+1. **By label** — the grep above: rows naming this node at the start.
+2. **By coordinate** — open the closing node's own frame and take the row
+   coordinates it names in its scope/population section (`path:line`, or the
+   test names). **These are the rows the node owns whether or not they say so.**
+   Each must either clear or carry its successor at the START of its attribute.
+
+**Arm 2 is the only one that can reach an already-orphaned row**, and a node
+that adopts orphans is precisely a node whose frame enumerates them — so the
+frame is a reliable source for arm 2 in exactly the case arm 1 fails. Report
+both arms; a bare zero without saying which arm produced it is not a discharge.
+
+**This is not the only instance.** On the 14-row breakdown measured the same
+day, the four `RT-CONTEXT-FRAME-LABEL-CORRECTION` rows are the same shape —
+label naming the merged predecessor, live owner `RT-CONTEXT-CAPTURE-CLAIM-
+ABSENCE`. **Fix the step, do not patch the node.**
+
+> **The general form, which outlives this instance:** a guard keyed on a name
+> cannot see the case that OMITS the name, and an adoption node omits it by
+> definition. When a check returns zero, ask whether the population it searched
+> could have contained a hit at all — a positive control answers that, and it is
+> what turns "clean" into "measured".
+
 > **Why this step exists.** Measured 2026-09-18, against the operator's
 > top-priority objective (clearing the ignored tests). Of the fourteen blocker
 > rows in `crates/ken-cli/tests/`, **four named a `merged` owner** — three
