@@ -186,6 +186,53 @@ fn a_facade_glyph_rename_republishes_the_defining_globalid() {
 // re-derived as a defect by a later reader.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// KNOWN GAP (documentation only; no AC depends on it) -- the stack floors
+// this WP committed are scoped to ONE MACHINE AND ONE TOOLCHAIN, and their
+// headroom is budgeted for one axis only.
+//
+// The floors live in `crates/ken-cli/tests/rt_capture_projection_grow.rs`
+// and `rt_branched_scrutinee_unit_body_port.rs`. Their derivation block
+// states `1984 / 2112 / delta 128 / libtest ambient 2048`, all in KiB, and
+// names the bisection resolution but NOT the configuration. Every one of
+// those numbers was measured on one devcontainer with one `rustc`. A number
+// written in absolute units reads as a fact about the program; these are
+// facts about the program ON A CONFIGURATION, and only the second is true.
+//
+// WHAT THE HEADROOM COVERS, WHICH IS THE PART THAT MISLEADS. The floor's
+// `INCREMENTS_OF_HEADROOM = 8` is justified there as eight further
+// elaborator changes of the size that tipped these -- that is budget
+// against SOURCE GROWTH. Nothing in the arithmetic is allocated to machine
+// or toolchain variation. If another host's baseline exceeds 1984 KiB, the
+// shortfall is absorbed silently by room reserved for something else, and
+// the derivation's stated virtue (that anyone can see what is being spent)
+// does not hold on that axis. Do not read the floors as already carrying
+// cross-machine headroom; that is a separate quantity and a separate spend.
+//
+// IF YOU RE-DERIVE THESE, `MEASURED_NEED_KIB` IS THE VOLATILE TERM. It
+// tracks compiler codegen -- the elaborator's frame -- and is what moves
+// when the source or the toolchain moves. The two link-side terms are not
+// what you are chasing:
+//
+//   static TLS   MEASURED, and it cancels. `readelf -lW`, PT_TLS `MemSiz`
+//                identical across both arms: `0x7b0` (1968 B) in the
+//                ken-cli binaries, `0x90` (144 B) in ken-elaborator's
+//                `map_build_acceptance`. Identical across arms is why the
+//                128 KiB delta measures frame rather than link. Note the
+//                two crates differ by ~14x, so a TLS figure taken from one
+//                does not carry to the other.
+//   guard page   NOT MEASURED. It is not expected to vary with a source
+//                change on a fixed host, but that is reasoning and not a
+//                measurement, and it is stated that way deliberately.
+//
+// A measured spread is what this gap actually wants, and it cannot be
+// produced by reading a header off one binary -- only by varying the
+// configuration. Anyone writing an acceptance criterion over the stack
+// budget should phrase it as the spread across the configurations the
+// budget must survive, never as a value, or it will be discharged with one
+// `readelf` on one box.
+// ---------------------------------------------------------------------------
+
 /// A provider whose four binding-backed roles all have the shape `33 §6.1`
 /// fixes. `{LEQ}` is the one hole the wrong-shape case fills differently.
 fn provider_with_leq(leq: &str) -> String {
