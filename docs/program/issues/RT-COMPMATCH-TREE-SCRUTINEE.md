@@ -262,3 +262,62 @@ touch this file (measured: `constructors.rs` plus its WP doc).
   Contention.
 - [[RT-SPECIALIZED-ACTIVE-RESUME]] — the cross-crate census this row's witness
   claim came from. Cited for provenance; not to be re-run.
+
+# WRITE-BACK: `D0`, `D1` and `D2` ALREADY LANDED
+
+The analysis above this line is SUPERSEDED.
+
+**Written back 2026-09-19 at `c67a33fda46f93e7bfb89e2fc3d9a3d127679dbd`.** The
+work below landed in `crates/` on 2026-09-18 and was never recorded here, so
+every reader since has met a node presenting its pre-campaign three-layer
+analysis as current. **That analysis is superseded by what follows.**
+
+**The landing, verified at the object rather than taken from a report:**
+
+    03976d2ac   ANCESTOR of origin/main -- confirmed
+                "RT-COMPMATCH-TREE-SCRUTINEE D1+D2: find the consumer
+                 behind worker_return"
+    touched     crates/ken-cli/tests/rt_span_prov_native.rs
+                crates/ken-runtime/.../static_transition/aggregates.rs
+    did NOT     touch this node, or its wp frame
+
+**`D0` returned outcome (a)**, in the commit's own words: *"first refusal
+cleared, a third layer (`StaticResponseDeferred`) found behind it. Row 14
+stays `#[ignore]`d, retitled to name the actual signature. QA+Architect
+approved at this exact SHA."*
+
+**`D1` and `D2` are discharged by that same commit** — it found the consumer
+behind `worker_return` and corrected the annotation, which is exactly what
+`D2` asks for.
+
+**RE-VERIFIED AT CURRENT `main`, not inherited:**
+
+    row 14      rt_span_prov_native.rs, still #[ignore]d
+    its label   RETITLED, and it now names the third layer:
+                "a deferred host response can only enter its exact response
+                 owner (StaticResponseDeferred, runtime-IR lowering);
+                 measured at 742bf929a"
+    provenance  03976d2ac is the commit that introduced that naming
+
+⇒ **The `D2` annotation correction is real and is in the tree.** The stale
+annotation this node was filed against no longer exists.
+
+**`D3` — the descent-campaign witness verdict: RETIRED.** **Flagged as
+RELAYED, NOT RE-DERIVED.** The campaign thread recorded *"D3: witness
+RETIRED"*; that is a claim about a conversation and I have not verified it
+against an artifact. It is written here because `D3` asks for it to be
+recorded, and it is marked so the next reader does not mistake a relay for a
+measurement.
+
+## THIS CLEARS NO ROW, AND THAT IS THE HONEST STATE
+
+**Row 14 is still `#[ignore]`d.** `D0` cleared the *first* refusal and
+uncovered a **third layer** behind it; the row now stops at
+`StaticResponseDeferred` in runtime-IR lowering. **The node's L1 contribution
+so far is zero rows cleared**, and anything that reads otherwise from `D0`
+having succeeded is reading the wrong thing.
+
+**Not done here, deliberately:** the third layer is **not** investigated and
+**not** sized. Sizing it against the superseded analysis above would be
+sizing the wrong thing, which is why the write-back precedes it. **Status is
+left as-is** — flipping it is not this write-back's to do.
