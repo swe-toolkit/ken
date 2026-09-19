@@ -508,6 +508,8 @@ fn ac1_a_bare_comparison_completes_its_omitted_prefix() {
 /// Asserted on the de Bruijn indices of the last two arguments rather than on
 /// a rendering: under `\a b.` the source order is `Var(1)` then `Var(0)`, and
 /// a double-reverse is precisely the swap.
+// Promise class: durable invariant. Parameterized standard-operator carriers
+// resolve through the same registry path as nullary carriers.
 #[test]
 fn a_parameterized_carrier_resolves_from_its_inferred_core_application() {
     let mut env = catalog_env();
@@ -528,6 +530,8 @@ fn a_parameterized_carrier_resolves_from_its_inferred_core_application() {
     );
 }
 
+// Promise class: durable invariant. Fixed instance-head constructors are
+// compared by canonical identity rather than by their surface spelling.
 #[test]
 fn a_fixed_instance_argument_matches_an_alias_by_global_identity() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -552,6 +556,8 @@ fn a_fixed_instance_argument_matches_an_alias_by_global_identity() {
     );
 }
 
+// Promise class: durable invariant. The post-selection check confirms the
+// whole instantiated carrier, not only its application head.
 #[test]
 fn a_rebound_fixed_argument_is_refused_by_full_carrier_confirmation() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -585,6 +591,8 @@ fn a_rebound_fixed_argument_is_refused_by_full_carrier_confirmation() {
     );
 }
 
+// Promise class: durable invariant. An ambiguous identity-to-registry-key
+// adapter refuses rather than selecting by map iteration order.
 #[test]
 fn two_registered_head_spellings_rebound_to_one_identity_are_refused() {
     let mut env = ElabEnv::new().expect("base environment");
