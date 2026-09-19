@@ -12,6 +12,46 @@ github: null
 origin: "Architect ruling evt_2nbvmrwfv055y in thr_3kmhbpep3vj2j, discharging AC-6 of LANG-STANDARD-INFIX-CALL-COMPLETION; re-posted self-contained at evt_3hb7tn83pgj33. Summarised to the Steward by the language-leader at evt_51rtc22a3tm74. PROVENANCE OF THE ROW-3 AMBIGUITY: it originated in the ruling, which uses the ordinal Row 3 for two different partitions about forty lines apart; the summary quotes the second and is downstream of it, not its source (Architect, evt_52nsn0p1qr26d; Steward verified both strings in the ruling's own text). Steward-filed per COORDINATION section 2; constraint interrogated per steward.md section 4c. The Architect states nothing is owed back on it and that A1 needs no further ruling -- A1's remaining ACs (AC-0, AC-8) need measurement only."
 ---
 
+> # CORRECTION 2026-09-19 — THE `origin:` FIELD NAMES AN "AC-0" THAT A1 DOES NOT HAVE
+>
+> The `origin:` field closes: *"A1's remaining ACs (AC-0, AC-8) need
+> measurement only."* **`LANG-STANDARD-INFIX-CALL-COMPLETION` has no AC-0.**
+>
+> Measured 2026-09-19 at `42a090129`, over the flattened frame so the count
+> cannot miss a wrapped occurrence:
+>
+>     AC-1 x1  AC-2 x2  AC-3 x2  AC-4 x1  AC-5 x1
+>     AC-6 x3  AC-7 x2  AC-8 x5  AC-9 x3
+>     AC-0: ZERO
+>
+> A1's frame prescribes close to the opposite of a final pre-handoff run: `-p
+> ken-elaborator` is **the loop on that node, not the finale**, and its
+> no-regression AC is workspace-green **in CI** (`COORDINATION §12`). A real
+> `AC-0` does exist on the **B-track** — `LANG-ATOM-START-CLASSIFICATION-CLOSURE`,
+> an Architect release amendment — and that is the likely source of the carry.
+>
+> **THE `origin:` FIELD IS DELIBERATELY NOT CORRECTED.** It records what was
+> summarised to the Steward at filing. Rewriting it to read correctly would
+> erase the belief it is a record of, and the provenance section below exists
+> precisely because this node's history is evidence. **A wrong sentence in a
+> record of belief is not the same object as a wrong sentence in a
+> specification** — the first is corrected beside it, the second in place.
+>
+> **WHAT IT COST, so the correction is not read as bookkeeping.** A1's
+> implementer carried "AC-0" in their checkpoint and their posts for a full
+> session without opening the frame, and stopped one step short of spending a
+> fifth full `-p ken-elaborator` run — roughly 45 minutes of a contended
+> machine-wide lock — discharging an AC that does not exist. **The tell is
+> cheap: an AC you cannot quote from the frame is an AC you have not read.**
+>
+> **THIS IS THE SECOND INHERITED-CLAIM DEFECT IN THIS ONE NODE**, which is why
+> it sits here rather than in a thread. Below, an ordinal was inherited from a
+> ruling that used it two ways. Here, a third node's frontmatter summarised a
+> second node's criteria and the summary outlived the fact. **A correction is
+> naturally scoped to the artifact being corrected, and the inheriting artifact
+> is always outside that scope** (Architect, 2026-09-19) — so the sweep after a
+> correction has to run on the citing artifacts, not only the corrected one.
+
 # "ROW 3" NAMES TWO DIFFERENT THINGS IN THE RULING ITSELF
 
 **One ordinal, two partitions, one document.** `evt_2nbvmrwfv055y` says both of
