@@ -7,6 +7,35 @@
 //! preservation, A0's admission of the glyphs as ordinary symbolic names).
 //! These two cases pin that, so a later regression in the facade surface is
 //! attributed here rather than read as a completion defect.
+//!
+//! AC-8, NO REGRESSION -- ITS ENUMERATION HALF, AND A GAP IT DOES NOT CLOSE.
+//!
+//! The workspace-green half is CI's (`COORDINATION §12`); nothing here is a
+//! local `--workspace` argument. The enumeration half exists to predict which
+//! oracles a catalog change moves, so a red is NAMED before publish instead of
+//! discovered at it.
+//!
+//! Ten test-side walkers enumerate the catalog, and no walker subsets below
+//! its own root. Both files this WP changes -- `Core/Classes/LawfulClasses`
+//! and the new `Core/Operators/Standard` -- are under `catalog/packages`, so
+//! both are inside all ten globs. That is the discharge. It is CONDITIONAL
+//! rather than universal, and it could have come out the other way.
+//!
+//! KNOWN GAP, RECORDED HERE AND NOT FIXED HERE. The ten do not share a root:
+//! five glob `catalog/`, five glob `catalog/packages`. Four real files sit in
+//! the difference, and the five package-rooted oracles cannot see any of them:
+//!
+//! - `catalog/guide/proof-techniques.ken.md`
+//! - `catalog/guide/decomposition-abstraction.ken.md`
+//! - `catalog/guide/surface-reference.ken.md`
+//! - `catalog/examples/CommandLine/Forge.ken.md`
+//!
+//! So a change to one of those four is seen by FIVE oracles, not ten. **This
+//! WP neither fixes that nor can be affected by it** -- both files it changes
+//! are inside every glob, so the gap cannot move A1's result in either
+//! direction. It is written down because it is real, because it is invisible
+//! from any single walker, and because the next reader of AC-8 will not be
+//! reading the thread it was found in.
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{Decl, ElabEnv, ExportForm};
