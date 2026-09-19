@@ -147,39 +147,106 @@ identity. Do not read it as a second confirmation.
 - **`D1`** — the two rows above un-ignored and green, or a grounded statement of
   what still stops each one.
 
-## 2a. The causal chain — SETTLED. DO NOT REPAIR THE CLASSIFICATION PATH.
+## 2a. The causal chain — REFUTED BY `M3`. IT IS TWO DEFECTS, NOT ONE.
 
-Architect `evt_5s3q6v3a53v7r`, read verbatim from
-`crates/ken-cli/tests/px7f_resource_native.rs` (`const RIGHT_NOT_HELD` begins at
-`:92`). Two sites decide the whole row: `bracket_has_right_denial` (`:133-139`)
-and `after_right_outer` (`:141-149`).
+**Architect `evt_12mfx5rxrp3g4` (2026-09-19), ruling on `M3`: the chain this
+section asserted is WRONG, and the "one defect" unification is WITHDRAWN by its
+own author.** The refuted text is kept at the end of this section, quoted and
+marked, so the next reader does not re-derive it from scratch.
 
-    interpreter  one release, settles Released
-                 => ResourceBracketBodyError (RightNotHeld 32 1)
-                 => :136 right_masks True => :147 Success => 0
+**THE DISCRIMINATOR THAT REFUTED IT.** One arm's Boolean flipped at a time,
+everything else held: `BodyAndReleaseError |-> True` leaves the exit at 82;
+`ResourceBracketOk |-> True` moves it to 0. **The constructor the native run
+actually builds is `ResourceBracketOk`** — neither of the two the refuted chain
+ranged over. The unread link named below was run, and it did not return either
+candidate.
 
-    native       the second release returns Closed, so the bracket carries a
-                 release error AS WELL AS the body error
-                 => ResourceBracketBodyAndReleaseError
-                 => :138, a hardcoded False => :148 Failure 82 => 82
+**THE CORRECTED CHAIN**, verified at source in
+`crates/ken-elaborator/src/prelude.rs`:
 
-**82 IS THE FIXTURE'S OWN LITERAL AT `:148`.** There is no exit-status mapping
-defect on this row ⇒ **the deferred exit-mapping filing call stays deferred, and
-this row hands it no owner.**
+    resource_settle_ok_error_for
+        Closed |-> ResourceBracketOk e r value
+    resource_settle_body_error_for
+        Closed |-> ResourceBracketBodyError e r body_error
 
-**`bracket_has_right_denial` IS CORRECT** — it classified a different bracket,
-faithfully. **Do not repair it, and do not repair anything on the classification
-path.** *"The native path computes a different bracket classification"* is true
-only in the sense that it was handed a different bracket to classify; nothing
-computes a wrong classification.
+Reaching `ResourceBracketOk` means `resource_settle_result_for` took the **OK**
+route — so the `body_result` it saw was `ResourceBodyOk`, **not**
+`ResourceBodyErr (RightNotHeld 32 1)`.
 
-**ONE UNREAD LINK, AND IT IS A ZERO-COST CHECK — RUN IT BEFORE ACTING ON THIS
-CHAIN.** That the native bracket is `ResourceBracketBodyAndReleaseError` and not
-`ResourceBracketReleaseError`. Both map to `False` at `:137`/`:138`, so **exit
-82 alone does not discriminate them**; the native trace carries both the
-`RightNotHeld` and the `Closed`, and only `BodyAndReleaseError` can hold both.
-**Name the constructor the native run actually built.** If it is neither, the
-chain above is wrong, and the Architect wants that inside one message.
+⇒ **THE BODY ERROR WAS LOST BEFORE CLASSIFICATION.** The `RightNotHeld` is in
+the trace and absent from the value classified. What reaches
+`bracket_has_right_denial` is not "a bracket carrying a release error" — it is
+**a bracket that has forgotten the body failed.**
+
+**THE TWO DEFECTS, AND THE AC EACH ANSWERS TO:**
+
+    duplicate dispatch  ->  the ENVELOPE defect  (AC-4)
+    lost body_result    ->  the EXIT defect      (AC-1)
+
+**Had the duplicate carried the correct `body_result`, `Closed` maps to
+`ResourceBracketBodyError`, `right_masks` returns True, and the exit is 0.** So
+**a duplicate release returning `Closed` is INVISIBLE in the exit status.** That
+is why these are two defects and not two symptoms of one, and it is why `AC-1`
+and `AC-4` are independent rather than one implying the other.
+
+**WHAT SURVIVES THE REFUTATION.** `bracket_has_right_denial` **is still
+correct** and is still not to be repaired — it faithfully classified the value
+it was handed. What changed is *which value that was, and why*. The exit-mapping
+filing call also still stays deferred: 82 remains the fixture's own literal at
+`:148`, and no exit-status mapping defect is claimed on this row.
+
+### 2a-i. "REMOVE THE SECOND DISPATCH" IS NOT A SUFFICIENT ACCEPTANCE
+
+Remove the specialization copy from this route and the predeclared copy's
+correct result is the one that propagates: the exit goes to 0, the envelope goes
+to three, **both ACs go green and the lost-`body_result` defect is untouched —
+merely no longer on this path.** That is turning the row green while leaving the
+defect, which `AC-4`'s own rationale forbids. The positive per-property
+criterion that closes it is **`AC-5`** in `§3`.
+
+### 2a-ii. THE REFUTED TEXT, KEPT SO IT IS NOT RE-DERIVED
+
+This stood as `§2a` and was Architect-approved. **It is false. Do not act on
+it**; it is retained only because a corrected conclusion with the wrong
+reasoning deleted invites the next reader to rebuild the wrong reasoning.
+
+> `interpreter` one release, settles Released ⇒
+> `ResourceBracketBodyError (RightNotHeld 32 1)` ⇒ `:136` `right_masks` True ⇒
+> `:147` Success ⇒ 0. `native` — the second release returns Closed, so the
+> bracket carries a release error AS WELL AS the body error ⇒
+> `ResourceBracketBodyAndReleaseError` ⇒ `:138`, a hardcoded False ⇒ `:148`
+> Failure 82 ⇒ 82.
+>
+> ONE UNREAD LINK: that the native bracket is
+> `ResourceBracketBodyAndReleaseError` and not `ResourceBracketReleaseError`.
+> Both map to `False`, so exit 82 alone does not discriminate them, and only
+> `BodyAndReleaseError` can hold both the `RightNotHeld` and the `Closed`.
+
+**How it failed is the discipline, and the first account of that was also
+wrong.** It said the chain ranged over the two constructors that produce 82.
+**It does not: three of the four produce 82 unconditionally.**
+`bracket_has_right_denial` (`crates/ken-cli/tests/px7f_resource_native.rs:133`)
+sends `ResourceBracketOk` (`:135`), `ResourceBracketReleaseError` (`:137`), and
+`ResourceBracketBodyAndReleaseError` (`:138`) all to `False`, and `:148` sends
+any `False` to `Failure 82`. Only `ResourceBracketBodyError` (`:136`) can reach
+`Success`, and only when `right_masks` accepts its error. **The candidate set
+was never "everything that produces 82",** so a reader applying the earlier
+account would look for the wrong thing.
+
+**What actually happened.** `ResourceBracketOk` was excluded by an *inference* —
+the trace carries the `RightNotHeld`, therefore the bracket must carry the body
+error. The unread link was then phrased as *"`BodyAndReleaseError` or
+`ReleaseError`?"* — **a choice between the two survivors of that inference.** So
+the check that was ordered sat *inside* the assumption that built the list, and
+**no answer to it could have tested that assumption.** Both answers confirm
+"the bracket carries a release error", which was the false part.
+
+⇒ **WHEN YOU NAME AN UNREAD LINK, ASK WHETHER RESOLVING IT EITHER WAY LEAVES
+YOUR INFERENCE STANDING. If both answers keep your reasoning intact, you have
+named a detail, not a link.** This one had exactly that defect. The
+one-arm-at-a-time flip found it because it varied each candidate
+**independently** rather than asking which of two was taken — a discriminator
+over the whole domain, not over the survivors.
 
 ## 3. Acceptance criteria
 
@@ -223,13 +290,28 @@ chain above is wrong, and the Architect wants that inside one message.
   **The repair is to NOT DISPATCH it.**
 
   ⇒ **`AC-1` is necessary and by itself NOT SUFFICIENT**, which is exactly what
-  those two false passes mean. The other direction also holds, and the pair is
-  only legible with both: under `§2a`'s chain **`AC-4` IMPLIES `AC-1`** — no
-  fourth event means `BodyError`, so `right_masks` is True and the exit is 0.
-  **`AC-1` nevertheless stays an independent AC precisely because that chain
-  carries an unread link** (`§2a`): if the native constructor turns out not to
-  be `BodyAndReleaseError`, `AC-4` could hold with `AC-1` still red. Keep both,
-  and that is the reason. Architect `evt_5tth40ek8zv60`.
+  those two false passes mean. That half stands (Architect `evt_5tth40ek8zv60`).
+
+  **THE OTHER DIRECTION IS REFUTED — `AC-4` DOES NOT IMPLY `AC-1`.** This
+  paragraph previously read *"under `§2a`'s chain `AC-4` IMPLIES `AC-1` — no
+  fourth event means `BodyError`, so `right_masks` is True and the exit is 0."*
+  **That implication rested entirely on the chain `M3` refuted**
+  (`evt_12mfx5rxrp3g4`, `§2a`). The unread link it hedged against did not
+  resolve to `BodyAndReleaseError`; it resolved to `ResourceBracketOk`, and the
+  body error is lost before classification. ⇒ **the two ACs answer to two
+  independent defects** — the envelope defect and the exit defect — and neither
+  implies the other in either direction. Keep both, and that is now the reason.
+- **`AC-5` — THE TWO EMISSION COPIES MUST AGREE, AS A PROPERTY OF THE
+  EMISSION.** Architect `evt_12mfx5rxrp3g4`, verbatim: **the specialization copy
+  and the predeclared copy of `effect_origin: 190` must compute the SAME bracket
+  result from the same `body_result`** — or the specialization copy must be shown
+  not to be emitted for this seat at all. **State which.**
+  *(Control: show it as a property of the emission, not as a passing fixture. A
+  green `px7f_resource_native` row does not discharge this — see `§2a-i`:
+  deleting the specialization copy makes `AC-1` and `AC-4` both green while
+  leaving the lost-`body_result` defect intact and merely off this path. The
+  discharging artifact names the two copies and the result each computes, or
+  names the emission condition under which only one exists.)*
 
 ## 4. Hard stops — report, do not work around
 
@@ -365,9 +447,15 @@ NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
    host_exit (Failure 82) only when bracket_has_right_denial is FALSE,
    while the trace carries the exact RightNotHeld -- and the native run
    performs TWO PrivateResourceRelease dispatches where the reference
-   interpreter performs ONE (M2) -- keyed, ON THE ARCHITECT'S READING
-   AND NOT YET ON A MEASUREMENT, on a source occurrence standing for the
-   runtime object grafting actually produced. M3 is what would measure it.
+   interpreter performs ONE (M2) -- keyed, MEASURED AT THE PRODUCER BY
+   M3 AND NO LONGER ON THE ARCHITECT'S READING, on SYNTACTIC CONTAINMENT
+   of the seat's source occurrence inside a continuation case body's
+   occurrence: inline_synthesized_seat_emission_owners
+   (static_transition.rs:743) pushes a Specialization owner per case body
+   satisfying occurrence_subtree_contains (occurrences.rs:284), a pure
+   walk over source origin ids. That key is NOT a function of the grafted
+   object -- re-bracketing under bind_bind moves a Vis into or out of a
+   given case body while producing the identical grafted tree.
 ```
 
 > **ENTRY 3 STANDS; THAT WORDING NARROWS WHAT IT CLAIMS RATHER THAN
@@ -459,7 +547,7 @@ the runtime-leader rather than both editing
 Architect read its row and it is producer/sink placement at the true
 `StaticWorker` producer. Same family, different question.
 
-## 7. The (A)/(B) fork — RULED. (A) IS NOT ORDERED, AND ITS TRIGGER IS STATED.
+## 7. The (A)/(B) fork — RULED. TRIGGER MET AT `M3`; (A) IS ORDERED.
 
 Architect ruling `evt_5gja8y3y23nt4` on research advisory `evt_3yz2ek90jrnkt`,
 2026-09-19. **The fork was decided by a theorem in the formalism the spec
@@ -500,14 +588,34 @@ is met, **(A) gets its own node, framed by the Architect and priced before it is
 scoped.** The Steward files it when the Architect says the condition is met,
 **and not before.**
 
-**STATUS AFTER `M1`/`M2`: NOT MET YET — AND "NOT YET" IS NOT "NO"**
-(`evt_5s3q6v3a53v7r`). There is now a **live divergence**: the reference spine
-has one `Vis` where the native path performs two. What is not yet known is that
-it arises from occurrence-keying — **an extra dispatch can equally come from a
-duplicated lowering path with nothing to do with the spine.**
+**STATUS AFTER `M3`: THE TRIGGER IS MET, ESTABLISHED AT THE PRODUCER**
+(Architect `evt_12mfx5rxrp3g4`, 2026-09-19). The key is **syntactic containment
+of the seat's source occurrence inside a continuation case body's occurrence**:
 
-**`M3` IS THE ONE READ THAT DECIDES IT:** what emits the second
-`ResourceRelease` on the native path, and **on what key.**
+    static_transition.rs:743  inline_synthesized_seat_emission_owners
+                              pushes ContinuationEmissionOwner::Specialization
+                              for each case body where
+    occurrences.rs:284        occurrence_subtree_contains(plan, root, needle)
+                              -- a pure syntactic walk over source origin ids
+
+Under `bind_bind` at `≅`, re-bracketing moves a `Vis` into or out of a given
+continuation's case body **while producing the identical grafted tree**. So
+*"which specializations contain this seat"* **is not a function of the grafted
+object** — the met arm of the discriminator below, reached from the producer
+rather than by inference. ⇒ **(A) is ordered. The Architect frames and prices
+it; the Steward files the node.**
+
+> **THE DISCHARGE ALMOST WENT THE OTHER WAY, USING THE REFUTED TABLE.** `M3`'s
+> report sorted this same measured fact with the **occurrence-counting** table
+> the Architect had already removed — *"not two source occurrences naming one
+> runtime object, therefore the second-distinct-emission-site / local-defect
+> arm."* That is the elimination the replacement exists to prevent, and it
+> lands on the arm that relieves the trigger's owner of filing (A). **The
+> trigger-met fact had been measured correctly and was sorted by the wrong
+> criterion.** Keep the two apart: a measurement is not its classification.
+
+**`M3` WAS THE ONE READ THAT DECIDED IT** — what emits the second
+`ResourceRelease` on the native path, and **on what key.** It has been run.
 
     the second dispatch is derived from something that is NOT a function of
     the grafted object -- a source or continuation occurrence, a syntactic
