@@ -240,10 +240,51 @@ authorisation is for the name, not for the file.
 adds.** *Control:* `provider_modules(PARSING_CURSOR)` lists
 `Core.Logic.Transport`; `assert_providers_consumed(PARSING_CURSOR, …)` lists
 `Core.Logic.Transport.cong` / `.sym` / `.trans` and
-`Data.Numeric.Nat.Order.leq_nat`; the doc comment's numeral matches the roster
-length. **Exactly those three items and nothing else** — a fold that grows
-loses the Architect's pre-clearance (`evt_4nh9w0qr67mw3`) and goes back for
-re-review.
+**`Core.Classes.LawfulClasses.leq_nat`**; the doc comment's numeral matches the
+roster length. **Exactly those three items and nothing else** — a fold that
+grows loses the Architect's pre-clearance (`evt_4nh9w0qr67mw3`) and goes back
+for re-review.
+
+> **CORRECTED 2026-09-19 ON A HARD STOP THIS `AC` CAUSED.** `AC-3b` first said
+> **`Data.Numeric.Nat.Order.leq_nat`**, and **no such global exists** —
+> foundation-leader `evt_2hgcc1ar08dsy`, at WIP `79875f64eabecfcce5007f4382`
+> `5a215e8b167f1c`, harness 5/6 with `env.globals[provider]` panicking on that
+> key alone while all three Transport entries resolve and pass.
+>
+> **THE ROSTER IS A LOADER-IDENTITY LIST, NOT AN IMPORT-SPELLING LIST.**
+> `assert_providers_consumed` indexes `env.globals[provider]` and then compares
+> `GlobalId`s through `term_mentions`; its own assert message says *"must
+> consume the canonical provider"*. `Order` **re-exports** `leq_nat` without
+> minting an alias, so the name keeps its defining module's identity. This is
+> the same identity-versus-spelling distinction that governs instance heads: a
+> facade re-export does not mint a new identity.
+>
+> ⇒ **Cursor's source import stays through `Data.Numeric.Nat.Order`, and the
+> roster names `Core.Classes.LawfulClasses`. Both are correct and they describe
+> different things.** Do **not** "reconcile" them by changing the catalog
+> source to import from `LawfulClasses` — that would edit the package for a
+> harness's convenience.
+>
+> **THE PRECEDENT IS TEN LINES AWAY AND SETTLES IT WITHOUT A JUDGMENT CALL.**
+> `FORMATTING_DOC`'s roster in this same function already carries
+> `"Core.Classes.LawfulClasses.leq_nat"`, verbatim, and is green today. **The
+> convention was established, and I wrote a literal that contradicted it while
+> editing the function that contains it.**
+>
+> **I TRANSCRIBED FOUR LITERALS FROM A REVIEW AND RESOLVED NONE OF THEM.**
+> Copying them byte-exact felt like care and stood in for the only check that
+> mattered — does the key exist. **A verbatim check is a check on
+> transcription.** Read the producer before writing a predicate over its value:
+> here the producer is `env.globals`, and one look at the neighbouring roster
+> would have shown the right spelling.
+>
+> **THIS CORRECTION IS NOT GROWTH, so the pre-clearance stands.** Same three
+> items, same four identities, same intent; one literal repaired so the entry
+> resolves at all. **The one thing that WOULD be growth:** if
+> `Core.Classes.LawfulClasses.leq_nat` does not resolve with
+> `provider_modules(PARSING_CURSOR)` as the fold leaves it, then adding
+> `Core.Classes.LawfulClasses` to that list is a **fourth** item — **stop and
+> report; do not add it.** The Steward re-requests the Architect in that case.
 
 > **AC-3a WAS NOT WRONG — IT FIRED CORRECTLY — AND IT STILL BOUNDED A
 > POPULATION I HAD NOT MEASURED. That is the fourth instance, and it is mine.**
