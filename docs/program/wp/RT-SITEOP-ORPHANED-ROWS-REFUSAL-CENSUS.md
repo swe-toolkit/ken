@@ -352,9 +352,31 @@ increment. What is delivered is its boundary.
             it onward again. No Match, no destructure, no unwrap of the
             Option anywhere in the file. core.rs carries the staged value; it
             does not validate it.
-    OPEN    the forward target of that last call, plus artifact/api.rs,
-            artifact/mod.rs and platform_runtime_support.rs. The consumer of
-            the Option is downstream of core.rs and has not been located.
+    LOCATED the forward target, in increment 1b: core.rs hands the value to
+            `super::units::define_unit_bodies`, in
+            cranelift_backend/lowering/units.rs -- a file named by NEITHER
+            enumeration (not in the eight BorrowedOpaque files, not in the
+            six entry-wrap files).
+    OPEN    whether units.rs CONSUMES or forwards again, plus artifact/api.rs,
+            artifact/mod.rs and platform_runtime_support.rs.
+
+> ### THE VALUE IS RENAMED AT THE CALL BOUNDARY, AND THAT IS WHY THE TRAIL
+> ### READS AS ENDING
+>
+>     core.rs    staged_process_input: Option<&RuntimeValue>
+>     units.rs   staged_root_value:    Option<&RuntimeValue>   <- same value
+>
+> `grep staged_process_input` over `units.rs` returns **zero**, and the file is
+> 8,445 lines, so the zero is entirely plausible and entirely wrong. It was
+> caught only because the call site provably passes the value, so the callee
+> must receive it under some name — implausibility, not a better key.
+>
+> ⇒ **Any enumeration of this value keyed on `staged_process_input` stops at
+> `core.rs` by construction.** Follow the parameter across each call boundary
+> and re-read the callee's signature for its local name; do not carry one name
+> across a hop. This is the same defect class as `AC-4`'s residual-versus-
+> emission guard, one layer along: there the value may never be written, here
+> it is written under a name the query does not contain.
 
 **The remaining routes are handed over as the predicate that generated them,
 not as a list**, so the next reader can re-run the enumeration and learn
