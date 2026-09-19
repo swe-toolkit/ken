@@ -141,6 +141,91 @@ sufficient** -- that is the condition that already holds and is why this says
 > flip:** the paragraph above, and the `origin:` line. Neither is reachable by
 > asking whether a line number moved.
 
+# FLIP TRIGGER: FIRED, AND DELIBERATELY NOT TAKEN. STAYS `draft`.
+
+**Steward, 2026-09-19.** The trigger above is mine and I ran it. Recording the
+result here rather than acting on it, because the honest disposition is neither
+"flip" nor "not yet".
+
+**Both conjuncts have landed** — `D2`/`D3` at `589926845`, the gate corrections
+at `9517225a0`, both verified on `origin/main`. I also ran the verb-keyed
+re-read the trigger requires, on both citations, and **both pass**:
+
+    citation 1   the per-arm-inlining paragraph. The predecessor still says it,
+      (:39-44)   same verb: "Per-arm inlining of a shared callee is legitimate,
+                 and the invariant is a claim about the source dispatcher while
+                 `plan.source_occurrences` is post-inlining -- the subject is
+                 wrong, not the claim."
+    citation 2   the `origin:` line. Its claims hold.
+
+**And the two licence exposures the trigger was written against are gone from
+`main`:** the predecessor's Objective no longer offers retiring the check as
+*"as good a result"* (the phrase does not occur in the file), and its
+*"# The open question"* section is now headed **CLOSED, with the ruling above
+it.** A flip today would not certify text that is about to be corrected.
+
+## SO WHY IT DOES NOT FLIP
+
+**The precondition expired in a way the trigger does not model.** The trigger
+asks whether the predecessor's work is *done*. What changed is **where the
+repair lives**: §8.9a of the predecessor's work package selects a repair unit
+and supersedes both §3a Arm B (*"a SUCCESSOR NODE, not this one"*) and §8.9
+(*"no repair unit is selected here"*) inside the same file, in its own words —
+*"one is now selected, it is neither arm, and it is larger than either."*
+
+⇒ **The repair lands in `RT-DUPLICATED-RESPONSE-BLOCK`. This node is one part
+of it, not the successor that carries it.** Flipping to `ready` would publish a
+node a team could pull as a standalone assignment, and its premise — that it
+owns the occurrence-keyed repair — is no longer what the tree says. That is the
+`draft` schema warning (*"a team pulling this node will find its premise
+false"*) firing for a second, different reason.
+
+## AND THE TITLE'S THESIS IS NOW CHALLENGED FROM SOURCE
+
+Runtime-implementer, 2026-09-19, read from source and **not measured by me**:
+
+    PlannedOccurrence { static_origin, expr }    static_transition.rs:570
+                                                 occurrences.rs:324
+
+Two fields. No instantiation id, no copy id — **`static_origin` IS the
+occurrence.** So "re-key the map on the occurrence" is not a threading task
+against a datum that exists unused. The producer keys from the dispatcher
+`Match` arm (`responses.rs:1246-1284`); the consumer arrives from a `Vis` site
+with `operation_origin` (`:1289-1307`, `:2030-2060`). **Two different origins,
+no recorded relation between them.** Per-`Vis` coordinates already exist on the
+consumer side; what is missing is the producer-to-consumer **correspondence**,
+which has to be derived or recorded.
+
+**This node's title names re-keying as the repair. That reading is now in
+question**, and restating the scope is the Steward act this node needs — not a
+status flip. Left open deliberately rather than rewritten tonight, because the
+measurement that would settle it is in flight in the predecessor's branch.
+
+**Fenced, and the fence does not lift on measurement (Architect, 2026-09-19,
+`evt_56qcf2b8cnct1`).** The origin-id delta (`365` for `px7n`, `317` for both
+`rt_escape` programs, uniform within each and different between) is consistent
+with inlining copying a contiguous origin-id region and does not establish it.
+It is UNMEASURED by its author. **Even measured TRUE it cannot be the repair
+mechanism:** `origin_of(node) = StaticOriginId(node.0)`
+(`occurrences.rs:91`) and the ordinal is declared planner-private
+(`:88-90` — *"planner-private precisely so no consumer outside this module can
+mint one"*), so contiguity is an allocation accident with no contract and no
+guard, and a route keyed on it fails SILENTLY when allocation changes.
+Authorized as a DIAGNOSTIC only — *does inlining copy contiguously* is real
+information about the correspondence that has to be derived. Making it a key
+requires the allocation property stated as a contract with its own guard, which
+is a separate ruling not made.
+
+> **Why this replaced a fence of mine, recorded because the failure is
+> reusable.** My wording was *"consistent with … does not establish it …
+> UNMEASURED … do not size against it."* Every clause of that is about the
+> measurement being **absent**, so it reads as a fence that a positive
+> measurement lifts — and a positive measurement is exactly what the seat was
+> about to take. **An epistemic fence expires on the evidence it names; a
+> structural one does not.** The objection here is not that contiguity is
+> unmeasured, it is that contiguity is not a contract, which no measurement
+> changes.
+
 # THIS IS AN UNDISCHARGED ASSIGNMENT. IT IS NOT A DISCOVERY.
 
 `RT-HOST-RESPONSE-ROUTE-KEY-COLLISION` section 3a, Steward, 2026-09-17:
@@ -268,6 +353,113 @@ the collision's independence, which nobody has taken.
 That sentence is the Steward's and the correction belongs in the predecessor's
 measured-outcome section, not here. It is recorded here because this node's
 fixed inputs would otherwise inherit it.
+
+# WITNESS: A MINIMAL REPRO, AND IT MEASURES "OCCURRENCE" DIRECTLY
+
+**Steward, 2026-09-19, from the runtime-implementer's probes in
+`thr_3s7btdee77g0n`** (`evt_6kwtw2dv0df8r`, `evt_4vvdf6mj9kx7t`), recorded here
+because the finding was made under a closed campaign and the implementer
+correctly declined to write it into a node they do not own.
+
+**This node's thesis is that the route map should key on the OCCURRENCE rather
+than the operation constructor. Until now the evidence for that was the four
+ignored rows, each a large program needing a 29-constructor census to read.
+There is a two-line repro.**
+
+    withBuffer 1 (pure) ; withBuffer 1 (pure)          REFUSES
+    withBuffer 1 (pure) ; withBuffer 2 (pure)          REFUSES  (distinct
+                                                       capacities)
+    withBuffer 1 (pure) ; withResource Read (pure)     REFUSES  (distinct
+                                                       OPERATIONS)
+
+    all three:  "two host response cases claim one operation constructor"
+
+Three builds, one edit apart. Varying the operation is what identifies the
+colliding constructor as the **release**, not the acquisition: every bracket
+emits a `ResourceRelease`, so no choice of bracket kind or capacity avoids it.
+
+**Controls — nesting is unaffected:**
+
+    cr-write-writable   three nested brackets, three releases   BUILDS
+    fixG, fixJ          three nested                            BUILD
+
+So the refusal is not "more than one release". It is **two brackets in
+sequence at the same level**.
+
+## THE MEASUREMENT THAT BEARS DIRECTLY ON THE KEY
+
+The Architect challenged the above as possibly static-only (`evt_6ppf0bzjzpssq`):
+a response case is a code position, so **one** bracket site invoked twice
+should mint **one** case and produce the interleaved footprint with no
+collision. That was tested:
+
+    proc pb_tw_one (_marker : Int) = withBuffer 1 pb_tw_leaf      ONE site
+    pb_tw_stage = bind (pb_tw_one 0) (\first. bind (pb_tw_one 1) ...)
+
+    "two host response cases claim one operation constructor"
+
+**One static bracket site. Two invocations. Two response cases.**
+
+⇒ **Cases are minted per INVOCATION, not per source site.** That is this node's
+key question answered by measurement rather than by argument: the unit the
+route map collides on is the occurrence, and legitimate distinct occurrences of
+one constructor are exactly what it cannot currently distinguish. Fold this
+into the acceptance bar's reading of "occurrence" rather than treating it as
+corroboration.
+
+## TWO CONSEQUENCES, STATED WITH THEIR FENCES
+
+- **Factoring is not a workaround.** The severity fork the Architect posed —
+  "narrow gap with a factoring workaround" versus "sequential resource use is
+  not expressible in native" — settles on the **stronger** arm, because the
+  proc form is the factoring and it refuses.
+- **Not a new defect class, and not even a new mechanism.** Called "a new
+  refusal class" when first found; one `git grep` showed four existing nodes on
+  the same message. **The proc-form result was also already predicted by a
+  ruling in the tree** — §8.9a of `RT-DUPLICATED-RESPONSE-BLOCK`'s **work
+  package**, quoted in its issues node at lines 268-271 and read from there:
+  *"Per-arm inlining of a shared callee is legitimate, and
+  the invariant is a claim about the source dispatcher while
+  `plan.source_occurrences` is post-inlining — the subject is wrong, not the
+  claim."* A shared callee invoked twice is inlined per arm, so two occurrences
+  is what that ruling says to expect. The Architect independently withdrew the
+  static-only challenge on that citation — **and the build had already run and
+  refused before the withdrawal was posted.** The measurement did not come from
+  the ruling and the ruling was not re-read from the measurement, so the two
+  agree independently rather than one being derived from the other.
+
+  ⇒ **The witness is new; the refusal and the mechanism are not.** What the
+  measurement adds is a two-line program where the existing ruling can be
+  checked directly, instead of a 29-constructor census inside four large
+  programs. Read it as confirmation with a cheap reproducer, not as a
+  discovery — and do not let a second node be filed on it.
+
+## THE SHAPE THE WITNESS DOES NOT COVER -- UNMEASURED, ATTACHED DELIBERATELY
+
+**Architect, 2026-09-19, recorded and explicitly NOT run.** All four measured
+shapes share a property easy to miss because it is the normal case: **a
+statically countable number of bracket executions** — two, whether from two
+call sites or two invocations of one.
+
+    FIFTH SHAPE   a bracket inside a RECURSIVE proc, whose executions cannot
+                  be statically enumerated at all.
+
+This is attached as a gap in the WITNESS, not as a bearing on the repair.
+**The repair-bearing reading is WITHDRAWN (Architect, 2026-09-19,
+`evt_56qcf2b8cnct1`).** It claimed a recursive proc supplies no static bound on
+the number of occurrences a re-keyed map must enumerate. That conflates
+executions with occurrences: `host_response_routes` iterates
+`plan.source_occurrences` (`responses.rs:1250`), a static post-inlining
+collection to which a recursive proc contributes a bounded number of entries.
+Recursion multiplies executions through one occurrence. It is the N=1 case for
+this map, not an unbounded one, and occurrence-keying's sufficiency is not in
+question on this ground.
+
+**It is unmeasured and must not be cited as though it were.** It was deferred
+on purpose: it is the fifth "five-minute build" in a night whose ignore count
+moved by zero, and the node it would inform is now released and being worked.
+Take it up inside the repair's design, where it is load-bearing, rather than
+as another probe.
 
 # Related
 
