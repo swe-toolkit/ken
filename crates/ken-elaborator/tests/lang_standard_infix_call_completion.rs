@@ -530,6 +530,102 @@ fn a_parameterized_carrier_resolves_from_its_inferred_core_application() {
     );
 }
 
+// Promise class: durable invariant. Matching a multi-parameter core carrier
+// preserves the telescope's outermost-first order when its prerequisites are
+// instantiated.
+//
+// MEASURED: the completed call's dictionary applies `Ord Nat` and then
+// `Ord Bool`, the two prerequisite identities selected for `Result Nat Bool`.
+// CLAIMED: the core matcher's argument vector and `subst_tel` agree on the
+// index order for every head parameter. THE GAP: this fixture closes only the
+// two-parameter boundary, so the two carrier arguments and prerequisite ids
+// are asserted distinct before their order is checked.
+#[test]
+fn two_parameter_head_preserves_prerequisite_instantiation_order() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         instance Ord Nat {{ leq = \\x y. True }} \
+         instance Ord Bool {{ leq = \\x y. False }} \
+         fn result_ord_leq \
+           (a : Type) (b : Type) (da : Ord a) (db : Ord b) \
+           (x : Result a b) (y : Result a b) : Bool = True \
+         instance Ord (Result a b) where (da : Ord a), (db : Ord b) {{ \
+           leq = result_ord_leq a b da db \
+         }} \
+         import Core.Operators.Standard (≤) \
+         fn ordered_result \
+           (x : Result Nat Bool) \
+           (y : Result Nat Bool) : Bool = x ≤ y"
+    ))
+    .expect(
+        "matching `Result Nat Bool` must instantiate its prerequisites as \
+         `Ord Nat` followed by `Ord Bool`",
+    );
+
+    let body = under_binders(body_of(&env, "ordered_result"), 2);
+    let Term::App(completed, _) = body else {
+        panic!("the completed call must apply its right operand");
+    };
+    let Term::App(completed, _) = *completed else {
+        panic!("the completed call must apply its left operand");
+    };
+    let Term::App(_, dictionary) = *completed else {
+        panic!("the completed call must apply an inferred dictionary");
+    };
+
+    let mut head = *dictionary;
+    let mut dictionary_args = Vec::new();
+    while let Term::App(function, argument) = head {
+        dictionary_args.push(*argument);
+        head = *function;
+    }
+    dictionary_args.reverse();
+
+    let nat = env.globals["Nat"];
+    let bool_ = env.globals["Bool"];
+    let nat_ord = env.globals["Ord_instance_Nat"];
+    let bool_ord = env.globals["Ord_instance_Bool"];
+    assert_ne!(
+        nat, bool_,
+        "positive control: the carrier argument identities must be distinct"
+    );
+    assert_ne!(
+        nat_ord, bool_ord,
+        "positive control: the prerequisite identities must be distinct"
+    );
+    assert_eq!(
+        head,
+        Term::const_(env.globals["Ord_instance_Result"], vec![]),
+        "the completed dictionary must be the generic `Ord (Result a b)` instance"
+    );
+    assert_eq!(
+        dictionary_args.len(),
+        4,
+        "the generic dictionary takes two type arguments and two prerequisites"
+    );
+    assert_eq!(
+        dictionary_args[0],
+        Term::indformer(nat, vec![]),
+        "the first type argument must retain the matcher's outermost slot"
+    );
+    assert_eq!(
+        dictionary_args[1],
+        Term::indformer(bool_, vec![]),
+        "the second type argument must retain the matcher's innermost slot"
+    );
+    assert_eq!(
+        dictionary_args[2],
+        Term::const_(nat_ord, vec![]),
+        "the `a` prerequisite must resolve to `Ord Nat`, not `Ord Bool`"
+    );
+    assert_eq!(
+        dictionary_args[3],
+        Term::const_(bool_ord, vec![]),
+        "the `b` prerequisite must resolve to `Ord Bool`, not `Ord Nat`"
+    );
+}
+
 // Promise class: durable invariant. Fixed instance-head constructors are
 // compared by canonical identity rather than by their surface spelling.
 #[test]
