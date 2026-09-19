@@ -151,21 +151,32 @@ relation provable. *Control:* `nth` (`:91`) and `length` (`:169`) are
 byte-identical to their pre-candidate text, extracted and compared
 programmatically, not by eye.
 
-**`AC-4` — no new trust, and the diff goes exactly two places.** *Control:* the
-added lines contain no `Axiom`, postulate, primitive, `Omega` carrier, or
-kernel/TCB surface; **and** the diff touches exactly
-`catalog/packages/Data/Collections/Derived.ken.md` and, under `crates/`, at
-most `crates/ken-cli/tests/rosetta.rs`. Any other path — test or not — means
-this frame did not anticipate something: that is a hard stop and a report, not
-a scope extension.
+**`AC-4` — no new trust, and the diff reaches product source nowhere.**
+*Control, both halves:* the added lines contain no `Axiom`, postulate,
+primitive, `Omega` carrier, or kernel/TCB surface; **and** the diff touches
+`catalog/packages/Data/Collections/Derived.ken.md` plus, under `crates/`,
+**only test harnesses that mechanically reconstruct a consumer's view of a
+catalog package.** Any path under `crates/**/src/**`, or any other non-test
+path, is a hard stop and a report, not a scope extension.
 
-**This `AC` previously read "under `crates/`, nothing at all", which was a
-frame defect and mine.** It forbade the only repair `AC-2` makes necessary, so
-the frame was unsatisfiable and the candidate went CI-red *because* it complied.
-The ring hard-stopped and reported rather than widening scope on its own, which
-is what the clause is for; the clause was simply wrong about which paths this
-node reaches. The sibling `CAT-NAT-ORDER-LAWS` `AC-D2-4` already carried the
-two-path form on the same evidence.
+**This `AC` has been wrong TWICE, both times mine, and both times in the same
+direction — so this revision changes its SHAPE and not its bound.** It first
+read *"under `crates/`, nothing at all"*, which forbade the only repair `AC-2`
+makes necessary; the candidate went CI-red *because* it complied. It then read
+*"at most `crates/ken-cli/tests/rosetta.rs`"*, naming the one such harness I
+had found by grep — and `crates/ken-elaborator/tests/cat_derived_pub_export.rs`
+is a second one, which surfaced only once the Rosetta panic stopped masking it.
+
+**The defect was not the bound. It was enumerating a population I had only
+sampled.** I measured the consumers I could find and wrote the census into the
+`AC` as if finding them completed it, so each new member arrives as a frame
+failure. **A predicate can report being incomplete; a list cannot.** Hence the
+clause above is now a property — *reconstructs a consumer's view of a catalog
+package* — and the hard stop lives where it was always supposed to: at
+**product source**, which is what "no scope extension" was protecting.
+
+Both hard stops the ring returned under the old wording were **correct** and
+neither widened scope on its own. That is the clause working.
 
 **`AC-5` — the Rosetta repair restores the consumer without weakening its
 guard.** The runner's exact-string, exact-cardinality matching is a fail-closed
@@ -193,5 +204,57 @@ forward to the next `{` in the file and returns a range over an unrelated
 declaration. **That helper fails open on exactly this input**, so extending the
 allowlist to `IsTrue` needs more than adding a string to it.
 
-*If the repair cannot stay inside `rosetta.rs`, stop and report rather than
-reaching further.* A third path is a different node, not a wider one.
+*If a repair cannot stay inside a consumer-view harness, stop and report rather
+than reaching further.* Product source is a different node, not a wider one.
+
+**`AC-6` — the export-surface harness publishes the two new proofs, and its
+fail-closed arms are untouched.**
+`crates/ken-elaborator/tests/cat_derived_pub_export.rs`
+synthesizes, per attached proof parsed out of `Derived.ken.md`, a probe file
+that imports **only the subject** and then restates the theorem
+(`:177-189`). That construction assumes **every attached proof's statement
+mentions nothing but its subject and base-environment names** — true of the
+three `list_append` monoid laws it was written against, false of a proof whose
+hypothesis is `IsTrue (leq_nat ...)`. The probe therefore cannot state the
+theorem, and `UnresolvedCon { name: "leq_nat" }` is that assumption expiring.
+Measured; this is the same class as settled input 5, one harness over.
+
+*Control, all four halves:*
+
+- **Both proofs are repaired, not the one the panic names.** Queries are sorted
+  by surface (`:192`), so `nth::at_or_beyond_is_none` panics first and
+  `nth::some_below_length` never runs. Their statements carry the same two
+  foreign names. A repair keyed on the reported name leaves the second live.
+- **The literal contract set gains exactly these two surfaces**, so `:229-241`
+  goes from eleven names to thirteen. *This assertion is the node's fail-closed
+  backstop and the reason the harness may be touched at all:* it refuses to let
+  `Derived`'s loader-visible surface grow without someone saying so in a
+  literal. **Control on the control:** deleting either new name from that set
+  must make the test RED, restored byte-exact. If it stays green, the
+  `assert_eq!` is no longer discriminating and that is a hard stop.
+- **The error classification is not widened.** `UnboundName` is the one class
+  read as "not published" (`:211-218`); every other class panics (`:219`).
+  **Do not move `UnresolvedCon` into the graceful arm.** That would reclassify
+  a genuine resolution failure as a legitimate absence, shrink the expected set
+  instead of growing it, and convert this harness's one fail-closed construct
+  into a fail-open one — the same direction `AC-5` forbids and `47b811be4`
+  moved away from.
+- **The two prose enumerations move with the literal.** The module doc comment
+  (`:1-9`) and the `assert_eq!` message (`:242-244`) both say *"the eight
+  operations plus the three migrated `list_append` monoid-law proofs"*. Leaving
+  that while the set says thirteen is exactly the prose-versus-surface drift
+  `CAT-NAT-ORDER-LAWS` `AC-D2-3` was written for.
+
+*The spelling is not a degree of freedom.* The cheapest way to make this red go
+away is to restate the two theorems using only base-environment names, and
+**that is forbidden** — `AC-2` requires `IsTrue (leq_nat ...)` and wins here. If
+the only available repair is a statement change, **stop and report**: that
+promotes `AC-2`'s "one report, not a deliverable" clause into a live finding
+about what a catalog statement may mention, which is a real result and not a
+workaround.
+
+*Noted for the successor, not a criterion:* a consumer citing these proofs must
+import `IsTrue` and `leq_nat` alongside `nth`. That is ordinary module
+discipline rather than a defect, and `CAT-PARSING-CURSOR-LAWS` needs those names
+regardless — `Order`'s `suc_decreases` is already in `IsTrue` form. Recorded so
+the successor's frame does not rediscover it as a surprise.

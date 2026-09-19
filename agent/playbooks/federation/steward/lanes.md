@@ -23,7 +23,9 @@ These rulings remain operative and are retained verbatim.
 
 - **2026-09-12, Route B:** L2's next deliverable is
   `LANG-ACTIVE-PREMISE-KERNEL-VIEW`, the contextual kernel-query boundary split
-  out of `LANG-TRANSPORT-SIGMA-PREMISE-SYNTHESIS`.
+  out of `LANG-TRANSPORT-SIGMA-PREMISE-SYNTHESIS`. **Discharged — that node is
+  merged, so L2 has no operator-set objective and its next one is a live
+  operator fork.**
 
 ## Catalog proof direction
 
@@ -63,8 +65,8 @@ ring starts without an operator lane change.
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
 | L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-KRET-GRAFTED-SPINE` | Repair determined by the double-dispatch locus | Consumer population measured zero `evt_2gs158dpvtn97`, selecting the legal-zero branch; repair `bc4764fb8` on the WP branch retires the terminal zero-match arm and keeps the `> 1` error, and the ignored row now advances past the origin-503 planner invariant to a downstream `-1`. Architect ruled the locus `evt_3wv0jdhn3x0fm`: same-route conclusion withdrawn, tag arithmetic survives, locus is the DOUBLE DISPATCH — 3 expected releases against 6 observed, the 1-Released/5-Closed split proving duplicates hit an already-closed handle. That is inventory entry 4, and entry 5 is the open fork. Count 7; §1a/§1b at 9. |
-| L2 | language | Deliver `LANG-ACTIVE-PREMISE-KERNEL-VIEW` under the 2026-09-12 Route-B ruling | `LANG-REWRITE-DESCENT-FRAME-TAX` | `LANG-ACTIVE-PREMISE-KERNEL-VIEW` | Complete the already-requested AC-4 targeted rerun, then finish exact-SHA review and route. |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-COLLECTIONS-NTH-LAWS` respin | `CAT-PARSING-CURSOR-LAWS` | `CAT-NAT-ORDER-LAWS` is CLOSED: D2 landed `a68434812` (ten exported proofs, definitions byte-unchanged). NTH-LAWS `2bd127cf7` is dead — CI-red on the `rosetta.rs` import pin that `AC-4` forbade repairing; `AC-4`/`AC-5` amended at `e8db106aa` and foundation owes a superseding SHA, re-approved exact, then re-routed. `CAT-PARSING-CURSOR-LAWS` is framed and goes ready when that lands. |
+| L2 | language | None set — the Route-B objective is discharged | none | Operator fork | **BLOCKED ON THE OPERATOR, and the lane does not know it.** `LANG-ACTIVE-PREMISE-KERNEL-VIEW` and `LANG-REWRITE-DESCENT-FRAME-TAX` are both merged; the A1 hold was already discharged by Pat's "g then remeasure" ruling landing as `6ce8aa0e9`. The lane is idle awaiting an objective, not awaiting a decision it has pending. Fork put to Pat: resume A1 re-baseline then `LANG-MODULE-IMPORT-SYSTEM` (recommended — 2026-08-22 ranks module/import above surface-syntax items because it blocks the foundation catalog trial), versus `LANG-MEMBERSHIP-OPERATOR-SURFACE`. |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-COLLECTIONS-NTH-LAWS` respin | `CAT-PARSING-CURSOR-LAWS` | `CAT-NAT-ORDER-LAWS` is CLOSED (D1+D2, `571d216eb`). NTH-LAWS respin `338cfe922` is CI-red at `cat_derived_pub_export.rs:219` — a SECOND consumer-view harness the frame's path enumeration missed, unmasked once the Rosetta panic stopped aborting the shard early. `AC-4` reshaped from a path list to a predicate and `AC-6` added; foundation owes a superseding SHA, re-approved exact, then re-routed. `CAT-PARSING-CURSOR-LAWS` is framed and goes ready when that lands. |
 
 ## Update rule
 
