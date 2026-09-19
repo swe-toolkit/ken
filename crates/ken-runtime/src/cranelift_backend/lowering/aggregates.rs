@@ -1421,6 +1421,43 @@ impl<'a> Lowering<'a> {
                          no source occurrence for it at that position",
                     ));
                 };
+                if matches!(
+                    self.static_transition_plan.source_occurrence(child_origin)?,
+                    RuntimeExpr::Var(_)
+                ) {
+                    let actual = self
+                        .static_transition_plan
+                        .aggregate_record_view(child_occurrence)?
+                        .producer_origin()
+                        .ok_or_else(|| {
+                            unsupported(
+                                lowered_value_kind(child),
+                                "a source aggregate child carries a synthesized producer record",
+                            )
+                        })?;
+                    if let Some(owner) = self.defining_emission_owner {
+                        match self
+                            .static_transition_plan
+                            .deferred_response_aggregate_producer_is_owned(
+                                owner,
+                                child_origin,
+                                actual,
+                            )?
+                        {
+                            Some(true) => continue,
+                            Some(false) => {
+                                return Err(unsupported(
+                                    lowered_value_kind(child),
+                                    format!(
+                                        "aggregate producer {actual:?} is not owned by the \
+                                         Deferred response relation at variable {child_origin:?}"
+                                    ),
+                                ));
+                            }
+                            None => {}
+                        }
+                    }
+                }
                 let expected = self
                     .static_transition_plan
                     .source_aggregate_occurrence(child_origin, child_shape)?;

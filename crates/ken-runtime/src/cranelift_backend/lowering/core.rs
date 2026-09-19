@@ -6462,7 +6462,7 @@ impl<'a> Lowering<'a> {
         {
             let current_owns_response = self
                 .static_transition_plan
-                .bounded_deferred_response_handler_owner(&row)?
+                .deferred_response_handler_owner(&row)?
                 .is_some_and(|owner| self.defining_emission_owner == Some(owner));
             if current_owns_response
                 && !handler_owned_deferred_response_mutation_applies(

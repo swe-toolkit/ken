@@ -16,7 +16,8 @@ use super::continuations::{
     checked_frame_for_consumer, continuation_call_selected_result_identity_opt,
     continuation_owner_entry_sources, continuation_result_constructor_identities,
     derive_checked_ih_post_call_consumer_chain, generated_context_parameters,
-    walk_continuation_value_environment, CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
+    walk_continuation_value_environment, CheckedCaseBinderLayout,
+    CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
     ContinuationContextId,
     ContinuationEmissionOwner, ContinuationInputProjection, ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
@@ -748,15 +749,38 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     UnconsumedTransportCaller,
 }
 
+/// The two owners phase A derives for a transport P2 response.
+///
+/// `base_owner` is the specialization that owns the response `Vis` itself.
+/// `caller_emission_owner` is the owner in which the exact caller emits that
+/// `Vis`. Retaining both makes downstream dispatch a projection of the phase-A
+/// relation instead of a second occurrence-containment derivation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct DeferredResponseOwnerPair {
+    base_owner: ContinuationEmissionOwner,
+    caller_emission_owner: ContinuationEmissionOwner,
+}
+
+impl DeferredResponseOwnerPair {
+    pub(in crate::cranelift_backend) fn base_owner(self) -> ContinuationEmissionOwner {
+        self.base_owner
+    }
+
+    pub(in crate::cranelift_backend) fn caller_emission_owner(
+        self,
+    ) -> ContinuationEmissionOwner {
+        self.caller_emission_owner
+    }
+}
+
 /// One response `Vis` classified `Deferred` (recut amendment
-/// `evt_4ar3rxzrra5v4`). It acquires no dedicated response owner and no
-/// `StaticResponseDeferred` placeholder. A statically bounded P2 suffix may be
-/// dispatched by the same enclosing specialized owner; every other row's
-/// operation root and host effect fall through to main's pre-WP lowering (R3).
-/// The row is POPULATED (never an
-/// absence), so `classify` is congruent (AC-1) and every consumer reconciles the
-/// residual by total match rather than reconstructing it from local negative
-/// evidence (R2).
+/// `evt_4ar3rxzrra5v4`). P1 retains the ordinary pre-WP route because it has no
+/// continuation unit. P2 retains the exact owner pair phase A computed: its
+/// effect is represented by `StaticResponseDeferred` outside the base owner and
+/// dispatched exactly once in the caller emission owner. The row is POPULATED
+/// (never an absence), so `classify` is congruent and every consumer reconciles
+/// the residual by total match rather than reconstructing ownership from local
+/// occurrence containment.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct DeferredResponseRow {
     vis_origin: StaticOriginId,
@@ -768,11 +792,15 @@ pub(in crate::cranelift_backend) struct DeferredResponseRow {
     effect_origin: StaticOriginId,
     operation: HostOpV1,
     sub_case: DeferredResponseSubCase,
+    /// The owner relation computed by phase A. Present exactly for P2; P1 has
+    /// no continuation unit and therefore no owner pair.
+    owner_pair: Option<DeferredResponseOwnerPair>,
     /// The K's capture and continuation-input counts (P2: from the demand; P1:
     /// zero because no continuation unit exists). Eligible-plane census derives
     /// every has-K count from Specialized rows.
     capture_count: usize,
     continuation_input_count: usize,
+    aggregate_producer_ownership: Option<DeferredResponseAggregateProducerOwnership>,
 }
 
 impl DeferredResponseRow {
@@ -807,7 +835,401 @@ impl DeferredResponseRow {
     pub(in crate::cranelift_backend) fn sub_case(&self) -> DeferredResponseSubCase {
         self.sub_case
     }
+
+    pub(in crate::cranelift_backend) fn owner_pair(&self) -> Option<DeferredResponseOwnerPair> {
+        self.owner_pair
+    }
 }
+
+/// The one additional planning relation authorized for locally driven P2
+/// responses. It relates an aggregate-valued `Var` in the exact K body to the
+/// source aggregate producers that may own that binder when the K is lowered in
+/// its caller emission owner.
+///
+/// The key includes the caller owner because the same source body may be emitted
+/// in more than one continuation copy. An empty source set is not authority: it
+/// means the abstract walk could not derive a source producer and lowering keeps
+/// the existing fail-closed answer.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct DeferredResponseAggregateProducerOwnership {
+    caller_emission_owner: ContinuationEmissionOwner,
+    variable_producers: BTreeMap<StaticOriginId, BTreeSet<StaticOriginId>>,
+}
+
+impl DeferredResponseAggregateProducerOwnership {
+    fn permits(
+        &self,
+        caller_emission_owner: ContinuationEmissionOwner,
+        variable_origin: StaticOriginId,
+        producer_origin: StaticOriginId,
+    ) -> Option<bool> {
+        (self.caller_emission_owner == caller_emission_owner)
+            .then(|| self.variable_producers.get(&variable_origin))
+            .flatten()
+            .map(|producers| producers.contains(&producer_origin))
+    }
+}
+
+type DeferredAggregateProducerSet = BTreeSet<StaticOriginId>;
+
+struct DeferredAggregateProducerDerivation {
+    constructed_fields: BTreeMap<StaticOriginId, Vec<DeferredAggregateProducerSet>>,
+    variable_producers: BTreeMap<StaticOriginId, DeferredAggregateProducerSet>,
+    target_closure: StaticOriginId,
+    target_reached: bool,
+}
+
+impl DeferredAggregateProducerDerivation {
+    fn record_variable(
+        &mut self,
+        origin: StaticOriginId,
+        producers: DeferredAggregateProducerSet,
+        inside_target: bool,
+    ) {
+        if inside_target && !producers.is_empty() {
+            self.variable_producers
+                .entry(origin)
+                .or_default()
+                .extend(producers);
+        }
+    }
+}
+
+fn deferred_aggregate_producer_union(
+    into: &mut DeferredAggregateProducerSet,
+    from: DeferredAggregateProducerSet,
+) {
+    into.extend(from);
+}
+
+fn derive_deferred_aggregate_producers(
+    plan: &StaticTransitionPlan<'_>,
+    derivation: &mut DeferredAggregateProducerDerivation,
+    origin: StaticOriginId,
+    expr: &RuntimeExpr,
+    environment: &[DeferredAggregateProducerSet],
+    inside_target: bool,
+) -> Result<DeferredAggregateProducerSet, CraneliftBackendError> {
+    let child = |position| plan.semantic.child_origin(origin, position);
+    match expr {
+        RuntimeExpr::CheckedJoinSite { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => {
+            derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(0)?,
+                body,
+                environment,
+                inside_target,
+            )
+        }
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. }
+        | RuntimeExpr::Trap(_) => Ok(BTreeSet::new()),
+        RuntimeExpr::Var(index) => {
+            let producers = environment
+                .get(*index as usize)
+                .cloned()
+                .unwrap_or_default();
+            derivation.record_variable(origin, producers.clone(), inside_target);
+            Ok(producers)
+        }
+        RuntimeExpr::Let { value, body } => {
+            let value = derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(0)?,
+                value,
+                environment,
+                inside_target,
+            )?;
+            let body_environment = std::iter::once(value)
+                .chain(environment.iter().cloned())
+                .collect::<Vec<_>>();
+            derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(1)?,
+                body,
+                &body_environment,
+                inside_target,
+            )
+        }
+        RuntimeExpr::If {
+            scrutinee,
+            then_expr,
+            else_expr,
+        } => {
+            let _ = derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(0)?,
+                scrutinee,
+                environment,
+                inside_target,
+            )?;
+            let mut result = derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(1)?,
+                then_expr,
+                environment,
+                inside_target,
+            )?;
+            deferred_aggregate_producer_union(
+                &mut result,
+                derive_deferred_aggregate_producers(
+                    plan,
+                    derivation,
+                    child(2)?,
+                    else_expr,
+                    environment,
+                    inside_target,
+                )?,
+            );
+            Ok(result)
+        }
+        RuntimeExpr::Construct { args, .. } => {
+            let mut fields = Vec::with_capacity(args.len());
+            for (position, argument) in args.iter().enumerate() {
+                fields.push(derive_deferred_aggregate_producers(
+                    plan,
+                    derivation,
+                    child(position)?,
+                    argument,
+                    environment,
+                    inside_target,
+                )?);
+            }
+            derivation.constructed_fields.insert(origin, fields);
+            Ok(BTreeSet::from([origin]))
+        }
+        RuntimeExpr::Record { fields } => {
+            let mut planned_fields = Vec::with_capacity(fields.len());
+            for (position, (_, value)) in fields.iter().enumerate() {
+                planned_fields.push(derive_deferred_aggregate_producers(
+                    plan,
+                    derivation,
+                    child(position)?,
+                    value,
+                    environment,
+                    inside_target,
+                )?);
+            }
+            derivation.constructed_fields.insert(origin, planned_fields);
+            Ok(BTreeSet::from([origin]))
+        }
+        RuntimeExpr::Match {
+            scrutinee, cases, ..
+        } => {
+            let scrutinee_producers = derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(0)?,
+                scrutinee,
+                environment,
+                inside_target,
+            )?;
+            let mut result = BTreeSet::new();
+            for (case_position, case) in cases.iter().enumerate() {
+                let mut bindings = vec![BTreeSet::new(); case.binders];
+                for producer in &scrutinee_producers {
+                    let RuntimeExpr::Construct {
+                        constructor, args, ..
+                    } = plan.planned_occurrence_expr(*producer)?
+                    else {
+                        continue;
+                    };
+                    if constructor != &case.constructor {
+                        continue;
+                    }
+                    let fields = derivation.constructed_fields.get(producer);
+                    for position in 0..case.binders.min(args.len()) {
+                        if let Some(field) = fields.and_then(|fields| fields.get(position)) {
+                            bindings[position].extend(field.iter().copied());
+                        }
+                    }
+                }
+                let case_environment = bindings
+                    .into_iter()
+                    .chain(environment.iter().cloned())
+                    .collect::<Vec<_>>();
+                deferred_aggregate_producer_union(
+                    &mut result,
+                    derive_deferred_aggregate_producers(
+                        plan,
+                        derivation,
+                        child(1 + case_position)?,
+                        &case.body,
+                        &case_environment,
+                        inside_target,
+                    )?,
+                );
+            }
+            Ok(result)
+        }
+        RuntimeExpr::ComputationalMatch {
+            scrutinee, cases, ..
+        } => {
+            let scrutinee_producers = derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(0)?,
+                scrutinee,
+                environment,
+                inside_target,
+            )?;
+            let mut result = BTreeSet::new();
+            for (case_position, case) in cases.iter().enumerate() {
+                let layout = CheckedCaseBinderLayout::for_case(case)?;
+                let mut bindings = vec![BTreeSet::new(); layout.binder_count()];
+                for producer in &scrutinee_producers {
+                    let RuntimeExpr::Construct {
+                        constructor, args, ..
+                    } = plan.planned_occurrence_expr(*producer)?
+                    else {
+                        continue;
+                    };
+                    if constructor != &case.constructor {
+                        continue;
+                    }
+                    let fields = derivation.constructed_fields.get(producer);
+                    for binder in 0..layout.binder_count() {
+                        let super::continuations::CheckedCaseBinderRole::ConstructorChild {
+                            field_position,
+                        } = layout.role_at(binder)
+                        else {
+                            continue;
+                        };
+                        let position = field_position as usize;
+                        if position < args.len() {
+                            if let Some(field) = fields.and_then(|fields| fields.get(position)) {
+                                bindings[binder].extend(field.iter().copied());
+                            }
+                        }
+                    }
+                }
+                let case_environment = bindings
+                    .into_iter()
+                    .chain(environment.iter().cloned())
+                    .collect::<Vec<_>>();
+                deferred_aggregate_producer_union(
+                    &mut result,
+                    derive_deferred_aggregate_producers(
+                        plan,
+                        derivation,
+                        child(1 + case_position)?,
+                        &case.body,
+                        &case_environment,
+                        inside_target,
+                    )?,
+                );
+            }
+            Ok(result)
+        }
+        RuntimeExpr::LexicalClosure {
+            captures,
+            params,
+            body,
+        } => {
+            let mut capture_producers = Vec::with_capacity(captures.len());
+            for (position, capture) in captures.iter().enumerate() {
+                capture_producers.push(derive_deferred_aggregate_producers(
+                    plan,
+                    derivation,
+                    child(1 + position)?,
+                    capture,
+                    environment,
+                    inside_target,
+                )?);
+            }
+            let is_target = origin == derivation.target_closure;
+            if is_target {
+                derivation.target_reached = true;
+                let body_environment = std::iter::repeat_with(BTreeSet::new)
+                    .take(params.len())
+                    .chain(capture_producers)
+                    .collect::<Vec<_>>();
+                let _ = derive_deferred_aggregate_producers(
+                    plan,
+                    derivation,
+                    child(0)?,
+                    body,
+                    &body_environment,
+                    true,
+                )?;
+            }
+            Ok(BTreeSet::new())
+        }
+        RuntimeExpr::Project { record, field } => {
+            let records = derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(0)?,
+                record,
+                environment,
+                inside_target,
+            )?;
+            let mut result = BTreeSet::new();
+            for producer in records {
+                let RuntimeExpr::Record { fields } = plan.planned_occurrence_expr(producer)? else {
+                    continue;
+                };
+                let Some(position) = fields.iter().position(|(name, _)| name == field) else {
+                    continue;
+                };
+                if let Some(value) = derivation
+                    .constructed_fields
+                    .get(&producer)
+                    .and_then(|fields| fields.get(position))
+                {
+                    result.extend(value.iter().copied());
+                }
+            }
+            Ok(result)
+        }
+        RuntimeExpr::PrimitiveCall { args, .. } => {
+            for (position, argument) in args.iter().enumerate() {
+                let _ = derive_deferred_aggregate_producers(
+                    plan,
+                    derivation,
+                    child(position)?,
+                    argument,
+                    environment,
+                    inside_target,
+                )?;
+            }
+            Ok(BTreeSet::new())
+        }
+        RuntimeExpr::Call { callee, args } => {
+            let _ = derive_deferred_aggregate_producers(
+                plan,
+                derivation,
+                child(0)?,
+                callee,
+                environment,
+                inside_target,
+            )?;
+            for (position, argument) in args.iter().enumerate() {
+                let _ = derive_deferred_aggregate_producers(
+                    plan,
+                    derivation,
+                    child(1 + position)?,
+                    argument,
+                    environment,
+                    inside_target,
+                )?;
+            }
+            Ok(BTreeSet::new())
+        }
+        RuntimeExpr::Effect { .. } | RuntimeExpr::Closure { .. } => Ok(BTreeSet::new()),
+    }
+}
+
 
 /// Phase-A carry of the two-phase response context install (RECUT 2, HS5). Built
 /// by [`StaticTransitionPlan::install_static_response_context_plan`] at
@@ -2120,10 +2542,12 @@ impl StaticTransitionPlan<'_> {
                     effect_origin: route.effect_origin,
                     operation: route.operation,
                     sub_case: DeferredResponseSubCase::NoContinuationUnit,
+                    owner_pair: None,
                     // P1 has no continuation unit -> no captures/inputs. Excluded
                     // from the census population (no demand), so zero is exact.
                     capture_count: 0,
                     continuation_input_count: 0,
+                    aggregate_producer_ownership: None,
                 });
                 continue;
             }
@@ -2778,6 +3202,59 @@ impl StaticTransitionPlan<'_> {
         Ok(())
     }
 
+    /// Derive the aggregate-producer ownership relation for a locally driven
+    /// transport P2 response. The walk starts at the caller specialization's
+    /// exact worker body and follows binder construction into the exact K
+    /// closure named by phase A. It records only source aggregate producers;
+    /// compiler-synthesized producers retain their existing path-keyed records.
+    fn deferred_response_aggregate_producer_ownership(
+        &self,
+        demand: &StaticResponseContextDemand,
+        owner_pair: DeferredResponseOwnerPair,
+    ) -> Result<DeferredResponseAggregateProducerOwnership, CraneliftBackendError> {
+        let ContinuationEmissionOwner::Specialization(caller) = owner_pair.caller_emission_owner()
+        else {
+            return Ok(DeferredResponseAggregateProducerOwnership {
+                caller_emission_owner: owner_pair.caller_emission_owner(),
+                variable_producers: BTreeMap::new(),
+            });
+        };
+        let units = self.continuation_units()?;
+        let caller_unit = units
+            .iter()
+            .find(|unit| unit.id() == caller)
+            .ok_or_else(|| {
+                planner_error(
+                    "a Deferred response caller emission owner names no continuation unit",
+                )
+            })?;
+        let root = caller_unit.worker_body_origin();
+        let root_expr = self.planned_occurrence_expr(root)?;
+        let mut derivation = DeferredAggregateProducerDerivation {
+            constructed_fields: BTreeMap::new(),
+            variable_producers: BTreeMap::new(),
+            target_closure: demand.k_closure_origin,
+            target_reached: false,
+        };
+        let _ = derive_deferred_aggregate_producers(
+            self,
+            &mut derivation,
+            root,
+            root_expr,
+            &[],
+            false,
+        )?;
+        if !derivation.target_reached {
+            return Err(planner_error(
+                "a Deferred response caller body does not reach its exact phase-A K closure",
+            ));
+        }
+        Ok(DeferredResponseAggregateProducerOwnership {
+            caller_emission_owner: owner_pair.caller_emission_owner(),
+            variable_producers: derivation.variable_producers,
+        })
+    }
+
     /// The phase-B Deferred/Specialized split. In an eligible response plane, a
     /// transport-source K's existing checked-IH transport emission is the real
     /// selected incoming owner call:
@@ -2860,6 +3337,16 @@ impl StaticTransitionPlan<'_> {
             {
                 // Population-side mutation restores P2 for an otherwise eligible
                 // plane; open and single-stage planes remain lawful residuals.
+                let owner_pair = DeferredResponseOwnerPair {
+                    base_owner: demand.base_owner,
+                    caller_emission_owner: demand.k_identity.emission_owner(),
+                };
+                let aggregate_producer_ownership = Some(
+                    self.deferred_response_aggregate_producer_ownership(
+                        &demand,
+                        owner_pair,
+                    )?,
+                );
                 deferred.push(DeferredResponseRow {
                     vis_origin: demand.vis_origin,
                     producer_call_origin: demand.producer_call_origin,
@@ -2867,8 +3354,10 @@ impl StaticTransitionPlan<'_> {
                     effect_origin: demand.effect_origin,
                     operation: demand.operation,
                     sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
+                    owner_pair: Some(owner_pair),
                     capture_count: demand.captures.len(),
                     continuation_input_count: demand.continuation_inputs.len(),
+                    aggregate_producer_ownership,
                 });
             } else {
                 // Execute-then-resume makes a transport-source caller a real
@@ -3361,7 +3850,9 @@ impl StaticTransitionPlan<'_> {
 
     /// The specialized handler that consumes one Deferred response.
     ///
-    /// The first arm is the statically bounded P2 interpreter suffix above. The
+    /// A transport P2 row projects its caller emission owner directly from the
+    /// phase-A owner pair retained on the row. P1 has no such pair. Its first
+    /// fallback is the statically bounded P2 interpreter suffix above; the final
     /// fallback is the established single-owner decomposition for a Deferred
     /// response whose K uses the current HostResult exactly once on its most
     /// demanding path and whose exits are only `ITree::Ret`, traps, or uniquely
@@ -3374,6 +3865,9 @@ impl StaticTransitionPlan<'_> {
         &self,
         row: &DeferredResponseRow,
     ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if let Some(pair) = row.owner_pair() {
+            return Ok(Some(pair.caller_emission_owner()));
+        }
         if let Some(owner) = self.bounded_deferred_response_handler_owner(row)? {
             return Ok(Some(owner));
         }
@@ -3497,6 +3991,53 @@ impl StaticTransitionPlan<'_> {
         if matching.next().is_some() {
             return Err(planner_error(
                 "one source Vis has more than one Deferred response row",
+            ));
+        }
+        Ok(first)
+    }
+
+    /// The one Deferred response row at an exact host-effect occurrence.
+    pub(in crate::cranelift_backend) fn deferred_response_at_effect(
+        &self,
+        effect_origin: StaticOriginId,
+    ) -> Result<Option<DeferredResponseRow>, CraneliftBackendError> {
+        let mut matching = self
+            .static_response_deferred
+            .iter()
+            .filter(|row| row.effect_origin == effect_origin);
+        let first = matching.next().cloned();
+        if matching.next().is_some() {
+            return Err(planner_error(
+                "one host-effect occurrence has more than one Deferred response row",
+            ));
+        }
+        Ok(first)
+    }
+
+    /// Whether the one locally driven P2 aggregate-producer relation permits a
+    /// source aggregate at this variable occurrence. `None` means no relation
+    /// owns the question and the ordinary exact-source check remains binding.
+    pub(in crate::cranelift_backend) fn deferred_response_aggregate_producer_is_owned(
+        &self,
+        caller_emission_owner: ContinuationEmissionOwner,
+        variable_origin: StaticOriginId,
+        producer_origin: StaticOriginId,
+    ) -> Result<Option<bool>, CraneliftBackendError> {
+        let mut answers = self
+            .static_response_deferred
+            .iter()
+            .filter_map(|row| row.aggregate_producer_ownership.as_ref())
+            .filter_map(|ownership| {
+                ownership.permits(
+                    caller_emission_owner,
+                    variable_origin,
+                    producer_origin,
+                )
+            });
+        let first = answers.next();
+        if answers.next().is_some() {
+            return Err(planner_error(
+                "one aggregate-valued variable is owned by more than one Deferred response relation",
             ));
         }
         Ok(first)

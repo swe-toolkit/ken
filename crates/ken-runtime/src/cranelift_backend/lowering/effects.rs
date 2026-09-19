@@ -2801,13 +2801,31 @@ impl<'a> Lowering<'a> {
                     Lowered::StaticResponseDeferred,
                 ));
             }
-            // Deferred (R3): the residual falls through to the ordinary host-effect
-            // lowering below -- main's pre-WP path (4a088d8aa), no placeholder/owner.
-            // A Specialized effect INSIDE its owner and a non-response effect also
+            // A transport P2 effect is compiler control in every copy except
+            // its exact base owner. The row carries this phase-A relation; do
+            // not re-derive it from which source subtrees happen to contain the
+            // effect. Its caller emission owner may explicitly drive it once,
+            // guarded by `driven_deferred_response_effect`.
+            Some(ResponseDisposition::Deferred) => {
+                let non_base_copy = self
+                    .static_transition_plan
+                    .deferred_response_at_effect(static_origin)?
+                    .and_then(|row| row.owner_pair())
+                    .is_some_and(|pair| {
+                        self.defining_emission_owner != Some(pair.base_owner())
+                    });
+                if non_base_copy
+                    && self.function_local.driven_deferred_response_effect
+                        != Some(static_origin)
+                {
+                    return Ok(LoweringOperand::Specialized(
+                        Lowered::StaticResponseDeferred,
+                    ));
+                }
+            }
+            // A Specialized effect inside its owner and a non-response effect
             // lower normally.
-            Some(ResponseDisposition::Specialized)
-            | Some(ResponseDisposition::Deferred)
-            | None => {}
+            Some(ResponseDisposition::Specialized) | None => {}
         }
         if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation) {
             // `RT-DEAD-ARM-EFFECT-LOWERING` `D1` -- the SECOND refusal site, and
