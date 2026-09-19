@@ -45,11 +45,13 @@ precondition, so the normalizer's check is not available as a hypothesis.
 
 Measured. Do not re-derive.
 
-**1. No new package edge, and no import cycle.** `Derived.ken.md:66` already
-imports `Core.Classes.LawfulClasses (bool_and, bool_leq)`; widen that list to
-add `IsTrue` and `leq_nat`. `LawfulClasses` imports only `Core.Logic.*` and
-`Data.Text.StringBijection` — it does **not** import `Data.Collections.Derived`,
-so widening the existing edge introduces no cycle.
+**1. No new package edge, so there is no cycle to check.** `Derived.ken.md:66`
+already imports `Core.Classes.LawfulClasses (bool_and, bool_leq)`; widen that
+list to add `IsTrue` and `leq_nat`. Widening an import list on an edge that
+already exists cannot introduce a cycle — the edge is the thing a cycle would
+be made of, and it is already there. (Corroborating but not the argument:
+`LawfulClasses` imports only `Core.Logic.*` and `Data.Text.StringBijection`,
+not `Data.Collections.Derived`.)
 
 **2. Nothing in the catalog already states this.** `nth` appears in ken-fenced
 code in exactly four files — `Parsing/Cursor`, `Parsing/Parsing`,
@@ -64,10 +66,11 @@ scrutinees are in WHNF; an induction that splits only one leaves the other
 stuck. That reads like a wall and is a missing case split.
 
 **4. `IsTrue` is an alias.** `IsTrue (b : Bool) : Prop = Equal Bool b True`
-(`LawfulClasses.ken.md:54`). The two spellings are the same proposition. Note
-that `LawfulClasses`' own `leq_nat` proofs use the `Equal Bool ... True`
-spelling (`:499`), so the sibling convention in that file differs from what
-`AC-1` requires here — see `AC-1` for why the consumer wins.
+(`LawfulClasses.ken.md:54`) — non-recursive and single-clause, so it unfolds on
+any argument without needing its scrutinee in WHNF. The two spellings are one
+proposition. Note that `LawfulClasses`' own `leq_nat` proofs use the
+`Equal Bool ... True` spelling (`:499`), so the sibling convention in that file
+differs from what `AC-2` requires here — see `AC-2` for why the consumer wins.
 
 ## Deliverable
 
@@ -78,7 +81,7 @@ element type `a`:
 - `length a xs ≤ n` implies `nth a n xs = None a`.
 
 Names and binder order are the implementer's. The **statement form is not** —
-see `AC-1`.
+see `AC-2`.
 
 ## Stop condition
 
@@ -90,25 +93,45 @@ closed.
 
 ## Acceptance criteria
 
-**`AC-1` — both directions are inhabited, and stated as `IsTrue` over
-`leq_nat`.** The Boolean hypothesis is carried as
-`IsTrue (leq_nat (Suc n) (length a xs))`, not `Equal Bool (...) True`. The two
-are definitionally equal, so this is a choice about the use site rather than
-about provability: the consumer is `CAT-PARSING-CURSOR-LAWS` reaching these
-through `Order`'s `suc_decreases`, which is in `IsTrue` form, and matching it
-at the statement costs nothing while diverging puts a conversion at every use
-site. *Control, both halves required:* the package elaborates with both terms
+**`AC-1` — both directions are inhabited and neither is degenerate.**
+*Control, both halves required:* the package elaborates with both terms
 present; **and** replacing either direction's term with `Refl` makes the
 package go RED, restored byte-exact afterwards. A positive check alone passes
 for a statement that is accidentally trivial.
 
-**`AC-2` — `nth` and `length` are unchanged.** This node relates the two
+**`AC-2` — the hypothesis is spelled `IsTrue` over `leq_nat`.** Carry it as
+`IsTrue (leq_nat (Suc n) (length a xs))`, not `Equal Bool (...) True`.
+
+*Control:* each added statement's hypothesis is grepped and matches
+`IsTrue (leq_nat`, with `Equal Bool` absent from both hypothesis positions.
+**This half is textual on purpose.** The two spellings are definitionally the
+same proposition, so no elaboration, no mutation, and no test can separate
+them — `AC-1`'s control is invariant under this choice and cannot discharge it.
+
+*Why it is required at all, given that nothing breaks either way:* the consumer
+is `CAT-PARSING-CURSOR-LAWS`, reaching these through `Order`'s `suc_decreases`,
+which is in `IsTrue` form. The argument is legibility at the use site, not
+provability and not term size — there is no conversion to avoid. It needs a
+criterion because the nearest model of a `leq_nat` fact,
+`pub proof refl for leq_nat ... : Equal Bool (leq_nat x x) True`
+(`LawfulClasses.ken.md:499`), uses the **other** spelling, so an implementer
+copying the neighbour diverges from the consumer and nothing reds.
+
+*One report, not a deliverable:* if Ken's conversion checker turns out to treat
+`IsTrue` as **opaque** at these use sites rather than unfolding it, say so
+rather than quietly relying on the `IsTrue` form working. Nobody has verified
+it; the definition makes it free in principle. If it is opaque, the spelling
+stops being legibility and becomes load-bearing, this `AC` changes character,
+and its control above becomes the least interesting thing about it. The node
+goes green either way, which is what makes it cheap to miss.
+
+**`AC-3` — `nth` and `length` are unchanged.** This node relates the two
 functions the package already ships; it does not redefine either to make the
 relation provable. *Control:* `nth` (`:91`) and `length` (`:169`) are
 byte-identical to their pre-candidate text, extracted and compared
 programmatically, not by eye.
 
-**`AC-3` — no new trust, and the diff goes exactly one place.** *Control:* the
+**`AC-4` — no new trust, and the diff goes exactly one place.** *Control:* the
 added lines contain no `Axiom`, postulate, primitive, `Omega` carrier, or
 kernel/TCB surface; **and** the diff touches exactly
 `catalog/packages/Data/Collections/Derived.ken.md` and, under `crates/`,
