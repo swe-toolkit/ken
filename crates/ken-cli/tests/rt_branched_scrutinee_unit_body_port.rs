@@ -84,8 +84,69 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
   }
 "#;
 
+// ── STACK FLOOR, AND WHAT IT COSTS ──────────────────────────────────────────
+//
+// These tests drive the elaborator's recursive descent and had NO stack grant:
+// they ran on libtest's ambient 2 MiB thread and passed on an ACCIDENTAL
+// margin, which an unrelated elaborator change then consumed. That is the same
+// shape as the guard deleted from `abi_s6_mapping_surface_native` — a test
+// whose need sits just under the ambient default has no signal of its own
+// until something else spends the remainder, and the arriving change wears the
+// blame.
+//
+// MEASURED, both arms built and the binaries invoked directly, bisected on
+// `RUST_MIN_STACK` at 64 KiB resolution:
+//
+//     without the change   1984 KiB     with it   2112 KiB     delta 128 KiB
+//     libtest ambient      2048 KiB     -> 1984 < 2048 < 2112, so it tips
+//
+// The floor below is DERIVED RATHER THAN CHOSEN, and written as arithmetic so
+// the spend is legible. The property the old 3.1% margin never had was that
+// anybody could see what they were spending.
+//
+// THIS IS A STOPGAP AND ITS SUBJECT IS NOT THIS FILE. `1984 KiB` is consumed
+// before any test-specific work begins and is IDENTICAL across three files in
+// two crates — a shared dominating consumer. Raising floors buys time; it does
+// not address a baseline that eats 97% of the ambient stack.
+const MEASURED_NEED_KIB: usize = 2112;
+/// The bisection could not resolve finer than this, so the true need may be
+/// up to one step above what was observed.
+const BISECTION_RESOLUTION_KIB: usize = 64;
+/// One elaborator change of the size that tipped these cost 128 KiB here.
+const OBSERVED_INCREMENT_KIB: usize = 128;
+/// How many further such changes this floor is buying room for. State the
+/// number rather than a round total: this is the quantity being spent.
+const INCREMENTS_OF_HEADROOM: usize = 8;
+const TEST_STACK_BYTES: usize = (MEASURED_NEED_KIB
+    + BISECTION_RESOLUTION_KIB
+    + INCREMENTS_OF_HEADROOM * OBSERVED_INCREMENT_KIB)
+    * 1024;
+
+/// Run a test body on a thread with the floor above.
+///
+/// The thread is NAMED: an overflow on an unnamed `Builder` reports
+/// `thread '<unknown>'`, which cost this investigation a step when exactly
+/// that happened elsewhere. A future overflow here names its own test.
+fn with_stack_floor(name: &str, body: impl FnOnce() + Send + 'static) {
+    let handle = std::thread::Builder::new()
+        .name(name.to_string())
+        .stack_size(TEST_STACK_BYTES)
+        .spawn(body)
+        .expect("spawning the floored test body must succeed");
+    if let Err(payload) = handle.join() {
+        std::panic::resume_unwind(payload);
+    }
+}
+
 #[test]
 fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
+    with_stack_floor(
+        "two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1",
+        two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1_body,
+    );
+}
+
+fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1_body() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     let (result, route1) = ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
         ken_cli::build_native_program(
@@ -135,6 +196,13 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
 
 #[test]
 fn suppressing_match_branch_entry_is_a_recorder_positive_control() {
+    with_stack_floor(
+        "suppressing_match_branch_entry_is_a_recorder_positive_control",
+        suppressing_match_branch_entry_is_a_recorder_positive_control_body,
+    );
+}
+
+fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
     let root = tempfile::tempdir().expect("temporary native-build root");
     let (_, rows) = ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
         ken_runtime::with_branched_scrutinee_unit_body_match_branch_entry_suppressed(|| {
