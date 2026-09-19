@@ -294,8 +294,73 @@ validates the other N.**
 - Applies to `expect_err` suites, "should reject" corpora, and refusal
   matrices generally, not just compile-fail.
 
+## 8th axis: A MISMATCH VERDICT IS ROBUST TO A WRONG COMPARAND — AND THE
+## CONCLUSION CAN STILL BE RIGHT, WHICH IS WHY IT LEAVES NO SYMPTOM
+
+Every axis above ends in a wrong or vacuous answer. **This one ends in the
+correct answer**, and that is what makes it the hardest of the family to see.
+
+A ring was asked to compare an ignored row's current refusal against a guard
+cited as `core.rs:10792-95`. That range was the **wrong mechanism** — an
+index-bounds check on a different type. The real guard was
+`resolve_recursive_unit_body` at `:13597`/`:13662`.
+
+| comparand | verdict | branch taken | next action |
+|---|---|---|---|
+| the wrong range | does not match | (a) | returns for an owner |
+| the right guard | does not match | (a) | returns for an owner |
+
+> **Every wrong reference produces "different". Exactly one produces "same".**
+> So a mismatch carries no evidence that the comparand was right — **only a
+> match tests it.**
+
+The stale coordinate would then have been **confirmed by use**: relayed
+onward as *the range that was checked and found not to match*, surfacing only
+when someone eventually got a genuine match and could not reproduce it.
+
+⇒ **A check that can only come back negative has not been exercised.** This
+is the comparison-shaped form of the file's opening rule, and it needs saying
+separately because here there is no green-but-vacuous result to be suspicious
+of — the output is right, actionable, and acted upon.
+
+**Root cause: the guard was cited by COORDINATE.** Line numbers are moments;
+every edit above a guard moves it, and whatever has moved to your line number
+is still real code with real text, so the citation **resolves** and reads as
+valid. It was the receiving seat resolving the mechanism **at the symbol**,
+rather than at the range handed to them, that caught it.
+
+Two more of the same family, same day, different seats:
+
+- a symbol grepped and its single hit taken without resolving the enclosing
+  item — so a type with **zero production constructors** was published as the
+  production producer, every occurrence being inside `mod tests`;
+- **a file's `mod tests` boundary is not where its first `#[cfg(test)]`
+  appears** — a check keyed on the first occurrence misclassifies everything
+  after a nested one.
+
+Three seats in one night: **the citation resolved, so nobody asked whether it
+resolved to the right thing.**
+
+**How to apply:**
+
+- **Hand over a symbol, never a line range.** If you only hold a coordinate,
+  resolve the enclosing item first and pass *that*; the coordinate rides along
+  in parentheses as a convenience and is never the identifier.
+- **Before accepting a "does not match", ask what a match would have
+  required.** If no reachable input could have produced one, the comparison
+  was decided by its setup and not by its subject.
+- **Prefer a check whose two outcomes are both informative.** A screen
+  informative in only one direction is not a screen; and the uninformative
+  branch is usually the likely one, so it will be the branch you get.
+- **A correct conclusion drawn from an unverified premise is unfinished
+  work.** The conclusion stands; nothing about its survival licenses the
+  premise for the next use — and the next use may be the one needing a match.
+
 Related fleet lessons on the same family:
 [[a-differential-over-an-aggregate-is-an-existential-not-a-universal]] (the
 sibling on *observation granularity*),
 [[withdraw-and-relocate-test-different-properties]] (the sibling on
-*perturbation shape*), [[verify-the-report-is-real-before-explaining-it]].
+*perturbation shape*), [[verify-the-report-is-real-before-explaining-it]],
+[[publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read]] and
+[[a-pattern-match-is-evidence-about-what-encloses-it]] (the citation-side
+siblings of the 8th axis).
