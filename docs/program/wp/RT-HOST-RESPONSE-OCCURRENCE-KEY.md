@@ -127,7 +127,7 @@ constructor agrees on its operation, 29 of 29. Adding `operation` to the key
 changes nothing. Refuted at section 3a of the predecessor and not re-openable
 here.
 
-### 3b. THE ACCEPTANCE BAR (Architect, 2026-09-18)
+### 3b. THE ACCEPTANCE BAR — TWO CLAUSES (clause 3 added and STRUCK 2026-09-19)
 
     MUST STILL REFUSE   two response-handling sites within ONE occurrence
                         claiming one operation constructor
@@ -138,6 +138,26 @@ here.
 re-keyed it.** A naive `(occurrence, constructor)` key satisfies the second
 half automatically and the first half only if the producer-side insert check is
 retained per occurrence. Retaining it is not optional.
+
+> ### THIS COPY IS CORRECT BY COINCIDENCE, AND THAT IS WHY IT CARRIES A MARKER.
+>
+> **Between 2026-09-18 and 2026-09-19 the bar was THREE clauses** — a
+> `MUST NOT MIS-ROUTE` clause added by `evt_4eghtvj2fhpz0` and struck by
+> `evt_7sj5xmgcxwk5f`. **This copy was never updated in either direction**, so
+> it went stale, then became accurate again without anyone touching it.
+>
+> **Do not delete this marker as redundant once the copies agree.** Its job is
+> not to flag a discrepancy — there is none. Its job is to stop the inference
+> that the bar was ALWAYS two clauses. Clause 3 was set deliberately, tested
+> against a four-row census, and struck on the measured finding that its
+> subject does not denote. **Two agreeing copies with no history erase that
+> record**, and the next reader to ask "was the consumer side ever checked?"
+> would have to redo the census to find out that it was.
+>
+> The three-clause copy in `issues/RT-HOST-RESPONSE-OCCURRENCE-KEY.md` was the
+> one that read as wrong and was corrected 2026-09-19. **This one read as right
+> and would not have been** — the Architect flagged it as the more dangerous of
+> the two for exactly that reason, and they are correct.
 
 ### 3c. READ SECTION 3a OF THE PREDECESSOR TO THE END
 
