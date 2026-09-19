@@ -318,6 +318,48 @@ for re-review.
 > Name it in the closeout. Whether it earns a node is the Steward's call at
 > L3's successor.
 
+**`AC-3c` — the consumer-view authorization is a PREDICATE, and it replaces the
+enumeration in `AC-3a`/`AC-3b`.** *Control:* for every whole-catalog assertion
+that reds causally on this candidate's declared surface, the candidate either
+brings the assertion into agreement or changes itself, and the choice is made by
+this test and recorded in the candidate:
+
+> **An assertion is MIRRORING when its expected value records what the catalog
+> declares. Bring it into agreement.** **An assertion is DIRECTIONAL when its
+> expected value records debt to be retired rather than a fact to be mirrored.
+> Change the candidate, never the assertion.** Where the assertion states which
+> it is, its own doc comment is the authority.
+
+**`AC-3a` and `AC-3b` each authorized a fold against a NAMED harness, and that
+is the defect.** An enumeration cannot report being incomplete, so every stop on
+this node has been a consumer-view surface the list did not happen to name —
+export literals, then the import roster, then the ambient census. **Three stops,
+one shape, and the shape is that I kept writing lists.** `AC-3c` is the only
+form that closes it: it quantifies over *assertions that fire*, which is a set
+the candidate cannot be wrong about because CI enumerates it.
+
+**The fourth stop is what showed the predicate needs two arms rather than one.**
+`catalog_ambient_passthrough_migration_census`
+(`lang_mod_strict_resolution_d0.rs:369`) failed on `Capability.Parsing.Cursor`
+gaining `IsTrue`. Read as a pin it looks exactly like the first three and the
+repair looks like refreshing it. **It is directional** — its doc says *"every
+remaining name still requires an explicit provider migration"*, so a growing
+expected set records a regression rather than a fact. Measured: `IsTrue` is
+`pub fn IsTrue` at `Core/Classes/LawfulClasses.ken.md:54`, `Data.Numeric.Nat`
+`.Order.ken.md:37` imports it explicitly and uses it eighteen times while
+staying **out** of the census, and `IsTrue` appears in **zero** census entries
+catalog-wide. So the repair is an explicit import in `Cursor.ken.md`, and the
+sentinel is not touched. Steward ruling `evt_5f4qhhwqk1hye`.
+
+> **A ONE-ARMED PREDICATE WOULD HAVE BEEN WORSE THAN THE LISTS IT REPLACED.**
+> "Bring every firing consumer-view assertion into agreement" is the natural
+> generalization of the first three stops, it reads as the rigorous fix, and on
+> this candidate it authorizes recording new migration debt as routine scope
+> hygiene. **The lists at least hard-stopped.** A predicate that generalizes
+> from a sampled population inherits the sample's bias and adds authority —
+> which is the same defect one level up, and the reason the directional arm is
+> written before any further consumer-view surface is met.
+
 ## Design note, not a criterion
 
 Name the `cursor_nat_lt`/`leq_nat` bridge as its own top-level declaration
