@@ -467,11 +467,54 @@ NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
 > **established**, because it authorizes a structural change. Stating the
 > reading as fact collapsed them.
 
-**Hard-stop count on this WP: 3.** **The parent node's count of 2 does NOT
-carry** — different WP, different question. Both acts have now FIRED at three
-(`§1a` at `evt_7d3h7mtff5acd`, `§1b` at `evt_1mv0phbj0zcn7`); **the next `§1a`
-re-trigger is at 6**, and the Architect will scope that one to whatever new
-fork the next stop surfaces rather than re-asking this question.
+Entries 4, 5 and 6, appended verbatim from the Architect at
+`evt_734ccm2xzxp5r`. Entries 1-3 above are deliberately not rewritten.
+
+```
+4. phase A derives the release's (base owner, caller emission owner) pair
+   and the conversion to DeferredResponseRow DROPS BOTH, retaining only
+   origins and counts -- so downstream reconstructs ownership from local
+   occurrence containment and effect 190 dispatches TWICE, once under the
+   predeclared / specialization-0 copies while constructing the Vis and
+   again when specialization 1 processes that same Vis -- keyed on a source
+   occurrence standing for the runtime object, the owner relation having
+   been discarded at the row boundary
+5. with the owner pair retained the dispatch is correct and single, and the
+   RETURN CONTRACT then refuses: k_ret_identity is derived from
+   continuation_result_origins(worker body 568) as Vis arity 2, while the
+   locally driven path consumes Vis 555, dispatches, lowers exact K body
+   542 and returns ITree::Ret arity 1 -- keyed on the SOURCE worker body's
+   occurrences naming the result of the DRIVEN object. This is entry 1
+   recurring at a second consumer after D0 repaired it at the first.
+6. deriving the driven result identity from the exact K body and
+   propagating it to the matching response row finds NO row at
+   StaticOriginId(503): the pairing resolves the driven object through
+   specialized.base_owner == Specialization(k_specialization) matched
+   against the deferred row's caller emission owner, a coordinate that is
+   not a function of the driven object, and at 503 the correspondence is
+   empty -- keyed on an owner coordinate standing for the driven object
+```
+
+> **WHAT ENTRY 6 DOES NOT CLAIM, kept so the frame does not overstate it.**
+> The zero-match is measured, and *that the pairing key is not a function of
+> the driven object* is grounded at `responses.rs:2984` and `:4359` plus the
+> two accessor docs at `continuations.rs:1489` and `:1508`. **NOT established:
+> that the intended pairing relation is wrong** — only that it resolves nothing
+> at 503. The entry's keying clause is held to what those citations carry.
+
+**Hard-stop count on this WP: 6.** **The parent node's count of 2 does NOT
+carry** — different WP, different question. `§1a` fired at three
+(`evt_7d3h7mtff5acd`) and has now **re-fired at six** (`evt_3t5nq11ernjfa`),
+holding the ruling on the next locus and calling Research. `§1b` fired at
+three (`evt_1mv0phbj0zcn7`) and was re-run at six (`evt_734ccm2xzxp5r`);
+**the next predicate check is at 9.**
+
+> **THE COUNT IS 6 AND NOT 5, AND THE ADJUDICATION IS THE ARCHITECT'S.** The
+> implementer reported "count remains 5" and that reading is defensible — they
+> stopped as directed, and measurements taken inside a stop are not new stops.
+> The Architect overrode it as their own trigger. **Recorded here because the
+> number is close and the next reader must not inherit the losing side of it
+> without knowing there was one.**
 
 ### The `§1b` answer, and a pre-commitment the Architect declined to discharge
 
