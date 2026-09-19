@@ -1,7 +1,7 @@
 ---
 id: RT-DUPLICATED-RESPONSE-BLOCK
 title: "Four ignored rows stop at `two host response cases claim one operation constructor` because the plan carries the same host-response block twice, not because two cases compete: across three programs the colliding constructors ALL agree on their operation and their effect-origin deltas are a single constant. Locate where the duplication enters and decide whether the planner emits it or the collision check is measuring a legitimate shape."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -317,3 +317,40 @@ Architect rules the occurrence-pairing arm, that is a successor node with its
 own frame, cut by the Steward), **not** the other eleven selected rows, and
 **not** `RT-FRAME-MARKER-ONCE` or `RT-CLOSURE-BOUNDARY-LANE` — it measures
 whether they are reached and repairs neither.
+
+# 2026-09-19: `ready` -> `active`. THE STATUS WAS CORRECT; THE RELEASE IS NEW.
+
+**Flagged by the runtime-leader (`evt_1zj4ezc15qrvb`) as a possibly-stale
+`ready`, on the grounds that `fb214f7c5` is titled "AC-11 discharged, AC-8
+fenced". Adjudicated by the Steward and recorded here so the shape is not
+re-surfaced: the status was NOT stale.**
+
+    fb214f7c5   DOES touch this node's wp frame (5 files, two lanes). Its
+                subject names the LANG node, which is why it reads as
+                another lane's commit. The citation was correct.
+    d9d8d692f   ancestor of main. One file, +323/-0, section 8.11a-i.
+                Purely additive. No production change, no repair, no row
+                readmitted.
+
+**AC-11 discharged PLUS AC-8 fenced is consistent with an open node**, because
+`AC-8`'s fence is a statement of remaining work in its own words: *"NEITHER
+repair is justified: not the key change, not the relaxation. This is the node's
+state, not a stall."* A fence that names what would decide it is not a closure.
+
+> **The general form, which is the part worth carrying.** A discharged AC and a
+> fenced AC look alike in a commit subject and mean opposite things about
+> whether a node is finished. **Read which ACs the commit moved and what the
+> fence says, never the count of ACs named in the subject line.** The subject
+> line is the one surface that cannot express the difference.
+
+**Released 2026-09-19 to the runtime ring as the `AC-8` discriminator
+increment** (kick `evt_20yrkxxjt5t0w`). Scope is one predicate at one
+coordinate: **`repeated_producer`'s reachability on the four ignored rows**,
+`responses.rs:3326-3328`, the sole unmeasured production `USE` surviving
+8.11h's classification. Both outcomes are pre-committed in `AC-8`'s own text.
+
+**Not released with it:** `[[RT-HOST-RESPONSE-OCCURRENCE-KEY]]` stays `draft`.
+Relaxation is refuted by 8.11h-2's `ANY USE` return and must not be re-proposed
+as a shortcut. The sort-key residual (`:2069`, `:2286-2291`, `:2900`, `CARRY`
+only if `StaticResponseContinuationId::from_position` is label-only) is
+recorded unresolved and is not folded into this increment.
