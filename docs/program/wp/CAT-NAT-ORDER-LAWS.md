@@ -167,14 +167,30 @@ report, per `steward.md` §4b.
   > edge's symbols were actually flattened**, so the FLATTEN half is not — which
   > is exactly why the roster looked maintained.
   >
-  > **REQUIRED, AND IT IS A MEASUREMENT RATHER THAN A DISCLOSURE.** The
-  > candidate states, for the `Nat.Order` edge at `:163`, **how many of its four
-  > symbols the roster flattens after the repair.** Today that number is 0 of 4;
-  > a hand-add of `leq_nat` makes it 1 of 4; deriving the roster makes it 4 of 4.
-  > **No threshold is set and the right number is not knowable from here** — the
-  > point is that the next candidate can compare against it. *(This replaces an
-  > earlier "say which you did", which was a disclosure: it had no failing
-  > state, and a constraint that cannot fail is documentation.)*
+  > **REQUIRED, AS A MEASUREMENT RATHER THAN A DISCLOSURE: the candidate states
+  > how many of `Nat.Order`'s declarations the flattened prelude carries, and
+  > what it excludes.** No threshold is set and the right number is not knowable
+  > from here — the point is that the next candidate can compare against it.
+  >
+  > **DISCHARGED at `33aa3aa2f`: 2 — `min` and `sub` — excluding `max`,
+  > `compare`, and all four new `pub proof`s**, by an explicit allowlist rather
+  > than a stale roster.
+  >
+  > > **THIS CRITERION WAS FIRST WRITTEN AGAINST A STRUCTURE THE REPAIR WAS FREE
+  > > TO DELETE, AND THE REPAIR DELETED IT** (Steward ruling
+  > > `evt_78zvp3es9xqy6`). It required a count over *"the `Nat.Order` edge at
+  > > `:163`"* — 0 of 4 today, 1 of 4 for a hand-add, 4 of 4 for a derivation.
+  > > The accepted repair removed the subtractive shape entirely, so that edge
+  > > no longer exists and the criterion had **no subject**: it could not be
+  > > satisfied, failed, or waived. Ruled OBVIATED, not satisfied, and restated
+  > > above against the shape that now exists. **Nobody discharges it by
+  > > inventing a number for an edge that is gone.**
+  > >
+  > > ⇒ **A CRITERION MUST NOT QUANTIFY OVER A STRUCTURE ITS OWN REPAIR MAY
+  > > REMOVE.** Pin it to the PROPERTY the repair must preserve, never to a
+  > > coordinate on the thing being repaired. The recommendation was the
+  > > Architect's; writing it into a landed AC pinned to `:163` was the
+  > > Steward's, and that is where the defect entered.
   >
   > **RECOMMENDED, NOT REQUIRED — scope is the Steward's under `§4`.** The right
   > shape is to derive the flattened-declaration roster from the removed-edge
@@ -190,14 +206,47 @@ report, per `steward.md` §4b.
 - **`AC-3` — NO DEFINITION CHANGED.** `min`, `max`, `sub`, `compare`, and
   `leq_nat` keep their current bodies. The proofs adapt to the definitions.
   *Control:* the diff shows no edit inside `:60-87`.
-- **`AC-4` — THE REJECTED BLOCK IS GONE AND ITS PROSE IS CORRECTED.**
-  `:146`'s ` ```ken reject ` fence and the `:139-145` prose asserting the law is
-  unproved must both go. *Control:* grep the package for `self_is_zero_wrong`
-  and for `deliberately doesn't prove` — both must return nothing.
+- **`AC-4` — THE PACKAGE DOES NOT ASSERT BOTH.** The prose claiming the law is
+  deliberately unproved is gone, and nothing in the package contradicts the
+  checked `sub::self_is_zero`.
+  *Control, in three parts, all of which can fail:* (a) grep the package for
+  `deliberately doesn't prove` — returns nothing; (b) **if** a ` ```ken reject `
+  fence for this law is retained, it carries its own `-- Fails: …` reason
+  INSIDE the fence, per this package family's sibling convention
+  (`Core/Classes/EffectfulClasses.ken.md:1142-1146`); (c) the surrounding prose
+  states the mechanism that fence demonstrates.
 
   **This AC exists because the prose is load-bearing and is not near the
   proof.** A checked `sub::self_is_zero` sitting six lines below a paragraph
   that says the law is deliberately unproved leaves the package asserting both.
+
+  > **AMENDED 2026-09-19 (Steward ruling `evt_78zvp3es9xqy6`). THE OLD CONTROL
+  > WAS `grep self_is_zero_wrong` MUST RETURN NOTHING, AND IT IS STRUCK.**
+  >
+  > **It keyed on the ARTIFACT when the requirement is about a PROPERTY.**
+  > Deleting the fence was one way to remove the contradiction; the ring found a
+  > better one, so the control fired on a tree that satisfies the requirement.
+  > The retained fence is now the EVIDENCE for the prose rather than a
+  > contradiction of it — *"That is asserted here, not merely asserted about:"*
+  > — and it is a non-degenerate negative control with its positive sibling:
+  > `pub proof self_is_zero` closes the goal by induction, `self_is_zero_wrong`
+  > shows `Refl` cannot, same goal and same binders. Deleting it would have left
+  > the mechanism claim executable as a fence and inert as a sentence.
+  >
+  > **The old control could also be satisfied by deletion alone, which is the
+  > other half of the defect:** a control that a ring can discharge by removing
+  > the thing it names is not testing the property.
+  >
+  > **THE RING RETAINED THE BLOCK WITHOUT AN AMENDMENT, AND THAT PART IS NOT
+  > WAIVED BY THE RULING GOING ITS WAY.** Authorized retroactively on the
+  > merits. The gap to bring the Steward is when an AC's control and its own
+  > stated rationale point different ways — as they did here. That is one
+  > message and always cheaper than the alternative.
+  >
+  > **SECOND INSTANCE IN THIS FRAME, SAME AUTHOR, SAME DAY.** `AC-2`'s control
+  > was "nothing under `crates/`" for a requirement of "no new trust". **A
+  > control is tested by two questions: can it be satisfied by something that
+  > misses the requirement, and can it fire on something that meets it.**
 
 ## 4. Authoring notes — read these before writing a proof
 
