@@ -2588,6 +2588,7 @@ fn elaborate_mutual_group_with_fixities(
         &mut elab.num_values,
         &elab.numeric_env,
         &elab.class_env,
+        &mut elab.resolution_provenance,
         &standard_operators_for_group,
         &mut elab.fixities,
         &mut elab.fixity_spans,

@@ -269,3 +269,133 @@ fn an_explicit_saturated_call_through_the_facade_path_elaborates() {
     // reachable and well-typed through the facade path.
     result.expect("an explicit saturated call through the facade elaborates");
 }
+
+// ---------------------------------------------------------------------------
+// AC-1 / AC-2 / AC-4 -- the completion itself, for the roles that need a
+// prefix. `∧`/`∨` are already saturated at two arguments; `≤`/`≥` are not, and
+// these rows are about the prefix completion supplies.
+// ---------------------------------------------------------------------------
+
+/// Peel the lambdas a `fn`'s parameters introduce, leaving the body proper.
+///
+/// `transparent_body` returns the whole `\a b. ...`, so counting the
+/// application spine without peeling counts zero and the row fails for a
+/// reason that has nothing to do with completion.
+fn under_binders(mut term: ken_kernel::Term, binders: usize) -> ken_kernel::Term {
+    for _ in 0..binders {
+        match term {
+            ken_kernel::Term::Lam(_, body) => term = *body,
+            other => panic!("expected a lambda binder, got {other:?}"),
+        }
+    }
+    term
+}
+
+/// The length of an application spine.
+fn spine_len(mut term: ken_kernel::Term) -> usize {
+    let mut depth = 0;
+    while let ken_kernel::Term::App(f, _) = term {
+        depth += 1;
+        term = *f;
+    }
+    depth
+}
+
+const ORD_BOOL: &str = "instance Ord Bool { leq = \\x y. x } ";
+
+/// AC-1 -- a saturated application reaches the kernel.
+///
+/// The positive control the refusing version could not have: before completion
+/// was wired this file was fully green, because nothing here elaborated a `≤`.
+/// A suite that passes whether or not the feature exists is the failure AC-1's
+/// "show the saturated application reaching the kernel" exists to prevent.
+#[test]
+fn ac1_a_bare_comparison_completes_its_omitted_prefix() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} {ORD_BOOL} \
+         import Core.Operators.Standard (≤, ≥) \
+         fn le (a : Bool) (b : Bool) : Bool = a ≤ b \
+         fn ge (a : Bool) (b : Bool) : Bool = a ≥ b"
+    ))
+    .expect("`a ≤ b` must complete: carrier inferred, `Ord` dictionary resolved");
+
+    // Four arguments reached the kernel, not two. The carrier and the
+    // dictionary are the prefix completion supplied.
+    for name in ["le", "ge"] {
+        let depth = spine_len(under_binders(body_of(&env, name), 2));
+        assert_eq!(
+            depth, 4,
+            "{name}'s body must be a FOUR-argument application -- carrier, \
+             dictionary, and the two operands -- not the two that were written"
+        );
+    }
+}
+
+/// AC-4 -- operand order, and the mutation this row exists to catch.
+///
+/// `ord_geq_at a d x y = d.leq y x` reverses INSIDE the binding, on values
+/// call-by-value has already evaluated left to right. So completion must apply
+/// the operands in SOURCE order for `≥` exactly as for `≤`; reversing at the
+/// call site as well would double-reverse and silently invert every `≥`.
+///
+/// Asserted on the de Bruijn indices of the last two arguments rather than on
+/// a rendering: under `\a b.` the source order is `Var(1)` then `Var(0)`, and
+/// a double-reverse is precisely the swap.
+#[test]
+fn ac4_completion_applies_operands_in_source_order_for_both_roles() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} {ORD_BOOL} \
+         import Core.Operators.Standard (≤, ≥) \
+         fn le (a : Bool) (b : Bool) : Bool = a ≤ b \
+         fn ge (a : Bool) (b : Bool) : Bool = a ≥ b"
+    ))
+    .expect("both comparisons must complete");
+
+    for name in ["le", "ge"] {
+        let body = under_binders(body_of(&env, name), 2);
+        let ken_kernel::Term::App(applied_lhs, rhs) = body else {
+            panic!("{name}'s body must be an application");
+        };
+        let ken_kernel::Term::App(_, lhs) = *applied_lhs else {
+            panic!("{name}'s body must be a two-deep application spine");
+        };
+        assert!(
+            matches!(*lhs, ken_kernel::Term::Var(1)),
+            "{name}: the FIRST operand must be the first-written one; a \
+             completion that reverses at the call site puts it second and \
+             double-reverses `≥` -- got {lhs:?}"
+        );
+        assert!(
+            matches!(*rhs, ken_kernel::Term::Var(0)),
+            "{name}: the SECOND operand must be the second-written one -- got \
+             {rhs:?}"
+        );
+    }
+}
+
+/// AC-2(b) -- an unrelated local `≤` is NOT completed.
+///
+/// Completion keys on the defining `GlobalId`, so a user's own operator with
+/// that spelling has a different identity and elaborates exactly as its own
+/// declaration says. If this ever reddens with an arity complaint, completion
+/// has started keying on the glyph.
+#[test]
+fn ac2b_an_unrelated_local_operator_with_the_same_glyph_is_left_alone() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} {ORD_BOOL} \
+         fn ≤ (x : Bool) (y : Bool) : Bool = y \
+         fn mine (a : Bool) (b : Bool) : Bool = a ≤ b"
+    ))
+    .expect("a local `≤` is an ordinary two-argument function and must stay one");
+
+    let depth = spine_len(under_binders(body_of(&env, "mine"), 2));
+    assert_eq!(
+        depth, 2,
+        "the local `≤` takes two arguments and must receive exactly two; a \
+         four-argument spine means completion fired on a glyph rather than on \
+         the certified identity"
+    );
+}
