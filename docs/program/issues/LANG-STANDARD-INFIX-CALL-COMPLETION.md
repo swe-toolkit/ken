@@ -1,17 +1,41 @@
 ---
 id: LANG-STANDARD-INFIX-CALL-COMPLETION
 title: "A1 of the reserved-infix-glyph objective: the reusable use-site standard-call completion adapter that spec 39 section 6.9 specifies and that ships un-implemented, co-landing its first standard consumers ∧ ∨ ≤ ≥ ≠ bound to ordinary checked functions; ∧ ∨ ≤ bind to the ALREADY-LANDED `Core.Classes.LawfulClasses` identities, reached through a separate standard-operator facade that RE-EXPORTS them rather than defining second copies, because 6.9 keys completion on ONE defining GlobalId and 33 section 6.1 requires exactly that home; ord_geq_at and ≠ are the genuinely new bindings; the completion resolver is factored so later membership (6.10) reuses the SAME scoped/coherent dictionary resolver, not a second operator dispatcher; results Bool, single left-to-right eval, no short-circuit; the definition-time NoInstance gap for a generic `where Ord a` binding is repaired or explicitly split before the generic case is claimed delivered"
-status: ready
+status: in-review
 owner: language
 size: L
 gate: none
-depends_on: [LANG-RESERVED-INFIX-NAMES, SPEC-STANDARD-INFIX-BINDING]
+depends_on: [LANG-RESERVED-INFIX-NAMES, SPEC-STANDARD-INFIX-BINDING, LANG-REWRITE-DESCENT-FRAME-TAX]
 blocks: [LANG-MEMBERSHIP-OPERATOR-SURFACE]
 github: null
 tier: T1
 origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy), grounded at main 4fdd4f0ad. A1: the reusable completion link, made its own node per the Architect (do not ship an unused framework nor a third wiring node -- co-land ∧ ∨ ≤ ≥ ≠). RELEASED 2026-09-17 by the Steward, re-grounded at main 8f0f3753270b2d7639fc7aed457b759e6e6a57a1: both prerequisites are merged, and the re-grounding refuted one of the stub's own scope lines (see the RELEASED banner). AMENDED same day with FI-2a after language-implementer attacked FI-2 as instructed (evt_70jn1q9r56ttr): FI-2 refuted second copies correctly but over-refuted the home, and spec 33 section 6.1 requires a re-exporting standard-operator module and fixes ≥'s binding as ord_geq_at. Architect then upheld the facade and overturned the Steward on ord_geq_at's home (evt_4jhrgeqse8k13, FI-2b): define it in LawfulClasses beside ord_leq_at, re-exported by the facade, because it is fully generic and section 2a puts only package-specific content in a package; the same ruling corrected the frame's stale 'actively contended' claim about LawfulClasses.ken.md to UNCONTENDED. IN-LANE: bounded elaborator + catalog design; Architect required reviewer; no new TCB (Architect: no new Eq/DecEq instance, Float-equality law, or TCB entry needed)."
 ---
 
+> # HELD 2026-09-19 (Steward) BEHIND [[LANG-REWRITE-DESCENT-FRAME-TAX]] — READ THIS FIRST
+>
+> **The work is done and approved; what is held is the LANDING.** The candidate
+> at `ed47f3ec9328859ff80a66d10ab9ab28c991cdba` is not withdrawn, not
+> re-scoped, and not defective. Do not respin it and do not rebase it yet.
+>
+> **Why.** A1's two new `rewrite_rexpr_inner` arms (`RStandardOp`,
+> `RInfixSpine`) add 144 B to a frame that is sized by the union of ALL `RExpr`
+> arms, and that pushes the legacy-map descent past
+> `local_prebinding_preserves_legacy_map_union_stack_budget`'s 2 MiB boundary.
+> The operator was given the options fork and ruled this session, verbatim:
+> **"g then remeasure"** — repair the whole-surface frame tax first, then
+> measure whether A1's arm still trips the detector at all.
+>
+> Landing A1 first would FORCE the re-baseline decision that (g) exists to
+> avoid, so the hold is the Steward's sequencing call. It costs no new time:
+> A1 was already gated on the operator.
+>
+> **`LANG-REWRITE-DESCENT-FRAME-TAX` `D3` answers the question this node is
+> waiting on**, and answers it as a REPORT — the re-baseline decision stays
+> with the operator either way. On its landing A1 rebases onto the new
+> `modules.rs` and returns for routing. Expect the rebase: that node edits the
+> same function.
+>
 > # RELEASED 2026-09-17 (Steward), re-grounded at main `8f0f37532`.
 >
 > Both prerequisites are `merged`: A0 [[LANG-RESERVED-INFIX-NAMES]] (landed
