@@ -222,13 +222,31 @@ reasoning deleted invites the next reader to rebuild the wrong reasoning.
 > Both map to `False`, so exit 82 alone does not discriminate them, and only
 > `BodyAndReleaseError` can hold both the `RightNotHeld` and the `Closed`.
 
-**How it failed is the discipline.** The chain ranged over exactly the two
-constructors that produce 82, because 82 was the observation it was built to
-explain — so the constructor that does **not** produce 82 was never a candidate,
-and the one unread link was phrased as a choice between the two. **An
-enumeration derived from the symptom cannot contain the case where the symptom
-has a different cause.** The one-arm-at-a-time flip found it because it varied
-each arm independently instead of asking which of two arms was taken.
+**How it failed is the discipline, and the first account of that was also
+wrong.** It said the chain ranged over the two constructors that produce 82.
+**It does not: three of the four produce 82 unconditionally.**
+`bracket_has_right_denial` (`crates/ken-cli/tests/px7f_resource_native.rs:133`)
+sends `ResourceBracketOk` (`:135`), `ResourceBracketReleaseError` (`:137`), and
+`ResourceBracketBodyAndReleaseError` (`:138`) all to `False`, and `:148` sends
+any `False` to `Failure 82`. Only `ResourceBracketBodyError` (`:136`) can reach
+`Success`, and only when `right_masks` accepts its error. **The candidate set
+was never "everything that produces 82",** so a reader applying the earlier
+account would look for the wrong thing.
+
+**What actually happened.** `ResourceBracketOk` was excluded by an *inference* —
+the trace carries the `RightNotHeld`, therefore the bracket must carry the body
+error. The unread link was then phrased as *"`BodyAndReleaseError` or
+`ReleaseError`?"* — **a choice between the two survivors of that inference.** So
+the check that was ordered sat *inside* the assumption that built the list, and
+**no answer to it could have tested that assumption.** Both answers confirm
+"the bracket carries a release error", which was the false part.
+
+⇒ **WHEN YOU NAME AN UNREAD LINK, ASK WHETHER RESOLVING IT EITHER WAY LEAVES
+YOUR INFERENCE STANDING. If both answers keep your reasoning intact, you have
+named a detail, not a link.** This one had exactly that defect. The
+one-arm-at-a-time flip found it because it varied each candidate
+**independently** rather than asking which of two was taken — a discriminator
+over the whole domain, not over the survivors.
 
 ## 3. Acceptance criteria
 
