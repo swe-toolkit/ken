@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-ORDER-LAWS
 title: "Proof-backfill for Data/Numeric/Nat/Order.ken.md: land the inductive sub/leq fragment the package explicitly defers (self-subtraction, saturation, strict decrease), then the min/max/compare theory. Dependency-bottom node of the proof-completeness survey's 17 follow-ons: its sub/leq lemmas are what the downstream *-LAWS packages reduce their own bounds reasoning to."
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none
