@@ -282,7 +282,7 @@ pub(crate) fn certify_roles(
         return Ok(HashMap::new());
     };
 
-    let mut certified = HashMap::new();
+    let mut certified: HashMap<StandardOperatorRole, GlobalId> = HashMap::new();
     for role in StandardOperatorRole::BINDING_BACKED {
         let glyph = role.glyph();
         let canonical =
@@ -316,6 +316,34 @@ pub(crate) fn certify_roles(
                 binding: canonical.clone(),
                 expected: expected_shape(role).to_string(),
                 found: describe(&ty, bool_id),
+                span: span.clone(),
+            });
+        }
+        // THE INJECTIVITY REFUSAL, and it is a THIRD malformation rather than
+        // a variant of the two above.
+        //
+        // The adapter recovers a role from `RStandardOp`'s identity by reverse
+        // lookup here, which is a FUNCTION only if these values are distinct.
+        // Nothing upstream prevents `export (bool_and as ∧, bool_and as ∨)` --
+        // the home would be publishing one binding under two role glyphs, and
+        // an occurrence of either could then complete as the other role.
+        //
+        // Enforced at the single place the map is built rather than stated as
+        // an invariant somewhere: the check is one scan of what we have just
+        // inserted, and an invariant that is cheap to enforce and merely
+        // recorded is the shape that goes false quietly.
+        if let Some((&earlier, _)) = certified.iter().find(|(_, &seen)| seen == id) {
+            let mut roles = [earlier.glyph(), glyph];
+            roles.sort_by_key(|g| {
+                StandardOperatorRole::ALL
+                    .iter()
+                    .position(|r| r.glyph() == *g)
+                    .unwrap_or(usize::MAX)
+            });
+            return Err(ElabError::StandardOperatorRolesShareABinding {
+                roles: (roles[0].to_string(), roles[1].to_string()),
+                binding: canonical.clone(),
+                home: home.to_string(),
                 span: span.clone(),
             });
         }

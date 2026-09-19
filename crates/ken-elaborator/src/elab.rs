@@ -8565,6 +8565,17 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         RExpr::RByteStr(bytes, span) => elab_bytes_lit(cx, bytes, span),
 
         RExpr::RBinOp(op, lhs, rhs, span) => elab_binop(cx, op, lhs, rhs, span),
+        // `39 §6.9` completion lands here. NOTHING MINTS THIS NODE YET -- the
+        // minting half is the next commit -- so this arm is unreachable today
+        // and says so by failing closed rather than by a comment. A silent
+        // fallback to an ordinary application is precisely the behaviour
+        // `§6.9` forbids ("never a silent fallback to a different meaning"),
+        // so the placeholder must refuse, not approximate.
+        RExpr::RStandardOp { op, span, .. } => Err(ElabError::Internal(format!(
+            "standard-operator completion for identity {:?} is not wired yet; \
+             this node is unreachable until the minting half lands ({:?})",
+            op, span
+        ))),
 
         RExpr::RInfixSpine { span, .. } => unassociated_infix_error(span),
 
@@ -10292,6 +10303,13 @@ fn infer_expr_row_type(
         RExpr::RPosProj(e, _, _) => infer_expr_row_type(e, effect_rows, projection_ctx),
         RExpr::RProj(e, field, _) => infer_expr_row_type(e, effect_rows, projection_ctx)
             .join(projected_field_row_type(e, field, projection_ctx)),
+        // The operands' rows, joined -- identical to `RBinOp` below, because
+        // the operator itself is a global binding and contributes no row of
+        // its own at this stage.
+        RExpr::RStandardOp { lhs, rhs, .. } => {
+            let left = infer_expr_row_type(lhs, effect_rows, projection_ctx);
+            left.join(infer_expr_row_type(rhs, effect_rows, projection_ctx))
+        }
         RExpr::RBinOp(_, l, r, _) => infer_expr_row_type(l, effect_rows, projection_ctx)
             .join(infer_expr_row_type(r, effect_rows, projection_ctx)),
         RExpr::RInfixSpine {
@@ -10555,45 +10573,46 @@ fn reassociate_rexpr(
     expr: RExpr,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<RExpr, ElabError> {
     Ok(match expr {
         RExpr::RApp(function, argument, span) => RExpr::RApp(
-            Box::new(reassociate_rexpr(*function, globals, fixities)?),
-            Box::new(reassociate_rexpr(*argument, globals, fixities)?),
+            Box::new(reassociate_rexpr(*function, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*argument, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RLam(name, body, span) => RExpr::RLam(
             name,
-            Box::new(reassociate_rexpr(*body, globals, fixities)?),
+            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RLet(name, ty, value, body, span) => RExpr::RLet(
             name,
-            ty.map(|ty| reassociate_rtype(ty, globals, fixities))
+            ty.map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                 .transpose()?,
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
-            Box::new(reassociate_rexpr(*body, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RAsc(value, ty, span) => RExpr::RAsc(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
-            Box::new(reassociate_rtype(*ty, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*ty, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::ROld(value, span) => RExpr::ROld(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RBecomes(index, name, value, span) => RExpr::RBecomes(
             index,
             name,
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RBinOp(operator, lhs, rhs, span) => RExpr::RBinOp(
             operator,
-            Box::new(reassociate_rexpr(*lhs, globals, fixities)?),
-            Box::new(reassociate_rexpr(*rhs, globals, fixities)?),
+            Box::new(reassociate_rexpr(*lhs, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*rhs, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RInfixSpine {
@@ -10603,7 +10622,7 @@ fn reassociate_rexpr(
         } => {
             let mut operands = operands
                 .into_iter()
-                .map(|operand| reassociate_rexpr(operand, globals, fixities));
+                .map(|operand| reassociate_rexpr(operand, globals, fixities, standard_operators));
             let mut values = vec![operands
                 .next()
                 .expect("a parsed spine has one more operand")?];
@@ -10632,7 +10651,7 @@ fn reassociate_rexpr(
             arms,
             span,
         } => RExpr::RMatch {
-            scrut: Box::new(reassociate_rexpr(*scrut, globals, fixities)?),
+            scrut: Box::new(reassociate_rexpr(*scrut, globals, fixities, standard_operators)?),
             equation,
             arms: arms
                 .into_iter()
@@ -10641,9 +10660,9 @@ fn reassociate_rexpr(
                         pat: arm.pat,
                         guard: arm
                             .guard
-                            .map(|guard| reassociate_rexpr(guard, globals, fixities))
+                            .map(|guard| reassociate_rexpr(guard, globals, fixities, standard_operators))
                             .transpose()?,
-                        body: reassociate_rexpr(arm.body, globals, fixities)?,
+                        body: reassociate_rexpr(arm.body, globals, fixities, standard_operators)?,
                         span: arm.span,
                     })
                 })
@@ -10656,28 +10675,28 @@ fn reassociate_rexpr(
             else_branch,
             span,
         } => RExpr::RIf {
-            condition: Box::new(reassociate_rexpr(*condition, globals, fixities)?),
-            then_branch: Box::new(reassociate_rexpr(*then_branch, globals, fixities)?),
-            else_branch: Box::new(reassociate_rexpr(*else_branch, globals, fixities)?),
+            condition: Box::new(reassociate_rexpr(*condition, globals, fixities, standard_operators)?),
+            then_branch: Box::new(reassociate_rexpr(*then_branch, globals, fixities, standard_operators)?),
+            else_branch: Box::new(reassociate_rexpr(*else_branch, globals, fixities, standard_operators)?),
             span,
         },
         RExpr::RPair(components, span) => RExpr::RPair(
             components
                 .into_iter()
-                .map(|component| reassociate_rexpr(component, globals, fixities))
+                .map(|component| reassociate_rexpr(component, globals, fixities, standard_operators))
                 .collect::<Result<Vec<_>, _>>()?,
             span,
         ),
         RExpr::RRecord { base, fields, span } => RExpr::RRecord {
             base: base
-                .map(|base| reassociate_rexpr(*base, globals, fixities).map(Box::new))
+                .map(|base| reassociate_rexpr(*base, globals, fixities, standard_operators).map(Box::new))
                 .transpose()?,
             fields: fields
                 .into_iter()
                 .map(|(name, value, name_span)| {
                     Ok((
                         name,
-                        reassociate_rexpr(value, globals, fixities)?,
+                        reassociate_rexpr(value, globals, fixities, standard_operators)?,
                         name_span,
                     ))
                 })
@@ -10685,30 +10704,42 @@ fn reassociate_rexpr(
             span,
         },
         RExpr::RProj(value, field, span) => RExpr::RProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             field,
             span,
         ),
         RExpr::RPosProj(value, index, span) => RExpr::RPosProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities)?),
+            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
             index,
             span,
         ),
         RExpr::RPi(name, domain, codomain, span) => RExpr::RPi(
             name,
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RArrow(domain, codomain, span) => RExpr::RArrow(
-            Box::new(reassociate_rexpr(*domain, globals, fixities)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities)?),
+            Box::new(reassociate_rexpr(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RExpr::RTrunc(inner, span) => RExpr::RTrunc(
-            Box::new(reassociate_rexpr(*inner, globals, fixities)?),
+            Box::new(reassociate_rexpr(*inner, globals, fixities, standard_operators)?),
             span,
         ),
+        // A LEAF HERE, AND THE ARGUMENT IS WHY -- stated because
+        // `leaf => leaf` below would have swallowed this variant with no
+        // compile error, the same invisible shape as the `modules.rs` remap.
+        //
+        // This node is MINTED BY THIS PASS, in `reduce_resolved_operator`,
+        // from operands the spine arm has already reassociated. So it can only
+        // be encountered on a SECOND traversal of an already-reassociated
+        // tree, where descending would be a no-op. Leafing is correct and
+        // descending would also be correct; what is not correct is leaving
+        // which one it is to a catch-all, since the reachability argument is
+        // the part that rots when the minting site moves.
+        leaf @ RExpr::RStandardOp { .. } => leaf,
         leaf => leaf,
     })
 }
@@ -10717,40 +10748,41 @@ fn reassociate_rtype(
     ty: RType,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<RType, ElabError> {
     Ok(match ty {
         RType::RPi(name, domain, codomain, span) => RType::RPi(
             name,
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RSigma(name, domain, codomain, span) => RType::RSigma(
             name,
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RArr(domain, codomain, span) => RType::RArr(
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::REffectArr(domain, row, codomain, span) => RType::REffectArr(
-            Box::new(reassociate_rtype(*domain, globals, fixities)?),
+            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
             row,
-            Box::new(reassociate_rtype(*codomain, globals, fixities)?),
+            Box::new(reassociate_rtype(*codomain, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RRefine(name, carrier, predicate, span) => RType::RRefine(
             name,
-            Box::new(reassociate_rtype(*carrier, globals, fixities)?),
-            Box::new(reassociate_rexpr(*predicate, globals, fixities)?),
+            Box::new(reassociate_rtype(*carrier, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rexpr(*predicate, globals, fixities, standard_operators)?),
             span,
         ),
         RType::RApp(function, argument, span) => RType::RApp(
-            Box::new(reassociate_rtype(*function, globals, fixities)?),
-            Box::new(reassociate_rtype(*argument, globals, fixities)?),
+            Box::new(reassociate_rtype(*function, globals, fixities, standard_operators)?),
+            Box::new(reassociate_rtype(*argument, globals, fixities, standard_operators)?),
             span,
         ),
         // `‖A‖` — descend into the truncated type. This is REACHING, not
@@ -10766,7 +10798,7 @@ fn reassociate_rtype(
         // a chain) that a correct descent REJECTS. Mutation-proven by
         // `d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation`.
         RType::RTrunc(inner, span) => {
-            RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities)?), span)
+            RType::RTrunc(Box::new(reassociate_rtype(*inner, globals, fixities, standard_operators)?), span)
         }
         // `d.Query` — descend into the base through the EXPRESSION half, the
         // same split `RRefine` above makes for its predicate.
@@ -10781,7 +10813,7 @@ fn reassociate_rtype(
         // change, and the unreachability argument is the part that rots when
         // the base's shape widens. Three lines cost less than the argument.
         RType::RProj(base, field, span) => RType::RProj(
-            Box::new(reassociate_rexpr(*base, globals, fixities)?),
+            Box::new(reassociate_rexpr(*base, globals, fixities, standard_operators)?),
             field,
             span,
         ),
@@ -10820,33 +10852,34 @@ pub(crate) fn reassociate_space_decl(
     space: &RSpaceDecl,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<Option<Box<RSpaceDecl>>, ElabError> {
     if !space.contains_infix_spine {
         return Ok(None);
     }
     let mut associated = space.clone();
     for cell in &mut associated.cells {
-        cell.ty = reassociate_rtype(cell.ty.clone(), globals, fixities)?;
-        cell.init = reassociate_rexpr(cell.init.clone(), globals, fixities)?;
+        cell.ty = reassociate_rtype(cell.ty.clone(), globals, fixities, standard_operators)?;
+        cell.init = reassociate_rexpr(cell.init.clone(), globals, fixities, standard_operators)?;
     }
     for operation in &mut associated.operations {
         for (_, parameter_type) in &mut operation.params {
-            *parameter_type = reassociate_rtype(parameter_type.clone(), globals, fixities)?;
+            *parameter_type = reassociate_rtype(parameter_type.clone(), globals, fixities, standard_operators)?;
         }
-        operation.ret_ty = reassociate_rtype(operation.ret_ty.clone(), globals, fixities)?;
+        operation.ret_ty = reassociate_rtype(operation.ret_ty.clone(), globals, fixities, standard_operators)?;
         operation.requires = operation
             .requires
             .clone()
             .into_iter()
-            .map(|expr| reassociate_rexpr(expr, globals, fixities))
+            .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
             .collect::<Result<Vec<_>, _>>()?;
         operation.ensures = operation
             .ensures
             .clone()
             .into_iter()
-            .map(|expr| reassociate_rexpr(expr, globals, fixities))
+            .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
             .collect::<Result<Vec<_>, _>>()?;
-        operation.body = reassociate_rexpr(operation.body.clone(), globals, fixities)?;
+        operation.body = reassociate_rexpr(operation.body.clone(), globals, fixities, standard_operators)?;
     }
     Ok(Some(Box::new(associated)))
 }
@@ -10855,6 +10888,7 @@ fn reassociate_rdecl(
     rdecl: &RDecl,
     globals: &HashMap<String, GlobalId>,
     fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<Option<Box<RDecl>>, ElabError> {
     if !rdecl.contains_infix_spine {
         return Ok(None);
@@ -10862,34 +10896,34 @@ fn reassociate_rdecl(
     let mut associated = rdecl.clone();
     associated.ty = associated
         .ty
-        .map(|ty| reassociate_rtype(ty, globals, fixities))
+        .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
         .transpose()?;
-    associated.body = reassociate_rexpr(associated.body, globals, fixities)?;
+    associated.body = reassociate_rexpr(associated.body, globals, fixities, standard_operators)?;
     associated.requires = associated
         .requires
         .into_iter()
-        .map(|expr| reassociate_rexpr(expr, globals, fixities))
+        .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
         .collect::<Result<Vec<_>, _>>()?;
     associated.ensures = associated
         .ensures
         .into_iter()
-        .map(|expr| reassociate_rexpr(expr, globals, fixities))
+        .map(|expr| reassociate_rexpr(expr, globals, fixities, standard_operators))
         .collect::<Result<Vec<_>, _>>()?;
     match &mut associated.kind {
         RDeclKind::View { constraints, .. } => {
             for constraint in constraints {
                 constraint.head_type =
-                    reassociate_rtype(constraint.head_type.clone(), globals, fixities)?;
+                    reassociate_rtype(constraint.head_type.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::Prop { intros } => {
             for intro in intros {
-                intro.ty = reassociate_rtype(intro.ty.clone(), globals, fixities)?;
+                intro.ty = reassociate_rtype(intro.ty.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::Law { fields, .. } => {
             for (_, field) in fields {
-                *field = reassociate_rexpr(field.clone(), globals, fixities)?;
+                *field = reassociate_rexpr(field.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::DataDecl { ctors, .. } => {
@@ -10898,7 +10932,7 @@ fn reassociate_rdecl(
                     .args
                     .clone()
                     .into_iter()
-                    .map(|ty| reassociate_rtype(ty, globals, fixities))
+                    .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                     .collect::<Result<Vec<_>, _>>()?;
             }
         }
@@ -10909,25 +10943,25 @@ fn reassociate_rdecl(
             ..
         } => {
             for entry in params.iter_mut().chain(indices.iter_mut()) {
-                entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities)?;
+                entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities, standard_operators)?;
             }
             for ctor in ctors {
                 for entry in &mut ctor.args {
-                    entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities)?;
+                    entry.ty = reassociate_rtype(entry.ty.clone(), globals, fixities, standard_operators)?;
                 }
                 ctor.result = ctor
                     .result
                     .clone()
-                    .map(|ty| reassociate_rtype(ty, globals, fixities))
+                    .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                     .transpose()?;
             }
         }
         RDeclKind::TypeAlias { ty } => {
-            *ty = reassociate_rtype(ty.clone(), globals, fixities)?;
+            *ty = reassociate_rtype(ty.clone(), globals, fixities, standard_operators)?;
         }
         RDeclKind::RecordDecl { fields } => {
             for field in fields {
-                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities)?;
+                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::ClassDecl {
@@ -10935,10 +10969,10 @@ fn reassociate_rdecl(
         } => {
             *param_kind = param_kind
                 .clone()
-                .map(|ty| reassociate_rtype(ty, globals, fixities))
+                .map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
                 .transpose()?;
             for field in fields {
-                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities)?;
+                field.ty = reassociate_rtype(field.ty.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::InstanceDecl {
@@ -10947,13 +10981,13 @@ fn reassociate_rdecl(
             fields,
             ..
         } => {
-            *head_type = reassociate_rtype(head_type.clone(), globals, fixities)?;
+            *head_type = reassociate_rtype(head_type.clone(), globals, fixities, standard_operators)?;
             for constraint in constraints {
                 constraint.head_type =
-                    reassociate_rtype(constraint.head_type.clone(), globals, fixities)?;
+                    reassociate_rtype(constraint.head_type.clone(), globals, fixities, standard_operators)?;
             }
             for (_, field) in fields {
-                *field = reassociate_rexpr(field.clone(), globals, fixities)?;
+                *field = reassociate_rexpr(field.clone(), globals, fixities, standard_operators)?;
             }
         }
         RDeclKind::Let
@@ -10993,7 +11027,7 @@ mod fixity_reassociation_skip_tests {
             kind: RDeclKind::Let,
         };
         assert!(
-            reassociate_rdecl(&declaration, &HashMap::new(), &HashMap::new())
+            reassociate_rdecl(&declaration, &HashMap::new(), &HashMap::new(), None)
                 .expect("spine-free reassociation cannot fail")
                 .is_none(),
             "a spine-free declaration must not allocate or traverse an associated clone"
@@ -11094,7 +11128,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
             rdecl,
         );
     }
-    let associated = reassociate_rdecl(rdecl, globals, fixities)?
+    let associated = reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators))?
         .expect("a declaration marked with an infix spine must be reassociated");
     elaborate_associated_rdecl(
         env,
@@ -12898,7 +12932,7 @@ fn elaborate_recursive_view(
 
     // 3. Reassociate once, after predeclaration and before type-directed body
     // elaboration. The existing checker sees ordinary RApp/RBinOp only.
-    let associated = match reassociate_rdecl(rdecl, globals, fixities) {
+    let associated = match reassociate_rdecl(rdecl, globals, fixities, Some(standard_operators)) {
         Ok(associated) => associated,
         Err(error) => {
             env.remove_last();
@@ -13068,7 +13102,7 @@ pub(crate) fn elaborate_mutual_group(
     }
     let associated_members = match members
         .iter()
-        .map(|member| reassociate_rdecl(member, globals, fixities))
+        .map(|member| reassociate_rdecl(member, globals, fixities, Some(standard_operators)))
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(members) => members,
@@ -13267,6 +13301,9 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RAsc(e, _, _) => rexpr_mentions_name(e, name),
         RExpr::ROld(e, _) => rexpr_mentions_name(e, name),
         RExpr::RBecomes(_, _, e, _) => rexpr_mentions_name(e, name),
+        RExpr::RStandardOp { lhs, rhs, .. } => {
+            rexpr_mentions_name(lhs, name) || rexpr_mentions_name(rhs, name)
+        }
         RExpr::RBinOp(_, l, r, _) => rexpr_mentions_name(l, name) || rexpr_mentions_name(r, name),
         RExpr::RInfixSpine {
             operands,

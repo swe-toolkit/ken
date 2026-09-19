@@ -330,6 +330,33 @@ pub enum ElabError {
         found: String,
         span: Span,
     },
+    /// Two standard-operator roles resolve to ONE defining binding.
+    ///
+    /// **A THIRD malformation of the home, not a variant of the other two.**
+    /// `Unfilled` is closed by publishing a binding and `WrongShape` by fixing
+    /// one already published; this is closed by publishing a SECOND, distinct
+    /// binding, and collapsing it into either would tell the author to do the
+    /// wrong thing. `§6.2` makes exactly that distinction for `≠`'s two
+    /// refusals and calls an implementation that merges them non-conforming.
+    ///
+    /// **Why it must be refused rather than recorded.** `39 §6.9` keys
+    /// completion on the defining `GlobalId`, so the adapter recovers a role
+    /// by reverse lookup in the certified map -- and that is a FUNCTION only
+    /// if the map's values are distinct. `certify_roles` builds it
+    /// glyph -> canonical -> id with nothing that would stop
+    /// `export (bool_and as ∧, bool_and as ∨)`, and under such a map an
+    /// occurrence of one glyph could complete as the other role. The
+    /// injectivity is cheap to enforce at the single place the map is built,
+    /// so it is enforced there instead of being left as a stated invariant.
+    StandardOperatorRolesShareABinding {
+        /// The two role glyphs, in `ALL` order, so the message is stable.
+        roles: (String, String),
+        /// The canonical binding both resolved to.
+        binding: String,
+        /// The standard-operator home consulted.
+        home: String,
+        span: Span,
+    },
     /// The `sct_check` on the reified dictionary group rejected the resolution
     /// chain — i.e. search would not terminate (`39 §6.4`, `17 §4.2`).
     /// Detected at admission time; never a search-time hang.
@@ -748,6 +775,19 @@ impl fmt::Display for ElabError {
                 "standard operator '{}' is published at {}-{} but '{}' does not have the \
                  shape `33 §6.1` fixes for it: expected {}, found {}",
                 role, span.start, span.end, binding, expected, found,
+            ),
+            ElabError::StandardOperatorRolesShareABinding {
+                roles,
+                binding,
+                home,
+                span,
+            } => write!(
+                f,
+                "standard operators '{}' and '{}' both resolve to '{}' at {}-{}: the \
+                 standard-operator home '{}' must publish a DISTINCT binding for each \
+                 role (`33 §6.1`), because completion is keyed on the defining \
+                 identity and cannot tell two roles apart when they share one",
+                roles.0, roles.1, binding, span.start, span.end, home,
             ),
             ElabError::NonTerminatingInstances { span } => write!(
                 f,
