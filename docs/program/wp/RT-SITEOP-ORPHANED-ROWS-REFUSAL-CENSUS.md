@@ -191,6 +191,46 @@ it, do.**
 `D2` hands back a **routing proposal**. It does not create nodes, close nodes,
 or re-label rows.
 
+## Which phase a candidate is in — decidable from its ROSTER alone
+
+**AC-7 and AC-11 mandate opposite file rosters, so a reviewer must be able to
+tell which one governs a given candidate without knowing what anyone intended.
+This rule is what makes that decidable, and it is a SEQUENCING requirement, not
+a definition:**
+
+> **The label edit lands in its OWN candidate, carrying no other AC's
+> deliverable. Every candidate before it is an investigation candidate.**
+
+A reviewer classifies from the roster and nothing else: a roster containing an
+`#[ignore]` attribute change is the closeout candidate and AC-11 governs it;
+any other roster is an investigation candidate and AC-7 governs it. **It also
+makes "`full` CI, never doc-only" follow from the shape** — the closeout
+candidate is the only one that touches `crates/` — rather than being a separate
+instruction someone has to remember.
+
+> **Added by Steward respin 2026-09-19, before the Architect's vote, because
+> the first version of this amendment left the boundary undefined and the
+> runtime-implementer produced the collision case rather than a worry**
+> (`evt_4zen8fkcjcp2c`). The terms "investigation" and "closeout" occurred five
+> times across AC-7 and AC-11 and **zero times anywhere else in the frame**:
+> each AC asserted which phase it governed and neither said how to tell.
+>
+> **The collision was the natural way to do the work, which is what made it
+> serious.** `AC-11`'s string *is* `AC-6`'s output — the successor written into
+> the attribute is the per-signature ownership proposal in the row's own words —
+> so the obvious candidate carries both, and is then an investigation candidate
+> by AC-6 and the closeout by AC-11. Two controls, both keyed on the roster,
+> demanding opposite rosters. **A reviewer checking AC-7 blocks it; a reviewer
+> checking AC-11 blocks its absence; both are reading the frame correctly.**
+>
+> **Defining the phase by "which AC it delivers" does not close it** — the
+> collision is exactly a candidate delivering an investigative AC *and* the
+> close obligation. **Defining it by the roster alone would be circular**, since
+> AC-11 already defines the closeout roster, which makes AC-11 self-satisfying
+> and leaves AC-7 no grip. Requiring the edit to land ALONE is what breaks the
+> circularity: it constrains sequencing, and the roster then reports the phase
+> as a consequence.
+
 ## Acceptance criteria
 
 - **AC-0** — the premise is re-established at your own named base, with output
@@ -215,11 +255,31 @@ or re-label rows.
   either confirmed at eight/six or corrected with your own measurement.
 - **AC-6** — a per-signature ownership proposal, with the fold-or-split argument
   written out for each grouping.
-- **AC-7** — no row is un-ignored, no row is re-labelled, and
-  `RT-SITEOP-CARRIED-WITNESS` is neither reopened nor amended. *(Control: the
-  candidate's file roster contains no change to any `#[ignore]` attribute and no
-  change under `docs/program/issues/RT-SITEOP-CARRIED-WITNESS.md`. A file roster
-  discharges this; prose cannot.)*
+- **AC-7** — **on every INVESTIGATION candidate** (see *Which phase a candidate
+  is in*, above — decide it from the roster, never from intent) no row is
+  un-ignored, no row is re-labelled, and `RT-SITEOP-CARRIED-WITNESS` is neither
+  reopened nor amended.
+  *(Control: the candidate's file roster contains no change to any `#[ignore]`
+  attribute and no change under
+  `docs/program/issues/RT-SITEOP-CARRIED-WITNESS.md`. A file roster discharges
+  this; prose cannot.)*
+
+  > **SCOPED TO THE INVESTIGATION CANDIDATES BY STEWARD AMENDMENT, 2026-09-19,
+  > BECAUSE AS WRITTEN IT FORBADE THIS NODE'S OWN STATED PRODUCT.** The issue
+  > title says *"the first deliverable is a LABEL CORRECTION, which is
+  > re-labelling and not clearing"*; unscoped, AC-7 said *"no row is
+  > re-labelled"* and its control was the **absence of exactly that edit**. The
+  > two could not both be satisfied by one candidate, so the node could not
+  > close correctly. Raised by the runtime-implementer at `evt_3ds0ek6a218z7`.
+  >
+  > **AC-7's intent survives intact and is the right fence:** a measurement node
+  > must not make an orphan disappear by quietly rewriting its label mid-census,
+  > which is the same fence AC-0's control states (*"a label that has become
+  > accurate is reported and not repaired"*). What was wrong was the **scope**,
+  > not the rule — it reached the closeout, where the label correction is not a
+  > repair-in-disguise but the node's actual deliverable. **AC-11 is where that
+  > edit now belongs**, and the two ACs are complementary rather than in
+  > tension: AC-7 bars the edit while measuring, AC-11 requires it at close.
 - **AC-8** — no regression. **Green in CI, never a local `--workspace` run**
   (`COORDINATION §12`).
 - **AC-9** — the handback states, in these words, **"rows 1 and 2 have a named
@@ -234,6 +294,61 @@ or re-label rows.
   so a reviewer cannot tell a stale coordinate from a wrong one. Where a number
   genuinely helps navigation, write it as "at `<sha>`, around `path:NNNN`" — an
   anchor to re-find, never a value to check.)*
+- **AC-11 — CLOSE OBLIGATION. This node does not reach `merged` until each of
+  its three rows either CLEARS or carries its successor owner at the START of
+  its own `#[ignore]` string.** The successor is whatever this census's own
+  measurement determined; if the answer is that no live node owns the row, the
+  attribute says that in those words, naming this census as the node that
+  established it. *(Control: the closeout candidate's file roster **contains**
+  changes to `crates/ken-cli/tests/px7f_resource_native.rs` and
+  `crates/ken-cli/tests/rt_escape_second_resource_native.rs`. This is the exact
+  edit AC-7 bars on the investigation candidates and requires here — check the
+  roster, not the prose. Because it touches `crates/`, this candidate is
+  **`full` CI, never doc-only**.)*
+
+  > **Added by Steward amendment 2026-09-19. This AC exists because the
+  > federation's guard against exactly this failure returns ZERO here, and the
+  > zero is guaranteed rather than informative.** `M7a` asks whether any row
+  > names the node that is merging. These three rows begin
+  > `#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: …` — they name the node that
+  > **merged**, not the one that is merging — so M7a discharges green at this
+  > node's close and all three rows stay orphaned. Measured by the
+  > runtime-implementer with both controls: the closing node's ID returns 0, the
+  > predecessor's returns 3, a nonexistent ID returns 0. **The instrument works;
+  > the population it searches cannot contain a hit for an adoption node.**
+  >
+  > **That is the whole reason this node exists, recurring at its own close.**
+  > The census was created because three rows named a merged owner and no live
+  > node would ever correct them. Closing it under a label-keyed guard would
+  > hand back the identical state, and the step that would have caught it is the
+  > one whose node just closed. `M7a` has since been given a second arm — check
+  > the closing node's own frame for row coordinates, not only the label grep —
+  > and **this AC is the same obligation written where the ring will read it**,
+  > because a step in the Steward's merge procedure is not visible to the seat
+  > authoring the candidate.
+  >
+  > **Who writes the string:** the ring, not the lieutenant. The reason text
+  > needs the census's own findings, which the publisher does not hold.
+- **AC-12 — the closeout candidate's review RECONCILES each attribute's
+  successor string against the approved `AC-6` proposal.** Not *"does the row
+  name a successor"* — `AC-11` already checks that — but **is the successor it
+  names the one `AC-6` established, for that signature.** *(Control: the review
+  quotes, per row, the `AC-6` grouping it came from and the string as written.
+  A reviewer who checks only that a successor is present fails this AC.)*
+
+  > **Named by the Architect at `evt_3z4e7gdv92hd2` as the obligation the phase
+  > split creates, and it is the price of the rule above.** Requiring the label
+  > edit to land alone puts `AC-6`'s proposal in one candidate and the attribute
+  > strings **whose content is that proposal** in another. **That is a
+  > transcription across a candidate boundary, and transcription drifts.**
+  >
+  > Without this check the frame would have traded an undecidable phase boundary
+  > for a silent divergence between what was reasoned and what got written into
+  > the durable label — and **the durable label is the artifact that outlives
+  > both candidates.** It is what the next census reads, long after the proposal
+  > justifying it has scrolled away. **A label that disagrees with its own
+  > proposal is indistinguishable from a correct one at the point of use**,
+  > which is precisely the failure family this census exists to fix.
 
 ## What must not happen
 
