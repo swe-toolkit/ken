@@ -236,6 +236,47 @@ makes the harness go RED, restored byte-exact afterwards. **If closing this
 needs any harness change beyond those, that is a fresh hard stop** — the
 authorisation is for the name, not for the file.
 
+**`AC-3b` — the IMPORT-side provider roster follows the imports this candidate
+adds.** *Control:* `provider_modules(PARSING_CURSOR)` lists
+`Core.Logic.Transport`; `assert_providers_consumed(PARSING_CURSOR, …)` lists
+`Core.Logic.Transport.cong` / `.sym` / `.trans` and
+`Data.Numeric.Nat.Order.leq_nat`; the doc comment's numeral matches the roster
+length. **Exactly those three items and nothing else** — a fold that grows
+loses the Architect's pre-clearance (`evt_4nh9w0qr67mw3`) and goes back for
+re-review.
+
+> **AC-3a WAS NOT WRONG — IT FIRED CORRECTLY — AND IT STILL BOUNDED A
+> POPULATION I HAD NOT MEASURED. That is the fourth instance, and it is mine.**
+> `AC-3a` says *"the only change to `cat_tier_d_cursor_import.rs` is…"*. I
+> wrote a bound scoped to the **whole file** while reasoning about **one
+> function** in it, so the import-side roster — a different function, a
+> genuinely different surface — was forbidden by a clause that never
+> considered it. The ring hard-stopped rather than edit it, which is `AC-3a`
+> working. **The three prior instances were a path list that had sampled its
+> population; this one is a FILE that had sampled its FUNCTIONS.** Same defect
+> at a finer grain.
+>
+> **THE DELETION CONTROL IS DELIBERATELY ABSENT HERE, AND THE REASON IS THE
+> FINDING.** `AC-3a` can demand that deleting the added name goes RED because
+> the export-side inventory is an `assert_eq!` against the full expected set —
+> exact equality, fail-closed. **The import side cannot do that.** It iterates
+> the roster it is handed and asserts each entry has a consumer, so **nothing
+> quantifies over the module's actual import set** and deleting an entry
+> merely makes it check less. Demanding a RED here would be an `AC` whose
+> evidence cannot be produced, which is the one I silently skip.
+>
+> ⇒ **`AC-3b` is a CONTENT check, not a gate, and it is written knowing the
+> difference.** Its force comes from the four identities having measured
+> consumers — `cong` 8, `sym` 9, `trans` 6, `leq_nat` 14 (Architect, same
+> event) — so this is a real coverage gap being closed and not a dead import
+> being papered over.
+>
+> **The asymmetry itself is NOT in scope here and must not be chased into this
+> candidate.** It predates this node; this is simply the first candidate to
+> move Cursor's import set, so it is the first for which the gap has a cost.
+> Name it in the closeout. Whether it earns a node is the Steward's call at
+> L3's successor.
+
 ## Design note, not a criterion
 
 Name the `cursor_nat_lt`/`leq_nat` bridge as its own top-level declaration
