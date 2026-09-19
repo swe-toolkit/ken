@@ -14,8 +14,32 @@
     crates/ken-runtime/src/cranelift_backend/planning/static_transition/responses.rs
       exact_response_ret_identity          the defect site
 
+    crates/ken-runtime/.../units.rs        LOWERING, added by amendment below
+      define_static_response_owner_bodies  the SECOND statement of the same
+                                           expectation (~:3430-3432 at
+                                           1be846b2d)
+
 Re-derive by **symbol**, not by line — the `:1379` coordinate in the ruling was
 measured on another tree and coordinates are perishable.
+
+**THE EXPECTATION IS STATED TWICE, AND ONLY ONE STATEMENT IS DERIVED**
+(Architect `evt_1cwnksydmx1rz`). In `define_static_response_owner_bodies`,
+two lines apart:
+
+    check 1  the carrier's TAG          parameterised by k_ret_identity
+    check 2  the carrier's FIELD COUNT  a hardcoded literal 1, which is
+                                        ITree::Ret's arity and nothing else
+
+**On these two rows**, whose composed K result is predicted to be `Vis`, a
+correct derivation makes check 1 pass and check 2 fail. **Predicted, not
+measured** — nobody has read what `emit_carrier_field_count` returns for a
+`Vis` carrier. It is **not** a general property of the repair: wherever the
+composed K's result is itself a `Ret`, the literal `1` is accidentally correct
+and both checks pass. Both live in the same `require_i64` family, produce the
+same trap and the same `UnclassifiedRuntimeTrap { terminal_value: -1 }`, and
+therefore have an **identical external signature** — which is why a repair that
+works **can** look exactly like a repair that did nothing. Do not attribute a
+`-1` to a particular check without a probe.
 
 **The defect, settled and not to be re-litigated:**
 
@@ -36,7 +60,13 @@ identity. Do not read it as a second confirmation.
 ## 2. Deliverables
 
 - **`D0`** — the repair: derive `k_ret_identity` following `bind`'s grafting
-  rather than the immediate occurrence.
+  rather than the immediate occurrence, **and derive BOTH statements of the
+  K-result expectation**. The planning-side tag derivation and the lowering-side
+  field count are one deliverable: a literal `1` two lines below the check you
+  parameterised **is** that derivation with the derivation missing. Finishing
+  one and not the other leaves the row red with no correction upstream able to
+  move it. **This is `D0` finished, not `D0` widened** — the expectation was
+  written in two places by an author who had one answer for both.
 - **`D1`** — the two rows above un-ignored and green, or a grounded statement of
   what still stops each one.
 
@@ -58,7 +88,17 @@ identity. Do not read it as a second confirmation.
 
 ## 4. Hard stops — report, do not work around
 
-- A repair that reaches outside `ken-runtime` planning.
+- A repair that reaches outside `ken-runtime` planning, **except for the one
+  emission call named in `§1`**: in `define_static_response_owner_bodies`, the
+  literal `1` in `require_i64(ret_fields, 1)` becomes the arity of the
+  constructor `k_ret_identity` names. Nothing else in emission is in scope, and
+  needing a second site is a fresh hard stop.
+  *(Steward scope ruling `evt_88t2h5g77dkg`, 2026-09-19, on the Architect's
+  recommendation. The original bullet was this frame's own prose, not a spec
+  rule — and it made `D0` unachievable, because the expectation is stated in two
+  files and only one is reachable from planning. A frame whose deliverable
+  cannot be reached inside its own scope is a defective frame. The implementer
+  was correct to stop rather than reach: the bullet fired exactly as written.)*
 - A row that needs a **new** `#[ignore]` anywhere to make progress.
 - The repair lands and `right-denial` still fails — that is a finding that the
   mechanism statement is incomplete, and it **outranks** finishing the node.
@@ -111,10 +151,27 @@ discards.
 ```text
 SYMPTOM INVENTORY (Architect appends one line per hard-stop; never rewritten)
 NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
-(empty at filing)
+
+1. the K-result expectation is stated TWICE in the emission and only one
+   statement is derived (tag parameterised by k_ret_identity, field count
+   a literal) -- keyed on a constructor's ARITY hardcoded as the Ret
+   assumption
 ```
 
-**Hard-stop count on this WP: 0.** The `§1a` research pull fires at 3.
+**Hard-stop count on this WP: 1.** The `§1a` research pull fires at 3. **The
+parent node's count of 2 does NOT carry** — different WP, different question.
+
+## 5a. A known boundary — RECORD IT, do not work on it
+
+`k_ret_identity` is a **single** `ConstructorIdentity`, so the plan assumes the
+composed K's result constructor is statically unique. **Under grafting that
+assumption can fail:** `bind (f r) k` may reduce to `Ret` on one response arm
+and `Vis` on another. The checkpoint code already fails closed on it ("more
+than one constructor result"), which is the right behaviour.
+
+This is here so the next reader meets it as a known boundary rather than as a
+surprise. **Not this node's work unless a row reaches it** (Architect,
+`evt_1cwnksydmx1rz`).
 
 ## 6. Contention
 
