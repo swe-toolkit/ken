@@ -481,3 +481,125 @@ is where `AC-3` now sits. That is the next question and it has not been asked.
 **Note for whoever asks it:** the field's own word is **"borrowed"**, which
 connects this path to candidate (a) rather than away from it. Candidate (a) is
 still not eliminated and this increment does not bear on it either way.
+
+## `AC-3` — ANSWERED. Ingress validation RUNS. Candidate (a) stays live.
+
+Measured at `0e88e3167ec23ec18fe7c31b467c1d08707cbd83`, read through
+`git show <sha>:<path>` throughout, so every coordinate below names the tree it
+was read on.
+
+**The answer, in one sentence:** a `proc main (_input : ProcessInput)` that
+never consumes the parameter still gets a nonzero check emitted against the
+borrowed process-input pointer, because the emission is gated on the **compile
+lane**, not on the body's use of the parameter.
+
+### Both rows were written down BEFORE the run
+
+Pre-registered, per the fleet rule that a predicate evaluated only under the
+reading you are trying to confirm is not a discriminator:
+
+| reading | what the emitter would have to look like |
+|---|---|
+| candidate (a) LIVE | the load and its check are emitted from a condition that does not mention the body — a lane flag, a signature role, a plan slot |
+| candidate (a) ELIMINATED | the load and its check are emitted from the parameter's **use site**, so an unconsumed `_input` emits neither |
+
+These are different code shapes and only one of them is present, so the
+observation separates them rather than confirming one of them.
+
+**And the surface trap was pre-registered too.** "The emitted code contains no
+reference to the process input" is produced by candidate (a) being eliminated
+**and** by the validation living in the C stub instead. So both surfaces were
+measured, not just the emitter.
+
+### The chain, by symbol
+
+    emit_bound_process_program_object_with_cranelift   artifact/api.rs
+        passes the process-mode argument as a LITERAL true
+        (at 0e88e3167, around crates/ken-runtime/src/cranelift_backend/
+         artifact/api.rs:412)
+
+    define_root_adapter                                lowering/units.rs
+        pub(super), column 0, production: the only two column-0 `mod`
+        openings in that file are `captured_environment_bijection` and
+        `admitted_matches_role_sequence`, both far below it
+        gates on process-mode twice, and on nothing else:
+          - refuses "process root has no declared role-keyed ingress slot"
+            for the ProcessInput and Capability roles
+          - loads ROOT_INGRESS_PROCESS_INPUT off the ingress and calls
+            Lowering::require_nonzero on it
+
+    Lowering::require_nonzero                          lowering/mod.rs
+        invalid branch emits `iconst(I64, -1)` then `return_`
+
+    the C stub ladder                                  object_linker_packaging
+        `if (value == -1) fputs("ken native trap: malformed borrowed
+         process input")`
+
+**The load-bearing link is the first one.** The process-mode argument is a
+literal at each call site — `true` in the bound-process-program entry, `false`
+in the seed and ordinary-program entries — and it appears nowhere else in the
+workspace. It is therefore a property of **which compile entry the caller
+chose**, fixed before the body is examined at all. It cannot be a function of
+whether the body consumes the parameter.
+
+### What this settles, and what it does not
+
+**Settles `AC-3`:** ingress validation runs for an unconsumed `_input`.
+Candidate (a) is not merely un-eliminated; it is affirmatively reached.
+
+**Does NOT settle the attribution of rows 1 and 2's `-1`**, and the reason is
+a closure argument rather than a gap in effort. Enumerating the producers
+rather than the occurrences: `iconst(types::I64, -1)` followed by `return_`
+appears at **ten production sites** in the lowering tree — three in
+`effects.rs`, four in `joins.rs`, three in `mod.rs`. Only one of the three in
+`mod.rs` is `require_nonzero`.
+
+Of those ten, exactly one is emitted **directly into the entry adapter**, so
+only that one's `-1` reaches the stub as the entry symbol's return without
+further translation. Whether the other nine propagate unchanged is **not
+established by what was run here**, and is not claimed.
+
+### The finding this turned up, which is larger than the crux
+
+`define_root_adapter` emits **four** `require_nonzero` calls into the entry
+adapter, and all four return the identical `-1`:
+
+| checked value | emitted under |
+|---|---|
+| the native int arena | unconditionally, every lane |
+| the boundary arena | unconditionally, every lane |
+| the borrowed process input | process mode only |
+| the host dispatch context | process mode only |
+
+The stub prints **"malformed borrowed process input"** for all four, because
+its first rung is a fixed label on an integer. **Two of the four are arena
+checks that have nothing to do with the process input and fire in every lane,
+including the lanes that pass process-mode false.**
+
+⇒ The stderr line was already known not to discriminate. What is new is the
+size of what it fails to discriminate: within the entry adapter alone the
+channel has four members, and the label names one of them.
+
+### And the earlier `-1` result is now EXPLAINED rather than merely stated
+
+`AC-2` established from the criterion function that `-1` is not a planned trap
+token at all: magnitude 1, and `1 & 0xff` is not `0xff`, so it fails the tag
+clause before anything else is consulted. That was derived from
+`root_trap_catalog_index` without knowing where `-1` comes from.
+
+It comes from here. `require_nonzero` builds its refusal by hand —
+`iconst`, `return_` — and never goes near the trap-token encoding. **`-1` is
+not a malformed trap token; it belongs to a second refusal channel that shares
+the return register with the trap channel.** The two results agree, and the
+second is the mechanism for the first.
+
+### `AC-9`
+
+`AC-3` is answered and `AC-2` is classified, so the `AC-9` condition is met on
+its face. It is **not** taken here, and the wording stands: **rows 1 and 2 have
+a named candidate owner and not an owner.** `AC-3` answered the direction the
+crux was posed to test — it kept candidate (a) alive rather than eliminating
+it — and a candidate that survives its own elimination test is exactly the one
+that gets promoted to owner silently, which is the failure `AC-9` was written
+against. Naming the owner additionally requires attributing the `-1` to one of
+the four adapter checks, and the paragraph above says why that is open.
