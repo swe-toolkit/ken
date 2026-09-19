@@ -25,11 +25,27 @@ advisory `evt_5ny4tmskqx3n4`. Cut and sizing are the Steward's
 
 **1. Six dispatches, ONE resource token, residual zero — measured on
 `DOUBLE_RELEASE` (`px7f_resource_native.rs:165`), the `:348` row's program**
-(runtime-leader `evt_5dbc20bwkmym1`). **The under-release reading is DROPPED.**
-It was live for one exchange: decomposed by disposition the aggregate reads 1
-`Released` against 3 expected, which would have meant two resources silently
-never released. One measurement closed it rather than an argument. **The defect
-is over-emission.**
+(runtime-leader `evt_5dbc20bwkmym1`). **That census ranges over HOW MANY
+RESOURCES. It does not range over WHICH DEMANDS REACH, and reading it as
+though it did cost three hard stops.** Architect `evt_2vjnatke9epca`; this is
+the fourth instance of the entries 10-13 predicate and the one with a measured
+cost. One token is a true statement about the resource; it is silent on whether
+every demand's lowering executes, because a demand that never dispatches
+consumes no token and so cannot move this number.
+
+> **THE "DEFECT IS PURE OVER-EMISSION" READING IS WITHDRAWN. IT WAS DROPPED ON
+> THIS CENSUS AND THE CENSUS DOES NOT BEAR ON IT.** Per-arrival attribution
+> (runtime-implementer `evt_26x11xnh5nb5e`) measures the native multiset as
+> **`{609 x1, 598 x5, 517 x0}`** against a reference requiring one of each.
+> **Two defects are stacked and they point in OPPOSITE directions:** Vis 598's
+> lowering executes five times, and sibling Vis 517's is never executed at all.
+> Inventory entry 13. **The aggregate 6-against-3 read as pure over-emission
+> because the excess exactly hid the absence.**
+
+⇒ **Per-member deduplication alone yields `{609 x1, 598 x1}` — two dispatches
+against a required three. A reconciliation table cannot manufacture the missing
+member.** Whether `D0` must therefore also repair 517's reach is **NOT RULED**;
+see the `§1a` hold below. Do not build against either answer yet.
 
 **2. The 1-`Released`/5-`Closed` split is arrival order at one central host
 authority**, not two families disagreeing about disposition. **Also
@@ -753,6 +769,10 @@ are deliberately not rewritten.
     to DOUBLE_RELEASE, which releases twice on purpose -- keyed on the
     measurement's citation rather than on the program it ranges over, the
     same import-across-programs the frame already records refuted at :588
+13. the native dispatch multiset is {609 x1, 598 x5, 517 x0} while the
+    reference requires one of each -- an over-emission and a dead member
+    stacked, keyed on the aggregate count (6 against 3) which read as pure
+    over-emission because the excess exactly hid the absence
 ```
 
 > **THE TWO COUNTERS HAVE SEPARATED, AND THEY STAY SEPARATED. `§1a` FOLLOWS THE
@@ -770,7 +790,9 @@ are deliberately not rewritten.
 > and a purely procedural stop contributes none. **That question ranges over
 > entries.**
 >
-> ⇒ **Next `§1a` check at stop 12. Next `§1b` check at entry 12.** Different
+> ⇒ **At that ruling: next `§1a` check at stop 12, next `§1b` check at entry
+> 12.** Both have since fired and both are recorded above; the live counters
+> are the ones stated outside this quote. Different
 > moments, correctly so.
 >
 > **This is an instance of the predicate the Architect has been ruling on all
@@ -779,7 +801,23 @@ are deliberately not rewritten.
 > entries makes it fire sooner and costs them more** — that is not the argument
 > for it, the population is, but the ruling relieves them of nothing.
 
-**Hard-stop count on this WP: 11; symptom entries: 12.** **`§1b` FIRED AT ENTRY
+> **`§1a` HAS FIRED AT STOP 12 AND THE RULING IS HELD.** Architect
+> `evt_2vjnatke9epca`: Research is called on the ONE NEW FORK (the 4th trigger,
+> 3/6/9/12), the Architect does not rule on this stop until the advisory is in
+> hand, and is not grinding the ruling in parallel. **The fork:** is one dead
+> site plus one site carrying the dead one's multiplicity the signature of
+> **specialization identity collapse**, and is the known remedy **placement**
+> (one dispatch site per demand at a correctly dominated point) rather than
+> **reconciliation** (a table over claims)? **If placement, `D0`'s size and
+> shape move and the table becomes secondary to the emission structure.**
+> Stated as an unruled hypothesis. **Nobody builds against either horn until
+> the advisory returns and the Architect rules.** The trigger was not talked
+> out of despite the chain visibly progressing — three consecutive reads landed
+> clean, decisive facts — because *"it's making progress"* is the
+> rationalisation `§1a` exists to override.
+
+**Hard-stop count on this WP: 12; symptom entries: 13. Next `§1a` at stop 15;
+next `§1b` at entry 15.** **`§1b` FIRED AT ENTRY
 12 AND IS ANSWERED** (Architect `evt_6pgwgkp3pshbq`): entries 10, 11 and 12
 share one predicate — **a measurement is attributed to a subject it does not
 range over.** The host's disposition was read as evidence about the planner;
