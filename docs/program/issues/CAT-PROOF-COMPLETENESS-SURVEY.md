@@ -1,7 +1,7 @@
 ---
 id: CAT-PROOF-COMPLETENESS-SURVEY
 title: "Survey every catalog package for incomplete proofs and dependence on computational tests: classify each package as fully-proven, tested-only-with-deferred-proofs, or no-proof-obligation, citing the exact intrinsics vs tests per package; produce the ledger from which the Steward frames the missing *-LAWS follow-ons. Grounded in PRINCIPLES #16 (a package is finished only when proven)."
-status: active
+status: merged
 owner: foundation
 size: L
 gate: none
