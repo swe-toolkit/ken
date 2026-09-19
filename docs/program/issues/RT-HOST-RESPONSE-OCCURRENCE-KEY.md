@@ -141,6 +141,71 @@ sufficient** -- that is the condition that already holds and is why this says
 > flip:** the paragraph above, and the `origin:` line. Neither is reachable by
 > asking whether a line number moved.
 
+# FLIP TRIGGER: FIRED, AND DELIBERATELY NOT TAKEN. STAYS `draft`.
+
+**Steward, 2026-09-19.** The trigger above is mine and I ran it. Recording the
+result here rather than acting on it, because the honest disposition is neither
+"flip" nor "not yet".
+
+**Both conjuncts have landed** — `D2`/`D3` at `589926845`, the gate corrections
+at `9517225a0`, both verified on `origin/main`. I also ran the verb-keyed
+re-read the trigger requires, on both citations, and **both pass**:
+
+    citation 1   the per-arm-inlining paragraph. The predecessor still says it,
+      (:39-44)   same verb: "Per-arm inlining of a shared callee is legitimate,
+                 and the invariant is a claim about the source dispatcher while
+                 `plan.source_occurrences` is post-inlining -- the subject is
+                 wrong, not the claim."
+    citation 2   the `origin:` line. Its claims hold.
+
+**And the two licence exposures the trigger was written against are gone from
+`main`:** the predecessor's Objective no longer offers retiring the check as
+*"as good a result"* (the phrase does not occur in the file), and its
+*"# The open question"* section is now headed **CLOSED, with the ruling above
+it.** A flip today would not certify text that is about to be corrected.
+
+## SO WHY IT DOES NOT FLIP
+
+**The precondition expired in a way the trigger does not model.** The trigger
+asks whether the predecessor's work is *done*. What changed is **where the
+repair lives**: §8.9a of the predecessor's work package selects a repair unit
+and supersedes both §3a Arm B (*"a SUCCESSOR NODE, not this one"*) and §8.9
+(*"no repair unit is selected here"*) inside the same file, in its own words —
+*"one is now selected, it is neither arm, and it is larger than either."*
+
+⇒ **The repair lands in `RT-DUPLICATED-RESPONSE-BLOCK`. This node is one part
+of it, not the successor that carries it.** Flipping to `ready` would publish a
+node a team could pull as a standalone assignment, and its premise — that it
+owns the occurrence-keyed repair — is no longer what the tree says. That is the
+`draft` schema warning (*"a team pulling this node will find its premise
+false"*) firing for a second, different reason.
+
+## AND THE TITLE'S THESIS IS NOW CHALLENGED FROM SOURCE
+
+Runtime-implementer, 2026-09-19, read from source and **not measured by me**:
+
+    PlannedOccurrence { static_origin, expr }    static_transition.rs:570
+                                                 occurrences.rs:324
+
+Two fields. No instantiation id, no copy id — **`static_origin` IS the
+occurrence.** So "re-key the map on the occurrence" is not a threading task
+against a datum that exists unused. The producer keys from the dispatcher
+`Match` arm (`responses.rs:1246-1284`); the consumer arrives from a `Vis` site
+with `operation_origin` (`:1289-1307`, `:2030-2060`). **Two different origins,
+no recorded relation between them.** Per-`Vis` coordinates already exist on the
+consumer side; what is missing is the producer-to-consumer **correspondence**,
+which has to be derived or recorded.
+
+**This node's title names re-keying as the repair. That reading is now in
+question**, and restating the scope is the Steward act this node needs — not a
+status flip. Left open deliberately rather than rewritten tonight, because the
+measurement that would settle it is in flight in the predecessor's branch.
+
+**Fenced:** the origin-id delta (`365` for `px7n`, `317` for both `rt_escape`
+programs, uniform within each and different between) is **consistent with**
+inlining copying a contiguous origin-id region and **does not establish it**.
+It is explicitly UNMEASURED by its author. Do not size against it.
+
 # THIS IS AN UNDISCHARGED ASSIGNMENT. IT IS NOT A DISCOVERY.
 
 `RT-HOST-RESPONSE-ROUTE-KEY-COLLISION` section 3a, Steward, 2026-09-17:
@@ -331,8 +396,9 @@ corroboration.
 - **Not a new defect class, and not even a new mechanism.** Called "a new
   refusal class" when first found; one `git grep` showed four existing nodes on
   the same message. **The proc-form result was also already predicted by a
-  ruling in the tree** — `RT-DUPLICATED-RESPONSE-BLOCK` §8.9a, lines 268-271,
-  read from the file: *"Per-arm inlining of a shared callee is legitimate, and
+  ruling in the tree** — §8.9a of `RT-DUPLICATED-RESPONSE-BLOCK`'s **work
+  package**, quoted in its issues node at lines 268-271 and read from there:
+  *"Per-arm inlining of a shared callee is legitimate, and
   the invariant is a claim about the source dispatcher while
   `plan.source_occurrences` is post-inlining — the subject is wrong, not the
   claim."* A shared callee invoked twice is inlined per arm, so two occurrences
