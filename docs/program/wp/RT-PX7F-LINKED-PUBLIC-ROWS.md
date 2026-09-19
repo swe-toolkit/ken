@@ -125,3 +125,77 @@ Touches `crates/ken-cli/tests/px7f_resource_native.rs` for the label or the
 un-ignore. **`RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` names the same two rows in
 its `AC-11` closeout roster.** Whichever lands first, the other re-derives —
 coordinate through the runtime-leader rather than both editing the file.
+
+## `D0` ANSWERED — both rows, same check, and the mechanism is decoded
+
+Measured at `1f0402ba40faba71065a44948c3ccb791cad9138`, which is `origin/main`
+and this candidate's merge-base, re-derived here. Probe reverted; the four
+touched files are blob-identical to `HEAD` and `grep -rc RTPROBE crates/` is 0.
+
+### The answer, per row as `AC-1` requires
+
+    linked_public_right_denial_preserves_exact_masks              units.rs:3430
+    linked_public_second_release_is_closed_and_the_handle_closes_once
+                                                                  units.rs:3430
+
+Both rows fire **the same** check, cited by symbol:
+`Lowering::require_i64(ret_tag, expected_ret)` inside
+`define_static_response_owner_bodies`, on the response-K context's returned
+carrier. **The grouping is CONFIRMED, not refuted** — the discriminator was
+worth running and it came back agreeing.
+
+**Candidate (a) is ELIMINATED for these rows.** All four `require_nonzero`
+checks in the entry adapter **pass**. The census's `AC-3` established that the
+borrowed-ingress check is *emitted*; this establishes that it does not *fail*.
+Both are true and they are different claims.
+
+### The mechanism, decoded rather than described
+
+The failing comparison is over a packed `ConstructorIdentity`
+(`pack_identity`: `((start << 32) | len) + 1`). Decoded:
+
+    row                expected                        actual
+    right_denial       DenseRange{start=3323, len=29}  DenseRange{start=3055, len=29}
+    second_release     DenseRange{start=3254, len=31}  DenseRange{start=2318, len=31}
+
+> **`len` matches exactly on both rows. Only `start` differs.**
+
+Same-length ranges at different offsets: the two sides denote a constructor of
+identical shape interned at a **different position**. So the check compares
+**interning position** where the property it needs is **constructor
+equality** — the same identity-versus-equality shape as the `px7l`/`px7m`
+rows' node-identity-versus-body-equality, one layer over. That neighbouring
+node reached its version of this independently; recorded here because the
+recurrence is evidence about the class, not about either row.
+
+### Controls, so the reading is a measurement
+
+- **Baseline** reproduces `-1` on both rows; build exit 0; 2 ran, 1 filtered.
+- **Inertness** — probe compiled in, env unset: `-1` on both. Off changes nothing.
+- **Forcing positive control** — force one check's invalid branch and the tagged
+  value reaches `terminal_value`. Without this, a `-1` reading says only that
+  nothing was observed.
+- **Liveness** — 13 distinct `require_nonzero` sites registered per row,
+  including all four adapter sites, so the instrumented path demonstrably ran.
+- **Uniqueness** — 0 tags map to two sites. The first registry was
+  `thread_local` and **libtest spawns a thread per test even at
+  `--test-threads=1`**, so numbering restarted per test and one tag denoted two
+  files. Caught by the registry's own redundancy; fixed by making it
+  process-global.
+
+**Instrument shape, for whoever repeats it:** `#[track_caller]` on
+`require_nonzero` and `require_i64`, forwarding `Location::caller()` into a
+process-global site registry. **26 `require_nonzero` and 101 `require_i64`
+call sites covered without editing a single one.**
+
+### THE FORK THIS OPENS, AND IT IS NOT MINE TO PICK
+
+Which side is authoritative? Either the planner's `k_ret_identity()` carries a
+**stale** `start` for a re-interned constructor, or the runtime carrier's tag
+is interned against a **different table** than the planner's. The two repairs
+are opposite — re-derive the planner's expectation, versus re-intern at the
+emission site — and the measurement above does not choose between them.
+
+`AC-2` is **NOT** discharged: the rows have not moved and this candidate lands
+no `crates/` file. What is landed is the measurement `D0` asked for, which was
+step one and is now durable rather than living in a thread.
