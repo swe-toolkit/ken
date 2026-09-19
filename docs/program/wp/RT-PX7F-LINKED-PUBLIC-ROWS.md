@@ -256,17 +256,58 @@ both; the outer continuation can. ⇒ **The site is main's continuation after
 the bracket**, in both rows, and in both it performs `host_exit` — an ambient
 operation, hence a `Vis`.
 
-⇒ **Outcome (1): true positive. The row is correct to refuse.** The carried
-constructor really is a `Vis`, so there is nothing to repair at the carrier;
-what does not hold is the planner's expectation that this response's `K`
-returns a `Ret`.
+⇒ **Outcome (1) on the bytes: the carried constructor really is a `Vis`.**
 
-**Residual, named rather than left implicit:** the localization above is a
-cross-fixture *argument* from a shape disagreement, not a per-site
-measurement. It is falsifiable — a fixture whose inner continuation is a `Ret`
-and whose outer is also a `Ret` should not exhibit the mismatch — and nothing
-here has run that case.
+**THE LOCALIZATION ABOVE IS FALSIFIED. The site is NOT main's continuation.**
+The hardening @runtime-leader called for was authored and it refuted the
+argument it was built to test.
 
-⇒ Disposition is the `px7m:206` shape, not a repair: a correct refusal whose
-row carries a label stating the mechanism. `AC-2`'s second branch, not its
-first.
+### The falsifying control, and what it cost to trust it
+
+`RET_ONLY_OUTER` differs from `RIGHT_NOT_HELD` on exactly one axis:
+`ret_only_after` returns an `ExitCode` via `Ret` in both arms instead of
+calling `host_exit`. Inner continuation already `Ret` in both, so this is the
+`Ret`/`Ret` case the residual named as the falsifier.
+
+**It still fires `units.rs:3430`** — the same `require_i64` K-ret check as the
+two rows — verified by decoding the tag against that run's own registry, with
+0 tags mapping to two sites. So changing the outer continuation from a `Vis`
+to a `Ret` does **not** avoid the mismatch, and the cross-fixture argument
+that the outer site explained it is **wrong**.
+
+> **A near-miss worth recording, because it would have destroyed a valid
+> result.** An intermediate run reported plain `-1` with `require_i64`
+> supposedly tagged, which reads as *"the control never reaches the K-ret
+> check"* and would have voided the control as failing for an unrelated
+> reason. That reading was an artifact: the patch's anchor matched a
+> **different function first**, so `require_i64` was never actually
+> instrumented in that build. Caught only by re-running with uniform
+> instrumentation over every `-1` emitter. **A probe that silently did not
+> apply is indistinguishable from a probe that applied and found nothing** —
+> the tag registry is what separates them, and a bare `-1` says only that no
+> INSTRUMENTED site fired.
+
+### Where `D1` actually stands
+
+All three programs — both ignored rows and a `Ret`/`Ret` control — reach the
+same check and fail it. The mismatch is therefore **not** explained by the
+outer continuation's shape, and the live hypothesis is that it is general to
+this `withResource`-plus-`bind` family rather than specific to a continuation
+that performs a second effect. **That is a hypothesis and nothing here tests
+it.**
+
+**No label may be written yet.** `AC-2`'s second branch requires stating *why*
+the refusal is terminal, and the mechanism statement that would have gone into
+it is the one just refuted.
+
+### Hard stop reached, reported rather than worked around
+
+`RET_ONLY_OUTER` is a **failing** test. Committing it green is impossible and
+`#[ignore]`ing it is this frame's first hard stop — *a row that needs a new
+`#[ignore]` anywhere to make progress*. It is therefore **recorded here and
+removed from the suite**, not landed. The program text is above; it reproduces
+in one run.
+
+⇒ Disposition is **undetermined**. It may still be `AC-2`'s second branch, but
+that cannot be asserted until the site is known, and the previous text
+asserting it is withdrawn.
