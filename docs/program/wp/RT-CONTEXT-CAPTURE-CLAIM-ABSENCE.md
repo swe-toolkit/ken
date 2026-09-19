@@ -291,6 +291,73 @@ refuted nodes in this series.
 - **`AC-8` — NO REGRESSION.** Green in CI, not a local `--workspace` run
   (`COORDINATION §12`). Under `A` or `B`, `core.rs:1271`'s two-direction unit
   test must be untouched and green.
+- **`AC-9` — CLOSE OBLIGATION. This node does not reach `merged` until each of
+  its four rows either CLEARS or carries a LIVE owner at the START of its own
+  `#[ignore]` string.** The four are `px7l_checked_host_recursive_bind.rs:163`
+  and `:241`, `px7m_hostresult_computational_match.rs:163` and `:206`. If the
+  answer for a row is that no live node owns its next step, the attribute says
+  so in those words, naming this node as the one that established it.
+  *(Control: each of the four satisfies exactly one branch at the candidate's
+  base. **(a) CLEARED** — the row is no longer `#[ignore]`d; there is no reason
+  string and no token to resolve, and this satisfies the AC. **(b) LIVE OWNER**
+  — the first node token in the reason string resolves to a node whose status is
+  `ready`, `active` or `draft`; `merged` and `closed` fail, and
+  present-and-terminal fails exactly as absent does. **(c) NO LIVE OWNER** — the
+  reason string opens by stating in words that no live node owns the next step
+  and names this node as having established that, which leaves a reader a record
+  to go to rather than a dead end; the reviewer's check is that branch (b) was
+  unavailable, not a token resolution. A row that names a terminal node without
+  taking branch (c)'s words fails. Because it touches `crates/`, the candidate
+  carrying this edit is **`full` CI, never doc-only**.)*
+
+  > **Added by Steward amendment 2026-09-19. These four rows are why the check
+  > exists, and today they fail it.** All four currently open
+  > `#[ignore = "RT-CONTEXT-FRAME-LABEL-CORRECTION …` — `merged` — and every
+  > later token they name (`RT-CARRIED-RESIDUAL-IH-ARITY` `closed`,
+  > `RT-CONTSRC-PRODUCER-LOCAL` and `RT-SITEOP-CARRIED-WITNESS` both `merged`)
+  > is terminal too. **This node is their live owner and its frame is the only
+  > place that says so**, by `file:line` at §1 — so a reader who starts at the
+  > row, which is where anyone clearing it starts, sees a merged node and a dead
+  > end. Measured at `evt_73fa9v0ca03ve`: 8 of the 14 selected rows are in this
+  > state and four of them are these.
+  >
+  > **`AC-6` above is not this AC.** It requires the `D4` label to state the
+  > depth-3 stack, name `L3`, and carry the `D2` ruling — all of which is
+  > *mechanism*, and a row can satisfy every word of it while still naming a
+  > dead owner. This AC is about **who to go to next**, which is the axis `AC-6`
+  > does not constrain.
+  >
+  > **Why an AC when `M7a` arm 2 already reaches these rows at close.**
+  > `M7a` is a **gate**, run by the merge seats when the node closes. An AC is a
+  > **design input**, read by the implementer before the work and by QA during
+  > review. **Reachability by the gate is not visibility to the author** — the
+  > distinction the runtime-implementer drew at `evt_719q9chqy9dwz` after
+  > measuring arm 2's reach and retracting the redundancy claim it seemed to
+  > license. The same reasoning is why
+  > `RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` carries `AC-11` despite arm 2.
+  >
+  > **This paragraph defends the EXECUTION-time reading only, and the teeth are
+  > not in the paragraph.** What stops this AC being skipped as ceremony is that
+  > **its control is already RED**: all four rows fail it as of `338a46e05`, and
+  > an AC that is already failing cannot be satisfied by doing nothing. The
+  > prose explains why the AC exists; the red control is what makes it
+  > unignorable. Noted because the reverse — a close obligation whose control
+  > passes on the tree that motivated it — would be ceremony no wording could
+  > rescue.
+  >
+  > The **proposal**-time failure is a different axis and this text does not
+  > close it: concluding an AC should not exist, before one is written, never
+  > reaches the paragraph that would have answered it. That belongs with `M7a`'s
+  > own general-form box, not here (runtime-implementer, `evt_5fj3d9ez285na`).
+  >
+  > **What this AC does NOT license.** The census's `AC-6` proposal will name
+  > this node as the expected applier for these four rows. That is a **routing**
+  > statement and it is backed by measurement. The **mechanism content** of the
+  > successor string is this node's own finding to make — the census did not
+  > measure these rows and may not write their labels. For `:206` in particular
+  > the live possibility is that the refusal is **correct** (its two arms
+  > measured `DIFFER, 1164 vs 1168 bytes, in exactly one leaf`), in which case
+  > the row CLEARS and this AC is satisfied by the first branch, not the second.
 
 ## §7. Contention
 

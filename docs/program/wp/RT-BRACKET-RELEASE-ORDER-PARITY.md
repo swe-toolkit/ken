@@ -257,6 +257,55 @@ event id. An unanswered `D0a` does not close this WP.
 local `--workspace` run. Local work is `scripts/ken-cargo -p ken-runtime` and
 the named test, nothing wider.
 
+**AC-9. CLOSE OBLIGATION. This node does not reach `merged` until
+`px8ta_oriented_subcontinuation.rs:326` carries a LIVE owner at the START of its
+`#[ignore]` string.** *(Control: the row satisfies one of two branches at the
+candidate's base. **(b) LIVE OWNER** — the first node token in that reason
+string resolves to a node whose status is `ready`, `active` or `draft`; `merged`
+and `closed` fail, and present-and-terminal fails exactly as absent does.
+**(c) NO LIVE OWNER** — the string opens by stating in words that no live node
+owns the next step and names this node as having established that, which leaves
+a reader a record to go to rather than a dead end. **Branch (a) CLEARED is
+foreclosed here** by `AC-6` and `AC-0`. A string that names a terminal node
+without taking branch (c)'s words fails. The candidate carrying this edit
+touches `crates/` and is therefore **`full` CI, never doc-only**.)*
+
+> **Added by Steward amendment 2026-09-19. Unlike most close obligations, this
+> one has only ONE branch available to it.** The usual form is *clears or names
+> a live owner*, and `AC-6` above forecloses the first half: the row **remains
+> `#[ignore]`d** by this node's own design, and `AC-0` bars adding attributes.
+> So the row survives this node, and the only question is whether it survives
+> pointing at something live.
+>
+> Today it does not. It opens
+> `#[ignore = "RT-SUBCONTINUATION-LIFO-RELEASE-ORDER …` — `merged` — and names
+> no other token at all. **This node is its live owner and this frame is the
+> only record of that**, via the title's naming of
+> `public_two_three_level_brackets_finish_and_release_lifo` as *"one of the
+> fifteen originally selected ignored rows (population now 14)"*. A reader who
+> starts at the row sees a merged node and stops. Measured at
+> `evt_73fa9v0ca03ve`, where this row was one of 8 of 14 in that state.
+>
+> **If this node's repair lands and the row still refuses at depth 3** — which
+> `AC-6` expects, as the same `ContinuationSpecialization` object-emission
+> refusal — **then the successor owner is whatever node takes that refusal, and
+> naming it is part of closing here.** If no live node owns it, the attribute
+> says so in those words and names this node as having established it. Handing
+> the row back to `main` still pointing at a merged node reproduces exactly the
+> state `RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` was cut to clean up.
+>
+> **Why an AC when `M7a` arm 2 already reaches this row at close.** `M7a` is a
+> **gate**, run by the merge seats at close; an AC is a **design input**, read
+> by the implementer before the work and by QA during review. **Reachability by
+> the gate is not visibility to the author** (runtime-implementer,
+> `evt_719q9chqy9dwz`). This is the same reason
+> `RT-SITEOP-ORPHANED-ROWS-REFUSAL-CENSUS` carries `AC-11` despite arm 2.
+>
+> **Not licensed by this AC:** the census's `AC-6` proposal will name this node
+> as the expected applier for this row. That is a **routing** statement backed
+> by measurement. The **mechanism content** of the successor string is this
+> node's finding to make — the census did not measure this row.
+
 ## 6. What this WP is NOT
 
 - **It does not clear the px8ta row and must not try.** That row carries a
