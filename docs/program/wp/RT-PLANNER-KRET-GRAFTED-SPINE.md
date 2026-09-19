@@ -23,17 +23,19 @@ advisory `evt_5ny4tmskqx3n4`. Cut and sizing are the Steward's
 
 ## Settled inputs — measured. Do not re-derive.
 
-**1. Six dispatches, ONE resource token, residual zero** (runtime-leader
-`evt_5dbc20bwkmym1`). **The under-release reading is DROPPED.** It was live for
-one exchange: decomposed by disposition the aggregate reads 1 `Released`
-against 3 expected, which would have meant two resources silently never
-released. One measurement closed it rather than an argument. **The defect is
-over-emission.**
+**1. Six dispatches, ONE resource token, residual zero — measured on
+`DOUBLE_RELEASE` (`px7f_resource_native.rs:165`), the `:348` row's program**
+(runtime-leader `evt_5dbc20bwkmym1`). **The under-release reading is DROPPED.**
+It was live for one exchange: decomposed by disposition the aggregate reads 1
+`Released` against 3 expected, which would have meant two resources silently
+never released. One measurement closed it rather than an argument. **The defect
+is over-emission.**
 
 **2. The 1-`Released`/5-`Closed` split is arrival order at one central host
-authority**, not two families disagreeing about disposition. Inventory entry
-10. `request_release` admits only a `Live` slot and refuses every later arrival
-with `Closed`.
+authority**, not two families disagreeing about disposition. **Also
+`DOUBLE_RELEASE`** — it is the same six dispatches as input 1, decomposed.
+Inventory entry 10. `request_release` admits only a `Live` slot and refuses
+every later arrival with `Closed`.
 
 **3. Carrying an existing coordinate has already been tried and is not
 enough.** At `bc4764fb8` `DeferredResponseRow` **already carries**
@@ -102,15 +104,38 @@ being prioritised after its symptom has disappeared.**
 **`AC-R1` — the two ignored rows clear, and the planner is what moved.**
 *Control:* `linked_public_right_denial_preserves_exact_masks`
 (`px7f_resource_native.rs:314`) goes green, **and** the native envelope matches
-the interpreter's — `exit_status: 0` and exactly three events, per the `M2`
-oracle differential. **Those three are the whole envelope — `FsOpen`,
-`FsHandleMetadata`, and ONE `ResourceRelease` settlement for identity 1 — NOT
-three releases.** Stated because the source carries three release expressions,
-and an implementer holding that population reads "three events" as one per
-demand; the Architect started `evt_4fgzxc5ba8x4q` reading it that way and it
-inverted the answer on cardinality. The reference performs **one** settlement,
-so three dispatches would be a five-event envelope and `AC-4` forbids it in
-terms. **A candidate that reaches green by changing the fixture,
+the interpreter's, `exit_status: 0`, per the `M2` oracle differential.
+
+**THE TWO IGNORED ROWS RUN TWO DIFFERENT PROGRAMS AND HAVE TWO DIFFERENT
+ENVELOPES. Neither count is stated without its program.** Architect ruling
+`evt_6pgwgkp3pshbq`; both ignore attributes measured at `origin/main`:
+
+    :314  linked_public_right_denial_preserves_exact_masks     RIGHT_NOT_HELD
+          1 demand -> 1 dispatch.  native 2 -> collapse 1.     3 events
+          FsOpen, FsHandleMetadata{RightNotHeld}, ONE ResourceRelease
+          settlement for identity 1
+
+    :348  linked_public_second_release_is_closed_and_the_
+          handle_closes_once                                   DOUBLE_RELEASE
+          3 demands -> 3 dispatches. native 6 -> collapse 3.    4 events
+
+**`RIGHT_NOT_HELD` has no second source-level release at all; `DOUBLE_RELEASE`
+releases twice on purpose** — both stated under `§4b`'s salient-symptom
+discipline, at the refuted bullet beginning *"THE INSTANCE THIS BULLET
+ORIGINALLY NAMED HAS BEEN REFUTED"*. The three-release-expression population
+belongs to `DOUBLE_RELEASE` and to nothing else, so "three events" and "three
+demands" are quantities over different programs that happen to share a numeral.
+
+**This clause has now been wrong in BOTH directions, which is why it is a table
+and not a sentence.** That `§4b` bullet records an earlier import of
+`DOUBLE_RELEASE`'s designed behaviour onto `RIGHT_NOT_HELD`. The Architect then
+imported `RIGHT_NOT_HELD`'s envelope onto `DOUBLE_RELEASE`
+(`evt_4fgzxc5ba8x4q`, withdrawn at `evt_6pgwgkp3pshbq`), and the Steward landed
+that reading here at `e0f1518f2` while believing it was repairing exactly this
+hazard. **A bare count invites the import; a count beside its program cannot be
+moved without the move being visible.**
+
+**A candidate that reaches green by changing the fixture,
 its assertions, or its ignore attribute has not advanced this node.** Do not
 read `:348`'s pass as a second confirmation; `§1` records that it discriminates
 nothing.
@@ -172,12 +197,19 @@ owner pair was NECESSARY and was measured NOT SUFFICIENT -- that is a settled
 result, not an open question, and it is the reason this WP mints a new
 identity rather than threading an existing coordinate.
 
-**The narrowing is retained as a measured fact.** Of the eighteen compile-time
-claims, SIXTEEN have no executing dispatch site: origin 190's thirteen in
-Specialization(1) and origin 622's three in Predeclared(4). The executing
-population is exactly origin 190's two Specialization(0) claims, and it maps
-one-to-one onto the two observed dispatch sites. This WP does not re-open that
-measurement and does not need to re-derive it.
+**The narrowing is retained as a measured fact, and it is a `DOUBLE_RELEASE`
+measurement** (`px7f_resource_native.rs:165`, the `:348` row's program). Of the
+eighteen compile-time claims, SIXTEEN have no executing dispatch site: origin
+190's thirteen in Specialization(1) and origin 622's three in Predeclared(4).
+The executing population is exactly origin 190's two Specialization(0) claims,
+and it maps one-to-one onto the two observed dispatch sites. This WP does not
+re-open that measurement and does not need to re-derive it.
+
+**Effect origin 190 is shared by all three of `DOUBLE_RELEASE`'s release
+demands and is therefore NOT injective over them** — inventory entry 11. Origin
+is the position the demands were lowered from, not an identity that tells them
+apart, which is why `§0` requires an id minted at bracket planning and
+*"distinct from source origin"*.
 
 **The host resource table is retained as the runtime backstop and is NOT the
 mechanism.** `ResourceTableV1` admits only a `Live` slot, refuses every later
@@ -717,6 +749,10 @@ are deliberately not rewritten.
     only by response provenance, so the implementer could not tell whether
     identity is per-resource or per-demand and had to stop -- keyed on the
     demand's provenance rather than on the obligation the frame mints
+12. M2's three-event envelope was measured on RIGHT_NOT_HELD and was applied
+    to DOUBLE_RELEASE, which releases twice on purpose -- keyed on the
+    measurement's citation rather than on the program it ranges over, the
+    same import-across-programs the frame already records refuted at :588
 ```
 
 > **THE TWO COUNTERS HAVE SEPARATED, AND THEY STAY SEPARATED. `§1a` FOLLOWS THE
@@ -743,8 +779,18 @@ are deliberately not rewritten.
 > entries makes it fire sooner and costs them more** — that is not the argument
 > for it, the population is, but the ruling relieves them of nothing.
 
-**Hard-stop count on this WP: 10; symptom entries: 11.** **The parent node's
-count of 2 does NOT
+**Hard-stop count on this WP: 11; symptom entries: 12.** **`§1b` FIRED AT ENTRY
+12 AND IS ANSWERED** (Architect `evt_6pgwgkp3pshbq`): entries 10, 11 and 12
+share one predicate — **a measurement is attributed to a subject it does not
+range over.** The host's disposition was read as evidence about the planner;
+effect origin 190 was read as the demand's identity; `M2`'s `RIGHT_NOT_HELD`
+envelope was read as `DOUBLE_RELEASE`'s requirement. Each measurement was
+correct; each was read as answering a question about a neighbouring object.
+**Entries 1-9 are defects in the compiler; 10-12 are defects in the EVIDENCE
+BASE this node reasons from**, so the closure is one sweep and not a fourth
+ruling: **every number in this frame names the fixture or the authority it was
+measured on.** That sweep is landed here. **Next `§1b` at entry 15.** **The
+parent node's count of 2 does NOT
 carry** — different WP, different question. `§1a` fired at three
 (`evt_7d3h7mtff5acd`), **re-fired at six** (`evt_3t5nq11ernjfa`), and has
 **re-fired at nine**, holding the ruling on the next locus and calling
