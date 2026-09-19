@@ -573,3 +573,129 @@ fn ac2c_an_explicit_partial_application_is_not_rewritten_into_a_completed_call()
          above passes because nothing completes at all"
     );
 }
+
+// ---------------------------------------------------------------------------
+// AC-7 -- the Boolean truth tables, against the SHIPPED catalog rather than a
+// stub.
+//
+// Every other fixture in this file defines `bool_and` as `\a b. a`, which is
+// fine for shape and identity questions and useless for truth values. These
+// rows load `catalog/packages` so the answers come from the real bindings.
+// ---------------------------------------------------------------------------
+
+fn catalog_env() -> ElabEnv {
+    let catalog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_module_from_roots(&[catalog], "Core.Operators.Standard")
+        .expect("the shipped standard-operator facade must load");
+    env
+}
+
+/// Normalise a `const`'s body, so the assertion is about the VALUE rather than
+/// about the term that was built.
+fn normalised_const(env: &ElabEnv, name: &str) -> ken_kernel::Term {
+    let (_, body) = env
+        .env
+        .transparent_body(env.globals[name])
+        .unwrap_or_else(|| panic!("{name} must be transparent"));
+    ken_kernel::conv::normalize(&env.env, &ken_kernel::Context::new(), &body)
+}
+
+/// AC-7 -- complete truth tables for `∧` and `∨` at the standard fixities.
+#[test]
+fn ac7_the_boolean_operators_have_the_complete_expected_truth_tables() {
+    let mut env = catalog_env();
+    let mut source = String::from("import Core.Operators.Standard (∧, ∨) ");
+    let rows = [
+        ("tt", "True", "True"),
+        ("tf", "True", "False"),
+        ("ft", "False", "True"),
+        ("ff", "False", "False"),
+    ];
+    for (tag, lhs, rhs) in rows {
+        source.push_str(&format!("const and_{tag} : Bool = {lhs} ∧ {rhs} "));
+        source.push_str(&format!("const or_{tag} : Bool = {lhs} ∨ {rhs} "));
+    }
+    source.push_str("const yes : Bool = True const no : Bool = False");
+    env.elaborate_file(&source)
+        .expect("the eight truth-table cases must elaborate");
+
+    let yes = normalised_const(&env, "yes");
+    let no = normalised_const(&env, "no");
+    assert_ne!(
+        yes, no,
+        "positive control: the two Boolean constructors must normalise apart, \
+         or every row below is vacuous"
+    );
+
+    for (tag, lhs, rhs, and_expected, or_expected) in [
+        ("tt", "True", "True", &yes, &yes),
+        ("tf", "True", "False", &no, &yes),
+        ("ft", "False", "True", &no, &yes),
+        ("ff", "False", "False", &no, &no),
+    ] {
+        assert_eq!(
+            &normalised_const(&env, &format!("and_{tag}")),
+            and_expected,
+            "`{lhs} ∧ {rhs}` has the wrong value"
+        );
+        assert_eq!(
+            &normalised_const(&env, &format!("or_{tag}")),
+            or_expected,
+            "`{lhs} ∨ {rhs}` has the wrong value"
+        );
+    }
+}
+
+/// AC-7 -- NO SHORT-CIRCUIT WAS INVENTED, observed where it is observable.
+///
+/// **The frame warns about a conflation and this row is built to avoid it.**
+/// `18a §5.4` is about a body's ARMS; AC-7 is about the OPERANDS. `bool_and`'s
+/// body matches on its first argument and forces one arm, but under
+/// call-by-value both operands are already evaluated before the body runs. An
+/// answer citing arm laziness has answered a different question.
+///
+/// So the observable asserted here is the user-visible one: `False ∧ Zero` is
+/// REFUSED even though `∧` settles at `False` on the left. Reporting
+/// no-short-circuit is CORRECT rather than a defect to fix.
+///
+/// **AND THIS ROW DOES NOT DISCRIMINATE WHICH LAYER REFUSES IT -- MEASURED,
+/// not assumed.** I wrote it claiming it would catch a completion that skips
+/// checking the second operand. It does not: replacing
+/// `check(cx, rhs, &bool_ty, span)` with a bare `infer(cx, rhs)` leaves this
+/// row GREEN, because the saturated application is kernel-checked and the
+/// type error surfaces there instead.
+///
+/// The property is real and the attribution is not available at this layer.
+/// That is the same shape as the carrier confirmation in
+/// `a_rebound_carrier_name_is_refused_by_identity_not_accepted_by_spelling`:
+/// the check is reached, and the kernel would have caught the case anyway. A
+/// row that distinguishes them would need a second operand that is ill-typed
+/// in a way the application's own check cannot see, and I do not have one.
+#[test]
+fn ac7_both_operands_are_checked_even_when_the_first_settles_the_result() {
+    let mut env = catalog_env();
+    let refused = env.elaborate_file(
+        "import Core.Operators.Standard (∧) \
+         const bad : Bool = False ∧ Zero",
+    );
+    let error = refused.expect_err(
+        "`False ∧ Zero` must be refused: `∧` settles at `False` on the left, \
+         and the right operand is still checked at `Bool`",
+    );
+    assert!(
+        !format!("{error:?}").contains("Zero has been ignored"),
+        "sanity on the message: {error:?}"
+    );
+
+    // POSITIVE CONTROL. Without it the row above is satisfied by a harness
+    // that refuses everything -- including by the import failing.
+    let mut env = catalog_env();
+    env.elaborate_file(
+        "import Core.Operators.Standard (∧) \
+         const good : Bool = False ∧ True",
+    )
+    .expect("the same shape with a well-typed right operand must elaborate");
+}
