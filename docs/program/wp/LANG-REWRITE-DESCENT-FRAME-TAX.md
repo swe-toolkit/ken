@@ -155,3 +155,57 @@ A1 probe frame was 44,216 B and reported 2,001,344 B. At both points the
 non-`rewrite_rexpr_inner` remainder is 11,624 B. A1 therefore adds 2,592 B per
 frame and 119,232 B at the unchanged depth. The frame is the dominant term, so
 D0 confirms rather than refutes D1's premise.
+
+## 9. D2 remeasurement and D3 consequence
+
+D2 used the identical §8 method after D1. The uninstrumented frame is
+19,080 B, the maximum descent depth remains 46, and the corrected total stack
+is 1,019,624 B. The disposable probe frame was 19,160 B and reported a
+1,004,144 B entry span.
+
+The split against the base is: frame **down 22,464 B** (54.1%), depth
+**unchanged**, and corrected total stack **down 903,024 B** (47.0%). The
+per-arm non-inlined calls move variant-specific work out of the dispatcher, so
+the non-dispatcher part grows from 11,624 B to 141,944 B while the recursive
+whole-surface frame falls by more than half.
+
+For D3, A1 tip `ed47f3ec9` plus D1 was assembled temporarily at `08c0e1c07`.
+`local_prebinding_preserves_legacy_map_union_stack_budget` passed unchanged at
+its stated two-MiB stack. D1 therefore prevents A1's arm from tripping the
+existing detector; no re-baseline or detector edit is proposed here.
+
+## 10. AC-2 arm and operand audit
+
+The base and candidate each have the same 29 ordered match arms over 28 unique
+variants; `RCon` deliberately has a kernel-head arm followed by its resolving
+arm. The exact sequence at both points is:
+
+```text
+RCon RCon RVar RPatternAlias RRecursiveResult RUniv RApp RLam RLet RAsc
+ROld RCell RBecomes RNumLit RStr RCharLit RByteStr RBinOp RInfixSpine
+RMatch RIf RPair RRecord RPosProj RProj RPi RArrow RAttachedProofRef RTrunc
+```
+
+The operand audit is:
+
+| variant group | preserved rewrite |
+|---|---|
+| `RCon` | kernel head stays canonical; other names use `resolve_ref` |
+| `RApp` | function uses `rewrite_rexpr_inner`; argument uses `rewrite_rexpr` |
+| `RLam`, `ROld`, `RBecomes`, `RTrunc` | body, value, or inner expression uses `rewrite_rexpr` |
+| `RLet` | optional type uses `rewrite_rtype`; RHS and body use `rewrite_rexpr` |
+| `RAsc` | expression uses `rewrite_rexpr`; type uses `rewrite_rtype` |
+| `RBinOp`, `RArrow` | both expression operands use `rewrite_rexpr` |
+| `RInfixSpine` | every operand rewrites; user operator names use `resolve_ref` |
+| `RMatch` | scrutinee, patterns, guards, and bodies all rewrite |
+| `RIf` | condition and both branches use `rewrite_rexpr` |
+| `RPair` | every component uses `rewrite_rexpr` |
+| `RRecord` | optional base and every field value use `rewrite_rexpr` |
+| `RPosProj`, `RProj` | projected expression uses `rewrite_rexpr` |
+| `RPi` | domain uses `rewrite_rtype`; codomain uses `rewrite_rexpr` |
+| `RAttachedProofRef` | subject and proof name use `resolve_attached_ref` |
+| all remaining variants | no recursive expression or reference operand |
+
+D1 changes only where those existing operations execute: each recursive arm's
+body is now a distinct non-inlined helper monomorph, leaving the dispatcher's
+arm list and operand transformations intact.
