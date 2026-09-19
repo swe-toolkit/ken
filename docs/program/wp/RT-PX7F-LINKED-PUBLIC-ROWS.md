@@ -149,24 +149,42 @@ checks in the entry adapter **pass**. The census's `AC-3` established that the
 borrowed-ingress check is *emitted*; this establishes that it does not *fail*.
 Both are true and they are different claims.
 
-### The mechanism, decoded rather than described
+### The mechanism — CORRECTED. The check is right; the carrier is wrong.
+
+> **The reading first published in this section was WRONG and is replaced
+> here rather than annotated, because a superseded claim left in place is the
+> copy a later reader obeys.** It said equal `len` with differing `start`
+> meant "the same constructor interned at a different position", and therefore
+> that the check compared interning position where it needed constructor
+> equality. **`len` is the byte-length of the name span, not a shape.**
+> Refuted by @architect (`evt_3p21wmxc54ytk`) before any repair was proposed.
 
 The failing comparison is over a packed `ConstructorIdentity`
-(`pack_identity`: `((start << 32) | len) + 1`). Decoded:
+(`pack_identity`: `((start << 32) | len) + 1`). Decoding the spans against
+`names` — which is the measurement the previous reading skipped:
 
-    row                expected                        actual
-    right_denial       DenseRange{start=3323, len=29}  DenseRange{start=3055, len=29}
-    second_release     DenseRange{start=3254, len=31}  DenseRange{start=2318, len=31}
+    row              expected                           actual
+    right_denial     "ctor:right-denial::ITree::Ret"    "ctor:right-denial::ITree::Vis"
+    double-release   "ctor:double-release::ITree::Ret"  "ctor:double-release::ITree::Vis"
 
-> **`len` matches exactly on both rows. Only `start` differs.**
+**`Ret` and `Vis` are both three bytes.** That is the whole reason `len`
+matched, and it is why equal-`len` was never evidence of anything: it is a
+*value*, and this node's parent census states the rule that disqualifies it —
+fold on a mechanism, never a symptom, a value, or a label. I applied that rule
+correctly to reject folding rows 1 and 2 this morning and then broke it one
+layer down on `len`.
 
-Same-length ranges at different offsets: the two sides denote a constructor of
-identical shape interned at a **different position**. So the check compares
-**interning position** where the property it needs is **constructor
-equality** — the same identity-versus-equality shape as the `px7l`/`px7m`
-rows' node-identity-versus-body-equality, one layer over. That neighbouring
-node reached its version of this independently; recorded here because the
-recurrence is evidence about the class, not about either row.
+⇒ **Outcome `(a)`: the bytes DIFFER, so the check is CORRECT and there is no
+interning defect.** The planner demanded `ITree::Ret` and emission carried
+`ITree::Vis`. `names.len()` also differs per row (5613 vs 5721), confirming
+each row decodes against its own arena and that the cross-decodes are garbage,
+as expected.
+
+**`D1` is therefore a different question than this node assumed:** why does
+this row's response carry the `Vis` constructor where the plan says `Ret`?
+Both prior arms are dead — arm 2 on design grounds (emission only reads the
+planner's value and never mints), and arm 1 because its premise required the
+bytes to be equal, which they are not.
 
 ### Controls, so the reading is a measurement
 
@@ -188,13 +206,12 @@ recurrence is evidence about the class, not about either row.
 process-global site registry. **26 `require_nonzero` and 101 `require_i64`
 call sites covered without editing a single one.**
 
-### THE FORK THIS OPENS, AND IT IS NOT MINE TO PICK
+### THE QUESTION THIS LEAVES
 
-Which side is authoritative? Either the planner's `k_ret_identity()` carries a
-**stale** `start` for a re-interned constructor, or the runtime carrier's tag
-is interned against a **different table** than the planner's. The two repairs
-are opposite — re-derive the planner's expectation, versus re-intern at the
-emission site — and the measurement above does not choose between them.
+Not "which side is authoritative" — that fork is dead, both arms with it. The
+live question is **why the response carries `Vis` where the plan says `Ret`**,
+which is a question about what the response-K context returns, not about
+identity encoding.
 
 `AC-2` is **NOT** discharged: the rows have not moved and this candidate lands
 no `crates/` file. What is landed is the measurement `D0` asked for, which was
