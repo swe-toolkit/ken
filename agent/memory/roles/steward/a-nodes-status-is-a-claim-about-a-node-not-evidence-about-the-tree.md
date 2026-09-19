@@ -66,6 +66,65 @@ one round trip instead of an implementer turn.** A ring that challenges a
 Steward kick when it contradicts the repository is working correctly, and the
 kick is what should be doubted — I have the summary, they have the tree.
 
+## 2026-09-19: THE SECOND FAILURE MODE, AND THE CHECK ABOVE IS BLIND TO IT
+
+The case above is a node that **fully merged**. The harder one is a node
+**partially executed**, and it defeats this file's own remedy.
+
+`RT-COMPMATCH-TREE-SCRUTINEE` read `status: ready`. I sequenced it first on the
+strength of its frame's stated shape — *"a single forcing step with a named
+target and a binary outcome, NOT a peeling ladder."* The runtime leader stopped
+the dispatch. Verified at the object:
+
+    03976d2ac  ANCESTOR of origin/main, 2026-09-18T22:42:18Z
+               "RT-COMPMATCH-TREE-SCRUTINEE D1+D2: find the consumer
+                behind worker_return"
+    touched    2 crates/ files
+    did NOT touch  the node file or its wp frame
+
+**`status: ready` was not even wrong here.** Work genuinely remained, so no
+field needed flipping and nothing looks stale on inspection. The rot is in the
+**body**: the node still presents its pre-work three-layer analysis as current,
+with no record of D0/D1/D2's landed outcome or the thread's `D3: witness
+RETIRED` verdict.
+
+> **A node can be simultaneously correct in its status and false in its
+> content.** The status field answers *"is this node finished?"* Nobody asks the
+> field that decides a dispatch: *"is what this node SAYS still true?"*
+
+### The check in this file does not fire
+
+`gh pr list --state merged | grep -F "<NODE-ID>"` finds **nothing** — there is
+no merged PR, because the work landed as one commit inside an arc that
+continues. **The remedy written above is sound for the merged case and blind to
+this one**, which is the more common one on a live lane.
+
+The predicate that catches both, handed to the runtime ring to apply at the
+point of use rather than as a tracker sweep:
+
+```sh
+git log --oneline origin/main --grep='<NODE-ID>'
+```
+
+**Commits the node file does not record ⇒ the node is stale, and the write-back
+precedes the work.** It costs one command per node start, it needs no `gh`
+credential, and it catches partial execution, which merged-PR matching cannot.
+
+### What it cost, and it is the sizing, not the kick
+
+The wasted dispatch was never the risk — the leader caught it. The damage was
+that **I sized and ordered the lane off a property that had already been
+consumed.** The binary-outcome shape was my entire reason for putting it ahead
+of a node covering three times as many rows; that forcing step fired the day
+before. ⇒ **When a premise is refuted, re-make the decision rather than
+defending the conclusion** — a conclusion that survives its broken premise is
+the one nobody re-examines. I reversed the order.
+
+And the corollary for any estimate: **you cannot size what the node
+misrepresents.** Separate the write-back from the work it unblocks, and size the
+work only after the artifact tells the truth. Here the write-back is T2
+transcription and does not need the T1 seat's post-compaction turn at all.
+
 See also [[a-node-status-can-be-right-about-the-edge-and-wrong-about-the-seat]],
 which is the sibling failure: that one is status-versus-**seat** (nobody is
 building it), this one is status-versus-**tree** (it is already built).
