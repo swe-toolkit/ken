@@ -440,9 +440,45 @@ crate-internal type, so widening back trips `#![deny(private_interfaces)]`
                                          -> pub(crate); signature @ 722a48cec
                                          names StandardOperatorRole
 
-**`--no-run` over every target confirms this is the COMPLETE list** — two
-targets, nothing further waiting. The repair is bounded by measurement, not by
-estimate.
+**`--no-run` over every target confirms this is the COMPLETE list of BROKEN
+TARGETS** — two, nothing further waiting.
+
+> ### THAT COUNT DOES NOT BOUND THE REPAIR, AND AN EARLIER REVISION SAID IT DID.
+>
+> This sentence read *"the repair is bounded by measurement, not by estimate."*
+> **It is not.** `--no-run` enumerates targets that fail to COMPILE; the cost of
+> fixing one is a different quantity it never measured. The census was complete
+> and correct and answered a different question than the one it was cited for.
+>
+> **Measured after the fact, which is the wrong order and is the point:**
+> `effects.rs` was two call sites. `seal2_support/mod.rs` is ~1200 lines with
+> two consumers. **Same "two targets," repairs an order of magnitude apart.**
+>
+> ⇒ **Before citing a number as a bound, say what it counts.** Steward,
+> corrected by the language-leader.
+
+### AMENDED 2026-09-19: this fold discharges at `effects.rs` ONLY
+
+**`tests/effects.rs` is folded in and is DONE** (`6ab1639f1`: relocated rather
+than rewritten, pin preserved, every target compiling, 179 lib rows green).
+
+**`adversary_seal2_repros` is NOT A1's to carry.** It returns to its own node,
+`draft` = QUEUED, sized M.
+
+**The reason is that this amendment's own blocking premise dissolved rather than
+being satisfied.** *"AC-8 cannot be discharged without it"* is what made the
+fold correct — a queued node would have serialized a BLOCKED WP behind no
+release date. With the `..` interim in place and its claim corrected, **AC-8 is
+not blocked**, so a queued node now serializes nothing and the argument that
+decided this points the other way.
+
+    A DEFERRAL ARGUMENT'S PRECONDITION IS A STATE, NOT A LABEL. Nobody
+    discharged "AC-8 is blocked"; it stopped being true, and nothing
+    announced that. Re-check the premise before extending a ruling built
+    on it.
+
+What remains for seal2 is only *"A1's own damage,"* which alone does not pull a
+shared-module relocation into a WP that is no longer blocked.
 
 ### Why this folds in rather than becoming a node
 
