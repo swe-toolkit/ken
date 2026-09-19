@@ -269,6 +269,85 @@ That sentence is the Steward's and the correction belongs in the predecessor's
 measured-outcome section, not here. It is recorded here because this node's
 fixed inputs would otherwise inherit it.
 
+# WITNESS: A MINIMAL REPRO, AND IT MEASURES "OCCURRENCE" DIRECTLY
+
+**Steward, 2026-09-19, from the runtime-implementer's probes in
+`thr_3s7btdee77g0n`** (`evt_6kwtw2dv0df8r`, `evt_4vvdf6mj9kx7t`), recorded here
+because the finding was made under a closed campaign and the implementer
+correctly declined to write it into a node they do not own.
+
+**This node's thesis is that the route map should key on the OCCURRENCE rather
+than the operation constructor. Until now the evidence for that was the four
+ignored rows, each a large program needing a 29-constructor census to read.
+There is a two-line repro.**
+
+    withBuffer 1 (pure) ; withBuffer 1 (pure)          REFUSES
+    withBuffer 1 (pure) ; withBuffer 2 (pure)          REFUSES  (distinct
+                                                       capacities)
+    withBuffer 1 (pure) ; withResource Read (pure)     REFUSES  (distinct
+                                                       OPERATIONS)
+
+    all three:  "two host response cases claim one operation constructor"
+
+Three builds, one edit apart. Varying the operation is what identifies the
+colliding constructor as the **release**, not the acquisition: every bracket
+emits a `ResourceRelease`, so no choice of bracket kind or capacity avoids it.
+
+**Controls — nesting is unaffected:**
+
+    cr-write-writable   three nested brackets, three releases   BUILDS
+    fixG, fixJ          three nested                            BUILD
+
+So the refusal is not "more than one release". It is **two brackets in
+sequence at the same level**.
+
+## THE MEASUREMENT THAT BEARS DIRECTLY ON THE KEY
+
+The Architect challenged the above as possibly static-only (`evt_6ppf0bzjzpssq`):
+a response case is a code position, so **one** bracket site invoked twice
+should mint **one** case and produce the interleaved footprint with no
+collision. That was tested:
+
+    proc pb_tw_one (_marker : Int) = withBuffer 1 pb_tw_leaf      ONE site
+    pb_tw_stage = bind (pb_tw_one 0) (\first. bind (pb_tw_one 1) ...)
+
+    "two host response cases claim one operation constructor"
+
+**One static bracket site. Two invocations. Two response cases.**
+
+⇒ **Cases are minted per INVOCATION, not per source site.** That is this node's
+key question answered by measurement rather than by argument: the unit the
+route map collides on is the occurrence, and legitimate distinct occurrences of
+one constructor are exactly what it cannot currently distinguish. Fold this
+into the acceptance bar's reading of "occurrence" rather than treating it as
+corroboration.
+
+## TWO CONSEQUENCES, STATED WITH THEIR FENCES
+
+- **Factoring is not a workaround.** The severity fork the Architect posed —
+  "narrow gap with a factoring workaround" versus "sequential resource use is
+  not expressible in native" — settles on the **stronger** arm, because the
+  proc form is the factoring and it refuses.
+- **Not a new defect class, and not even a new mechanism.** Called "a new
+  refusal class" when first found; one `git grep` showed four existing nodes on
+  the same message. **The proc-form result was also already predicted by a
+  ruling in the tree** — `RT-DUPLICATED-RESPONSE-BLOCK` §8.9a, lines 268-271,
+  read from the file: *"Per-arm inlining of a shared callee is legitimate, and
+  the invariant is a claim about the source dispatcher while
+  `plan.source_occurrences` is post-inlining — the subject is wrong, not the
+  claim."* A shared callee invoked twice is inlined per arm, so two occurrences
+  is what that ruling says to expect. The Architect independently withdrew the
+  static-only challenge on that citation — **and the build had already run and
+  refused before the withdrawal was posted.** The measurement did not come from
+  the ruling and the ruling was not re-read from the measurement, so the two
+  agree independently rather than one being derived from the other.
+
+  ⇒ **The witness is new; the refusal and the mechanism are not.** What the
+  measurement adds is a two-line program where the existing ruling can be
+  checked directly, instead of a 29-constructor census inside four large
+  programs. Read it as confirmation with a cheap reproducer, not as a
+  discovery — and do not let a second node be filed on it.
+
 # Related
 
 - `[[RT-DUPLICATED-RESPONSE-BLOCK]]` — establishes the reading that licenses
