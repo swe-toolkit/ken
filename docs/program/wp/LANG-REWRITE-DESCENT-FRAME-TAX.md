@@ -132,3 +132,26 @@ The option fork is CLOSED by operator ruling: **(g), then remeasure.** Options
 does not land with the arm are **not live** and are not to be re-argued inside
 this node. If `D0` refutes (g)'s premise, that reopens the fork **at the
 operator**, not at the ring.
+
+## 8. D0 measurement — recorded before D1
+
+**Method, applied identically at both points:** build the exact
+`map_build_acceptance` test in the debug test profile, use `nm -C` plus
+`objdump -Cd` to read `rewrite_rexpr_inner`'s uninstrumented prologue stack
+allocation, then run a disposable eight-MiB clone of the D1 fixture with an
+entry `rsp` probe and a thread-local active-depth guard. Correct the probe's
+outermost-to-deepest entry span by subtracting its measured per-frame overhead
+for the intervening frames, then add one uninstrumented frame:
+`span - (depth - 1) * (probe_frame - frame) + frame`. The probe and cloned test
+were measurement-only and are absent from the candidate.
+
+| point | frame | max depth | corrected total stack | frame share |
+|---|---:|---:|---:|---:|
+| base `1be846b2d` | 41,544 B | 46 | 1,922,648 B | 99.40% |
+| A1 `ed47f3ec9` | 44,136 B | 46 | 2,041,880 B | 99.43% |
+
+The base probe frame was 41,608 B and reported a 1,883,984 B entry span; the
+A1 probe frame was 44,216 B and reported 2,001,344 B. At both points the
+non-`rewrite_rexpr_inner` remainder is 11,624 B. A1 therefore adds 2,592 B per
+frame and 119,232 B at the unchanged depth. The frame is the dominant term, so
+D0 confirms rather than refutes D1's premise.
