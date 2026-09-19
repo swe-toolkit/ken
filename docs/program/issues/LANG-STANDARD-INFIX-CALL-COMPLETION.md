@@ -348,14 +348,43 @@ would have to manufacture is the one to raise, not to skip.
 - **AC-3 (one SELECTOR, not one entry point).** **AMENDED 2026-09-19 — the
   property below replaces the original wording, which is struck.** The property:
 
-      ONE FUNCTION PERFORMS INSTANCE SELECTION. Every entry point
-      contributes a registry KEY and REFUSALS, never a resolution.
+      ONE FUNCTION PERFORMS INSTANCE SELECTION -- SELECTION MEANING THE
+      READ WHOSE RESULT BECOMES A DICTIONARY *TERM* IN THE ELABORATED
+      OUTPUT. Every other registry read is a CLASSIFICATION and must be
+      enumerated as such. Every entry point contributes a registry KEY
+      and REFUSALS, never a resolution.
 
-  **Discharge:** enumerate every `ClassEnv::instances` read that yields a
-  dictionary instance; show **exactly one** sits on a production path; and show
-  that for a given `(class, key)` every entry point returns **the same
-  resolution or a refusal**. The satisfying act is a structural property of the
-  tree, not an authored list.
+  **Discharge:** enumerate every `ClassEnv::instances` read on a production
+  path; for each, say whether its result **flows into a `Term` that is
+  elaborated** or is consumed as a lookup key for classification; show
+  **exactly one** is a selection; and show that for a given `(class, key)`
+  every entry point returns **the same resolution or a refusal**. The
+  satisfying act is a structural property of the tree, not an authored list.
+
+> ### RE-AMENDED HOURS LATER: THE FIRST AMENDMENT'S DISCHARGE COULD NOT ANSWER ITS OWN QUESTION.
+>
+> **Struck:** *"enumerate every `ClassEnv::instances` read that yields a
+> dictionary instance; show exactly one sits on a production path."*
+>
+> **Measured at `0b2f327e9`, there are at least FOUR such reads, all on
+> production paths** — `instance_search`'s own `.get`,
+> `instance_class_for_global`'s `.values().find`,
+> `projected_field_row_type`'s `.values().find`, and the selection at `:9888`.
+> A count of them is complete, correct, and an answer to a different question.
+>
+> **The phrase that fails is "yields a dictionary instance."** It reads as
+> *yields an instance id* — and `projected_instance_id` yields one of those
+> while never producing a dictionary. So the struck discharge would have
+> reported **four selections where there is one**, and an implementer following
+> it would have gone looking for three defects that do not exist.
+>
+> **The discriminator that works is above: does the read's result flow into an
+> elaborated `Term`?** Only one does. Architect, `evt_14epkeqjam4q2`.
+>
+> ⇒ **This is the third measurement in one session that was complete, correct,
+> and cited for a question it did not answer** — and the only one that reached
+> an acceptance criterion, where it would have been executed rather than
+> discussed. **A count is not a criterion; the discriminator is.**
 
 > ### WHY AC-3 WAS REWORDED: TWO PROPERTIES SHARED ONE SENTENCE UNTIL THEY CAME APART
 >
