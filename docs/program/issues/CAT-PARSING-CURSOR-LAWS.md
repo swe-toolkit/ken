@@ -6,7 +6,7 @@ owner: foundation
 size: L
 gate: none
 tier: T1
-depends_on: [CAT-PROOF-COMPLETENESS-SURVEY, CAT-NAT-ORDER-LAWS]
+depends_on: [CAT-PROOF-COMPLETENESS-SURVEY, CAT-NAT-ORDER-LAWS, CAT-COLLECTIONS-NTH-LAWS]
 blocks: []
 github: null
 origin: "One of the seventeen proof-backfill follow-ons named by docs/program/CATALOG-PROOF-COMPLETENESS-SURVEY.md (landed ec23d4ab6), under operator ruling 2026-09-13 / PRINCIPLES #16. Filed draft, NOT released: the Steward measured its dependency on CAT-NAT-ORDER-LAWS at origin/main b839fd63295e550c12524bd9f4804fdf28be7169 while selecting which of the seventeen to release first -- see the body. The survey lists the seventeen as a flat set and does not record this edge; it is filed here so the measurement is not re-derived."
@@ -79,13 +79,20 @@ waiting on, in `catalog/packages/Data/Numeric/Nat/Order.ken.md`:
 - **strict decrease** — `suc_decreases` (`:109-113`):
   `IsTrue (leq_nat (Suc b) a) → IsTrue (leq_nat (Suc (sub a (Suc b))) (sub a b))`
 
-**2. The deferred design question is answered, and the answer is a mismatch on
-two axes, not one.** `Order` carries its Boolean hypotheses as `IsTrue`
-(`Order.ken.md:188`). Cursor's three laws state their conclusions as
-`Equal Bool (cursor_nat_lt ...) True` (`:222`, `:235`, `:250`). The bridge
-crosses **both** the predicate — `cursor_nat_lt` is strict `<`, `leq_nat` is
-`≤` — **and** the wrapper, `IsTrue` against `Equal Bool _ True`. The body above
-anticipated the predicate axis only.
+**2. The deferred design question is answered: the real gap is the predicate,
+and the wrapper is free.** `Order` carries its Boolean hypotheses as `IsTrue`
+(`Order.ken.md:188`); Cursor's three laws state their conclusions as
+`Equal Bool (cursor_nat_lt ...) True` (`:222`, `:235`, `:250`). An earlier
+revision of this frame called that a mismatch on two axes. **It is one.**
+`IsTrue (b : Bool) : Prop = Equal Bool b True`
+(`Core/Classes/LawfulClasses.ken.md:54`) — the two spellings are the same
+proposition, so the wrapper closes by unfolding, like `bytes_nat_length` in
+input 4. **What is left is the predicate: `cursor_nat_lt` is strict `<`,
+`leq_nat` is `≤`, and they are genuinely different functions.**
+
+The bridge between them is **in scope for this node**. It mentions
+`cursor_nat_lt`, a `Cursor`-local symbol, so it is not a `Derived` fact and
+must not become a third predecessor.
 
 **3. The bridge needs no new package edge.** `Cursor.ken.md:33` already imports
 `sub` from `Data.Numeric.Nat.Order`, and `Order.ken.md:39` re-exports `leq_nat`
@@ -96,11 +103,25 @@ and `IsTrue`. Widen the existing import list.
 (`Data/Collections/Derived.ken.md:900`), and `arg_length` is `bytes_nat_length`
 (`Cursor.ken.md:67`).
 
-**5. `add` facts exist; `nth` facts do not.**
+**5. `add` facts exist; the `nth` pair arrives as a predecessor.**
 `Data/Numeric/Nat/Arithmetic.ken.md` carries `assoc`, `comm`, `zero_l`,
-`zero_r`, `suc_l`, `suc_r`. `Derived.ken.md` carries **no lemma relating `nth`
-to `length`** — `nth` occurs there only in its own definition (`:91`), in
-`char_at` (`:882`), in prose, and in the API list. Measured, not assumed.
+`zero_r`, `suc_l`, `suc_r`. `Derived.ken.md` carried **no lemma relating `nth`
+to `length`**, catalog-wide. `CAT-COLLECTIONS-NTH-LAWS` lands that pair; it is
+a `depends_on` of this node, not a wall this node is expected to hit.
+
+**6. The `Nat` side of the positivity step is already paid — there is no
+second predecessor.** `offset < len ⇒ Zero < sub len offset` is not
+`saturates`, which is the zero direction. It falls out of `suc_decreases`:
+instantiate `b := offset`, `a := len`, case-split on `sub len offset`, and the
+`Zero` branch makes the conclusion `IsTrue (leq_nat (Suc _) Zero)`, which is
+absurd — so `sub len offset` is a `Suc`, which is what `cursor_nat_lt Zero _`
+reduces on. Architect, `evt_1391bs7gcxara`.
+
+**7. Scrutinee order is opposed, and it reads like a wall.** `nth` matches `xs`
+first then `n` (`Derived.ken.md:91`); `arg_remaining_from` matches `index`
+first then `args` (`Cursor.ken.md:152`). Neither reduces until both scrutinees
+are in WHNF, so an induction that splits only on `index` leaves `nth` stuck.
+That is a missing case split, not a missing lemma.
 
 ## Deliverable
 
@@ -111,17 +132,21 @@ inhabitant.
 
 ## Stop condition
 
-**If the proof needs a general `List`/`nth` fact that belongs in
-`Data/Collections/Derived.ken.md`, stop and report. Do not widen scope into
-`Derived`, and do not land a general `List` fact inside `Capability/Parsing`.**
-That is the same dependency shape this node already measured for `sub`, and it
-was resolved with a predecessor rather than a scope extension. `nth` is where it
-can recur: `arg_cursor_peek` is two `nth` calls, and both
-`CursorPeekHasRemaining` and `CursorEndValid` turn on them.
+**If the proof needs a general `List` fact beyond the pair
+`CAT-COLLECTIONS-NTH-LAWS` lands, stop and report. Do not widen scope into
+`Data/Collections/Derived.ken.md`, and do not land a general `List` fact inside
+`Capability/Parsing`.** That is the same rule that produced both predecessors,
+and it is the direction that fails closed.
 
-Proving those two laws by direct induction on the `args`/`index`/`offset`
-structure — the recursion `arg_remaining_from` and `arg_cursor_peek` both
-follow — is in scope and is the expected route.
+An earlier revision of this frame made the `nth` gap itself the stop condition.
+That was the wrong instrument: the gap is reached **with certainty**, in the
+base case of `CursorPeekHasRemaining` with a one-argument cursor, so the stop
+would have been a scheduled turn ending in the predecessor being cut anyway.
+Architect ruling `evt_1391bs7gcxara`; the derivation is recorded in
+`CAT-COLLECTIONS-NTH-LAWS`.
+
+Induction on `args`/`index` discharges the outer `nth` layer with no lemma and
+is the expected route for that half.
 
 ## Acceptance criteria
 
@@ -150,8 +175,8 @@ anticipate something: that is a hard stop and a report, not a scope extension.
 
 ## Design note, not a criterion
 
-Name the two-axis bridge as its own top-level declaration whose type mentions
-both `cursor_nat_lt` and `leq_nat`, rather than inlining the conversion inside
-each law. Inlined, the direction of the `IsTrue` ↔ `Equal Bool _ True`
-conversion lives nowhere a reader can check it. Not an AC: the deliverable is
-the inhabitant, and the shape is the implementer's.
+Name the `cursor_nat_lt`/`leq_nat` bridge as its own top-level declaration
+whose type mentions both, rather than inlining the conversion inside each law.
+Inlined, the direction of the strict-versus-non-strict step lives nowhere a
+reader can check it. Not an AC: the deliverable is the inhabitant, and the
+shape is the implementer's.
