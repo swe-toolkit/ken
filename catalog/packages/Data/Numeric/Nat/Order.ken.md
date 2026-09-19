@@ -189,6 +189,14 @@ Both conditional laws carry their Boolean hypotheses as `IsTrue` propositions,
 matching this package's order examples and letting downstream consumers pass
 canonical `leq_nat` evidence without restating the underlying Boolean equation.
 
+`self_is_zero` needs its induction: `sub`'s structural recursion does not reduce
+for an abstract `n` matched against itself, so `Refl` alone cannot close the
+goal. That is asserted here, not merely asserted about:
+
+```ken reject
+proof self_is_zero_wrong for sub (n : Nat) : Equal Nat (sub n n) Zero = Refl
+```
+
 ## 5. Design notes
 
 **The facade preserves one identity.** The canonical relation, attached proofs,
