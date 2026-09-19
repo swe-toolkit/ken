@@ -460,3 +460,116 @@ fn a_rebound_carrier_name_is_refused_by_identity_not_accepted_by_spelling() {
          stopped firing and the downstream net is carrying it alone: {error:?}"
     );
 }
+
+/// AC-2(a) -- the renaming hop, which is the half the delivery does NOT
+/// already produce.
+///
+/// **FI-2a makes the obvious version degenerate and the frame says so.** The
+/// facade's own re-export IS the production path, so "a re-exported binding
+/// completes" is satisfied by shipping and controls nothing. The witness has
+/// to be a second surface route to the same identity that the delivery does
+/// not create on its own.
+///
+/// `<+>` is that route: the home re-exports `ord_leq_at` twice, once as the
+/// role glyph `≤` and once under an ordinary USER OPERATOR spelling.
+/// `certify_roles` ignores `<+>` -- it is not a role glyph -- so the certified
+/// map is unchanged and the two-spellings refusal does not fire. But `<+>`
+/// still RESOLVES to the certified identity, and it is a symbolic operator so
+/// it reaches the infix path, mints the node, and completes identically.
+///
+/// **It has to be a SYMBOLIC name, not just a different word.** A first
+/// attempt used `lte`, which is an ordinary identifier: `a lte b` parses as
+/// the application `(a lte) b` and never reaches spine reduction at all, so it
+/// failed with `NotAFunction` and proved nothing about completion. Operator
+/// position is a parse-level fact before it is an identity-level one.
+///
+/// **That is the whole content of "keyed on the identity, never the glyph":**
+/// a spelling the compiler has never heard of completes, because completion
+/// never asked what it was spelled.
+#[test]
+fn ac2a_a_renaming_hop_to_the_same_identity_completes_identically() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "class Ord a {{ leq : a -> a -> Bool }} \
+         module Provider {{ \
+           pub fn bool_and (a : Bool) (b : Bool) : Bool = a \
+           pub fn bool_or (a : Bool) (b : Bool) : Bool = a \
+           pub fn ord_leq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq x y \
+           pub fn ord_geq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq y x \
+         }} \
+         module Core.Operators.Standard {{ \
+           export Provider (bool_and as ∧, bool_or as ∨, ord_leq_at as ≤, \
+                            ord_leq_at as <+>, ord_geq_at as ≥) }} \
+         {ORD_BOOL} \
+         import Core.Operators.Standard (≤, <+>) \
+         fn viaGlyph (a : Bool) (b : Bool) : Bool = a ≤ b \
+         fn viaHop (a : Bool) (b : Bool) : Bool = a <+> b"
+    ))
+    .expect("a second re-export of the SAME identity under another name must also complete");
+
+    assert_eq!(
+        under_binders(body_of(&env, "viaGlyph"), 2),
+        under_binders(body_of(&env, "viaHop"), 2),
+        "`a <+> b` must produce the SAME completed term as `a ≤ b` -- the \
+         policy is keyed on the defining GlobalId, and a spelling the compiler \
+         has no role for must reach it just the same"
+    );
+
+    // Non-degeneracy: the hop is doing work, not coinciding. A four-argument
+    // spine means the prefix was supplied for `lte` too rather than it having
+    // elaborated as some ordinary two-argument call.
+    assert_eq!(
+        spine_len(under_binders(body_of(&env, "viaHop"), 2)),
+        4,
+        "`<+>` must have been COMPLETED, not merely accepted"
+    );
+}
+
+/// AC-2(c) -- an explicit partial application is never rewritten.
+///
+/// **This is the claim I have leaned on in three separate design arguments and
+/// never pinned.** The whole case for a distinct `RExpr` node over a marker on
+/// `RApp` was that this holds BY CONSTRUCTION: completion is minted only in
+/// spine reduction, so an explicit application is a different constructor and
+/// cannot reach the adapter. An argument used that often is exactly the one
+/// that should not stay unpinned.
+///
+/// `ord_leq_at Bool d` supplies the carrier and the dictionary and yields a
+/// function. If completion ever keyed on identity-plus-arity instead of on
+/// operator position, this would be "completed" into a four-argument call and
+/// stop being a function -- which the `: Bool -> Bool -> Bool` annotation
+/// rejects.
+#[test]
+fn ac2c_an_explicit_partial_application_is_not_rewritten_into_a_completed_call() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} {ORD_BOOL} \
+         import Provider (ord_leq_at) \
+         import Core.Operators.Standard (≤) \
+         fn partial (d : Ord Bool) : Bool -> Bool -> Bool = ord_leq_at Bool d \
+         fn saturated (a : Bool) (b : Bool) : Bool = a ≤ b"
+    ))
+    .expect(
+        "`ord_leq_at Bool d` is a valid TWO-argument application yielding a \
+         function; completion must not reinterpret it as a four-argument call",
+    );
+
+    // It stayed at two. The prefix positions were filled by the author, and
+    // completion supplied nothing.
+    assert_eq!(
+        spine_len(under_binders(body_of(&env, "partial"), 1)),
+        2,
+        "the explicit partial application must keep exactly the two arguments \
+         written; a longer spine means completion fired on an explicit call"
+    );
+
+    // Positive control on the same identity in the same file: the operator
+    // occurrence DID get its prefix. Without this row, "stayed at two" would
+    // be satisfied by completion being switched off entirely.
+    assert_eq!(
+        spine_len(under_binders(body_of(&env, "saturated"), 2)),
+        4,
+        "the operator occurrence must still complete -- otherwise the row \
+         above passes because nothing completes at all"
+    );
+}
