@@ -503,3 +503,61 @@ exposes.
 narrowed from "cross-arena ordinals may not correspond" to "which single
 operation `ctor_543` denotes", and the first of those is now closed by
 measurement rather than by plausibility.
+
+## `D1` CLOSES ON A GROUNDED RULING, not a tenth measurement
+
+`D1` permits either a repair or a grounded ruling. This takes the second, and
+says why the first is not available to me.
+
+### What is established, and it is a mechanism
+
+1. `exact_response_ret_identity` reads ONE syntactic occurrence and composes
+   nothing (Architect, from the code).
+2. The rosters are identical and declaration-derived, so `ctor_543` is one
+   constructor across both arenas (measured).
+3. The two rows have different origins and the same runtime `Vis` operation,
+   so **at least one row's runtime `K` carries an operation that is not its
+   own origin's** (forced by 2).
+
+⇒ **The planner derives its expectation from a continuation the runtime does
+not invoke.** That is a mechanism statement and it is not a hypothesis.
+
+### Why I am not writing the repair
+
+*"Not the immediate one"* still admits two derivations with **opposite**
+repairs:
+
+    (A) the runtime correctly COMPOSES, per spec 42 §6.2
+        `Vis e k -> apply k (H e)`, and the planner UNDER-DERIVES
+        -> planner-side repair
+    (B) the runtime SELECTS the wrong continuation
+        -> emission-side repair
+
+Discriminating them by measurement means pinning which operation `ctor_543`
+denotes. **That map is not reachable from here:** `FSOp`'s constructors are
+hand-built in the elaborator prelude as **anonymous** `named(vec![...])`
+entries — which is exactly why the arena carries synthesized `ctor_NNN` — and
+the operation-to-ordinal correspondence lives in `ken-elaborator`, outside
+this frame's boundary. Reconstructing it means inferring a positional
+correspondence over anonymous constructors, which is the same shape of
+inference that produced both refuted localizations on this node.
+
+### THE FORK IS PROBABLY NORMATIVE, NOT EMPIRICAL — AND THAT IS THE ROUTE
+
+**Spec 42 §6.2 defines `Vis e k -> apply k (H e)`.** If composition is
+normative there, then a runtime that composes is **correct** and the planner's
+single-occurrence derivation is the defect — **`(A)` is settled by reading the
+spec, and `ctor_543` never needs pinning at all.**
+
+That is a normative reading, which is the Architect's lane and not mine to
+make. ⇒ **Routing the fork rather than measuring around it.** A tenth probe
+would be chasing empirically what one spec clause may already decide, which is
+the shape the operator's streamline ruling names.
+
+### Disposition
+
+**`AC-2` remains undischarged and no label is written.** The branch is
+undetermined because it turns on `(A)` versus `(B)`, and under `(A)` the
+successor is a planner-side node that does not exist — a Steward filing call.
+Nine commits, all measurement; the frame's own yardstick says that is not the
+rows moving, and it is not.
