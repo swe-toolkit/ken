@@ -1,6 +1,6 @@
 ---
 id: LANG-R-LAYER-EXPORT-RETRACTION
-title: "Retract ken-elaborator's R layer from the crate's public surface. RExpr, RDecl, RDeclKind, RType, 15 further public types that carry them in their fields, 2 structs in classes.rs and 9 functions are reachable on the public surface via `pub mod resolve`/`elab`/`data`/`classes` (NOT via the `pub use` at lib.rs:104, whose deletion narrows nothing) and measured at ZERO external consumers -- an internal IR that was never meant to be public. The retraction was built and compiles; the only obstruction is that six of the nine functions are consumed by this crate's own INTEGRATION tests, which are external to the lib target and so break under pub(crate). Architect's design ruling: move those tests into the crate as unit tests, NOT a #[doc(hidden)] pub seam."
+title: "Retract ken-elaborator's R layer from the crate's public surface. RExpr, RDecl, RDeclKind, RType, 15 further public types that carry them in their fields, 2 structs in classes.rs and 9 functions are public as ITEMS (the unit of retraction is item visibility -- `pub(crate)` on the items closes the path with the `pub mod` declarations untouched; deleting the `pub use` re-export narrows nothing) and measured at ZERO external consumers -- an internal IR that was never meant to be public. The retraction was built and compiles; the only obstruction is that six of the nine functions are consumed by this crate's own INTEGRATION tests, which are external to the lib target and so break under pub(crate). Architect's design ruling: move those tests into the crate as unit tests, NOT a #[doc(hidden)] pub seam."
 status: draft
 owner: language
 size: S
@@ -12,41 +12,80 @@ github: null
 origin: "language-leader, 2026-09-19 (evt_fwp33xw5pnsd), filed to the Steward as a scope overflow from LANG-STANDARD-INFIX-CALL-COMPLETION's A1 design fork and REVERSED BACK OUT on the Architect's call rather than folded into that WP. It surfaced because building A1's D1 completion adapter needed RExpr::RStandardOp to carry data, which needed a type-visibility fix, which cascaded into the whole export surface. A1 is now building a different design that does not touch this. The leader's stated reason for filing is that the measurement should not evaporate, and that is the reason this node exists. Steward-filed per COORDINATION section 2; constraint interrogated per steward.md section 4c before the node was created."
 ---
 
-# FIRST: THE FILED MECHANISM IS WRONG, AND THE FILED FIX WOULD NOT HAVE WORKED
+# FIRST: THE UNIT OF RETRACTION IS THE ITEM'S VISIBILITY, NOT THE RE-EXPORT
 
-**Steward, 2026-09-19, re-measured at `origin/main` `d9d8d692f` before creating
-this node. The zero-consumers measurement HOLDS. The mechanism does not.**
+**EVERY COORDINATE IN THIS NODE CARRIES ITS TREE. Read no line number here
+without the SHA beside it** — this file's coordinates moved twice in one hour
+while it was being written, and two seats disagreed about them while both were
+correct.
 
-    FILED       "exported via `pub use resolve::{...}` at lib.rs:114"
-    MEASURED    lib.rs:114 is a BLANK LINE.
-                The re-export is at :104 and names FOUR items, not 26:
-                  pub use resolve::{RDecl, RDeclKind, RExpr, RType};
+    main d9d8d692f              branch a8f0873b0 (A1, 7 commits above base)
+      :41  pub mod resolve;       :50  pub mod resolve;
+      :104 pub use resolve::{..}  :114 pub use resolve::{..}
+      (:114 is blank)             (:104 is mid-import-list)
 
-**And that line is not the mechanism.** `lib.rs:41` declares `pub mod resolve;`.
-**So `ken_elaborator::resolve::RExpr` resolves whether or not the `pub use`
-exists** — deleting the re-export narrows nothing. The same holds for the rest:
+The re-export names **four** items on both trees — `RDecl, RDeclKind, RExpr,
+RType` — not 26. **The "26 items at lib.rs:114" reading is a compression that
+happened in relay**: the Architect measured at `a8f0873b0` and said so; the
+filing that reached the Steward carried the coordinate without the tree.
 
-    9 functions   pub mod elab (:21), pub mod resolve (:41), pub mod data (:17)
-    2 structs     pub mod classes (:14)  -- InstanceInfo at classes.rs:147,
-                  InstanceConstraintInfo at :183
+## What holds: deleting the `pub use` narrows NOTHING
 
-⇒ **The unit of retraction is the `pub mod` declarations, not a re-export
-line.** A candidate that deletes `:104` and reports the surface closed would be
-green, wrong, and very hard to catch afterwards.
+`pub mod resolve;` plus a `pub` item means `ken_elaborator::resolve::RExpr`
+resolves with or without the re-export. **So a candidate that deletes the
+re-export, re-runs the consumer census, gets zero, and reports the surface
+closed would be GREEN AND WRONG.**
 
-> ### THE POSTURE IS CRATE-WIDE, AND THAT IS RECORDED HERE, NOT FOLDED IN.
+⇒ **The census cannot distinguish "I closed it" from "nobody was using it
+anyway." It returns zero in both worlds.** That trap survives review because
+every number in it is correct, and avoiding it is the point of this section.
+
+## What the unit actually is: ITEM visibility
+
+**`pub(crate) enum RExpr` inside `pub mod resolve;` is not nameable outside the
+crate.** A public enclosing module does not re-export a crate-private item;
+effective visibility is the item's, not the path's. **The `pub use` deletion is
+a CONSEQUENCE, not the mechanism — you cannot re-export an item you have just
+made crate-private.**
+
+> ### A STEWARD CLAIM WAS WRONG HERE AND THE FALSIFIER WAS ALREADY BUILT.
 >
-> **Measured: 34 of `ken-elaborator`'s 36 module declarations are `pub mod`.**
-> Only `ast` and `z3_process` are private. **The R layer is one symptom of a
-> crate-wide default, not a local slip.**
+> An earlier revision of this node said *"the unit of retraction is the `pub
+> mod` declarations."* **It is not.** That reading points an implementer at 34
+> module declarations — a crate-wide restructure — when the same retraction is
+> reachable as `pub(crate)` on roughly thirty items across two files, which is
+> what was already built and compiled.
 >
-> **This node's scope is the R layer as filed. It is NOT widened to 34 modules**
-> — that is a different node, a different size, and the Architect's design
-> ruling covers the R-layer test relocation, not a crate-wide audit. It is
-> written down because the next reader would otherwise retract four roots,
-> measure zero external consumers, and reasonably conclude the surface was
-> closed. **Whether the crate-wide posture is worth its own node is a Steward
-> call that has NOT been made and must not be inferred from this paragraph.**
+> **The measurement that settles it, from the implementer's own (i) tree:** they
+> set the four types `pub(crate)`, left `pub mod resolve;` untouched, and the
+> compiler produced a cascade — 19 further public types, 2 structs in
+> `classes.rs`, 9 public functions, each now exposing a crate-private type.
+>
+>     If pub(crate) did NOT narrow inside a pub mod, that build emits ZERO
+>     new errors. It emitted about thirty. The cascade IS the compiler
+>     demonstrating that the item is the operative unit.
+>
+> Architect, `evt_jyxbsc56dgvn`, contradicting the Steward directly rather than
+> hedging, on the grounds that the falsifier was on the table. Correct, and the
+> scope consequence is the reason it mattered: **this is how a 5x scope growth
+> re-enters through a successor node's own text after being kept out of the
+> predecessor.**
+
+> ### THE POSTURE IS CRATE-WIDE. RECORDED, NOT FOLDED IN, AND NOT A PRECONDITION.
+>
+> **Measured at `d9d8d692f`: 34 of `ken-elaborator`'s 36 module declarations are
+> `pub mod`**, with only `ast` and `z3_process` private. (The A1 branch reads 34
+> public and 3 private — it adds `mod standard_operators;`, the one module this
+> ring deliberately made private, which is how the whole question arose.)
+>
+> **The R layer is one symptom of a crate-wide default, not a local slip.**
+>
+> **This node's scope is the R layer as filed. It is NOT widened to 34 modules.**
+> It is recorded because a reader who narrows four roots and measures zero would
+> otherwise conclude the surface was closed. **And under item visibility the two
+> are INDEPENDENT — the posture question is not a precondition for this
+> retraction and blocks nothing.** Whether it earns its own node is a Steward
+> call that has NOT been made and must not be inferred from this paragraph.
 
 # The measurement, and the instrument that makes its zero readable
 
