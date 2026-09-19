@@ -522,6 +522,60 @@ withholding the authorization held a candidate that a qualifier would not have.
 > mechanism keyed on a unit is blind to anything that is not one of those
 > units** (Architect, `evt_2mks4ydn9ps1a`).
 
+### M3a-i — A VERDICT NAMING A SUPERSEDED OBJECT IS A RE-CAST REQUEST
+
+**A superseding object supersedes the verdict REQUEST along with the object. So
+a verdict that arrives naming a SHA you have already replaced is not a verdict
+to argue with — it is a request to re-cast, and the only useful reply is the new
+SHA.** Convention set 2026-09-19, proposed by the Architect and held to from
+both sides.
+
+What it replaces: writing a post that explains why the stale verdict cannot
+carry. That explanation is almost always *correct* — an approval keyed on a blob
+that has since moved genuinely cannot reach the new object — and it is still
+wasted, because the reviewer has usually already re-read and re-voted by the
+time it lands. **Correct and spent are not exclusive.**
+
+Measured the day it was set: three crossed pairs on one doc-only candidate in
+under ten minutes, each side reasoning correctly from a state it could not have
+known was stale. The third exchange was a Steward post proving an approval could
+not carry, answered by a verdict — already sent — in which the reviewer had
+re-derived rather than carried it. **The cost is not confusion. Every catch in
+that sequence was a good catch. The cost is posts spent re-deriving positions
+the other party has already moved off.**
+
+**Both directions:**
+
+- **A verdict of yours naming an object the author superseded:** say only
+  *"re-cast at `<sha>`"*. Do not explain the carry rule.
+- **A verdict of theirs naming an object you superseded:** do not route on it,
+  and do not spend a post on why. Post the live SHA and let them re-read.
+
+**This does not weaken the carry rule itself, which is unchanged and absolute:
+an approval is at an object, never at a branch, and NEVER route on a verdict
+that names a different SHA than the one you are routing.** The convention is
+about what you SAY when that happens, not about what you may route.
+
+#### IT APPLIES TO APPROVALS. A BLOCK ON A DEAD OBJECT IS NOT VOID.
+
+**An approval and a block do not decay the same way, and reading "a verdict" as
+covering both is how a respin launders a finding.**
+
+    APPROVAL on a superseded object   VOID. It attests to a tree that no
+                                      longer exists. Re-cast at the new SHA.
+    BLOCK on a superseded object      STILL CARRIES on every defect the new
+                                      object did not touch. The respin
+                                      discharges only what it actually changed.
+
+A respin is not a reset. If a block raised three findings and the new SHA
+addresses one, **two findings are live at the new object** and the reviewer owes
+no re-derivation to keep them so. Say which ones the respin discharges and how;
+do not post the new SHA and let the earlier verdict lapse by supersession.
+
+⇒ The asymmetry is not arbitrary. An approval is a claim about a *specific
+tree* and cannot survive it. A block is a claim about a *defect*, and a defect
+survives every edit that does not remove it.
+
 ## M4 — Mint a token
 
 **M4 onward is the LIEUTENANT's when one is seated** — you stop after M3a.
