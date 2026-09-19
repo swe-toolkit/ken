@@ -345,10 +345,39 @@ would have to manufacture is the one to raise, not to skip.
   than mints — the identity behind the facade path and the identity behind
   `Core.Classes.LawfulClasses`'s own path are the SAME `GlobalId`, which is the
   property `33 section 4.3` promises and the one FI-2 exists to protect.
-- **AC-3 (one resolver, not two).** Name the single resolver entry point D1
-  calls and show, by reading, that no second operator-dispatch path exists.
-  **The satisfying act is a structural property of the tree, not an authored
-  list:** state the entry point and show every completion site reaches it.
+- **AC-3 (one SELECTOR, not one entry point).** **AMENDED 2026-09-19 — the
+  property below replaces the original wording, which is struck.** The property:
+
+      ONE FUNCTION PERFORMS INSTANCE SELECTION. Every entry point
+      contributes a registry KEY and REFUSALS, never a resolution.
+
+  **Discharge:** enumerate every `ClassEnv::instances` read that yields a
+  dictionary instance; show **exactly one** sits on a production path; and show
+  that for a given `(class, key)` every entry point returns **the same
+  resolution or a refusal**. The satisfying act is a structural property of the
+  tree, not an authored list.
+
+> ### WHY AC-3 WAS REWORDED: TWO PROPERTIES SHARED ONE SENTENCE UNTIL THEY CAME APART
+>
+> **Struck:** *"Name the single resolver entry point D1 calls and show, by
+> reading, that no second operator-dispatch path exists."*
+>
+> It was written when there was **one** entry point, so *"one entry point"* and
+> *"one selection semantics"* were the same claim in the same sentence. With two
+> adapters they are different claims, and only the second one matters.
+>
+> **The concrete failure of the old wording:** it would **PASS** on a future
+> tree carrying a third entry point that derives its key differently and
+> **resolves** rather than refuses — because such a tree still has a namable
+> single entry point for D1. The AC would be satisfied by a tree containing
+> exactly the defect it was written to prevent. Architect, `evt_71eam3r3e5sy9`.
+>
+> **This is not tightening a loose sentence.** An AC keyed on "how many entry
+> points" has no vocabulary for *a second reader that may or may not be a
+> selector*, so it cannot even ask the question. The amended property can, which
+> is why `[[LANG-INSTANCE-SEARCH-SECOND-PATH]]`'s `D0` is discharged by running
+> exactly this census — the AC and that node's open question are the same
+> measurement.
 - **AC-4 (`≥` operand order and single evaluation).** A case whose operands
   have observable evaluation shows each operand evaluated EXACTLY ONCE,
   left-to-right, with `≥` reversing already-evaluated values. Positive control:
