@@ -147,6 +147,33 @@ sufficient** -- that is the condition that already holds and is why this says
 result here rather than acting on it, because the honest disposition is neither
 "flip" nor "not yet".
 
+> ### THE BLOCKING PREMISE MAY DISSOLVE RATHER THAN BE SATISFIED. DO NOT FLIP ON IT.
+>
+> **Added later the same day, after the predecessor's consumer-side census.**
+> The `draft` marker rests on `:88`: *"this node's `D0` asks about a code path
+> `RT-DUPLICATED-RESPONSE-BLOCK` is about to change ... measuring it before that
+> lands measures the wrong tree."*
+>
+> **`RT-DUPLICATED-RESPONSE-BLOCK` now stands at NEITHER REPAIR JUSTIFIED** —
+> not the key change, not the relaxation, on the measured finding that one
+> observable flat is not every observable flat over an unclosed consumer set.
+> **If it closes with no production change, the predecessor never changes the
+> code path, and `:88`'s premise is FALSE rather than DISCHARGED.**
+>
+> ⇒ **Those two states demand different acts and look identical from here.**
+> "The predecessor landed its repair" and "the predecessor established there is
+> no repair to land" both end with this node unblocked, and only the first means
+> the tree moved under `D0`. **Flipping on "the blocker is gone" without saying
+> WHICH of the two occurred re-runs this node's founding error one level up** —
+> a status read as a state.
+>
+> **DO NOT FLIP ON THIS REASONING YET.** `repeated_producer`'s reachability on
+> the four rows is the named next measurement and is NOT taken; it can still
+> move the predecessor off "neither justified" in either direction. **When the
+> predecessor closes, read WHAT IT CLOSED WITH, not that it closed** — and if it
+> closed with no production change, re-ground `D0`'s fixed inputs against the
+> unchanged tree and say in the flip that the premise dissolved.
+
 **Both conjuncts have landed** — `D2`/`D3` at `589926845`, the gate corrections
 at `9517225a0`, both verified on `origin/main`. I also ran the verb-keyed
 re-read the trigger requires, on both citations, and **both pass**:
