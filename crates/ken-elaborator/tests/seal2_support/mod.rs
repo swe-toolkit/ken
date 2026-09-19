@@ -111,7 +111,8 @@ pub struct Producer {
 /// producer can live.
 ///
 /// The walk is bound to `ElabEnv`'s own fields by an exhaustive struct
-/// destructuring with **no `..`**. Adding a field to `ElabEnv` fails to compile
+/// destructuring which **was written with no `..` and now carries one**.
+/// AS INTENDED, adding a field to `ElabEnv` fails to compile
 /// here, forcing whoever adds it to classify the new namespace as either a
 /// producer source (walked below) or a justified non-source (added to the
 /// discard with its reason). This is the AC-2 gate, and **it is currently
@@ -121,9 +122,11 @@ pub struct Producer {
 /// annotating it is the point: a reader who skips the notice must not be able
 /// to pick up a false guarantee from the body.
 ///
-/// ⛔ Do **not** rewrite this as field access (`env.globals`, `env.class_env`,
-/// …). Naming every field with no `..` is the entire point — it is what makes
-/// the enumeration closed rather than a hand list waiting for its next omission.
+/// Do **not** rewrite this as field access (`env.globals`, `env.class_env`,
+/// …). Naming every field was the entire point — it is what WOULD make
+/// the enumeration closed rather than a hand list waiting for its next
+/// omission, and it is what the `..` currently costs. Field access would
+/// discard even the ability to restore it.
 pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
     let ElabEnv {
         // --- namespaces that hold carrier-bearing `Term`s of their own ---
