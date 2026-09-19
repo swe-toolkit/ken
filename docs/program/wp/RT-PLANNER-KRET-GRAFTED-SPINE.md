@@ -44,8 +44,20 @@ consumes no token and so cannot move this number.
 
 ⇒ **Per-member deduplication alone yields `{609 x1, 598 x1}` — two dispatches
 against a required three. A reconciliation table cannot manufacture the missing
-member.** Whether `D0` must therefore also repair 517's reach is **NOT RULED**;
-see the `§1a` hold below. Do not build against either answer yet.
+member.** **This is now RULED** (Architect `evt_695x0zxb802mb`, on research
+advisory `evt_5j08pmzsxmjzb`):
+
+> **placement proves AT LEAST ONCE; an obligation table or flag proves AT MOST
+> ONCE.**
+
+The two stacked defects take one half each, and they are not one mechanism:
+
+    517 x0   a member whose dispatch is never reached   AT-LEAST-ONCE  PLACEMENT
+    598 x5   a reached member dispatching repeatedly    AT-MOST-ONCE   RECONCILE
+
+⇒ **`D0` is the at-most-once half ONLY. `D0` does not repair 517, and `D0`
+alone cannot clear `:348`.** The placement half is `D2`. The `§1a` hold at stop
+12 is **discharged**; counters stay at stop 12 / entry 13.
 
 **2. The 1-`Released`/5-`Closed` split is arrival order at one central host
 authority**, not two families disagreeing about disposition. **Also
@@ -79,6 +91,21 @@ at-most-once. Rust's `MovePathIndex` plus drop flags and `resourcet`'s
 `ReleaseKey` plus registry are one representation under two enforcement
 regimes, and the advisory found no third shape.
 
+**6. 517's dead dispatch is NOT specialization collapse. It is reach, and the
+read is STATIC.** runtime-implementer `evt_2yefr4rsaxbyd`, answering the
+Architect's three-part test: **(a) yes, (b) no, (c) no.** Signatures are
+distinct in release-relevant dimensions; they do **not** map to one residual
+body; the distinguishing dimension **is** retained in the environment.
+
+    Vis 517 -> handler specialization 1 -> context 0 -> worker body 586
+    Vis 598 -> handler specialization 0 -> context 1 -> worker body 598
+
+⇒ **Body not shared, so this is placement/reach.** Insufficient polyvariance is
+**refuted**, not merely unconfirmed: the two contexts differ in parameter count
+(7 vs 6), capture count (2 vs 4), and source body. **The separate context
+assigned to Vis 517 EXISTS STATICALLY AND IS NOT REACHED.** Do not build a
+specialization-side repair; that horn is closed.
+
 ## Deliverables
 
 **`D0` — mint, carry, reconcile the observed two, and fail closed on the rest.**
@@ -92,6 +119,49 @@ Releasable on its own (`steward.md §4a`).
   **reconciled in ONE table keyed by that id.** Family keys place code and
   never own disposition.
 - **A release claim that carries no obligation id is a COMPILE ERROR.**
+- **An obligation member with NO dispatch site at all is a COMPILE ERROR** —
+  the same fail-closed default, extended from the claim side to the member side
+  (Architect `evt_695x0zxb802mb`). It is a check over the table `D0` already
+  builds, and it manufactures nothing.
+
+> **THE TABLE MAY VALIDATE COMPLETENESS BUT MUST NEVER MANUFACTURE A DISPATCH.**
+> A reconciliation table that emits a missing dispatch is placement wearing a
+> table's name, and it puts scheduling inside the layer where the at-most-once
+> reasoning lives. The table's only move on an incomplete member is to **refuse
+> the build**.
+>
+> **AND THIS CHECK DOES NOT CATCH `517 x0` — the ruling's own stated
+> justification for it is REFUTED by settled input 6, which returned after the
+> ruling.** The ruling reasoned that the check *"would have caught `517 x0` at
+> compile time instead of at hard-stop 12"*. **Vis 517 HAS a dispatch site**:
+> specialization 1, context 0, body 586, statically assigned and statically
+> distinct. A check asking *does this member have a site* passes on 517.
+> **Keep the check — it is cheap and it catches the `D1` families, which have
+> no site at all — but do not expect it to red on 517, and do not read 517
+> surviving it as the check being broken.** Catching 517 requires deciding
+> whether its site is *reached*, which is `D2`, not a table lookup.
+
+**`D2` — placement: every semantic member has a REACHED dispatch site.**
+Releasable on its own; **ordered after `D0`** (see the unmasking note under
+`AC-R1`). Acceptance is **517 executing**. Per settled input 6 the shape is
+**CFG/reach-side, not specialization-side** — 517's context already exists and
+is already distinct, so nothing is to be separated or re-keyed. Nothing in
+`D2` changes the `ReleaseObligationId` representation.
+
+> **ONE SUB-FORK IS OPEN AND IT IS `D2`'s ACCEPTANCE, NOT ITS EXISTENCE.**
+> *"Exists statically but is not reached"* has two readings the clone map does
+> not separate, and they take different repairs:
+>
+> - **(i) the context is CFG-unreachable** — dead by construction, so a static
+>   reachability check decides it and `D2` restores the edge.
+> - **(ii) the context is CFG-reachable but no execution enters it** — the
+>   demand was routed to a context this program never takes, no static check
+>   reds, and `D2` re-routes 517's dispatch to a correctly dominated point on
+>   the path that runs.
+>
+> **Under (i) `D2` can carry a compile-time control; under (ii) it cannot, and
+> its only control is 517 executing.** Do not write `D2`'s controls until this
+> is ruled.
 
 **`D1` — producer closure.** Enumerate **every family that can mint a release
 claim** and reconcile the roster. The closure is over **producers**, not over
@@ -121,6 +191,32 @@ being prioritised after its symptom has disappeared.**
 *Control:* `linked_public_right_denial_preserves_exact_masks`
 (`px7f_resource_native.rs:314`) goes green, **and** the native envelope matches
 the interpreter's, `exit_status: 0`, per the `M2` oracle differential.
+
+> ### `AC-R1` IS THE NODE'S CRITERION. IT IS NOT `D0`'s, AND `D0` MUST NOT BE
+> ### JUDGED AGAINST IT.
+>
+> **`D0` IS EXPECTED TO LEAVE `:348` RED, AT TWO DISPATCHES AGAINST THREE.**
+> Stated in advance, because **the symptom flips direction** and the next seat
+> will read the new red as a `D0` regression. `:348`'s native multiset goes
+>
+>     {609 x1, 598 x5, 517 x0}  ->  {609 x1, 598 x1, 517 x0}
+>
+> — six becomes two, the envelope is still wrong, **and the row is still red.**
+> That is `D0` succeeding. Its own criterion is `AC-R2` plus that multiset.
+>
+> **`D0`-FIRST IS THE RIGHT ORDER BECAUSE IT UNMASKS.** Today the aggregate
+> 6-against-3 reads as pure over-emission because **the excess exactly hides
+> the absence** — that is entry 13, and it cost this chain three hard stops.
+> After `D0` the deficit is 2-against-3: visible, attributable, and `D2`'s.
+>
+> **WHETHER `D0` ALONE CLEARS `:314` IS UNMEASURED — DO NOT ASSERT EITHER
+> WAY.** The `{609, 598, 517}` multiset was attributed on `DOUBLE_RELEASE`,
+> which is `:348`'s program. **Nobody has run a per-arrival attribution on
+> `:314`'s native 2.** If that 2 is also one-doubled-plus-one-dead rather than
+> one-doubled, `D0` leaves `:314` red as well. Predicting it from `:348`'s
+> multiset is the entries 10-13 predicate — *a measurement attributed to a
+> subject it does not range over* — run a fifth time, in the frame that closed
+> on it. **Measure `:314` before claiming it.**
 
 **THE TWO IGNORED ROWS RUN TWO DIFFERENT PROGRAMS AND HAVE TWO DIFFERENT
 ENVELOPES. Neither count is stated without its program.** Architect ruling
@@ -801,17 +897,23 @@ are deliberately not rewritten.
 > entries makes it fire sooner and costs them more** — that is not the argument
 > for it, the population is, but the ruling relieves them of nothing.
 
-> **`§1a` HAS FIRED AT STOP 12 AND THE RULING IS HELD.** Architect
-> `evt_2vjnatke9epca`: Research is called on the ONE NEW FORK (the 4th trigger,
-> 3/6/9/12), the Architect does not rule on this stop until the advisory is in
-> hand, and is not grinding the ruling in parallel. **The fork:** is one dead
-> site plus one site carrying the dead one's multiplicity the signature of
-> **specialization identity collapse**, and is the known remedy **placement**
+> **`§1a` FIRED AT STOP 12 AND IS NOW DISCHARGED** — ruled at
+> `evt_695x0zxb802mb` on advisory `evt_5j08pmzsxmjzb`, and the deciding read
+> returned at `evt_2yefr4rsaxbyd`. **The collapse horn is REFUTED and the
+> remedy IS placement**, so the fork below is answered, not open. The outcome
+> is carried in `§0` settled inputs 1 and 6 and in `D2`; this block is the
+> record of the trigger, not live state. **Historical from here:** Architect
+> `evt_2vjnatke9epca` called Research on the ONE NEW FORK (the 4th trigger,
+> 3/6/9/12), did not rule on that stop until the advisory was in hand, and did
+> not grind the ruling in parallel. **The fork it posed:** was one dead site
+> plus one site carrying the dead one's multiplicity the signature of
+> **specialization identity collapse**, and was the known remedy **placement**
 > (one dispatch site per demand at a correctly dominated point) rather than
-> **reconciliation** (a table over claims)? **If placement, `D0`'s size and
-> shape move and the table becomes secondary to the emission structure.**
-> Stated as an unruled hypothesis. **Nobody builds against either horn until
-> the advisory returns and the Architect rules.** The trigger was not talked
+> **reconciliation** (a table over claims)? It was stated as an unruled
+> hypothesis, and nobody was to build against either horn until the advisory
+> returned. **Both halves have since been answered: the remedy IS placement
+> (`D2`), and the collapse signature is refuted** — so `D0`'s shape moved by
+> LOSING the row rather than by growing. The trigger was not talked
 > out of despite the chain visibly progressing — three consecutive reads landed
 > clean, decisive facts — because *"it's making progress"* is the
 > rationalisation `§1a` exists to override.
