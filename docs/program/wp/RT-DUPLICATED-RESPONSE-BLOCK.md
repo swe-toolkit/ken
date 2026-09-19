@@ -1276,7 +1276,8 @@ branch is refuted and relaxation is NOT licensed by this classification.**
 **And the key change is not licensed either.** The rule's ANY USE branch says
 *"that consumer's observable is `AC-11`'s exhibit"* — but the exhibit is the
 observable **measured**, and `repeated_producer`'s reachability on these four
-rows is unmeasured. What the classification delivers is **a named, bounded,
+rows was unmeasured **at this point in the record. It is measured in 8.11j, and
+the answer is UNREACHED on all four** — so no exhibit arrives by this route. What the classification delivers is **a named, bounded,
 single-site candidate** where before there was an open set.
 
 ⇒ **8.11f's "neither repair is justified on current evidence" STANDS**, now
@@ -1287,7 +1288,9 @@ the remaining question is one predicate at one coordinate.
 
 **No production change, no repair, no row readmitted.** The four rows'
 dispositions in 8.4 stand unchanged. `repeated_producer`'s reachability on the
-four rows is the named next measurement and is not taken here.
+four rows is the named next measurement and is not taken **in this increment**.
+**It is taken in 8.11j**, which is also additive — still no production change,
+no repair, and no row readmitted.
 
 #### 8.11i One coordinate I published wrong, and why
 
@@ -1299,3 +1302,126 @@ unaffected — the four inputs are the ones named — but **a coordinate read of
 an instrumented working tree is not a coordinate in the tree**, and this
 candidate's every other line number was re-read against the reverted file
 before it was written.
+
+#### 8.11j `AC-8` discriminator: `repeated_producer` is UNREACHED on all four rows
+
+**Measured at `85cb7f9623601dd30fb7f94e4c4ee1cf63eb4d60` on
+`wp/RT-DUPLICATED-RESPONSE-BLOCK-ac8-discriminator`.** This takes the
+measurement 8.11h-3 named and declined. **No production change, no repair, no
+row readmitted; the instrumentation was reverted and the file is byte-identical
+to its base blob `27c86afe72123717331ad183e1d51c65a775204d`.**
+
+**The coordinate, by symbol rather than by line**, because 8.11i is this
+section's own cautionary note: the predicate is the `repeated_producer` binding
+inside `StaticTransitionPlan::bounded_deferred_response_suffix`, whose sole
+caller is `bounded_deferred_response_handler_owner`, itself called from
+`lowering/core.rs`'s producer-trampoline step and from
+`deferred_response_handler_owner`.
+
+**Two configurations, one binary, env-gated so neither is a code change:**
+
+    CONFIG A   production. The construction-time refusal is live.
+    CONFIG B   the refusal alone suppressed, nothing else changed --
+               the same instrument 8.4 and the labels already used.
+
+Each row run singly, `--ignored --exact --nocapture --test-threads=1`.
+
+    CONFIG A            routes_enter  collide  suffix_enter  repeated
+    px7n:149                  1          1          0           0
+    px7n:170                  1          1          0           0
+    rt_escape:653             1          1          0           0
+    rt_escape:713             1          1          0           0
+    all four stop at: two host response cases claim one operation constructor
+
+    CONFIG B            routes_enter  collide  suffix_enter  repeated
+    px7n:149                  2         58          0           0
+    px7n:170                  2         58          0           0
+    rt_escape:653             2         58          0           0
+    rt_escape:713             2         58          0           0
+    px7n rows advance to:      checked Runtime frame marker was consumed
+                               more than once
+    rt_escape rows advance to: ComputationalMatch: tree-producing match
+                               scrutinee is not Bool or a constructor
+
+⇒ **`repeated_producer` is not evaluated on any of the four rows, in either
+configuration. It is not merely shadowed by the collision refusal.**
+
+##### The controls, including the two that returned nothing
+
+**Positive control on the channel.** `routes_enter` fires on every row, so the
+probe channel is live wherever the zeros below it are reported. A zero under a
+dead channel and a zero under a live one are the same character, and only this
+separates them.
+
+**Known-answer oracle, and it passed.** 8.4 and the row labels already state
+that `host_response_routes` runs **twice** per compile and that a line count
+over the probe output reads **58** where the census reads 29. Config B returns
+exactly 2 and exactly 58 on all four rows, and each row advances to precisely
+the refusal its own label names. Those numbers were not sought; they fell out.
+They establish two things at once — that the suppression genuinely took effect,
+and that this instrument **agrees with the prior census rather than quietly
+replacing it**.
+
+**A named control that measured nothing, recorded because it reads as
+evidence.** `S6`, which section 2 names as a control, is **itself `#[ignore]`d**
+and did not run. Its probe counts are all zero and they are a **non-measurement,
+not a negative result**. Caught by reading `test result:` rather than the probe
+tally.
+
+**Exit accounting, on a suite that does reach the function.** `px8ta` (2
+passing) enters `bounded_deferred_response_suffix` **4** times and still never
+evaluates the predicate, so every entry leaves through one of the six early
+returns. Each return was tagged and the accounting closed:
+
+    suffix_enter            4
+    exits                   4 x frontier_none
+    reached_predicate       0
+    balances                YES  (4 = 4)
+
+**The dominant exit was predicted from the code before the run** —
+`static_response_frontier` returns `None` on `CheckedRecursiveInvocation` /
+`CheckedComputationalIHInvocation` and on cycles — and the prediction was
+recorded before the data landed. A `Some(empty)` frontier would instead have
+**reached** the predicate with `substantive = 0`, so the reading was falsifiable
+and was not falsified.
+
+**Probe-can-fire control, which is what makes the zero a measurement.** The
+accounting above proves the mechanism inside that function is live, but the
+`repeated_producer` line itself had still never executed. Forcing the
+`frontier_none` return to fall through with an empty frontier — a throwaway
+control, reverted — produced, with the value predicted in advance:
+
+    RTPROBE_EXIT reached_predicate                                    x4
+    RTPROBE_REPEATED value=false substantive=0 mapping_chain=false
+                     branch=empty                                     x4
+
+⇒ **The key is valid and the probe fires. The zero is a measurement.**
+
+##### What this does and does not establish
+
+**The pre-committed UNREACHED branch fires, and it is a finding rather than a
+null result.** The one production USE site that 8.11h left unmeasured is now
+measured, and it is **not reachable on this population**. So
+`repeated_producer` does **not** supply `AC-11`'s exhibit on these four rows,
+8.11f's *"neither repair is justified on current evidence"* **stands**, and the
+last open candidate at that coordinate is closed **on these rows**.
+
+**Three bounds, stated because the measurement does not reach past them:**
+
+1. **Config B's "unreached" is bounded by the next refusal.** Each row still
+   stops — at the frame marker for `px7n`, at `ComputationalMatch` for both
+   `rt_escape` rows. So this is *not reached before that stop*, **never
+   unreachable in principle on that program**. Nothing has seen past those
+   refusals.
+2. **The exit accounting is vacuous on the four rows themselves.** They never
+   enter the function, so their exit tally is `0 = 0` and carries no
+   information. The accounting is evidence about `px8ta`, which is a control,
+   not a member of the population.
+3. **Nothing here says `repeated_producer` is dead generally.** The population
+   is the four rows plus one control suite. A program whose response frontier
+   is non-`None` would reach it, and none was found within this increment's
+   fence rather than shown not to exist.
+
+**The sort-key residual at `:2069`, `:2286-2291` and `:2900` was not settled and
+was not pursued** — the measurement did not happen to touch
+`StaticResponseContinuationId::from_position`, and the kickoff fenced it.
