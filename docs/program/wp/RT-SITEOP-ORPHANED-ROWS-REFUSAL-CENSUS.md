@@ -432,3 +432,52 @@ discharged and `AC-3` is not, so no owner is named here.
 
 `AC-4` is discharged only for the zeros this increment actually produced;
 `AC-6`'s fold-or-split argument, and any routing proposal, await `AC-3`.
+
+### Increment 1c — a published pointer CORRECTED, and the launch ingress located
+
+**`AC-3` is still not answered.** This increment fixes a wrong pointer I
+published and replaces it with a measured one.
+
+**THE CORRECTION.** I posted, and wrote into the handover, *"start at
+`NativeProcessInput` in `object_linker_packaging` — the launch producer."*
+**That is wrong.** Measured:
+
+    object_linker_packaging.rs   4502 lines, `mod tests {` opens at :2398
+    its only NativeProcessInput  :3044 -- INSIDE mod tests
+    production constructions     ZERO
+
+I grepped a symbol, took its single hit, and named it the launch producer
+without resolving its enclosing item. **Same failure as the two already
+recorded above**, committed while writing the section that warns about them.
+Every `NativeProcessInput {` in `native_process_entrypoint.rs` is likewise at
+`:576+` against a `mod tests` opening at `:399`, so **`NativeProcessInput` has
+no production constructor in either file.**
+
+**THE LAUNCH INGRESS, LOCATED — `boundary_activation.rs`, production by
+measurement** (`mod tests` opens at `:530`; all sites below are above it):
+
+    :432  fn bind_process_frame(process_input: *const c_void,
+                                host_context: *mut c_void, capability: u64)
+    :440  boxes it into GeneratedRootIngressV1 { process_input, ... }
+    :512  pub struct GeneratedRootIngressV1 -- #[repr(C)], the frame the
+          generated adapter receives
+
+The source names it in its own terms: *"The launch ingress is Rust-owned and
+C-opaque"*, and the field is *"the borrowed process-input value the launcher
+built"*.
+
+**What `bind_process_frame` does with it:** its only guard is
+`if self.finished || !self.is_published() { return None; }` — a lifecycle
+check on the activation, **not on the value**. The pointer is boxed and handed
+to generated code unexamined. **No destructure, no arity check, no
+constructor check at the boundary.**
+
+⇒ **Bounded reading, and it is NOT `AC-3`:** the launch ingress does not
+validate the process input; it transfers a pointer. Whether anything validates
+it therefore depends on **what the generated code does with the frame** when
+the program declares an unused `_input` — which is lowering/emission work and
+is where `AC-3` now sits. That is the next question and it has not been asked.
+
+**Note for whoever asks it:** the field's own word is **"borrowed"**, which
+connects this path to candidate (a) rather than away from it. Candidate (a) is
+still not eliminated and this increment does not bear on it either way.
