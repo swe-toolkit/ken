@@ -809,6 +809,10 @@ Three clauses replace two:
        same key the producer inserted under, and a Vis site whose copy is
        absent REFUSES rather than falling back to another copy.
 
+**CLAUSE 3 IS STRUCK (Architect, `evt_7sj5xmgcxwk5f`; see 8.11e).** Both its
+forms are non-actionable on the censused population. The bar for this node is
+clauses 1 and 2. Do not read clause 3 above as live.
+
 Clause 3's control is **not a green test**: revert clause 3 alone, keep 1 and
 2, and exhibit a Vis site routing to the other copy's `producer_call_origin`.
 If that control cannot be built, that is itself a finding about whether the
@@ -918,3 +922,322 @@ labels say so in those words. Neither blocker is absorbed here.
   mine, and it is the sentence the rest of section 8 rests on.
 - The four labels' **attribution halves** are the predecessor ring's, carried
   and re-measured, not rewritten.
+
+### 8.11 The consumer-side census, and why clause 3 came off the bar
+
+**Measured at `origin/main` `9ea70e9bfbc8d3bd7ab5db3aa43b1ca079ca68e8`.** The
+instrument extends `D0`'s to the **consumer** side: it prints every producer
+insert with its `(constructor, occurrence, arm, body, effect, producer_call,
+response)` coordinates, every `ITree::Vis` occurrence the demand loop reaches
+with the route it selects, every node the selection walk visits, and the
+stage-partition counts. Environment-gated on `RTPROBE`, run with the
+construction-time refusal suppressed, **reverted; `grep -c RTPROBE` over the
+touched file returns zero.** Nothing in this section is a production change.
+
+#### 8.11a The duplicated block, measured at the `Match` level
+
+Not one block. **Four per-family dispatcher `Match` occurrences, each
+instantiated exactly twice at one offset:**
+
+| program | copy A occurrences | copy B occurrences | offset |
+|---|---|---|---|
+| `px7n-nested-computational-eliminator` | 29, 55, 96, 311 | 394, 420, 461, 676 | 365 |
+| `rt_escape_escape_file_then_readat` | 27, 53, 94, 309 | 344, 370, 411, 626 | 317 |
+| `rt_escape_nat_fanout_escaped` | 27, 53, 94, 309 | 344, 370, 411, 626 | 317 |
+
+Arms per occurrence: 1 `EntropyOp`, 3 `ClockOp`, 4 `ConsoleOp`, 21 `FSOp` =
+**29**. Two invocations per compile, 58 inserts and 29 overwrites each, which
+reproduces 8.5 exactly.
+
+⇒ **`365` and `317` are the copy offset itself**, not an effect-origin
+artefact. §3's *"explain the constant, not just the duplicate"* is discharged:
+one inlining event copies the whole dispatcher set at one offset, which is why
+a single delta rather than a spread, and why the delta is program-relative.
+
+**The two `rt_escape` programs' producer censuses are IDENTICAL, not merely
+agreeing** — the same origin ids in the same arms. §8.7 recorded the transfer
+behind its "one shape seen twice" correction as UNTESTED. It is now tested and
+the correction is stronger than it claimed: the second census is **not weak
+independent evidence, it is not independent evidence at all.**
+
+#### 8.11b `px7n`: no `Vis` site selects any route, under any key
+
+Both `ITree::Vis` occurrences report the selection walk finding **zero
+`Construct` nodes**:
+
+    vis=349  operation_origin=348  kind=Var(1)  children=0
+    vis=714  operation_origin=713  kind=Var(1)  children=0
+
+The operation argument is a bound variable. `714 - 349 = 365`, so these are the
+two copies of one source `Vis` — the only program where a `Vis` sits inside the
+copied region.
+
+⇒ **On `px7n` the guard at `:1281` refuses over a route map the program never
+reads.** 29 routes built from the prelude dispatcher, zero selections.
+
+#### 8.11c `esc:653` and `esc:713`: the consumer side is where they differ
+
+| | routed `Vis` | unrouted `Vis` | routes used |
+|---|---|---|---|
+| `esc:653` | 3 | 2 | `eff=507` (`ctor_543`), `eff=491` (`ctor_545`) |
+| `esc:713` | 5 | 5 | same two |
+
+    esc:653   814 -> 507    884 -> 491   1108 -> 507
+    esc:713   814 -> 507    900 -> 491   1108 -> 491
+              1310 -> 491   1534 -> 507
+
+**`vis=1108` exists in both plans and selects a different operation in each**
+— `ctor_543` in `653`, `ctor_545` in `713`. `AC-1`'s control is satisfied by a
+measurement rather than by an assertion: the producer census transfers between
+these two rows and the consumer census does not.
+
+**Many-to-one is structural, not duplication-induced.** Three distinct `Vis`
+sites share one route on `713`. The map holds one entry per constructor, so a
+single dispatcher copy would produce the same collapse; the dispatcher arm is
+shared handler code and the route key cannot name a `Vis` site.
+
+All surviving routes are **copy B's** (`occ=626`), which is what ascending
+iteration over `source_occurrences` plus last-write-wins predicts.
+
+#### 8.11d The two-count control, and why it returns AGREE VACUOUSLY
+
+The Architect's replacement clause 3 (`evt_4dqvac0h298gm`) made the observable
+`ordinary_stage_count` (`:2832`) and `requires_execute_then_resume` (`:2836`),
+to be computed under the current constructor-keyed map and under a
+copy-distinguishing map.
+
+    esc:653   demands=3  transport_sources=0  owners_entries=0
+              ordinary_stage_count=0  requires_execute_then_resume=false
+    esc:713   demands=5  transport_sources=0  owners_entries=0
+              ordinary_stage_count=0  requires_execute_then_resume=false
+
+**The partition is non-trivial in the data and empty in the map.** The demands
+carry two distinct `producer_call_origin` values (`esc:653` — `484`x1,
+`504`x2; `esc:713` — `484`x3, `504`x2), so two stage entries would form if
+anything were admitted. **Zero of eight demands across the two programs pass
+`transport_sources.contains(&demand.k_identity)`, because `transport_sources`
+is empty.**
+
+**The second count needs no second map, because it cannot differ.**
+
+    responses.rs:2164-2170
+    k_identity = continuation_call_binding_for(
+        vis_origin, unit.continuation_origin(),
+        unit.producer_alternative(), unit.recursive_position())
+
+    responses.rs:2101-2102
+    matching = units.iter()
+        .filter(|unit| unit.producer_construct_origin() == vis_origin)
+
+Every input to `k_identity` comes from the `Vis` site or from `unit`, and
+`unit` is itself selected on `vis_origin`. **So every input is route-
+independent transitively**, the admission gate is keyed on `k_identity`, and
+its admitting set is empty. No producer-side re-keying can place an entry in
+`transport_producer_owners`. A copy-distinguishing map can only make fewer
+`Vis` sites select, so it cannot grow the demand set either. The transitive
+step is the Architect's, `evt_7sj5xmgcxwk5f`.
+
+**Provenance control — the zero is not downstream of the collapse.**
+`checked_ih_environment_transport_source_identities` reads
+`plan.checked_ih_environment_transports` (`aggregates.rs:4456-4463`), built by
+`build_checked_ih_environment_transports(&self.plan)`
+(`construction.rs:1442`, `:1476`). Its only input is the plan; `routes` is a
+local of `host_response_routes` and is not a plan field. Without this check the
+measurement would have been the defect confirming itself.
+
+⇒ **The control's two branches do not both apply. It returns AGREE, and the
+agreement is VACUOUS** — `0 == 0` over an empty admitting set. The ruling's
+"counts agree" branch concludes *the duplication is inert in production*, and
+that conclusion needs the agreement to be informative. **Recording this as the
+inert branch would be a control defined by its own absent subject**, which is
+the vacuity `AC-7` is already recorded under in 8.9b. It is recorded here as
+the weaker thing it is.
+
+**Fence.** Measured on `esc:653` and `esc:713` only. **`px7n` cannot reach this
+measurement at all** — no `Vis` there selects a route, so it has no demands to
+partition.
+
+#### 8.11e Clause 3 is STRUCK. The bar for this node is clauses 1 and 2
+
+**Architect, `evt_7sj5xmgcxwk5f`.** Both forms are non-actionable across the
+whole censused population:
+
+    per-Vis form      subject has no witness -- in no measured program does a
+                      Vis both route and have a copy of its own. Where
+                      containment could name a copy (px7n) nothing routes;
+                      where things route (esc) containment names no copy.
+    partition form    subject exists, observable is gated out before the
+                      partition forms, and cannot move under any keying.
+
+`AC-11`, which is clause 3's acceptance criterion in this frame, is
+**discharged by the strike** rather than by an exhibit.
+
+**AN OBLIGATION THIS CANDIDATE DOES NOT DISCHARGE, NAMED WITH ITS OWNER. THERE
+ARE TWO COPIES AND THE SECOND IS THE DANGEROUS ONE.**
+
+**Located by HEADING, not by line, because one of these coordinates went stale
+between the review and this amendment** — see the note below the table.
+
+    issues/RT-HOST-RESPONSE-OCCURRENCE-KEY.md
+        heading "# THE ACCEPTANCE BAR, SET BY THE ARCHITECT"
+        THREE clauses, the third "MUST NOT MIS-ROUTE".
+        Now carries a struck clause. Reads as WRONG, so it will get fixed.
+
+    wp/RT-HOST-RESPONSE-OCCURRENCE-KEY.md
+        heading "### 3b. THE ACCEPTANCE BAR (Architect, 2026-09-18)"
+        TWO clauses, no marker. After the strike it is content-correct BY
+        COINCIDENCE. Reads as RIGHT, so it will NOT get fixed.
+
+**The line numbers this obligation first carried are already stale, which is
+why it now cites headings.** The three-clause copy was at `:196-215` when the
+Architect verified it during review (`evt_76jqgvmhdtnpq`); `bd454ee04` landed
+between that review and this amendment and moved it to `:267-296`. The `wp`
+copy is at `:130` in both. **Measured at `bd454ee040d04518369450855344748d2ded42da`,
+and stated as a heading so the next reader does not inherit a third reading of
+the same coordinate.**
+
+**The second copy is the one that loses the record.** Anyone later reconciling
+the two finds them agreeing at two clauses and concludes the bar was always two
+— which erases that clause 3 was set, tested against a four-row census, and
+struck on evidence. **A copy that is accidentally correct needs the marker more
+than the copy that is visibly wrong**, because nothing will ever send a reader
+back to it. Second copy identified by the Architect, `evt_76jqgvmhdtnpq`.
+
+**Anyone reading the three-clause copy today sees a clause that no longer
+stands** — the exact shape 8.9a recorded when it replaced the two-clause bar,
+one turn earlier, in that same file. This candidate does not edit either: both
+are outside §6's path list, the bar is the Architect's and the nodes are the
+Steward's. **Recorded here so the correction is in the tree rather than only in
+a thread, and flagged in the handback.**
+
+#### 8.11f The symmetric point, and what it does to both repairs
+
+**The guard cannot be relaxed on an open enumeration either.** One observable
+measured flat is not every observable measured flat, and that cuts against
+relaxation exactly as hard as it cuts against the key change.
+
+⇒ **On current evidence NEITHER repair is justified**, and that is `AC-8`
+operating rather than a stall: *a check that refuses nothing has been deleted
+rather than satisfied*, and nothing here shows this one refuses nothing.
+
+#### 8.11g `AC-11`'s two dispositions, recorded at their true strengths
+
+    px7n:149, px7n:170   EXHIBIT UNBUILDABLE, HARD, FINAL. No Vis selects any
+                         route, so no Vis can route to the wrong copy.
+                         Covered verbatim by AC-11's own clause: "if the
+                         exhibit cannot be built, that failure is itself the
+                         finding and is reported."
+
+    esc:653, esc:713     EXHIBIT NOT BUILT. Weaker, and deliberately not
+                         levelled up to px7n's. The one proposed observable
+                         is measured and flat, and the consumer enumeration
+                         behind any further attempt is OPEN AND UNCLOSED.
+                         This is not "the duplication is inert".
+
+#### 8.11h The reader-site classification: ANY USE, and one field with none
+
+**Run on the runtime-leader's revised ruling (`evt_23cfn1drnhehx`), on the
+Architect's decision rule (`evt_7sj5xmgcxwk5f` §5): for every reader of
+`producer_call_origin` and `response_origin`, does it USE the value (key,
+group, compare, branch) or CARRY it (diagnostic, sort key, label)?** A source
+classification at the base SHA, not a probe. 45 `producer_call_origin` sites
+and 13 `response_origin` sites, both files, every site classified.
+
+**`producer_call_origin` — PRODUCTION USE, two sites:**
+
+    :2824 :2851   the stage partition. MEASURED in 8.11d and gated out on
+                  both esc programs; cannot move under any keying.
+    :3326-3328    repeated_producer = substantive.iter().all(|candidate|
+                    candidate.producer_call_origin()
+                      == response.producer_call_origin())
+                  It branches: `if repeated_producer || mapping_access_chain`
+                  returns the bounded Deferred suffix, else returns empty and
+                  the sequence keeps its existing owner/forward-edge route.
+                  UNMEASURED.
+
+**`producer_call_origin` — PRODUCTION CARRY:** eight `SsaInfeasible` diagnostic
+payloads (`:2118`, `:2153`, `:3590`, `:3605`, `:3642`, `:3658`, `:3675`,
+`:3690`), five field propagations (`:1276`, `:2134`, `:2262`, `:2688`,
+`:2881`), and the declarations and accessors.
+
+**`producer_call_origin` — SORT, and this is the classification's one
+residual:** `:2069`, `:2286-2291` and `:2900` use it as the PRIMARY sort key,
+and the sort immediately assigns `StaticResponseContinuationId::from_position`.
+It is CARRY **only if that id's value is label-only**, which this
+classification did not establish. Recorded as unresolved rather than filed
+under CARRY.
+
+**`producer_call_origin` — TEST-SUPPORT ONLY, not production consumers:**
+`:2356-2357` (`VaryProducerKRow`) and `:2373-2374` (`MergeTwoKKeys`) sit under
+the `#[cfg(feature = "px8-ds-test-support")]` gate opened at `:2299`. All six
+`static_transition.rs` sites (`:982`, `:1001`, `:1033`, `:1105`, `:1139`,
+`:1183`) belong to three `#[cfg(feature = "px8-ds-test-support")]` observation
+structs.
+
+**`response_origin` — ZERO PRODUCTION USE, and that is the finding.** Every one
+of its 13 sites is a declaration, an accessor, a field propagation, or
+test-support. Its only reader outside `responses.rs` is
+`static_transition.rs:1106`, inside a `px8-ds-test-support` observation struct.
+**No production code branches, keys, groups or compares on it.**
+
+**AND IT IS WRITTEN WHERE IT IS NOT READ -- BUT NOT BY THE MECHANISM THE
+REVIEW NAMED.** Handed over non-blocking by the Architect
+(`evt_76jqgvmhdtnpq`) as *"written at `:2389`, `:2400-2401`, `:2413` by a
+normalization pass"*. **Checked at the coordinates rather than carried: all
+three sites are `StaticResponseContextDemandMutation::Substitute*` arms inside
+the `#[cfg(feature = "px8-ds-test-support")]` block opened at `:2299`.** There
+is no normalization pass. The corrected shape is sharper:
+
+    SET      once, in host_response_routes' HostResponseRoute (:1276 region)
+    CARRIED  into the demand (:2263) and the continuation (:2689)
+    WRITTEN  only by three test-support mutation arms, which exist precisely
+             to perturb it
+    READ     only by static_transition.rs:1106, itself test-support
+
+⇒ **The field's whole lifecycle outside propagation is test-support on both
+ends.** Its correctness is exercised by no production behaviour, so a mutation
+of it is observable only in the observation struct. Recorded beside the
+positional-id residual as the review asked, with the mechanism corrected.
+
+⇒ **This narrows 8.9a.** That section reads *"the copies differ on all three
+origins, which are exactly the fields naming WHICH producer and WHICH
+continuation the response reaches."* One of those three, `response_origin`,
+**is not read by production code anywhere in the backend.** Differing on it
+carries no consequence that this enumeration can find. The sentence is not
+withdrawn — `producer_call_origin` does have production USE — but it is true
+of fewer fields than it names.
+
+#### 8.11h-2 What the decision rule returns, and what it does NOT return
+
+**ANY USE.** `repeated_producer` is a production consumer that branches on
+`producer_call_origin`, and it is an **all-equal test**: a map that gives two
+same-constructor `Vis` sites distinct `producer_call_origin` values can flip it
+from true to false where the collapsed map makes them equal. **So the ALL CARRY
+branch is refuted and relaxation is NOT licensed by this classification.**
+
+**And the key change is not licensed either.** The rule's ANY USE branch says
+*"that consumer's observable is `AC-11`'s exhibit"* — but the exhibit is the
+observable **measured**, and `repeated_producer`'s reachability on these four
+rows is unmeasured. What the classification delivers is **a named, bounded,
+single-site candidate** where before there was an open set.
+
+⇒ **8.11f's "neither repair is justified on current evidence" STANDS**, now
+with the enumeration closed behind it rather than open. The difference is that
+the remaining question is one predicate at one coordinate.
+
+#### 8.11h-3 What is NOT delivered
+
+**No production change, no repair, no row readmitted.** The four rows'
+dispositions in 8.4 stand unchanged. `repeated_producer`'s reachability on the
+four rows is the named next measurement and is not taken here.
+
+#### 8.11i One coordinate I published wrong, and why
+
+I first cited `k_identity`'s construction at `:2232-2238`. **That range is
+`effect_source_owner`.** The coordinate was read off the file **with the probe
+applied**, which had added about sixty-eight lines above it; the true range is
+`:2164-2170`. Caught by the Architect against the tree. The substance is
+unaffected — the four inputs are the ones named — but **a coordinate read off
+an instrumented working tree is not a coordinate in the tree**, and this
+candidate's every other line number was re-read against the reverted file
+before it was written.
