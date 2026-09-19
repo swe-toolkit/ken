@@ -76,6 +76,51 @@ pub fn sub (a : Nat) (b : Nat) : Nat =
       }
   }
 
+pub proof self_is_zero for sub (n : Nat) : Equal Nat (sub n n) Zero =
+  match n {
+    Zero ↦ Proved;
+    Suc n2 ↦ proof self_is_zero for sub n2
+  }
+
+pub proof zero_left for sub (b : Nat) : Equal Nat (sub Zero b) Zero =
+  match b {
+    Zero ↦ Proved;
+    Suc b2 ↦ Proved
+  }
+
+pub proof saturates for sub
+      (a : Nat)
+    : (b : Nat) → IsTrue (leq_nat a b) → Equal Nat (sub a b) Zero =
+  match a {
+    Zero ↦
+      λb.
+        match b {
+          Zero ↦ λh. Proved;
+          Suc b2 ↦ λh. Proved
+        };
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λh. absurd h;
+          Suc b2 ↦ λh. proof saturates for sub a2 b2 h
+        }
+  }
+
+pub proof suc_decreases for sub
+      (a : Nat)
+    : (b : Nat)
+      → IsTrue (leq_nat (Suc b) a)
+      → IsTrue (leq_nat (Suc (sub a (Suc b))) (sub a b)) =
+  match a {
+    Zero ↦ λb. λh. absurd h;
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λh. proof refl for leq_nat a2;
+          Suc b2 ↦ λh. proof suc_decreases for sub a2 b2 h
+        }
+  }
+
 pub fn compare (a : Nat) (b : Nat) : OrdResult =
   match leq_nat a b {
     True ↦
@@ -135,16 +180,14 @@ appear literally unchanged on the reduced side without any further
 constructor-level reduction — the goal stays `Eq`-shaped, not collapsed to
 `Top`.
 
-The companion fact `sub n n = Zero` (self-subtraction) is also true, but —
-unlike `sub::zero_right` — needs induction on `n` (`sub`'s own structural
-recursion doesn't reduce for an ABSTRACT `n` matched against itself), so
-`Refl` alone cannot close it; this entry deliberately doesn't prove that
-separately-inductive law, to keep scope small, and names the gap here
-rather than carrying an unproved claim:
+The four further subtraction laws use structural induction. `self_is_zero`
+and `zero_left` close the two zero endpoints. `saturates` proves that
+`sub a b` is `Zero` whenever `a ≤ b`, while `suc_decreases` proves
+`Suc (sub a (Suc b)) ≤ sub a b` whenever `Suc b ≤ a`.
 
-```ken reject
-proof self_is_zero_wrong for sub (n : Nat) : Equal Nat (sub n n) Zero = Refl
-```
+Both conditional laws carry their Boolean hypotheses as `IsTrue` propositions,
+matching this package's order examples and letting downstream consumers pass
+canonical `leq_nat` evidence without restating the underlying Boolean equation.
 
 ## 5. Design notes
 
@@ -174,7 +217,8 @@ canonical `leq_nat`.
 
 1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
    `leq_nat` with their provider identities. It exports its defined-at `min`,
-   `max`, `sub`, and `compare` operations; `OrdResult` remains package-local.
+   `max`, `sub`, and `compare` operations and the four inductive `sub` proofs;
+   `OrdResult` remains package-local.
 2. **Source map.**
 
    | Task | Section |
@@ -192,7 +236,8 @@ canonical `leq_nat`.
    declaration or trust. The local operations introduce no `Axiom`, primitive,
    or postulate.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
-   package's checked laws cover the local arithmetic operations.
+   package's checked laws cover the local arithmetic operations, including
+   self-subtraction, left-zero, saturation, and strict decrease.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can selectively import the local arithmetic and
    comparison operations.
