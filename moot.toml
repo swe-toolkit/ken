@@ -40,17 +40,36 @@
 # there; prefer `send-keys`. The per-tick composer check now belongs only on
 # `language-implementer`.
 #
-# ⚠ THE KEY SPLIT IS THE THING THAT SILENTLY BREAKS. A Codex seat needs
-# `harness = "codex"` AND `model_reasoning_effort`; a Claude Code seat has NO
-# `harness` key and uses `effort`. Changing `model` alone misconfigures the seat.
+# ⚠ THE KEY SPLIT IS THE THING THAT SILENTLY BREAKS. Changing `model` alone
+# misconfigures the seat. The two live shapes, as of 2026-09-19:
+#
+#   pi seat           model = "openai-codex/<m>", harness = "pi", `effort`,
+#                     and the PI_* `env` block. NO `model_reasoning_effort`.
+#   Claude Code seat  Anthropic `model`, NO `harness` key, `effort`, NO `env`.
+#   codex seat        `harness = "codex"` AND `model_reasoning_effort`, NOT
+#                     `effort`. No seat is on this harness as of 2026-09-19 —
+#                     kept because the requirement is invisible from the live
+#                     config, so reseating TO codex is where it gets dropped.
+#
 # **Measured 2026-08-17: three seats — architect, runtime-implementer,
 # language-implementer — were on Claude Code carrying `model_reasoning_effort`,
 # each under a comment stating that Claude Code seats use `effort`.** The comment
-# and the key disagreed for days and nothing reported it. Their move to Codex
-# resolved it; all 28 seats now agree. **Verify with a parse, not by reading:**
+# and the key disagreed for days and nothing reported it. **Verify with a parse,
+# not by reading:**
 #
 #   python3 -c "import tomllib;d=tomllib.load(open('moot.toml','rb'))['agents'];\
-#   print([n for n,a in d.items() if (a.get('harness')=='codex')!=str(a.get('model','')).startswith('gpt')])"
+#   print([n for n,a in d.items() if (a.get('harness')=='pi') != \
+#   (str(a.get('model','')).startswith('openai-codex/') and bool(a.get('env')) \
+#   and 'model_reasoning_effort' not in a)] or 'consistent')"
+#
+# ⚠ THE PREVIOUS VERSION OF THAT COMMAND WAS VACUOUS AND READ AS A PASS. It was
+# `(a.get('harness')=='codex') != str(a.get('model','')).startswith('gpt')`.
+# No seat has `harness = "codex"` any more, and a pi seat's model starts with
+# `openai-codex/`, not `gpt` — so BOTH sides are False for every seat and the
+# check cannot fail. It returned a clean `[]` against a config where every
+# `harness` key could have been deleted. A guard whose two arms are both dead
+# reports agreement, not correctness: when a check comes back clean, confirm it
+# can still produce a hit before believing it.
 #
 # ⚠ THE 2026-08-17 RESEAT (operator). `architect` -> `gpt-5.6-sol` (high),
 # reversing the 2026-08-13 swap; `runtime-implementer` and `language-implementer`
@@ -308,8 +327,15 @@ startup_prompt = "You are the Verify team QA. Read agent/COORDINATION.md (federa
 
 [agents.language-leader]
 display_name = "Language leader"
-model = "claude-sonnet-5"
+# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
+# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
+# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
+# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
+# `model_reasoning_effort` key (that is the codex harness).
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Language team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/language/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.language-implementer]
@@ -380,14 +406,28 @@ display_name = "Language implementer"
 # seat, reseat back to Anthropic (standing operator authority). Current work
 # (item-8 LANG-TRUNC D1 grammar) is not that subject. RESEAT TIMING: this seat is
 # ACTIVE, so it relaunches at its next seam (candidate or hard-stop), not now.
-model = "opus[1m]"
+# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
+# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
+# and L2 at the next convenient seam." Anthropic Opus 5 1M (T1) -> pi + openai-codex/gpt-5.6-sol,
+# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
+# `model_reasoning_effort` key (that is the codex harness).
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Language team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/language/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.language-qa]
 display_name = "Language QA"
-model = "claude-sonnet-5"
+# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
+# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
+# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
+# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
+# `model_reasoning_effort` key (that is the codex harness).
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Language team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/language/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-leader]
@@ -406,8 +446,15 @@ display_name = "Runtime leader"
 # priority L1 lane on the HS18 upstream repair. pi/OpenAI gpt-5.6-terra (T2) ->
 # Claude Code Anthropic Sonnet 5 (T2 — MODELS.md-sanctioned for this ring's
 # leader). Claude Code seat: NO harness key, uses `effort`, NO env.
-model = "claude-sonnet-5"
+# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
+# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
+# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
+# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
+# `model_reasoning_effort` key (that is the codex harness).
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You lead Ken's Runtime team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/runtime/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.runtime-implementer]
@@ -467,8 +514,15 @@ display_name = "Runtime implementer"
 # Opus 5, so the Architect's independent soundness vote is same-model review with
 # correlated blind spots. Surfaced to the operator 2026-09-14. To restore
 # independence, move the Architect (not this seat) to a different model.
-model = "opus[1m]"
+# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
+# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
+# and L2 at the next convenient seam." Anthropic Opus 5 1M (T1) -> pi + openai-codex/gpt-5.6-sol,
+# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
+# `model_reasoning_effort` key (that is the codex harness).
+model = "openai-codex/gpt-5.6-sol"
+harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Runtime team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/runtime/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-qa]
@@ -483,8 +537,15 @@ display_name = "Runtime QA"
 # limit (~7000 min to reset). pi/OpenAI gpt-5.6-terra (T2) -> Claude Code Anthropic
 # Sonnet 5 (T2 — MODELS.md-sanctioned for this ring's QA). Claude Code seat: NO
 # harness key, uses `effort`, NO env.
-model = "claude-sonnet-5"
+# 2026-09-19 reseat (operator directive; Steward-executed): "OpenAI
+# subscription credits have reset. Reseat L3 immediately to openai/pi and L1
+# and L2 at the next convenient seam." Claude Sonnet 5 (T2) -> pi + openai-codex/gpt-5.6-terra,
+# TIER-PRESERVING. pi harness uses `effort` + the PI_* env block, and has NO
+# `model_reasoning_effort` key (that is the codex harness).
+model = "openai-codex/gpt-5.6-terra"
+harness = "pi"
 effort = "medium"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are the Runtime team QA. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/qa.md and agent/teams/runtime/qa.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.ergo-leader]
