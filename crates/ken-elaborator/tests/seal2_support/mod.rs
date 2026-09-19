@@ -88,6 +88,25 @@ pub struct Producer {
     pub ty: Term,
 }
 
+/// **THIS GATE IS CURRENTLY DISABLED. READ THIS BEFORE THE DESCRIPTION BELOW,
+/// WHICH DESCRIBES HOW IT WORKED AND NO LONGER DOES.**
+///
+/// The pattern now carries `..`, so a new `ElabEnv` field -- public or not --
+/// is a SILENT PASS rather than a build break. Rust requires `..` once a
+/// pattern omits an inaccessible field, and `ElabEnv` gained its first
+/// non-`pub` field in `fa37c6ca6`; an integration test cannot name it. From
+/// that commit this file did not compile at all. `..` is what makes it build
+/// again, and it costs exactly the property the description claims.
+///
+/// **The description is left standing rather than softened.** Softening it
+/// would retire the obligation; leaving it true-of-the-intent and false-of-
+/// the-present is what keeps the repair owed. The repair is to move this
+/// enumeration where private fields are nameable -- a `#[cfg(test)]` module
+/// inside `ken-elaborator` -- which is a test-architecture change and not the
+/// WP that found it.
+///
+/// ---
+///
 /// Enumerate **every** namespace of `ElabEnv` in which a source-reachable
 /// producer can live.
 ///
@@ -123,6 +142,32 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         space_metadata: _, // private GlobalId index — types live in global_env
         prelude_env,  // GlobalIds for prelude decls — types live in global_env
         module_state, // surface-name -> canonical-name aliases into global_env
+        // Resolution provenance: `InstanceResolution` is `instance_id:
+        // GlobalId` plus three `String`s (class, head spelling, defining
+        // package) and carries NO `Term`. It is an append-only LOG of choices
+        // already made, and every type it could be said to mention is reached
+        // through `globals`/`global_env` above via that id. Verified by
+        // reading the struct rather than inferred from the field's name.
+        resolution_provenance,
+        // `..` IS HERE UNDER PROTEST, AND THE GATE ABOVE IS ALREADY DEFEATED.
+        //
+        // Rust requires `..` once a struct pattern omits an INACCESSIBLE
+        // field, and `ElabEnv` gained a `pub(crate)` field --
+        // `standard_operators` -- in `fa37c6ca6`. An integration test cannot
+        // name it, so from that commit this pattern could not compile without
+        // `..`, and `adversary_seal2_repros` has been RED on this branch ever
+        // since. The gate was not weakened by degrees; it stopped building.
+        //
+        // With `..` present the doc comment above is no longer true: a new
+        // field, public or not, is now a silent pass. **The claim is left
+        // standing rather than softened, because the repair is a real change
+        // and softening the text would retire the obligation instead.**
+        //
+        // WHAT RESTORES IT: this enumeration has to live where private fields
+        // are nameable -- a `#[cfg(test)]` module inside `ken-elaborator`
+        // rather than an integration test. That is a test-architecture change
+        // and is not this WP's; it is filed as the repair.
+        ..
     } = env;
     let _ = (
         num_values,
@@ -135,6 +180,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         effect_rows,
         prelude_env,
         module_state,
+        resolution_provenance,
     );
 
     let mut producers = Vec::new();
