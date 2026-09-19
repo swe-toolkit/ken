@@ -1,17 +1,17 @@
 //! CAT-DERIVED-PUB-EXPORT acceptance controls.
 //!
 //! Promise class: durable invariants. The eight public collection operations
-//! retain their `Data.Collections.Derived` identities, and the three migrated
-//! `list_append` monoid-law attached proofs (`list_append::{left_unit, assoc,
-//! right_unit}`, relocated from `Core.Classes.LawfulFunctors` per the
-//! attached-proof ownership rule so a selective importer can cite them) are
-//! published beside `list_append`, while the verified-sort carrier and
-//! operations remain private.
+//! retain their `Data.Collections.Derived` identities. The two `nth` bound
+//! proofs and the three migrated `list_append` monoid-law attached proofs
+//! (`list_append::{left_unit, assoc, right_unit}`, relocated from
+//! `Core.Classes.LawfulFunctors` per the attached-proof ownership rule so a
+//! selective importer can cite them) are published beside their subjects,
+//! while the verified-sort carrier and operations remain private.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{parser, Decl, ElabEnv, ElabError};
+use ken_elaborator::{Decl, ElabEnv, ElabError, parser};
 use ken_kernel::{GlobalId, Term};
 
 const DERIVED: &str = "Data.Collections.Derived";
@@ -197,13 +197,20 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// publishable top-level definition is visible, including attached proofs via
 /// their imported subjects; the successful set is compared with an independent
 /// literal contract set. CLAIMED: Derived's complete loader-visible export
-/// surface is exactly the eight authorized operations plus the three `list_append`
-/// monoid-law attached proofs migrated in from LawfulFunctors. THE GAP: none
+/// surface is exactly the eight authorized operations, the two `nth` bound
+/// proofs, and the three `list_append` monoid-law attached proofs migrated in
+/// from LawfulFunctors. THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
 #[test]
 fn derived_loader_publishes_exactly_its_authorized_export_surface() {
     let mut env = load_derived();
+    // Attached-proof probes restate the provider theorem outside Derived's
+    // module namespace. `IsTrue` is already available in the base environment;
+    // re-importing that package name would be ambiguous, so import only the
+    // other foreign name from its canonical provider.
+    env.elaborate_file("import Core.Classes.LawfulClasses (leq_nat)")
+        .expect("Derived proof dependencies must elaborate for publication queries");
     let published = top_level_publication_queries()
         .into_iter()
         .filter(|query| match env.elaborate_file(&query.source) {
@@ -237,9 +244,12 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "list_append::left_unit".to_owned(),
             "list_append::right_unit".to_owned(),
             "nth".to_owned(),
+            "nth::at_or_beyond_is_none".to_owned(),
+            "nth::some_below_length".to_owned(),
             "reverse".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         the eight operations plus the three migrated list_append monoid-law proofs"
+         the eight operations plus the two nth bound proofs and the three migrated \
+         list_append monoid-law proofs"
     );
 }
