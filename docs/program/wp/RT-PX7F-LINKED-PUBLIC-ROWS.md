@@ -52,13 +52,24 @@ SHA and re-derive by symbol, not by line.
   **and** reports "no check fired" rather than silence when none does. An
   instrument that cannot report the negative cannot report an answer.)*
 - **`AC-2` — THE ROWS MOVED.** Each row is either un-ignored and green in CI, or
-  still `#[ignore]`d with a reason string that **opens with this node's ID**,
-  **states which check fires and why it is terminal**, and then **either names
-  the live successor that owns the next step, or states in those words that no
-  live node owns it and that this node established that**. A string that opens
-  with this node's ID and says only which check fires and why it is terminal
-  **does not satisfy this AC**: at the flip this node is `merged`, and `M7a` is
-  keyed on exactly that.
+  still `#[ignore]`d with a reason string obeying the **START-TOKEN RULE: the
+  token the string OPENS with is whoever owns the row NEXT.**
+  - **A live successor exists** — the string **opens with the SUCCESSOR's ID**,
+    then states which check fires and why, then the provenance: established by
+    this node, and what this node measured.
+  - **No live successor** — the string **opens with THIS node's ID**, states
+    which check fires and why it is terminal, and then says **in those words**
+    that no live node owns the next step and that this node established that.
+
+  A string that opens with this node's ID **while a live successor exists** does
+  not satisfy this AC, and neither does one that opens with this node's ID and
+  says only which check fires. At the flip this node is `merged`, and **`M7a`
+  arm 1 matches on the START token, treating anything later as a mention that
+  does not own the row** — so successor-mid-string mints exactly the unroutable
+  row arm 1 exists to catch. The census's `AC-11` independently states the same
+  rule — *"carries its successor owner at the START of its own `#[ignore]`
+  string"* — so START-token ordering is what **both** consumers already read,
+  and this AC was the outlier.
   *(Control: the candidate's roster **contains** a change to
   `crates/ken-cli/tests/px7f_resource_native.rs`. Because it touches `crates/`
   this is **`full` CI, never doc-only**.)*
@@ -80,6 +91,33 @@ made this grouping worth running rather than assuming.
 - A repair that reaches outside `ken-cli`/`ken-runtime` lowering.
 - `D0` cannot distinguish the four checks at all — that is a finding about the
   instrument and it outranks the repair.
+
+## 5b. Symptom inventory — ARMED
+
+**Seeded late.** `§1b` makes seeding this the Steward's duty *at framing*, and
+this node reached two hard stops without it. The entries below were reconstructed
+from the thread by the Architect, which is exactly the recovery `§1b` exists to
+make unnecessary: **the count is re-derivable from a thread and a pattern across
+stops is not, and the thread is the first thing a compaction discards.**
+
+```text
+SYMPTOM INVENTORY (Architect appends one line per hard-stop; never rewritten)
+NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
+1. mismatch attributed to interning position — keyed on span LENGTH standing in
+   for constructor identity. Refuted at D0: bytes differ (Ret vs Vis, both
+   three bytes).
+2. mismatch attributed to the outer continuation being a Vis — keyed on the
+   OUTER CONTINUATION'S SHAPE. Refuted by RET_ONLY_OUTER: the Ret/Ret control
+   still fires units.rs:3430.
+```
+
+**The predicate question is NOT answered at two, deliberately** (Architect,
+`evt_3c4jfa2wjtby4`). Both entries share the shape *"localized by a property
+that turned out not to discriminate"*, and that is cheap to see and usually
+wrong at two. The trigger is mechanical at the third entry precisely so nobody
+folds on a symptom — the error this node's parent census exists to name.
+
+**Hard-stop count on this WP: 2.** The `§1a` research pull fires at 3.
 
 ## 6. Contention
 
