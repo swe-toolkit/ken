@@ -1112,61 +1112,18 @@ fn surf1_surface_visits_open_row_reaches_join_and_stays_conservative() {
     );
 }
 
-/// SURF-1 D1 production path: real `RDeclKind::View` elaboration consumes the
-/// parsed concrete `visits` row and records the checked `RowType`. If the
-/// `elaborate_rdecl_v1` hook is removed, this fails with `None`.
-#[test]
-fn surf1_view_elaboration_consumes_visits_row() {
-    let src = "proc surf1_visits (x : Nat) : Nat visits [Console] = x";
-    let decls = parse_decls(src).expect("const with concrete visits row must parse");
-    let rdecl = resolve_decl(&decls[0]).expect("const with concrete visits row must resolve");
-    let mut env = ken_elaborator::ElabEnv::new().expect("base env");
-
-    let result = ken_elaborator::elab::elaborate_rdecl_v1(
-        &mut env.env,
-        &mut env.globals,
-        &mut env.num_values,
-        &env.numeric_env,
-        &mut env.class_env,
-        &rdecl,
-    )
-    .expect("const with concrete D1 visits row must elaborate");
-
-    let row = result
-        .effect_row_type
-        .expect("production const elaboration must expose checked visits row");
-    assert_eq!(
-        row,
-        RowType::singleton("Console"),
-        "written [Console] must reach production checking as a RowType"
-    );
-}
-
-/// SURF-1 D1 production path: row variables fail closed unless the same
-/// variable was allocated from a HOF latent-row binding in the declaration
-/// type. A plain first-order const must not synthesize `e` from `visits`.
-#[test]
-fn surf1_view_elaboration_rejects_unbound_visits_row_var() {
-    let src = "proc surf1_bad_visits (x : Nat) : Nat visits [Console | e] = x";
-    let decls = parse_decls(src).expect("const with open visits row must parse");
-    let rdecl = resolve_decl(&decls[0]).expect("const with open visits row must resolve");
-    let mut env = ken_elaborator::ElabEnv::new().expect("base env");
-
-    let err = ken_elaborator::elab::elaborate_rdecl_v1(
-        &mut env.env,
-        &mut env.globals,
-        &mut env.num_values,
-        &env.numeric_env,
-        &mut env.class_env,
-        &rdecl,
-    )
-    .expect_err("unbound visits row variable must reject fail-closed");
-
-    assert!(
-        format!("{err:?}").contains("unknown row variable `e` in visits row"),
-        "unexpected error for unbound row variable: {err:?}"
-    );
-}
+// TWO ROWS MOVED, NOT DELETED. `surf1_view_elaboration_consumes_visits_row`
+// and `surf1_view_elaboration_rejects_unbound_visits_row_var` now live in
+// `src/elab.rs`, in `mod surf1_visits_row_production_path`.
+//
+// They pin the `elaborate_rdecl_v1` hook on purpose, and that function is
+// `pub(crate)` because its signature names `StandardOperatorRole`, which
+// `deny(private_interfaces)` keeps off this crate's public surface. An
+// integration test cannot call it, so the rows had to move rather than be
+// rewritten through a public path -- a rewrite keeps the assertion and drops
+// the thing asserted.
+//
+// The pointer is here because this is where someone looks for them.
 
 /// SURF-1 D1 / `36 §1.5.5`: recursive row-polymorphic inference ranges over
 /// `RowType` and terminates at the idempotent fixpoint `e ∪ e = e`.
