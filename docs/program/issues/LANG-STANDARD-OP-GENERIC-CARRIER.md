@@ -9,34 +9,49 @@ tier: T1
 depends_on: [LANG-STANDARD-INFIX-CALL-COMPLETION]
 blocks: []
 github: null
-origin: "Architect ruling evt_2nbvmrwfv055y in thr_3kmhbpep3vj2j, discharging AC-6 of LANG-STANDARD-INFIX-CALL-COMPLETION; re-posted self-contained at evt_3hb7tn83pgj33. Summarised to the Steward by the language-leader at evt_51rtc22a3tm74. Steward-filed per COORDINATION section 2; constraint interrogated per steward.md section 4c. The Architect states nothing is owed back on it and that A1 needs no further ruling -- A1's remaining ACs (AC-0, AC-8) need measurement only."
+origin: "Architect ruling evt_2nbvmrwfv055y in thr_3kmhbpep3vj2j, discharging AC-6 of LANG-STANDARD-INFIX-CALL-COMPLETION; re-posted self-contained at evt_3hb7tn83pgj33. Summarised to the Steward by the language-leader at evt_51rtc22a3tm74. PROVENANCE OF THE ROW-3 AMBIGUITY: it originated in the ruling, which uses the ordinal Row 3 for two different partitions about forty lines apart; the summary quotes the second and is downstream of it, not its source (Architect, evt_52nsn0p1qr26d; Steward verified both strings in the ruling's own text). Steward-filed per COORDINATION section 2; constraint interrogated per steward.md section 4c. The Architect states nothing is owed back on it and that A1 needs no further ruling -- A1's remaining ACs (AC-0, AC-8) need measurement only."
 ---
 
-# READ THE RULING, NOT THE SUMMARY: THE TWO DISAGREE ON ROW 3
+# "ROW 3" NAMES TWO DIFFERENT THINGS IN THE RULING ITSELF
 
-**They agree on Rows 1 and 2 and they do NOT agree on Row 3.** Both readings
-were honestly produced and the drift is in a place that looks like agreement.
+**One ordinal, two partitions, one document.** `evt_2nbvmrwfv055y` says both of
+these, about forty lines apart:
 
-    RULING evt_2nbvmrwfv055y   Row 3 = CONCRETE carriers. DELIVERED under
-                               A1's eight ACs. Explicitly NOT this node.
-    SUMMARY evt_51rtc22a3tm74  Row 3 = the `RVarTy` spelling finding, a new
-                               soundness-adjacent row surfaced while grounding.
+    "Row 3 -- CONCRETE CARRIERS. Delivered, eight ACs."
 
-**Both are true statements about the ruling; they are not the same row.** The
-ruling's Row 3 is a DISPOSITION (this is done, it lives in A1). The summary's
-Row 3 is a FINDING the ruling raises separately, under *"one more thing for
-whatever frame eventually carries it."*
+    under the heading "A THIRD ROW FOR THAT NODE":
+    "...Route it as Row 3 of the same node; do not fold it into A1."
+    (the `RVarTy` spelling finding)
 
-⇒ **This node carries the ruling's three rows. The `RVarTy` finding is NOT a row
-here** — the Steward routed it to `[[LANG-INSTANCE-REGISTRY-IDENTITY-KEY]]` as
-its single home, and the Architect confirmed the subtraction and dropped it from
-this node's slot (`evt_3hb7tn83pgj33`). **Do not re-add it. One home, not two.**
+**Verified by the Steward by reading `evt_2nbvmrwfv055y` in
+`thr_3kmhbpep3vj2j` directly — both strings are in the ruling's own text.**
 
-> **Why this section is first.** A node built from the summary alone would have
-> filed a soundness finding into a disposition node and lost the "already
-> delivered" row entirely — a count that matches (three rows either way) over a
-> membership that does not. The relay was checked for count and shape; the thing
-> that moved was which rows.
+⇒ **A reader who takes the second is quoting the ruling, not misreading it.**
+The language-leader's summary (`evt_51rtc22a3tm74`) carries the second reading
+for exactly that reason and is downstream of the ambiguity, not its source.
+Architect, owning it: `evt_52nsn0p1qr26d`.
+
+**THE DISPOSITION, which the Architect confirms:** this node carries CONCRETE
+CARRIERS as Row 3. **The `RVarTy` finding is NOT a row here** — it is routed to
+`[[LANG-INSTANCE-REGISTRY-IDENTITY-KEY]]` as its single home, and the Architect
+dropped it from this node's slot (`evt_3hb7tn83pgj33`). **Do not re-add it. One
+home, not two.**
+
+> ### THE LESSON IS THE AUTHOR'S, NOT THE RELAY'S. AN EARLIER REVISION HAD IT WRONG.
+>
+> That revision was headed *"READ THE RULING, NOT THE SUMMARY"* and filed this
+> as relay drift — a count that matches over a membership that moves. **That
+> instruction could not have protected anyone: BOTH readings are in the
+> ruling.** Reading it is where the ambiguity lives.
+>
+> **What actually resolved it was noticing a disagreement between two sources
+> and going to the artifact to adjudicate, rather than picking one.** That is
+> the transferable move, and it is not the same as distrusting relays.
+>
+> **The author-side rule, which is the one that prevents recurrence:** never
+> reuse an ordinal for a second partition in the same document, and when a
+> finding rides alongside a disposition list, **give it a name, not the next
+> number.**
 
 # WHICH TREE EACH ROW IS GROUNDED ON, AND WHY IT DECIDES THE ORDER
 
@@ -198,10 +213,25 @@ when the concrete case is done.** No work here.
         -> ROW 2 COLLAPSES INTO ROW 1. The explicit encoding is unsupported
            too, the node is smaller and differently shaped.
            RE-FILE. Do NOT repair the earlier site.
+           NAME THE REFUSAL SITE. "Earlier" is informative ONLY once you
+           know it is not "no such match on this tree" -- see below.
 
 **Report WHICH site refused, not merely that it refused.** The two outcomes are
 distinguished only by the coordinate, and "it does not compile" is consistent
 with both.
+
+> ### THE PRE-COMMITMENT WAS INCOMPLETE, AND THAT HOLE IS WHY THE CLAUSE EXISTS.
+>
+> A two-outcome pre-commitment is only sound if **both outcomes are reachable
+> only for the reasons named.** REFUSES-EARLIER was not: on `main` it is also
+> what you get when A1's completion path is absent entirely, which is a fact
+> about the tree rather than about the program. **So the instrument would have
+> accepted a reading it could not have produced honestly**, and the wrong
+> branch — re-file smaller — is the one it would have licensed.
+>
+> Two independent guards, both required: the tree check (A1's completion path
+> shown PRESENT before the run counts) and the named site (which refusal
+> fired). Architect, `evt_52nsn0p1qr26d`, on their own pre-commitment.
 
 > ### WHY `D0` EXISTS RATHER THAN THE NODE JUST ASSERTING ROW 2.
 >
