@@ -469,19 +469,69 @@ would have to manufacture is the one to raise, not to skip.
   evaluated before the body runs. An answer that cites arm laziness to explain
   operand behaviour has answered a different question, and one that reports
   no-short-circuit is CORRECT rather than a defect to fix.
-- **AC-9 (the hardness layer FAILS CLOSED — D1c, FI-5).** Three observations,
-  and **all three require evidence you must manufacture, which by this frame's
+- **AC-9 (the hardness layer FAILS CLOSED — D1c, FI-5).** Two observations,
+  and **both require evidence you must manufacture, which by this frame's
   own standard makes them the ones to raise rather than skip.**
   (a) **Role absent:** remove or rename a role out of the facade's export table
   and show a HARD ERROR naming the role — not a silent completion miss, not a
   fallback to glyph text. (b) **Role present, WRONG SHAPE:** bind a role to a
   binding of the wrong telescope and show a hard error naming the role AND the
   mismatch. **This is the case a presence-only check accepts, and it is why the
-  contract is on shape.** (c) **Home moved:** relocate the standard-operator
-  home and show every unfilled role named. Positive control for all three: a
-  build that is green before the perturbation and red after, with the role name
-  in the message — **a red build alone does not discharge this; the diagnostic
-  must name the role.**
+  contract is on shape.** Positive control for both: a build that is green
+  before the perturbation and red after, with the role name in the message —
+  **a red build alone does not discharge this; the diagnostic must name the
+  role.**
+  **A third observation (c) was withdrawn on 2026-09-19 — see the amendment
+  immediately below. AC-9 is discharged by (a) and (b) alone, and a Decision
+  may record it discharged on that basis.**
+
+  > ### AMENDMENT 2026-09-19 — (c) UNSATISFIABLE; THE FRAME WAS WRONG
+  >
+  > **Withdrawn text, verbatim, so the record shows what was asked:**
+  >
+  > > (c) **Home moved:** relocate the standard-operator home and show every
+  > > unfilled role named.
+  >
+  > **It cannot be satisfied at the occurrence, by construction.** Naming a role
+  > there requires recognising the occurrence as a standard operator; that
+  > recognition binds to the defining `GlobalId` through the certified map — and
+  > in this exact scenario the certified map is what is empty. The only other
+  > recognition route is the occurrence's glyph text, which
+  > `spec/30-surface/39-elaboration.md` `§6.9` forbids in terms:
+  >
+  > > **The policy binds to the defining `GlobalId` and its checked telescope,
+  > > never to the occurrence's glyph text.**
+  >
+  > ⇒ **The frame demanded a diagnostic at the one place the design prohibits
+  > producing it.** An implementer taking (c) at face value would have ground
+  > against a prohibition this same frame imposes. That is a defect in the
+  > criterion, not a build gap, and no amount of work at the occurrence closes
+  > it.
+  >
+  > **SCOPE THE CLAIM — it is not unsatisfiable everywhere.** One layer up it is
+  > perfectly implementable: make an absent standard-operator home a refusal
+  > **at the check**, naming every unfilled role. That keys on nothing
+  > forbidden. Do not read "unsatisfiable" as a property of the question; it is
+  > a property of the layer (c) named.
+  >
+  > **RULED NOT TO BUILD** (Architect, `evt_5k3a1b06jr3zf`). The check-layer
+  > refusal would oblige **every** program to carry `Core.Operators.Standard`
+  > whether or not it uses a standard operator — a cost paid by every program to
+  > sharpen a diagnostic for a case that is already caught downstream. **The AC
+  > moves; the code does not.**
+  >
+  > **WHAT HAPPENS TODAY, recorded so the next reader does not re-derive it as a
+  > defect:** with the home absent, `certify_standard_operator_home` never
+  > fires, `standard_operators` stays empty, the occurrence takes the ordinary
+  > spine, and the build is **RED but names no role** — caught downstream by the
+  > kernel check rather than named as a role. That is the accepted behaviour,
+  > not an outstanding gap.
+  >
+  > **WHOSE ERROR.** This frame is a Steward cut (2026-09-13) and (c) is the
+  > Steward's own text. The amendment relieves the ring of an obligation the
+  > Steward wrote, which is exactly why it is recorded here in full rather than
+  > quietly dropped: a withdrawal that favours its own author is the one that
+  > needs the argument written down, not the one that needs it least.
 - **AC-8 (no regression).** Workspace-green **in CI**, never a local
   `--workspace` run (`COORDINATION` section 12). Enumerate the globbed catalog
   oracles your change reaches and name each in your handoff — a catalog-touching
