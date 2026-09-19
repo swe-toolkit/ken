@@ -14,8 +14,8 @@ use super::aggregates::{
 };
 use super::continuations::{
     checked_frame_for_consumer, continuation_call_selected_result_identity_opt,
-    continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
-    generated_context_parameters,
+    continuation_owner_entry_sources, continuation_result_constructor_identities,
+    derive_checked_ih_post_call_consumer_chain, generated_context_parameters,
     walk_continuation_value_environment, CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
     ContinuationContextId,
     ContinuationEmissionOwner, ContinuationInputProjection, ContinuationSourceCoordinate,
@@ -1376,36 +1376,20 @@ fn exact_capture_source(
     Ok(Ok(sources[0].coordinate))
 }
 
-fn exact_response_ret_identity(
+fn exact_response_result_identity(
     plan: &StaticTransitionPlan<'_>,
-    continuation_origin: StaticOriginId,
+    worker_body_origin: StaticOriginId,
 ) -> Result<Result<ConstructorIdentity, &'static str>, CraneliftBackendError> {
-    let RuntimeExpr::ComputationalMatch { cases, .. } =
-        plan.planned_occurrence_expr(continuation_origin)?
-    else {
-        return Ok(Err(
-            "the static response continuation is not an ITree computational eliminator",
-        ));
-    };
-    let matches = cases
-        .iter()
-        .enumerate()
-        .filter(|(_, case)| {
-            case.constructor.as_str().ends_with("::ITree::Ret")
-                && case.argument_binders == 1
-                && case.recursive_positions.is_empty()
-        })
-        .map(|(index, _)| index)
-        .collect::<Vec<_>>();
-    if matches.len() != 1 {
-        return Ok(Err(
-            "the static response continuation has no exact one-parameter Ret case",
-        ));
+    let identities = continuation_result_constructor_identities(plan, worker_body_origin)?;
+    match identities.as_slice() {
+        [identity] => Ok(Ok(*identity)),
+        [] => Ok(Err(
+            "the grafted response continuation has no exact constructor result",
+        )),
+        _ => Ok(Err(
+            "the grafted response continuation has more than one constructor result",
+        )),
     }
-    Ok(Ok(
-        plan.semantic
-            .case_constructor_identity(continuation_origin, matches[0])?,
-    ))
 }
 
 fn free_environment_indices(
@@ -2179,9 +2163,9 @@ impl StaticTransitionPlan<'_> {
                 // transport-source identity is Specialized and its existing
                 // transport emission is the selected incoming response-owner
                 // call. An open/single-stage plane or suppression retains P2.
-                let k_ret_identity = match exact_response_ret_identity(
+                let k_ret_identity = match exact_response_result_identity(
                     self,
-                    unit.continuation_origin(),
+                    unit.worker_body_origin(),
                 )? {
                     Ok(identity) => identity,
                     Err(reason) => return Ok(Err(infeasible(reason))),
