@@ -1,7 +1,7 @@
 ---
 id: CAT-COLLECTIONS-NTH-LAWS
 title: "Land the nth/length pair in Data/Collections/Derived.ken.md: nth returning Some bounds the index below the length, and an index at or beyond the length returns None -- the general List facts CAT-PARSING-CURSOR-LAWS reaches in the base case of its first law and cannot discharge in-package."
-status: ready
+status: merged
 owner: foundation
 size: M
 gate: none

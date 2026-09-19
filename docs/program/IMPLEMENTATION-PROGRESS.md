@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-19 20:21:31Z — from 691 issue file(s) in `docs/program/issues/`.
+2026-09-19 21:45:49Z — from 691 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -61,7 +61,7 @@ the committed file matches the generator's output.
 | `CAT-C2` | Localized Map/Set key-interface split: a non-canonical carrier becomes a lawful Map/Set key under a weaker key-order dictionary while staying an unlawful Ord key wherever antisym concludes kernel Equal | draft | spec-enclave | M | none | — |
 | `CAT-CAPEX` | catalog exhibits no checked capability/authority exemplar — write one against the landed Cap/Auth surface | merged | ergo | M | none | — |
 | `CAT-CC-ORACLE-BEHAVIORALIZE` | Behavioralize the pre-existing prohibited repository-text oracles in the cc3/cc4/cc5 catalog acceptance tests: replace the Axiom source scans with trusted-base delta checks, and the catalog data-declaration / fn text scans with loader-inventory / selective-resolution / elaboration controls. A test-only cleanup surfaced by CV during the CAT-MIGRATE-TIER-D-CURSOR review; pre-existing, non-blocking, queued behind the active lanes. | merged | foundation | S | none | — |
-| `CAT-COLLECTIONS-NTH-LAWS` | Land the nth/length pair in Data/Collections/Derived.ken.md: nth returning Some bounds the index below the length, and an index at or beyond the length returns None -- the general List facts CAT-PARSING-CURSOR-LAWS reaches in the base case of its first law and cannot discharge in-package. | ready | foundation | M | none | — |
+| `CAT-COLLECTIONS-NTH-LAWS` | Land the nth/length pair in Data/Collections/Derived.ken.md: nth returning Some bounds the index below the length, and an index at or beyond the length returns None -- the general List facts CAT-PARSING-CURSOR-LAWS reaches in the base case of its first law and cannot discharge in-package. | merged | foundation | M | none | — |
 | `CAT-DEQUE` | Two-list functional deque — Data/Collections: a persistent double-ended queue with amortized front/back ops and a proved sequence-abstraction law, target 2 of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-DERIVED-PUB-EXPORT` | Bring catalog Data/Collections/Derived.ken.md to the pub-export standard — mark its census-recorded exported operations pub so consuming packages can selectively import them instead of reimplementing. The provider prerequisite that unblocks census group 4 (derived-list reuse) and is a necessary half of the LawfulFunctors standalone repair. | merged | foundation | S | none | https://github.com/swe-toolkit/ken/pull/3079 |
 | `CAT-DERIVED-REUSE-CONSUMERS` | Drain catalog-reuse census group 4 (derived-list computational reuse) — replace six reimplementations of list_append, reverse, concat_map, and length across five packages with selective imports from Data.Collections.Derived. The consumer half of CAT-DERIVED-PUB-EXPORT, shaped on the landed CAT-NAT-REUSE-CONSUMERS per-package increment pattern. | merged | foundation | M | none | — |
@@ -728,7 +728,6 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `ABI-S6-HS18-D5B-SUBSTRATE-PORT` — Port the D5b prefix's PRODUCTION residue onto main so ABI-S6-HS18-MAIN-BASED-CLOSURE increment A has a substrate to stand on. Increment A was decomposed as a diff between two points on the preserved line, which measures what it ADDED to the checkpoint rather than what it NEEDS on main; the four prefix commits below it never landed. Scope is the ~117-item prefix-minus-main gap NARROWED to its production cluster (generated-context-result authority, checked-IH post-call/detached, recursive-position calls, source dynamic match, the absent acceptance test), not the raw +10472/-5307. Excludes the refused MappingAcquireFile arm BY CONSTRUCTION -- it is RT-D5B-MAPPING-AVAILABILITY-FLIP's, deliberately held.
-- `CAT-COLLECTIONS-NTH-LAWS` — Land the nth/length pair in Data/Collections/Derived.ken.md: nth returning Some bounds the index below the length, and an index at or beyond the length returns None -- the general List facts CAT-PARSING-CURSOR-LAWS reaches in the base case of its first law and cannot discharge in-package.
 - `CI-MAIN-RUNS-CANCEL-EACH-OTHER` — Every push to main shares one concurrency group with cancel-in-progress, so each merge kills the CI still running for the previous merge; post-merge runs on main are a record of a specific tree, not a superseded attempt at the same one, and the fix is to stop cancelling them
 - `CI-WRITE-PARTITION-JOB-COMMENT-STALE` — ci.yml tells readers that native-slow (px8f_write_partition) is green because it selects zero tests. It has selected and run a real test since 2026-09-05. The comment names a line and an #[ignore] that no longer exist, so it instructs a reader to discount a green that is carrying signal -- and, worse, to discount the job's red.
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
@@ -776,7 +775,6 @@ is itself not yet `merged`/`closed`:
 
 - `ABI-S6-HS18-D5B-SUBSTRATE-ADJUDICATION` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
 - `ABI-S6-HS18-MAIN-BASED-CLOSURE` blocked by `ABI-S6-HS18-D5B-SUBSTRATE-PORT` (status: ready)
-- `CAT-PARSING-CURSOR-LAWS` blocked by `CAT-COLLECTIONS-NTH-LAWS` (status: ready)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `SPEC-MEMBERSHIP-CLASS-CONTRACT` (status: active)
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` blocked by `LANG-STANDARD-INFIX-CALL-COMPLETION` (status: in-review)
