@@ -56,6 +56,28 @@ pub fn min (m : Nat) (n : Nat) : Nat =
       }
   }
 
+pub proof zero_left for min (n : Nat) : Equal Nat (min Zero n) Zero = Proved
+
+pub proof leq_left for min (m : Nat) (n : Nat) : IsTrue (leq_nat (min m n) m) =
+  match m {
+    Zero ↦ Proved;
+    Suc m2 ↦
+      match n {
+        Zero ↦ Proved;
+        Suc n2 ↦ proof leq_left for min m2 n2
+      }
+  }
+
+pub proof leq_right for min (m : Nat) (n : Nat) : IsTrue (leq_nat (min m n) n) =
+  match m {
+    Zero ↦ Proved;
+    Suc m2 ↦
+      match n {
+        Zero ↦ Proved;
+        Suc n2 ↦ proof leq_right for min m2 n2
+      }
+  }
+
 pub fn max (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ n;
@@ -63,6 +85,28 @@ pub fn max (m : Nat) (n : Nat) : Nat =
       match n {
         Zero ↦ m;
         Suc n2 ↦ Suc (max m2 n2)
+      }
+  }
+
+pub proof zero_left for max (n : Nat) : Equal Nat (max Zero n) n = Refl
+
+pub proof left_leq for max (m : Nat) (n : Nat) : IsTrue (leq_nat m (max m n)) =
+  match m {
+    Zero ↦ Proved;
+    Suc m2 ↦
+      match n {
+        Zero ↦ proof refl for leq_nat (Suc m2);
+        Suc n2 ↦ proof left_leq for max m2 n2
+      }
+  }
+
+pub proof right_leq for max (m : Nat) (n : Nat) : IsTrue (leq_nat n (max m n)) =
+  match m {
+    Zero ↦ proof refl for leq_nat n;
+    Suc m2 ↦
+      match n {
+        Zero ↦ Proved;
+        Suc n2 ↦ proof right_leq for max m2 n2
       }
   }
 
@@ -75,6 +119,8 @@ pub fn sub (a : Nat) (b : Nat) : Nat =
         Suc m ↦ sub m n
       }
   }
+
+pub proof zero_right for sub (a : Nat) : Equal Nat (sub a Zero) a = Refl
 
 pub proof self_is_zero for sub (n : Nat) : Equal Nat (sub n n) Zero =
   match n {
@@ -130,6 +176,64 @@ pub fn compare (a : Nat) (b : Nat) : OrdResult =
       };
     False ↦ Gt
   }
+
+pub proof lt_implies_leq for compare
+      (a : Nat)
+    : (b : Nat) → Equal OrdResult (compare a b) Lt → IsTrue (leq_nat a b) =
+  match a {
+    Zero ↦ λb. λh. Proved;
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λh. absurd h;
+          Suc b2 ↦ λh. (proof lt_implies_leq for compare) a2 b2 h
+        }
+  }
+
+pub proof eq_implies_equal for compare
+      (a : Nat)
+    : (b : Nat) → Equal OrdResult (compare a b) Eq → Equal Nat a b =
+  match a {
+    Zero ↦
+      λb.
+        match b {
+          Zero ↦ λh. (proof antisym for leq_nat) Zero Zero Proved Proved;
+          Suc b2 ↦ λh. absurd h
+        };
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λh. absurd h;
+          Suc b2 ↦
+            λh.
+              let
+                equal_tail = (proof eq_implies_equal for compare) a2 b2 h;
+                tail_leq_forward : IsTrue (leq_nat a2 b2) =
+                  J (λb' _. IsTrue (leq_nat a2 b')) ((proof refl for leq_nat) a2) equal_tail;
+                tail_leq_reverse : IsTrue (leq_nat b2 a2) =
+                  J (λb' _. IsTrue (leq_nat b' a2)) ((proof refl for leq_nat) a2) equal_tail
+              in
+                (proof antisym for leq_nat) (Suc a2) (Suc b2) tail_leq_forward tail_leq_reverse
+        }
+  }
+
+pub proof gt_implies_reverse_leq for compare
+      (a : Nat)
+    : (b : Nat) → Equal OrdResult (compare a b) Gt → IsTrue (leq_nat b a) =
+  match a {
+    Zero ↦
+      λb.
+        match b {
+          Zero ↦ λh. Proved;
+          Suc b2 ↦ λh. absurd h
+        };
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λh. Proved;
+          Suc b2 ↦ λh. (proof gt_implies_reverse_leq for compare) a2 b2 h
+        }
+  }
 ```
 
 ## 3. Using it
@@ -159,16 +263,8 @@ const ord_nat_leq : Bool = carried_nat_leq (Suc Zero) (Suc (Suc Zero))
 
 ## 4. Laws & proofs
 
-`min`/`max`/`sub` earn their place with the computation facts a caller
-relies on:
-
-```ken example
-proof zero_left for min (n : Nat) : Equal Nat (min Zero n) Zero = Proved
-
-proof zero_left for max (n : Nat) : Equal Nat (max Zero n) n = Refl
-
-proof zero_right for sub (a : Nat) : Equal Nat (sub a Zero) a = Refl
-```
+`min`/`max`/`sub` earn their place with three exported computation facts:
+`min::zero_left`, `max::zero_left`, and `sub::zero_right`.
 
 `min::zero_left` closes with `Proved`: `min Zero n` reduces to the literal
 `Zero`
@@ -188,6 +284,11 @@ and `zero_left` close the two zero endpoints. `saturates` proves that
 Both conditional laws carry their Boolean hypotheses as `IsTrue` propositions,
 matching this package's order examples and letting downstream consumers pass
 canonical `leq_nat` evidence without restating the underlying Boolean equation.
+The four `min`/`max` bounds use the same form. The three `compare` agreements
+return the forward order for `Lt`, propositional equality for `Eq`, and the
+reverse order for `Gt`. The equality proof recurses through the two `Nat`
+arguments, transports reflexivity along the tail equality to recover both
+order directions, and applies `leq_nat::antisym` at each step.
 
 `self_is_zero` needs its induction: `sub`'s structural recursion does not reduce
 for an abstract `n` matched against itself, so `Refl` alone cannot close the
@@ -227,8 +328,9 @@ canonical `leq_nat`.
 
 1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
    `leq_nat` with their provider identities. It exports its defined-at `min`,
-   `max`, `sub`, and `compare` operations and the four inductive `sub` proofs;
-   `OrdResult` remains package-local.
+   `max`, `sub`, and `compare` operations; their three zero computation facts;
+   the four `min`/`max` bounds; the three `compare` agreements; and the four
+   inductive `sub` proofs. `OrdResult` remains package-local.
 2. **Source map.**
 
    | Task | Section |
@@ -246,8 +348,9 @@ canonical `leq_nat`.
    declaration or trust. The local operations introduce no `Axiom`, primitive,
    or postulate.
 5. **Proof families.** The provider owns the structural `Nat` order proofs. This
-   package's checked laws cover the local arithmetic operations, including
-   self-subtraction, left-zero, saturation, and strict decrease.
+   package's checked laws use structural recursion for the `min`/`max` bounds
+   and subtraction theory, and case analysis on the canonical relation for the
+   `compare` agreements. The equality arm closes through `leq_nat::antisym`.
 6. **Consumers.** Generic ordered algorithms can resolve `Ord Nat` through this
    facade; direct callers can selectively import the local arithmetic and
    comparison operations.
