@@ -5,7 +5,7 @@ status: ready
 owner: foundation
 size: M
 gate: none
-tier: T1
+tier: T2
 depends_on: []
 blocks: [CAT-PARSING-CURSOR-LAWS]
 github: null

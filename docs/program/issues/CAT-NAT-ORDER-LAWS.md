@@ -45,7 +45,85 @@ merges as soon as it is done, even a partial WP).
 
 - **`D1` — the inductive `sub`/`leq` fragment.** The four lemmas the deferral
   names or the downstream consumers need. This is the increment being released.
-- **`D2` — the min/max/compare theory.** Held; framed when `D1` lands.
+- **`D2` — the min/max/compare theory.** D1 landed at
+  `47b811be4f618b3671331857294a0d0b84d8276d`, so D2 is unblocked and framed
+  below. **D1 alone does not close this node**; D2 does.
+
+## `D2` frame — the min/max/compare theory
+
+Releasable now. Nothing blocks it.
+
+### Settled inputs
+
+Measured at `47b811be4`. Do not re-derive.
+
+**1. There is no predecessor gap, and this is the opposite of the sibling
+case.** `Core/Classes/LawfulClasses.ken.md` already carries the full order
+theory for `leq_nat` — `refl` (`:499`), `trans` (`:505`), `antisym` (`:527`),
+and `total` (`:584`). Every fact `compare` can need about `leq_nat` exists.
+`CAT-PARSING-CURSOR-LAWS` had to be cut behind a predecessor because its
+`nth` obligation had none; **D2 has all four and needs nothing new.**
+
+**2. `compare` is defined entirely from `leq_nat`.** It matches `leq_nat a b`
+and then `leq_nat b a` (`Order.ken.md:124`), so its laws are consequences of
+those four facts rather than of anything about `Nat` structure. In particular
+the `Eq` arm is exactly where `antisym` is used.
+
+**3. The existing `min`/`max` facts are examples, not package proofs.**
+`proof zero_left for min` (`:121`) and `proof zero_left for max` (`:123`) sit
+inside a ` ```ken example ` fence in `§4`. They are illustrative and are not on
+the package's exported proof surface. Promoting them is part of D2.
+
+### Deliverable
+
+Exported proofs in `Data/Numeric/Nat/Order.ken.md`, for abstract `m`/`n`/`a`/`b`:
+
+- **`min` and `max` are the bounds their names claim** — `min m n ≤ m`,
+  `min m n ≤ n`, `m ≤ max m n`, `n ≤ max m n`.
+- **`compare` agrees with `leq_nat` on all three arms** — `Lt`, `Eq`, and `Gt`
+  each imply the corresponding order fact, with `Eq` yielding
+  `Equal Nat a b` through `antisym`.
+- The two `§4` example facts, promoted to `pub proof`.
+
+Carry Boolean hypotheses and conclusions as `IsTrue` over `leq_nat`, matching
+what D1 landed and what `§4`'s own prose already commits the package to.
+
+Names and binder order are the implementer's.
+
+### Stop condition
+
+**If any law needs a `Nat` or `Bool` fact that `Nat/Order.ken.md`,
+`Nat/Arithmetic.ken.md`, or `LawfulClasses.ken.md` do not already carry, stop
+and report.** Do not widen into those packages and do not land a general fact
+here. Settled input 1 says this should not happen; if it does, the frame was
+wrong and that is worth more than a workaround.
+
+### Acceptance criteria
+
+**`AC-D2-1` — the laws are inhabited, exported, and none is degenerate.**
+*Control, both halves required:* the package elaborates with the new terms
+present; **and** replacing any one law's term with `Refl` makes the package go
+RED, restored byte-exact afterwards.
+
+**`AC-D2-2` — the shipped functions are unchanged.** This deliverable proves
+what the package already ships; it does not adjust a definition until it
+becomes provable. *Control:* `min` (`:49`), `max` (`:59`), `sub` (`:69`), and
+`compare` (`:124`) are byte-identical to their text at `47b811be4`, extracted
+and compared programmatically.
+
+**`AC-D2-3` — `§4`'s prose and the package's proof surface agree.** *Control:*
+no sentence in `§4` describes as an *example*, or as unproved, a fact the
+package now exports as a `pub proof`. **This package has produced that exact
+drift twice** — a paragraph saying a law was deliberately unproved six lines
+above a checked proof of it, and the `example` fence in settled input 3. It is
+the node's recurring defect, not a hypothetical.
+
+**`AC-D2-4` — no new trust, and the diff goes exactly one place.** *Control:*
+the added lines contain no `Axiom`, postulate, primitive, `Omega` carrier, or
+kernel/TCB surface; **and** the diff touches exactly
+`catalog/packages/Data/Numeric/Nat/Order.ken.md` and, under `crates/`, at most
+`crates/ken-cli/tests/rosetta.rs`. Any other path — test or not — is a hard
+stop and a report, not a scope extension.
 
 ## Not this node
 

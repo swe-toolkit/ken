@@ -62,9 +62,9 @@ ring starts without an operator lane change.
 
 | Lane | Ring | Objective | Active WP | Next WP | Blocker / next action |
 |---|---|---|---|---|---|
-| L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-KRET-GRAFTED-SPINE` | Repair determined by its current producer read | Runtime completes M3 producer/key read; Architect rules the repair. No new inventory or label node. |
+| L1 | runtime | Clear the selected ignored runtime rows | `RT-PLANNER-KRET-GRAFTED-SPINE` | Repair determined by the grounded zero-match fact | Replacement seat live and working the fail-closed site-1 guard. Grounded next fact is a terminal zero-match at exact origin 503, not the prior `-1`. Hard stop 5; leader owns the next direction. |
 | L2 | language | Deliver `LANG-ACTIVE-PREMISE-KERNEL-VIEW` under the 2026-09-12 Route-B ruling | `LANG-REWRITE-DESCENT-FRAME-TAX` | `LANG-ACTIVE-PREMISE-KERNEL-VIEW` | Complete the already-requested AC-4 targeted rerun, then finish exact-SHA review and route. |
-| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-NAT-ORDER-LAWS` D1 | `CAT-COLLECTIONS-NTH-LAWS` | No blocker. D1 routed `2e7d1855d`, with the lieutenant on full CI. Next WP is `ready` and depends on nothing; release it when the ring frees. `CAT-PARSING-CURSOR-LAWS` moves out one slot behind it (Architect `evt_1391bs7gcxara`). |
+| L3 | foundation | Complete catalog proof backfill before catalog extension | `CAT-COLLECTIONS-NTH-LAWS` | `CAT-NAT-ORDER-LAWS` D2 | No blocker. D1 landed `47b811be4`; NTH-LAWS kicked `evt_r7nn7bgyksqz`, leader confirmed working. D2 is framed in its node and releasable; `CAT-PARSING-CURSOR-LAWS` waits on NTH-LAWS. |
 
 ## Update rule
 
