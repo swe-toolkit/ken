@@ -394,6 +394,132 @@ would have to manufacture is the one to raise, not to skip.
   oracles your change reaches and name each in your handoff — a catalog-touching
   change trips oracles in crates this WP never edits, and they surface as red CI
   at publish, which is the most expensive place to find them.
+  - **Standing instruction: `-p ken-elaborator` is the LOOP on this node, not
+    the finale** (`COORDINATION` section 12). Run it per increment, not once
+    before handoff. **This asks for nothing section 12 does not already
+    prescribe** — `-p <crate>` is the law's default, and `--lib` / `--test
+    <name>` are narrowings *below* it.
+  - **`--lib` green is not "the crate compiles."** A targeted test selection is
+    also a targeted COMPILATION selection: sibling test targets are never built,
+    so a target that stops compiling is invisible to it. The cheap inner reading
+    is `ken-cargo test -p ken-elaborator --no-run`, which compiles every test
+    target of the crate and runs none.
+  - **Measured on this node, 2026-09-19:** three reds — `adversary_seal2_repros`,
+    `effects.rs`, and the `ord_geq_at` oracle — were all found only by the
+    crate-wide run, two of them compile failures in targets nobody in the loop
+    was building, riding eleven and thirteen commits respectively.
+
+> ### WHY THIS IS WORDED AS "THE LOOP, NOT THE FINALE" AND NOT AS "RUN BROADER"
+>
+> The pattern kept getting written as *"found only by running something broader
+> than the change appeared to need."* **That framing invites a resource argument
+> it will lose**, because section 12 exists to restrain local builds and a
+> reader is right to push back on being told to run wider than necessary.
+>
+> **The accurate statement is the opposite: all three reds were caught by the
+> run the law already asks for.** `-p <crate>` is section 12's prescription;
+> the loop had narrowed below it. So the instruction asks for nothing new, and
+> nothing in it can be traded away on cost grounds. Architect, `evt_6b39fyc17xzm1` —
+> corrected once already without taking, which is ordinary: a correction lands
+> on the artifact and not on the belief, and this is the artifact where the
+> belief hardens.
+
+## SCOPE AMENDMENT, 2026-09-19: the two broken test targets are IN scope
+
+**Steward ruling. A1 repairs `adversary_seal2_repros` and `tests/effects.rs`
+itself, under this amendment, with no new node.**
+
+Both targets stopped compiling on A1's own commits, and both narrowings were
+**forced rather than chosen** — each function's signature now names a
+crate-internal type, so widening back trips `#![deny(private_interfaces)]`
+(`lib.rs:17`):
+
+    adversary_seal2_repros   fa37c6ca6   ElabEnv gained pub(crate)
+                                         standard_operators
+    tests/effects.rs         a8f0873b0   elaborate_rdecl_v1: pub @ 775c9823b
+                                         -> pub(crate); signature @ 722a48cec
+                                         names StandardOperatorRole
+
+**`--no-run` over every target confirms this is the COMPLETE list** — two
+targets, nothing further waiting. The repair is bounded by measurement, not by
+estimate.
+
+### Why this folds in rather than becoming a node
+
+**The deciding fact is the queue, not the architecture.** Any node minted for
+this work would be filed `draft` = QUEUED behind L1 (`steward.md` section 0),
+and AC-8 cannot be discharged without the repair — so blocking A1 on it would
+**serialize a blocked WP behind a queue position with no release date.** That is
+critical-path growth bought for nothing.
+
+The rest follows the ordinary case: **a WP repairs what it broke.** A1's own
+damage, at A1's own commits, in one crate, with no dependency and no contention.
+
+> **The retraction precedent does NOT bar this, and the implementer was right to
+> ask rather than assume.** `[[LANG-R-LAYER-EXPORT-RETRACTION]]` is queued
+> because it is **gated and contended and repairs damage that is not A1's** —
+> not because test-architecture changes are categorically outside A1. The
+> Architect states plainly that they never ruled the latter (`evt_6b39fyc17xzm1`):
+> *"A ruling applied by resemblance to the case it was made in is the failure
+> mode I would flag in anyone else's hands."* Declining to take it unasked was
+> the correct discipline; the answer is that the bar is not there.
+
+### The two sites are NOT the same work
+
+- **`adversary_seal2_repros` — relocation is FORCED.** The gate's entire
+  mechanism is destructuring `ElabEnv` with no `..`, and an integration test can
+  do that only while every field is `pub`. There is no integration-test version
+  of this gate. It goes in-crate as `#[cfg(test)]`, where the private field is
+  nameable.
+
+- **`tests/effects.rs` — RELOCATE, and KEEP THE PIN.** There is a cheaper second
+  option — rewrite the two rows against the public `elaborate_file_v1` with no
+  relocation — and **it is refused.** The rows' own doc comment states the pin
+  deliberately: *"If the `elaborate_rdecl_v1` hook is removed, this fails with
+  `None`."* They target one layer below production on purpose, and
+  `surf1_view_elaboration_consumes_visits_row` asserts that **this hook** exposes
+  `effect_row_type`. Against the public path they would stop redding if the hook
+  were removed and some other path supplied the row.
+
+> **Why the Steward rules this rather than routing it to the rows' owner.** The
+> Architect correctly flagged the pin as the owner's to spend or keep. **SURF-1
+> resolves to no live seat** — as with SEAL-2, authorship is provenance, not a
+> standing claim, and routing a decision to an unstaffed owner parks it.
+> **When the owner of a documented guarantee cannot be found, the default is to
+> preserve the guarantee, not to spend it on their behalf.** The ring is already
+> performing an in-crate relocation in this crate this turn, so the cheaper
+> option saves a fraction of one of two sites and costs a property someone wrote
+> down on purpose. Keep the pin.
+
+### The re-call is a semantic choice, not a mechanical one — say it
+
+`tests/effects.rs:1125` and `:1155` pass **six** arguments; the signature now
+takes **eight**. Both sites predate `provenance` and `standard_operators`, so
+**this is a re-call, not a move** — price it that way.
+
+**One of the two new arguments is a choice:** what standard-operator map do
+`surf1_view_elaboration_consumes_visits_row` and its sibling receive? Empty is
+almost certainly right for fixtures containing no comparison — **and it must be
+chosen and stated, not defaulted into.** State the reason at the call site.
+
+**If the reason is "these fixtures contain no comparison operator," that is a
+property of the fixture, and a property can be pinned rather than assumed.**
+Preferred, not mandated: assert it, so the choice is self-checking if a fixture
+later grows one.
+
+### Ruled out, so nobody spends a round on them
+
+Both are the Architect's calls and the Steward adopts them:
+
+- **A `pub` wrapper whose signature avoids the private type.** Widens the
+  production surface for a test's convenience — worse than the problem.
+- **A test-only cargo feature.** Re-opens the feature-unification trap where a
+  sibling's dev-dependency activates it in every `cargo test`. It does not do
+  what it looks like it does.
+
+**Not a hard stop.** Two targets that stopped compiling eleven and thirteen
+commits back are defects the loop surfaced, not walls the design hit. **A1's
+hard-stop count stays at FIVE** (Architect).
 
 ## Not this node
 
