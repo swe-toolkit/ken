@@ -106,10 +106,87 @@ report, per `steward.md` §4b.
   narrative that the proofs are correct.
 - **`AC-2` — NO NEW TRUST.** No `Axiom`, postulate, primitive, `Omega` path
   carrier, TCB change, or kernel change is added.
-  *Control:* the diff touches `catalog/packages/Data/Numeric/Nat/Order.ken.md`
-  and nothing under `crates/`. A diff that needs a `crates/` change has found
-  something this frame did not anticipate — that is a hard stop and a report,
-  not a scope extension.
+  *Control:* the diff touches
+  `catalog/packages/Data/Numeric/Nat/Order.ken.md` and, under `crates/`,
+  EXACTLY `crates/ken-cli/tests/rosetta.rs` AND NOTHING ELSE. Any other
+  path under `crates/` -- test or not -- has found something this frame
+  did not anticipate: that is a hard stop and a report, not a scope
+  extension.
+
+  > **AMENDED 2026-09-19 (Steward ruling `evt_215j827h8f8rr`), AFTER THIS
+  > CONTROL FIRED ON A DIFF THAT DOES NOT VIOLATE THE REQUIREMENT.**
+  >
+  > **The requirement is the first sentence. "Nothing under `crates/`" was its
+  > CONTROL** — a proxy chosen because, on a proof-backfill WP, a `crates/`
+  > change would ordinarily BE a trust change. `crates/ken-cli/tests/rosetta.rs`
+  > is a test harness: repairing its prelude inventory adds no axiom, no
+  > postulate, no primitive, no `Omega` carrier, no TCB surface, no kernel
+  > change. **The control fired; the property it guards was untouched.** The
+  > requirement is unchanged and binds in full — only the control is widened,
+  > and it is widened to one named test file rather than to `crates/`.
+  >
+  > **WHAT IT CAUGHT, AND WHY THE STOP WAS STILL CORRECT.** D1's four public
+  > proofs depend on `leq_nat`. The Rosetta flattener's `collections_prelude()`
+  > strips the `LawfulClasses` import/export and keeps only `bool_leq` and
+  > `bool_and`, so four `NEEDS_COLLECTIONS` programs fail
+  > `UnresolvedCon { name: "leq_nat" }` — a 12-pass/4-fail partition, with
+  > scratch removal of exactly the 1,012-byte four-proof block restoring all
+  > four. **The proofs are correct and the harness roster is stale.** The ring
+  > reported instead of reaching, which is the bullet working; the alternative
+  > it correctly rejected was reordering catalog proofs around an order-
+  > sensitive deletion in a test, which would encode the harness's brittleness
+  > into the catalog where it outlives the harness.
+  >
+  > **THE DEBT IS FOUR SYMBOLS, NOT ONE, AND THE FUNCTION CONTRADICTS ITSELF**
+  > (Architect `evt_5c1kc5tbfe6tp`, grounded at `origin/main` and re-verified
+  > here). The function states its own invariant at `:152-154`: *"Remove every
+  > import whose provider source this compatibility runner has flattened
+  > immediately above it."* Then:
+  >
+  >     :141  flattened from LawfulClasses: ["pub fn bool_leq",
+  >                                          "pub fn bool_and"]
+  >     :173  edge removed from Derived:
+  >             import ... LawfulClasses (bool_and, bool_leq)
+  >           INVARIANT HOLDS -- both are flattened above.
+  >     :163  edge removed from Nat.Order:
+  >             import ... LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
+  >     :164  and the matching export
+  >           INVARIANT FAILS FOR ALL FOUR -- none is flattened anywhere.
+  >
+  > `leq_nat` occurs in the whole file exactly twice, both on those two edge
+  > strings. **The harness names four symbols whose provider it claims to have
+  > flattened, and flattens none of them** — ten lines from the adjacent edge
+  > where the correct pattern is demonstrated. `leq_nat` is merely the first one
+  > a surviving declaration referenced; `Ord`, `IsTrue` and `bool_or` are latent
+  > only because `remove_flattened_segment` and `remove_flattened_tail` delete
+  > whatever used them.
+  >
+  > **WHY IT WAS SILENT: A ONE-SIDED GUARD ON A TWO-SIDED INVARIANT.**
+  > `remove_flattened_import` fails closed when an edge is missing or
+  > duplicated, so the REMOVAL half is enforced. **Nothing checks that a removed
+  > edge's symbols were actually flattened**, so the FLATTEN half is not — which
+  > is exactly why the roster looked maintained.
+  >
+  > **REQUIRED, AND IT IS A MEASUREMENT RATHER THAN A DISCLOSURE.** The
+  > candidate states, for the `Nat.Order` edge at `:163`, **how many of its four
+  > symbols the roster flattens after the repair.** Today that number is 0 of 4;
+  > a hand-add of `leq_nat` makes it 1 of 4; deriving the roster makes it 4 of 4.
+  > **No threshold is set and the right number is not knowable from here** — the
+  > point is that the next candidate can compare against it. *(This replaces an
+  > earlier "say which you did", which was a disclosure: it had no failing
+  > state, and a constraint that cannot fail is documentation.)*
+  >
+  > **RECOMMENDED, NOT REQUIRED — scope is the Steward's under `§4`.** The right
+  > shape is to derive the flattened-declaration roster from the removed-edge
+  > list rather than maintain the two beside each other: both halves are already
+  > in one function and the invariant relating them is already in its comment.
+  > **That is a local closure, NOT the "make the roster track the whole
+  > catalog's exports" project** — the two are very different sizes and must not
+  > be conflated. One honest complication, so this is not read as a one-liner:
+  > the edge names `Ord` and `IsTrue`, which are not `pub fn` declarations, so a
+  > naive "flatten every edge symbol as `pub fn <sym>`" is not a valid rule. The
+  > derivation needs a per-symbol form, and that is real work. **Either repair
+  > satisfies this frame.**
 - **`AC-3` — NO DEFINITION CHANGED.** `min`, `max`, `sub`, `compare`, and
   `leq_nat` keep their current bodies. The proofs adapt to the definitions.
   *Control:* the diff shows no edit inside `:60-87`.
