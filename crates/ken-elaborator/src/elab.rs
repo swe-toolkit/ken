@@ -20024,3 +20024,109 @@ mod missing_pattern_witness_diagnostic_strictness_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod surf1_visits_row_production_path {
+    //! SURF-1 D1's two production-path rows, RELOCATED FROM
+    //! `tests/effects.rs` rather than rewritten (language-leader,
+    //! `evt_66h8wqeaffnfg`).
+    //!
+    //! **They pin the `elaborate_rdecl_v1` hook deliberately** -- their own
+    //! doc said "if the hook is removed, this fails with `None`" -- so the
+    //! cheaper rewrite through a public `elaborate_file` path was refused: it
+    //! would keep the assertion and drop the thing being asserted.
+    //!
+    //! They live here because that function is `pub(crate)`, and it is
+    //! `pub(crate)` because its signature names `StandardOperatorRole`, which
+    //! `lib.rs`'s `deny(private_interfaces)` keeps off the public surface for
+    //! the membership track. An integration test cannot reach it. **In-crate
+    //! they are compiled by `--lib`**, which runs every increment -- the
+    //! version in `tests/` was not compiled by any targeted selection and sat
+    //! broken, undelivered, for the branch's whole length.
+    use super::*;
+    use crate::effects::RowType;
+    use crate::parser::parse_decls;
+    use crate::resolve::resolve_decl;
+
+    /// The certified standard operators these fixtures need: NONE -- CHOSEN
+    /// AND STATED, not defaulted.
+    ///
+    /// **And the choice self-checks.** "These fixtures contain no comparison
+    /// operator" is a property of the fixtures, not a fact about the world, so
+    /// it is asserted rather than assumed: a fixture that later grows a `≤`
+    /// reds here instead of being silently refused by an empty map.
+    fn no_standard_operators(src: &str) -> HashMap<StandardOperatorRole, GlobalId> {
+        for role in StandardOperatorRole::ALL {
+            assert!(
+                !src.contains(role.glyph()),
+                "this fixture now contains `{}`, so an EMPTY certified map is \
+                 no longer the right choice for it -- supply the role or split \
+                 the fixture",
+                role.glyph()
+            );
+        }
+        HashMap::new()
+    }
+
+    /// SURF-1 D1 production path: real `RDeclKind::View` elaboration consumes
+    /// the parsed concrete `visits` row and records the checked `RowType`. If
+    /// the `elaborate_rdecl_v1` hook is removed, this fails with `None`.
+    #[test]
+    fn surf1_view_elaboration_consumes_visits_row() {
+        let src = "proc surf1_visits (x : Nat) : Nat visits [Console] = x";
+        let decls = parse_decls(src).expect("const with concrete visits row must parse");
+        let rdecl = resolve_decl(&decls[0]).expect("const with concrete visits row must resolve");
+        let mut env = crate::ElabEnv::new().expect("base env");
+        let standard_operators = no_standard_operators(src);
+
+        let result = elaborate_rdecl_v1(
+            &mut env.env,
+            &mut env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            &mut env.class_env,
+            &mut env.resolution_provenance,
+            &standard_operators,
+            &rdecl,
+        )
+        .expect("const with concrete D1 visits row must elaborate");
+
+        let row = result
+            .effect_row_type
+            .expect("production const elaboration must expose checked visits row");
+        assert_eq!(
+            row,
+            RowType::singleton("Console"),
+            "written [Console] must reach production checking as a RowType"
+        );
+    }
+
+    /// SURF-1 D1 production path: row variables fail closed unless the same
+    /// variable was allocated from a HOF latent-row binding in the declaration
+    /// type. A plain first-order const must not synthesize `e` from `visits`.
+    #[test]
+    fn surf1_view_elaboration_rejects_unbound_visits_row_var() {
+        let src = "proc surf1_bad_visits (x : Nat) : Nat visits [Console | e] = x";
+        let decls = parse_decls(src).expect("const with open visits row must parse");
+        let rdecl = resolve_decl(&decls[0]).expect("const with open visits row must resolve");
+        let mut env = crate::ElabEnv::new().expect("base env");
+        let standard_operators = no_standard_operators(src);
+
+        let err = elaborate_rdecl_v1(
+            &mut env.env,
+            &mut env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            &mut env.class_env,
+            &mut env.resolution_provenance,
+            &standard_operators,
+            &rdecl,
+        )
+        .expect_err("unbound visits row variable must reject fail-closed");
+
+        assert!(
+            format!("{err:?}").contains("unknown row variable `e` in visits row"),
+            "unexpected error for unbound row variable: {err:?}"
+        );
+    }
+}

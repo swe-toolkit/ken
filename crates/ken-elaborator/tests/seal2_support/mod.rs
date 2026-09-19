@@ -114,8 +114,12 @@ pub struct Producer {
 /// destructuring with **no `..`**. Adding a field to `ElabEnv` fails to compile
 /// here, forcing whoever adds it to classify the new namespace as either a
 /// producer source (walked below) or a justified non-source (added to the
-/// discard with its reason). This is the AC-2 gate: a new namespace can never be
-/// a silent pass, only a build break.
+/// discard with its reason). This is the AC-2 gate, and **it is currently
+/// DEFEATED by the `..` at the destructure** -- see the notice at the top. As
+/// written today a new namespace IS a silent pass; the sentence that used to
+/// stand here said it could never be one, and changing the claim rather than
+/// annotating it is the point: a reader who skips the notice must not be able
+/// to pick up a false guarantee from the body.
 ///
 /// ⛔ Do **not** rewrite this as field access (`env.globals`, `env.class_env`,
 /// …). Naming every field with no `..` is the entire point — it is what makes
