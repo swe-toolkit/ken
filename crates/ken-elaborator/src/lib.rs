@@ -158,9 +158,14 @@ pub struct ElabEnv {
     /// The standard-operator identities layer 3 certified against the
     /// standard-operator home's export table (`33 §6.1`, `39 §6.9`).
     ///
-    /// Empty when the program does not provide the home, in which case a
-    /// standard-operator occurrence is refused at the occurrence naming the
-    /// role. **Not `pub`**: the role type is crate-internal by contract, and
+    /// Empty when the program does not provide the home. **An occurrence is
+    /// then NOT refused naming the role, and this comment used to say it
+    /// was.** An empty map certifies nothing, so each occurrence is left as an
+    /// ordinary under-applied application and caught downstream by the kernel
+    /// check; the residual on `reduce_resolved_operator`'s non-certified arm
+    /// carries the detail.
+    ///
+    /// **Not `pub`**: the role type is crate-internal by contract, and
     /// `#![deny(private_interfaces)]` above is what holds that rather than
     /// this comment.
     pub(crate) standard_operators:
