@@ -201,10 +201,30 @@ question**, and restating the scope is the Steward act this node needs — not a
 status flip. Left open deliberately rather than rewritten tonight, because the
 measurement that would settle it is in flight in the predecessor's branch.
 
-**Fenced:** the origin-id delta (`365` for `px7n`, `317` for both `rt_escape`
-programs, uniform within each and different between) is **consistent with**
-inlining copying a contiguous origin-id region and **does not establish it**.
-It is explicitly UNMEASURED by its author. Do not size against it.
+**Fenced, and the fence does not lift on measurement (Architect, 2026-09-19,
+`evt_56qcf2b8cnct1`).** The origin-id delta (`365` for `px7n`, `317` for both
+`rt_escape` programs, uniform within each and different between) is consistent
+with inlining copying a contiguous origin-id region and does not establish it.
+It is UNMEASURED by its author. **Even measured TRUE it cannot be the repair
+mechanism:** `origin_of(node) = StaticOriginId(node.0)`
+(`occurrences.rs:91`) and the ordinal is declared planner-private
+(`:88-90` — *"planner-private precisely so no consumer outside this module can
+mint one"*), so contiguity is an allocation accident with no contract and no
+guard, and a route keyed on it fails SILENTLY when allocation changes.
+Authorized as a DIAGNOSTIC only — *does inlining copy contiguously* is real
+information about the correspondence that has to be derived. Making it a key
+requires the allocation property stated as a contract with its own guard, which
+is a separate ruling not made.
+
+> **Why this replaced a fence of mine, recorded because the failure is
+> reusable.** My wording was *"consistent with … does not establish it …
+> UNMEASURED … do not size against it."* Every clause of that is about the
+> measurement being **absent**, so it reads as a fence that a positive
+> measurement lifts — and a positive measurement is exactly what the seat was
+> about to take. **An epistemic fence expires on the evidence it names; a
+> structural one does not.** The objection here is not that contiguity is
+> unmeasured, it is that contiguity is not a contract, which no measurement
+> changes.
 
 # THIS IS AN UNDISCHARGED ASSIGNMENT. IT IS NOT A DISCOVERY.
 
@@ -424,12 +444,16 @@ call sites or two invocations of one.
     FIFTH SHAPE   a bracket inside a RECURSIVE proc, whose executions cannot
                   be statically enumerated at all.
 
-This is attached here rather than left to be rediscovered because it bears on
-the repair, not just on the witness. **A route map re-keyed on the occurrence
-still has to enumerate occurrences**, and a recursive proc supplies no static
-bound on how many there are. Whether occurrence-keying is sufficient, or only
-sufficient for the statically-countable case, is therefore an open question
-about this node's own thesis — not a further witness.
+This is attached as a gap in the WITNESS, not as a bearing on the repair.
+**The repair-bearing reading is WITHDRAWN (Architect, 2026-09-19,
+`evt_56qcf2b8cnct1`).** It claimed a recursive proc supplies no static bound on
+the number of occurrences a re-keyed map must enumerate. That conflates
+executions with occurrences: `host_response_routes` iterates
+`plan.source_occurrences` (`responses.rs:1250`), a static post-inlining
+collection to which a recursive proc contributes a bounded number of entries.
+Recursion multiplies executions through one occurrence. It is the N=1 case for
+this map, not an unbounded one, and occurrence-keying's sufficiency is not in
+question on this ground.
 
 **It is unmeasured and must not be cited as though it were.** It was deferred
 on purpose: it is the fifth "five-minute build" in a night whose ignore count
