@@ -6,6 +6,7 @@
 //! L2 additions: `data` declarations, `type` aliases, `match` expressions,
 //! type application (`T a b`).
 
+use ken_kernel::GlobalId;
 use std::{
     cell::Cell,
     collections::{HashMap, HashSet},
@@ -293,6 +294,48 @@ pub enum RExpr {
     RByteStr(Vec<u8>, Span),
     /// Infix binary op (`35 §3`); emitted only after reassociation.
     RBinOp(BinOp, Box<RExpr>, Box<RExpr>, Span),
+    /// A STANDARD-OPERATOR occurrence in operator position (`39 §6.9`),
+    /// carrying the defining identity. Emitted only by
+    /// `reduce_resolved_operator`, which is reachable only from an
+    /// [`Self::RInfixSpine`] -- so this node IS the statement that the
+    /// occurrence was written in operator position.
+    ///
+    /// **This exists so AC-2(c) is a property of the TYPE, not of a value.**
+    /// `§6.9` requires that an explicit application is never rewritten:
+    /// `ord_leq_at Nat d` stays partial. Under a marker on
+    /// [`Self::RApp`] that claim would be discharged by every construction
+    /// site choosing correctly, forever; here an explicit application is
+    /// simply a different constructor and the claim is not something a
+    /// producer can get wrong.
+    ///
+    /// **It removes an asymmetry rather than adding a mechanism** (Architect,
+    /// `evt_2y0a3j5yjznn2`): the sibling arm of the same `match` already
+    /// keeps its own node for a BUILTIN infix operator, as
+    /// [`Self::RBinOp`]. The user arm was the only one that erased into an
+    /// application, and that erasure is the whole reason the role was
+    /// undecidable later.
+    RStandardOp {
+        /// The DEFINING identity, not the role and not the glyph.
+        ///
+        /// **`39 §6.9` binds completion to the defining `GlobalId` "never to
+        /// the occurrence's glyph text", and this field is that sentence.**
+        /// The adapter recovers the role by reverse lookup in the certified
+        /// map, which is identity-keyed, so an alias -- `export (ord_leq_at as
+        /// ≤, ord_leq_at as lte)` -- completes through `lte` exactly as it
+        /// does through `≤`. Carrying the glyph instead would have been the
+        /// glyph-text binding `§6.9` forbids, relocated one pass later.
+        ///
+        /// **It is also why nothing here crosses this crate's public
+        /// surface.** `GlobalId` is `ken-kernel`'s and already public;
+        /// `StandardOperatorRole` is crate-internal BY CONTRACT for the
+        /// membership track, and `#![deny(private_interfaces)]` in `lib.rs`
+        /// is what holds that. A role-typed field here would have defeated
+        /// that guard, and the fix is to carry less, not to widen the role.
+        op: GlobalId,
+        lhs: Box<RExpr>,
+        rhs: Box<RExpr>,
+        span: Span,
+    },
     /// A flat operator run preserved through module name resolution. The
     /// post-predeclaration pass consumes it before type-directed elaboration.
     RInfixSpine {
@@ -379,6 +422,7 @@ impl RExpr {
             | RExpr::RRecursiveResult { span: s, .. }
             | RExpr::RTrunc(_, s)
             | RExpr::RBinOp(_, _, _, s)
+            | RExpr::RStandardOp { span: s, .. }
             | RExpr::RInfixSpine { span: s, .. } => s,
             RExpr::RMatch { span, .. } | RExpr::RIf { span, .. } => span,
         }

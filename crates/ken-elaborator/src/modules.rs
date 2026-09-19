@@ -1351,6 +1351,31 @@ fn rewrite_rexpr_inner(
             Box::new(rewrite_rexpr(scope, exports, *r)?),
             s,
         ),
+        // THE CROSS-MODULE REMAP, and omitting it would have been INVISIBLE
+        // rather than a compile error (Architect, `evt_2y0a3j5yjznn2`). This
+        // function is a REWRITE over every node: a variant left out does not
+        // fail to compile, it silently stops having its operands remapped, and
+        // an operator crossing an import would then complete differently from
+        // the same operator in its home module -- which no single-module
+        // fixture can see.
+        //
+        // The IDENTITY is deliberately not remapped. A `GlobalId` is already
+        // canonical -- `33 §4.3` says an export republishes the existing one
+        // and never mints another -- so there is nothing here for a module
+        // boundary to rewrite. That is the whole reason this node carries the
+        // identity rather than the glyph: the glyph WOULD have needed
+        // remapping, and forgetting it is the invisible failure above.
+        RExpr::RStandardOp {
+            op,
+            lhs,
+            rhs,
+            span,
+        } => RExpr::RStandardOp {
+            op,
+            lhs: Box::new(rewrite_rexpr(scope, exports, *lhs)?),
+            rhs: Box::new(rewrite_rexpr(scope, exports, *rhs)?),
+            span,
+        },
         RExpr::RInfixSpine {
             operands,
             operators,
@@ -2469,8 +2494,16 @@ fn elaborate_resolved_space(
     elab: &mut ElabEnv,
     resolved: &crate::resolve::RSpaceDecl,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    let associated =
-        crate::elab::reassociate_space_decl(resolved, &elab.globals, &elab.fixities)?;
+    // Cloned rather than borrowed, following the same shape as the two
+    // `standard_operators_here` sites above: `elab` is `&mut` here and the
+    // reassociation pass needs an immutable view of the certified map.
+    let standard_operators_here = elab.standard_operators.clone();
+    let associated = crate::elab::reassociate_space_decl(
+        resolved,
+        &elab.globals,
+        &elab.fixities,
+        Some(&standard_operators_here),
+    )?;
     crate::elab::elaborate_space_decl(elab, associated.as_deref().unwrap_or(resolved))
 }
 
