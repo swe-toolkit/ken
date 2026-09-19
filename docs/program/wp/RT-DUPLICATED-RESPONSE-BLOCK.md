@@ -1205,13 +1205,24 @@ and 13 `response_origin` sites, both files, every site classified.
 
     :2824 :2851   the stage partition. MEASURED in 8.11d and gated out on
                   both esc programs; cannot move under any keying.
-    :3326-3328    repeated_producer = substantive.iter().all(|candidate|
-                    candidate.producer_call_origin()
-                      == response.producer_call_origin())
+    :3326-3328    repeated_producer = !substantive.is_empty()
+                    && substantive.iter().all(|candidate|
+                      candidate.producer_call_origin()
+                        == response.producer_call_origin())
                   It branches: `if repeated_producer || mapping_access_chain`
                   returns the bounded Deferred suffix, else returns empty and
                   the sequence keeps its existing owner/forward-edge route.
-                  UNMEASURED.
+                  UNMEASURED at 8.11h. MEASURED in 8.11j: UNREACHED on all
+                  four rows.
+
+**The `!substantive.is_empty() &&` conjunct at `:3326` is load-bearing, and an
+earlier revision of this list dropped it.** Restored 2026-09-19. Without it the
+quoted predicate is `all()` over a possibly-empty iterator, which is vacuously
+**true** — so 8.11j's forced-fall-through control, which records
+`value=false substantive=0`, reads as an internal contradiction and the control
+reads as broken. With the guard, `false` on an empty `substantive` is the only
+correct value, and that is derivable **only** from the real code. That is what
+makes 8.11j's advance prediction genuinely derived rather than retrofitted.
 
 **`producer_call_origin` — PRODUCTION CARRY:** eight `SsaInfeasible` diagnostic
 payloads (`:2118`, `:2153`, `:3590`, `:3605`, `:3642`, `:3658`, `:3675`,
@@ -1277,8 +1288,9 @@ branch is refuted and relaxation is NOT licensed by this classification.**
 *"that consumer's observable is `AC-11`'s exhibit"* — but the exhibit is the
 observable **measured**, and `repeated_producer`'s reachability on these four
 rows was unmeasured **at this point in the record. It is measured in 8.11j, and
-the answer is UNREACHED on all four** — so no exhibit arrives by this route. What the classification delivers is **a named, bounded,
-single-site candidate** where before there was an open set.
+the answer is UNREACHED on all four** — so no exhibit arrives by this route.
+What the classification delivers is **a named, bounded, single-site candidate**
+where before there was an open set.
 
 ⇒ **8.11f's "neither repair is justified on current evidence" STANDS**, now
 with the enumeration closed behind it rather than open. The difference is that
