@@ -3405,12 +3405,15 @@ impl StaticTransitionPlan<'_> {
             let first = matching.next();
             if matching.next().is_some() {
                 return Err(planner_error(format!(
-                    "a locally driven Deferred response result at {result_origin:?} reaches more than one response row in its exact caller owner"
+                    "a locally driven Deferred response result at {result_origin:?} reaches more than one response row whose base owner is its exact caller emission owner"
                 )));
             }
-            if let Some(demand) = first {
-                demand.k_ret_identity = result_identity;
-            }
+            let Some(demand) = first else {
+                return Err(planner_error(format!(
+                    "a locally driven Deferred response result at {result_origin:?} reaches no response row whose base owner is its exact caller emission owner"
+                )));
+            };
+            demand.k_ret_identity = result_identity;
         }
         specialized.sort_by_key(|demand| {
             (
