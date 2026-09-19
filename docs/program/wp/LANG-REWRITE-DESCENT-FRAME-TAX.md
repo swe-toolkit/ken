@@ -158,16 +158,23 @@ D0 confirms rather than refutes D1's premise.
 
 ## 9. D2 remeasurement and D3 consequence
 
-D2 used the identical §8 method after D1. The uninstrumented frame is
-19,080 B, the maximum descent depth remains 46, and the corrected total stack
-is 1,019,624 B. The disposable probe frame was 19,160 B and reported a
-1,004,144 B entry span.
+D2 used the identical §8 method after D1. The uninstrumented dispatcher
+prologue is 19,080 B, the maximum descent depth remains 46, and the corrected
+total stack is 1,019,624 B. The disposable probe frame was 19,160 B and
+reported a 1,004,144 B entry span.
 
-The split against the base is: frame **down 22,464 B** (54.1%), depth
-**unchanged**, and corrected total stack **down 903,024 B** (47.0%). The
-per-arm non-inlined calls move variant-specific work out of the dispatcher, so
-the non-dispatcher part grows from 11,624 B to 141,944 B while the recursive
-whole-surface frame falls by more than half.
+The 19,080 B dispatcher prologue is not the complete per-level descent cost.
+Each closure passed to `rewrite_rexpr_arm` contains the recursive call, so its
+helper frame stays live beneath it. The accumulated helper contribution is
+`141,944 - 11,624 = 130,320 B` across the 45 recursive transitions, or
+approximately 2,896 B per helper frame. The repair therefore moves per-arm
+temporaries into a new per-level helper frame rather than off the stack.
+
+The split against the base is: recurring per-level descent cost approximately
+**41,544 B → 21,976 B** (47.1%), depth **unchanged at 46**, and corrected total
+stack **1,922,648 B → 1,019,624 B**, down 903,024 B (47.0%). The directly
+measured total remains the authoritative quantity; 21,976 B is the derived
+approximation `19,080 + 2,896` for sizing the post-D1 recursive chain.
 
 For D3, A1 tip `ed47f3ec9` plus D1 was assembled temporarily at `08c0e1c07`.
 `local_prebinding_preserves_legacy_map_union_stack_budget` passed unchanged at
