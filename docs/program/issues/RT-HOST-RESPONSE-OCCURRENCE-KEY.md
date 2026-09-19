@@ -348,6 +348,29 @@ corroboration.
   programs. Read it as confirmation with a cheap reproducer, not as a
   discovery — and do not let a second node be filed on it.
 
+## THE SHAPE THE WITNESS DOES NOT COVER -- UNMEASURED, ATTACHED DELIBERATELY
+
+**Architect, 2026-09-19, recorded and explicitly NOT run.** All four measured
+shapes share a property easy to miss because it is the normal case: **a
+statically countable number of bracket executions** — two, whether from two
+call sites or two invocations of one.
+
+    FIFTH SHAPE   a bracket inside a RECURSIVE proc, whose executions cannot
+                  be statically enumerated at all.
+
+This is attached here rather than left to be rediscovered because it bears on
+the repair, not just on the witness. **A route map re-keyed on the occurrence
+still has to enumerate occurrences**, and a recursive proc supplies no static
+bound on how many there are. Whether occurrence-keying is sufficient, or only
+sufficient for the statically-countable case, is therefore an open question
+about this node's own thesis — not a further witness.
+
+**It is unmeasured and must not be cited as though it were.** It was deferred
+on purpose: it is the fifth "five-minute build" in a night whose ignore count
+moved by zero, and the node it would inform is now released and being worked.
+Take it up inside the repair's design, where it is load-bearing, rather than
+as another probe.
+
 # Related
 
 - `[[RT-DUPLICATED-RESPONSE-BLOCK]]` — establishes the reading that licenses
