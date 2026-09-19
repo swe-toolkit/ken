@@ -1298,12 +1298,9 @@ fn rewrite_rexpr_inner(
                 s,
             ))
         })?,
-        RExpr::ROld(e, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::ROld(
-                Box::new(rewrite_rexpr(scope, exports, *e)?),
-                s,
-            ))
-        })?,
+        RExpr::ROld(e, s) => {
+            rewrite_rexpr_arm(|| Ok(RExpr::ROld(Box::new(rewrite_rexpr(scope, exports, *e)?), s)))?
+        }
         RExpr::RCell(index, name, span) => RExpr::RCell(index, name, span),
         RExpr::RBecomes(index, name, value, span) => rewrite_rexpr_arm(|| {
             Ok(RExpr::RBecomes(
