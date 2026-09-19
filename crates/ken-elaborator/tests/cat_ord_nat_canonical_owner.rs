@@ -332,7 +332,6 @@ fn order_facade_carries_relation_and_dictionary_identities() {
         "the Order public path must resolve to the LawfulClasses leq_nat GlobalId"
     );
     let resolution = env
-        .class_env
         .resolution_provenance
         .iter()
         .rev()

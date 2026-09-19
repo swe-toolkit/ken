@@ -201,7 +201,6 @@ fn selective_consumer_preserves_local_and_reexported_provider_identities() {
     );
 
     let resolution = env
-        .class_env
         .resolution_provenance
         .iter()
         .rev()

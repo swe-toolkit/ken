@@ -386,7 +386,6 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
     assert_transparent_body_mentions(&env, "cat_ord_pub_leq_at", ord_leq_at);
     assert_transparent_body_mentions(&env, "cat_bool_pub_some", is_some);
     let resolution = env
-        .class_env
         .resolution_provenance
         .iter()
         .rev()
@@ -507,6 +506,14 @@ fn class_owner_provider_loader_visible_inventories_are_exact() {
             "leq_nat::refl".to_owned(),
             "leq_nat::total".to_owned(),
             "leq_nat::trans".to_owned(),
+            // `ord_geq_at` joins the authorized surface with FI-2b: the
+            // Architect ruled it is defined HERE beside `ord_leq_at`,
+            // because it is fully generic and `33 §2a` puts only
+            // package-SPECIFIC content in a package. This exact-inventory
+            // oracle is globbed over the catalog, so a catalog-touching
+            // WP trips it in a file the WP never edits -- which is the
+            // shape AC-8 exists to make someone enumerate.
+            "ord_geq_at".to_owned(),
             "ord_leq_at".to_owned(),
             "string_deceq_eq".to_owned(),
             "string_deceq_eq::complete".to_owned(),
