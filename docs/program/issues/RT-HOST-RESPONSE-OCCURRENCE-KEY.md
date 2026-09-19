@@ -9,7 +9,7 @@ tier: T1
 depends_on: [RT-DUPLICATED-RESPONSE-BLOCK]
 blocks: []
 github: null
-origin: "Steward, 2026-09-18, fourth repair node from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger on operator directive 2026-09-15 'The other tests should be fixed.' The occurrence-keying insight is the Steward's own section 3a amendment to RT-HOST-RESPONSE-ROUTE-KEY-COLLISION, written 2026-09-17: 'What the key actually omits is the OCCURRENCE.' It was routed to that node's AC-4 and AC-4 closed 'not reached', so the assignment has sat undischarged since. RT-DUPLICATED-RESPONSE-BLOCK then located WHERE the second presentation comes from -- per-arm inlining of a shared callee -- which makes the construction-time uniqueness assertion wrong in its SUBJECT, stated over post-inlining occurrences rather than over the source dispatcher, and NOT unnecessary. Corrected 2026-09-18 on Architect evt_5m7k7k4vrg5ay: this line previously said that node 'established the reading that licenses it', which overstates in the same direction the body did -- that node measured the origin and explicitly did NOT measure whether producing the second presentation is correct (its 8.2). The Architect ruled the repair LIVE 2026-09-18 and rejected both design arms (evt_4eghtvj2fhpz0); separately, the Architect set this node's acceptance bar and has since REPLACED it with the three-clause bar below. The liveness ruling and the bar are two acts and this line used to fuse them. Steward-filed per COORDINATION section 2."
+origin: "Steward, 2026-09-18, fourth repair node from the RT-IGNORED-FAILING-ROWS-INVENTORY ledger on operator directive 2026-09-15 'The other tests should be fixed.' The occurrence-keying insight is the Steward's own section 3a amendment to RT-HOST-RESPONSE-ROUTE-KEY-COLLISION, written 2026-09-17: 'What the key actually omits is the OCCURRENCE.' It was routed to that node's AC-4 and AC-4 closed 'not reached', so the assignment has sat undischarged since. RT-DUPLICATED-RESPONSE-BLOCK then located WHERE the second presentation comes from -- per-arm inlining of a shared callee -- which makes the construction-time uniqueness assertion wrong in its SUBJECT, stated over post-inlining occurrences rather than over the source dispatcher, and NOT unnecessary. Corrected 2026-09-18 on Architect evt_5m7k7k4vrg5ay: this line previously said that node 'established the reading that licenses it', which overstates in the same direction the body did -- that node measured the origin and explicitly did NOT measure whether producing the second presentation is correct (its 8.2). The Architect ruled the repair LIVE 2026-09-18 and rejected both design arms (evt_4eghtvj2fhpz0); separately, the Architect set this node's acceptance bar, REPLACED it with a three-clause bar (evt_4eghtvj2fhpz0), and on 2026-09-19 STRUCK clause 3 (evt_7sj5xmgcxwk5f) -- the bar below is TWO clauses. The liveness ruling and the bar are two acts and this line used to fuse them. Steward-filed per COORDINATION section 2."
 ---
 
 # The refusal, and why the key is now the right unit when it was not before
@@ -266,39 +266,69 @@ arrival.
 
 # THE ACCEPTANCE BAR, SET BY THE ARCHITECT
 
-> ### THIS BAR WAS TWO CLAUSES AND IS NOW THREE. THE THIRD REPLACES, NOT EXTENDS.
+> ### HISTORY OF THIS BAR — READ THE CLAUSES BELOW, NOT THIS BLOCK.
 >
-> **Architect, `evt_4eghtvj2fhpz0`, 2026-09-18.** The two-clause bar below was
-> published here as *"THE ACCEPTANCE BAR"* and **was insufficient on its own**
-> — both its clauses are producer-side, and **every producer-side control
-> passes on a repair that mis-routes.**
+> **The bar went two clauses (2026-09-18) → three (`evt_4eghtvj2fhpz0`, same
+> day) → back to two (`evt_7sj5xmgcxwk5f`, 2026-09-19).** It is TWO now. This
+> block is kept for the reasoning, which outlived the clause it produced.
 >
-> **Say "replaces", not "gains".** A reader arriving at a bar that looks
-> complete will not go looking for a third clause, which is the whole failure
-> mode: the two clauses below are individually correct and jointly **not a
-> bar.** Architect, `evt_7ct1bwa50pne7`; Steward sweep.
+> **Why the third was added.** Both original clauses are producer-side, and
+> **every producer-side control passes on a repair that mis-routes** — the two
+> are individually correct and jointly not a bar. That argument was right.
+>
+> **Why it was struck anyway.** The concern is real; its SUBJECT is not. On
+> this population there is no "wrong copy" to name, in either form the census
+> admits — so the clause could never be discharged or failed, only left open.
+> **A control whose subject does not denote is not a weak control, it is not a
+> control.** Striking it is not a retreat from the mis-route concern.
 >
 > **And this node is ONE PART of the repair, not the whole of it.** The ruling
 > is that producer and consumer move together. Re-keying alone does not clear
 > the rows.
 
-All three are required. Clause 2 is the one a tuple-widening satisfies by
-accident; **clause 3 is the one nothing else in this chain checks.**
+## THE BAR IS TWO CLAUSES. CLAUSE 3 IS STRUCK — 2026-09-19.
+
+**Architect ruling `evt_7sj5xmgcxwk5f`. Both required clauses follow; there is
+no third, and one must not be re-cut.**
 
     MUST STILL REFUSE   two response-handling sites within ONE occurrence
                         claiming one operation constructor
     MUST NOT REFUSE     N legitimate instantiations each contributing one
                         response handler
-    MUST NOT MIS-ROUTE  the consumer selects by the key the producer inserted
-                        under, and a Vis site whose route copy is ABSENT
-                        REFUSES rather than falling back to the last-written
-                        route
 
 **A repair that cannot still refuse the first has relaxed the invariant, not
-re-keyed it.** **A repair that satisfies the first two and fails the third has
-kept the guard green while routing every `Vis` site to the wrong copy** — which
-is a silent wrong-continuation route, and is what `responses.rs:1279` is
-currently the only barrier against.
+re-keyed it.** Clause 2 is the one a tuple-widening satisfies by accident.
+
+**Why clause 3 was struck, so it is not reinstated by the next reader.** It
+required that *"the consumer selects by the key the producer inserted under,
+and a `Vis` site whose route copy is ABSENT REFUSES rather than falling back to
+the last-written route."* **Its subject does not denote**, in either form the
+censused population admits:
+
+    per-Vis form     no Vis both routes and has a copy of its own, so there is
+                     no witness to "the wrong copy" (px7n: zero Constructs,
+                     no Vis selects any route at all).
+    partition form   the subject exists, but the observable is gated out
+                     BEFORE the partition forms and cannot move under any
+                     producer-side re-keying (esc:653/713, measured flat).
+
+**A third form would be the fourth costume of one claim**, and the Architect
+struck it against their own prior text rather than re-cut again.
+
+> **THIS BLOCK PREVIOUSLY READ "All three are required ... clause 3 is the one
+> nothing else in this chain checks", AND THAT TEXT WAS LIVE ON `main` FOR A
+> FULL TURN AFTER THE STRIKE.** Flagged by the runtime-implementer, who
+> correctly declined to edit it — outside their path list, the bar is the
+> Architect's and this node is the Steward's.
+>
+> **The failure repeats this node's own recorded lesson one level up.** One
+> turn earlier, `8.9a` replaced a two-clause bar with a three-clause bar and the
+> warning written at that moment was: *"a reader arriving at a bar that looks
+> complete will not go looking for a third clause."* **A bar that looks complete
+> is equally unlikely to be interrogated for a clause that no longer stands.**
+> The hazard is not the count — it is that a bar is read as a standing fact when
+> it is a ruling with a timestamp. **Both edits are the same defect, and the
+> second landed in the file that recorded the first.**
 
 # THE POPULATION IS ALL FOUR ROWS
 
