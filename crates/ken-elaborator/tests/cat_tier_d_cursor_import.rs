@@ -39,6 +39,7 @@ fn provider_modules(module: &str) -> &'static [&'static str] {
             "Data.Collections.Derived",
             "Data.Numeric.Nat.Arithmetic",
             "Data.Numeric.Nat.Order",
+            "Core.Logic.Transport",
         ],
         _ => &[],
     }
@@ -296,7 +297,7 @@ fn parsing_cursor_loader_visible_inventory_is_exact() {
 /// Promise class: durable invariant.
 ///
 /// MEASURED: Cursor roots-loads after DC and the published lower tiers with no
-/// trust/class/instance growth; every one of its eleven imported provider
+/// trust/class/instance growth; every one of its fifteen imported provider
 /// identities occurs in an owned checked declaration; private representation
 /// operations remain unimportable. CLAIMED: DC is the sole intra-slice value
 /// edge and every lower-tier value dependency is explicit. THE GAP: each import
@@ -316,7 +317,11 @@ fn parsing_cursor_imports_are_canonical_and_visibility_only() {
             "Data.Collections.Derived.length",
             "Data.Collections.Derived.nth",
             "Data.Numeric.Nat.Arithmetic.add",
+            "Core.Classes.LawfulClasses.leq_nat",
             "Data.Numeric.Nat.Order.sub",
+            "Core.Logic.Transport.cong",
+            "Core.Logic.Transport.sym",
+            "Core.Logic.Transport.trans",
         ],
     );
     assert_private(PARSING_CURSOR, "MkArgCursor");
