@@ -10892,17 +10892,31 @@ fn reduce_resolved_operator(
                 },
                 // The ordinary user-operator spine, unchanged.
                 //
-                // **RESIDUAL, stated because it is the one case I could not
-                // construct rather than one I have closed.** When
-                // `standard_operators` is `None` -- the paths that elaborate
-                // no user body -- a standard occurrence would take this arm
-                // and be left as a two-argument application of a four-argument
-                // binding, caught downstream by the kernel check rather than
-                // named as a role. Deciding it here without the map would mean
-                // keying on the glyph, which is the thing `§6.9` forbids. I
-                // could not build an input that reaches it, because the map is
-                // absent exactly where no user body elaborates; that is an
-                // argument, not a proof, and it is QA's to attack.
+                // **RESIDUAL: REACHABLE, UNFIXTURED.** A standard occurrence
+                // taking this arm is left as a two-argument application of a
+                // four-argument binding, caught downstream by the kernel check
+                // rather than named as a role. Deciding it here without the
+                // map would mean keying on the glyph, which is the thing
+                // `§6.9` forbids.
+                //
+                // AN EARLIER VERSION OF THIS COMMENT CALLED THE CASE
+                // UNCONSTRUCTIBLE, and the reason it gave covered only half of
+                // it. It reasoned about `standard_operators == None` -- the
+                // paths that elaborate no user body -- and concluded the map is
+                // absent exactly where no user body elaborates. But an ABSENT
+                // HOME yields `Some(empty)`, not `None`: `certify_roles`
+                // returns an empty map rather than declining, and an empty map
+                // certifies nothing, so this arm is reached WITH a user body.
+                //
+                // The shape that reaches it: import `ord_leq_at as ≤` directly
+                // while `Core.Operators.Standard` is absent from the program.
+                // `≤` then resolves to the four-argument binding, nothing is
+                // certified, and the occurrence lands here.
+                //
+                // That construction is stated and NOT BUILT. A named, unbuilt
+                // construction is a better thing to hand an attacker than a
+                // claim of non-constructibility, which is what this said
+                // before and what the paragraph above refutes.
                 None => {
                     let head = RExpr::RCon(name, operator_span.clone());
                     let first_span = Span::merge(head.span(), lhs.span());
