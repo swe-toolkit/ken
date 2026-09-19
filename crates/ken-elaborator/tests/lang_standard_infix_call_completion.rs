@@ -157,25 +157,33 @@ fn a_facade_glyph_rename_republishes_the_defining_globalid() {
 // A red build does not discharge AC-9. The diagnostic has to NAME THE ROLE,
 // so every assertion below is on the role, not merely on failure.
 //
-// AC-9(c) IS NOT DISCHARGED BY WHAT IS BELOW, and must not be recorded as if
-// it were. (a) unfilled and (b) wrong-shape are covered here; (c) is the
-// HOME-MOVED case, and there is no test for it because the behaviour it asks
-// for does not exist: relocate the home and `certify_standard_operator_home`
-// never fires, the map stays empty, every occurrence takes the ordinary
-// spine, and no role is named anywhere.
+// AC-9 IS DISCHARGED BY (a) AND (b). (c) IS WITHDRAWN, NOT OPEN. The
+// withdrawal is a frame amendment authored by the Steward against
+// `docs/program/issues/LANG-STANDARD-INFIX-CALL-COMPLETION.md`; read the
+// frame for its terms rather than this comment.
 //
-// That is not a missing test. `(c)` as written is UNSATISFIABLE BY
-// CONSTRUCTION: naming a role at the occurrence requires the certified map,
-// which is exactly what is empty in this scenario, and the only other way to
-// recognise the occurrence is its glyph -- which `§6.9` forbids. The
-// occurrence layer cannot answer it.
+// (a) unfilled and (b) wrong-shape are the tests below. (c) asked for the
+// HOME-MOVED case to be refused naming the role, and there is no test for it
+// because that behaviour does not exist: relocate the home and
+// `certify_standard_operator_home` never fires, the map stays empty, every
+// occurrence takes the ordinary spine, and no role is named anywhere. The
+// build still goes red -- the kernel catches the under-applied call -- so
+// what is lost is the ATTRIBUTION, not the refusal. That is recorded in the
+// frame as accepted behaviour, not as an outstanding gap.
 //
-// The open question is therefore a FRAME AMENDMENT, not a build gap: move
-// (c) to the check layer (refuse when the home is absent, naming every
-// unfilled role). That check is deliberately NOT built here -- it would make
-// every program carry the home whether or not it uses a standard operator,
-// which is not worth it for a case already caught downstream, if less
-// precisely.
+// (c) was unsatisfiable AT THE OCCURRENCE by construction: naming a role
+// there needs the certified map, which home-moved is precisely the scenario
+// that empties, and the only other route is the glyph, which `§6.9` forbids
+// verbatim -- "never to the occurrence's glyph text".
+//
+// **THAT IS A PROPERTY OF THE LAYER, NOT OF THE QUESTION, and the two must
+// not be collapsed.** One layer up, at the check, "refuse when the home is
+// absent, naming every unfilled role" is perfectly implementable. It is
+// deliberately NOT built: it would make every program carry the home whether
+// or not it uses a standard operator, which is not worth it for a case
+// already caught downstream, if less precisely. So "unsatisfiable" here must
+// never be read as "impossible" -- collapsing those is how this gets
+// re-derived as a defect by a later reader.
 // ---------------------------------------------------------------------------
 
 /// A provider whose four binding-backed roles all have the shape `33 §6.1`
