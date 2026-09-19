@@ -502,12 +502,58 @@ Entries 4, 5 and 6, appended verbatim from the Architect at
 > that the intended pairing relation is wrong** — only that it resolves nothing
 > at 503. The entry's keying clause is held to what those citations carry.
 
-**Hard-stop count on this WP: 6.** **The parent node's count of 2 does NOT
+Entries 7, 8, 9 and 10, appended verbatim from the Architect at
+`evt_3kx5y2nwqbxq9`, numbered against this file's sequence. Entries 1-6 above
+are deliberately not rewritten.
+
+```
+7. the live-claim census counts seats claimed PER ARM and pruned
+   afterwards, so 13 claims in Specialization(1) is not 13 duplications
+   and the magnitudes cannot be read off it -- keyed on a count whose
+   UNIT is the arm and whose reader took it for the duplication, the
+   pruning that separates the two happening after the count is taken
+8. StaticOriginId is erased before native host dispatch and the runtime
+   trace, ABI and call-site map carry no origin, so the coordinate the
+   attribution question was posed in does not exist at the point the
+   observation is made -- keyed on an ORIGIN coordinate that does not
+   survive to the observation point, where the OWNER does, as a function
+   symbol
+9. the owner label was read as naming an emitted function -- five
+   declaration families in one pass (units, continuations, responses,
+   contexts, fusions) each emit under the SAME enclosing specialization
+   and are keyed by five disjoint typed identities (UnitBundle
+   :303-327), so Specialization(0) is many-to-one onto emitted functions
+   -- keyed on a LABEL taken for an IDENTITY of a population it does not
+   range over
+10. the two executing dispatch sites are DISPOSITION-DISJOINT, not
+   duplicative: ken_static_response_0 emits the single Released and
+   ken_continuation_context_1 emits all five Closed, residual zero --
+   two emission families independently reconstruct ownership of one
+   resource and reach DIFFERENT dispositions -- keyed on an identity
+   RE-DERIVED PER FAMILY because it was never carried, so no key in the
+   system can express that the two disagree
+```
+
+> **THE TWO COUNTERS HAVE NOW SEPARATED, WHICH `§5`'s OWN TEXT SAID WOULD
+> HAPPEN.** Nine hard stops have produced ten symptom entries: a single stop can
+> yield more than one symptom line. The Architect's words, kept because the
+> temptation to reconcile them is real: *"they should not be forced to match —
+> pretending otherwise would corrupt whichever of the two is load-bearing."*
+>
+> **`§5` says `§1a` fires at the third HARD STOP and `§1b` at the third
+> INVENTORY ENTRY**, and records that the two coincided 1:1 *"today"*. That
+> stopped being true at this append. **Which counter `§1b` follows from here is
+> the Architect's to state, not the Steward's**, and this note deliberately does
+> not settle it: the next `§1b` check is either the twelfth entry or the
+> twelfth stop, and those are now different moments. The Steward is recording
+> the divergence, not resolving it.
+
+**Hard-stop count on this WP: 9.** **The parent node's count of 2 does NOT
 carry** — different WP, different question. `§1a` fired at three
-(`evt_7d3h7mtff5acd`) and has now **re-fired at six** (`evt_3t5nq11ernjfa`),
-holding the ruling on the next locus and calling Research. `§1b` fired at
-three (`evt_1mv0phbj0zcn7`) and was re-run at six (`evt_734ccm2xzxp5r`);
-**the next predicate check is at 9.**
+(`evt_7d3h7mtff5acd`), **re-fired at six** (`evt_3t5nq11ernjfa`), and has
+**re-fired at nine**, holding the ruling on the next locus and calling
+Research. `§1b` fired at three (`evt_1mv0phbj0zcn7`), was re-run at six
+(`evt_734ccm2xzxp5r`), and was re-run at nine (`evt_3kx5y2nwqbxq9`).
 
 > **THE COUNT IS 6 AND NOT 5, AND THE ADJUDICATION IS THE ARCHITECT'S.** The
 > implementer reported "count remains 5" and that reading is defensible — they
@@ -550,6 +596,42 @@ existed when the amendment was written, not worse.
 
 **The associativity theorem in `§7` is independent of all of this** and does not
 need entry 3 at all.
+
+### The `§1b` support set restated at nine, and what it still lacks
+
+The Architect's `§1b` re-run at nine (`evt_3kx5y2nwqbxq9`), against **this
+file** as the artifact. An earlier statement of the support set was measured
+against `wp/RT-PLANNER-KRET-GRAFTED-SPINE-INVENTORY-45`, whose wording for
+entries 4 and 5 is superseded; that branch is **behind** this file and is not
+the artifact.
+
+The predicate: **the release's identity is never CARRIED. At each boundary it
+is dropped and reconstructed from whatever coordinate is locally available, and
+every such coordinate ranges over a population coarser than the resource
+itself.**
+
+- **Fitting: 3, 4, 5, 6, 7, 8, 9, 10** — eight of ten. Entry 5 ends *"keyed on
+  the SOURCE worker body's occurrences naming the result of the DRIVEN
+  object"*, a source-syntax coordinate standing in for a runtime object's
+  identity, and entry 6 is *"keyed on an owner coordinate standing for the
+  driven object"*. Both fit; the earlier "5 does not fit" was read off the
+  superseded wording.
+- **Not fitting: 1 and 2.** Entry 1 is a constructor's arity hardcoded as a
+  literal beside a derived one. Entry 2 is a fail-closed check hiding
+  downstream state — an instance of the Architect's *other* named predicate,
+  observation gated by its own subject.
+
+> **EIGHT OF TEN IS THE COUNT; ONE SURVIVED PREDICTION IS WHAT IT DOES NOT YET
+> HAVE.** Recorded in the Architect's own words because the correction made
+> their own claim *stronger*, which is the direction that earns more scrutiny
+> rather than less. Two checks they ran on it instead of banking it: the
+> predicate **discriminates** — entries 1 and 2 are real, are on this WP, and
+> do not fit; and it has **not yet made a prediction that could have failed**.
+> The predicate was named before the 1+5 attribution and listed "any other
+> split" as a stop, so the disposition-disjoint result of entry 10 is
+> *consistent with* it but was **not predicted by** it. The strengthening came
+> from re-reading corrected artifact text, **which is weaker evidence than a
+> survived prediction.**
 
 **TWO ACTS FIRE AT THREE, BOTH THE ARCHITECT'S, BOTH BEFORE THEY RULE**
 (`evt_3t3ynhwbr8jv`). **They are driven by two different counters and the
