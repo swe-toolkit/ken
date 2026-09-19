@@ -255,7 +255,7 @@ fn formatting_doc_imports_are_canonical_and_visibility_only() {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: every publishable Parsing.Cursor declaration and constructor is
-/// queried through its real DC-first roots closure, and exactly the 17-name
+/// queried through its real DC-first roots closure, and exactly the 18-name
 /// downstream union imports together. CLAIMED: Cursor exposes its shared
 /// dictionary, argument carriers, operations, and laws without publishing
 /// implementation state. THE GAP: provider use and the private boundary are
@@ -272,6 +272,7 @@ fn parsing_cursor_loader_visible_inventory_is_exact() {
         "CursorPeekHasRemaining",
         "MkArgLocation",
         "MkCursorOps",
+        "arg_cursor_laws",
         "arg_cursor_ops",
         "arg_cursor_start",
         "arg_length",
