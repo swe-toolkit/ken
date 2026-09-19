@@ -2695,7 +2695,7 @@ fn expand_scope(
             Decl::ModuleDecl {
                 name,
                 decls: inner,
-                span: module_span,
+                span: _,
             } => {
                 let child_prefix = qualify(prefix, name);
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
@@ -2708,10 +2708,42 @@ fn expand_scope(
                     false,
                 )?;
                 ids.extend(child_ids);
+                // THIS DISCHARGES A CONTRACT, NOT A SYMPTOM.
+                //
+                // `local_prebinding_preserves_legacy_map_union_stack_budget`
+                // promises that persistent local declaration bindings must not
+                // enlarge `expand_scope`'s long-lived legacy frame. An earlier
+                // form of this arm bound the decl's span and cloned
+                // `child_prefix` so both could outlive the recursive call --
+                // small in magnitude, and a true violation of exactly that.
+                //
+                // MEASURED: removing it does NOT fix the overflow that test
+                // reports. The overflow comes from the `RStandardOp` descent in
+                // `rewrite_rexpr_inner`, which is a DIFFERENT FRAME and which
+                // correctness requires. So this edit is a no-op for the red and
+                // the fix for the contract, and those are not the same job.
+                // Keep it for the second reason: once the budget is
+                // re-baselined, a total-stack pin can no longer see 8 bytes of
+                // creep, and nothing else is watching this frame.
+                //
+                // `certify_standard_operator_home` no-ops for every module but
+                // one, so gate it here rather than charge every recursion level
+                // for the comparison: test the name, move `child_prefix` into
+                // the export table as the pre-A1 code did, and materialise the
+                // span from `decl` only on the path that consumes it. `decls`
+                // outlives the call, so the span never has to cross it.
+                let is_standard_operator_home =
+                    child_prefix == crate::standard_operators::STANDARD_OPERATOR_HOME;
                 elab.module_state
                     .exports
-                    .insert(child_prefix.clone(), child_exports);
-                certify_standard_operator_home(elab, &child_prefix, Some(module_span))?;
+                    .insert(child_prefix, child_exports);
+                if is_standard_operator_home {
+                    certify_standard_operator_home(
+                        elab,
+                        crate::standard_operators::STANDARD_OPERATOR_HOME,
+                        Some(decl.span()),
+                    )?;
+                }
                 i += 1;
             }
             Decl::SpaceDecl {
