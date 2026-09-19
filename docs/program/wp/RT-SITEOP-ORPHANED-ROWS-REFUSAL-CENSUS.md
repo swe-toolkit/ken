@@ -254,7 +254,64 @@ instruction someone has to remember.
 - **AC-5** — the file count in this frame's search space was re-derived, and
   either confirmed at eight/six or corrected with your own measurement.
 - **AC-6** — a per-signature ownership proposal, with the fold-or-split argument
-  written out for each grouping.
+  written out for each grouping. **Its population is the EIGHT rows whose own
+  `#[ignore]` text names no live node, not this node's three** (enumerated
+  below). For each row **outside AC-11's closeout roster**, the proposal names
+  **which live node is expected to apply the correction** — a ROUTING statement
+  and nothing more. *(Control: the proposal has an entry for each of the eight,
+  and each of the five outside the roster names an owning node that is `ready`,
+  `active` or `draft` at the candidate's base. An entry that proposes mechanism
+  content for a row this census did not measure fails this AC.)*
+
+  > **Added by Steward amendment 2026-09-19, on the owner-liveness residue
+  > measurement (`evt_73fa9v0ca03ve`). The residue is EMPTY — every one of the
+  > 14 selected rows has a live owner — and that is exactly why the population
+  > is eight.** The defect is not orphaning. It is that **8 of 14 rows' own
+  > text names nothing live**, so ownership is real but recoverable only by
+  > opening 126 live node frames and matching coordinates. A reader starts at
+  > the row, and the row is a dead end.
+  >
+  >     THIS NODE (its 3, the closeout roster)
+  >       px7f_resource_native.rs:314
+  >       px7f_resource_native.rs:348
+  >       rt_escape_second_resource_native.rs:684
+  >
+  >     RT-CONTEXT-CAPTURE-CLAIM-ABSENCE  [ready]
+  >       px7l_checked_host_recursive_bind.rs:163
+  >       px7l_checked_host_recursive_bind.rs:241
+  >       px7m_hostresult_computational_match.rs:163
+  >       px7m_hostresult_computational_match.rs:206
+  >
+  >     RT-BRACKET-RELEASE-ORDER-PARITY   [ready]
+  >       px8ta_oriented_subcontinuation.rs:326
+  >
+  > The right-hand column is the arm-2 result, verified at each owning frame
+  > rather than by grep — the first three are this node's own adoptees, the next
+  > four are fenced by `file:line` at `RT-CONTEXT-CAPTURE-CLAIM-ABSENCE`'s frame,
+  > and `px8ta:326` is named by test name in
+  > `RT-BRACKET-RELEASE-ORDER-PARITY`'s own title.
+  >
+  > **WHY ROUTING ONLY, AND WHY THIS IS A CONSTRAINT RATHER THAN A PREFERENCE.**
+  > Raised by the runtime-implementer (`evt_70s2ffwwyn3b6`), endorsed as a
+  > standing constraint by the Architect (`evt_1b6zpr83b4cr8`). A routing
+  > statement is backed by the arm-2 measurement above and is writable here. A
+  > **mechanism string** for `px7l`/`px7m`/`px8ta` would not be: this census
+  > measured `px7f` ×2 and `rt_escape`, and those rows' mechanisms are the other
+  > two nodes' findings — for `px7m:206` the likely correct answer is that the
+  > refusal is RIGHT, which is `RT-CONTEXT-CAPTURE-CLAIM-ABSENCE`'s conclusion to
+  > reach. **A successor string authored from someone else's unfinished
+  > measurement is authoritative-looking and unbacked, and a reader who greps
+  > finds a hit and stops looking — strictly worse than the dead end it
+  > replaces,** and the same label rot this node exists to clean up. It is also
+  > what `AC-12` exists to catch, so manufacturing it here would defeat the check
+  > one AC below.
+  >
+  > **AC-6 RECORDS the expectation; it does not make anything CHECK it.** The
+  > five rows outside the closeout roster are corrected by their own nodes, whose
+  > reviewers open **their** frames, not this one. The obligation therefore also
+  > lands in each owning node's frame, the way `AC-11` sits in this one — see
+  > `RT-CONTEXT-CAPTURE-CLAIM-ABSENCE` and `RT-BRACKET-RELEASE-ORDER-PARITY`.
+  > Recording and enforcing are two halves and **neither does the other's work**.
 - **AC-7** — **on every INVESTIGATION candidate** (see *Which phase a candidate
   is in*, above — decide it from the roster, never from intent) no row is
   un-ignored, no row is re-labelled, and `RT-SITEOP-CARRIED-WITNESS` is neither
