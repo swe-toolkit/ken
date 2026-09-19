@@ -10755,19 +10755,6 @@ fn elab_standard_operator(
         // `(a : Type) -> Ord a -> a -> a -> Bool`. Completion must infer the
         // carrier and resolve the `Ord` dictionary by `§6.2`'s ordinary
         // instance search before the saturated application exists.
-        //
-        // **NOT YET WIRED, AND THE REASON IS STRUCTURAL RATHER THAN
-        // UNFINISHED WORK.** `resolve_instance_dictionary` -- the single
-        // resolver entry point D1 must reuse, per AC-3 -- takes
-        // `&mut GlobalEnv` and `&mut ClassEnv`, while `ElabCtx` carries
-        // `class_env: Option<&ClassEnv>`. An expression site cannot hand the
-        // resolver what it needs without changing how the context holds the
-        // registry, and that is a shape decision rather than a local edit.
-        //
-        // Refusing is the correct interim: `§6.9` forbids a silent fallback to
-        // a different meaning, and an under-applied four-argument binding is
-        // exactly such a fallback. The sound subset above ships; this one
-        // fails closed and names why.
         StandardOperatorRole::Leq | StandardOperatorRole::Geq => {
             // `§6.9`'s ORDER, exactly: infer the operand carrier, resolve the
             // dictionary by the ordinary `§6.2` search, then check the

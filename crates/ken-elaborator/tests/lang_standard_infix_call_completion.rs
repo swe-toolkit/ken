@@ -399,3 +399,64 @@ fn ac2b_an_unrelated_local_operator_with_the_same_glyph_is_left_alone() {
          the certified identity"
     );
 }
+
+/// The carrier-identity confirmation, exercised on the state it exists for --
+/// **and the measurement partly refutes the reason it was added.**
+///
+/// The state is reachable through the public API because the
+/// duplicate-definition guard is per compilation unit while `ElabEnv::globals`
+/// persists across `elaborate_file` calls and `insert` overwrites. So a second
+/// file can rebind `Foo` to a new type after the first file registered an
+/// `Ord Foo` instance for the old one. At the occurrence the scan matches the
+/// single registered spelling -- `globals["Foo"]` is the NEW type today -- so
+/// the two-match ambiguity arm stays silent. That is the blindness the
+/// confirmation exists for.
+///
+/// **MEASURED, and the hazard is MISATTRIBUTED rather than silent.** With the
+/// confirmation forced to accept, this program does not elaborate either: the
+/// kernel rejects it with `TypeMismatch { expected: (g641 Dg649), found:
+/// (g641 Dg646) }`. The wrong dictionary is caught downstream. So what the
+/// confirmation buys is ATTRIBUTION -- a refusal naming the class and the
+/// spelling, instead of a raw kernel mismatch on two opaque dictionary
+/// identities that points at the whole declaration.
+///
+/// That is worth having and it is not what the amendment was justified by.
+/// Recorded here rather than quietly enjoyed, because the next reader
+/// weighing this check's cost should weigh the benefit it actually has.
+///
+/// **RESIDUAL, and it is the reason the check still earns its place.** These
+/// two carriers are distinct inductives, so their dictionary types differ and
+/// the kernel cannot miss it. I have NOT exhibited a rebind where the old and
+/// new carriers are convertible but distinct identities -- there the kernel's
+/// net may not catch it and the substitution would be silent after all. The
+/// confirmation does not depend on which case it is; the kernel's coverage
+/// does.
+#[test]
+fn a_rebound_carrier_name_is_refused_by_identity_not_accepted_by_spelling() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(&format!(
+        "{PROVIDER_AND_HOME} \
+         data Foo : Type where {{ MkFoo : Foo }} \
+         instance Ord Foo {{ leq = \\x y. True }}"
+    ))
+    .expect("the first file registers `Ord Foo` for the original `Foo`");
+
+    let rebound = env.elaborate_file(
+        "data Foo : Type where { MkFoo2 : Foo } \
+         import Core.Operators.Standard (≤) \
+         fn f (a : Foo) (b : Foo) : Bool = a ≤ b",
+    );
+    let error = rebound.expect_err(
+        "the registered `Ord Foo` is for the FIRST `Foo`; completing against it \
+         would hand one carrier's dictionary to another",
+    );
+    assert!(
+        matches!(
+            error,
+            ken_elaborator::ElabError::InstanceCarrierIdentityMismatch { .. }
+        ),
+        "the refusal must be the identity confirmation, naming the class and \
+         the spelling -- a kernel TypeMismatch here means the confirmation \
+         stopped firing and the downstream net is carrying it alone: {error:?}"
+    );
+}
