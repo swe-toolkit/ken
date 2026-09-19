@@ -1,7 +1,7 @@
 ---
 id: RT-CONTEXT-FRAME-LABEL-CORRECTION
 title: "Four ignored rows carry a label naming this ID and the ID has no node: their labels already establish that the context-frame admission gate CANNOT readmit them at either setting, and that the surviving refusal is `plain Match branches declare different recursive body units`. Decide whether that refusal is correct for these programs -- the branches genuinely declare different units -- or whether the units disagree only because body origins are resolved from closure structure, and establish the readmission condition the labels record as UNKNOWN."
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -225,6 +225,41 @@ rather than to assume one:
 **These were not ranked.** The label's phrasing pointed at (2) and did not
 establish it. **`D1` refuted (2) outright.** The instinct to leave them unranked
 was right; the error was that neither was the mechanism.
+
+# STATUS CORRECTED 2026-09-19: `ready` -> `merged`. THE STALE STATUS WAS MINE.
+
+`D0` and `D1` were answered 2026-09-18; `D2`+`D3` landed at
+`badc039dad6dbecc5165ec0a02054b0984e9b2e4`, verified an ancestor of
+`origin/main` `ab323fc9e`. The node's deliverables are
+discharged and its own text has said so since the 18th. **The status field did
+not move, so the node advertised released, unstarted work for a day.**
+
+**The Steward kicked a seat at it on that stale status** (`evt_1svabjf8wasek`,
+withdrawn at `evt_4p2c7gw0p7tp7`). Caught by the runtime ring in one checkout,
+at no cost beyond the round trip, and corrected here.
+
+> ### THIS IS THE NODE'S OWN DEFECT, ONE LEVEL UP.
+>
+> This node exists because four `#[ignore]` labels named a blocker whose account
+> of them had gone stale. The node then became a tracker row naming a state that
+> had gone stale. **Same shape, different artifact: a durable label that records
+> what was believed when it was written, with nothing forcing a re-read when the
+> thing it describes moves.**
+>
+> The row-level instance got a node. The tracker-level instance is unframed and
+> is not this node's to carry.
+
+# WHAT IS STILL OPEN IS A SUCCESSOR, AND IT IS NOT FRAMED
+
+Rows 3-6 are NOT readmitted and nothing here claims they are. `D3`'s section
+already says no repair at `core.rs:1230` makes any row pass. What they need
+first is a **bounded** answer to how deep the stack goes.
+
+**That successor needs a design bound before it can be framed** — the node's own
+words are "a bounded read along one path with a stated stopping point, not a
+ladder," and the Architect has since found ten more refusal sites behind L2. A
+frame written without that bound is a ladder with a budget. **Steward: do not
+frame it as a measurement WP until the stopping point is ruled.**
 
 # Related
 
