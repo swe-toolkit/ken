@@ -44,6 +44,20 @@ use crate::error::{ElabError, Span};
 /// deferred, non-blocking improvement and is deliberately not built here.
 pub(crate) const STANDARD_OPERATOR_HOME: &str = "Core.Operators.Standard";
 
+/// Is `module` the standard-operator home?
+///
+/// **One definition, used by both the layer-3 entry point and the call site
+/// that gates it.** They previously each spelled `== STANDARD_OPERATOR_HOME`
+/// independently -- identical today, and identical is the problem: the day
+/// this notion widens (a normalisation, an alias, a second name) a second
+/// copy does not fail to compile, it silently stops gating and certification
+/// quietly never runs. That is the same invisible-omission shape `39 §6.9`
+/// forces this crate to guard against elsewhere, so it is worth a function
+/// rather than a convention.
+pub(crate) fn is_standard_operator_home(module: &str) -> bool {
+    module == STANDARD_OPERATOR_HOME
+}
+
 /// The standard operator roles of `33 §6.1`'s fixity table.
 ///
 /// **CLOSED AT FIVE, and `∈` is deliberately absent.** `§6.1`'s table names
