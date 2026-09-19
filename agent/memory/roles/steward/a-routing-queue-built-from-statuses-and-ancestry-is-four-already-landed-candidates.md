@@ -142,3 +142,53 @@ Related: [[stale-base-candidate-silently-reverts-everything-landed-since]] and
 5. **Tell the seats.** Four stale statuses meant four seats each believed they
    were blocked on the Steward. Refreshing them is part of closing the sweep,
    otherwise the next sweep re-derives the same four.
+
+## RECURRED 2026-09-19. RULE 5 WAS EXECUTED AND DID NOT HOLD.
+
+Five days later a Steward sweep re-derived this from scratch — same measurement,
+same conclusion, and **two of the same candidates**: `742d1628a` (kernel, then
+nine days landed as `0c68628f5`) and `a1b22e678` (doc, five days landed as
+`4b8b5e280`). Both are named with their landed SHAs in the section above.
+
+Three rings were idle: kernel (`kernel-leader` -> Steward M3-M4, `kernel-qa` ->
+leader's Decision, `kernel-implementer` -> QA's verdict) and the doc ring
+(`librarian` -> Steward closeout, `doc-author` -> Librarian review).
+
+**Two distinct failures, and only one of them is the statuses.**
+
+### Why telling the seats is not sufficient
+
+Rule 5 treats a stale status as a per-seat defect, repaired by refreshing it.
+But the configuration here is a **cycle**: each seat's blocker names another
+seat in the ring. Refresh any one member and the others still name it.
+
+> **A ring of mutual blockers contains no member whose next action is to
+> measure `main`** — because every member is *correctly* waiting on a member.
+> The topology is stable under any number of individually-correct statuses, and
+> no seat inside it is doing anything wrong.
+
+⇒ the durable repair is not a refresh, it is a habit the blocked seat owns:
+**before reporting yourself blocked on a named seat, blob-loop your own
+candidate against the tip.** That is five seconds, it does not require the seat
+you are blocked on to still exist, and it is the only move that breaks a cycle
+from the inside. Rule 5 stays, but it closes *this* sweep; it does not prevent
+the next.
+
+### The re-derivation, which is the more expensive half
+
+The sweep that found it **skipped the startup memory-scope read as too
+expensive**, then spent a full turn re-measuring candidates this file already
+lists by SHA. "The scopes are large and I have the distilled index resident"
+was the reasoning; the index line for this lesson is not a substitute, because
+the payload is *which four candidates*, and only the file carries that.
+
+**A lesson you re-derive is a scope you did not read** — and it announces
+itself as novel work, because re-derivation and discovery feel identical from
+the inside. Sibling:
+[[the-false-zero-that-agrees-with-you-is-the-one-that-is-never-caught]].
+
+The asymmetry that settles the startup question: reading the scope costs a
+bounded, known amount once per session. Skipping it costs an unbounded
+re-derivation at an unpredictable moment, **plus the days of ring idleness that
+the un-read lesson would have cut short.** Here that was three rings and nine
+days.
