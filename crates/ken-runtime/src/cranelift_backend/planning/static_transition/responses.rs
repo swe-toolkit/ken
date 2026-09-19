@@ -3297,6 +3297,7 @@ impl StaticTransitionPlan<'_> {
         let requires_execute_then_resume = ordinary_stage_count >= 2;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
+        let mut locally_driven_results = Vec::new();
         for demand in demands {
             #[cfg(feature = "px8-ds-test-support")]
             let suppress_execute = SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
@@ -3341,6 +3342,35 @@ impl StaticTransitionPlan<'_> {
                     base_owner: demand.base_owner,
                     caller_emission_owner: demand.k_identity.emission_owner(),
                 };
+                let locally_driven_result = match exact_response_result_identity(
+                    self,
+                    demand.k_body_origin,
+                )? {
+                    Ok(identity) => identity,
+                    Err(reason) => {
+                        return Err(planner_error(format!(
+                            "a locally driven Deferred response has no exact post-drive result identity: {reason}"
+                        )))
+                    }
+                };
+                if let Some((_, existing_origin, existing_identity)) =
+                    locally_driven_results.iter().find(|(caller_owner, _, _)| {
+                        *caller_owner == owner_pair.caller_emission_owner()
+                    })
+                {
+                    if *existing_identity != locally_driven_result {
+                        return Err(planner_error(format!(
+                            "locally driven Deferred results at {existing_origin:?} and {:?} disagree in one caller owner",
+                            demand.k_body_origin,
+                        )));
+                    }
+                } else {
+                    locally_driven_results.push((
+                        owner_pair.caller_emission_owner(),
+                        demand.k_body_origin,
+                        locally_driven_result,
+                    ));
+                }
                 let aggregate_producer_ownership = Some(
                     self.deferred_response_aggregate_producer_ownership(
                         &demand,
@@ -3366,6 +3396,20 @@ impl StaticTransitionPlan<'_> {
                 // owner performs the host effect, calls the exact K context once,
                 // and returns its existing Result word before the caller resumes.
                 specialized.push(demand);
+            }
+        }
+        for (caller_owner, result_origin, result_identity) in locally_driven_results {
+            let mut matching = specialized
+                .iter_mut()
+                .filter(|demand| demand.base_owner == caller_owner);
+            let first = matching.next();
+            if matching.next().is_some() {
+                return Err(planner_error(format!(
+                    "a locally driven Deferred response result at {result_origin:?} reaches more than one response row in its exact caller owner"
+                )));
+            }
+            if let Some(demand) = first {
+                demand.k_ret_identity = result_identity;
             }
         }
         specialized.sort_by_key(|demand| {
