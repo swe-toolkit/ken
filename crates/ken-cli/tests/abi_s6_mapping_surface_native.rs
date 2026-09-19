@@ -457,12 +457,50 @@ fn try_differential(case: &str, entry: &str, matrix_body: &str) -> Result<Differ
     })
 }
 
+/// Run `try_differential` on a worker thread with an explicit stack.
+///
+/// RESTORED. This wrapper and its grant were added at `1c48b6c5c`, whose
+/// message is "fix stack-overflow regression", and deleted four hours later at
+/// `d8bbef963`, whose message is about `mapWrite` offset/extent alignment and
+/// never mentions the stack. It removed the grant in TWO places: it repointed
+/// the two callers below at `try_differential` directly, and it stripped the
+/// lone `.stack_size` from the suppressed-local-drive `Builder`. Between them,
+/// ALL TWELVE of this module's tests went back on libtest's ambient 2 MiB
+/// thread — ten via `differential`, one via `differential_matrix_body`, and
+/// one directly.
+///
+/// Restoring only the wrapper therefore leaves
+/// `suppressing_bounded_response_owner_drive_restores_the_pending_vis_trap`
+/// on 2 MiB. Both sites, or the job is not done.
+///
+/// A deleted guard is invisible when the deleting commit is about something
+/// else. Nothing ever went red on `main`: eight days later `badc039da` was
+/// still 8/8 green without it, and `main` is green without it today. That is
+/// a fact about proximity to a cliff, not about safety — the margin was
+/// consumed by an unrelated change that had no reason to look here.
+fn try_differential_in_worker(
+    case: &str,
+    entry: &str,
+    matrix_body: &str,
+) -> Result<Differential, String> {
+    let owned_case = case.to_owned();
+    let entry = entry.to_owned();
+    let matrix_body = matrix_body.to_owned();
+    std::thread::Builder::new()
+        .name(format!("abi-s6-{case}"))
+        .stack_size(32 * 1024 * 1024)
+        .spawn(move || try_differential(&owned_case, &entry, &matrix_body))
+        .map_err(|error| format!("starts {case} matrix worker: {error:?}"))?
+        .join()
+        .map_err(|_| format!("{case}: matrix worker panicked"))?
+}
+
 fn differential(case: &str, entry: &str) -> Differential {
-    try_differential(case, entry, "read_body").unwrap_or_else(|error| panic!("{error}"))
+    try_differential_in_worker(case, entry, "read_body").unwrap_or_else(|error| panic!("{error}"))
 }
 
 fn differential_matrix_body(case: &str, body: &str) -> Result<Differential, String> {
-    try_differential(case, "matrix_stage", body)
+    try_differential_in_worker(case, "matrix_stage", body)
 }
 
 fn differential_matrix_body_with_suppressed_local_drive(
@@ -473,6 +511,7 @@ fn differential_matrix_body_with_suppressed_local_drive(
     let body = body.to_owned();
     std::thread::Builder::new()
         .name(format!("abi-s6-{case}-suppressed-local-drive"))
+        .stack_size(32 * 1024 * 1024)
         .spawn(move || {
             let (result, applications) = ken_runtime::with_handler_owned_deferred_response_mutation(
                 ken_runtime::HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
