@@ -1,7 +1,7 @@
 ---
 id: RT-WORKER-FIXTURE-DECODE
-title: "AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes"
-status: ready
+title: "PREMISE REFUTED AS WRITTEN 2026-09-19 — demoted ready to draft, DO NOT KICK until re-measured: the witness row two_same_shape_workers_are_distinguished is un-ignored and live, readmitted on a mutation that reds its first comparison, so the expression is not dark. Residue unmeasured: which of the three comparisons is the target-redirect one. WAS: AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes"
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -11,7 +11,41 @@ github: null
 origin: Measured by the RT-SRCBODY-BIND-ORDER all-eight-package two-ended census (evt_ksrhrv82t5ae), after CI failed this row at candidate fb99d0fc. Fails identically at frozen base 21fd46dc, so it is pre-existing base debt and not a regression from D1. Fits no released owner; the ring stopped and reported rather than assigning a nearest fit. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> ## FRAMED — `ready`, size M
+> # DEMOTED `ready` -> `draft` 2026-09-19 (Steward). DO NOT KICK; RE-MEASURE FIRST.
+>
+> **The witness row is live and passing, so the premise as written does not
+> hold.** Measured at `ba67e549f`.
+>
+> This node's premise is that the detector is **dark**: *"its expression dies at
+> the run step with Backend NativeResultDecode token 9, before any of its three
+> comparisons."* Its witness row —
+> `cranelift_backend::lowering::core::tests::constructors::two_same_shape_workers_are_distinguished`,
+> whose `#[ignore]` string named this node and read *"the worker fixture cannot
+> run, so the AC-5 comparisons are unreachable"* — **carries no `#[ignore]`
+> attribute any more.** It was readmitted by `RT-IGNORED-PASSING-ROWS-DISPOSITION`
+> (merged) on a mutation, not on the green: broadcasting the first stored capture
+> across the worker call's capture run reds **the first comparison** with the
+> collapse visible in it. A comparison that can be reached and red is not a
+> comparison behind a dark expression.
+>
+> **Why demoted and not closed.** The readmission demonstrates the **first** of
+> the three comparisons is reachable. This node's subject is AC-5's
+> **target-redirect** detector, and nothing measured here says which of the three
+> that is or whether the other two are reachable. Closing on this evidence would
+> be the same-shape-different-population inference the campaign has repeatedly
+> paid for. `draft` is the honest state: the premise is refuted **as written**,
+> and the residue — if any — has not been measured.
+>
+> **The reason this is urgent rather than tidy:** `ready` means kickable. A ring
+> kicked at this node would have spent a T1 turn building a repair for a detector
+> that is no longer dark, and the frame's own ACs are controls on that repair —
+> none of them could report that there was nothing to repair.
+>
+> **Whoever picks this up: re-measure first.** If the target-redirect comparison
+> is reachable, close this REFUTED. If a distinct one of the three is still dark,
+> re-cut the node to that comparison alone and say so in the title.
+>
+> ## FRAMED — was `ready`, size M
 >
 > Frame: [`wp/RT-WORKER-FIXTURE-DECODE.md`](../wp/RT-WORKER-FIXTURE-DECODE.md)
 >
