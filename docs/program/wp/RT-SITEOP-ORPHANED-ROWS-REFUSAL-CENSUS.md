@@ -775,3 +775,154 @@ it — and a candidate that survives its own elimination test is exactly the one
 that gets promoted to owner silently, which is the failure `AC-9` was written
 against. Naming the owner additionally requires attributing the `-1` to one of
 the four adapter checks, and the paragraph above says why that is open.
+
+## `AC-6` — per-signature ownership proposal, population eight
+
+Base `7d3d9d5ba473bc4967166bb6d33efc59197f59b7`, which is `origin/main` and the
+merge-base of this candidate, re-derived here rather than taken from the
+kickoff. Rows are cited by test name per `AC-10`.
+
+**`D2`'s rule governs every fold below:** rows fold on a **mechanism**, never on
+a symptom, a value, or a label. Both directions need an argument; either taken
+for free is the same error.
+
+### The population, and a control on how it was selected
+
+`rt_escape_second_resource_native.rs` carries **four** ignored rows and only
+**one** is in this population. The other three name live nodes at their own
+start and are correctly excluded:
+
+    row                                                  first token      in?
+    escaped_resource_used_by_fanning_host_op_...         RT-DUPLICATED-    no
+                                                         RESPONSE-BLOCK    (active)
+    escaped_buffer_used_by_fanning_host_op_...           RT-SITEOP-        YES
+                                                         CARRIED-WITNESS   (merged)
+    nat_fanout_escaped_resource_matches_interpreter      RT-DUPLICATED-    no
+                                                         RESPONSE-BLOCK    (active)
+    r2_cross_buffer_freeze_fails_closed_with_...         RT-PROCESS-       no
+                                                         EXIT-STATUS       (draft)
+
+⇒ The selector discriminates **within a single file**, on owner liveness rather
+than on file membership. A selection that had taken the file would have taken
+four; a selection keyed on the label text would have taken four. This is the
+positive control that the eight are eight.
+
+### `G1` — rows 1 and 2. THIS NODE. **Grouped as CANDIDATES, not folded.**
+
+    linked_public_right_denial_preserves_exact_masks
+    linked_public_second_release_is_closed_and_the_handle_closes_once
+      px7f_resource_native.rs                    owner: THIS NODE
+
+**What they measurably share is disqualified as a fold basis by `D2`, three
+times over:** the same phase and terminal value (`RUNTIME`,
+`UnclassifiedRuntimeTrap { terminal_value: -1 }`) is a **symptom** and a
+**value**; their byte-identical `#[ignore]` strings are a **label**, and this
+frame already records that the identical text is the error rather than evidence
+of a shared cause.
+
+**The mechanism I can establish is too coarse to individuate them.** `AC-3`
+established that a process-mode compile emits four `require_nonzero` checks
+into the entry adapter via `define_root_adapter`, gated on the compile lane and
+not on the body. Both rows go through that emitter — **and so does every
+process-mode row in the workspace.** A property shared with the whole
+population is not a grouping.
+
+**What would fold them, and it is not measured:** which of the four adapter
+checks fires on each row. `AC-3`'s bound 1 stands — `-1` has ten production
+producers in the lowering tree, four of them `require_nonzero` calls in the
+entry adapter alone, two of which are arena checks unrelated to the process
+input. **The value does not attribute the row, so it cannot fold two rows
+either.**
+
+⇒ **Proposal: one node for `G1`, scoped to discriminating which adapter check
+fires.** If the answer differs between the two rows, this grouping is wrong and
+the discriminator is what says so — which is the property that makes it worth
+running rather than assuming.
+
+### `G2` — row 10. THIS NODE. **SPLIT from `G1`, and the split is measured.**
+
+    escaped_buffer_used_by_fanning_host_op_matches_interpreter
+      rt_escape_second_resource_native.rs        owner: THIS NODE
+
+`AC-1` partitioned this on the packaging error's **own `stage` field**
+(`ObjectEmission`), not on the signatures differing. **It refuses at COMPILE:
+no artifact is produced and nothing runs**, so it never reaches the entry
+adapter that `G1` turns on. That is a stronger split than a differing symptom —
+the two groups cannot share a mechanism, because one of them never executes.
+
+The frame offered this split as its own position and invited refutation. **I
+cannot refute it and I am not going to manufacture an argument against it**;
+the `stage` field is the instrument and it is the producer's own.
+
+### `G3` — four rows. ROUTE TO `RT-CONTEXT-CAPTURE-CLAIM-ABSENCE` [`ready`].
+
+    delayed_capturing_generic_bind_agrees_across_real_executors
+    runtime_selected_non_unit_response_is_consumed_across_real_executors
+      px7l_checked_host_recursive_bind.rs
+    dynamic_ok_payload_selects_a_multistep_tree_across_real_executors
+    dynamic_err_payload_selects_a_multistep_tree_across_real_executors
+      px7m_hostresult_computational_match.rs
+
+**Routing statement and nothing more.** The owner is established by the arm-2
+verification at `evt_73fa9v0ca03ve`: that node's frame fences all four by
+`file:line` at its §1. Status measured at this candidate's base: **`ready`**.
+
+**This census does not say whether these four fold.** Their own labels record a
+three-versus-one split on body equality — that is **the labels' claim and that
+node's to confirm or refute**, not a finding this census made or adopts. Saying
+more would be mechanism content for rows this census did not measure, which
+`AC-6`'s control fails and `AC-12` exists to catch.
+
+### `G4` — one row. ROUTE TO `RT-BRACKET-RELEASE-ORDER-PARITY` [`ready`].
+
+    public_two_three_level_brackets_finish_and_release_lifo
+      px8ta_oriented_subcontinuation.rs
+
+**Routing statement and nothing more.** That node names this row by test name
+in its own title and at its frame's population section. Status at this base:
+**`ready`**.
+
+Noted for whoever executes it, as routing rather than mechanism: that node's
+`AC-9` has only branches `(b)` and `(c)` available, because its `AC-6` requires
+the row to remain ignored and `AC-0` bars adding attributes.
+
+### Fold-or-split, stated as a table so nothing is taken for free
+
+| pair | direction | the argument |
+|---|---|---|
+| `G1` internal | **not folded** | only symptom/value/label shared; the one mechanism established is shared with the whole process-mode population |
+| `G1` vs `G2` | **split** | measured at the packaging error's own `stage` field; `G2` never executes |
+| `G3` vs `G4` | **split** | different owning nodes, established by arm 2 at each frame |
+| `G3` internal | **not decided here** | mechanism, and it belongs to the owning node |
+
+### What this does NOT discharge
+
+`AC-9`'s wording stands unchanged: **rows 1 and 2 have a named candidate owner
+and not an owner.** `G1` proposes a node to *find* the owner; it does not name
+one. `AC-3` kept candidate (a) alive rather than eliminating it, and a
+candidate that survives its own elimination test is the one that gets promoted
+silently.
+
+No row is un-ignored and no `#[ignore]` attribute is touched by this candidate
+— this is an **investigation** candidate and `AC-7` governs it.
+
+> **A hygiene note for whoever checks `AC-7` and the phase rule on this
+> candidate, because I tripped it on myself.** Both controls are **roster**
+> tests, and the roster here is one file under `docs/program/wp/` with **zero**
+> `crates/` files. But a reviewer who implements the phase rule as a content
+> grep over the diff gets a hit:
+>
+>     git diff -U0 | grep -c '#\[ignore'                  ->  2
+>     git diff -U0 | grep -c '^[+-][[:space:]]*#\[ignore'  ->  0
+>     git diff --name-only -- crates/ | wc -l              ->  0
+>
+> **Both hits are prose in the added markdown** — one of them is the sentence
+> immediately above, asserting that no attribute is touched. An unanchored
+> grep would classify this as the **closeout** candidate and then fail it for
+> not containing the two test files, which is the opposite of the truth.
+>
+> ⇒ Use the roster, as both controls are written. If you want a content check
+> as well, anchor it to attribute position (`^[+-][[:space:]]*#\[ignore`) and
+> pair it with the `crates/` file count. This is the same shape as an oracle
+> that fires on the prose denying it, and the frame is not at fault — it says
+> roster, and roster is right.
