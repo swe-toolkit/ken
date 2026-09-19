@@ -156,6 +156,26 @@ fn a_facade_glyph_rename_republishes_the_defining_globalid() {
 //
 // A red build does not discharge AC-9. The diagnostic has to NAME THE ROLE,
 // so every assertion below is on the role, not merely on failure.
+//
+// AC-9(c) IS NOT DISCHARGED BY WHAT IS BELOW, and must not be recorded as if
+// it were. (a) unfilled and (b) wrong-shape are covered here; (c) is the
+// HOME-MOVED case, and there is no test for it because the behaviour it asks
+// for does not exist: relocate the home and `certify_standard_operator_home`
+// never fires, the map stays empty, every occurrence takes the ordinary
+// spine, and no role is named anywhere.
+//
+// That is not a missing test. `(c)` as written is UNSATISFIABLE BY
+// CONSTRUCTION: naming a role at the occurrence requires the certified map,
+// which is exactly what is empty in this scenario, and the only other way to
+// recognise the occurrence is its glyph -- which `§6.9` forbids. The
+// occurrence layer cannot answer it.
+//
+// The open question is therefore a FRAME AMENDMENT, not a build gap: move
+// (c) to the check layer (refuse when the home is absent, naming every
+// unfilled role). That check is deliberately NOT built here -- it would make
+// every program carry the home whether or not it uses a standard operator,
+// which is not worth it for a case already caught downstream, if less
+// precisely.
 // ---------------------------------------------------------------------------
 
 /// A provider whose four binding-backed roles all have the shape `33 §6.1`

@@ -337,9 +337,15 @@ struct ElabCtx<'e> {
     /// dictionary's fields.
     class_env: Option<&'e ClassEnv>,
     /// The standard-operator identities certified by the required-roles check
-    /// (`33 §6.1`). `None` on paths that elaborate no user expression body; a
-    /// standard-operator occurrence reached with this unset is REFUSED naming
-    /// the role rather than silently left under-applied.
+    /// (`33 §6.1`). `None` on paths that elaborate no user expression body.
+    ///
+    /// **An occurrence reached with this unset is NOT refused naming the
+    /// role, and this comment used to say it was.** Nothing is certified, so
+    /// the occurrence takes the non-certified arm in `reduce_resolved_operator`
+    /// and is left as an ordinary UNDER-APPLIED application — precisely the
+    /// outcome the old sentence offered as the alternative it ruled out. It is
+    /// caught downstream by the kernel check. That arm's residual carries the
+    /// reachability argument.
     standard_operators: Option<&'e HashMap<StandardOperatorRole, GlobalId>>,
     /// The sink `§6.2` instance search appends its provenance to.
     ///
@@ -9537,9 +9543,13 @@ pub fn elaborate_rdecl(
     }
     let mut sentinel = ClassEnv::sentinel();
     // A sentinel class environment marks a path that elaborates no user
-    // expression body, so it certifies no standard operators either. Empty is
-    // the fail-closed value: an occurrence reaching here is refused naming the
-    // role rather than silently left under-applied.
+    // expression body, so it certifies no standard operators either.
+    //
+    // EMPTY IS NOT A FAIL-CLOSED VALUE, and this comment used to call it one.
+    // An empty map certifies nothing, so an occurrence reaching here is left
+    // as an ordinary under-applied application and caught downstream by the
+    // kernel check -- NOT refused naming the role. See the residual on
+    // `reduce_resolved_operator`'s non-certified arm.
     let no_standard_operators = HashMap::new();
     // A LOCAL SINK IS CORRECT HERE, AND IT IS THE ONLY PLACE THAT IS TRUE.
     // Provenance used to live inside `ClassEnv`, so on this path it went into
