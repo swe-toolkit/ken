@@ -216,3 +216,57 @@ identity encoding.
 `AC-2` is **NOT** discharged: the rows have not moved and this candidate lands
 no `crates/` file. What is landed is the measurement `D0` asked for, which was
 step one and is now durable rather than living in a thread.
+
+## Two cheap reads, ahead of `D1` proper
+
+### Read 1 — NO COLLISION. Neither composed-return node owns this.
+
+    RT-COMPOSED-RETURN-PRODUCER-SINK-COLOCATION  ready  D0-only feasibility:
+      can a fresh declared-call result be CO-LOCATED with a predeclared Ret
+      sink at the true StaticWorker producer. Lands no production.
+    RT-COMPOSED-RETURN-RUNTIME-CLOSURE           draft  HELD as FALLBACK,
+      explicitly NOT the selected mechanism; a runtime-closure repair route.
+
+Neither witness condition is *"the response carries `Vis` where the plan
+demands `Ret`"*, and **neither node names `px7f` or either of these two rows.**
+
+**The one near-miss, checked rather than assumed:** the runtime-closure node's
+title does contain `Vis` — three times — but it is quoting normative spec
+`42 §6.2`, `Vis e k -> apply k (H e)`. That is the effect-tree constructor in a
+semantics formula, not a witness condition about an identity mismatch. A
+grep on the token alone would have read as a collision.
+
+⇒ `D1` is this node's, as re-posed.
+
+### Read 2 — it genuinely IS a `Vis`, and the fixtures localize WHICH one
+
+The spec formula above is the discriminator: `Vis` **is** "performs an effect,
+with a continuation"; `Ret` is "returns". So the question is whether the
+response continuation performs a second effect. Read from the two fixtures:
+
+    fixture          INNER continuation (resource body)   OUTER (after main's bracket)
+    RIGHT_NOT_HELD   metadata_after -> Ret, both arms     after_right_outer -> host_exit
+    DOUBLE_RELEASE   double_release_after_first -> bind   double_release_done -> host_exit
+                     a SECOND effect
+
+**The two fixtures DISAGREE on the inner shape and AGREE on the outer**, and
+both rows produce the identical `Ret`-versus-`Vis` mismatch. A site whose shape
+differs between the fixtures cannot explain a mismatch that is the same on
+both; the outer continuation can. ⇒ **The site is main's continuation after
+the bracket**, in both rows, and in both it performs `host_exit` — an ambient
+operation, hence a `Vis`.
+
+⇒ **Outcome (1): true positive. The row is correct to refuse.** The carried
+constructor really is a `Vis`, so there is nothing to repair at the carrier;
+what does not hold is the planner's expectation that this response's `K`
+returns a `Ret`.
+
+**Residual, named rather than left implicit:** the localization above is a
+cross-fixture *argument* from a shape disagreement, not a per-site
+measurement. It is falsifiable — a fixture whose inner continuation is a `Ret`
+and whose outer is also a `Ret` should not exhibit the mismatch — and nothing
+here has run that case.
+
+⇒ Disposition is the `px7m:206` shape, not a repair: a correct refusal whose
+row carries a label stating the mechanism. `AC-2`'s second branch, not its
+first.
