@@ -69,10 +69,29 @@ and then `leq_nat b a` (`Order.ken.md:124`), so its laws are consequences of
 those four facts rather than of anything about `Nat` structure. In particular
 the `Eq` arm is exactly where `antisym` is used.
 
-**3. The existing `min`/`max` facts are examples, not package proofs.**
-`proof zero_left for min` (`:121`) and `proof zero_left for max` (`:123`) sit
-inside a ` ```ken example ` fence in `§4`. They are illustrative and are not on
-the package's exported proof surface. Promoting them is part of D2.
+**3. THREE existing facts are examples, not package proofs — and their terms
+differ, which `AC-D2-1` turns on.** Re-measured at `origin/main`
+`c86690632b92191b31c2d950a45d5daf56813753`; the file is byte-identical to
+`47b811be4`. An earlier revision of this input cited `:121`/`:123` and named
+two facts. **Both were wrong.** The real coordinates and terms, inside the
+` ```ken example ` fence in `§4`:
+
+    :166  proof zero_left  for min (n : Nat) : Equal Nat (min Zero n) Zero = Proved
+    :168  proof zero_left  for max (n : Nat) : Equal Nat (max Zero n) n    = Refl
+    :170  proof zero_right for sub (a : Nat) : Equal Nat (sub a Zero) a    = Refl
+
+They are illustrative and are not on the package's exported proof surface.
+Promoting all three is part of D2.
+
+`sub::zero_right` is a `sub` fact that `D1` did not promote while it promoted
+three siblings. It stays here rather than being reopened as `D1` work: leaving
+one `sub` law in an example fence beside three exported ones is exactly the
+prose-versus-surface drift `AC-D2-3` exists to catch.
+
+The package's own prose at `:173-177` states why the terms differ, and it is
+correct: `min Zero n` reduces to the literal `Zero`, so that goal whnfs to top
+and closes with `Proved`; `max Zero n` reduces to the abstract `n`, so that
+goal stays `Eq`-shaped and closes with `Refl`.
 
 ### Deliverable
 
@@ -83,7 +102,8 @@ Exported proofs in `Data/Numeric/Nat/Order.ken.md`, for abstract `m`/`n`/`a`/`b`
 - **`compare` agrees with `leq_nat` on all three arms** — `Lt`, `Eq`, and `Gt`
   each imply the corresponding order fact, with `Eq` yielding
   `Equal Nat a b` through `antisym`.
-- The two `§4` example facts, promoted to `pub proof`.
+- The three `§4` example facts of settled input 3, promoted to `pub proof`,
+  each keeping the closer the package's prose already justifies for it.
 
 Carry Boolean hypotheses and conclusions as `IsTrue` over `leq_nat`, matching
 what D1 landed and what `§4`'s own prose already commits the package to.
@@ -102,8 +122,39 @@ wrong and that is worth more than a workaround.
 
 **`AC-D2-1` — the laws are inhabited, exported, and none is degenerate.**
 *Control, both halves required:* the package elaborates with the new terms
-present; **and** replacing any one law's term with `Refl` makes the package go
-RED, restored byte-exact afterwards.
+present; **and** each law carries a mutation that makes the package go RED,
+restored byte-exact afterwards.
+
+**A MUTATION WHOSE MUTANT EQUALS THE ORIGINAL IS NOT A CONTROL.** An earlier
+revision of this `AC` required replacing *any one law's term* with `Refl`. For
+`max::zero_left` and `sub::zero_right` the term **already is** `Refl`, so that
+mutation is the identity: it cannot red, and reporting it as a pass would be
+reporting the mutation's own precondition. Do not run a vacuous arm and do not
+count it. If any law added here turns out to have this shape, **name it and
+substitute below** rather than recording a pass.
+
+*Per-law mutation, by the term the law actually carries:*
+
+- **Term is a real proof** (the seven bound and `compare` laws) — replace the
+  term with `Refl`. Must RED.
+- **Term is `Proved`** (`min::zero_left`) — replace with `Refl`. Must RED: the
+  goal whnfs to top, which is why `Proved` is its closer.
+- **Term is `Refl`** (`max::zero_left`, `sub::zero_right`) — replace with
+  `Proved`. Must RED: the goal is `Eq`-shaped over an abstract variable and
+  does not whnf to top.
+
+*Third half, required for the three definitional facts only:* **mutate the
+STATEMENT, not the term.** Perturb one side of the equation so it states
+something false — `Equal Nat (max Zero n) n` becomes `Equal Nat (max Zero n)
+Zero`, and likewise for the other two. Must RED; restore byte-exact.
+
+**This half is the one that does the job the `AC` is for, and the term arm
+cannot do it here.** A law that reduces definitionally is proved by `Refl`
+*whatever it says*, including `Equal Nat (max Zero n) (max Zero n)`, which is
+true, trivial, and passes every term mutation. The failure mode for a
+computational law is a **contentless statement**, not a weak proof, so the
+control has to move to the statement. Not required for the seven — their term
+arm already discriminates, and adding it there is cost without a question.
 
 **`AC-D2-2` — the shipped functions are unchanged.** This deliverable proves
 what the package already ships; it does not adjust a definition until it
