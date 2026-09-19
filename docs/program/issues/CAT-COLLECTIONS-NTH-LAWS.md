@@ -72,6 +72,25 @@ proposition. Note that `LawfulClasses`' own `leq_nat` proofs use the
 `Equal Bool ... True` spelling (`:499`), so the sibling convention in that file
 differs from what `AC-2` requires here — see `AC-2` for why the consumer wins.
 
+**5. Widening this import breaks one Rosetta consumer, by design, and the
+repair layer is settled.** `crates/ken-cli/tests/rosetta.rs:147` pins the
+string `import Core.Classes.LawfulClasses (bool_and, bool_leq)` exactly, and
+`remove_flattened_import` (`:66-76`) panics at `:70` when it does not occur.
+`ken run` takes one flat source unit, so this compatibility runner flattens
+`Derived`'s providers and subtracts the now-redundant import edges; an import
+that gains names is a miss, and the panic is the runner **working**. Settled
+input 1 requires the widening and `AC-2` requires the spelling that forces it,
+so this is not an avoidable collision — the candidate cannot satisfy this frame
+without it.
+
+**The same collision one package over was already repaired and cleared.**
+`47b811be4` (`CAT-NAT-ORDER-LAWS` D1) hit it when D1's new `Order` exports
+leaked into flat source as `UnresolvedCon leq_nat`, breaking 4/16 examples. Its
+repair replaced subtractive surgery over `Nat.Order` with an additive
+`["pub fn min", "pub fn sub"]` allowlist, 16/16 green, and the Adversary
+reviewed that repair and found NO DEFECT. **The direction of that repair is the
+part to carry: it moved a fail-open construct to a fail-closed one.**
+
 ## Deliverable
 
 Two exported declarations in `Data/Collections/Derived.ken.md`, for a general
@@ -108,7 +127,8 @@ for a statement that is accidentally trivial.
 same proposition, so no elaboration, no mutation, and no test can separate
 them — `AC-1`'s control is invariant under this choice and cannot discharge it.
 
-*Why it is required at all, given that nothing breaks either way:* the consumer
+*Why it is required at all, given that nothing breaks inside Ken either way:*
+the consumer
 is `CAT-PARSING-CURSOR-LAWS`, reaching these through `Order`'s `suc_decreases`,
 which is in `IsTrue` form. The argument is legibility at the use site, not
 provability and not term size — there is no conversion to avoid. It needs a
@@ -131,9 +151,47 @@ relation provable. *Control:* `nth` (`:91`) and `length` (`:169`) are
 byte-identical to their pre-candidate text, extracted and compared
 programmatically, not by eye.
 
-**`AC-4` — no new trust, and the diff goes exactly one place.** *Control:* the
+**`AC-4` — no new trust, and the diff goes exactly two places.** *Control:* the
 added lines contain no `Axiom`, postulate, primitive, `Omega` carrier, or
 kernel/TCB surface; **and** the diff touches exactly
-`catalog/packages/Data/Collections/Derived.ken.md` and, under `crates/`,
-nothing at all. Any other path — test or not — means this frame did not
-anticipate something: that is a hard stop and a report, not a scope extension.
+`catalog/packages/Data/Collections/Derived.ken.md` and, under `crates/`, at
+most `crates/ken-cli/tests/rosetta.rs`. Any other path — test or not — means
+this frame did not anticipate something: that is a hard stop and a report, not
+a scope extension.
+
+**This `AC` previously read "under `crates/`, nothing at all", which was a
+frame defect and mine.** It forbade the only repair `AC-2` makes necessary, so
+the frame was unsatisfiable and the candidate went CI-red *because* it complied.
+The ring hard-stopped and reported rather than widening scope on its own, which
+is what the clause is for; the clause was simply wrong about which paths this
+node reaches. The sibling `CAT-NAT-ORDER-LAWS` `AC-D2-4` already carried the
+two-path form on the same evidence.
+
+**`AC-5` — the Rosetta repair restores the consumer without weakening its
+guard.** The runner's exact-string, exact-cardinality matching is a fail-closed
+roster: it is *supposed* to panic when a provider edge changes shape, so that a
+catalog change cannot silently stop being flattened. *Control, both halves:*
+
+- **Rosetta is 16/16** on the repaired object, by the same command as
+  `47b811be4`'s discriminator.
+- **The pin stays exact.** No substring, prefix, regex, "contains", or
+  tolerate-extra-names matching, and no removal of a cardinality assertion.
+  Update the pinned text to what `Derived` now carries; do not teach the pin to
+  accept a class of strings. A pin that tolerates a widened import also
+  tolerates the next one silently, which converts the one construct here that
+  fails closed into one that fails open — the exact direction `47b811be4`
+  moved away from.
+
+*Two hazards this frame can name, both measured; the repair shape is the
+ring's:* updating the pinned string alone subtracts the import edge while
+nothing supplies `IsTrue` or `leq_nat` to the flat unit — `collections_prelude`
+allowlists only `["pub fn bool_leq", "pub fn bool_and"]` from `LawfulClasses`
+(`rosetta.rs:115`) — which is the `UnresolvedCon` shape D1 hit. And
+`pub fn IsTrue` (`LawfulClasses.ken.md:54`) is a single-line braceless
+declaration, so `flattened_braced_declaration` does not panic on it: it scans
+forward to the next `{` in the file and returns a range over an unrelated
+declaration. **That helper fails open on exactly this input**, so extending the
+allowlist to `IsTrue` needs more than adding a string to it.
+
+*If the repair cannot stay inside `rosetta.rs`, stop and report rather than
+reaching further.* A third path is a different node, not a wider one.
