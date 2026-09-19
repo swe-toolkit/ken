@@ -243,10 +243,18 @@ display_name = "research"
 # T1 by §4h (synthesis and design input, not mechanical), so opus, and the 1M
 # window because this seat reads the permissive references under local/refs/ and
 # synthesizes long cited reports.
-# Claude Code harness = NO harness key, uses `effort`, NO env.
+# 2026-09-19 reseat: OpenAI subscription credits reset, so this seat returned to
+# pi/openai-codex gpt-5.6-sol at high, TIER-PRESERVING (T1 per §4h). The
+# "Claude Code harness = NO harness key, NO env" note that stood here described
+# the 2026-09-15 Anthropic seating and is SUPERSEDED — it contradicted the live
+# keys below, which is the exact failure this file's header warns about.
+# 2026-09-19 (Steward, operator-directed): added the PI_* env block. The return to
+# pi set `harness`/`model` but omitted `env`, leaving this the only seat whose
+# shape disagreed with its own harness under the header's consistency parse.
 model = "openai-codex/gpt-5.6-sol"
 harness = "pi"
 effort = "high"
+env = { PI_OFFLINE = "1", PI_SKIP_VERSION_CHECK = "1", PI_TELEMETRY = "0" }
 startup_prompt = "You are Ken's Research agent (ad hoc external-knowledge dispatch; research is not a standing team — see the Steward playbook §5). Read agent/COORDINATION.md (federation law) and MODELS.md first. Set your status and await the Steward's research dispatch, then gather sources and synthesize a cited report back to the Steward. Do not poll."
 
 [agents.adversary]
