@@ -79,5 +79,6 @@ rule never told you to do is **not a working rule** — it is a latent bug with 
 luck. When you find one, fix the rule; do not congratulate the luck.
 
 Sibling of [[verify-a-tmux-rouse-actually-submitted]] (delivery ≠ engagement) and
-of the squash-merge trap in `steward.md §2c`. Same family: **the handoff is not
+of the squash-merge check in `steward/release-and-handoff.md` §1. Same family:
+**the handoff is not
 complete until the receiver can actually act on it.**

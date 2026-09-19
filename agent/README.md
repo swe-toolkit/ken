@@ -35,10 +35,11 @@ DeepSeek V4 Pro) and the clean-room × provider rules.
 
 ## Promotion ladder (how the tiers stay coherent)
 
-Lessons flow **up**, curated by the Steward: team overlay → archetype source →
-`COORDINATION.md`, promoted only when validated across ≥2 teams (or ≥3 runs),
-model-/operator-agnostic, and normative. This is the inheritance the tooling
-lacks. See `playbooks/federation/steward.md` and `COORDINATION.md §10`.
+Lessons may flow **up** from team overlay → archetype source →
+`COORDINATION.md` when validated across at least two teams or three runs,
+model- and operator-agnostic, and normative. The operator assigns an accepted
+workflow change to a non-Steward author; the Steward reports workflow defects
+but never edits the corpus. See `COORDINATION.md §10`.
 
 ## Provenance
 

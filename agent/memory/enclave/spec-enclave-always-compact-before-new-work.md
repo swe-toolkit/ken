@@ -44,5 +44,5 @@ tell that a threshold was the loophole.
   reason to *finish the retro now*, never to defer the compaction or let the
   unit take on new work uncompacted.
 - Sibling of playbooks state mechanism not intent (compact mechanically at the
-  seam, never on a story about ctx level). Lives in `steward.md` §2c
-  handoff-gate step 4 + the step-2 enclave-handoff note.
+  seam, never on a story about ctx level). Lives in
+  `steward/compaction.md` under **Team compaction**.
