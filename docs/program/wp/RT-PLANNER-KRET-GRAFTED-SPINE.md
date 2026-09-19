@@ -137,31 +137,61 @@ Releasable on its own (`steward.md §4a`).
 > specialization 1, context 0, body 586, statically assigned and statically
 > distinct. A check asking *does this member have a site* passes on 517.
 > **Keep the check — it is cheap and it catches the `D1` families, which have
-> no site at all — but do not expect it to red on 517, and do not read 517
-> surviving it as the check being broken.** Catching 517 requires deciding
-> whether its site is *reached*, which is `D2`, not a table lookup.
-
-**`D2` — placement: every semantic member has a REACHED dispatch site.**
-Releasable on its own; **ordered after `D0`** (see the unmasking note under
-`AC-R1`). Acceptance is **517 executing**. Per settled input 6 the shape is
-**CFG/reach-side, not specialization-side** — 517's context already exists and
-is already distinct, so nothing is to be separated or re-keyed. Nothing in
-`D2` changes the `ReleaseObligationId` representation.
-
-> **ONE SUB-FORK IS OPEN AND IT IS `D2`'s ACCEPTANCE, NOT ITS EXISTENCE.**
-> *"Exists statically but is not reached"* has two readings the clone map does
-> not separate, and they take different repairs:
+> no site at all — but do not expect it to red on 517.** 517 surviving it is
+> not the check being broken; it is **the check reporting correctly on the
+> question it asks** (Architect `evt_321kgnhds826z`, accepting the refutation).
 >
-> - **(i) the context is CFG-unreachable** — dead by construction, so a static
->   reachability check decides it and `D2` restores the edge.
-> - **(ii) the context is CFG-reachable but no execution enters it** — the
->   demand was routed to a context this program never takes, no static check
->   reds, and `D2` re-routes 517's dispatch to a correctly dominated point on
->   the path that runs.
+> **`D0`'s CHECK IS SITE-EXISTENCE AND NOTHING ELSE. The word "reachable" in
+> the original constraint is WITHDRAWN** (same ruling). `D0` has no CFG; it
+> has a table, and the check is a lookup in `D0`'s own artifact. **Read as
+> CFG-reachability it stops being a table lookup and becomes `D2`'s control
+> wearing `D0`'s name** — so do not build it that way. Catching 517 needs the
+> join in `AC-D2-1`, not a bigger table lookup.
+
+**`D2` — placement: every member's release site is ON AN OUTGOING EDGE OF ITS
+OWN BRACKET.** Releasable on its own; **ordered after `D0`** (see the unmasking
+note under `AC-R1`). Per settled input 6 the shape is **CFG/reach-side, not
+specialization-side** — 517's context already exists and is already distinct,
+so nothing is to be separated or re-keyed. Nothing in `D2` changes the
+`ReleaseObligationId` representation.
+
+Three parts, **in this order**:
+
+- **`D2a` — the control** (`AC-D2-1`, below). Written and red before any
+  repair.
+- **`D2b` — the placement measurement.** Which of (i)/(ii) below holds, read
+  off the emitted artifact at a known SHA.
+- **`D2c` — the repair**, priced by `D2b`: **restore the edge** under (i),
+  **re-route the dispatch** under (ii).
+
+> **THE TWO HORNS ARE THE SAME DEFECT FROM TWO SIDES, AND THEY SHARE A
+> PREDICATE** (Architect `evt_321kgnhds826z`, ruling the sub-fork this frame
+> opened):
 >
-> **Under (i) `D2` can carry a compile-time control; under (ii) it cannot, and
-> its only control is 517 executing.** Do not write `D2`'s controls until this
-> is ruled.
+> - **(i)** the site landed somewhere **unreachable**.
+> - **(ii)** the site landed somewhere **reachable that is not an exit of
+>   517's scope**.
+>
+> Both say: **517's recorded release site is not on an outgoing edge of 517's
+> bracket.** They differ only in *why* it is in the wrong place, and **a
+> control asking whether it is in the RIGHT place does not consult that
+> difference — so it reds under both.**
+>
+> ⇒ **The earlier reading in this frame — that horn (ii) leaves `D2` with no
+> compile-time control — is WITHDRAWN. It was wrong.** (i)-versus-(ii) prices
+> the **repair**, not the control, so it is sequenced as `D2b`, after the
+> control rather than before it. **And it is a measurement, not a fork:** both
+> readings are facts about the emitted artifact at a known SHA, decided by the
+> parser that already produced the domination read, and neither is a choice
+> between materially different futures.
+
+**Prior art puts the obligation at placement time, not after it.** rustc
+inserts scheduled drops **on every outgoing edge of the scope**, and its
+correctness argument is by construction at placement rather than a post-hoc
+reachability check; LLVM's edge rule has the same shape — predecessor-specific
+work belongs on the edge, and putting it in a shared destination body makes it
+run for every predecessor. **Both horns are instances of "the release is in
+the body, not on the edge."**
 
 **`D1` — producer closure.** Enumerate **every family that can mint a release
 claim** and reconcile the roster. The closure is over **producers**, not over
@@ -271,6 +301,60 @@ kernel/TCB surface; **and the diff touches no resource-table code in
 `ken-host`.** `ResourceTableV1` stays exactly what it is. A candidate whose
 argument is that the host already enforces at-most-once has restated the
 problem rather than fixed it.
+
+### `D2`'s controls
+
+Horn-independent by the `evt_321kgnhds826z` ruling: the shape below reds under
+both (i) and (ii), so `D2a` is writable now and does not wait on `D2b`.
+
+**`AC-D2-1` — every member's release site is on an outgoing edge of its own
+bracket, and the control is a JOIN over two artifacts.**
+
+> For each member `M`: `M`'s recorded release dispatch site lies on an
+> outgoing edge of `M`'s bracket in the emitted CFG.
+>
+>     left operand   D0's obligation table -- which site belongs to which member
+>     right operand  the emitted CFG       -- which blocks are the bracket's exits
+
+**It must be a join, and a reachability walk is NOT a substitute.** A walk from
+entry answers horn (i) only, and it answers it about the **program**, not about
+`M` — it cannot see a site that is perfectly reachable and belongs to the wrong
+scope. **Neither operand carries the deciding relation alone:** the table knows
+ownership and nothing about edges; the CFG knows edges and nothing about
+ownership. That is also what makes this a real check rather than a restatement
+— **a predicate computed from the planner's placement record alone cannot
+disagree with the planner.**
+
+**The instrument exists and has already been run on the neighbouring
+question.** `evt_5545jspb3nhc8`'s domination read is this same join — planner
+row map against the emitted x86 CFG, establishing that Vis 609 dominates the
+unit-1 context call. **`D2` is not being asked to build a new analysis.**
+
+**`AC-D2-2` — the control's MANDATORY positive control, and it is stated in
+advance because the last claim of this shape failed for want of exactly it.**
+
+> The control **must RED** at `31b9ab4800484cf8dc73839b6145484fd3206142`, on
+> member 517, **naming body 586 as not on an outgoing edge of 517's bracket.**
+>
+> **If it does not red there, the CONTROL is wrong — not 517.** Do not adjust
+> 517's row to green it, and **do not read a green as 517 being fine.**
+
+One ruling ago the Architect asserted a check would catch `517 x0` without
+measuring, and the clone map refuted it (see `D0`'s member-side bullet). The
+same claim is load-bearing here, so this time it ships with its own falsifier.
+
+**`AC-D2-3` — the join can fail on a case that is not 517.** *Control:* a
+mutation relocating one member's recorded dispatch site to a **reachable block
+that is not an exit of its bracket** must RED, restored byte-exact afterwards.
+A control that reds only on 517 does not discriminate a placement predicate
+from a hard-coded row.
+
+**`AC-D2-4` — 517 executes.** *Control:* `:348`'s native multiset reaches
+`{609 x1, 598 x1, 517 x1}` — three dispatches against a required three. **This
+is `:348` only.** Whether `:314` clears is still unmeasured under `D0`, and
+`D2` does not license a prediction about it either; `AC-R1` remains the node's
+criterion for both rows and is reached by `D0` + `D2` together, not by `D2`
+alone.
 
 ## Stop condition
 
