@@ -525,35 +525,50 @@ are deliberately not rewritten.
    :303-327), so Specialization(0) is many-to-one onto emitted functions
    -- keyed on a LABEL taken for an IDENTITY of a population it does not
    range over
-10. the two executing dispatch sites are DISPOSITION-DISJOINT, not
-   duplicative: ken_static_response_0 emits the single Released and
-   ken_continuation_context_1 emits all five Closed, residual zero --
-   two emission families independently reconstruct ownership of one
-   resource and reach DIFFERENT dispositions -- keyed on an identity
-   RE-DERIVED PER FAMILY because it was never carried, so no key in the
-   system can express that the two disagree
+10. the two executing dispatch sites are ken_static_response_0 (one
+   dispatch) and ken_continuation_context_1 (five), residual zero. The
+   one Released / five Closed split is NOT the two families disagreeing
+   about disposition: request_release admits only a Live slot and
+   refuses every later arrival with Closed, so the split is ARRIVAL
+   ORDER AT ONE CENTRAL HOST AUTHORITY. The host converts duplicate
+   compiler dispatches into one release plus five refusals -- it is
+   working, and it is the FIRST common authority, which is too late to
+   prevent the dispatches -- keyed on the absence of any PRE-DISPATCH
+   obligation identity shared by the emission families
 ```
 
-> **THE TWO COUNTERS HAVE NOW SEPARATED, WHICH `§5`'s OWN TEXT SAID WOULD
-> HAPPEN.** Nine hard stops have produced ten symptom entries: a single stop can
-> yield more than one symptom line. The Architect's words, kept because the
-> temptation to reconcile them is real: *"they should not be forced to match —
-> pretending otherwise would corrupt whichever of the two is load-bearing."*
+> **THE TWO COUNTERS HAVE SEPARATED, AND THEY STAY SEPARATED. `§1a` FOLLOWS THE
+> STOP COUNT; `§1b` FOLLOWS THE ENTRY COUNT.** Architect ruling
+> `evt_269dk8msteb89`. Nine hard stops have produced ten symptom entries: a
+> single stop can yield more than one symptom line. `§5` records that the two
+> coincided 1:1 *"today"* — **that was the coincidence, never the design.**
 >
-> **`§5` says `§1a` fires at the third HARD STOP and `§1b` at the third
-> INVENTORY ENTRY**, and records that the two coincided 1:1 *"today"*. That
-> stopped being true at this append. **Which counter `§1b` follows from here is
-> the Architect's to state, not the Steward's**, and this note deliberately does
-> not settle it: the next `§1b` check is either the twelfth entry or the
-> twelfth stop, and those are now different moments. The Steward is recording
-> the divergence, not resolving it.
+> Derived from what each trigger is *for*, not from the coincidence. **`§1a`
+> asks whether an unaided pair has run out of road**; its subject is the round —
+> build, wall, hard stop, rule again — so **that question ranges over stops**.
+> **`§1b` asks whether the accumulated symptoms share a predicate**; its subject
+> is the symptom, so a stop yielding two symptoms contributes two data points
+> and a purely procedural stop contributes none. **That question ranges over
+> entries.**
+>
+> ⇒ **Next `§1a` check at stop 12. Next `§1b` check at entry 12.** Different
+> moments, correctly so.
+>
+> **This is an instance of the predicate the Architect has been ruling on all
+> evening: each counter keyed on the population its own question ranges over.**
+> Recorded with their own note that **entries lead stops, so keying `§1b` to
+> entries makes it fire sooner and costs them more** — that is not the argument
+> for it, the population is, but the ruling relieves them of nothing.
 
 **Hard-stop count on this WP: 9.** **The parent node's count of 2 does NOT
 carry** — different WP, different question. `§1a` fired at three
 (`evt_7d3h7mtff5acd`), **re-fired at six** (`evt_3t5nq11ernjfa`), and has
 **re-fired at nine**, holding the ruling on the next locus and calling
-Research. `§1b` fired at three (`evt_1mv0phbj0zcn7`), was re-run at six
-(`evt_734ccm2xzxp5r`), and was re-run at nine (`evt_3kx5y2nwqbxq9`).
+Research. **That ninth trigger is DISCHARGED** by the research advisory
+(`evt_5ny4tmskqx3n4`) and the ruling it produced (`evt_3ynad2h315w1v`); the
+hold on the locus is released. `§1b` fired at three (`evt_1mv0phbj0zcn7`), was
+re-run at six (`evt_734ccm2xzxp5r`), and was re-run at ten entries
+(`evt_3kx5y2nwqbxq9`).
 
 > **THE COUNT IS 6 AND NOT 5, AND THE ADJUDICATION IS THE ARCHITECT'S.** The
 > implementer reported "count remains 5" and that reading is defensible — they
