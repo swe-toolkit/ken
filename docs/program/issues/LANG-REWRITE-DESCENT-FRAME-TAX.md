@@ -1,7 +1,7 @@
 ---
 id: LANG-REWRITE-DESCENT-FRAME-TAX
 title: "rewrite_rexpr_inner's stack frame is sized by the union of ALL RExpr arms, so every variant added to the language surface taxes every level of every descent. The function (crates/ken-elaborator/src/modules.rs:1290) is one match over every RExpr variant, each arm constructing a fresh RExpr by value in return position; in a debug build rustc does not coalesce per-arm stack slots, so the frame carries the whole surface whether or not the program contains any of it. A1's two new arms (RStandardOp, RInfixSpine) added 144 B and pushed the D1 legacy-map descent past local_prebinding_preserves_legacy_map_union_stack_budget's 2 MiB boundary -- but RStandardOp is not special: the NEXT variant anyone adds does the same thing and the detector goes red again under a different name. Stop paying the whole-surface frame tax, then remeasure. MEASURE BEFORE REPAIRING: the claim that frame size dominates is INFERRED, not measured, and D0 exists to test it."
-status: ready
+status: merged
 owner: language
 size: M
 gate: none

@@ -12,29 +12,34 @@ tier: T1
 origin: "Steward cut 2026-09-13 from the Architect final-A decomposition (evt_784ge2nq65dfy), grounded at main 4fdd4f0ad. A1: the reusable completion link, made its own node per the Architect (do not ship an unused framework nor a third wiring node -- co-land ∧ ∨ ≤ ≥ ≠). RELEASED 2026-09-17 by the Steward, re-grounded at main 8f0f3753270b2d7639fc7aed457b759e6e6a57a1: both prerequisites are merged, and the re-grounding refuted one of the stub's own scope lines (see the RELEASED banner). AMENDED same day with FI-2a after language-implementer attacked FI-2 as instructed (evt_70jn1q9r56ttr): FI-2 refuted second copies correctly but over-refuted the home, and spec 33 section 6.1 requires a re-exporting standard-operator module and fixes ≥'s binding as ord_geq_at. Architect then upheld the facade and overturned the Steward on ord_geq_at's home (evt_4jhrgeqse8k13, FI-2b): define it in LawfulClasses beside ord_leq_at, re-exported by the facade, because it is fully generic and section 2a puts only package-specific content in a package; the same ruling corrected the frame's stale 'actively contended' claim about LawfulClasses.ken.md to UNCONTENDED. IN-LANE: bounded elaborator + catalog design; Architect required reviewer; no new TCB (Architect: no new Eq/DecEq instance, Float-equality law, or TCB entry needed)."
 ---
 
-> # HELD 2026-09-19 (Steward) BEHIND [[LANG-REWRITE-DESCENT-FRAME-TAX]] — READ THIS FIRST
+> # HOLD RELEASED 2026-09-19 (Steward). THE REMAINING STEP IS THE REMEASURE.
 >
-> **The work is done and approved; what is held is the LANDING.** The candidate
-> at `ed47f3ec9328859ff80a66d10ab9ab28c991cdba` is not withdrawn, not
-> re-scoped, and not defective. Do not respin it and do not rebase it yet.
+> **`LANG-REWRITE-DESCENT-FRAME-TAX` LANDED** at
+> `6ce8aa0e92d221e7e56a39439c273e2697a0781c` (*"split recursive rewrite arms
+> into non-inlined monomorphs"*), verified an ancestor of `origin/main`. That
+> was this node's entire hold condition, and **it has been met since that
+> commit landed while this node sat unworked.** The idleness was mine: I set
+> the hold, the operator's ruling discharged it, and I did not lift it.
 >
-> **Why.** A1's two new `rewrite_rexpr_inner` arms (`RStandardOp`,
-> `RInfixSpine`) add 144 B to a frame that is sized by the union of ALL `RExpr`
-> arms, and that pushes the legacy-map descent past
-> `local_prebinding_preserves_legacy_map_union_stack_budget`'s 2 MiB boundary.
-> The operator was given the options fork and ruled this session, verbatim:
-> **"g then remeasure"** — repair the whole-surface frame tax first, then
-> measure whether A1's arm still trips the detector at all.
+> **The operator's ruling was `"g then remeasure"`, and only the first half has
+> been done.** (g) is landed. **The remeasure is the live deliverable**, and it
+> is not a new node — it is the second clause of a ruling already given.
 >
-> Landing A1 first would FORCE the re-baseline decision that (g) exists to
-> avoid, so the hold is the Steward's sequencing call. It costs no new time:
-> A1 was already gated on the operator.
+> **NEXT ACTION, language ring:** rebase the candidate
+> `ed47f3ec9328859ff80a66d10ab9ab28c991cdba` onto the new `modules.rs` — expect
+> a real rebase, `FRAME-TAX` edits the same function — then **measure whether
+> A1's two arms still trip
+> `local_prebinding_preserves_legacy_map_union_stack_budget` at all.** Return
+> the measurement with the rebased SHA.
 >
-> **`LANG-REWRITE-DESCENT-FRAME-TAX` `D3` answers the question this node is
-> waiting on**, and answers it as a REPORT — the re-baseline decision stays
-> with the operator either way. On its landing A1 rebases onto the new
-> `modules.rs` and returns for routing. Expect the rebase: that node edits the
-> same function.
+> **The candidate is not withdrawn, not re-scoped, and not defective.** The work
+> was done and approved before the hold; nothing about it is reopened.
+>
+> **Whichever way the remeasure lands, the re-baseline decision stays with the
+> operator.** If the detector no longer trips, A1 routes and the re-baseline
+> question is moot — which is the outcome (g) was chosen to produce. **If it
+> still trips, report it and stop: do not re-place the detector's boundary**,
+> because not re-placing it is the whole reason (g) was selected over (a)-(f).
 >
 > # RELEASED 2026-09-17 (Steward), re-grounded at main `8f0f37532`.
 >
