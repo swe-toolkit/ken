@@ -1,300 +1,69 @@
-# Escalation: research pulls, the symptom inventory, and the WIP audit
+# Escalation
 
-Steward task procedure. Read at the point of use. Governing playbook:
-`../steward.md`.
+Escalation protects a product WP from unaided repetition. It must not become a
+parallel management program.
 
-Three mechanisms that keep a long ruling chain from running away. They answer
-**different** failures and none substitutes for another: the research cadence
-imports external prior art, the symptom inventory accumulates our own forks,
-and the WIP audit catches a seat working long without guidance.
+## Hard stops
 
-## Research dispatch
+An advancing hard stop means the implementer attempted the current design,
+found a new structural wall, and needs a new Architect ruling. A measurement,
+requested probe, ordinary rejection, or recut checkpoint is not an advancing
+hard stop.
 
-Research is not a standing team. When the federation needs external knowledge,
-you dispatch research subagents, gather results, and synthesize a report for
-the operator, Spec, or the Architect. Treat it as a bounded, on-demand
-activity, not a role.
+## Steward backstop
 
-## What counts as a hard stop — the number is an advancing count, not a raw tally
+The Architect owns the count for each live chain. On every third advancing hard
+stop, it holds its ruling and asks Research for a prior-art advisory in the same
+WP thread. The Steward is only the backstop:
 
-Three words get used loosely and only one of them counts toward the cadence.
-Keep them distinct, because the confusion is live: an `HS<N>` label reads like
-"the Nth time we hit a wall," and it is not.
+1. catch a missed third-stop trigger;
+2. ensure the Research mention was delivered;
+3. wait for the advisory and Architect ruling;
+4. recut the product WP only if the ruling requires it.
 
-- **Hard stop (`HS<N>`)** — an *advancing* stop: the implementer built the
-  Architect's ruling, hit a genuinely **new** structural wall, and returned with
-  evidence needing a **new** ruling (`../architect.md` §1a). Only this gets the
-  next number, appends one symptom-inventory row, and is what the research
-  cadence counts (every 3rd, then 6th/9th/… → mandatory research pull).
-- **Non-advancing stop** — a stop that needs no new ruling: a D0/feasibility
-  return, a probe or measurement the current ruling already asked for, an
-  exploration returning coordinates, or a recut checkpoint. It keeps the current
-  number ("still `HS<N>`"), adds **no** inventory row, and does **not** retrigger
-  research. Do not label it `HS<N+1>` — the implementer calling it a "hard stop"
-  in prose does not make it one.
-- **Clean stop** — orthogonal: worktree hygiene only (no code retained, baseline
-  restored, no commit/candidate/lockfile change). An advancing hard stop and a
-  non-advancing stop can each be clean or not; "clean" says nothing about
-  whether the count advances.
+## Advisory boundary
 
-**The count is per-chain and re-anchors on every recut**, so an `HS` number is
-not a campaign-wide ordinal — a fresh chain restarts the advancing count.
+Research is the standing `research` seat, not a spawned subagent. The advisory
+informs the Architect; it never designs or directs the fix.
 
-### THREE DIFFERENT NUMBERS. Only the first is the trigger.
+Do not create a separate tracking node, symptom report, or workflow artifact.
+The WP thread carries the chain. If three stops reveal one shared predicate, the
+Architect names it and the Steward replaces the affected frame text rather than
+appending another layer of history.
 
-This clause used to collapse them, and the collapse read as *"research is due
-only when an armed line says so"* — which, since no line is armed absent an
-operator anchor, made research **never** due and the whole §1a cadence dead
-letter. Corrected 2026-09-17 (`thr_6azxdz555c2qy`).
+## Sixty-minute WIP audit
 
-| number | who holds it | does it fire the pull? |
-|---|---|---|
-| **consecutive ADVANCING hard stops in the live chain** | the Architect, alone | **YES — every 3rd. This is the trigger.** |
-| the **`HS<N>` label** | free text in frames and threads | **NO.** A campaign ordinal that re-anchors on recut. Its divisibility by 3 means nothing. |
-| an armed **`next research pull = #N`** | the Steward, and **only** from an operator count-anchor | **Overrides the cadence when present.** Usually absent; absence is not "not due". |
+If an implementation seat works for 60 minutes without finishing, hard-stopping,
+or receiving an Architect audit or ruling, ask the Architect to review the WIP.
+Routine progress posts do not reset the clock.
 
-⇒ **The Architect's own count of advancing stops is always operative.** It does
-not need a line from you to be armed, and it is an obligation, not a prompt. The
-thing the old wording rightly warned against is reading the trigger off an
-**`HS` label** — labels drift, get reused, and survive recuts that reset the
-real count. **A label is not a count.**
+The request states:
 
-⇒ **Absent an operator anchor, the correct answer to "is a pull armed?" is "no
-line is armed, and your every-3rd obligation stands unchanged."** Never let
-"no armed line" be heard as "not due" — that is the failure this table exists
-to stop. See the steward lesson
-`anchor-an-armed-trigger-on-an-event-not-on-an-index`, which is about anchoring
-on an **event** rather than an index, and is not a licence to disarm the
-cadence.
+- seat and WP;
+- elapsed time and anchoring event;
+- current branch or checkpoint;
+- the three possible outcomes.
 
-## The hard-stop chain: the Architect self-triggers, you backstop
+## Audit outcomes
 
-A ruling chain that bounces between the Architect and an implementer as a run
-of hard stops can go deep, and by the third an independent prior-art
-perspective beats another unaided round (operator, 2026-07-18).
+| Outcome | Next action |
+|---|---|
+| On track | Continue; reset the clock. |
+| Implementation correction | Architect routes the correction through the leader. |
+| WP mis-sized | Steward recuts the WP, retaining completed work. |
 
-**The trigger lives with the Architect, not you.** It counts its own
-consecutive hard stops and, on every third (6th, 9th, 12th, ...), *before*
-ruling, self-holds, calls research in-thread, and rules on the advisory. Moving
-the trigger to the design authority kills the poll-race: the hold lands
-pre-ruling by construction, and the Architect frames a sharper question than a
-transport relay could. The mechanism is `../architect.md` section 1a.
+The Steward does not inspect or redirect the implementation directly. A second
+or repeated audit on the same unit is evidence that the cut, not the worker, is
+the problem.
 
-**Your job is the backstop, not the driver.** Four standing duties:
+## Real escalation filter
 
-1. **You do NOT hold the count. Relay operator count-anchors, and nothing
-   else.** The running hard-stop count belongs to the Architect alone, carried
-   in `ARCHITECT-STATE.md` and republished in each ruling post with its delta
-   and reason (`../architect.md` §1a, lines 90-109). **There is no Steward
-   hard-stop tracker.** The node schema has no hard-stop field, hard stops
-   appear only as free text in inconsistent spellings, and a loose key over the
-   corpus returns a number that is an artifact of the key.
+Escalate only a fork the existing authorities cannot decide:
 
-   What *does* come to you is every **operator count-anchor** ("the research
-   pull discharged the 6th; next re-trigger = the 9th"). Record it, arm it as
-   an explicit `next research pull = N` line, relay it, and re-read it when the
-   chain takes another stop. **A bare list of fork numbers in prose is not an
-   armed trigger.** Absent an operator anchor, you have no number.
+- scope or priority not settled by the operator's current direction;
+- component design not settled by the Architect's current ruling;
+- behavior not settled by `/spec`;
+- any proposed TCB growth.
 
-   > **This clause used to say the opposite, and that is the point.** It read
-   > *"on any disagreement your tracker is the count of record"* — an authority
-   > assigned to an artifact that does not exist. `architect.md` deleted its
-   > half on 2026-09-16 (`6471ad1e701c2aade7a5d9076a945e18fb433889`) and this
-   > half survived, so the Architect read a live duty of mine and offered to
-   > stand down on a count I do not keep (2026-09-17, thr_6azxdz555c2qy).
-   >
-   > **A one-sided retraction does not remove an authority; it moves which seat
-   > holds the stale copy** — and it moves it to the seat being deferred TO,
-   > which is the direction nobody audits. **When you delete an authority
-   > claim, delete it at both ends the same day.**
-   >
-   > If a seat cites your count at you, the correct answer is that you hold
-   > none and their own record stands — **not** a number you reconstruct to
-   > meet the citation.
-2. **Catch a missed trigger.** If the Architect reaches a trigger point and
-   rules without self-holding, hold it in-thread and kick research yourself,
-   **transport and framing only, no design opinion** — the instant you frame
-   the mechanism you become the de-facto designer. **Catch-up rule:** for a
-   chain already past a trigger with no research pull, do not wait for the next
-   clean multiple. Fire research at the very next hard stop, then re-anchor the
-   cadence from there.
-3. **Guarantee the advisory lands.** Research is a no-poll seat. After it is
-   called, verify it actually woke and repair transport if not (see
-   `watchdog.md`). The Architect is held until the advisory posts, so a dropped
-   mention is frontier latency.
-4. **Record.** Log each escalation in the decision log and the tracker — the
-   count, the advisory event id, the disposition.
-
-You never adjudicate the mechanism and research never rules.
-
-## The count is only a trigger if it is armed
-
-Operator, 2026-07-24. On one
-chain the count reached **ten** hard stops with no research pull: the
-Architect's self-trigger lapsed across its compactions *and* the backstop
-lapsed because the count lived only as a prose list of fork numbers, never as
-an armed line either party re-read. **A deep chain with zero research
-advisories on it is itself the tell that both the self-trigger and the backstop
-have silently lapsed.**
-
-**Your backstop does not run on a count of your own, because you do not keep
-one (duty 1).** It runs on that tell, which is observable without one: a chain
-visibly deep with **zero** research advisories against it. Watch for the
-absence of advisories, not for a threshold — an absence you can see in the
-thread, where a count would only be a number you reconstructed. Arm any
-operator anchor the moment it reaches you.
-
-## Seed and carry the symptom inventory
-
-Operator-directed, 2026-07-24, after one chain ran to 33 hard stops: *"The
-iterations didn't accumulate the defects and failed to track the global
-picture, hindering the decision-making abilities of the architect."*
-
-**The research cadence cannot substitute for this.** On that chain the
-advisories fired at #24, #27, #30, #33 and were genuinely useful — and the
-chain still ran to 33, because nothing was holding the pattern across stops.
-
-## Symptom inventory: your duties, three, all mechanical
-
-1. **Seed the section when you frame or release any WP.** It goes in the
-   tracked file — `docs/program/issues/<ID>.md`, or the WP frame if one exists:
-
-   ```text
-   SYMPTOM INVENTORY (Architect appends one line per hard-stop; never rewritten)
-   NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
-   (empty)
-   ```
-
-   **Armed as a line, exactly like the research count.** An unarmed trigger is
-   not a trigger.
-
-2. **Backstop the predicate check.** The Architect appends the entries and owns
-   the check. If a third entry lands and no predicate answer appears in-thread
-   before the next ruling, hold the Architect and ask the one question —
-   **transport and framing only, never the answer.** Naming the predicate
-   yourself makes you the de-facto designer.
-
-3. **Act on a named predicate: it is a recut, and recuts are yours.** *"Yes,
-   these share `<predicate>`"* is not another ruling to log — it is the
-   Architect telling you the **representation** is the defect. You author the
-   recut frame, and its shape is fixed:
-   - **Retain** everything already proved. A named predicate is not a licence
-     to restart.
-   - **Replace** only what the predicate names.
-   - **Freeze** the old chain's count and open a fresh one; carry the last
-     clean checkpoint forward as a semantic oracle, not an acceptance path.
-
-## Symptom inventory: two things that will make you skip it
-
-- **"The architecture is still viable."** It usually is, and a viability
-  verdict is not an answer to the predicate question. One review correctly
-  affirmed viability; what unblocked the work was the representation insight
-  beside it. **Do not accept the affirmation as the deliverable.**
-- **"Every ruling so far was correct."** They were. **Local correctness of each
-  entry is what makes a shared predicate invisible** — it is the symptom, not
-  the refutation.
-
-**The measured case, so the shape is recognizable:** four entries accumulated
-separately — whole-configuration specialization, flattened residual keys,
-`Debug` serialization as identity, helper identity coupled to
-environment/control/layout contents. **All four are one predicate: a dynamic
-property naming static code.** Named, it yields one structural closure.
-Enumerated, it yields an unbounded chain of individually reasonable rulings.
-The predicate was already visible at the third entry, and the step-back that
-finally came was operator-initiated — the fleet had no endogenous mechanism to
-produce it. This section is that mechanism.
-
-## The 60-minute WIP audit
-
-Operator, 2026-07-31, verbatim: *"if an implementation agent works for more
-than 60 minutes without finishing the task or hitting a hard stop, ask the
-architect to review the work in progress, and if necessary interrupt and
-redirect. Reset the clock on each hard stop, architect review, etc. We just had
-the runtime implementer run 30 hours without guidance."*
-
-> An implementation seat that has been working 60 minutes without finishing and
-> without hard-stopping gets an Architect WIP audit. You request it; the
-> Architect reviews; any redirect flows Architect to leader to implementer.
-
-## WIP audit: the clock, and the one way to make the rule vacuous
-
-**Reset the clock on:** a kickoff or corrected re-kickoff; a genuine hard stop
-(the seat stops and routes a question for a ruling); an Architect WIP audit or
-ruling; a candidate handoff; task completion.
-
-**A routine progress post does not reset the clock.** This is the whole design.
-A working seat posts a status every 15 to 30 minutes, so if those reset it the
-trigger never fires — and it will *look* armed the entire time. **The clock
-measures time since the last piece of guidance, not time since the last sign of
-life.**
-
-**Arm it as a deadline anchored on an event id, never as a count:**
-`next WIP audit due 20:25 UTC unless reset — clock started evt_1wa9cprvdn0mf`.
-Carry that line in the resume checkpoint and re-read it every tick. An
-index-shaped trigger reads as a confident "not due" when an append is missed.
-
-## WIP audit: this overrides "do not nudge a ring that is building"
-
-The watchdog tick prompt says not to nudge a ring that is building, and that is
-still right for a nudge. **An audit request is not a nudge** — it is
-operator-mandated periodic guidance, and the seat it protects is by
-construction one that is building. Do not let the tick prompt's line talk you
-out of firing this.
-
-## WIP audit: ask for three outcomes; the third is not reached by default
-
-Operator, 2026-07-31: *"one of the options should be to reconsider the
-integrity of the WP and evaluate whether it would be better approached as a
-restructured set of smaller WPs... an uninterrupted run longer than 60 minutes
-is an indication (though not necessarily conclusive) that the WP is too
-large."*
-
-**Name all three in the request.** An audit asked only to "review the WIP"
-answers the question the Architect naturally holds — *is this implementation
-correct under the contract?* — and (c) never gets considered.
-
-| outcome | meaning | who acts |
-|---|---|---|
-| (a) on track | the work implements the ruled mechanism; continue | nobody — reset the clock |
-| (b) course correction | wrong implementation, right contract | Architect to leader to implementer |
-| (c) the WP is mis-sized | the contract itself is too large a single bite | **you** — the recut is the Steward's |
-
-**(c) is a diagnosis the Architect makes and a recut you author.** The Architect
-does not create or resize tracked work. Treat *"this should be several WPs"*
-exactly as a named predicate above: retain what is proved, replace only what
-the finding names, freeze the old node's clock and open fresh ones. Run it
-through the node gate in `../steward.md` first — a sizing finding is grounded,
-an aesthetically tidier graph is not.
-
-**The 60-minute mark is an indication, not a verdict.** A single long run can
-be one honestly hard problem. **The signal that is nearly conclusive is
-repetition:** firing audit after audit on one node means the sizing was the
-defect and you have been treating it as a guidance problem.
-
-## WIP audit: route, and the edge you must not create
-
-Post the request to the **Architect**, naming the seat, the elapsed time, the
-clock's anchoring event, and the last few status posts. **You do not review the
-WIP yourself and you do not post to the implementer.** The redirect runs
-Architect to leader to implementer, on edges that already exist. A
-Steward-to-implementer edge here would make you the ring's de-facto leader.
-
-**Topology note:** this adds standing Steward-to-Architect traffic, which the
-topology rule reserves to the operator. **The operator authorized it in the
-directive above.** Do not simplify it back as drift.
-
-## WIP audit: why a clean progress record is not the check
-
-The 2026-07-31 turn that produced this rule ran about 30 hours. The Architect's
-audit opened by affirming the progress record as disciplined, then found the
-implementation did not implement the ruled mechanism at all.
-
-**The trap: all nineteen progress posts were lucid, self-critical, and named
-the cheap wrong fix they were refusing. That is exactly what made it look like
-a seat needing no guidance.** A well-written progress report is evidence of a
-disciplined *reporter*, never of a sound *mechanism*, and the mechanism is the
-thing only the Architect can see.
-
-**Corollary for your own reporting:** *"unperturbed after removing probe X"* is
-a claim about probe X, not about perturbation. Do not repeat a seat's
-unperturbed-evidence claim as a finding unless a probe scan backs it.
+A stale coordinate, failed transport, known owner, or mechanical gate result is
+not a fork. Correct or route it without convening more reviewers.

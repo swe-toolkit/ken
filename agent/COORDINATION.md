@@ -827,32 +827,26 @@ It costs a message, invites a reply, converts a report into a thread, and every
 step is individually courteous. **The prohibition is the mechanism; a Steward
 who may reply "just this once" has no rule at all.**
 
-## 10. Knowledge promotion: the promotion ladder
+## 10. Knowledge promotion and workflow ownership
 
-- **Lessons are promoted when observed, not harvested on a schedule.** When any
-  agent learns something durable in the course of a WP — a trap that cost time,
-  a discipline that held, a candidate rule worth generalizing — it is a candidate
-  to promote up the ladder. Tag a candidate node-internal or topology-touching,
-  so the Steward's invariance filter (§9) is pre-sorted.
-- The **Steward** promotes lessons up a ladder (see the steward playbook):
-  team-local → archetype source → this file.
-- A lesson promotes only when it passes all three: **(a) validated across ≥3
-  runs *or* independently in ≥2 teams, (b) effort-/model-/operator-agnostic, (c)
-  a normative rule, not a one-off fact.** Exception: an explicit operator
-  correction promotes on a single data point. On promotion, retire the source
-  note atomically. Cross-team replication is a *stronger* generalization signal
-  than single-team repetition — use it.
-- **(d) The ratchet guard — lessons only ever *add*.** No carry-forward proposes
-  *removing* a hop; each says "also loop in X," "relay verbatim so nothing's
-  lost," "cross-check Y in parallel." Every one is locally sensible and
-  collectively ruinous — absent a hard default the communication topology
-  monotonically complexifies. So any carry that adds a communication **party,
-  relay, gate, or confirm-hop** is **topology-touching (§9)**: it does **not**
-  promote on validation alone — it needs **explicit operator consent**, exactly
-  like a new edge. Prefer the node-internal form every time: sharpen *what* an
-  existing reviewer checks, never *who else* gets looped in. The bias is toward
-  the **thinner** flow; simplifying it back is the Steward's standing mandate,
-  complicating it is the operator's call alone.
+Lessons are recorded when observed in product work, never harvested on a
+schedule. Promotion is exceptional: the lesson must be a normative rule,
+model- and operator-agnostic, and validated across at least three runs or two
+teams. An explicit operator correction may promote on one observation.
+
+**The Steward does not author or edit workflow files.** It may report a workflow
+defect and its product impact to the operator, but it does not patch
+`agent/**`, workflow or publisher scripts, startup prompts, `moot.toml`, or CI
+workflow files; it does not open a workflow WP; and it does not run a promotion
+cadence. The operator assigns any accepted change to another seat. The sole
+exception is the short current-state roster
+`agent/playbooks/federation/steward/lanes.md`.
+
+A designated non-Steward author applies `skill-style`, edits the operative rule,
+deletes the retired source text, and lets git preserve history. Any change that
+adds a party, relay, gate, review, or confirmation hop still requires explicit
+operator consent under §9. Default to deleting workflow and traffic rather than
+adding another control.
 
 ## 11. Cross-team query protocol
 
@@ -1118,7 +1112,7 @@ and publishes.
 > | exception | route | condition |
 > |---|---|---|
 > | **`docs/program/`** — Steward-owned program docs (trackers, issue files, WP frames, program guides) | Steward resolves, no Architect | the change is **currency or editorial**, and the Steward **authorized the expansion when routing the WP**. A change that alters *program law* or a WP's **acceptance criteria** is not editorial — it is a frame amendment, and it is the Steward's to author, not a ring's to fold in. |
-> | **the Steward's own §6a corpus route** — `agent/**`, `docs/program/IMPLEMENTATION-PROGRESS.md` | Steward publishes directly (`ken-steward` §6a) | Not a doc-ring WP at all, so §14a never governed it. Process law is the Steward's lane (§4); routing it through the Architect would **add a review cycle to the workflow graph**, which §4 forbids without operator consent. The Architect's vote **is** still required where an `agent/` edit changes a **soundness or design gate** rather than process. |
+> | **workflow corpus** — `agent/**`, workflow/publisher scripts, startup prompts, `moot.toml`, CI workflow files | Operator-designated non-Steward author; Steward may route an accepted exact SHA but never author or amend it | The operator authorized the change. Apply `skill-style` to playbooks. Architect review is required only when the edit changes a soundness or design gate. |
 >
 > **LEDGER RIDER — RETIRED 2026-08-02. Its premise was removed one day after
 > it was written, and it stood for a week claiming a gate that does not exist.**
@@ -1146,7 +1140,7 @@ and publishes.
 > ⇒ **A `docs/program/` edit owes no attestation fold.** Leave `library/`
 > byte-untouched; currency lands at the next release point through
 > `scripts/gen-source-attestations.sh` and `scripts/gen-doc-status.sh`.
-> ⛔ **Do not bring a single row current** while the rest of the ledger sits at
+> **Do not bring a single row current** while the rest of the ledger sits at
 > `library/REVISION` — that makes the ledger internally inconsistent and reads
 > as though the gate were live again.
 >

@@ -8,7 +8,7 @@ source: private memory `compaction-is-manual-no-clean-seam`
 singleton-specific
 
 Operator clarified (2026-06-30, correcting my over-read): **team compaction is
-solved — follow the playbook** (`agent/playbooks/federation/steward.md` §2c).
+solved — follow `agent/playbooks/federation/steward/compaction.md`.
 `moot compact` the whole team (leader + implementer + QA, or the spec enclave)
 at the clean WP boundaries — **after the prior WP's retros are in, before
 delivering the next WP**, team quiescent. Keep doing this; don't skip it.

@@ -66,7 +66,7 @@ at the end of the *previous* line, so the edit added a second one. The result is
   the original failure.
 - **For "did it land?", use BLOB IDENTITY** (`git rev-parse origin/main:<f>` vs
   `git hash-object <f>`). It verifies the whole artifact and is immune to
-  wrapping, markup, and typos alike. This is now `ken-steward` §6a step 5.
+  wrapping, markup, and typos alike. This is `steward/merge-procedure.md` M6.
 - **For "does this text exist?", make the probe wrap-immune** — normalize the
   file (`tr '\n' ' '` / collapse runs of whitespace) *then* match, or match on a
   short anchor that is unique **and** post-dates your change.

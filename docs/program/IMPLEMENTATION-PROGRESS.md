@@ -1,30 +1,22 @@
 # Implementation progress — the build backbone
 
 **Owned by the Steward** (`agent/playbooks/federation/steward.md §2a`). This
-file tracks execution **against the implementation DAG**
-(`05-implementation-dag.md`), the build's analog of `spec/SPEC-PROGRESS.md`.
-It **survives compaction**: on a cold start or after a compact, read this
-first, then continue from the frontier (below). Update it **every synthesis
-pass and on every WP state change**. The plan lives in `05`; this file
-tracks *progress against it*. Run until complete, blocked, or instructed
-(§2b).
+file is generated from the implementation DAG's issue files. It is not a
+startup input, live lane ledger, diary, or second execution authority. Current
+lane state lives in `agent/playbooks/federation/steward/lanes.md`; WP contracts
+live in `docs/program/issues/`.
 
-**This file holds CURRENT STATE ONLY, and it is GENERATED** — edit
-`docs/program/issues/*.md` and re-run `scripts/gen-progress.sh`; hand edits
-here are overwritten. The full chronicle — every prior "live state"
-snapshot, the detailed evidence trail for every merged WP, and the
-day-by-day session logs back to project start — lives in
-[`diary/`](diary/INDEX.md). If you need *why* a past call was made, or the
-mechanism detail behind a closed WP, start there;
-[`diary/CURRENT-BRIEFING.md`](diary/CURRENT-BRIEFING.md) carries the live
-operator briefing and the Steward's resume state.
+Regenerate this file only when publishing a real node creation, product landing,
+closure, or operator-directed plan change. Bundle it with that publish. Never
+edit it by hand and never publish a tracker-only synchronization. Git and the WP
+thread preserve execution history.
 
 **Status legend:** `draft` (not framed / deps unmet) · `ready` (deps met,
 unassigned) · `active` (a team is building) · `in-review` (PR open / QA / CI)
-· `merged` (landed + retro in) · `closed` (resolved without landing, e.g. a
+· `merged` (landed) · `closed` (resolved without landing, e.g. a
 superseded or withdrawn item). Gates: see `05-implementation-dag.md`.
 
-**★ GENERATED FILE — do not hand-edit.** This file is regenerated from the
+**GENERATED FILE — do not hand-edit.** This file is regenerated from the
 frontmatter of every `docs/program/issues/*.md` work-item file by
 `scripts/gen-progress.sh`. To change tracked status, edit the relevant
 `docs/program/issues/<ID>.md` file and re-run the generator. CI checks that
@@ -32,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-09-19 16:04:20Z — from 689 issue file(s) in `docs/program/issues/`.
+2026-09-19 16:34:56Z — from 689 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 

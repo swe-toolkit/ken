@@ -30,8 +30,6 @@ any context reset, in order:
    - `agent/playbooks/federation/steward/merge-policy.md` — the two standing
      merge policies (accepted base belongs on main; accepted partials merge as
      soon as done). You apply these; you do not re-decide them.
-   - `agent/playbooks/federation/steward/escalation.md` — the hard-stop symptom
-     inventory and the 60-minute WIP audit.
 4. Read your memory scopes: `agent/memory/fleet/` (every lesson there binds you;
    note especially the merge-split / one-owner-per-merge lesson), plus any
    lieutenant-scoped directory once one exists.
@@ -78,24 +76,21 @@ token mint:
   Steward's M1-M2 checks as your own sanity gate before publishing, but the
   authorization is the Steward's `ROUTED:` post plus the resolved Decision read
   fresh from the object (never from memory).
-- **Node lifecycle (M7).** Flip the node's status and run
-  `scripts/gen-progress.sh`; flip a released node to `active` on release so the
-  crates-moving aggregate does not read it as invisible.
+- **Node lifecycle (M7).** Record verified closeouts and batch issue-status plus
+  generated-progress updates. Never publish one management commit per product
+  merge; follow M7's bounded batch rule.
 - **The Adversary hook (M8) for code merges.** Compact the Adversary FIRST, then
   notify it naming the landed **squash** SHA (not the tip), the paths, and the
   shortstat, then rouse its pane. Docs-only merges skip M8.
-- **Next-slice release + kick in a structurally-determined campaign.** When a
-  slice lands and the campaign's next node is already framed and dependency-clear,
-  flip it `active`, publish the docs-only release, and kick the ring — the
-  release-and-handoff mechanics are the Steward's `release-and-handoff.md`. This
-  is execution of a settled plan, not a new priority call.
+- **Next-slice handback.** When a slice lands and the next node is already
+  framed and dependency-clear, report that fact to the Steward. The Steward
+  releases and kicks through `release-and-handoff.md`; you do not publish a
+  separate status transition or invent a successor.
 - **Merge-mechanics fault recovery.** A path-guard check stuck at
   `status=in_progress` with `conclusion=success` → `gh run rerun <runid>`
   (needs actions:write; leaves the PR open; the run must be `completed` first),
   else close+reopen the PR — the SHA never changes, so the merge Decision stays
   bound. A transient publisher death → re-run the publisher on the SAME SHA.
-- **WIP audits on the lanes you drive.** Fire the 60-minute idle audit
-  (`escalation.md`), verifying delivery positively first.
 
 ## §3. THE BRIGHT LINE — what is yours, and what you escalate
 
@@ -136,10 +131,9 @@ merge queue and drain it in that order:
 - **Yield after each merged unit** and re-read the queue, so a newly-arrived
   higher-priority candidate is taken next. Do not batch a whole lane ahead of a
   higher-priority arrival.
-- **Maintain `local/lanes.md`** — a per-lane liveness ledger: each lane's
-  current node, its ring's state, the last landed SHA and when, and whether it is
-  waiting on you, on review, or on the Steward. This is the instrument that makes
-  a silently-starved lane visible; a starved lane emits silence, not an event.
+- Read the compact, operator-owned roster in
+  `agent/playbooks/federation/steward/lanes.md`; do not maintain a second lane
+  ledger.
 
 When the priority order itself is unclear or two lanes contend without a settled
 rule, that is a §3 escalation, not a call you make.
@@ -205,6 +199,7 @@ implementer -> leader -> {QA, Architect}      (review routing, UNCHANGED)
   wait on and the seat that owes it, you are stalled — find out.
 - **Held finished work is the top of the queue** (COORDINATION §10⁻). A routed
   candidate waiting to merge outranks starting anything else.
+
 ## §8. ARM YOUR OWN MONITORING INTERVAL AT SESSION START
 
 **Operator ruling, 2026-09-17. This closes the former open item — "whether you
@@ -236,7 +231,7 @@ a re-arm you skipped leaves this backstop dead. **900s is an upper bound, not a
 prescription** — a shorter period is fine (the minimum is 60), and the lieutenant
 seat has run this at 600s.
 
-### WHY THIS IS NOT "POLLING", WHICH §7 FORBIDS
+## WHY THIS IS NOT "POLLING", WHICH §7 FORBIDS
 
 **§7's "event-driven, never poll" governs how you READ THE SPACE.** It is still
 in force: do not sit in a loop calling `get_recent_context`.
@@ -248,7 +243,7 @@ non-publication is a STATE, and no event ever fires for it.** The Steward posts
 compaction, or swallowed by a modal, **nothing will ever tell you again**, and
 the queue is silently stalled while your seat looks merely quiet.
 
-### THE STALL THIS WAS RULED ON
+## THE STALL THIS WAS RULED ON
 
 Measured 2026-09-17. Three candidates sat routed with **no PR opened**;
 `origin/main` did not move for roughly half an hour; a fourth PR's CI was
@@ -262,7 +257,7 @@ The seat woke, did nothing substantive, and slept. **A missed wake cannot be
 repaired by another wake through the same channel** — recovery has to come from
 a timer the seat owns, or from a human.
 
-### TWO THINGS THE TICK MUST ACTUALLY DO
+## TWO THINGS THE TICK MUST ACTUALLY DO
 
 1. **Reap your monitors.** Sixty accumulated watches is a seat spending its
    context on landings that already happened. Retire a monitor when its

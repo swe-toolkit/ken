@@ -1,408 +1,81 @@
-# Compaction: your own and the teams'
+# Compaction
 
-Steward task procedure. Read at the point of use. Governing playbook:
-`../steward.md`. The handoff gate that consumes this is in
-`release-and-handoff.md`.
+Compaction protects a clean work boundary. It is not a recurring management
+project and it is never performed mid-turn.
 
-Context compaction is strictly the Steward's responsibility. You direct the
-work flow, so you own the clean context boundary that flows with it. **Leaders
-do not compact their members.**
+## Steward self-compaction
 
-## Codex (pi) seats: a 272k window, auto-compaction ON — compact at SEAMS only
+Near 33% context, finish the current action, leave the worktree clean, and write
+a short durable checkpoint containing:
 
-The Codex/pi seats — the lieutenant and every pi ring seat
-(kernel/verify/language/spec/foundation) — have a **272k-token** context window,
-not Claude Code's 1M (operator, 2026-08-23). Their pane footer reads
-`N%/272k (auto)`: the percent is of 272k, and **`(auto)` means auto-compaction is
-on**. Orientation (skills + role playbook + memory scopes) is a **>40k fixed
-floor** — about 15% of the window before any work is done.
+- current lane actions;
+- any routed-but-unlanded SHA;
+- the next concrete act.
 
-**The model for compacting THEM: deliberate compaction pays only at a clean task
-SEAM; between seams, let auto-compaction handle growth.** At a seam the old
-context is disposable — the seat re-orients for the new unit regardless — so
-compaction there loses nothing. Between seams the context IS the working state,
-and on a 272k window with a 40k floor an early-threshold compaction (33% ≈ 90k,
-only ~50k of it real work) discards half the useful context to reclaim headroom
-the floor immediately refills, then re-pays orientation. That is thrash;
-auto-compaction near the ceiling avoids it.
-
-- **A seat that STARTS FRESH on a new task/hunt — compact at that seam.** Build
-  teams and the spec enclave (the before-new-work gate below) and the Adversary
-  (M8a). The seam is real and the context is disposable there, so these gates
-  stand exactly as written.
-- **The lieutenant — NEVER deliberately compact it; let it autocompact.** It runs
-  a continuous merge queue with **no "before new work" seam** to hang a
-  compaction on. It climbs slowly (~0.3%/merge), is a stateless executor that
-  re-orients cleanly, and `moot compact lieutenant` hangs anyway (2026-08-23;
-  detachment was tested and is NOT the cause). If it ever truly needs shrinking,
-  **restart the session** (stronger than compact) rather than chasing it.
-
-**Your OWN 33% self-compact (steward §0a) is unchanged** — you are a Claude Code
-seat on a 1M window, where the floor is a small fraction and the math differs.
-
-## Compacting a team before new work
-
-**Always compact before new work — build teams and the spec enclave. No
-exceptions. No before-work threshold** (operator, 2026-07-04, the enclave
-twice).
-
-For any unit you are about to hand a new work item — a build team (leader,
-implementer, QA) or the spec enclave (spec-leader, spec-author,
-conformance-validator) — you compact **every** member unconditionally. You do
-not check the ctx level first, you do not weigh whether the context is warm or
-relevant, and you do not exempt a member because a prior task left them running.
-
-**The ctx percentage is irrelevant to the decision, so do not even look at the
-number to decide.** The instant you find yourself reasoning *"they are only at
-N%"*, *"that context is an asset"*, *"I will compact at the next seam"*, or
-*"let me wait for X first"* — you have already violated the rule. Stop and
-compact. **Each means each.**
-
-**The 33% figure is a mid-flight ceiling, not a before-work gate.** It means
-only: if a unit drifts over 33% while working with no handoff in sight, compact
-it at the next safe seam. It is never a licence to skip the before-new-work
-compaction. **Before new work: compact unconditionally, ctx unread. Mid-work:
-33% ceiling. Two separate rules; the enclave gets no before-work exemption.**
-
-**Why the rule has no threshold:** three operator corrections drove it, the
-enclave twice, and each time the rationalization was a threshold — "under
-threshold and warm relevant context", "compact at the flip seam". A per-role
-before-work threshold *invites* the "still under it" rationalization, so there
-is none. Compaction is not lossy for what matters: the summary preserves recent
-detail and the agent re-fetches any source from the filesystem at pickup.
-
-## The COMPACT-THEN-KICK sequence: four beats, and the order is load-bearing
-
-**The rule above says compact before new work. This says the two acts are
-ORDERED and separated by a verification, not issued together.** The Adversary
-section below states the same four beats for one seat; they are general.
-
-    1. COMPACT       every member of the unit, unconditionally, ctx unread
-    2. VERIFY        the drop, per "verifying a drop" -- search the FULL
-                     stream, never a truncated tail
-    3. KICK          post the mention (the thread anchor, COORDINATION §4a/§4b)
-    4. ROUSE         a separate pane rouse; a compacted no-poll seat does not
-                     wake on a mention alone
-
-**Never collapse 1 and 3 into one gesture, and never issue 3 while 2 is
-unanswered.** A mention delivered to a seat that is **about to compact, or
-mid-compaction, is consumed by the compaction** — the seat comes back with a
-summary of a turn in which it was told to do something, and no work in hand. It
-then sits idle at an empty composer looking correctly quiet, which is
-indistinguishable from a seat that was never kicked.
-
-> **The failure is silent on both sides and that is why the order is a rule.**
-> You see a posted mention; the seat sees nothing. Nothing in the channel
-> records that a kick was lost, so the symptom arrives later as *"the ring never
-> started"* — and the natural next action, re-posting the kick, opens a second
-> thread for the same WP unless you go back for the original anchor's event id.
-
-**A seat at high ctx that is MID-TURN is the dangerous case and the one to leave
-alone.** Do not compact or kick it; wait for the turn to end. The footer's ctx
-**lags the turn**, so read the pane **body** for a spinner before acting on the
-number — a seat showing 83% with an active composer is working, and both a
-compact and a kick land in the worst possible place. Check the body, not the
-footer, every time.
-
-**Corollary for the release path: publish, THEN kick.** Kick on the **landed**
-change, never the routed one. A kick naming a SHA that has not landed sends the
-seat to look for content that is not on `main` yet.
-
-## Compacting the ADVERSARY: yours, at the merge notification
-
-**Operator, 2026-08-17: *"There is nothing that compacts adversary and the
-adversary does not self-compact."*** `COORDINATION §15` files it with the
-singletons who compact themselves; that assignment produced nothing, so the
-Steward owns it.
-
-**Its gate is `merge-procedure.md` M8a — compact it, confirm the drop, post the
-notification, then rouse the pane.** All four beats, because a mention does not
-wake a compacted no-poll seat.
-
-**Do not build it a schedule.** The merge notification is not merely *a*
-boundary for this seat, it is **all of them**: the Adversary is event-driven,
-its context grows only while hunting, and it hunts only when notified. A
-periodic sweep would fire mostly on an idle seat and would still miss the
-handback, which is the moment that matters.
-
-**Watchdog backstop:** its pane is in the tick's ctx scan like any other, and it
-is the seat that scan is most likely to lapse on, because an event-driven seat
-reads as "not active" and drops out of an active-agent enumeration.
-
-## Compacting a team: the mechanism
-
-**Use the checked-in script. Do not hand-drive `tmux send-keys` pane by pane** —
-that races the text/Enter split and double-queues `/compact` on a busy pane.
-
-```
-scripts/handoff-gate-compact.sh [--wait-seconds <N>] <agent>...
-```
-
-List every receiving-unit member explicitly, e.g. `language-leader
-language-implementer language-qa`, or the enclave triple `spec-leader
-spec-author conformance-validator`. In order the script:
-
-1. **Preflights** — resolves each agent's `.worktrees/<agent>` and its
-   `moot-<agent>` tmux session, and fails before mutating anything if any is
-   unresolved.
-2. `git fetch origin`.
-3. **`git reset --hard origin/main`** on each worktree. This also satisfies
-   "start new work from current `origin/main`", but **it moves the branch ref**,
-   so it discards not only uncommitted state but any committed commits the
-   branch holds ahead of `origin/main`. The script auto-preserves those under a
-   `preserved/<branch>` ref and warns — but still only run it once the unit is
-   quiescent with its prior WP merged, and eyeball that each agent's branch is
-   not ahead of `origin/main` first. **A `preserved/` ref is a safety net, not
-   a substitute for knowing what a ring is sitting on.** Mind the squash-merge
-   trap (`merge-procedure.md`): branch-ahead does not imply unmerged.
-4. **Sends the compaction sequence** (`Enter`, `-l '/compact'`, `Enter`) to
-   every pane in parallel. The `-l` literal form lands on both Codex and
-   Claude-Code panes, so one script is provider-agnostic.
-5. **Waits `--wait-seconds`** (default 300) and returns.
-
-**Run it in the background.** The default five-minute synchronous wait exceeds
-a foreground tool timeout — launch with `run_in_background: true`. Do the next
-prep while it waits; you are re-invoked when it returns.
-
-> ### DO NOT PUBLISH DURING THE GATE WINDOW. The reset is a SNAPSHOT.
->
-> Step 3 resets every worktree to **`origin/main` as it stood when the gate
-> started.** If you publish while it runs — and the five-minute wait is exactly
-> when publishing feels free — **`main` moves and the ring is left one commit
-> behind the frame you just wrote for them.**
->
-> Measured 2026-08-12: the gate pinned all three Runtime seats at `9fe5a3a4`
-> while a frame recut landed at `00cc425a`. The leader was about to re-release
-> from a tree that **did not contain the deliverable being released.**
->
-> **The failure is silent in both directions.** The seats look correctly
-> reset — they *are* at a clean `origin/main`, just not the current one. The
-> frame looks correctly landed, because it is. **Nothing in either check
-> compares the two**, and the ring's next act is to read a frame it does not
-> have.
->
-> Either finish publishing before you launch the gate, or, if something had to
-> land mid-window, verify and say so explicitly:
->
-> ```sh
-> git rev-parse origin/main
-> for a in <members>; do git -C /workspaces/ken/.worktrees/$a rev-parse HEAD; done
-> ```
->
-> **If they differ, that is yours to correct, not the ring's to notice.** Tell
-> the leader the exact SHAs and the `git fetch origin --prune && git reset
-> --hard origin/main` — do not assume a seat that was just reset will think to
-> re-fetch.
-
-**The script sends the compaction; it does not confirm the drop.** After it
-returns, `capture-pane` each member and confirm ctx actually fell, or a live
-`Compacting...`, or a queued `/compact`.
-
-## Compacting a team: verifying a drop
-
-Accept any of: a `Compacting...` spinner, ctx dropped, or a queued `/compact`
-with "Press up to edit queued messages" — the queued case fires at the current
-turn's end, which is a clean seam and is correct. T1 enclave agents rarely hit
-a natural idle seam during a dense event stream, so a queued `/compact` is the
-normal, desired outcome.
-
-**Draw no negative conclusion from a truncated buffer.** The `Compacting...`
-progress bar renders a few lines *above* the input, so a narrow tail shows a
-stale prompt plus the pre-compaction ctx and reads as a confident "did not
-land" — observed on a pane at 4% `Compacting` that looked idle under `tail -5`.
-
-**The fix is not a bigger number** — a bigger `N` only moves the cliff.
-**The rule is positional: if the
-evidence renders above the region your window covers, that window structurally
-cannot answer the question, and it does not return "unknown" — it returns a
-confident wrong answer.** Search the full stream and truncate the result, never
-the input:
+Then run:
 
 ```sh
-tmux capture-pane -p -S -50 -t moot-<role> | grep -c Compacting   # correct
-tmux capture-pane -p -t moot-<role> | tail -5 | grep Compacting   # wrong
+moot compact steward
 ```
 
-A pane whose ctx truly did not move did not compact — resend to that one pane
-and re-verify.
+Stop the turn. On resume, re-orient, read the checkpoint and
+`steward/lanes.md`, check unread mentions, and re-arm the watchdog.
 
-## Compacting a team: the Codex harness
+## Team compaction
 
-The fleet runs the Codex TUI in `moot-<role>` panes.
+Compact a build team or Spec enclave only at a genuine new-WP boundary. Do not
+compact for:
 
-- **`send-keys` needs `-l` (literal) for text and slash commands.** Without it
-  the string does not land.
-- **Autocomplete eats Enter.** Typing `/compact` opens the slash-command
-  palette, and a following `Enter` accepts the completion rather than
-  submitting. So the type-then-separate-Enter recipe mis-fires for slash
-  commands on Codex.
-- **For `/compact`, `moot compact <role>` is the reliable path on Codex.** It
-  lands cleanly (the pane shows `Context compacted`). Still verify the drop.
-- **ctx reads as `N% context left`**, not `ctx N%` — grep `context left`, and
-  accept that it is often absent from the tail entirely.
-- **Post-compaction mention rouse.** A just-compacted agent does not
-  auto-pick-up a mention posted *after* its compaction; it sits idle at an
-  empty composer. Rouse it with `tmux send-keys -t moot-<role> -l "<one line:
-  run get_recent_context and pick up event <evt_id>; re-orient per CLAUDE.md,
-  then proceed>"` and then a **separate** `Enter`.
-- **Clearing a garbled composer:** `C-u` clears some panes; stubborn ones need
-  `C-a`, `C-k`, then repeated `BSpace`. **Never `Escape`** — it aborts an
-  in-flight compaction.
+- another increment or respin of the same WP;
+- QA or reviewer handoff;
+- a question, ruling, or ordinary status change;
+- a desire to lower a context percentage while the seat is working.
 
-## The mid-flight ceiling and the ctx scan
+## Team preconditions
 
-**For pi seats this mid-flight threshold-chasing is superseded by
-auto-compaction** — see the Codex-seats section above. The 25/33/45 figures below
-date to the pre-pi enclave (operator, 2026-07-02) and to Claude Code seats; on a
-272k window with a 40k floor, chasing a 25/33% mid-flight number thrashes. For pi
-seats the SEAM gate (before-new-work; M8a) is the primary trigger and
-auto-compaction is the mid-flight net; the scan below is then only for spotting a
-genuinely stuck or near-ceiling seat, never a licence to compact a mid-flight pi
-seat at 33%.
 
-High context is expensive per turn for very little gain: an agent at 90%
-reprocesses about 900K tokens every turn, and the working state beyond a good
-summary adds little. The boundary rule above is the primary trigger; this
-percentage cap is the safety net that catches drift the boundary rule cannot
-see — an agent doing cross-WP assist work never hits a clean own-WP boundary,
-so it silently climbs.
+1. every member is quiescent;
+2. no member owes an unfinished vote, answer, handoff, or unmerged artifact;
+3. dirty or ahead worktrees have been resolved by their owners;
+4. the new frame is already landed on `origin/main`.
 
-- Scan each active agent's context in the watchdog tick.
-- At the next quiescent seam, compact any agent above about 25%, and treat
-  about 33% as compact-at-the-very-next-quiescent-moment.
-- An agent found above about 45% is a monitoring miss, not a normal state.
+## Team mechanism
 
-Thresholds were lowered from 60/70 to 25/33 by the operator, 2026-07-02. The
-observed post-compaction floor for a heavy-context agent is 8 to 9%, so 25/33
-keeps an enclave agent oscillating in a tight, cheap low band well clear of the
-costly high end. Aggressive compaction is safe here because enclave work is
-discrete review and authoring tasks that resume cleanly from `/spec` and the
-tracker.
+Run the checked-in gate with every member named:
 
-**The ctx scan is the mandatory first step of every watchdog tick.** It is the
-one step that silently lapses, and the lapse is invisible — a stall scan comes
-back "all clear" while a T1 agent climbs. Two amplifiers, both real: a *minimal
-tick* run to conserve compute must still include the one cheap capture, since
-it is the cheapest high-value line in the tick; and a **self-authored enclave
-cascade** is the peak-risk window, because none of its steps hits a
-Steward-delivery boundary compact, so the scan is the only trigger that can
-catch it. Escalate the scan during a cascade, never relax it. **A tick that
-reports "all clear" without a ctx line is an incomplete tick.**
-
-**Cross-check with the handoff gate:** if a unit was handed a WP this cycle yet
-its members' ctx is still high, the gate was skipped. The gate is the proactive
-fix; this scan is only the backstop. **When the scan is the thing catching a
-stale enclave, the gate already failed upstream — treat that as the miss, not a
-routine catch.**
-
-## The gate is part of the RELEASE, not a step before it
-
-**Measured 2026-08-12, and the cost was a full seat-turn.** `D2k-1a` merged,
-the Runtime ring went idle, and the Steward released `D2k-1b-i` the same turn
-**without running the gate.** The implementer was at **ctx 55%** — past the
-45% this file calls *"a monitoring miss, not a normal state"* — took the
-increment, did the grounding, and handed it back **unstarted on capacity.** The
-leader then had to ask for the gate.
-
-**The rationalization was delivery pressure, and it came from a real rule.**
-`../steward.md §1` makes an idle build team the Steward's backlog, so the
-instant the merge landed the whole objective was zero gap between merge and
-kickoff. **The gate looks like a delay in exactly that moment.**
-
-⇒ **Measured, that trade is inverted: skipping five minutes of compaction cost
-a whole turn.** A ring going idle is not a reason to skip the gate — **it is
-the only quiescent seam you get**, and quiescence is this file's own
-precondition.
-
-**The sequence is compact, then kick.** If you are writing a release post and
-cannot say when that unit was last compacted, **you are the blocker, and the
-seat's capacity handback is your miss surfacing from the wrong side.**
-
-**A handback on capacity is a good handback.** The seat above refused to open
-the most soundness-adjacent increment in its sequence while fatigued, and said
-explicitly that no mechanism stop had fired so the node's record would not be
-corrupted. Read it as the gate firing late, not as a failed turn.
-
-## Before you compact anyone: outstanding obligations
-
-Confirm the agent owes nothing in flight — a pending review vote on another
-team's open Decision, an unfinished handoff, an open `question` it must answer.
-Compaction drops the obligation. K3: the spec enclave was compacted for its
-next WP while a merge-review request was open, the vote was dropped, and it
-surfaced only at the merge gate. Resolve, reassign, or confirm-not-required
-first.
-
-**Precondition: quiescent.** Never compact an agent mid-reasoning.
-
-## Self-compaction: the checklist
-
-The operator has corrected this three times. **Run the checklist; do not
-improvise.**
-
-A build team gets its compact seam free from the WP pipeline. You and the other
-singletons have no such boundary — your work arrives event-driven from many
-sources at once, so you must manufacture your own seam.
-
-**The first half matters more than the second: keep your durable checkpoint
-continuously current.** A compaction, auto or self, is safe because your resume
-state already lives on disk in the progress tracker, not only in context. You
-cannot read your own token count from a tool, so you cannot time it perfectly;
-the discipline is to keep the tracker so current that whenever compaction
-fires, resume is lossless. **A stale tracker is the only thing that makes a
-random-timed autocompact dangerous. Fix the staleness, not the timing.**
-
-## Self-compaction: when
-
-At or near 33% ctx. Check your own pane at every seam. Above 33% you are
-already late — compact at the next safe moment, not at the next milestone.
-
-```bash
-tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1
+```sh
+scripts/handoff-gate-compact.sh <leader> <implementer> <qa>
 ```
 
-## Self-compaction: the six steps, in order
+For the Spec enclave, name `spec-leader`, `spec-author`, and
+`conformance-validator`. Verify each pane shows a context drop, active
+compaction, or a queued compaction. A sent command without an observed result is
+not a completed gate.
 
-1. **Finish the current turn's durable state.** Tracker and node edits
-   committed, worktree clean (`git status --porcelain` empty), nothing
-   half-posted.
-2. **Write the resume checkpoint** — the one tracker line naming the very next
-   action. Assume you wake with nothing but that line.
-3. **Launch the detached resume watcher.**
-   ```bash
-   nohup scripts/postcompact-resume.sh moot-steward >/tmp/pcr-steward.log 2>&1 & disown
-   ```
-4. **Send `/compact` to your own pane — text and Enter as two separate calls.**
-   ```bash
-   tmux send-keys -t moot-steward -l '/compact' ; sleep 2 ; tmux send-keys -t moot-steward Enter
-   ```
-5. **Stop. This is the last action of the turn.** `/compact` fires at turn end;
-   any further tool call delays or eats it.
-6. **On wake:** re-orient per `CLAUDE.md`, read the checkpoint, resume.
+After the drop, post the kickoff and rouse any compacted no-poll seat. The order
+is compact, verify, kick, rouse. A kickoff sent before compaction can be consumed
+by the compaction.
 
-## Self-compaction: the three ways this fails
+## Pi seats
 
-- **Launching the watcher is not compacting.** Step 3 without step 4 leaves you
-  running at full context believing you compacted. That is the exact miss the
-  operator caught twice.
-- **Announcing it is not doing it.** "I will self-compact now" in your reply,
-  with no `send-keys`, is nothing.
-- **Fused keystroke.** `send-keys '/compact' Enter` in one call can drop the
-  newline and leave the command unsent. Always two calls with the `sleep 2`.
+Pi seats have auto-compaction. Between work boundaries, let it operate. Do not
+chase the former 25/33/45-percent thresholds. At a new-WP seam, the explicit gate
+above still applies because old task context is disposable there.
 
-## Two rules that are not part of the self-compact checklist
+The lieutenant has no new-WP seam in its continuous merge queue. Do not compact
+it routinely; let it auto-compact or restart it only when the operator directs.
 
-- **The watcher is for self-compaction only.** Never launch it when
-  handoff-gate-compacting a team — there the kickoff mention is the resume
-  trigger, and a premature resume wakes the unit into "no new work".
-- **Never nest `nohup ... &` inside a backgrounded Bash call** — the
-  notification then describes the wrapper, not the watcher.
+## Adversary
 
-Why the watcher exists at all: `/compact` returns the seat to an empty prompt
-with nothing to re-invoke it, so a detached process immune to the turn
-lifecycle must send the resume after the `Compacting...` window clears. A
-SessionStart hook cannot substitute — it shapes the next turn's context, it
-cannot trigger a turn.
+The Adversary is compacted at M8 before a code-merge notification. Compact,
+verify, notify, rouse. It does not self-compact and does not receive a periodic
+compaction schedule.
 
-Steward, Architect, and Librarian all self-compact this way; see
-`../architect.md` section 3. **The Adversary does not** — it is a singleton by
-law and Steward-compacted in practice, at M8a above.
+## Failures
+
+- If a pane is working, leave it alone.
+- If the gate refuses a dirty worktree, the owner resolves it; the Steward does
+  not reset another seat by hand.
+- If context did not drop, retry only that idle pane and verify again.
+- If a kickoff was sent before the drop, reuse the original WP thread anchor
+  when re-delivering; never create a second thread.
