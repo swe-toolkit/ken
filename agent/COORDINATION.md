@@ -1111,7 +1111,7 @@ and publishes.
 > | exception | route | condition |
 > |---|---|---|
 > | **`docs/program/`** — Steward-owned program docs (trackers, issue files, WP frames, program guides) | Steward resolves, no Architect | the change is **currency or editorial**, and the Steward **authorized the expansion when routing the WP**. A change that alters *program law* or a WP's **acceptance criteria** is not editorial — it is a frame amendment, and it is the Steward's to author, not a ring's to fold in. |
-> | **workflow corpus** — `agent/**`, workflow/publisher scripts, startup prompts, `moot.toml`, CI workflow files | Operator-designated non-Steward author; Steward may route an accepted exact SHA but never author or amend it | The operator authorized the change. Apply `skill-style` to playbooks. Architect review is required only when the edit changes a soundness or design gate. |
+> | **workflow corpus** — `agent/**`, workflow/publisher scripts, startup prompts, CI workflow files | Operator-designated non-Steward author; Steward may route an accepted exact SHA but never author or amend it | The operator authorized the change. Apply `skill-style` to playbooks. Architect review is required only when the edit changes a soundness or design gate. |
 >
 > **LEDGER RIDER — RETIRED 2026-08-02. Its premise was removed one day after
 > it was written, and it stood for a week claiming a gate that does not exist.**
