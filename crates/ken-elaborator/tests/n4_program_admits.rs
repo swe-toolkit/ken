@@ -112,7 +112,7 @@ fn admitted_ambient_resolution_records_distinct_provider_provenance() {
     write_two_provider_fixture(&root, "P, Q");
 
     let env = load(&root, "Entry").expect("both explicitly admitted providers resolve");
-    let resolutions = &env.class_env.resolution_provenance;
+    let resolutions = &env.resolution_provenance;
     assert_eq!(resolutions.len(), 2);
     assert_eq!(resolutions[0].defining_package, "P");
     assert_eq!(resolutions[0].class_name, "RenderP");
@@ -246,7 +246,6 @@ fn single_source_package_self_admits_without_program() {
 
     let env = load(&root, "Solo").expect("one source package self-admits");
     let provenance = env
-        .class_env
         .resolution_provenance
         .last()
         .expect("real search records provenance");
@@ -270,7 +269,6 @@ fn sole_external_source_provider_self_admits_without_boundary() {
     let env = load(&root, "Entry")
         .expect("a boundary-less closure self-admits its sole source provider");
     let provenance = env
-        .class_env
         .resolution_provenance
         .last()
         .expect("real search records the external provider");

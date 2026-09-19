@@ -289,7 +289,6 @@ fn loader_projects_both_readers_and_admits_clause_changes_real_dispatch() {
     );
     assert_eq!(
         accepted_env
-            .class_env
             .resolution_provenance
             .last()
             .expect("real dictionary search records provenance")

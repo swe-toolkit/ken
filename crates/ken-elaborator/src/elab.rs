@@ -9523,12 +9523,21 @@ pub fn elaborate_rdecl(
     // the fail-closed value: an occurrence reaching here is refused naming the
     // role rather than silently left under-applied.
     let no_standard_operators = HashMap::new();
+    // A LOCAL SINK IS CORRECT HERE, AND IT IS THE ONLY PLACE THAT IS TRUE.
+    // Provenance used to live inside `ClassEnv`, so on this path it went into
+    // the throwaway `sentinel` above and was dropped with it. A local vector
+    // preserves that exactly. Contrast `elaborate_rdecl_v1`, where provenance
+    // accumulated into the CALLER's registry and a local would have silently
+    // discarded it -- same refactor, opposite right answer, decided by where
+    // the old field's owner outlived the call.
+    let mut discarded_provenance = Vec::new();
     let result = elaborate_rdecl_v1(
         env,
         globals,
         num_values,
         numeric_env,
         &mut sentinel,
+        &mut discarded_provenance,
         &no_standard_operators,
         rdecl,
     )?;
@@ -9669,12 +9678,20 @@ fn match_instance_head(
 /// Resolve an instance and recursively apply every prerequisite dictionary.
 /// The returned candidate is immediately kernel-inferred, so an elaborator
 /// wiring error fails closed before it can become a local dictionary binding.
+/// **Takes `&ClassEnv` and a separate `&mut` SINK.** The resolution decision is
+/// a pure function of the registry; the one thing this writes is an
+/// append-only provenance log that used to live inside `ClassEnv` and forced
+/// the whole registry to be borrowed mutably. Splitting the sink out is what
+/// puts dictionary resolution within reach of an expression site, where
+/// `ElabCtx` holds `Option<&ClassEnv>` and must not be granted an authority
+/// `33 §6.2` says it does not have.
 fn resolve_instance_dictionary(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
-    class_env: &mut ClassEnv,
+    class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
     requested: &RType,
@@ -9687,6 +9704,7 @@ fn resolve_instance_dictionary(
         num_values,
         numeric_env,
         class_env,
+        provenance,
         ctx,
         class_name,
         requested,
@@ -9702,7 +9720,8 @@ fn resolve_instance_dictionary_inner(
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
-    class_env: &mut ClassEnv,
+    class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     ctx: &Context,
     class_name: &str,
     requested: &RType,
@@ -9793,6 +9812,7 @@ fn resolve_instance_dictionary_inner(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             ctx,
             &constraint.class_name,
             &required_head,
@@ -9807,9 +9827,7 @@ fn resolve_instance_dictionary_inner(
         span: span.clone(),
     })?;
     if enforce_direct_use {
-        class_env
-            .resolution_provenance
-            .push(crate::classes::InstanceResolution {
+        provenance.push(crate::classes::InstanceResolution {
                 instance_id: info.instance_id,
                 class_name: class_name.to_string(),
                 head_type: head_name,
@@ -11175,6 +11193,12 @@ pub(crate) fn elaborate_rdecl_v1(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    // Threaded rather than made local. `fixities`, `fixity_spans` and
+    // `ctor_decl_spans` below ARE locals on this standalone path because they
+    // are scoped to one declaration -- provenance is not. It accumulated into
+    // the caller's registry before this change, so making it local here would
+    // silently drop it on this path.
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
@@ -11190,6 +11214,7 @@ pub(crate) fn elaborate_rdecl_v1(
         num_values,
         numeric_env,
         class_env,
+        provenance,
         standard_operators,
         &HashMap::new(),
         &mut fixities,
@@ -11234,6 +11259,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
@@ -11252,6 +11278,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
             num_values,
             numeric_env,
             class_env,
+            provenance,
             standard_operators,
             effect_rows,
             fixities,
@@ -11269,6 +11296,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
         num_values,
         numeric_env,
         class_env,
+        provenance,
         standard_operators,
         effect_rows,
         fixities,
@@ -11286,6 +11314,7 @@ fn elaborate_associated_rdecl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     fixities: &mut HashMap<GlobalId, Fixity>,
@@ -11334,6 +11363,7 @@ fn elaborate_associated_rdecl(
                     num_values,
                     numeric_env,
                     class_env,
+                    provenance,
                     &dictionary_ctx,
                     &constraint.class_name,
                     &constraint.head_type,

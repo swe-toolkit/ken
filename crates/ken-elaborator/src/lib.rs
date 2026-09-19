@@ -183,6 +183,26 @@ pub struct ElabEnv {
     /// The Lc typeclass environment: class/instance registry + structural
     /// postulates (`RecordNil`, `record_nil_val`). Initialized in `empty()`.
     pub class_env: ClassEnv,
+    /// Successful implicit-resolution provenance, in source order.
+    ///
+    /// **A SIBLING OF `class_env`, not a field of it, and the split is the
+    /// point.** `33 §6.2` instance search is a lookup against a registry fixed
+    /// before any body elaborates, so the resolution DECISION is a pure
+    /// function of `&ClassEnv`. This is the one thing the resolver writes --
+    /// an append-only OUTPUT with zero production readers -- and while it
+    /// lived inside `ClassEnv` the whole registry had to be borrowed mutably
+    /// to record it, which put dictionary resolution out of reach of an
+    /// expression site.
+    ///
+    /// Keeping it inside and borrowing the field alone does not work: `&*env`
+    /// and `&mut env.field` overlap as places. Two fields of `ElabEnv` are
+    /// disjoint by direct projection, which is why the SINK moves rather than
+    /// the borrow (Architect, `evt_qgdv6h7s3fyn`).
+    ///
+    /// **ONE OWNER, APPENDED IN ELABORATION ORDER.** `classes.rs` documented
+    /// "in source order" and tests index `resolutions[0]`/`[1]`, so this must
+    /// not become per-declaration.
+    pub resolution_provenance: Vec<classes::InstanceResolution>,
     /// Module/import/visibility bookkeeping (`33 §3-4`, ES3-build) —
     /// persists the file-level (root) import scope and every elaborated
     /// module's `pub` export table across separate `elaborate_*` calls.
@@ -248,6 +268,7 @@ impl ElabEnv {
             prelude_env: prelude::empty_prelude_env(),
             // placeholder; replaced after prelude registration below.
             class_env: classes::ClassEnv::sentinel(),
+            resolution_provenance: Vec::new(),
             module_state: modules::ModuleState::default(),
         };
         // L3 prelude: Peano `Nat` (replaces the placeholder postulate) + the

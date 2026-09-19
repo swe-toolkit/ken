@@ -510,7 +510,6 @@ fn admitted_reexport_carries_only_the_named_instance_surface() {
                 panic!("re-exporting key participant {carried} must carry Q's dictionary: {error}")
             });
         let resolution = accepted
-            .class_env
             .resolution_provenance
             .last()
             .expect("implicit dispatch records provenance");
