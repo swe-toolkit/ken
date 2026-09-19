@@ -1,7 +1,7 @@
 ---
 id: CAT-PARSING-CURSOR-LAWS
 title: "Proof-backfill for Capability/Parsing/Cursor.ken.md: construct the missing inhabitant of the package's own CursorLaws proposition for arg_cursor_ops -- the three components (CursorPeekHasRemaining, CursorAdvanceProgress, CursorEndValid) are written as Props with no term proving them for the shipped dictionary."
-status: draft
+status: ready
 owner: foundation
 size: L
 gate: none
@@ -27,7 +27,14 @@ of `CursorPeekHasRemaining` (`:222`), `CursorAdvanceProgress` (`:235`), and
 `CursorEndValid` (`:250`). No term inhabits it for `arg_cursor_ops` (`:204`).
 The deliverable is the inhabitant, not the statement.
 
-## WHY THIS IS `draft` AND NOT `ready` — the measured dependency
+## WHY THIS WAS `draft` — the measured dependency, now DISCHARGED
+
+**Released 2026-09-19 at `origin/main`
+`a86ee0ca54268d7900d686ec95cb1d7cbf7c81b3`.** Both predecessors are on `main`:
+`CAT-NAT-ORDER-LAWS` landed `saturates` and `suc_decreases`, and
+`CAT-COLLECTIONS-NTH-LAWS` landed the `nth`/`length` pair. The section below is
+the original measurement, retained because the survey does not record this edge
+and it should not be re-derived. It is history, not an open condition.
 
 Measured at `origin/main` `b839fd63295e550c12524bd9f4804fdf28be7169`.
 
@@ -61,7 +68,8 @@ records that choice in its package prose.
 
 # Frame
 
-Released when `CAT-NAT-ORDER-LAWS` `D1` lands. Sizing raised from `M`/`T2` to
+RELEASED 2026-09-19; both predecessors are on `main`. Sizing raised from
+`M`/`T2` to
 `L`/`T1`: the work is inductive proof construction over a fuel-recursive
 normalizer that crosses argument boundaries, plus a predicate bridge — semantic
 invention, not a mechanical port.
@@ -70,18 +78,28 @@ invention, not a mechanical port.
 
 Measured. Do not re-derive.
 
-**1. The `draft` reason above is discharged.** `D1` candidate
-`2e7d1855d97c99344d74007028d0ab1e9e523638` lands both `sub` facts this node was
-waiting on, in `catalog/packages/Data/Numeric/Nat/Order.ken.md`:
+**1. The `draft` reason above is discharged.** Both `sub` facts this node was
+waiting on are on `main` in
+`catalog/packages/Data/Numeric/Nat/Order.ken.md`. **Navigate by symbol; the
+line numbers are current at `a86ee0ca5` and will drift again:**
 
-- **saturation** — `saturates` (`:91-93`):
+- **saturation** — `pub proof saturates for sub` (`:137`):
   `(b : Nat) → IsTrue (leq_nat a b) → Equal Nat (sub a b) Zero`
-- **strict decrease** — `suc_decreases` (`:109-113`):
+- **strict decrease** — `pub proof suc_decreases for sub` (`:155`):
   `IsTrue (leq_nat (Suc b) a) → IsTrue (leq_nat (Suc (sub a (Suc b))) (sub a b))`
+
+Both statements are quoted byte-exact from `main`; it is only the coordinates
+that moved. An earlier revision of this frame cited `:91-93` and `:109-113`,
+read off the pre-squash `D1` candidate. **Those lines now hold
+`zero_left for max` and `right_leq for max` — real proofs, wrong ones.** A
+stale coordinate that lands on a different real symbol does not announce
+itself the way a miss does.
 
 **2. The deferred design question is answered: the real gap is the predicate,
 and the wrapper is free.** `Order` carries its Boolean hypotheses as `IsTrue`
-(`Order.ken.md:188`); Cursor's three laws state their conclusions as
+(`Order.ken.md:61`, `:71`, `:93`, `:103`, `:139`, `:158` — six sites, so this
+is the package's convention and not one proof's choice); Cursor's three laws
+state their conclusions as
 `Equal Bool (cursor_nat_lt ...) True` (`:222`, `:235`, `:250`). An earlier
 revision of this frame called that a mismatch on two axes. **It is one.**
 `IsTrue (b : Bool) : Prop = Equal Bool b True`
@@ -100,14 +118,21 @@ and `IsTrue`. Widen the existing import list.
 
 **4. The `Bytes` view closes by unfolding, not by a new fact.**
 `bytes_nat_length bs` is *defined* as `length UInt8 (bytes_to_list bs)`
-(`Data/Collections/Derived.ken.md:900`), and `arg_length` is `bytes_nat_length`
+(`Data/Collections/Derived.ken.md:928`), and `arg_length` is `bytes_nat_length`
 (`Cursor.ken.md:67`).
 
-**5. `add` facts exist; the `nth` pair arrives as a predecessor.**
+**5. `add` facts exist; the `nth` pair HAS LANDED.**
 `Data/Numeric/Nat/Arithmetic.ken.md` carries `assoc`, `comm`, `zero_l`,
 `zero_r`, `suc_l`, `suc_r`. `Derived.ken.md` carried **no lemma relating `nth`
-to `length`**, catalog-wide. `CAT-COLLECTIONS-NTH-LAWS` lands that pair; it is
-a `depends_on` of this node, not a wall this node is expected to hit.
+to `length`**, catalog-wide — until `CAT-COLLECTIONS-NTH-LAWS`, which landed
+the pair at `a86ee0ca5`:
+
+- `pub proof some_below_length for nth` (`Derived.ken.md:177`)
+- `pub proof at_or_beyond_is_none for nth` (`:191`):
+  `IsTrue (leq_nat (length a xs) n) → Equal (Option a) (nth a n xs) (None a)`
+
+It is a discharged `depends_on` of this node, not a wall this node is expected
+to hit.
 
 **6. The `Nat` side of the positivity step is already paid — there is no
 second predecessor.** `offset < len ⇒ Zero < sub len offset` is not
