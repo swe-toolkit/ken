@@ -59,6 +59,21 @@ identity. Do not read it as a second confirmation.
 
 ## 2. Deliverables
 
+> **`D0` IS DISCHARGED** (Architect `evt_3t3ynhwbr8jv`, 2026-09-19). Both
+> statements of the K-result expectation are now derived, at checkpoint
+> `401be7c89367cb8c07aec0f24a982260b720df3d`. The discriminator returned
+> positive — **the trap MOVED**, so the worker-body derivation was right and
+> the field count was the second expectation. The planner's expectation no
+> longer disagrees with the carrier the runtime produces: validation passes and
+> the program executes end to end.
+>
+> **What remains is `D1`, and it is a different class of failure.**
+> `right-denial` is one assertion from green: `exit_status` is asserted before
+> the mask assertion and returns 82 where 0 is expected, so the mask assertion
+> is not reached — and the trace carries exactly the
+> `RightNotHeld { required: 32, held: 1 }` that assertion demands. **Do not
+> re-open `D0`.**
+
 - **`D0`** — the repair: derive `k_ret_identity` following `bind`'s grafting
   rather than the immediate occurrence, **and derive BOTH statements of the
   K-result expectation**. The planning-side tag derivation and the lowering-side
@@ -100,9 +115,27 @@ identity. Do not read it as a second confirmation.
   cannot be reached inside its own scope is a defective frame. The implementer
   was correct to stop rather than reach: the bullet fired exactly as written.)*
 - A row that needs a **new** `#[ignore]` anywhere to make progress.
-- The repair lands and `right-denial` still fails — that is a finding that the
-  mechanism statement is incomplete, and it **outranks** finishing the node.
+- The repair lands and `right-denial` still fails — **stop and report, but do
+  NOT report it as "the mechanism statement is incomplete" until you have
+  distinguished which of two findings it is.** Both outrank finishing the node;
+  they have opposite consequences.
 
+      the failure is the SAME CLASS      the diagnosis is incomplete
+      the failure CHANGED CLASS          the diagnosis was RIGHT and the
+                                         repaired check was MASKING a second
+                                         defect downstream of it
+
+  *(Repaired 2026-09-19 after this bullet fired and its stated finding was
+  wrong. As originally written it keyed on "still fails" — **the same symbol
+  for "the diagnosis was wrong" and "the diagnosis was right and was hiding
+  something"** — so it could not distinguish them, and it asserted the first.
+  Here it was the second: an expectation mismatch became a semantic outcome,
+  the trace acquired the exact `RightNotHeld { required: 32, held: 1 }` the row
+  demands, and the program began executing end to end. **A fail-closed
+  validation hides everything downstream of itself; removing one NECESSARILY
+  reveals whatever was behind it, and revealing a downstream defect is not
+  evidence the diagnosis was incomplete.** Architect `evt_3t3ynhwbr8jv`. The
+  frame defect was the Steward's.)*
 ## 4a. The mapping check — RUN AND PASSED before this node started
 
 **Nothing is owed here. This section records a discharged check rather than
@@ -140,6 +173,31 @@ would stand whatever the buffer said. What the check protected is the
 *row-level* reading in `§1` of the node file — **which row departs** — and that
 reading is now measured: `right-denial`.
 
+## 4b. Reporting and reasoning disciplines — NOT hard stops
+
+These do not fire and do not count. Violating one is an error in the report,
+not a condition that halts the node, and none of them increments the hard-stop
+count in `§5`.
+
+- **Do not report a red row as "still red" when it is one assertion from
+  green.** State which assertion fails, which are not reached, and whether the
+  unreached ones would pass on the trace you have. `D1` closes on "un-ignored
+  and green, or a grounded statement of what still stops each one", and those
+  are different statements.
+- **Do not build a mechanism statement on a field you have not shown was
+  written.** `terminal_exit: ReturnedError` and `terminal_error: None` are the
+  `EffectObservation` constructor's INITIAL VALUES (`ken-runtime`
+  `native_effect_v1.rs`); they carry no information unless something on the
+  path overwrites them. A fail-closed default and a measurement are the same
+  symbol at the point of reading — the same shape as the `-1` this node already
+  learned not to attribute.
+- **Do not chase a salient symptom before establishing it is anomalous.** A
+  second `ResourceRelease` returning `Closed` is the DESIGNED behaviour the
+  sibling row `linked_public_second_release_is_closed_and_the_handle_closes_once`
+  exists to test, and `release_if_live` exists for exactly that case. Chasing
+  the salient-but-normal is this node's own recurring failure: span length,
+  then continuation shape, then the arena ordinals.
+
 ## 5. Symptom inventory — ARMED AT FILING
 
 **Seeded at framing this time.** The parent node reached two hard stops before
@@ -156,10 +214,29 @@ NEXT PREDICATE CHECK = 3rd entry, then 6th, 9th, ...
    statement is derived (tag parameterised by k_ret_identity, field count
    a literal) -- keyed on a constructor's ARITY hardcoded as the Ret
    assumption
+2. the fail-closed validation was masking a second defect -- with the
+   expectation repaired the program executes and returns exit 82 where 0
+   is asserted -- keyed on a fail-closed check hiding every downstream
+   state from observation
 ```
 
-**Hard-stop count on this WP: 1.** The `§1a` research pull fires at 3. **The
-parent node's count of 2 does NOT carry** — different WP, different question.
+**Hard-stop count on this WP: 2.** **The parent node's count of 2 does NOT
+carry** — different WP, different question.
+
+**TWO ACTS FIRE AT THREE, BOTH THE ARCHITECT'S, BOTH BEFORE THEY RULE**
+(`evt_3t3ynhwbr8jv`). **They are driven by two different counters and the
+frame must not be what teaches someone they are one:** `§1a` fires at the third
+**HARD STOP** — consecutive hard stops on the same design question — and they
+hold the ruling and call research in-thread with the WP, the thread, the
+hard-stop event ids, the clean checkpoint SHA and the exact question. `§1b`
+fires at the third **INVENTORY ENTRY** and they answer in one paragraph whether
+the three entries share a predicate. **The two counters coincide on this node
+today, 1:1, and that is a fact about this node and not about the counters** — a
+stop that produces no entry, or an entry appended for something other than a
+stop, separates them. **Reporting a third stop is
+therefore not a round-trip like the first two. Expect a pause and do not read
+it as a stall.** The predicate question is deliberately NOT answered at two —
+answering early is how it becomes a formality.
 
 ## 5a. A known boundary — RECORD IT, do not work on it
 
