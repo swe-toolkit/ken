@@ -1056,6 +1056,8 @@ proof true_of_equal for ord_leq_at
     : Equal Bool (ord_leq_at a d x y) True =
   J (λy2 _. Equal Bool (ord_leq_at a d x y2) True) (d.refl x) p
 
+pub fn ord_geq_at (a : Type) (d : Ord a) (x : a) (y : a) : Bool = d.leq y x
+
 theorem bool_true_false_absurd
       (z : Bool) (ht : Equal Bool z True) (hf : Equal Bool z False)
     : Bottom =

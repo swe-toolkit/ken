@@ -1363,6 +1363,65 @@ fn cat4_delete_dropkey_filters_all_equivalent_keys() {
 
 #[test]
 fn cat4_union_intersection_difference_execute_over_nat() {
+    // EXPLICIT STACK, AND THE MEASUREMENT THAT SIZED IT.
+    //
+    // This body recurses proportionally to the Peano depth of its `nat(..)`
+    // literals, and it was running on libtest's default 2 MiB thread stack
+    // with 64 KiB to spare -- 3.1%. Nobody chose 3.1%; it is where the
+    // numbers happened to land, which is why the next commit to widen an
+    // elaborator context tipped it into SIGABRT. A `SIGABRT` here is not a
+    // normal failure: it aborts the process, so cargo stops and every
+    // remaining suite in the run goes unexecuted.
+    //
+    // Measured on one box, both trees built, test binaries invoked directly,
+    // `RUST_MIN_STACK` bisected to 16 KiB with zero variance over three runs
+    // per cell (scale = multiplier on every `nat(..)` in this test):
+    //
+    //     scale    before    after     delta
+    //       1      1984 K   2080 K      96 K
+    //       2      3696 K   3824 K     128 K
+    //       3      5424 K   5552 K     128 K
+    //       4      7136 K   7280 K     144 K
+    //
+    // The cost is ~80 KiB fixed plus ~16 KiB PER SCALE STEP, against a base
+    // of ~1717 KiB PER SCALE STEP: a 0.93% slope ratio, so about 1% off the
+    // maximum reachable depth. The unit is the scale step above, not the
+    // recursion level -- read as per-level, 1717 KiB against a 1984 KiB peak
+    // is absurd and the whole figure reads as broken. That misreading cost a
+    // reviewer a re-derivation, which is why the unit sits in the same
+    // sentence as the ratio.
+    //
+    // The shape is proportionate to carrying a wider context through the
+    // same recursion, not a new per-level allocation, which is why it was
+    // ruled a cost rather than a defect.
+    //
+    // BOTH HALVES, because a residue recorded without its complement reads
+    // as classified: the magnitude is immaterial under this headroom, AND
+    // nobody asked what the arriving change put on a per-scale-step frame.
+    // The KiB is the symptom, not the finding. The mechanism was deliberately
+    // not investigated -- chasing it would widen a change that carries no
+    // defect -- so this is an open question, not a finding of "nothing here".
+    //
+    // 4 MiB is chosen, not inherited: measured need is 2080 KiB, so this
+    // leaves room for roughly twenty more widenings of that size.
+    //
+    // WHAT THIS GIVES UP, SAID PLAINLY: this test's subject is set-operation
+    // correctness, and until now it also tripped -- by accident -- on any
+    // change that grew stack usage. That tripwire was uncalibrated and fired
+    // on whoever arrived rather than whoever erred. It is deliberately gone.
+    // A calibrated depth detector is a separate piece of work and does not
+    // live here.
+    let body = std::thread::Builder::new()
+        .stack_size(4 * 1024 * 1024)
+        .spawn(cat4_union_intersection_difference_execute_over_nat_body)
+        .expect("spawning the test body must succeed");
+    // Propagate a panic unchanged so an assertion failure still reads as one.
+    if let Err(payload) = body.join() {
+        std::panic::resume_unwind(payload);
+    }
+}
+
+fn cat4_union_intersection_difference_execute_over_nat_body() {
     let mut env = mk_env();
     let mut store = make_store(&env);
     let a = format!(
