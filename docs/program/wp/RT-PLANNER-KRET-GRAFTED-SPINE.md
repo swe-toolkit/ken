@@ -103,7 +103,14 @@ being prioritised after its symptom has disappeared.**
 *Control:* `linked_public_right_denial_preserves_exact_masks`
 (`px7f_resource_native.rs:314`) goes green, **and** the native envelope matches
 the interpreter's — `exit_status: 0` and exactly three events, per the `M2`
-oracle differential. **A candidate that reaches green by changing the fixture,
+oracle differential. **Those three are the whole envelope — `FsOpen`,
+`FsHandleMetadata`, and ONE `ResourceRelease` settlement for identity 1 — NOT
+three releases.** Stated because the source carries three release expressions,
+and an implementer holding that population reads "three events" as one per
+demand; the Architect started `evt_4fgzxc5ba8x4q` reading it that way and it
+inverted the answer on cardinality. The reference performs **one** settlement,
+so three dispatches would be a five-event envelope and `AC-4` forbids it in
+terms. **A candidate that reaches green by changing the fixture,
 its assertions, or its ignore attribute has not advanced this node.** Do not
 read `:348`'s pass as a second confirmation; `§1` records that it discriminates
 nothing.
@@ -706,12 +713,17 @@ are deliberately not rewritten.
    working, and it is the FIRST common authority, which is too late to
    prevent the dispatches -- keyed on the absence of any PRE-DISPATCH
    obligation identity shared by the emission families
+11. three release demands share one effect origin (190) and are told apart
+    only by response provenance, so the implementer could not tell whether
+    identity is per-resource or per-demand and had to stop -- keyed on the
+    demand's provenance rather than on the obligation the frame mints
 ```
 
 > **THE TWO COUNTERS HAVE SEPARATED, AND THEY STAY SEPARATED. `§1a` FOLLOWS THE
 > STOP COUNT; `§1b` FOLLOWS THE ENTRY COUNT.** Architect ruling
-> `evt_269dk8msteb89`. Nine hard stops have produced ten symptom entries: a
-> single stop can yield more than one symptom line. `§5` records that the two
+> `evt_269dk8msteb89`. At that ruling, nine hard stops had produced ten symptom
+> entries: a single stop can yield more than one symptom line. `§5` records
+> that the two
 > coincided 1:1 *"today"* — **that was the coincidence, never the design.**
 >
 > Derived from what each trigger is *for*, not from the coincidence. **`§1a`
@@ -731,7 +743,8 @@ are deliberately not rewritten.
 > entries makes it fire sooner and costs them more** — that is not the argument
 > for it, the population is, but the ruling relieves them of nothing.
 
-**Hard-stop count on this WP: 9.** **The parent node's count of 2 does NOT
+**Hard-stop count on this WP: 10; symptom entries: 11.** **The parent node's
+count of 2 does NOT
 carry** — different WP, different question. `§1a` fired at three
 (`evt_7d3h7mtff5acd`), **re-fired at six** (`evt_3t5nq11ernjfa`), and has
 **re-fired at nine**, holding the ruling on the next locus and calling
