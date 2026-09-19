@@ -457,3 +457,49 @@ and Cranelift panicked with *"you cannot add an instruction to a block already
 filled"* — the surrounding emission continued into a filled block. `require_i64`
 shows the pattern: switch to a fresh block after the return. A probe that
 changes control flow must restore a block for the code it interrupts.
+
+## The arena gap, CLOSED — and what it establishes
+
+The residual above was that `ctor_543` is a per-arena ordinal whose identity
+across the two arenas was unmeasured. Measured now, by scanning each program's
+own `names` buffer for its whole `FSOp` constructor roster:
+
+    double-release   n=11   ctor_541 .. ctor_551
+    right-denial     n=11   ctor_541 .. ctor_551
+
+**Identical rosters, identical numbering, differing only in the program
+prefix.** The numbering is therefore declaration-derived — `FSOp` is declared
+once and its constructors are named from that declaration — not assigned
+per-program. ⇒ **`ctor_543` denotes the same `FSOp` constructor in both
+arenas.** The cross-arena step is now a measurement.
+
+### What follows, stated at the strength it actually has
+
+    row              origin operation      runtime Vis operation
+    right-denial     FsHandleMetadata      ctor_543
+    double-release   ResourceRelease       ctor_543
+
+`FsHandleMetadata` and `ResourceRelease` are **different** operations, so they
+cannot both be `ctor_543`. With the roster identical across arenas, this is
+now forced:
+
+> **At least one of these two rows has a runtime `K` whose operation is NOT
+> its own origin's operation.**
+
+That refutes the immediate-continuation reading outright — a `K` that was the
+immediate syntactic continuation would carry its own origin's operation on
+**both** rows. It is no longer a hypothesis.
+
+**What is still not pinned: WHICH operation `ctor_543` is**, and therefore
+which of the two rows is the one whose `K` departs from its origin. The
+natural reading — that both compose to the bracket's release, the one FS
+operation common to both programs' brackets — is consistent with everything
+measured and is **not** established. Pinning it needs the origin's own
+operation resolved to a constructor ordinal, which no accessor currently
+exposes.
+
+⇒ **Established: the runtime `K` is not the immediate continuation.**
+**Not established: that it is specifically the composed one.** The gap has
+narrowed from "cross-arena ordinals may not correspond" to "which single
+operation `ctor_543` denotes", and the first of those is now closed by
+measurement rather than by plausibility.
